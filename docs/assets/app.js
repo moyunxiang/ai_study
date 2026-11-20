@@ -130,7 +130,7 @@ function route() {
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.k === ({eras: 'era', tracks: 'track', n: '', concepts: 'c', chain: 'path', link: 'path', quiz: 'me', year: 'era', stats: 'me', orgs: 'me'}[view] ?? view)));
   document.body.classList.toggle('is-map', view === 'map');
   const views = {home, map: viewMap, eras: viewEras, era: viewEra, tracks: viewTracks, track: viewTrack, n: viewNode, concepts: viewConcepts, c: viewConcept, path: viewPath, search: viewSearch,
-    open: viewOpen, chain: viewChain, year: viewYear, stats: viewStats, me: viewMe, orgs: viewOrgs, link: viewLink, quiz: viewQuiz};
+    open: viewOpen, chain: viewChain, year: viewYear, stats: viewStats, me: viewMe, orgs: viewOrgs, link: viewLink, quiz: viewQuiz, guide: viewGuide};
   (views[view] || home)(seg[1], q, seg[2]);
   if (view !== 'map') window.scrollTo(0, 0);
 }
@@ -152,11 +152,19 @@ function home() {
       <p class="lead">每个阶段大家在攻克什么，谁解决了它，又留下了什么给后来的人。${G.tracks.length}条分支、${G.nodes.length}个节点——论文、模型、芯片、数据集和关键事件——每一个都有讲解，彼此用“解决 / 延续 / 使用 / 竞争”连起来。只需要基本的编程和大一数学就能从头读起。</p>
       <div class="stats"><span><b>${G.nodes.length}</b>节点</span><span><b>${G.edges.length}</b>连接</span><span><b>${t1.length}</b>主干必读</span><span><b>${Object.keys(concepts).length}</b>基础概念</span><span><b>${written}</b>已有讲解</span></div>
       <div class="acts" style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap">
-        <a class="btn fill" href="#/path">从头开始学</a><a class="btn" href="#/map">打开图谱</a><a class="btn" href="#/concepts">先补基础概念</a><a class="btn" href="#/open">看开放问题</a><a class="btn" href="#/link">查两个工作的联系</a><a class="btn" href="#/quiz">自测</a>
-        ${byId[store.get('last')] ? `<a class="btn" href="#/n/${store.get('last')}">继续上次：${esc(byId[store.get('last')].title)}</a>` : ''}
-        <button class="btn" id="rand">随便看一个</button></div>
+        <a class="btn fill" href="#/path">开始学习</a><a class="btn" href="#/guide">怎么用这个网站</a>
+        ${byId[store.get('last')] ? `<a class="btn" href="#/n/${store.get('last')}">继续上次：${esc(byId[store.get('last')].title)}</a>` : ''}</div>
       ${ps.d ? `<div class="bar" style="max-width:420px;margin-top:16px"><i style="width:${ps.pct}%"></i></div><div class="muted" style="font-size:12.5px;margin-top:4px">主干已读 ${ps.d} / ${ps.n}</div>` : ''}
     </div>
+    <section class="sec"><div class="sec-h"><h2>从这里开始</h2><span class="muted">第一次来，照这三步走就行</span></div>
+      <div class="steps">
+        <a href="#/path?to=prep"><b>1</b><h3>先扫一遍预备概念</h3><p>向量、求导、概率这些进入AI之前要会的东西，十分钟过一遍，不熟的点进去看。</p><span>去路线页的“预备”一节 →</span></a>
+        <a href="#/path"><b>2</b><h3>沿主干按时间读</h3><p>${t1.length}个缺了就讲不通的工作，从1943年排到今天。每篇先看顶上三格：当时卡在哪、怎么解决、改变了什么。</p><span>打开主干路线 →</span></a>
+        <a href="#/guide"><b>3</b><h3>再按兴趣展开</h3><p>想深入某个方向就去那条分支；想知道某个工作的来龙去脉就在图谱里聚焦它；想找什么直接搜。</p><span>看完整使用指南 →</span></a>
+      </div></section>
+    <section class="sec"><div class="sec-h"><h2>只想搞懂一样东西</h2><span class="muted">选一个终点，给你一条从零到它的最短阅读链</span></div>
+      <div class="grid">${GOALS.filter(g => byId[g[0]]).slice(0, 8).map(([gid, label]) => `<a class="card hue" ${hue(byId[gid].track)} href="#/chain/${gid}"><h3>${esc(label)}</h3><p>终点：${esc(byId[gid].title)}（${byId[gid].date.slice(0, 4)}）</p></a>`).join('')}</div>
+      <div class="toolbar"><a class="btn sm" href="#/path">全部目标与主干路线 →</a></div></section>
     <section class="sec"><div class="sec-h"><h2>九个时代</h2><span class="muted">按时间顺序读，每个时代先看“当时在攻克什么”</span></div>
       <ul class="river">${G.eras.map(e => {
         const ns = G.nodes.filter(n => eraOf(n) === e);
@@ -165,6 +173,16 @@ function home() {
       }).join('')}</ul></section>
     <section class="sec"><div class="sec-h"><h2>十六条分支</h2><span class="muted">每条分支沿着一个问题往下走</span></div>
       <div class="grid">${G.tracks.map(t => `<a class="card hue" ${hue(t.key)} href="#/track/${t.key}"><h3>${esc(t.name)}</h3><p>${esc(t.question)}</p><div class="n">${order[t.key].length} 个节点</div></a>`).join('')}</div></section>
+    <section class="sec"><div class="sec-h"><h2>工具</h2><span class="muted">读的过程中会用到</span></div>
+      <div class="grid tools">
+        <a class="card" href="#/map"><h3>图谱</h3><p>横向是分支，纵向是时间。看某一年各个方向同时在做什么，或聚焦一个工作看它的来龙去脉。</p></a>
+        <a class="card" href="#/link"><h3>演进路径</h3><p>任选两个工作，找出连接它们的最短一条线，例如从感知机到Transformer中间隔着什么。</p></a>
+        <a class="card" href="#/concepts"><h3>概念词条</h3><p>${Object.keys(concepts).length}个基础概念，讲解里带虚线的词都能点过来。</p></a>
+        <a class="card" href="#/open"><h3>开放问题</h3><p>近几年的工作留下、还没有后续工作解决的问题，适合找研究方向。</p></a>
+        <a class="card" href="#/quiz"><h3>自测卡片</h3><p>合上书讲一遍：先自己回忆，再翻面对照，没答上的下次优先出现。</p></a>
+        <a class="card" href="#/me"><h3>我的进度</h3><p>已读、在读、收藏和笔记，只存在这台设备的浏览器里，可以导出。</p></a>
+      </div>
+      <div class="toolbar"><button class="btn sm" id="rand">随便看一个</button></div></section>
     ${foot()}</div>`;
   $('#rand').onclick = () => { const pool = G.nodes.filter(n => n.has && n.tier <= 2); const pick = (pool.length ? pool : G.nodes)[Math.floor(Math.random() * (pool.length || G.nodes.length))]; location.hash = '#/n/' + pick.id; };
 }
@@ -308,8 +326,81 @@ function viewConcept(key) {
   document.title = `${c.name} · AI脉络`;
 }
 
+/* ——— 使用指南 ——— */
+function viewGuide() {
+  store.set('seenGuide', 1);
+  const t1n = G.nodes.filter(n => n.tier === 1).length, t2n = G.nodes.filter(n => n.tier === 2).length, t3n = G.nodes.filter(n => n.tier === 3).length;
+  const ex = byId.transformer ? 'transformer' : G.nodes.find(n => n.tier === 1).id;
+  app.innerHTML = `<div class="page narrow"><div class="mast"><div class="eyebrow">使用指南 · 读完约3分钟</div><h1>怎么用这个网站</h1>
+    <p class="lead">这是一张按时间排列的AI发展分支图。图上每个点是一个工作（论文、模型、芯片、数据集或事件），每条线说明后来的工作和前面的工作是什么关系。你不需要把${G.nodes.length}个点都读完：先读${t1n}个主干，其余按需要查。</p></div>
+    <div class="prose guide">
+      <h2>一、三种读法，选一种开始</h2>
+      <div class="steps col">
+        <a href="#/path"><b>A</b><h3>按时间从头读（推荐）</h3><p>打开“路线”，先扫一遍预备概念，再按时代顺序读主干节点。每个时代读之前先看那个时代的页面：当时有什么条件、大家在攻克什么。</p><span>去路线 →</span></a>
+        <a href="#/path"><b>B</b><h3>只想搞懂一样东西</h3><p>比如只想读懂Transformer或Stable Diffusion。在“路线”页的“按目标学”里选一个终点，网站会排出一条从零到它的阅读链，每一站只用到前面讲过的东西。</p><span>选目标 →</span></a>
+        <a href="#/tracks"><b>C</b><h3>只关心一个方向</h3><p>比如只看机器人或只看硬件。打开“分支”，选一条，从上往下读。默认显示主干和重要两档，想更全再切到“全部”。</p><span>去分支 →</span></a>
+      </div>
+
+      <h2>二、一个节点页怎么读</h2>
+      <p>以 <a class="ln" href="#/n/${ex}">${esc(byId[ex].title)}</a> 为例，从上到下是：</p>
+      <ul>
+        <li><b>顶上三格</b>　当时卡在哪、它怎么解决、改变了什么。赶时间只读这三格也能知道这个工作是干什么的。</li>
+        <li><b>先要会的概念</b>　读懂这篇需要的基础概念，不会的先点进去看。正文里带虚线的词也是概念，带颜色下划线的是别的节点。</li>
+        <li><b>背景、方法、结果、后续</b>　完整讲解。</li>
+        <li><b>它留下的问题</b>　这个工作没解决的事，以及后来是哪个工作解决的。沿着这里往下点，就是这个方向的发展线。</li>
+        <li><b>它建立在什么之上 / 后来谁接着做</b>　它和其他工作的全部连接，每条都有一句说明。</li>
+        <li><b>怎么学</b>　读原文或动手的建议。页面最底下列出了讲解核对过的出处。</li>
+      </ul>
+      <p>读完点标题下面的圆点记录状态：点一下是“在读”，再点一下是“已读”。键盘 ← → 可以翻到本分支的上一个、下一个。</p>
+
+      <h2>三、图例</h2>
+      <h3>节点分三档</h3>
+      <ul>
+        <li><b>主干</b>（${t1n}个）　缺了它后面就讲不通，必读。</li>
+        <li><b>重要</b>（${t2n}个）　这个方向的人都知道，建议读。</li>
+        <li><b>延伸</b>（${t3n}个）　用到再查，不需要通读。</li>
+      </ul>
+      <h3>连线有四种</h3>
+      <ul class="rels">
+        <li><span class="ty solves">解决</span><div>后来的工作解决了前面工作留下的某个具体问题。这是最值得顺着读的一种线。</div></li>
+        <li><span class="ty extends">延续</span><div>沿用前面的思路往前推了一步，比如同一系列的下一代。</div></li>
+        <li><span class="ty uses">使用</span><div>把前面的工作当作一个部件或工具来用。</div></li>
+        <li><span class="ty rivals">竞争</span><div>针对同一个问题的不同路线。</div></li>
+      </ul>
+      <p>线的方向永远是从早到晚。节点类型有七种：论文、模型、系统、硬件、数据集、事件、思想。</p>
+
+      <h2>四、每个页面是干什么的</h2>
+      <ul>
+        <li><a class="ln" href="#/path">路线</a>　主干阅读顺序、按目标的阅读链、预备概念。<b>不知道从哪开始就来这里。</b></li>
+        <li><a class="ln" href="#/eras">时代</a>　九个时代，每个时代当时的条件、各方向在攻克什么、什么热了什么退潮了。</li>
+        <li><a class="ln" href="#/tracks">分支</a>　十六条分支，每条沿一个问题从头排到尾。</li>
+        <li><a class="ln" href="#/map">图谱</a>　所有节点画在一张图上：横向是分支，纵向是时间。适合看全貌，或者在节点页点“在图谱中看它的来龙去脉”聚焦一个工作。节点很多时先用顶上的“显示”和“分支”筛一下。</li>
+        <li><a class="ln" href="#/concepts">概念</a>　${Object.keys(concepts).length}个基础概念词条，分预备、入门、进阶三级。</li>
+        <li><a class="ln" href="#/open">开放问题</a>　还没有后续工作解决的遗留问题，可以按分支和年份筛。</li>
+        <li><a class="ln" href="#/me">我的</a>　学习进度、收藏、笔记、导出导入；里面还有自测卡片和图谱统计。</li>
+        <li><b>搜索</b>　右上角，按 <code>/</code> 聚焦。可以搜标题、英文原题、作者、机构、概念和术语；结果页里可以切换到搜索讲解全文。</li>
+      </ul>
+
+      <h2>五、几个建议</h2>
+      <ul>
+        <li>主干每篇大约5到10分钟。每天读两三篇，一个月左右能读完主干，对整个领域就有完整的时间线了。</li>
+        <li>遇到看不懂的词先点概念词条，不要硬读。概念词条本身也列了它需要的前置概念。</li>
+        <li>读完一个时代，用“我的”里的自测卡片过一遍，或者在节点页底部写两句笔记。</li>
+        <li>想知道两个工作之间隔着什么，用<a class="ln" href="#/link">演进路径</a>。</li>
+      </ul>
+
+      <h2>六、需要知道的两件事</h2>
+      <ul>
+        <li><b>进度只存在这台设备的浏览器里。</b>换设备或清除浏览数据会丢，可以在“我的”页导出和导入。</li>
+        <li><b>讲解由AI模型撰写。</b>写作时要求对照论文原文或官方页面核对，每个节点底部列了出处，但仍可能有错，尤其是最近一两年的事件。引用前请以原文为准。</li>
+      </ul>
+      <div class="toolbar" style="margin-top:28px"><a class="btn fill" href="#/path">开始学习</a><a class="btn" href="#/">回首页</a></div>
+    </div>${foot()}</div>`;
+  document.title = '使用指南 · AI脉络';
+}
+
 /* ——— 学习路线 ——— */
-function viewPath() {
+function viewPath(_, q = {}) {
   const seen = new Set();
   const lv0 = Object.values(concepts).filter(c => c.level === 0);
   lv0.forEach(c => seen.add(c.key));
@@ -328,13 +419,14 @@ function viewPath() {
     <div class="toolbar"><button class="btn sm" id="exp">导出进度</button><button class="btn sm" id="imp">导入进度</button><input type="file" id="impf" accept="application/json" hidden></div></div>
     <section class="sec"><div class="sec-h"><h2>按目标学</h2><span class="muted">只想搞懂某一样东西？给你一条从零到它的最短链</span></div>
       <div class="grid">${GOALS.filter(g => byId[g[0]]).map(([gid, label]) => `<a class="card hue" ${hue(byId[gid].track)} href="#/chain/${gid}"><h3>${esc(label)}</h3><p>终点：${esc(byId[gid].title)}（${byId[gid].date.slice(0, 4)}）</p><div class="n">${chainOf(gid, false).length} 站</div></a>`).join('')}</div></section>
-    <section class="sec"><div class="sec-h"><h2>0　预备</h2><span class="muted">进入AI之前就该会的 ${lv0.length} 个概念</span></div>
+    <section class="sec" id="prep"><div class="sec-h"><h2>0　预备</h2><span class="muted">进入AI之前就该会的 ${lv0.length} 个概念</span></div>
       <p style="color:var(--ink-2);margin:4px 0 0">扫一遍，不熟的点进去看。之后每篇讲解开头都会列出它需要的概念，读到哪补到哪。</p>
       <div class="cgrid">${lv0.map(c => `<a href="#/c/${c.key}" class="${c.has ? '' : 'todo-c'}"><span class="lv">${status('c:' + c.key) === 2 ? '✓' : '0'}</span><span>${esc(c.name)}<small>${AREA[c.area]}</small></span></a>`).join('')}</div></section>
     ${blocks.join('')}${foot()}</div>`;
   $('#exp').onclick = exportAll;
   $('#imp').onclick = () => $('#impf').click();
   $('#impf').onchange = ev => importAll(ev.target.files[0], viewPath);
+  if (q.to === 'prep') setTimeout(() => $('#prep') && $('#prep').scrollIntoView(), 0);
 }
 
 /* ——— 搜索 ——— */
