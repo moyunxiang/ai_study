@@ -372,7 +372,15 @@ def main():
     for key, c in concepts.items():
         c["nodes"] = used.get(key, [])
     dump(OUT / "concepts.json", {"concepts": list(concepts.values()), "terms": sorted(terms.values(), key=lambda x: x["t"])})
-    print(f"\n已生成 {OUT.relative_to(ROOT)}/")
+    # 版本戳：让浏览器和CDN在每次构建后取到新的数据与脚本
+    import re, time
+    stamp = time.strftime("%Y%m%d%H%M")
+    idx = ROOT / "docs" / "index.html"
+    html = idx.read_text(encoding="utf-8")
+    html = re.sub(r"\?v=\d+", f"?v={stamp}", html)
+    html = re.sub(r'window\.AIMAP_V="\d+"', f'window.AIMAP_V="{stamp}"', html)
+    idx.write_text(html, encoding="utf-8")
+    print(f"\n已生成 {OUT.relative_to(ROOT)}/（版本 {stamp}）")
 
 
 if __name__ == "__main__":

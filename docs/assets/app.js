@@ -43,7 +43,7 @@ function cycleStatus(id) {
 
 /* ——— 数据 ——— */
 async function getJSON(p) {
-  const r = await fetch(p);
+  const r = await fetch(p + (window.AIMAP_V ? '?v=' + window.AIMAP_V : ''));
   if (!r.ok) throw new Error(p + ' ' + r.status);
   return r.json();
 }

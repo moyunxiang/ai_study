@@ -1,0 +1,36 @@
+{
+  "id": "sglang",
+  "who": "Lianmin Zheng, Liangsheng Yin, Zhiqiang Xie, Chuyue Sun, Jeff Huang, Cody Hao Yu, Shiyi Cao, Christos Kozyrakis, Ion Stoica, Joseph E. Gonzalez, Clark Barrett, Ying Sheng · 斯坦福 / 伯克利 / LMSYS",
+  "venue": "NeurIPS 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2312.07104"},
+    {"label": "GitHub", "url": "https://github.com/sgl-project/sglang"}
+  ],
+  "problem": "智能体、思维树、多轮对话、RAG这类应用要对模型发起许多次相互关联的调用，大段提示前缀反复出现；推理引擎却在每个请求结束后丢掉KV缓存，结构化输出也只能逐个token约束。",
+  "idea": "前端提供gen、select、fork等原语来写“语言模型程序”；运行时把所有请求的KV缓存保存在一棵基数树里，自动匹配并复用公共前缀（RadixAttention），并用压缩状态机一次解码多个确定的token。",
+  "impact": "让跨请求的KV缓存复用成为推理引擎的标配能力；SGLang成为与vLLM并列的主流开源推理引擎。",
+  "background": "[[vllm]]解决了单个请求内部的KV缓存浪费，但它的复用只发生在同一请求的多个输出之间。实际应用里，大量共享发生在**不同请求之间**：同一个系统提示被所有用户共享；多轮对话的每一轮都要带上全部历史；少样本提示里的示例对每个问题都一样；[[tot]]、[[self-consistency]]会从同一个中间状态分出许多条推理路径。每次请求结束就丢弃KV缓存，意味着这些相同的前缀被一遍遍重新做预填充。\n\n另一个问题是结构化输出。[[outlines]]这类约束解码把正则表达式或JSON模式编译成有限状态机，每一步屏蔽不合法的token；但它一次只处理一个token，即使下一段文字是完全确定的（比如JSON里固定的`{'name': `），也要一个token一个token地跑模型。",
+  "method": "**前端语言**。嵌入在Python中的领域专用语言：`gen`调用模型生成并把结果存入变量（可用`regex`参数约束格式），`select`让模型从几个选项中选概率最高的，`fork`把当前提示状态复制成几份并行执行，`join`再合并。程序可以使用普通的Python控制流。\n\n**RadixAttention**。运行时维护一棵基数树（每条边可以标记一整段token的前缀树），节点上挂着对应token的KV缓存，以每个token为一页分页存放。新请求到达时，在树中找最长匹配前缀，命中部分的KV直接复用，只对剩余部分做预填充；请求结束后KV不丢弃，而是留在树里。显存满了按LRU（最近最少使用）先驱逐叶子节点，这样公共祖先能被保留得更久。\n\n**缓存感知调度**。等待队列中优先执行与缓存匹配前缀最长的请求，而不是先来先服务。论文证明，对一批请求，按基数树的深度优先顺序执行可以达到最优命中率，而“最长共享前缀优先”等价于深度优先。\n\n**压缩有限状态机**。把状态机中只有唯一出路的连续转移合并成一条边，遇到这种确定的片段时一次性把多个token填进去，只需一次前向。",
+  "results": "在Llama系列和多模态模型上，覆盖智能体控制、逻辑推理、少样本基准、JSON解码、RAG流水线和多轮对话等任务，SGLang的吞吐比当时最先进的推理系统最高提升6.4倍。在这些基准上，缓存命中率在50%到99%之间，缓存感知调度得到的命中率接近理论最优。输出很长、会话之间几乎没有共享的场景下，几乎没有加速。",
+  "legacy": "自动前缀缓存很快成为推理引擎的常规功能，vLLM等也加入了类似机制；商业API随后推出的[[prompt-caching]]本质上是同一思路。结构化生成方向，[[xgrammar]]把约束从正则推广到上下文无关文法并深度集成进SGLang。KV缓存跨机器复用的问题由[[mooncake]]等系统继续推进。2026年1月，据TechCrunch报道，SGLang项目分拆成立公司RadixArk（[[inference-startups]]）。",
+  "limits": [
+    {"text": "基数树缓存只存在于单个推理实例的显存里，多机多副本之间无法共享，请求被路由到别的副本就不能命中。", "solved_by": ["mooncake", "nvidia-dynamo"]},
+    {"text": "压缩状态机只支持正则表达式表示的约束，对嵌套的JSON、代码等上下文无关文法支持有限，约束检查本身也有开销。", "solved_by": ["xgrammar"]},
+    {"text": "为提高命中率而重排请求会牺牲先来先服务的公平性，在延迟敏感的在线服务中只能有限地重排。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "vllm", "type": "solves", "note": "vLLM在请求结束时丢弃KV缓存，只在同一请求的多个输出间共享；RadixAttention跨请求自动发现并复用公共前缀。"},
+    {"to": "outlines", "type": "solves", "note": "Outlines的有限状态机每步只约束一个token；压缩状态机把确定的多token片段合并，一次前向解码完。"},
+    {"to": "orca-serving", "type": "uses", "note": "运行时沿用连续批处理，并在此基础上做缓存感知的调度。"},
+    {"to": "dspy", "type": "uses", "note": "评测中包含DSPy编写的RAG流水线，作为“多次调用、共享上下文”的典型语言模型程序。"},
+    {"to": "langchain", "type": "rivals", "note": "LangChain等框架只在应用层编排调用，看不到底层缓存；SGLang把前端语言与推理运行时一起设计，从而能复用KV、并行分支。"}
+  ],
+  "prereq": ["kv-cache", "throughput-latency", "graph-basics", "decoding-sampling", "in-context-learning"],
+  "terms": [
+    {"t": "基数树（radix tree）", "d": "一种压缩的前缀树：一条边可以代表一整段连续token，便于快速查找最长公共前缀、插入和删除。"},
+    {"t": "LRU驱逐", "d": "缓存满了时，先删除最久没有被使用的条目。"},
+    {"t": "语言模型程序", "d": "包含多次模型调用、分支、循环和外部工具的程序，例如智能体、思维树搜索、多步RAG。"}
+  ],
+  "learn": "先理解[[c:kv-cache]]与[[vllm]]的分页思想，以及前缀树的基本操作。然后读论文第3节（RadixAttention与调度，看图3的九个时间点）和第4节（压缩状态机）。动手：用SGLang部署一个小模型，构造一批共享长系统提示的请求，对比开启和关闭前缀缓存时的吞吐与首token延迟。",
+  "check": {"source": "https://arxiv.org/abs/2312.07104", "confirmed": "标题、12位作者、v1提交于2023-12-12（v2 2024-06-06）；摘要中的RadixAttention、压缩有限状态机与最高6.4倍；HTML正文中的基数树+LRU、每页一个token、最长共享前缀优先等价于DFS的定理、gen/select/fork/join原语、50%–99%缓存命中率；TechCrunch 2026-01-21关于SGLang分拆为RadixArk的报道。"}
+}

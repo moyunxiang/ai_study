@@ -1,0 +1,37 @@
+{
+  "id": "chainer",
+  "who": "Seiya Tokui, Kenta Oono, Shohei Hido, Justin Clayton · Preferred Networks",
+  "venue": "2015年6月开源；论文 NIPS 2015 LearningSys Workshop，KDD 2019",
+  "links": [
+    {"label": "LearningSys 2015论文", "url": "http://learningsys.org/papers/LearningSys_2015_paper_33.pdf"},
+    {"label": "arXiv（KDD 2019版）", "url": "https://arxiv.org/abs/1908.00213"},
+    {"label": "PFN 2019年迁移到PyTorch的公告", "url": "https://preferred.jp/en/news/pr20191205/"}
+  ],
+  "problem": "Theano、Caffe等框架要求先把整张计算图定义好再运行：带条件分支、变长输入的模型（循环网络、树形网络）很难写，模型运行时是一个黑盒，没法用普通调试器看里面发生了什么。",
+  "idea": "Define-by-Run：不预先定义图，而是在用普通Python代码执行前向计算的同时记录每一步运算，反向传播时沿记录倒推。if、for等宿主语言的控制流可以直接用，每次运行的图都可以不同。",
+  "impact": "第一个以动态计算图为核心的主流框架；PyTorch的设计直接借鉴了它，“边运行边建图”后来成为深度学习框架的默认范式，连TensorFlow 2也改成了这种模式。",
+  "background": "2015年的主流框架都属于论文所说的**Define-and-Run**：先定义图（[[caffe]]的配置文件、[[theano]]的符号表达式），再把数据喂进去运行。这对卷积网络这类固定结构很合适——整张图在手，框架可以做全局优化。\n\n但论文指出两个问题。第一，带控制流的动态网络很麻烦：循环网络每个句子长度不同，必须用框架专门提供的循环算子或开关算子，而不能用Python本身的`if`和`for`。第二，模型运行时是一个大黑盒，结构、权重、梯度都封装在图对象里，调试器和性能分析工具看不进去，图优化之后更难追查。研究者越来越多地在做循环网络、变分自编码器这类非卷积模型，这些痛点越来越突出。",
+  "method": "**按需建图**。Chainer里的每个数组被包装成Variable，每个可微运算是一个Function。执行`y = f(x)`时，除了算出y的值，还顺手在图里记下：函数节点f引用输入x，输出y引用f。这张图只记录“如何倒推”，不负责定义前向计算。调用`loss.backward()`时，从loss沿引用链逆拓扑序遍历，按链式法则累积梯度（即[[ad-reverse-mode]]）。\n\n因为图只依赖程序实际执行的轨迹，前向代码可以随意使用Python控制流：\n\n`h = F.relu(self.l1(x))`\n`for t in range(len(sentence)): h = self.rnn(h, sentence[t])`\n\n每个句子长度不同，生成的图大小也不同，梯度依然正确；任何一行都可以下断点、打印中间值。\n\n**面向对象的模型定义**。模型是一个Python类，参数是成员，前向计算是一个方法，子网络可以像积木一样嵌套——论文称这种写法由Chainer在2015年首先引入，后来被PyTorch和TensorFlow Eager广泛采用。\n\n**内存管理**。依靠Python的引用计数，一段计算历史不再被引用时立即释放，无需整图分析。\n\n**CuPy**。最初基于PyCUDA，后来自研了接口与[[numpy]]高度兼容的GPU数组库CuPy，`np`换成`cp`即可在GPU上运行；CuPy后来独立成为通用项目。",
+  "legacy": "Chainer证明了动态图在研究中的生产力优势。2017年发布的[[pytorch]]采用同样的define-by-run自动微分和面向对象模型写法，借助Facebook的支持迅速成为研究界首选；[[tf2]]在2019年把Eager执行设为默认。2019年12月，Preferred Networks宣布发布v7后Chainer进入维护阶段，公司研究平台逐步迁移到PyTorch。CuPy则作为独立的GPU数组库延续至今。",
+  "pitfalls": "- Define-by-Run不等于没有计算图：图仍然存在，只是在前向时动态生成、每次可以不同，用完即丢。\n- 动态图失去了运行前看到整张图的机会，因此天然难以做算子融合等全局优化，这是它与静态图框架长期的取舍。",
+  "limits": [
+    {"text": "每一步运算都要经过Python解释器调度，小算子多时开销显著，也无法做跨算子的全局优化。", "solved_by": ["jax", "pytorch-2"]},
+    {"text": "模型就是Python代码，部署到没有Python的移动端或服务器C++环境很困难。", "solved_by": ["pytorch-1", "onnx"]},
+    {"text": "由一家日本创业公司主导，社区和生态规模有限，最终被同一路线、背靠大公司的PyTorch取代。", "solved_by": ["pytorch"]}
+  ],
+  "relations": [
+    {"to": "theano", "type": "solves", "note": "解决Theano静态图难以表达动态控制流、运行时不可调试的问题，改为执行前向时动态记录计算图。"},
+    {"to": "caffe", "type": "solves", "note": "Caffe用配置文件描述固定层图，循环网络等结构难以表达；Chainer让模型就是任意Python代码。"},
+    {"to": "numpy", "type": "uses", "note": "数组接口沿用NumPy，并自研了与NumPy兼容的GPU数组库CuPy。"},
+    {"to": "ad-reverse-mode", "type": "uses", "note": "在运行时记录的计算历史上执行反向模式自动微分。"},
+    {"to": "autograd-hips", "type": "rivals", "note": "同年哈佛HIPS的autograd也采用运行时记录运算再反向求导的方式，但面向NumPy代码、无GPU；Chainer面向深度学习并支持GPU。"},
+    {"to": "cuda", "type": "uses", "note": "通过PyCUDA及后来的CuPy调用CUDA，在GPU上执行运算。"}
+  ],
+  "prereq": ["autodiff", "backpropagation", "recurrent-layer", "cpu-gpu", "vector-matrix"],
+  "terms": [
+    {"t": "Define-and-Run / Define-by-Run", "d": "前者先定义完整计算图再运行（静态图）；后者在运行前向计算的过程中同时构建计算图（动态图），也叫eager模式。"},
+    {"t": "CuPy", "d": "Chainer团队开发的GPU数组库，接口与NumPy几乎一致，后来独立为通用项目。"}
+  ],
+  "learn": "先理解[[c:autodiff]]中计算图与反向遍历的关系。读KDD 2019论文第2、3节（Define-and-Run的两个问题与按需建图）。动手：用几十行Python实现一个define-by-run的标量自动微分（每个运算返回记得父节点的对象，backward按逆拓扑序走），用它在一个带if分支和for循环的函数上求导，验证梯度正确；再对比在PyTorch里写同样的代码。",
+  "check": {"source": "https://arxiv.org/abs/1908.00213", "confirmed": "KDD 2019版论文：Define-and-Run两个问题、按需建图、变量/函数节点、面向对象模型定义2015年首先引入、引用计数释放、CuPy起源于替代PyCUDA；LearningSys 2015论文作者与单位（Preferred Networks）；PFN 2019-12-05公告：2015年6月开源、v7后进入维护阶段、迁移至PyTorch；TensorFlow博客2019-09确认TF 2.0默认eager执行。"}
+}

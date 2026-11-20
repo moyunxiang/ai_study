@@ -1,0 +1,39 @@
+{
+  "id": "pytorch-2",
+  "who": "Jason Ansel, Edward Z. Yang, Horace He, Natalia Gimelshein, Animesh Jain, Michael Voznesensky, Bin Bao, Peter Bell et al. · Meta / PyTorch团队",
+  "venue": "ASPLOS 2024（PyTorch 2.0发布于2023-03）",
+  "links": [
+    {"label": "论文（ACM）", "url": "https://doi.org/10.1145/3620665.3640366"},
+    {"label": "PyTorch 2.0发布博客", "url": "https://pytorch.org/blog/pytorch-2.0-release/"},
+    {"label": "论文PDF", "url": "https://docs.pytorch.org/assets/pytorch2-2.pdf"}
+  ],
+  "problem": "PyTorch的即时执行（eager）好写好调，但框架一次只看到一个算子，无法做算子融合等全图优化；此前的图捕获工具TorchScript在真实模型上只有约一半能用。",
+  "idea": "在Python解释器执行字节码之前拦截它，把其中连续的PyTorch操作抽成计算图交给编译器，遇到看不懂的Python代码就“断图”回退执行，用户只需加一行torch.compile。",
+  "impact": "让PyTorch在保留eager体验的同时获得编译器加速：默认后端把模型编译成Triton内核，在180多个真实模型上推理几何平均提速2.27倍，成为今天训练和推理大模型的常规手段。",
+  "background": "[[pytorch]]胜出的原因是即时执行：每行Python代码立刻在GPU上算出结果，可以随意打印、用if和循环、单步调试。代价是框架每次只看到一个算子，比如`x * w + b`后接GELU会变成三四个独立的GPU内核，每个都要把中间结果写回显存再读出来，很多时间花在搬数据上（见[[c:memory-bandwidth]]）。TensorFlow、[[jax]]借助[[xla]]能整图编译，但要求用户按图的方式写程序。\n\nPyTorch此前尝试过几种图捕获：[[pytorch-1]]的TorchScript要么记录一次运行轨迹（遇到数据相关的分支就会错），要么解析Python源码（只支持Python的一个子集）。论文统计，torch.jit.script在TorchBench真实模型上只有约一半能成功，Hugging Face的模型因为返回特殊的输出类型全部失败；用户常要花几周改写代码才能“TorchScript化”一个大模型。",
+  "method": "**TorchDynamo：在字节码层面捕获图**。CPython的PEP 523允许替换函数帧的求值函数。TorchDynamo在每个Python函数执行前分析它的字节码，把其中的PyTorch张量操作记录成一个FX图；遇到无法处理的东西（打印、调用C扩展、依赖张量具体数值的分支）就在那里**断图**：前半段图交给编译器，那段Python照常执行，之后再继续捕获。编译结果会被缓存，并附带**守卫**（guard）：检查张量形状、类型、全局状态等假设是否仍成立，成立就直接复用，否则重新编译。因此用户代码无需任何改动。\n\n**AOTAutograd**：在编译前把反向传播图也提前生成出来，使训练时的前向和反向都能被编译。\n\n**TorchInductor：默认后端**。把FX图降低成一套循环级的中间表示，做算子融合、内存规划等优化，然后在GPU上生成[[triton-lang]]内核、在CPU上生成C++代码。例如逐元素操作和归约可以融合成一个Triton内核，中间结果留在片上不落显存。",
+  "results": "图捕获：在TorchBench的80个模型上，TorchDynamo成功74个（93%），TorchScript只有36个（45%）。加速：在NVIDIA A100上的180多个真实模型（TorchBench、Hugging Face、TIMM）中，TorchInductor推理几何平均提速2.27倍、训练1.41倍，优于论文比较的另外六种编译后端。PyTorch 2.0于2023年3月15日发布，torch.compile是其主要新接口，并且完全向后兼容。",
+  "legacy": "torch.compile成为PyTorch训练和推理的常规选项：[[torchtitan]]等大规模训练框架把它与[[fsdp]]组合使用，[[vllm]]、[[sglang]]等推理引擎用它融合非注意力部分的算子；[[executorch]]借助同一套图捕获把模型导出到手机和边缘设备。它也让[[triton-lang]]从少数专家的工具变成了框架默认的代码生成目标。",
+  "pitfalls": "- torch.compile不是把整个程序变成静态图：断图越多，能融合的部分越少，加速越小。\n- 第一次运行要编译，可能需要几十秒到几分钟；张量形状频繁变化会触发反复重编译。\n- 它主要省的是显存读写和Python开销，对已经被大矩阵乘主导的模型，加速有限。",
+  "limits": [
+    {"text": "动态形状、数据相关的控制流会导致断图和反复重编译，首次编译时间长，在线服务里难以预测延迟。", "solved_by": []},
+    {"text": "编译只覆盖单进程内的计算图，与分布式训练的切分、通信重叠等组合起来仍需手工处理。", "solved_by": ["torchtitan"]},
+    {"text": "生成的是要在Python运行时里执行的代码，不能直接部署到没有Python的手机和嵌入式设备。", "solved_by": ["executorch"]}
+  ],
+  "relations": [
+    {"to": "pytorch", "type": "extends", "note": "保留PyTorch的即时执行编程方式，在其下方加一层可选的编译器，100%向后兼容。"},
+    {"to": "pytorch-1", "type": "solves", "note": "TorchScript要求用户改写代码且在真实模型上只有约45%能捕获；TorchDynamo在字节码层面捕获，能处理93%且无需改代码。"},
+    {"to": "triton-lang", "type": "uses", "note": "TorchInductor在GPU上把融合后的算子生成为Triton内核，而不是手写CUDA。"},
+    {"to": "xla", "type": "rivals", "note": "XLA要求整图可追踪，适合JAX/TensorFlow的函数式写法；PyTorch 2允许断图回退到Python，以灵活性换取部分优化空间。"},
+    {"to": "jax", "type": "rivals", "note": "JAX用jit追踪纯函数获得编译优化，PyTorch 2把类似收益带到了任意命令式Python代码上。"}
+  ],
+  "prereq": ["autodiff", "cpu-gpu", "memory-bandwidth", "backpropagation"],
+  "terms": [
+    {"t": "即时执行（eager mode）", "d": "每条运算语句立刻执行并得到结果，与先构建完整计算图再统一执行的“图模式”相对。"},
+    {"t": "断图（graph break）", "d": "TorchDynamo遇到无法放进图里的Python代码时，把图在此处切开，前后各自编译，中间那段照常由Python执行。"},
+    {"t": "守卫（guard）", "d": "编译时所做假设（如张量形状、数据类型）的检查函数；下次调用时假设成立就复用编译结果，否则重新编译。"},
+    {"t": "算子融合", "d": "把多个原本各自读写显存的算子合并成一个GPU内核，中间结果留在片上，减少显存读写。"}
+  ],
+  "learn": "先确认会[[c:autodiff]]，理解PyTorch即时执行的方式。然后读论文第2节（以往图捕获方法的问题）和第3节（TorchDynamo的守卫与断图）。动手：对一个小Transformer分别跑eager和torch.compile，比较速度；再设置环境变量TORCH_LOGS=graph_breaks,output_code，查看断图位置和生成的Triton代码。",
+  "check": {"source": "https://doi.org/10.1145/3620665.3640366", "confirmed": "OpenAlex记录的标题、作者、ASPLOS 2024；摘要中的TorchDynamo/TorchInductor、2.27×推理与1.41×训练几何平均加速、180多个模型、优于六种编译器；论文PDF表1的TorchBench 80个模型中TorchDynamo 74（93%）与TorchScript 36（45%）；PyTorch博客的2.0发布日期2023-03-15。"}
+}

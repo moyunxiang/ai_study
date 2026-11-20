@@ -1,0 +1,40 @@
+{
+  "id": "hf-transformers",
+  "who": "Thomas Wolf, Lysandre Debut, Victor Sanh, Julien Chaumond, Clement Delangue, Anthony Moi, Pierric Cistac, Tim Rault et al. · Hugging Face",
+  "venue": "前身pytorch-pretrained-BERT发布于2018年11月；论文 arXiv 2019-10",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1910.03771"},
+    {"label": "GitHub：huggingface/transformers", "url": "https://github.com/huggingface/transformers"},
+    {"label": "Hugging Face课程", "url": "https://huggingface.co/learn"}
+  ],
+  "problem": "BERT、GPT等预训练模型各自用不同框架、不同代码风格发布（BERT官方只有TensorFlow版），想换一个模型就要重新读一遍代码、重写加载和分词逻辑，复现和比较都很费劲。",
+  "idea": "把各种Transformer预训练模型用统一的三件套（分词器、模型主体、任务头）和统一的接口重新实现，一行代码按名字下载预训练权重，配套一个任何人都能上传模型的中心化模型库。",
+  "impact": "成为使用预训练模型的事实标准入口：`from_pretrained`一行加载几乎所有开源模型，模型库从NLP扩展到视觉、语音和大语言模型，大大降低了用预训练模型做研究和应用的门槛。",
+  "background": "2018年下半年，预训练语言模型接连出现：[[elmo]]、[[gpt-1]]，以及10月的[[bert]]。它们效果很好，但使用门槛高：BERT官方代码和权重只有TensorFlow版本，而研究界正在转向[[pytorch]]；每个模型的分词方式不同（BERT用[[wordpiece]]，GPT用[[bpe]]），输入格式、位置编码、掩码细节各不一样；预训练权重散落在各自的仓库和网盘里。想在同一个任务上比较三个模型，往往要维护三套代码。\n\n2018年11月，Hugging Face发布了pytorch-pretrained-BERT：把BERT移植到PyTorch并能加载Google发布的预训练权重。随后GPT、GPT-2等更多模型陆续加入，项目最终更名为Transformers。",
+  "method": "论文描述的设计核心是**统一的抽象层次**：\n\n- **分词器（Tokenizer）**：把原始文本变成模型需要的编号序列，每个模型一个类，负责它特有的子词切分、特殊符号、截断到最大长度等。为了速度，又用Rust重写了独立的tokenizers库。\n- **模型主体（Transformer）**：每个架构的基类实现从词嵌入经过若干自注意力层到最终隐状态的计算，尽量贴近原始实现；大多数模型的代码放在单个文件里，方便阅读和修改，而不是层层继承抽象。\n- **任务头（Head）**：在主体之上加分类、问答、语言建模等输出层。\n\n不同架构尽量保持同样的接口，一组**Auto类**根据预训练模型的名字自动实例化正确的配置、分词器和模型。典型用法：\n\n`tok = AutoTokenizer.from_pretrained(「bert-base-uncased」)`\n`model = AutoModelForSequenceClassification.from_pretrained(「bert-base-uncased」)`\n\n换成另一个模型只需改名字。同一套模型同时提供PyTorch和TensorFlow实现，可以互相转换权重。\n\n**模型库（Model Hub）**：任何人都可以上传预训练或微调后的模型，附带说明模型来源和用途的模型卡，并在网页上直接试用推理。部署方面，PyTorch版可导出为TorchScript，也可以转成[[onnx]]格式加速。",
+  "results": "论文（2020年版）称项目有400多位外部贡献者，模型库已有2097个社区上传的模型；与ONNX团队合作优化BERT、RoBERTa和GPT-2的推理，在一个模型上取得接近4倍的加速。论文还展示了2019年10月至2020年5月间最热门预训练模型的日均下载量，其中为该库专门开发的[[distilbert]]也位列其中。",
+  "legacy": "Transformers把“下载预训练模型→微调”变成了几行代码的标准流程，此后发布的开源模型大多直接提供Transformers格式的权重。模型库发展为[[hf-hub]]，加入数据集托管；同一家公司又推出了扩散模型库[[diffusers]]和参数高效微调库[[peft-lib]]。大模型时代，它的单文件、可读优先的实现成了研究者理解新架构的常用参考，但大规模训练通常交给[[zero]]、[[fsdp]]等工具，高吞吐推理则交给[[vllm]]等专门的推理引擎。",
+  "pitfalls": "- Transformers是“模型实现与权重分发库”，不是训练框架本身：底层计算由PyTorch、TensorFlow或JAX完成。\n- 同一个名字的模型，分词器必须与权重配套；用错分词器不会报错，但输出会完全没有意义。\n- 每个模型单独一个文件是刻意的设计（便于阅读和修改），代价是大量相似代码重复。",
+  "limits": [
+    {"text": "为可读性设计的逐模型实现不包含大规模分布式训练所需的切分与显存优化，训练数十亿参数以上的模型要依赖外部工具。", "solved_by": ["zero", "fsdp"]},
+    {"text": "推理按普通批处理逐token生成，没有针对大模型服务的KV缓存管理和连续批处理，线上吞吐低。", "solved_by": ["vllm"]},
+    {"text": "全参数微调大模型显存开销大，库本身最初没有低成本微调方案。", "solved_by": ["peft-lib", "qlora"]},
+    {"text": "最初只面向文本Transformer，图像生成等其他模态的模型需要另外的库。", "solved_by": ["diffusers"]}
+  ],
+  "relations": [
+    {"to": "bert", "type": "solves", "note": "BERT官方只有TensorFlow实现；项目最初就是把BERT及其预训练权重移植到PyTorch，让更多研究者能直接使用。"},
+    {"to": "pytorch", "type": "uses", "note": "最初完全基于PyTorch实现，后来同时支持TensorFlow，底层计算都交给这些框架。"},
+    {"to": "transformer", "type": "uses", "note": "库里的模型都共享Transformer的多头注意力核心，差别在位置表示、掩码和是否为编码器-解码器结构。"},
+    {"to": "gpt-1", "type": "uses", "note": "把GPT等生成式预训练模型纳入同一接口，用户可在同一套代码中切换双向和单向模型。"},
+    {"to": "sentencepiece", "type": "uses", "note": "为每个模型实现其原有的子词切分方式（WordPiece、BPE、SentencePiece等），保证与预训练权重一致。"},
+    {"to": "onnx", "type": "uses", "note": "模型可导出为ONNX格式部署，论文报告与ONNX团队合作后推理加速接近4倍。"}
+  ],
+  "prereq": ["transformer-block", "pretrain-finetune", "tokenization", "self-attention", "transfer-learning"],
+  "terms": [
+    {"t": "from_pretrained", "d": "Transformers中按名字或路径加载预训练配置、分词器和权重的方法，首次使用时自动下载并缓存。"},
+    {"t": "Auto类", "d": "如AutoModel、AutoTokenizer，根据预训练模型的配置自动选择正确的具体类，使代码不必写死模型类型。"},
+    {"t": "模型卡（model card）", "d": "随模型发布的说明文档，记录训练数据、用途、局限和评测结果。"}
+  ],
+  "learn": "先补[[c:pretrain-finetune]]和[[c:tokenization]]。跟着Hugging Face课程的前几章完成：用pipeline做情感分析，用AutoTokenizer看一句话被切成了哪些token，再在一个小数据集上微调一个BERT分类模型。然后打开库中BERT的模型文件，对照[[transformer]]原文找到多头注意力和前馈层的代码。",
+  "check": {"source": "https://arxiv.org/abs/1910.03771", "confirmed": "标题、作者、arXiv v1 2019-10-09（v5 2020-07-14）；正文：Tokenizer/Transformer/Head三件套、单文件实现、Auto类、Rust分词库、PyTorch与TensorFlow、400多位外部贡献者、Apache 2.0、模型库2097个模型、ONNX接近4倍加速、DistilBERT为该库开发。Hacker News显示github.com/huggingface/pytorch-pretrained-BERT于2018-11-07发布。"}
+}

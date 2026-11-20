@@ -1,0 +1,37 @@
+{
+  "id": "flashattention-2",
+  "who": "Tri Dao · 普林斯顿大学 / 斯坦福大学",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2307.08691"},
+    {"label": "代码 flash-attention", "url": "https://github.com/Dao-AILab/flash-attention"}
+  ],
+  "problem": "FlashAttention解决了显存读写问题，但只发挥出A100理论峰值的25%–40%，远低于矩阵乘内核能达到的效率；长序列、小批量时GPU大量计算单元空闲。",
+  "idea": "不改算法结果，只重新分配工作：减少矩阵乘以外的运算，在序列长度方向上也并行，让同一线程块内的warp各算一部分查询而不必相互汇总。",
+  "impact": "注意力速度再翻一倍左右，达到A100峰值的50%–73%，接近矩阵乘的效率；训练GPT类模型时每卡可达225 TFLOPs/s，迅速成为2023–2024年大模型训练的默认注意力内核。",
+  "background": "[[flashattention]]把N×N注意力矩阵留在片上SRAM里分块计算，显存从平方降到线性。但Tri Dao发现它的前向只达到A100理论峰值的30%–50%，反向更低，而优化良好的矩阵乘（GEMM）能达到80%–90%。差距来自GPU上的工作划分：\n\n- [[a100]]上FP16/BF16矩阵乘的峰值是312 TFLOPs/s，非矩阵乘的FP32运算只有19.5 TFLOPs/s，也就是说每一次非矩阵乘运算的代价相当于16次矩阵乘运算。在线softmax里频繁的缩放、指数、除法都属于这类“贵”的运算。\n- FlashAttention-1只在批次和注意力头两个维度上并行。长序列训练时批次往往很小，比如批大小2、16个头只有32个线程块，A100却有108个流式多处理器，大量单元闲置。\n- 一个线程块内部，四个warp按K、V分工（split-K），各自算出部分结果后要写进共享内存、同步、再相加，这些读写拖慢了前向。",
+  "method": "三处改动，数学结果与标准注意力完全一致。\n\n**1. 减少非矩阵乘运算**。FlashAttention-1每处理一个K、V块就把当前输出按新的softmax分母重新缩放一次。FA2改为在循环中只维护未归一化的输出和每行的最大值、指数和，**最后才统一除一次分母**；反向传播也只保存每行的logsumexp一个数，而不是最大值和指数和两个。\n\n**2. 在序列长度方向并行**。前向时，不同的查询块彼此独立，于是让每个线程块负责一个查询块，线程块数变成`批次 × 头数 × (N/块大小)`，长序列小批量时也能占满GPU。反向时则按K、V块划分线程块，用原子加汇总对查询的梯度。\n\n**3. 改变warp间的分工**。线程块内让每个warp负责一部分**查询**（Q的不同行），K、V对所有warp共享。这样每个warp独立算出自己那几行的完整输出，不需要warp之间通过共享内存汇总（论文称避免了split-K方案）。\n\n此外支持到256的头维度，以及[[mqa]]、[[gqa]]（多个查询头共享一组K、V时不复制K、V，而是在内核里按索引读取）。实现借助了[[cutlass]] 3.x提供的构件。",
+  "results": "在A100上，注意力前向加反向比FlashAttention快1.7–3.0倍，比Triton实现的FlashAttention快1.3–2.5倍，比PyTorch标准实现快3–10倍，最高达230 TFLOPs/s，即理论峰值的73%。端到端训练1.3B、2.7B参数的GPT类模型时，每块A100最高225 TFLOPs/s，模型FLOPs利用率72%。直接在H100上运行同一实现（未使用H100的新指令）可达335 TFLOPs/s。",
+  "legacy": "开源大模型训练框架普遍把它作为默认注意力实现，长上下文训练和推理的成本随之下降。论文自己指出，在H100上还没有用上TMA和第四代Tensor Core，预计还有1.5–2倍空间，这正是[[flashattention-3]]的出发点；到Blackwell架构又有了[[flashattention-4]]。按查询块并行、按块累加的思路也被[[ring-attention]]等多卡序列并行方案沿用。",
+  "limits": [
+    {"text": "在H100上只用了与A100相同的指令，没有利用TMA、异步Tensor Core和FP8，利用率只有约35%。", "solved_by": ["flashattention-3"]},
+    {"text": "计算量仍随序列长度平方增长，单卡能处理的上下文长度依然有限。", "solved_by": ["ring-attention", "nsa"]},
+    {"text": "依赖NVIDIA架构和CUTLASS手写优化，换新一代GPU（如Blackwell）需要重新设计流水线。", "solved_by": ["flashattention-4"]}
+  ],
+  "relations": [
+    {"to": "flashattention", "type": "solves", "note": "FlashAttention只达到A100峰值的25%–40%；FA2通过减少非矩阵乘运算和改进线程块、warp的划分，把它提到50%–73%，速度约翻倍。"},
+    {"to": "a100", "type": "uses", "note": "以A100的矩阵乘与非矩阵乘吞吐差距（312对19.5 TFLOPs/s）作为设计依据，主要实验在A100上完成。"},
+    {"to": "online-softmax", "type": "uses", "note": "沿用在线softmax，但把归一化推迟到循环结束，只做一次除法。"},
+    {"to": "cutlass", "type": "uses", "note": "用CUTLASS 3.x提供的矩阵乘和数据搬运构件重写内核。"},
+    {"to": "gqa", "type": "uses", "note": "原生支持多查询和分组查询注意力，不必为每个查询头复制K、V。"},
+    {"to": "triton-lang", "type": "rivals", "note": "社区有Triton版的FlashAttention，FA2的CUDA实现比它快1.3–2.5倍，说明这类内核当时仍需手工深度优化。"}
+  ],
+  "prereq": ["self-attention", "softmax", "cpu-gpu", "memory-bandwidth", "params-flops"],
+  "terms": [
+    {"t": "warp", "d": "NVIDIA GPU上一起执行同一条指令的32个线程。一个线程块通常包含4到8个warp。"},
+    {"t": "占用率（occupancy）", "d": "GPU上同时在跑的线程块占硬件能容纳的比例。线程块太少时，很多流式多处理器空闲。"},
+    {"t": "logsumexp", "d": "`log Σ exp(s_j)`，即softmax分母的对数。只保存这一个数，反向时就能重算出softmax的结果。"}
+  ],
+  "learn": "先读懂[[flashattention]]的分块和在线softmax。然后读FA2论文第3节，对照图2（FA1与FA2的并行方式）和图3（warp的分工）。动手：在PyTorch里用`scaled_dot_product_attention`分别跑长序列小批量和短序列大批量，比较不同后端的速度；有余力可以跟着Triton官方教程写一个fused attention，体会按查询块并行的写法。",
+  "check": {"source": "https://arxiv.org/abs/2307.08691", "confirmed": "标题、作者Tri Dao、v1提交于2023-07-17；摘要中的25%–40%、约2倍、50%–73%、225 TFLOPs/s（72% MFU）；HTML正文中的A100 312与19.5 TFLOPs/s（16倍）、split-K的说明、MQA/GQA支持、1.7–3.0倍/1.3–2.5倍/3–10倍、230 TFLOPs/s（73%）、H100上335 TFLOPs/s与预计1.5–2倍空间、致谢CUTLASS 3.x。"}
+}

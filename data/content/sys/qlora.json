@@ -1,0 +1,40 @@
+{
+  "id": "qlora",
+  "who": "Tim Dettmers, Artidoro Pagnoni, Ari Holtzman, Luke Zettlemoyer · 华盛顿大学",
+  "venue": "NeurIPS 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2305.14314"},
+    {"label": "代码", "url": "https://github.com/artidoro/qlora"},
+    {"label": "Hugging Face博客：4-bit与QLoRA", "url": "https://huggingface.co/blog/4bit-transformers-bitsandbytes"}
+  ],
+  "problem": "LoRA省掉了优化器状态，但冻结的基座仍以16位常驻显存；16位微调LLaMA 65B要超过780GB显存。而当时的量化方法只能用于推理，一拿来训练就会出问题。",
+  "idea": "把冻结的基座量化成为正态分布权重专门设计的4位格式NF4，计算时临时反量化到BF16，梯度穿过量化权重只更新LoRA；再量化缩放系数本身，并用分页优化器吸收显存峰值。",
+  "impact": "单张48GB显卡就能微调65B模型、消费级显卡能微调中等模型，开源社区的指令微调从此大规模普及；4位加载和QLoRA成为Hugging Face生态的标准选项。",
+  "background": "[[lora]]让可训练参数只剩千分之一，但前向和反向仍要用到完整的基座模型。[[llama-1]] 65B以16位存储就有130GB，加上激活等开销，论文给出常规16位微调需要超过780GB显存。\n\n另一方面，[[llm-int8]]和[[gptq]]已经能把权重压到8位甚至4位用于推理。但它们是为推理设计的：梯度要穿过量化后的权重反向传播，量化误差和显存峰值都会出问题。能不能**在4位基座上训练**，并且效果不输16位全量微调？",
+  "method": "**两种数据类型**：存储用4位，计算用BF16（见[[c:floating-point]]）。每次用到某个权重矩阵时，先把它反量化成BF16再做矩阵乘；梯度只流向LoRA的A、B矩阵，4位基座本身不更新。\n\n**4位NormalFloat（NF4）**。预训练权重近似服从零均值的[[c:gaussian]]。分位数量化让每个量化区间分到同样多的数值，在信息论意义上最优。NF4就是把标准正态分布的分位点预先算好，作为16个固定的量化值，再把每个权重块按最大绝对值缩放到[−1, 1]后对应到最近的值。这样不需要为每个张量临时估计分位数。论文实验显示它优于普通的4位整数和4位浮点。\n\n**双重量化**。分块量化时每64个权重要存一个32位缩放系数，平均每个参数多占`32/64 = 0.5`比特。把这些缩放系数再按256个一组量化成8位，开销降到`8/64 + 32/(64·256) ≈ 0.127`比特，每个参数省约0.37比特，65B模型约省3GB。\n\n**分页优化器**。用NVIDIA统一内存，显存不够时把优化器状态自动换页到CPU内存，避免长序列小批次带来的显存峰值导致训练崩溃。\n\n此外论文发现，要追平16位微调，LoRA必须加到**所有**线性层上，而不只是注意力的查询和值投影。",
+  "results": "65B模型的微调显存从超过780GB降到48GB以内，速度和效果不输16位全量微调的基线。作者用它训练了1000多个模型，覆盖8个指令数据集、LLaMA和T5多种规模。最好的模型Guanaco在Vicuna基准上达到ChatGPT水平的99.3%，只需在单块GPU上微调24小时。论文还发现，小而高质量的数据集比大数据集更重要，用GPT-4打分可以作为人工评测的廉价近似，但现有聊天机器人基准并不可靠。",
+  "legacy": "bitsandbytes的4位加载和QLoRA被集成进[[hf-transformers]]与[[peft-lib]]，配合[[llama-2]]等开放模型，个人在一张24GB显卡上微调7B、13B模型成为常态。[[unsloth]]用手写Triton内核把QLoRA训练再提速并省显存，[[llama-factory]]把它做成零代码的微调工具。“4位存储、16位计算”的思路也影响了后来的低比特训练研究。",
+  "pitfalls": "- QLoRA省的是显存，不是时间：每次前向都要反量化，训练通常比16位LoRA慢。\n- 训练好的LoRA是在量化基座上学到的；合并回16位基座或重新量化后，效果可能有细微差异。\n- 99.3%的数字来自用GPT-4打分的Vicuna基准，论文自己也指出这类基准不可靠。",
+  "limits": [
+    {"text": "反量化带来额外计算，训练速度比16位LoRA慢；65B模型仍需要一张48GB的专业卡。", "solved_by": ["unsloth"]},
+    {"text": "评测主要依赖GPT-4打分和Vicuna基准，论文自己指出这些聊天基准不可靠，“接近ChatGPT”的结论需要谨慎看待。", "solved_by": ["chatbot-arena"]},
+    {"text": "从配置量化、LoRA秩到数据格式仍需手写训练代码，普通用户上手门槛不低。", "solved_by": ["llama-factory"]},
+    {"text": "4位基座与LoRA分离训练，部署时要么保留两部分、要么合并后再量化，后者会引入新的误差。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "lora", "type": "solves", "note": "LoRA的冻结基座仍以16位占满显存；QLoRA把基座压到4位，65B模型的微调显存从超过780GB降到48GB以内。"},
+    {"to": "gptq", "type": "rivals", "note": "GPTQ的4位量化只用于推理；QLoRA让梯度穿过4位权重完成训练，后来两种量化格式的模型都能挂LoRA。"},
+    {"to": "8bit-optimizers", "type": "extends", "note": "沿用同一作者的分块量化与bitsandbytes实现，并把分页思路用到优化器状态上。"},
+    {"to": "llm-int8", "type": "extends", "note": "LLM.int8()把推理压到8位；QLoRA进一步压到4位，并且用于训练。"},
+    {"to": "llama-1", "type": "uses", "note": "主要在LLaMA 7B到65B上训练Guanaco系列，验证不同规模下的效果。"},
+    {"to": "vicuna", "type": "uses", "note": "沿用Vicuna的测试集和用GPT-4打分的评测方式，并分析了其可靠性问题。"}
+  ],
+  "prereq": ["quantization-concept", "floating-point", "gaussian", "peft-concept", "low-rank", "adaptive-optimizer", "backpropagation"],
+  "terms": [
+    {"t": "NF4", "d": "4位NormalFloat：16个量化值取自标准正态分布的分位点，使正态分布的权重在每个量化区间里分布均匀，比均匀间隔的4位整数误差小。"},
+    {"t": "双重量化", "d": "分块量化需要为每块存一个缩放系数；把这些系数本身也量化，进一步省下约0.37比特/参数。"},
+    {"t": "分页优化器", "d": "利用NVIDIA统一内存，在显存不足时自动把优化器状态换到CPU内存，用完再换回，防止训练因显存峰值崩溃。"}
+  ],
+  "learn": "先读懂[[lora]]和[[c:quantization-concept]]里的分块量化。然后读论文第3节（NF4、双重量化、分页优化器）和第4节（为什么要给所有线性层加LoRA）。动手：用transformers的4位加载配合peft，在一张消费级显卡上对一个7B模型做QLoRA指令微调，记录显存占用，再与16位LoRA对比速度。",
+  "check": {"source": "https://arxiv.org/abs/2305.14314", "confirmed": "标题、4位作者、v1提交于2023-05-23；摘要中的单卡48GB微调65B、Guanaco达ChatGPT的99.3%、24小时、1000多个模型与8个数据集；HTML正文中的超过780GB、BF16计算、NF4的分位数定义、双重量化0.5→0.127比特（省0.373比特，65B约3GB）、分页优化器使用NVIDIA统一内存。"}
+}

@@ -1,0 +1,40 @@
+{
+  "id": "vllm",
+  "who": "Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph E. Gonzalez, Hao Zhang, Ion Stoica · 加州大学伯克利分校 / 斯坦福 / UCSD",
+  "venue": "SOSP 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2309.06180"},
+    {"label": "vLLM发布博客（2023-06-20）", "url": "https://blog.vllm.ai/2023/06/20/vllm.html"},
+    {"label": "GitHub", "url": "https://github.com/vllm-project/vllm"}
+  ],
+  "problem": "推理服务的批大小受限于KV缓存显存：现有系统为每个请求按最大长度预留一整块连续显存，实测只有20.4%–38.2%真正存了数据，其余被碎片和预留浪费。",
+  "idea": "借用操作系统的虚拟内存分页：把每个请求的KV缓存切成固定大小的块，按需分配、不必连续，用块表记录映射；多个序列还能共享同一物理块，写时再复制。",
+  "impact": "KV缓存浪费降到接近零，同样延迟下吞吐提升2–4倍；vLLM成为使用最广的开源大模型推理引擎，分页KV缓存成为推理系统的标准设计。",
+  "background": "[[orca-serving]]的连续批处理让GPU每一步都能塞进更多请求，但能塞多少取决于显存里还能放多少KV缓存（见[[c:kv-cache]]）。KV缓存很大：论文给出，OPT-13B每个token的KV要`2 × 5120 × 40 × 2字节 = 800KB`，一个2048 token的请求就要约1.6GB。\n\n当时的系统（Orca、FasterTransformer）沿用深度学习框架的习惯，把每个请求的KV缓存存成一块连续张量，并且因为不知道最终会生成多长，按最大可能长度预留。这带来三种浪费：预留了但还没用到的部分；实际很短、永远用不到的部分（内部碎片）；不同请求预留大小不同造成的空隙（外部碎片）。论文实测这些系统里只有20.4%–38.2%的KV缓存显存存着真实数据。此外，并行采样、束搜索时多个输出共享同一段提示，却各存一份KV。",
+  "method": "**PagedAttention**。把一个序列的KV缓存分成若干**KV块**，每块存固定数量token（默认16个）的K和V。块在显存里可以不连续，每个请求有一张**块表**，记录“第j个逻辑块在哪个物理块”，就像操作系统的页表。注意力计算改写成按块进行：内核根据块表逐块取出K、V，计算分数并累加。\n\n**按需分配**。请求开始时只分配装得下提示的块；生成过程中最后一块写满了，才分配新的一块。浪费只发生在每个序列的最后一块里，最多15个token的空间。\n\n**共享与写时复制**。并行采样时，多个输出共享提示部分的物理块，每块带一个引用计数；某个输出要往共享块里写新内容时，才复制出一份（copy-on-write）。束搜索中不同候选的大部分块也可以共享。\n\n**抢占**。显存不够时，以序列组为单位暂停一些请求：要么把它们的块换出到CPU内存（swapping），要么丢掉、之后重新计算（recomputation）。\n\n系统层面，vLLM用集中式调度器加多GPU工作进程，分布式部分基于[[ray]]，模型并行沿用[[megatron]]的张量切分。",
+  "results": "在相同延迟水平下，相比FasterTransformer和Orca，vLLM把主流模型的吞吐提高2–4倍，序列越长、模型越大、解码算法越复杂（如束搜索），优势越明显；束搜索场景下KV共享最多可省55%显存。发布博客中，在ShareGPT请求分布下，vLLM的吞吐最高是Hugging Face Transformers的24倍、Text Generation Inference的3.5倍。正式开源前，它已在LMSYS的[[chatbot-arena]]和Vicuna演示中运行了两个月。",
+  "legacy": "vLLM迅速成为开源推理的事实标准，分页KV缓存也被[[tensorrt-llm]]等引擎采用。后续工作沿着它留下的问题推进：[[sarathi]]和[[distserve]]处理预填充与解码的互相干扰，[[s-lora]]在分页思想上同时服务上千个LoRA，[[sglang]]用基数树自动复用跨请求的公共前缀，[[mooncake]]把KV缓存做成跨机器的分布式存储，[[batch-invariance]]研究批处理导致的输出不确定性。2026年1月，vLLM核心团队创办的Inferact宣布获得1.5亿美元融资，将其商业化（[[inference-startups]]）。",
+  "limits": [
+    {"text": "只在同一请求的多个输出之间自动共享KV；不同请求之间的公共前缀（系统提示、多轮对话历史、少样本示例）不能自动发现和复用。", "solved_by": ["sglang", "prompt-caching"]},
+    {"text": "预填充和解码仍在同一批GPU上混合调度，一个长提示的预填充会拖慢正在解码的请求。", "solved_by": ["sarathi", "distserve"]},
+    {"text": "查块表、处理变长序列带来额外开销，论文的分页注意力内核比高度优化的FasterTransformer内核延迟高20%–26%。", "solved_by": []},
+    {"text": "批的组成随负载变化，同一输入在不同批中可能得到数值上不同的输出，推理结果不可复现。", "solved_by": ["batch-invariance"]}
+  ],
+  "relations": [
+    {"to": "orca-serving", "type": "solves", "note": "Orca按最大长度为每个请求预留KV缓存，大部分显存被浪费；vLLM按块按需分配，浪费接近零，批可以大得多。"},
+    {"to": "flashattention", "type": "extends", "note": "同样按块组织注意力计算，但块的划分服务于显存管理：K、V块可以散落在显存各处，由块表索引。"},
+    {"to": "ray", "type": "uses", "note": "用Ray管理多GPU、多机上的工作进程，实现分布式推理。"},
+    {"to": "megatron", "type": "uses", "note": "大模型按Megatron-LM的张量并行方式切分到多卡，每块卡管理自己那部分注意力头的KV块。"},
+    {"to": "efficient-inference", "type": "extends", "note": "前人分析指出KV缓存是解码的主要显存负担，vLLM从系统层面解决它的分配与共享问题。"},
+    {"to": "vicuna", "type": "uses", "note": "最早部署在LMSYS的Vicuna演示和Chatbot Arena上，评测请求分布也取自ShareGPT对话。"}
+  ],
+  "prereq": ["kv-cache", "throughput-latency", "autoregressive", "self-attention", "memory-bandwidth", "decoding-sampling"],
+  "terms": [
+    {"t": "分页（paging）", "d": "操作系统把内存切成固定大小的页，程序看到连续的虚拟地址，实际页可散落在物理内存各处，由页表映射。vLLM把这一套用在KV缓存上。"},
+    {"t": "块表（block table）", "d": "记录每个请求的第几个逻辑KV块存放在哪个物理块的映射表，相当于页表。"},
+    {"t": "写时复制（copy-on-write）", "d": "多个序列共享同一份数据，只有某个序列要修改时才复制出一份私有副本，避免无谓的拷贝。"},
+    {"t": "内部/外部碎片", "d": "内部碎片是分配给某请求却用不上的空间；外部碎片是各块之间零散、无法再分配出去的空隙。"}
+  ],
+  "learn": "先弄懂[[c:kv-cache]]，自己算一个7B模型在2048长度下每个请求的KV缓存大小。然后读论文第3节（现有系统的显存浪费，图2、图3）和第4节（PagedAttention与块管理）。动手：用pip安装vllm，跑一个小模型的离线批量推理，调gpu_memory_utilization观察能并发的请求数；有余力可以读vllm中块管理器的源码。",
+  "check": {"source": "https://arxiv.org/abs/2309.06180", "confirmed": "标题、9位作者、arXiv v1 2023-09-12（SOSP 2023）；摘要中的2–4倍吞吐；HTML正文中的20.4%–38.2%、OPT-13B每token 800KB、默认块大小16、copy-on-write、swapping与recomputation、束搜索最多省55%、分页内核延迟比FasterTransformer高20–26%；vLLM博客2023-06-20的24倍（对HF）与3.5倍（对TGI）及在Chatbot Arena和Vicuna演示上运行两个月；SiliconANGLE/Bloomberg 2026-01-22关于Inferact融资1.5亿美元的报道。"}
+}

@@ -1,0 +1,38 @@
+{
+  "id": "swe-bench-verified",
+  "who": "OpenAI Preparedness团队，与SWE-bench原作者（Jimenez、Yang、Press、Narasimhan等）合作 · OpenAI / Princeton",
+  "links": [
+    {"label": "OpenAI公告", "url": "https://openai.com/index/introducing-swe-bench-verified/"},
+    {"label": "SWE-bench Verified榜单", "url": "https://www.swebench.com/verified.html"},
+    {"label": "OpenAI：为何不再评测Verified（2026）", "url": "https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/"}
+  ],
+  "problem": "原版SWE-bench里有大量题目描述含糊、单元测试过窄或环境装不起来，正确的补丁也会被判错，分数系统性低估了模型。",
+  "idea": "请93名Python开发者把1699道题每题独立标注3次，只要有一人认为描述不清或测试不公平就剔除，最后留下500道人工确认可解的题，并配上Docker化的评测环境。",
+  "impact": "成为2024–2025年几乎每次前沿模型发布都会报告的编码分数；GPT-4o在同一脚手架上的成绩从16%升到33.2%，说明原分数被题目本身压低了。",
+  "background": "[[swe-bench]]（2023）从12个Python开源仓库里取已解决的GitHub issue：智能体拿到issue原文和修复前的代码库，要提交一个补丁；评测时运行两组隐藏测试——FAIL_TO_PASS（修复前失败、修复后通过，检验问题是否真被解决）和PASS_TO_PASS（前后都通过，检验没把别的功能弄坏），两组都过才算解决。\n\nOpenAI要把它用作[[preparedness-framework]]里“模型自主性”风险的追踪指标，于是先检查题目本身。他们发现三类毛病：测试过于具体甚至与issue无关；issue描述不完整，看不出该怎么改；开发环境有时装不起来，测试无论如何都失败。公告里举的例子是scikit-learn的一道题：issue只说TfidfVectorizer的copy参数没被使用，隐藏测试却要求抛出DeprecationWarning，而且警告文字要与PR讨论后才定下的那句话逐字一致——智能体看不到PR讨论，几乎不可能做对。截至2024年8月5日，榜单最高分在完整SWE-bench上只有20%，在子集SWE-bench Lite上43%。",
+  "method": "**标注**。93名有Python经验的开发者先通过入职测试（工程师事先高置信标注的50道样题），再对原测试集随机抽取的1699道题打标签。每题看两个维度，各打0–3分：issue描述是否明确（0=清楚，3=没有额外信息几乎看不懂要做什么）；FAIL_TO_PASS测试是否会误杀正确解（0=覆盖所有正确解，3=测得太窄、太宽或测的不是issue说的事）。另外估计一个熟悉代码库的工程师需要多久：<15分钟、15分钟–1小时、1–4小时、>4小时（这一项只作参考，不用于筛选）。\n\n**保守合并**。每题由3人独立标注，取三人中最严重的分数。任一维度达到2分或有其他重大问题就剔除——等价于“三人中任何一人提出异议就删”。这样会误删一些好题，但留下来的题可解的把握更大。\n\n**组成500题**。在剩下的题里尽量保留1–4小时和>4小时的难题，其余随机抽样补足500道。同时公开全部1699道题的标注，可按难度切片：“easy”子集是196道<15分钟的题，“hard”子集是45道>1小时的题。与SWE-bench作者一起改用容器化的Docker评测框架，减少环境问题造成的误判。",
+  "results": "1699道题中，38.3%被标为描述不清，61.1%被标为测试可能误杀正确解，合计68.3%被剔除。GPT-4o在表现最好的开源脚手架[[agentless]]上解决33.2%，是它在原版SWE-bench上16%的两倍多。按难度分层后，每一档的成功率都上升了，说明提分主要来自去掉了不可能完成的题，而不只是题变容易了；不过Verified里估计超过1小时的题不到10%，整体确实偏易。",
+  "legacy": "此后一年多，Verified取代原版和Lite，成为模型发布时最常引用的软件工程分数，也成了各种智能体框架的公共靶子。\n\n2026年2月23日，OpenAI发文宣布不再报告Verified分数：最近6个月最好成绩只从74.9%涨到80.9%；他们让至少6名工程师复查o3在64次独立运行中都没能稳定做对的138道题，发现59.4%的题存在测试或描述上的实质问题（35.5%测试过窄，强制特定实现细节；18.8%测试过宽，检查了题目没要求的功能）；更严重的是受测的前沿模型都能凭题号和片段复述出原始修复补丁，说明见过题和答案（见[[c:data-contamination]]、[[contamination]]）。OpenAI建议改用[[swe-bench-pro]]。",
+  "pitfalls": "- Verified是SWE-bench测试集的人工筛选子集，不是新出的题，仍然全是Python、仍然来自那12个公开仓库。\n- “经人工验证”指的是题目可解、测试公平，不保证没有残留问题；2026年的复查发现被标注者漏掉的坏题仍占相当比例。\n- 不同厂商报告的Verified分数常用不同脚手架、不同尝试次数，直接比较前要看评测设置；官方榜单为此另设了只给bash的mini-SWE-agent统一设置。",
+  "limits": [
+    {"text": "题目全部来自12个公开Python仓库、只看文本issue，估计耗时超过1小时的题不到10%，覆盖不了多语言、多模态和长程的真实工程。", "solved_by": ["swe-bench-mm", "aider-polyglot", "swe-lancer", "swe-bench-pro"]},
+    {"text": "题目和修复补丁都在公开代码库里，前沿模型训练时很可能见过，分数会混入记忆成分。", "solved_by": ["swe-bench-pro"]},
+    {"text": "筛选后仍有不少测试过窄或过宽的坏题，高分段的失败很大部分反映的是数据集缺陷而非模型能力，到80%附近就测不出进步。", "solved_by": ["swe-bench-pro"]},
+    {"text": "只检验“提交一个补丁能否通过测试”，不衡量完成一项任务人类要花多久、能否持续数小时自主工作。", "solved_by": ["metr-horizon"]}
+  ],
+  "relations": [
+    {"to": "swe-bench", "type": "solves", "note": "用三人独立标注剔除描述含糊、测试误杀和环境装不起来的题，解决了原版分数被不可能完成的题压低的问题。"},
+    {"to": "preparedness-framework", "type": "uses", "note": "OpenAI为在准备度框架里可靠追踪“模型自主性”风险而做这次审查。"},
+    {"to": "agentless", "type": "uses", "note": "GPT-4o的33.2%是在Agentless这个开源脚手架上测得的，它是当时在Verified上表现最好的开源方案。"},
+    {"to": "gpt-4o", "type": "uses", "note": "以GPT-4o为主要受测模型，对比它在原版、Lite和Verified上的分数。"},
+    {"to": "imagenet-v2", "type": "extends", "note": "同属“回头审查基准本身”的工作：ImageNetV2问榜单是否过拟合，Verified问题目是否可解、测试是否公平。"}
+  ],
+  "prereq": ["benchmark", "agent-loop", "data-contamination", "train-val-test"],
+  "terms": [
+    {"t": "FAIL_TO_PASS / PASS_TO_PASS", "d": "SWE-bench的两组隐藏测试：前者修复前失败、修复后通过，检验问题是否解决；后者修复前后都通过，检验没有改坏其他功能。"},
+    {"t": "脚手架（scaffold）", "d": "包在模型外面的程序，负责给模型看文件、执行命令、提交补丁。同一个模型换脚手架，分数可能差很多。"},
+    {"t": "gold patch", "d": "当年真正合并进仓库、解决该issue的人工补丁，作为参考答案。"}
+  ],
+  "learn": "先读[[swe-bench]]理解任务格式 → 读OpenAI公告的Annotation Criteria和Dataset construction两节，弄清0–3分标签和“三人取最严重”的规则 → 再读2026年的复查文章，看坏题和污染的具体例子 → 动手：从Hugging Face下载princeton-nlp/SWE-bench_Verified，挑一道easy题，自己读issue写补丁，再用官方Docker框架跑测试。",
+  "check": {"source": "https://web.archive.org/web/2025id_/https://openai.com/index/introducing-swe-bench-verified/ ; https://web.archive.org/web/2026id_/https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/ ; https://www.swebench.com/verified.html", "confirmed": "发布日期2024-08-13；93名开发者、1699道题、每题3人、0–3分、≥2剔除；38.3%/61.1%/68.3%；500题，easy 196题、hard 45题；GPT-4o 33.2% vs 16%；截至2024-08-05榜首20%/Lite 43%；>1小时题不到10%。2026-02-23复查：74.9%→80.9%，138题、59.4%、35.5%、18.8%，推荐SWE-bench Pro。openai.com直连返回403，内容经Wayback存档核对。"}
+}

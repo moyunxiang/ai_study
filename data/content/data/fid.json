@@ -1,0 +1,39 @@
+{
+  "id": "fid",
+  "who": "Martin Heusel, Hubert Ramsauer, Thomas Unterthiner, Bernhard Nessler, Sepp Hochreiter · 林茨大学（JKU Linz）",
+  "venue": "NeurIPS 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1706.08500"},
+    {"label": "Inception Score原文（Improved Techniques for Training GANs）", "url": "https://arxiv.org/abs/1606.03498"}
+  ],
+  "problem": "GAN没有可算的似然，大家只能靠肉眼挑图或用Inception Score打分；IS只看生成图本身，不与真实图片比较。",
+  "idea": "把真实图和生成图都送进ImageNet上训练好的Inception网络，取最后池化层的特征向量，各拟合一个高斯分布，再算两个高斯之间的Fréchet距离。",
+  "impact": "FID成为2018年后GAN、扩散模型等图像生成工作的默认指标，几乎每篇论文的主表都报它。",
+  "background": "[[gan]]能生成逼真图片，但它不给出样本的概率，没法像语言模型那样算似然或[[c:perplexity]]。2016年[[improved-gan]]提出Inception Score（IS）：把生成图送进ImageNet分类器，若每张图的类别预测很确定（单图标签熵低）、而所有图的类别分布又很分散（整体熵高），分数就高，公式是`IS = exp(E_x KL(p(y|x) ‖ p(y)))`。\n\nIS的毛病是完全不看真实数据：它只问“像不像ImageNet的某一类”，不问“像不像你要学的那个数据集”。生成人脸时，人脸本身不属于ImageNet的哪一类，IS就说明不了好坏；同一类里只会生成一模一样的图（[[c:mode-collapse]]），IS也察觉不到。",
+  "method": "这篇论文的主线其实是GAN训练的收敛性：提出**两时间尺度更新规则**（TTUR），判别器和生成器用各自的[[c:learning-rate]]，并用随机逼近理论证明它在温和假设下收敛到局部纳什均衡。为了评估效果，作者顺带定义了FID，后者的影响远超主线。\n\nFID的计算分三步：\n\n- 把真实图片和至少数万张生成图都送进预训练的[[inception-v3]]，取最后池化层（论文称coding layer）的特征向量。\n- 对两组特征分别算均值向量`m`和[[c:covariance]]矩阵`C`，等于把每组特征近似成一个[[c:gaussian]]。\n- 计算两个高斯之间的Fréchet距离（也叫2-Wasserstein距离）：`FID = ‖m − m_w‖² + Tr(C + C_w − 2(C·C_w)^½)`，下标w表示真实数据。\n\n第一项比较“平均长相”，第二项比较“多样性和相关结构”。两组越像，FID越小，0是完全相同。论文用50,000张生成图估计统计量。",
+  "results": "作者对CelebA人脸逐级施加高斯噪声、模糊、黑色方块遮挡、旋涡扭曲、椒盐噪声，以及混入ImageNet图片，FID都随扰动程度单调上升；附录对比显示IS对这些扰动的反应不如FID一致。\n\n用FID评估TTUR：DCGAN在CelebA上FID从21.4降到12.5，LSUN卧室从70.4降到57.5；WGAN-GP在LSUN上从20.5降到9.5（论文表1）。",
+  "legacy": "FID很快压过IS成为标准。[[gans-created-equal]]用它在同一预算下横向比较多种GAN，发现差距大多来自调参；[[progan]]、[[biggan]]、[[stylegan]]、[[ddpm]]、[[ldm]]都以FID为主要指标。\n\n它的局限也逐渐暴露：结果依赖样本数和图片缩放实现，小样本时有偏；Inception特征偏向ImageNet物体类别；一个数字无法区分“画得不真”和“种类太少”。文生图兴起后，FID又完全不管图片是否符合文字描述，于是出现了以人类偏好或组合正确性为准的评测，如[[imagereward]]、[[hpsv2]]、[[geneval]]。",
+  "pitfalls": "- FID不是这篇论文的标题内容，论文主线是TTUR；骨架把节点命名为“FID与Inception Score”，但IS出自更早的[[improved-gan]]。\n- 不同代码库的FID不可直接比较：图片缩放方式、Inception权重版本、样本数（1万还是5万）都会让数值差出好几分。\n- FID低不代表每张图都好，它衡量的是分布整体的接近程度。",
+  "limits": [
+    {"text": "只用均值和协方差刻画特征分布，把“质量”和“多样性”压成一个数，看不出模型是画得不真还是种类太少。", "solved_by": []},
+    {"text": "特征来自ImageNet分类网络，对人脸、医学图像等非ImageNet领域的差异不敏感，也可能被ImageNet类别特征“刷分”。", "solved_by": []},
+    {"text": "完全不衡量条件生成是否符合输入，文生图时无法判断图片与文字描述是否一致。", "solved_by": ["imagereward", "hpsv2", "geneval", "t2i-compbench"]},
+    {"text": "估计量依赖样本数与实现细节，样本少时系统性偏高，跨论文比较常常不可靠。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "improved-gan", "type": "solves", "note": "IS不与真实数据比较、对同类图片重复不敏感；FID直接比较真假两组特征分布，解决了这一缺陷。"},
+    {"to": "gan", "type": "extends", "note": "GAN没有可算的似然，FID为它提供了一个基于样本的评估方式，TTUR则改进了它的训练。"},
+    {"to": "inception-v3", "type": "uses", "note": "用ImageNet上预训练的Inception-v3最后池化层的特征作为图像表示。"},
+    {"to": "googlenet", "type": "uses", "note": "所用网络属于GoogLeNet开创的Inception系列，“Inception Distance”的名字由此而来。"},
+    {"to": "imagenet", "type": "uses", "note": "特征网络在ImageNet上训练，因此FID衡量的“相似”带着ImageNet物体类别的视角。"},
+    {"to": "wgan-gp", "type": "uses", "note": "TTUR实验的对象之一，在LSUN卧室上把WGAN-GP的FID从20.5降到9.5。"},
+    {"to": "dcgan", "type": "uses", "note": "TTUR实验的另一个对象，CelebA上FID从21.4降到12.5。"}
+  ],
+  "prereq": ["generation-metrics", "gaussian", "covariance", "kl-divergence", "feature-representation", "adversarial-training"],
+  "terms": [
+    {"t": "Fréchet距离", "d": "衡量两个分布有多远的一种距离；对两个高斯分布有闭式解，就是正文里的公式，也等于把一个分布“搬运”成另一个的最小平均代价（2-Wasserstein距离）。"},
+    {"t": "TTUR", "d": "两时间尺度更新规则：判别器和生成器各用一个学习率，让判别器更新得更快，从而使训练更稳定、可证明收敛。"}
+  ],
+  "learn": "先理解[[c:gaussian]]与[[c:covariance]]，再读[[c:generation-metrics]]。读原文第4节“Experiments”开头对FID的定义和图3的扰动实验，以及附录A1与IS的对比。动手：用torchvision的Inception-v3提取CIFAR-10两半各5000张图的特征，自己实现FID公式，再给其中一半加高斯噪声，看分数怎么变。",
+  "check": {"source": "https://arxiv.org/abs/1706.08500", "confirmed": "标题、5位作者、arXiv v1提交于2017-06-26；从论文PDF核对了FID公式、生成50,000张样本估计统计量、图3的六种扰动，以及表1中DCGAN CelebA 21.4→12.5、LSUN 70.4→57.5、WGAN-GP LSUN 20.5→9.5。IS公式与提出者核对自arXiv 1606.03498。"}
+}

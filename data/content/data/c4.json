@@ -1,0 +1,38 @@
+{
+  "id": "c4",
+  "who": "Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee, Sharan Narang, Michael Matena, Yanqi Zhou, Wei Li et al. · Google",
+  "venue": "JMLR 2020（随T5论文发布）",
+  "links": [
+    {"label": "arXiv（T5论文第2.2节）", "url": "https://arxiv.org/abs/1910.10683"},
+    {"label": "TensorFlow Datasets: c4", "url": "https://www.tensorflow.org/datasets/catalog/c4"},
+    {"label": "C4审计论文", "url": "https://arxiv.org/abs/2104.08758"}
+  ],
+  "problem": "Common Crawl每月产出约20TB网页文本，但混满了导航栏、报错提示、代码和重复内容，直接拿来预训练效果差；而维基百科、图书语料又太小。",
+  "idea": "对2019年4月的一个Common Crawl快照套一组简单的启发式规则：只留以标点结尾的句子、去掉短页面和含黑名单词的页面、三句一组去重、只留英语，得到约750GB较干净的英文文本。",
+  "impact": "成为第一个被广泛使用的、可公开复现的网页级预训练语料，T5、mT5、LLaMA等都用过它；它的规则也成了后来网页语料清洗流水线的起点。",
+  "background": "[[gpt-2]]之后，大家知道预训练文本越多越好，但公开可用的高质量语料只有维基百科和[[bookscorpus]]，合计只有几十GB。[[common-crawl]]提供了几乎无限的网页存档，按[[t5]]论文的说法，它每月抽取出约20TB纯文本，可其中大部分不是自然语言：菜单、“请启用JavaScript”、Lorem ipsum占位符、代码、版权声明、大段重复。OpenAI的WebText靠Reddit点赞筛选链接，但数据没有公开。\n\nT5团队要系统比较各种预训练设置，需要一个足够大、足够干净、又能让别人完全复现的语料。",
+  "method": "C4（Colossal Clean Crawled Corpus，巨大的干净爬取语料）就是一串过滤规则：\n\n- 只保留以句末标点（句号、感叹号、问号、右引号）结尾的行。\n- 丢弃少于3句的页面，只保留至少5个词的行。\n- 页面中只要出现“肮脏、下流、淫秽或其他不良词汇”黑名单里的任何一个词，整页删除。\n- 删除含Javascript一词的行（多是浏览器提示），删除含“lorem ipsum”的页面，删除含花括号“{”的页面（多半是代码），删除含“terms of use”“cookie policy”等字样的行。\n- 去重：任何连续三句话在数据集中出现超过一次，只保留一份。\n- 用langdetect语言识别，只保留判为英语概率不低于0.99的页面。\n\n每条规则都很粗糙，但组合起来能把一个快照的大部分噪声去掉。结果通过TensorFlow Datasets发布，任何人运行同一脚本都能重建。",
+  "results": "T5论文表8对比了在不同语料上预训练同一个模型：C4（745GB）的GLUE分数83.28、SuperGLUE 71.36；不做启发式过滤的C4（6.1TB）分别只有81.46和68.04，并且在所有任务上都是最差的。这说明清洗比单纯多8倍数据更重要。另一方面，领域更窄的“维基百科加图书”（20GB）在SuperGLUE上反而达到73.24，主要来自小说类阅读理解MultiRC，说明语料与下游任务的领域匹配也有影响。\n\n同一节还把C4截短后重复使用，发现重复次数多时下游性能下降、训练损失异常地低，提示模型在记忆数据。",
+  "legacy": "C4成为2020–2023年的标准语料之一：多语种版mC4用于[[mt5]]，[[llama-1]]把它作为预训练数据的一部分（采样占比15%）。\n\n它的规则也很快被检视。[[c4-audit]]发现黑名单过滤不成比例地删掉了与少数群体相关的文本，语料里还有机器生成文本和其他基准的测试样本。之后的语料改用更细的质量判别：[[ccnet]]用语言模型困惑度筛选，[[the-pile]]混入多种精选来源，[[refinedweb]]、[[fineweb]]、[[dclm]]则在多个快照上做大规模去重和基于模型的质量分类，规模达到万亿token级别。",
+  "pitfalls": "- C4只用了一个月的快照，规模约750GB，远小于后来动辄数十个快照、上万亿token的语料。\n- “干净”只是指格式噪声少，不代表内容无偏或无毒；黑名单删词本身就引入了偏差。",
+  "limits": [
+    {"text": "按单词黑名单整页删除，误删了大量涉及少数群体、医学和性教育的正常文本，引入了新的偏差。", "solved_by": ["c4-audit"]},
+    {"text": "过滤全靠手写规则，无法区分“格式正确但内容空洞”的网页，质量判断很粗。", "solved_by": ["ccnet", "fineweb", "dclm"]},
+    {"text": "只用一个快照、只留英语，规模在GPT-3之后很快不够用。", "solved_by": ["refinedweb", "fineweb", "fineweb2"]},
+    {"text": "发布时没有记录内容来源、域名分布和评测集泄漏情况，使用者不清楚里面有什么。", "solved_by": ["c4-audit"]}
+  ],
+  "relations": [
+    {"to": "common-crawl", "type": "uses", "note": "原料是Common Crawl 2019年4月的网页抽取文本。"},
+    {"to": "t5", "type": "uses", "note": "C4是为T5的系统性对比实验而建，在论文第2.2节定义并随之发布。"},
+    {"to": "bookscorpus", "type": "solves", "note": "图书与维基百科语料只有约20GB，C4提供了大一个数量级、可公开复现的替代。"},
+    {"to": "openwebtext", "type": "rivals", "note": "WebText靠Reddit链接的人工投票筛选质量，C4靠启发式规则；T5里按同类Reddit链接从C4筛出的17GB子集与完整C4表现接近（GLUE 84.03对83.28）。"},
+    {"to": "gpt-2", "type": "extends", "note": "GPT-2表明大规模网页文本能训出通用语言模型，但其WebText未公开；C4把这条路做成了公开数据。"}
+  ],
+  "prereq": ["pretrain-finetune", "language-model", "self-supervised", "tokenization"],
+  "terms": [
+    {"t": "启发式过滤", "d": "用人写的简单规则（标点、长度、关键词）判断一行或一页文本是否保留，不需要训练模型，速度快但很粗糙。"},
+    {"t": "快照", "d": "Common Crawl大约每月发布一次的整批爬取结果，每个快照包含数十亿网页。"}
+  ],
+  "learn": "读T5原文第2.2节（C4的规则，一页多）和第3.4节（语料对比，表8、表9）。动手：下载几个Common Crawl的WET文件，用Python实现上述六条规则，统计每条规则各删掉了多少比例的文本，再随机抽看被删的内容。",
+  "check": {"source": "https://arxiv.org/abs/1910.10683", "confirmed": "T5论文v1提交于2019-10-23；从PDF核对了C4全部过滤规则、2019年4月快照、约750GB、Common Crawl约20TB/月、表8中C4 745GB的GLUE 83.28 / SuperGLUE 71.36与未过滤版6.1TB的81.46 / 68.04、维基加图书的73.24；另从LLaMA论文（arXiv 2302.13971）核对C4采样占比15%。"}
+}

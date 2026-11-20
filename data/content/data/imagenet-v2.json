@@ -1,0 +1,38 @@
+{
+  "id": "imagenet-v2",
+  "who": "Benjamin Recht, Rebecca Roelofs, Ludwig Schmidt, Vaishaal Shankar · 加州大学伯克利分校",
+  "venue": "ICML 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1902.10811"},
+    {"label": "ImageNetV2数据与代码", "url": "https://github.com/modestyachts/ImageNetV2"}
+  ],
+  "problem": "ImageNet和CIFAR-10的测试集被整个领域反复使用了近十年，大家担心榜单上的进步只是在测试集上“调”出来的，换一批新图就会消失。",
+  "idea": "严格照原数据集的流程重新采集一套新测试集，拿大量已发表的模型直接去测，看准确率掉多少、排名变不变。",
+  "impact": "发现所有模型都掉了11–14个百分点，但排名几乎不变、原测试集上的进步会成比例地兑现；问题出在对“稍难图片”的泛化，而不是测试集被过度使用。",
+  "background": "机器学习的基本约定是：测试集只在最后用一次，才能无偏地估计模型在新数据上的表现（见[[c:train-val-test]]）。但[[imagenet]]和[[cifar]]的测试集被成千上万篇论文用来选模型、调超参数，每篇都在前人的结果上再改一点。统计学上这叫**自适应数据分析**：[[reusable-holdout]]等工作证明，反复根据同一份holdout数据做决定，估计会越来越乐观。\n\n于是一个直接的疑问是：榜单上从[[alexnet]]到NASNet的十几个百分点进步，有多少是真的？",
+  "method": "思路是“复制一遍原实验”。CIFAR-10的图片当年取自[[tiny-images]]，ImageNet取自Flickr，作者就从同样的来源、同样的时间段、同样的关键词去搜候选图片，并参照原文档匹配每一类内部的子类分布。\n\n清洗也照原流程，用[[mturk]]众包：每张候选图让至少十个工人判断是否属于目标类，得到一个**选中频率**（多少比例的工人选了它）。任务里混入原验证集的图片，借此估计原数据的选中频率分布。然后用三种方式抽样每类十张图：按原验证集的选中频率分布匹配（MatchedFrequency）、只取选中频率不低于0.7的（Threshold0.7）、取最高的十张（TopImages）。最终ImageNet新测试集1万张，CIFAR-10新测试集2000张，并人工复查去掉错标。\n\n分析上把准确率下降拆成三项：自适应差距（在原测试集上调参造成的乐观）、分布差距（新旧数据分布不同）、泛化差距（有限样本的随机误差）。",
+  "results": "MatchedFrequency版本上，ImageNet模型的top-1准确率普遍下降11–14个百分点，CIFAR-10下降3–15个百分点。例如ResNet-152从78.3%降到67.0%，PNASNet-Large从82.9%降到72.2%。\n\n关键在于下降很有规律：新准确率几乎是原准确率的线性函数，ImageNet上`acc_new ≈ 1.11·acc_orig − 20.2%`，CIFAR-10上斜率1.69。斜率大于1意味着原测试集上每提高1个百分点，新测试集上提高超过1个百分点，排名也基本保持。如果是测试集被调过拟合，最“卷”的新模型应该掉得最多，事实相反。\n\n抽样方式影响巨大：TopImages版本比原验证集还高约2%，Threshold0.7低约3%，可见下降主要来自新图片平均“稍难”一点。",
+  "legacy": "这篇论文给“榜单是否可信”提供了一个可复用的检验方法：重新采集一份同分布的测试集。它同时显示，即使是极其相似的分布偏移也会让模型掉十几个百分点，推动了一系列分布偏移基准，如[[imagenet-c]]、[[imagenet-a-r]]和[[wilds]]。[[clip]]后来专门报告了在ImageNetV2等偏移集上的表现，作为“有效鲁棒性”超出这条线性趋势的证据。大模型时代，[[gsm1k]]照同样的思路重写了一份GSM8K来检查污染。",
+  "pitfalls": "- 结论不是“ImageNet模型没有过拟合测试集”就万事大吉：它说明排名可信，但绝对准确率对采集细节非常敏感。\n- 新旧测试集的差距大部分可由选中频率解释，说明“同分布”在实践中极难复制，标注流程本身就是分布的一部分。",
+  "limits": [
+    {"text": "11–14个百分点的下降中，仍有一部分无法用选中频率等可测因素解释，具体是什么让新图更难没有定论。", "solved_by": []},
+    {"text": "只研究了与原数据几乎同分布的轻微偏移，模型面对损坏、风格变化、真实场景迁移时的鲁棒性没有涉及。", "solved_by": ["imagenet-c", "imagenet-a-r", "wilds"]},
+    {"text": "线性趋势表明，在ImageNet上训练的标准模型都在同一条线上，单靠改架构几乎不能提升对分布偏移的有效鲁棒性。", "solved_by": ["clip"]}
+  ],
+  "relations": [
+    {"to": "imagenet", "type": "extends", "note": "按ImageNet的Flickr来源、时间窗和众包流程重新采集一份1万张的测试集，检验原榜单的可信度。"},
+    {"to": "reusable-holdout", "type": "solves", "note": "可复用holdout在理论上警告了反复使用测试集的风险；这篇用实验测出ImageNet上自适应过拟合并不是准确率下降的主因。"},
+    {"to": "cifar", "type": "extends", "note": "同样为CIFAR-10复制了2000张的新测试集CIFAR-10.1，下降3–15个百分点。"},
+    {"to": "mturk", "type": "uses", "note": "用Mechanical Turk众包得到每张图的选中频率，并据此控制新测试集的难度。"},
+    {"to": "dataset-bias", "type": "extends", "note": "数据集偏差说明不同数据集之间难以迁移；这篇显示连同一来源、同一流程复制的数据也会让模型显著掉分。"},
+    {"to": "resnet", "type": "uses", "note": "ResNet-152等大量已发表模型构成测试平台，ResNet-152从78.3%降到67.0%。"}
+  ],
+  "prereq": ["train-val-test", "generalization", "distribution-shift", "top-k-error", "statistical-significance"],
+  "terms": [
+    {"t": "自适应过拟合", "d": "研究者根据测试集成绩反复修改模型，相当于间接在测试集上训练，使测试成绩高估真实水平。"},
+    {"t": "选中频率", "d": "众包时选择“这张图属于该类”的工人比例。频率越高，图片越典型、越容易认。"},
+    {"t": "有效鲁棒性", "d": "在分布偏移数据上的准确率比“按原准确率线性预测的值”高出多少；落在线上的模型被认为没有额外的鲁棒性。"}
+  ],
+  "learn": "先补[[c:train-val-test]]与[[c:distribution-shift]]。读原文第2节对三项差距的分解、图1和第4节的选中频率实验。动手：用torchvision加载一个预训练ResNet-50，分别在ImageNet验证集的一个子集和ImageNetV2 MatchedFrequency上测top-1，算出两者差距。",
+  "check": {"source": "https://arxiv.org/abs/1902.10811", "confirmed": "标题、4位作者、arXiv v1提交于2019-02-13；摘要中的ImageNet 11%–14%、CIFAR-10 3%–15%；论文PDF中的Flickr来源、1万/2000张规模、三种抽样方式与选中频率0.73/0.85/0.93、线性拟合斜率1.11与1.69、ResNet-152 78.3→67.0与PNASNet 82.9→72.2、TopImages约+2%与Threshold0.7约−3%。"}
+}

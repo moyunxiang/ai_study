@@ -1,0 +1,60 @@
+{
+ "id": "soap",
+ "who": "Nikhil Vyas, Depen Morwani, Rosie Zhao, Mujin Kwun, Itai Shapira, David Brandfonbrener, Lucas Janson, Sham Kakade · Harvard University",
+ "venue": "ICLR 2025",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2409.11321"
+  }
+ ],
+ "problem": "[[shampoo]]这类高阶预条件方法在训练中显示出优于[[adam]]的迹象，但超参数多、计算开销大。",
+ "idea": "证明Shampoo等价于在其预条件器特征基下运行[[adafactor]]，据此提出在该特征基中运行Adam的SOAP，只多一个预条件更新频率超参数。",
+ "impact": "把二阶式预条件与Adam的简单性结合起来，降低了使用Shampoo类方法的门槛。",
+ "method": "Shampoo为每个权重矩阵维护左右两个预条件矩阵，并求其逆的1/4次幂，需要额外的超参数和较重的计算。作者先证明一个联系：以1/2次幂实现的Shampoo，等价于在Shampoo预条件器的特征基里运行Adafactor（Adam的省内存近似）。\n\n这个洞察直接带出SOAP：定期对Shampoo的两个预条件矩阵做特征分解，得到一组旋转基，把梯度转到这个基里，再在这个基里运行普通的Adam，更新完再转回原空间。这样除了Adam本身的超参数，只多一个“多久重算一次特征基”的频率。因为Adam的二阶矩在这个基里持续更新，即使特征基更新得不频繁，效果也比Shampoo更稳。\n\n作者在360M和660M参数的语言模型预训练上评测：在大批量设定下，与AdamW相比迭代数减少超过40%、时钟时间减少超过35%，与Shampoo相比两项指标都约好20%。",
+ "limits": [
+  {
+   "text": "每隔若干步仍要做特征分解，并为每个矩阵存放预条件基，显存和计算都比Adam高。",
+   "solved_by": []
+  },
+  {
+   "text": "只在较小规模的语言模型上验证，更大规模下是否仍有同样收益尚不清楚。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "shampoo",
+   "type": "extends",
+   "note": "在Shampoo预条件器的特征基里运行Adam，简化并稳定Shampoo。"
+  },
+  {
+   "to": "adam",
+   "type": "uses",
+   "note": "在旋转后的基里使用Adam更新。"
+  },
+  {
+   "to": "adafactor",
+   "type": "uses",
+   "note": "用Shampoo与Adafactor在特征基下等价的结论作为推导起点。"
+  }
+ ],
+ "prereq": [
+  "adaptive-optimizer",
+  "eigen-svd",
+  "gradient-descent",
+  "memory-bandwidth",
+  "jacobian-hessian"
+ ],
+ "terms": [
+  {
+   "t": "预条件器",
+   "d": "用来对梯度做线性变换以改善条件数的矩阵，可以看作逐参数学习率的矩阵推广。"
+  }
+ ],
+ "learn": "先读[[adam]]与[[shampoo]]，再读本文第3节的等价性证明；用PyTorch实现一个单层的SOAP更新，与Adam比较损失曲线。",
+ "check": {
+  "source": "https://arxiv.org/abs/2409.11321",
+  "confirmed": "标题、8位作者、arXiv v1提交于2024-09-17；摘要中Shampoo与Adafactor在特征基下等价、仅多一个预条件频率超参数，以及360m/660m模型上超过40%迭代数和超过35%时钟时间的减少、相对Shampoo约20%。"
+ }
+}

@@ -1,0 +1,106 @@
+{
+  "id": "nvlink",
+  "who": "NVIDIA（与IBM合作开发）",
+  "venue": "GTC 2014（2014年3月25日）宣布；2016年随Tesla P100首次商用；NVSwitch随DGX-2于2018年3月发布",
+  "links": [
+    {
+      "label": "NVIDIA新闻稿（2014-03-25）",
+      "url": "https://nvidianews.nvidia.com/news/nvidia-launches-world-s-first-high-speed-gpu-interconnect-helping-pave-the-way-to-exascale-computing"
+    },
+    {
+      "label": "Wikipedia：NVLink",
+      "url": "https://en.wikipedia.org/wiki/NVLink"
+    },
+    {
+      "label": "Wikipedia：Nvidia DGX（DGX-2与NVSwitch）",
+      "url": "https://en.wikipedia.org/wiki/Nvidia_DGX"
+    }
+  ],
+  "problem": "GPU之间、GPU与CPU之间只能经过PCIe交换数据，带宽比显存低一个数量级；模型一大必须拆到多块卡上，卡间通信就成了训练的瓶颈。",
+  "idea": "在GPU上直接做多条专用高速串行链路，卡与卡点对点相连；2018年再加上专用交换芯片NVSwitch，让一台机器里所有GPU都能以全带宽互相访问显存。",
+  "impact": "把“多块GPU当成一块大GPU用”变成现实，从8卡服务器一直扩展到72卡整机柜，是大模型张量并行等需要频繁通信的训练方式能够成立的前提。",
+  "background": "2012年[[alexnet]]把网络拆到两块[[gtx-580]]上，两卡只能经PCIe交换数据，作者特意设计成只在少数几层通信。数据中心的[[tesla-gpu]]和[[kepler]]计算卡同样插在PCIe插槽里：PCIe 3.0 x16双向合计约31.5GB/s，而一块GPU自己的显存带宽有几百GB/s。NVIDIA在2014年的新闻稿中指出，PCIe限制了GPU访问CPU内存的能力，比典型的CPU内存系统慢4到5倍；对于带宽更高的IBM POWER处理器，这个瓶颈更明显。\n\n机器之间有[[infiniband]]这样的高速网络，但同一台机器里的几块GPU之间反而缺一条足够快的通道。",
+  "method": "**点对点链路**。NVLink是一种短距离、多通道的串行连接。第一代每条链路每个方向20GB/s，P100上有4条，总计160GB/s（双向），约为PCIe 3.0 x16的5倍。一块GPU的多条链路可以接到不同的GPU，也可以几条并到同一块GPU上加宽带宽。程序可以直接读写另一块GPU的显存，不必经过主机内存中转。\n\n**一代代加链路**。第二代（V100）6条链路共300GB/s，第三代（A100）12条共600GB/s，第四代（H100）18条共900GB/s，第五代（Blackwell）1800GB/s，第六代（Vera Rubin）每块GPU3.6TB/s。\n\n**NVSwitch**。链路数有限，GPU一多就无法两两直连：DGX-1的8块P100只能连成部分直连的网状结构。2018年起NVLink改用交换结构：专用交换芯片NVSwitch像网络交换机一样转发数据，让所有GPU之间都能以全带宽通信。第四代NVSwitch还能在交换芯片里直接做求和、广播等简单运算，减少训练中梯度汇总的通信量。",
+  "results": "2014年NVIDIA官方称NVLink能让GPU与CPU共享数据的速度比当时快5到12倍，并计划在2016年的Pascal架构中采用；IBM同时把它集成进未来的POWER处理器。2016年4月发布的[[dgx-1]]用NVLink连接8块P100。2017–2018年交付的Summit和Sierra超算用NVLink 2.0连接IBM POWER9 CPU与V100 GPU。\n\n2018年3月27日发布的DGX-2用NVSwitch把16块32GB的V100连成一个整体，官方称算力2 PFLOPS、共512GB HBM2，整机10U、最大功耗10kW，起售价39.9万美元。到2026年的Vera Rubin NVL72，一个机柜用9个NVLink 6交换芯片连起72块GPU，总纵向扩展带宽官方称260TB/s。",
+  "legacy": "NVLink加NVSwitch定义了今天AI服务器的基本形态：一个“高带宽域”里的GPU用NVLink互连，域与域之间再用[[infiniband]]或以太网（[[spectrum-x]]）连接。[[megatron]]式的张量并行要求每一层计算都在几块GPU之间交换数据，通常只放在同一个NVLink域内；[[blackwell]]把这个域扩到整机柜72块GPU。[[grace-hopper]]用NVLink-C2C把CPU和GPU连在一起，消除了PCIe瓶颈。\n\n因为NVLink是NVIDIA私有的，AMD、Intel等在2024年牵头制定开放标准[[ualink]]与之竞争；2025年9月NVIDIA宣布与Intel合作，由Intel设计带NVLink的定制x86 CPU（[[nvidia-intel]]）。",
+  "limits": [
+    {
+      "text": "NVLink是NVIDIA私有接口，只能连接NVIDIA的GPU和少数获授权的CPU，其他厂商的加速器无法加入同一个高带宽域。",
+      "solved_by": [
+        "ualink",
+        "nvidia-intel"
+      ]
+    },
+    {
+      "text": "NVSwitch最初的交换域只覆盖一台机器（DGX-2的16块GPU），更大的模型仍要跨机经网络通信，张量并行无法跨出这一台机器。",
+      "solved_by": [
+        "blackwell",
+        "vera-rubin"
+      ]
+    },
+    {
+      "text": "在主流x86服务器里CPU与GPU之间仍走PCIe，NVLink只解决了GPU之间的瓶颈。",
+      "solved_by": [
+        "grace-hopper"
+      ]
+    },
+    {
+      "text": "铜缆链路只能在机柜范围内使用，跨机柜、跨机房的通信仍要靠带宽低得多的InfiniBand或以太网。",
+      "solved_by": [
+        "cpo"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "tesla-gpu",
+      "type": "solves",
+      "note": "Tesla计算卡插在PCIe上，多卡之间、卡与CPU之间的带宽远低于显存；NVLink给它们加了专用的直连通道。"
+    },
+    {
+      "to": "kepler",
+      "type": "solves",
+      "note": "Kepler一代的K20/K40/K80计算卡仍插在PCIe上互连；NVLink在2014年与下一代Pascal路线图一同宣布，就是为了替换这条瓶颈。"
+    },
+    {
+      "to": "gtx-580",
+      "type": "solves",
+      "note": "AlexNet在两块GTX 580上只能经PCIe通信，不得不限制通信的层数；NVLink让卡间带宽提高约5倍以上。"
+    },
+    {
+      "to": "infiniband",
+      "type": "rivals",
+      "note": "两者分工又竞争：InfiniBand连接机器之间，NVLink连接机器内部；NVLink域从8卡扩到整机柜后，部分原本走网络的通信被它取代。"
+    },
+    {
+      "to": "cuda",
+      "type": "extends",
+      "note": "CUDA的编程模型只针对一块GPU；NVLink让一块GPU能直接读写另一块的显存，把编程模型延伸到多卡。"
+    }
+  ],
+  "prereq": [
+    "interconnect",
+    "memory-bandwidth",
+    "distributed-training",
+    "cpu-gpu"
+  ],
+  "terms": [
+    {
+      "t": "PCIe",
+      "d": "电脑主板上连接显卡、网卡等扩展设备的通用总线。第三代x16插槽双向合计约31.5GB/s。"
+    },
+    {
+      "t": "NVSwitch",
+      "d": "NVIDIA专为NVLink设计的交换芯片，所有GPU都连到交换芯片上，任意两块之间都能以全带宽通信。"
+    },
+    {
+      "t": "纵向扩展（scale-up）",
+      "d": "把更多芯片连成一个通信极快、像一台大机器那样工作的整体；与之相对的横向扩展（scale-out）是用网络把很多台机器连起来。"
+    }
+  ],
+  "learn": "先读[[c:interconnect]]和[[c:distributed-training]]。然后看维基百科NVLink条目的性能对比表，比较PCIe各代与NVLink各代的带宽。动手：估算一个70亿参数模型用FP16做一次全量梯度同步要传多少字节，分别用31.5GB/s和900GB/s算出需要多少时间，体会为什么张量并行只放在NVLink域内。",
+  "check": {
+    "source": "https://nvidianews.nvidia.com/news/nvidia-launches-world-s-first-high-speed-gpu-interconnect-helping-pave-the-way-to-exascale-computing",
+    "confirmed": "NVIDIA 2014-03-25新闻稿：GTC宣布NVLink、与IBM共同开发、“five to 12 times faster”、Pascal预计2016年、PCIe比CPU内存系统慢4–5倍。维基百科NVLink：2014年3月首次宣布、2018年起用分组交换结构、NVLink 4.0的NVSwitch可做求和与广播（SHARP）；各代带宽表160/300/600/900/1800GB/s、PCIe 3.x x16为31.51GB/s；Summit和Sierra用NVLink 2.0连接POWER9与V100；NVLink 6每GPU3.6TB/s、NVL72用9个交换芯片共260TB/s。维基百科Nvidia DGX：DGX-1于2016-04-06宣布；DGX-2于2018-03-27宣布、16块V100 32GB、2 PFLOPS、512GB HBM2、NVSwitch全带宽、10kW、39.9万美元。 NVIDIA 2025-09-18新闻稿（https://nvidianews.nvidia.com/news/nvidia-and-intel-to-develop-ai-infrastructure-and-personal-computing-products）：Intel设计制造带NVLink的定制数据中心与客户端CPU。"
+  }
+}

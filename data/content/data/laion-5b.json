@@ -1,0 +1,38 @@
+{
+  "id": "laion-5b",
+  "who": "Christoph Schuhmann, Romain Beaumont, Richard Vencu, Cade Gordon, Ross Wightman, Mehdi Cherti, Theo Coombes, Aarush Katta et al. · LAION（非营利开源社区）等",
+  "venue": "NeurIPS 2022 Datasets and Benchmarks",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2210.08402"},
+    {"label": "LAION-5B发布公告", "url": "https://laion.ai/laion-5b-a-new-era-of-open-large-scale-multi-modal-datasets/"}
+  ],
+  "problem": "CLIP、DALL·E、Imagen都靠数亿到数十亿图文对训练，但这些数据全在大公司内部；学术界能拿到的最大公开图文集只有几千万到4亿对，没法复现或研究这类模型。",
+  "idea": "从Common Crawl网页里抽出约500亿个带alt文本的图片链接，用现成的CLIP计算图文相似度，低于阈值的丢掉，留下58.5亿对，以“链接加文本加元数据”的形式公开发布。",
+  "impact": "成为开源图文模型的公共底座：Stable Diffusion在它的子集上训练，OpenCLIP用它复现并超过了CLIP；也因版权、隐私和有害内容问题，成为数据伦理争议的焦点。",
+  "background": "[[clip]]用4亿图文对做对比学习，ImageNet零样本准确率从此前最好的11.5%跳到76.2%；[[align]]用了超过10亿对几乎不清洗的含噪数据。这类数据集（WIT、JFT、ALIGN的数据）都没有公开。公开的[[cc3m]]、[[cc12m]]、[[yfcc100m]]规模只有数百万到一亿级。\n\nLAION社区在2021年先发布了[[laion-400m]]，证明用CLIP过滤Common Crawl可以得到能训出CLIP的数据。但要研究“数据规模继续扩大会怎样”，以及训练文生图大模型，需要再大一个数量级，而且最好覆盖多种语言。",
+  "method": "**来源**。解析[[common-crawl]]的网页，提取所有带alt文本（图片的替代说明文字）的`<img>`标签，得到图片URL和对应文本，约500亿条。\n\n**CLIP过滤**。下载图片，用OpenAI的CLIP ViT-B/32分别编码图片和文本，计算余弦相似度。英文对低于0.28、其他语言（用多语种CLIP）低于0.26的全部删除。这一步删掉了约90%，剩下58.5亿对：23.2亿英文、22.6亿其他100多种语言、12.7亿无法判定语言（如地名、产品名）。\n\n**标注而非删除**。每条数据附带图片尺寸、相似度分数，以及作者训练的NSFW（不适宜内容）分类器和水印检测器的打分；约3%被判为NSFW。是否过滤交给使用者决定。\n\n**发布形式**。只发布URL和文本等元数据，不存图片本身，配套img2dataset下载工具（文中称10个节点约7天可下完）、CLIP嵌入的近邻检索索引和网页浏览界面。另从中筛出1.7亿张的高分辨率子集和1.2亿张的“美学”子集。",
+  "results": "论文验证了数据可用：在同样的计算量（看过340亿个样本）下，ViT-L/14在LAION-2B英文子集上训练的ImageNet零样本准确率75.4%，高于在LAION-400M上的73.9%，说明数据规模本身有收益。作者还用它复现了GLIDE的文生图模型，并记录了[[stable-diffusion]]在LAION-2B英文、高分辨率和美学子集上的训练过程。",
+  "legacy": "LAION-5B让开源社区第一次拥有与大公司同量级的图文数据。[[openclip]]在上面系统研究了CLIP的规模定律；[[stable-diffusion]]的开源引发了文生图的大众化。\n\n它的问题同样深远。CLIP过滤只保证图文相关，不保证质量，于是[[datacomp]]把“怎样从同一个候选池里筛数据”变成了竞赛，[[metaclip]]公开了更接近CLIP原始做法的平衡采样配方。2023年12月[[laion-takedown]]：研究者在其中发现儿童性虐待材料的链接，数据集被下架。版权方面，图片作者和图库对用其训练的模型提起诉讼，如[[getty-stability-uk]]。",
+  "pitfalls": "- LAION-5B不是一个图片包，而是一张URL表；几年后大量链接失效，不同人下载到的“同一个数据集”内容并不相同。\n- 它的过滤器本身是CLIP，所以数据带着CLIP的偏好，用它评估CLIP类模型存在循环。",
+  "limits": [
+    {"text": "只用CLIP相似度阈值过滤，图文“相关”不等于图片清晰、描述准确，大量alt文本简短、残缺或是关键词堆砌。", "solved_by": ["datacomp", "metaclip", "dall-e-3"]},
+    {"text": "自动NSFW检测远不完美，数据中仍含违法和有害内容，且已分发的链接表无法回收。", "solved_by": ["laion-takedown"]},
+    {"text": "未取得图片作者或被拍摄者的同意，版权与隐私问题悬而未决。", "solved_by": ["getty-stability-uk"]},
+    {"text": "只发链接导致数据随时间腐烂，实验难以精确复现。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "laion-400m", "type": "extends", "note": "沿用LAION-400M的CLIP过滤流程，规模扩大约14倍并加入多语种数据；400M后来被视为它的子集。"},
+    {"to": "common-crawl", "type": "uses", "note": "从Common Crawl网页中提取约500亿个带alt文本的图片链接作为候选。"},
+    {"to": "clip", "type": "uses", "note": "用CLIP ViT-B/32的图文相似度作为唯一的质量过滤器，又用这份数据复现CLIP。"},
+    {"to": "clip", "type": "solves", "note": "CLIP的4亿对训练数据从未公开，LAION-5B提供了同类、更大的公开替代，使复现成为可能。"},
+    {"to": "align", "type": "rivals", "note": "ALIGN用超过10亿对几乎不过滤的噪声数据，LAION用CLIP做过滤；两者都表明规模可以弥补噪声，但只有LAION公开。"},
+    {"to": "cc12m", "type": "extends", "note": "Conceptual Captions系列靠规则清洗得到千万级数据，LAION用模型过滤把公开数据集推到数十亿级。"}
+  ],
+  "prereq": ["contrastive-learning", "embedding", "dot-product", "zero-few-shot", "self-supervised"],
+  "terms": [
+    {"t": "alt文本", "d": "网页里给图片写的替代文字（HTML的alt属性），本意是给看不到图片的读者或搜索引擎用，质量参差不齐。"},
+    {"t": "CLIP过滤", "d": "用一个已训练好的CLIP模型给每个图文对打相似度分，只保留分数高于阈值的。快且便宜，但会继承CLIP自身的偏好。"}
+  ],
+  "learn": "先懂[[c:contrastive-learning]]和[[clip]]。读原文第3节（采集与过滤流程）和第4节（数据统计），附录里有作者按[[datasheets]]格式写的数据说明书。动手：用img2dataset下载几千条LAION子集，按CLIP相似度分桶各随机看几十张，体会0.28这个阈值附近的数据长什么样。",
+  "check": {"source": "https://arxiv.org/abs/2210.08402", "confirmed": "标题、作者、arXiv v1提交于2022-10-16；从PDF核对了58.5亿/23.2亿/22.6亿/12.7亿、ViT-B/32阈值0.28与0.26、约500亿候选删去约90%、约3% NSFW、10节点7天下载、1.7亿高分辨率与1.2亿美学子集、ViT-L/14在LAION-2B-en上75.4%对LAION-400M上73.9%、CLIP从11.5%到76.2%的引述、Stable Diffusion在LAION-5B子集上训练。"}
+}

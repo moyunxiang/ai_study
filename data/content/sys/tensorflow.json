@@ -1,0 +1,43 @@
+{
+  "id": "tensorflow",
+  "who": "Martín Abadi, Ashish Agarwal, Paul Barham, Eugene Brevdo, Zhifeng Chen, Jeffrey Dean, Rajat Monga, Sanjay Ghemawat et al.（共40位） · Google Brain",
+  "venue": "2015-11-09开源（白皮书）；系统论文 OSDI 2016",
+  "links": [
+    {"label": "白皮书（arXiv 1603.04467）", "url": "https://arxiv.org/abs/1603.04467"},
+    {"label": "OSDI 2016系统论文（arXiv 1605.08695）", "url": "https://arxiv.org/abs/1605.08695"},
+    {"label": "TensorFlow 2.0发布博客", "url": "https://blog.tensorflow.org/2019/09/tensorflow-20-is-now-available.html"}
+  ],
+  "problem": "Google的第一代系统DistBelief只能表达固定的层状网络，研究者难以实现新模型；参数服务器是只有专家能改的特权代码；训练、手机端推理、多GPU、集群各要一套系统，学术界的Theano、Caffe、Torch又不能扩展到大规模分布式。",
+  "idea": "把一切——模型计算、参数存储与更新、跨设备通信、控制流——都表示成同一张带可变状态的数据流图；运行时把图切分到CPU、GPU、手机乃至上百台机器上执行，并在图上自动求导。以Apache 2.0许可证开源。",
+  "impact": "一套代码从研究原型一路跑到手机和数据中心，很快成为工业界最常用的深度学习框架之一，把大规模分布式训练能力交到普通开发者手里；它的静态图设计也直接催生了XLA、TPU软件栈与TensorFlow Lite。",
+  "background": "Google Brain从2011年起用第一代系统[[distbelief]]训练了大量模型——无监督学习、图像分类、语音识别、搜索与广告。白皮书提到，与Google Brain合作的50多个团队用DistBelief把深度网络部署进了产品。但它有三处硬伤：网络只能按预定义的层来搭，想试一种新的优化器或新层要改C++系统代码；参数服务器（见[[parameter-server]]）的更新规则写死在“特权代码”里，研究者改不了；它面向CPU集群，不擅长GPU，也无法把同一个模型放到手机上运行。\n\n与此同时，学术界的框架各有所长：[[theano]]有计算图和自动微分，[[caffe]]在单GPU上很快，[[torch7]]灵活好写，但都基本局限在单机。Google需要一个既有学术框架的灵活性、又有DistBelief规模的系统。",
+  "method": "**数据流图**。程序先构建一张图：节点是运算（op，如MatMul、Add、ReLU），边上流动的是张量（多维数组）。白皮书的例子：\n\n`W = tf.Variable(tf.random_uniform([784, 100], -1, 1))`\n`relu = tf.nn.relu(tf.matmul(W, x) + b)`\n\n这几行只建图，真正计算要通过`Session.run(C, feed_dict={x: input})`，运行时只执行算出C所需的那部分子图。\n\n**可变状态也在图里**。`Variable`是一种特殊的op，返回一个跨多次运行持续存在的张量，用`Assign`、`AssignAdd`修改。于是“参数服务器”不再是特殊系统：把变量放在某些机器上、把更新规则写成普通的图运算，就得到一个用户可编程的参数服务器。队列、互斥锁、条件分支（Switch/Merge）和循环（Enter/NextIteration）也都是op。\n\n**自动求导**。`tf.gradients(C, [b, W, x])`沿着从C到各输入的路径反向遍历，为每个前向op添加对应的“梯度函数”节点，结果仍是图的一部分（见[[c:autodiff]]）。\n\n**切分与放置**。运行时用代价模型模拟执行、贪心地把每个节点放到某个设备上（用户也可以手动指定），然后把跨设备的边替换成一对**Send/Recv**节点——同一台机器内走PCIe拷贝，跨机器走TCP或RDMA。所有通信被隔离在这对节点里，其余运算的代码与设备无关。跨机器传输时还可以把float32截成16位再传，以节省带宽。\n\n**并行方式**。数据并行（同步或异步地把多个副本的梯度汇总）和模型并行（把一个模型的不同部分放到不同设备）都只是“同一张图的不同切法”。OSDI论文还加入了**备份worker**：同步训练时多启动几个副本，每步只取最先完成的m个结果，缓解个别慢机器拖累全体。",
+  "results": "白皮书称，与DistBelief相比编程模型更灵活、性能显著更好，几十个内部用户已经迁移，任务从手机上的视觉模型推理到用数百台机器训练数千亿参数的模型。OSDI 2016论文的测试：在单块Titan X上训练四个卷积网络，TensorFlow比Caffe快，与当时最新版Torch相差不到6%（两者都用cuDNN），但慢于用手写汇编卷积核的Neon；在最多200个K40 GPU worker上训练Inception-v3，同步训练加备份worker最多提升15%吞吐。",
+  "legacy": "TensorFlow开源后迅速成为工业界标准，周边生态包括可视化工具TensorBoard、移动端的[[tflite]]、为图做整体编译优化的[[xla]]，以及支撑[[tpu]]的软件栈；[[keras]]后来成为它的官方高层API。[[transformer]]的最初实现（tensor2tensor）、[[bert]]的官方代码都基于TensorFlow，[[mesh-tensorflow]]在它上面实现了张量切分。\n\n但“先建图、再Session.run”的模式难调试、难写动态模型，研究者大量转向[[pytorch]]。2019年的[[tf2]]把eager执行设为默认、用`tf.function`按需转成图，等于向PyTorch的路线靠拢；同样出自Google的[[jax]]则以函数变换加XLA编译的方式继承了“整图优化”的思想。今天新的大模型研究多在PyTorch或JAX上，TensorFlow主要存在于已有的生产系统中。",
+  "pitfalls": "- TensorFlow 1.x的Python代码只是在“描述”计算：`relu`变量是图里的一个符号，打印它不会得到数值，这正是它难调试的根源。TF 2.x默认eager，行为已经完全不同，读旧代码时要注意版本。\n- “数据流图”并不意味着只能做神经网络：它是通用的带状态数值计算图，但几乎所有优化都围绕深度学习展开。",
+  "limits": [
+    {"text": "静态图加Session的编程模型抽象层次多、报错难以定位，带条件分支和循环的动态模型要用专门的控制流算子编写，研究效率低。", "solved_by": ["pytorch", "tf2", "jax"]},
+    {"text": "每个op单独调用一个内核，逐元素运算之间不融合，中间结果反复读写显存，性能依赖人工手写融合算子。", "solved_by": ["xla", "jax"]},
+    {"text": "参数服务器式的分布式训练配置繁琐，同步训练扩展到多机多卡时效率不高。", "solved_by": ["horovod", "ring-allreduce"]},
+    {"text": "完整运行时体积大，难以直接部署到手机和嵌入式设备上做低延迟推理。", "solved_by": ["tflite"]},
+    {"text": "只做张量级别的切分放置，单个巨型模型如何在数百个设备间自动高效地切分，仍需用户手工设计。", "solved_by": ["mesh-tensorflow", "gpipe", "megatron"]}
+  ],
+  "relations": [
+    {"to": "distbelief", "type": "extends", "note": "白皮书明确称TensorFlow是DistBelief之后的第二代系统，保留其规模，同时让任意模型和更新规则都可编程。"},
+    {"to": "theano", "type": "extends", "note": "继承了Theano“构建计算图—在图上自动求导—执行”的核心设计，并扩展到多设备和多机分布式。"},
+    {"to": "parameter-server", "type": "solves", "note": "参数服务器的更新逻辑是研究者改不了的特权代码；TensorFlow把参数和更新都表示为图中的普通运算，让参数服务器变成可编程的。"},
+    {"to": "mapreduce", "type": "uses", "note": "同步训练的备份worker借鉴MapReduce的备份任务思想，只是改为主动启动并取最先完成的结果。"},
+    {"to": "caffe", "type": "rivals", "note": "Caffe以配置文件定义层、单GPU速度快；TensorFlow在单卡速度上超过Caffe，并以更细粒度的运算图和分布式能力胜出。"},
+    {"to": "torch7", "type": "rivals", "note": "Torch以命令式编程灵活见长，TensorFlow以静态图优化和部署见长；Torch路线后来以PyTorch的形式在研究界反超。"},
+    {"to": "cudnn", "type": "uses", "note": "卷积、池化等关键运算调用cuDNN，这也是它与Torch单卡性能接近的原因。"}
+  ],
+  "prereq": ["autodiff", "backpropagation", "distributed-training", "sgd-minibatch", "cpu-gpu", "vector-matrix"],
+  "terms": [
+    {"t": "数据流图", "d": "节点表示运算、边表示数据（张量）流向的有向图。一个节点的所有输入都就绪后即可执行，因此图结构天然暴露了可以并行的部分。"},
+    {"t": "Session.run", "d": "TF 1.x中执行图的入口：指定要取回的张量和喂入的数据，运行时只执行计算这些张量所必需的子图。"},
+    {"t": "Send/Recv节点", "d": "图被切分到不同设备后，跨设备的边被替换成成对的发送和接收节点，所有设备间通信都封装在其中。"},
+    {"t": "备份worker", "d": "同步数据并行中额外启动的几个副本；每步只聚合最先完成的若干个梯度，避免个别慢机器拖慢整体。"}
+  ],
+  "learn": "先确认会[[c:autodiff]]和[[c:distributed-training]]的基本概念。读白皮书第2节（编程模型）、第3.2节（跨设备执行与Send/Recv）和第4.1节（梯度计算），再读OSDI论文第4.4节（同步与备份worker）。动手：在TF 2.x里用`tf.function`包一个小MLP的训练步，用TensorBoard查看生成的图；再写同样的PyTorch代码，对比静态图与动态图的调试体验。",
+  "check": {"source": "https://arxiv.org/abs/1603.04467", "confirmed": "白皮书标题、40位作者、日期Preliminary White Paper 2015-11-09、arXiv 2016-03-14；第二代系统、50多个团队用DistBelief、Apache 2.0于2015年11月开源、手机到数百台机器、784×100例子、Variable/Switch/Merge等op、Send/Recv、tf.gradients、16位有损压缩。OSDI论文（arXiv 1605.08695）：单Titan X上快于Caffe、与Torch差距6%以内、Neon更快、200个worker、K40、备份worker最多提升15%吞吐。TF博客确认2.0默认eager。"}
+}

@@ -1,0 +1,96 @@
+{
+  "id": "terminal-bench",
+  "who": "Mike Merrill, Alex Shaw, Chris Rytting, Ludwig Schmidt, Andy Konwinski 等 · Stanford / Laude Institute",
+  "links": [
+    {
+      "label": "官方公告",
+      "url": "https://www.tbench.ai/news/announcement"
+    },
+    {
+      "label": "论文（2.0版，2026）",
+      "url": "https://arxiv.org/abs/2601.11868"
+    },
+    {
+      "label": "GitHub",
+      "url": "https://github.com/laude-institute/terminal-bench"
+    }
+  ],
+  "problem": "Claude Code、Codex、OpenHands等智能体都靠命令行干活，但主流编码基准只考“给Python仓库打补丁”，测不到配置网络、编译内核、做数据分析这类终端里的综合操作。",
+  "idea": "手工编写在Docker容器里完成的终端任务，每题配一份人工验证的参考解和检查最终容器状态的测试；再提供一个只给tmux窗口、不带任何专用工具的中立智能体Terminus，便于公平比较模型。",
+  "impact": "发布约一周后就被Claude 4的官方公告引用（Opus 4得43.2%），此后成为前沿实验室报告智能体能力的常用指标，也成为后来2.0版和Harbor框架的基础。",
+  "background": "2025年上半年，编码智能体的主战场从IDE插件转向终端：[[claude-code]]、Codex、Cursor、[[openhands]]等都通过shell命令读文件、跑程序、装依赖。终端是文本界面，正好对上语言模型最擅长的模态；它功能强大、文档齐全，又容易放进容器里隔离风险。\n\n但当时最主流的[[swe-bench]]及其子集[[swe-bench-verified]]只考一种动作：读GitHub issue、给12个Python仓库之一提交补丁、跑单元测试。智能体在终端里常见的失败——把多步操作串起来、在长上下文里保持状态、在没人监督时安全地执行有风险的命令——这些都测不到。",
+  "method": "**任务格式**。每个任务是一个目录：Dockerfile（或docker-compose）定义环境，task.yaml写给智能体的指令，solution.sh是人写的参考解，tests里的测试只检查任务结束时容器的状态，不检查智能体敲了哪些命令——怎么做都行，只看结果。首发版Terminal-Bench-Core-v0共80题，覆盖科学计算、网络配置、玩游戏、数据分析、调用API和修补安全漏洞，每个智能体每题只有一次机会。\n\n**三个例子**。简单题：给一个陌生的加密命令行工具，智能体要自己用`--help`读懂用法再完成加密。难题：从源码编译Linux内核并在QEMU里运行，GPT-4.1驱动的Terminus装了nano编辑器后无法处理交互式会话，最后放弃。科学题：拟合拉曼光谱的两个峰，但文件里的单位是波长（nm）而非常用的波数（cm⁻¹），智能体没有察觉，得到负振幅之类明显荒谬的结果仍声称做过合理性检查。\n\n**评测框架**。harness负责启动多容器环境、记录智能体动作、验证最终状态；智能体可以装进容器、通过Python接口直接接入，或通过[[mcp]]服务器拿到一个tmux会话。Terminus只能向tmux窗口发送按键，不提供任何额外工具，避免偏向某个模型。",
+  "results": "公告给出的是不同“智能体+模型”组合的解决率，并附多次运行的误差棒。2025年5月22日Anthropic发布Claude 4时称Opus 4在Terminal-bench上得43.2%，与SWE-bench的72.5%一起作为“最强编码模型”的主要证据。",
+  "legacy": "社区很快发现1.0有些任务不稳定（例如依赖外部网站的任务今天能过、明天不能过）。2025年11月发布的[[terminal-bench-2]]从93名贡献者提交的229个任务里精选89个、每题经三名评审验证，同时推出可扩展到云端数千个容器、支持RL采样的Harbor框架；2026年的论文报告前沿模型和智能体在2.0上的解决率仍低于65%。终端任务从此与SWE-bench并列，成为衡量编码智能体的两类主要基准。",
+  "pitfalls": "- 分数是“智能体+模型”的组合成绩，同一个模型换脚手架差别可能很大；要比较模型本身，应看统一用Terminus的结果。\n- 1.0（80题、持续增加）与2.0（89题、重新筛选）的分数不能直接比较。",
+  "limits": [
+    {
+      "text": "首发只有80题且在持续增减，部分任务依赖外部网络或网站，结果不稳定，不同时间的分数难以比较。",
+      "solved_by": [
+        "terminal-bench-2"
+      ]
+    },
+    {
+      "text": "评测框架只在本地运行容器，难以大规模并行，也不支持把任务当作强化学习环境来采样训练。",
+      "solved_by": [
+        "terminal-bench-2"
+      ]
+    },
+    {
+      "text": "任务和参考解全部公开，尚无保密测试集，题目可能进入模型训练数据。",
+      "solved_by": []
+    },
+    {
+      "text": "成绩混合了模型能力与智能体脚手架的设计，各厂商自报的分数常用不同脚手架，难以分离两者的贡献。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "swe-bench",
+      "type": "solves",
+      "note": "SWE-bench只考Python仓库的补丁，Terminal-Bench把评测扩展到编译、配置、数据分析、安全等任意终端任务，并只按最终状态打分。"
+    },
+    {
+      "to": "claude-code",
+      "type": "uses",
+      "note": "以Claude Code这类终端编码智能体为主要评测对象，harness直接支持把它们装进容器运行。"
+    },
+    {
+      "to": "swe-agent",
+      "type": "extends",
+      "note": "SWE-agent为智能体专门设计了操作接口，Terminus反其道只给一个tmux窗口，用最朴素的接口作为中立基线。"
+    },
+    {
+      "to": "openhands",
+      "type": "uses",
+      "note": "OpenHands等开源智能体可以通过harness接入，在同一批任务上比较。"
+    },
+    {
+      "to": "mcp",
+      "type": "uses",
+      "note": "harness可作为MCP服务器暴露tmux会话，让任何MCP客户端接入评测。"
+    }
+  ],
+  "prereq": [
+    "benchmark",
+    "agent-loop",
+    "tool-calling",
+    "data-contamination"
+  ],
+  "terms": [
+    {
+      "t": "tmux",
+      "d": "终端复用器，可以在一个窗口里开多个持久的shell会话。Terminus通过向tmux发送按键来操作终端，就像人在敲键盘。"
+    },
+    {
+      "t": "结果导向评测",
+      "d": "只检查任务完成后的环境状态（文件、服务、输出）是否正确，不规定智能体用什么命令、走什么路径。"
+    }
+  ],
+  "learn": "先读[[swe-bench]]了解编码基准的常规做法 → 读Terminal-Bench公告的任务格式和三个例子 → 再读2026年论文第2节（任务构造与验证）和失败分析 → 动手：装好harness，挑一个简单任务，先自己在容器里手动完成，再让一个智能体跑一遍，对比它卡在哪里。",
+  "check": {
+    "source": "https://www.tbench.ai/news/announcement ; https://arxiv.org/abs/2601.11868 ; https://www.anthropic.com/news/claude-4",
+    "confirmed": "公告页面日期2025-05-15（HN帖2025-05-19），作者Merrill、Shaw、Rytting、Schmidt、Konwinski；Core-v0共80题；任务目录结构；三个任务例子；Terminus只用tmux；三种接入方式含MCP。论文2026-01-17：Stanford/Laude等，93名贡献者229题选89题、三名评审，前沿<65%。Claude 4公告：Opus 4 Terminal-bench 43.2%、SWE-bench 72.5%。；2.0公告页见HN 2025-11-11帖。"
+  }
+}

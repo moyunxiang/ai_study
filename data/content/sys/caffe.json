@@ -1,0 +1,38 @@
+{
+  "id": "caffe",
+  "who": "贾扬清（Yangqing Jia）, Evan Shelhamer, Jeff Donahue, Sergey Karayev, Jonathan Long, Ross Girshick, Sergio Guadarrama, Trevor Darrell · 加州大学伯克利分校BVLC",
+  "venue": "开源发布2013年12月；论文 ACM Multimedia 2014",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1408.5093"},
+    {"label": "GitHub：BVLC/caffe", "url": "https://github.com/BVLC/caffe"}
+  ],
+  "problem": "AlexNet之后人人都想用卷积网络，但能高效训练它的代码要么是作者个人的CUDA代码，要么需要自己用Theano搭，复现一个ImageNet模型门槛很高。",
+  "idea": "用C++/CUDA写一套高速的卷积网络库：网络结构写在纯文本配置文件里，不用写代码；CPU和GPU一键切换；同时发布训练好的参考模型（如AlexNet）供直接下载使用。",
+  "impact": "2014—2016年计算机视觉研究和工业部署的主力框架，R-CNN、FCN等大量视觉工作用它实现；“下载预训练模型再微调”的习惯从它的Model Zoo开始普及。",
+  "background": "[[alexnet]]在2012年证明了GPU训练的大卷积网络在[[imagenet]]上的威力，但其cuda-convnet代码面向特定实验，扩展不便。当时的选择大致是：[[theano]]灵活但要自己从数学表达式搭网络、编译慢；[[torch7]]需要写Lua；其他工具要么没有GPU支持、要么不开源。视觉研究者想要的是一个“像搭积木一样”组网、又足够快、能直接部署进C++产品的工具。Caffe的直接前身是同组的[[decaf]]——一个用预训练卷积网络提取通用特征的Python工具，但它速度不够快。",
+  "method": "**网络即配置**。模型用Google Protocol Buffer格式的文本文件（.prototxt）描述，每层写明类型、输入输出和参数，例如一个卷积层要写明类型Convolution、输入blob（data）、输出blob（conv1）、卷积核大小和输出通道数。网络可以是任意有向无环图。训练超参数写在另一个solver文件里，改结构不需要重新编译。\n\n**Blob与Layer**。数据统一存成四维数组blob（批大小×通道×高×宽），blob在CPU和GPU内存之间按需自动同步。每个层实现前向和反向两个函数；Solver驱动SGD训练。\n\n**卷积变矩阵乘**。卷积层先用im2col把输入中每个卷积窗口展开成一列，再调用一次[[blas]]的GEMM完成卷积。以LeNet第一层为例：28×28的单通道输入、5×5卷积核，输出24×24，于是展开成25×576的矩阵，与20×25的权重相乘就得到20个通道的输出。这样卷积的速度直接受益于高度优化的矩阵乘法库，GPU上用cuBLAS（见[[cuda]]）。\n\n**参考模型**。发布训练好的AlexNet和[[rcnn]]检测模型，用户可以直接拿来提特征或微调。",
+  "results": "论文称在单块K40或Titan GPU上每天能处理超过4000万张图片（约2.5毫秒一张），并认为它可能是当时最快的卷积网络实现。公开发布后前六个月就被伯克利和其他大学的大量研究项目使用，还用微调把网络扩展到完整ImageNet的1万个类别。",
+  "legacy": "Caffe让卷积网络在视觉圈普及：[[rcnn]]、[[fcn]]等基于它实现，[[model-zoo]]让社区共享预训练模型，[[cudnn]]发布后很快被集成进来加速卷积。它的“层”抽象和配置文件式定义被许多后来的推理引擎沿用。\n\n局限也很明显：加新层要写C++和CUDA，循环网络支持差，多机训练困难。Caffe在2018年停止支持，研究界早已转向[[tensorflow]]和[[pytorch]]。",
+  "pitfalls": "- Caffe的代码是BSD许可证，但论文明确说明发布的参考模型仅限学术和非商业用途，并不是BSD。\n- 配置文件方便的是“组合已有的层”；需要新运算时仍要自己写C++/CUDA的前向和反向函数。",
+  "limits": [
+    {"text": "网络必须用配置文件描述成固定的层图，循环网络、动态结构和新运算很难表达，研究灵活性差。", "solved_by": ["pytorch", "tensorflow"]},
+    {"text": "主要面向单机，多机分布式训练支持弱，难以训练更大的模型。", "solved_by": ["tensorflow"]},
+    {"text": "im2col把输入展开会成倍增加显存占用，卷积性能受限于通用矩阵乘法。", "solved_by": ["cudnn"]}
+  ],
+  "relations": [
+    {"to": "alexnet", "type": "solves", "note": "AlexNet的训练代码难以复用；Caffe把它作为参考模型发布，任何人都能下载、复现和微调。"},
+    {"to": "cuda", "type": "uses", "note": "所有层都有CUDA实现，矩阵运算调用cuBLAS，CPU与GPU模式一键切换。"},
+    {"to": "decaf", "type": "extends", "note": "直接前身DeCAF是用预训练卷积网络提特征的Python工具；Caffe用C++重写，扩展到完整的训练、微调和部署。"},
+    {"to": "blas", "type": "uses", "note": "用im2col把卷积转成BLAS的GEMM矩阵乘法，直接继承优化矩阵库的速度。"},
+    {"to": "theano", "type": "rivals", "note": "Theano从数学表达式出发、灵活但编译慢；Caffe以层为单位、配置即模型、速度快，在视觉圈更受欢迎。"},
+    {"to": "torch7", "type": "rivals", "note": "同期另一主力框架，用Lua脚本写模型更灵活；Caffe以纯配置和C++部署见长。"}
+  ],
+  "prereq": ["conv-layer", "image-tensor", "backpropagation", "sgd-minibatch", "matrix-multiplication", "cpu-gpu"],
+  "terms": [
+    {"t": "im2col", "d": "把图像中每个卷积窗口覆盖的像素展开成矩阵的一列，使卷积可以用一次大矩阵乘法完成，代价是数据被重复存储。"},
+    {"t": "Protocol Buffer（prototxt）", "d": "Google的一种结构化数据描述格式。Caffe用它的文本形式描述网络结构和训练参数，也用二进制形式存储模型权重。"},
+    {"t": "微调（fine-tuning）", "d": "拿在大数据集上训练好的模型作为起点，在新任务的数据上继续训练，通常只需少量数据和时间。"}
+  ],
+  "learn": "先补[[c:conv-layer]]和[[c:matrix-multiplication]]。读论文第2、3节了解Blob/Layer/Solver。动手：用NumPy写一个im2col，把一个小卷积改写成矩阵乘法，与直接循环的结果对比是否一致；再打开Caffe仓库examples/mnist下的LeNet配置文件，逐层对照理解。",
+  "check": {"source": "https://arxiv.org/abs/1408.5093", "confirmed": "标题、8位作者、arXiv 2014-06-20；摘要与正文中K40/Titan每天超4000万张、约2.5ms一张、BSD许可证、参考模型非BSD仅限非商业、Protocol Buffer配置、四维blob、前六个月广泛使用、微调到1万类。维基百科确认DeCAF为前身、2013年12月公开发布、2018年停止支持；GitHub源码base_conv_layer.cpp中确认卷积为im2col加caffe_cpu_gemm。"}
+}

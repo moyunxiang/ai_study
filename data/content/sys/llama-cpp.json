@@ -1,0 +1,37 @@
+{
+  "id": "llama-cpp",
+  "who": "Georgi Gerganov及社区 · 个人项目，后为ggml.ai（2026年加入Hugging Face）",
+  "links": [
+    {"label": "GitHub", "url": "https://github.com/ggml-org/llama.cpp"},
+    {"label": "Ars Technica报道（2023-03-13）", "url": "https://arstechnica.com/information-technology/2023/03/you-can-now-run-a-gpt-3-level-ai-model-on-your-laptop-phone-and-raspberry-pi/"},
+    {"label": "How is LLaMa.cpp possible?", "url": "https://finbarr.ca/how-is-llama-cpp-possible/"}
+  ],
+  "problem": "LLaMA权重流出后，人们第一次有了GPT-3级别的开放模型，但官方代码依赖PyTorch和NVIDIA GPU，16位权重的7B模型就要十几GB显存，普通笔记本跑不起来。",
+  "idea": "用纯C/C++、无任何依赖重写LLaMA推理，把权重按小块量化到4位，并针对CPU的SIMD指令和Apple芯片优化，让模型在笔记本、手机甚至树莓派上直接运行。",
+  "impact": "开启了“本地大模型”生态：Ollama、LM Studio等几乎所有本地推理工具都以它为核心，GGUF成为开源模型分发的通用量化格式。",
+  "background": "2023年2月24日Meta发布[[llama-1]]，权重只对申请通过的研究者开放；3月2日权重就在BitTorrent上流出。官方推理代码基于PyTorch、面向数据中心GPU。7B模型按16位存储约14GB，65B约130GB，远超普通电脑的显卡。\n\n同期的[[gptq]]已经证明大模型权重可以压到3–4位而基本不掉点，但它的实现仍依赖GPU和PyTorch。作者Georgi Gerganov此前写过[[whisper]]语音模型的纯C++移植whisper.cpp，以及一个小型张量库ggml，于是把同样的思路用到了LLaMA上。",
+  "method": "**零依赖的推理实现**。在ggml张量库之上，用C/C++实现LLaMA的前向计算，单个可执行文件即可运行，不需要Python、PyTorch或CUDA。早期重点优化CPU：用ARM NEON、x86 AVX等SIMD指令做矩阵向量乘，多线程并行；在Mac上利用Accelerate框架，后来又加入Metal、CUDA、Vulkan等多种GPU后端。\n\n**分块4位量化**。把权重每32个分成一块，每块存一个16位缩放系数和32个4位整数，计算时边读边反量化。平均每个权重约4.5比特，按此估算7B模型只需约4GB，可以放进笔记本内存。\n\n**为什么在笔记本上也能跑得动**：逐token生成时，每一步都要把全部权重读一遍，速度上限约等于“内存带宽÷模型字节数”（见[[c:memory-bandwidth]]）。量化到4位后要读的字节少了四倍。[[apple-m1]]的统一内存让CPU和GPU共用一大块高带宽内存，进一步放宽了限制。\n\n此后社区不断加入：内存映射加载（mmap）、更细的k-quants量化、OpenAI兼容的HTTP服务、按语法约束输出JSON、FlashAttention等。",
+  "results": "2023年3月10日首次发布，可在M1 Mac上运行LLaMA。据Ars Technica整理的时间线，次日就有人在4GB内存的树莓派4上跑通7B模型（约10秒一个token），13日又有人在Pixel 6手机上跑通。一篇流传很广的分析估算，M1 GPU的带宽为68.25GB/s，4位7B模型的生成速度上限约每秒10个token。截至2026年5月，项目在GitHub上有超过10.9万颗星。",
+  "legacy": "2023年8月引入的[[gguf]]格式取代了早期互不兼容的GGML文件，成为本地模型的事实标准，[[hf-hub]]上大多数开源模型都有GGUF量化版。[[ollama]]把它包装成一条命令即可下载运行的工具，LM Studio等桌面应用也以它为引擎。它证明了[[rtx-4090]]、Mac这类消费级设备也能运行有用的大模型，推动了本地和端侧AI。2026年2月20日，ggml团队加入Hugging Face（[[ggml-hf]]）。",
+  "limits": [
+    {"text": "早期的GGML文件格式没有版本和元数据，模型或量化方式一改，旧文件就无法加载。", "solved_by": ["gguf"]},
+    {"text": "最初的4位量化只是按块取整，低比特时质量损失明显，不如利用激活或二阶信息的量化方法。", "solved_by": ["gguf", "awq"]},
+    {"text": "面向单用户本地使用，缺少连续批处理和高效KV缓存管理，不适合多用户高吞吐的服务场景。", "solved_by": ["vllm"]},
+    {"text": "需要自己编译、找权重、转换格式，对非开发者门槛仍高。", "solved_by": ["ollama"]}
+  ],
+  "relations": [
+    {"to": "llama-1", "type": "uses", "note": "最初就是为在个人电脑上运行流出的LLaMA权重而写，项目名也来自它。"},
+    {"to": "gptq", "type": "rivals", "note": "GPTQ用二阶信息做精细的4位量化但依赖GPU；llama.cpp用更简单的分块取整量化，换来在CPU和各种设备上都能跑，两者后来互相借鉴。"},
+    {"to": "apple-m1", "type": "uses", "note": "把Apple芯片当作一等目标平台，利用统一内存的大容量和高带宽，Mac成为本地跑大模型的主力机器。"},
+    {"to": "whisper", "type": "extends", "note": "作者先写了Whisper的纯C++移植whisper.cpp，llama.cpp沿用同一套ggml张量库和思路。"},
+    {"to": "nanogpt", "type": "rivals", "note": "同样是“少量代码实现GPT类模型”，nanoGPT面向用PyTorch学习和训练，llama.cpp面向在任意设备上部署推理。"}
+  ],
+  "prereq": ["quantization-concept", "memory-bandwidth", "floating-point", "cpu-gpu", "autoregressive", "params-flops"],
+  "terms": [
+    {"t": "ggml", "d": "Gerganov写的C语言张量库，提供矩阵运算、量化数据类型和多种硬件后端，llama.cpp建立在它之上。"},
+    {"t": "SIMD", "d": "单指令多数据：CPU一条指令同时对多个数做相同运算，如ARM的NEON、x86的AVX，是CPU上加速矩阵运算的关键。"},
+    {"t": "统一内存", "d": "CPU和GPU共用同一块物理内存，不需要把数据在内存和显存之间来回拷贝，Apple M系列芯片采用这种设计。"}
+  ],
+  "learn": "先理解[[c:quantization-concept]]和[[c:memory-bandwidth]]，自己估算：一个7B模型在4位、8位、16位下各占多少字节，在你的电脑内存带宽下每秒最多能生成几个token。然后下载llama.cpp，从Hugging Face取一个小模型的GGUF文件，分别用Q4和Q8量化运行，比较速度与输出质量。想深入可读ggml的矩阵乘和反量化代码。",
+  "check": {"source": "https://en.wikipedia.org/wiki/Llama.cpp", "confirmed": "维基百科：作者Georgi Gerganov、首次发布2023-03-10、此前的whisper.cpp和ggml、2026年5月超过10.9万星、2026-02-20加入Hugging Face；Ars Technica 2023-03-13报道中的LLaMA发布与流出日期、树莓派4（4GB，10秒/token）和Pixel 6；finbarr.ca文中M1带宽68.25GB/s与7B约10 token/s的上限估算；Hacker News 2023-03-10发布帖。"}
+}
