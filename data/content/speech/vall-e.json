@@ -1,0 +1,38 @@
+{
+  "id": "vall-e",
+  "who": "Chengyi Wang, Sanyuan Chen, Yu Wu, Ziqiang Zhang, Long Zhou, Shujie Liu, Zhuo Chen, Yanqing Liu et al. · Microsoft",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2301.02111"},
+    {"label": "演示页", "url": "https://aka.ms/valle"}
+  ],
+  "problem": "当时的TTS把文本回归成梅尔谱，训练数据通常不到1000小时；要模仿一个没见过的说话人，效果差，往往还得拿他的录音微调。",
+  "idea": "把TTS当成语言模型问题：用EnCodec把语音变成离散token，在6万小时有声书上训练“音素+3秒提示录音的token → 后续语音token”的条件语言模型，靠上下文学习克隆声音。",
+  "impact": "只听3秒录音就能用陌生人的声音说任意句子，还能保留提示里的情绪和录音环境；开启了“编解码器语言模型”这一类零样本TTS。",
+  "background": "2022年的主流TTS是两段式流水线：[[tacotron-2]]、[[fastspeech]]这类声学模型把音素序列回归成连续的梅尔谱，再由[[hifi-gan]]等声码器变成波形。训练数据一般是几十到几百小时的干净录音棚语音。要做“零样本”（没见过的说话人）合成，[[yourtts]]等方法额外加一个说话人向量，但与真人的相似度明显不够。\n\n与此同时，[[audiolm]]已经证明：把音频压成离散token后，Transformer语言模型可以像续写文字一样续写语音。但它只能续写，不能指定要说的文字。VALL-E要把这两件事合起来。",
+  "method": "**表示**。用现成的[[encodec]]把24kHz语音编码成每秒75帧、每帧8个码本的整数矩阵（相当于6kbps）。一段10秒的语音就是750×8个token。\n\n**任务定义**。训练时，给定一句话的音素序列x和它的音频token矩阵C，最大化`p(C | x, C̃)`，其中C̃是同一说话人的一段提示录音的token。推理时只需把“提示录音的音素+要合成的音素”接在一起作为文本条件，把提示录音的token作为前缀，模型接着往下生成——这正是[[gpt-3]]式的提示续写（见[[c:in-context-learning]]）。\n\n**两级生成**。第1层码本最重要，承载内容和大致音色，用一个只有解码器的**自回归**Transformer逐帧生成，它也自然决定了语音有多长（见[[c:autoregressive]]）。第2到8层码本是逐级补充的细节，用另一个**非自回归**Transformer：给定前j−1层，一次并行预测整句的第j层，调用7次即可。两个模型都是12层、16头、宽1024。自回归部分用随机采样而非束搜索，因为束搜索容易陷入无限循环。\n\n**数据**。训练集是LibriLight的6万小时英文有声书，约7000个说话人；原始数据没有文字，作者先用LibriSpeech 960小时训练的识别模型自动转写。数据量比此前TTS大几百倍。",
+  "results": "在LibriSpeech test-clean上（说话人都没在训练中出现），VALL-E的词错误率5.9%、说话人相似度0.580，此前最好的零样本系统YourTTS是7.7%和0.337。人工评测中，相对YourTTS的CMOS提高0.12、相似度SMOS提高0.93。合成语音还会保留提示录音里的情绪和混响。",
+  "legacy": "VALL-E之后，“编解码器token+语言模型”成为零样本TTS的一大路线：[[vall-e-2]]解决重复、漏词问题，[[seed-tts]]、[[cosyvoice]]、[[minimax-speech]]把它做成产品级多语言系统。同年的[[voicebox]]走非自回归的流匹配路线，速度更快，两条路线后来常被组合使用。3秒克隆声音也让伪造语音的风险变得现实，见[[voice-deepfake-fcc]]。",
+  "pitfalls": "- VALL-E没有训练新的编解码器，用的是现成的EnCodec。\n- “3秒”指提示录音长度；模型本身是在6万小时数据上训练的，并非只学3秒。\n- 词错误率是用HuBERT识别模型转写合成语音后算出来的，衡量的是可懂度，不是音质。",
+  "limits": [
+    {"text": "自回归生成第1层token时注意力对齐会乱，部分词会含糊、漏读或重复读。", "solved_by": ["vall-e-2", "voicebox"]},
+    {"text": "训练数据只有英文朗读有声书，口音和说话风格覆盖不足，在VCTK口音数据上明显比LibriSpeech差。", "solved_by": ["seed-tts", "cosyvoice", "emilia"]},
+    {"text": "要用两个模型分别生成第1层和其余7层，且自回归部分逐帧生成，速度慢。", "solved_by": ["soundstorm", "voicebox"]},
+    {"text": "几秒录音就能仿冒任何人的声音，可用于诈骗和绕过声纹验证，论文只提出“可以训练检测模型”。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "audiolm", "type": "extends", "note": "沿用“音频token+Transformer语言模型”的思路，加入音素作为条件，从无条件续写变成指定文字的语音合成。"},
+    {"to": "encodec", "type": "uses", "note": "直接用EnCodec 6kbps配置的8层RVQ码本作为建模目标和波形解码器。"},
+    {"to": "soundstream", "type": "uses", "note": "残差向量量化的分层码本结构来自SoundStream，VALL-E据此把第1层和后续层分开建模。"},
+    {"to": "yourtts", "type": "solves", "note": "此前零样本TTS靠说话人向量，与真人音色相似度低；VALL-E靠提示续写把相似度从0.337提高到0.580。"},
+    {"to": "tacotron-2", "type": "rivals", "note": "放弃“文本→梅尔谱连续回归→声码器”的流水线，改为离散token上的条件语言建模。"},
+    {"to": "gpt-3", "type": "extends", "note": "把大语言模型的上下文学习搬到语音：提示录音就是“示例”，模型据此续写同一音色。"}
+  ],
+  "prereq": ["language-model", "autoregressive", "vector-quantization", "vocoder-codec", "in-context-learning", "phoneme-acoustic", "zero-few-shot"],
+  "terms": [
+    {"t": "零样本TTS", "d": "合成训练时从未见过的说话人的声音，只给一小段他的录音作为参考，不做任何微调。"},
+    {"t": "说话人相似度", "d": "用说话人识别模型把合成语音和真人录音各变成一个向量，计算余弦相似度，越接近1越像同一个人。"},
+    {"t": "CMOS / SMOS", "d": "人工评测分数。CMOS比较两个系统谁更自然（−3到3）；SMOS评价与目标说话人有多像（1到5）。"}
+  ],
+  "learn": "先读[[encodec]]弄懂RVQ码本，再读[[audiolm]]。原文读第4节（问题定义、AR与NAR两级模型、提示方式）和表2。动手：用开源复现（如社区的VALL-E实现）或[[encodec]]把一句话编码成8×T矩阵，观察只保留第1层与保留全部8层解码后的音质差别。",
+  "check": {"source": "https://arxiv.org/html/2301.02111v1", "confirmed": "arXiv 2023-01-05提交，微软团队；正文核对：EnCodec 24kHz、75Hz、8个1024项码本（6kbps）、AR/NAR两级、12层16头宽1024、LibriLight 6万小时约7000说话人、表2 WER 5.9/相似度0.580对YourTTS 7.7/0.337、CMOS+0.12与SMOS+0.93、局限部分（漏词重复、口音覆盖、两模型）与滥用风险说明。"}
+}

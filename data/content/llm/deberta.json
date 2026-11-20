@@ -1,0 +1,36 @@
+{
+  "id": "deberta",
+  "who": "Pengcheng He, Xiaodong Liu, Jianfeng Gao, Weizhu Chen · Microsoft",
+  "venue": "ICLR 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2006.03654"},
+    {"label": "官方代码", "url": "https://github.com/microsoft/DeBERTa"}
+  ],
+  "problem": "BERT把词向量和位置向量相加成一个向量再算注意力，内容和位置混在一起；“两个词相距多远”这一信息只能被间接学到。",
+  "idea": "每个词用两个向量分别表示内容和相对位置，注意力分数拆成“内容对内容、内容对位置、位置对内容”三项相加；绝对位置只在最后预测被遮住的词时才加入。",
+  "impact": "用RoBERTa一半的数据取得更好的理解类成绩，15亿参数版本首次在SuperGLUE上单模型超过人类基线，是编码器模型路线的最后一批主力之一。",
+  "background": "[[bert]]和[[roberta]]的输入是“词嵌入 + 绝对位置嵌入”相加的单个向量（见[[c:positional-encoding]]），自注意力分数就是两个这样的向量做内积。这样内容和位置纠缠在一起：模型想表达“我想关注离我两格远的那个词”，需要从混合向量里自己拆。\n\n[[relative-position]]（Shaw等，2018）提出在注意力里加入相对距离的嵌入，但只考虑了“查询词的内容”与“相对位置”的交互。DeBERTa认为反过来也重要：一个词对另一个词的关注，既取决于“我是什么词、对方离我多远”，也取决于“对方是什么词、我相对它在哪里”。",
+  "method": "**解耦注意力**。第i个词有内容向量`H_i`，位置由与另一个词j的相对距离`δ(i,j)`决定，距离截断在±k之内（预训练时k=512），每个距离对应一个相对位置向量。注意力分数是三项之和：\n\n`A_ij = Q_iᶜ·K_jᶜ + Q_iᶜ·K_δ(i,j)ʳ + K_jᶜ·Q_δ(j,i)ʳ`\n\n第一项是内容对内容，和普通注意力一样；第二项是“i的内容”对“j相对于i的位置”；第三项是“j的内容”对“i相对于j的位置”。位置对位置那一项在相对位置下几乎不带信息，被去掉。因为是三项相加，缩放因子从`√d`改成`√(3d)`。相对位置向量对所有查询共享，只需存2k个，计算开销可控。\n\n**增强的掩码解码器（EMD）**。只用相对位置有个问题：「a new store opened beside the new mall」中遮住store和mall，两个词的局部上下文几乎一样（都跟在new后面），但一个是主语一个不是。DeBERTa在所有Transformer层之后、预测被遮词的softmax之前，才把绝对位置加进来，让模型在“解码”时知道每个词在句中的位置。\n\n**SiFT**。微调时对归一化后的词嵌入加小扰动做虚拟对抗训练（[[c:adversarial-training]]），用于大模型上的稳定性。",
+  "results": "大模型（24层、隐藏维度1024）只用78GB预训练文本，就在多项任务上超过用160GB训练的RoBERTa-Large：MNLI 91.1 对 90.2，SQuAD v2.0 90.7 对 88.4，RACE阅读理解86.8 对 83.2。扩到48层、15亿参数后，单模型SuperGLUE宏平均89.9，首次超过人类基线89.8；集成模型90.3。",
+  "legacy": "DeBERTa（及其后续v2/v3）在2021–2022年是Kaggle和工业界文本分类、抽取任务的默认编码器之一。但同一时期研究重心正转向能生成的解码器大模型：[[gpt-3]]展示了不微调也能做任务，之后的[[t0]]、[[flan-t5]]把理解任务也改写成生成。“把位置信息放进注意力分数、而不是加到输入上”这一方向被生成式模型以更简洁的形式继承：[[rope]]用旋转让内积天然只依赖相对距离，[[alibi]]直接给分数加距离惩罚。2024年的[[modernbert]]则把RoPE等新组件装回BERT式编码器。",
+  "limits": [
+    {"text": "仍是只有编码器的掩码语言模型，不能直接生成文本，每个下游任务都要单独微调一份模型。", "solved_by": ["flan-t5"]},
+    {"text": "三项注意力分数比标准注意力多了位置投影和两次额外的矩阵乘法，相对位置截断在±512，不适合很长的输入。", "solved_by": ["rope", "modernbert"]},
+    {"text": "SuperGLUE超过人类基线只说明基准接近饱和，并不意味着具备人类水平的语言理解，评测需要更难的基准。", "solved_by": ["mmlu", "big-bench"]}
+  ],
+  "relations": [
+    {"to": "roberta", "type": "extends", "note": "在RoBERTa的训练配方上改注意力和解码层，用一半数据取得更好成绩。"},
+    {"to": "relative-position", "type": "extends", "note": "Shaw等只算“内容对相对位置”一项，DeBERTa补上“位置对内容”，并把内容和位置的表示完全分开。"},
+    {"to": "bert", "type": "solves", "note": "BERT把内容和绝对位置相加成一个向量，DeBERTa把两者解耦，并把绝对位置推迟到输出层使用。"},
+    {"to": "electra", "type": "rivals", "note": "同期改进BERT的另一条路线：ELECTRA改预训练目标，DeBERTa改注意力结构；后来的DeBERTa v3把两者合在一起。"},
+    {"to": "t5", "type": "rivals", "note": "在SuperGLUE排行榜上与110亿参数的T5竞争，DeBERTa以15亿参数取得更高分。"},
+    {"to": "glue", "type": "uses", "note": "主要在GLUE/SuperGLUE这类理解基准上评测。"}
+  ],
+  "prereq": ["self-attention", "positional-encoding", "masked-modeling", "pretrain-finetune", "embedding"],
+  "terms": [
+    {"t": "相对位置编码", "d": "不告诉模型“我在第几个位置”，而是告诉它“两个词相距几格”。对语言来说，相对距离往往比绝对位置更有用。"},
+    {"t": "SuperGLUE人类基线", "d": "用众包标注者在同一测试集上的成绩作为“人类水平”的参照，并非专家上限。"}
+  ],
+  "learn": "先读懂[[bert]]的掩码预训练和[[c:self-attention]]的公式。然后读原文第3.1节（解耦注意力的三项公式与相对距离δ的定义）和第3.2节（EMD的store/mall例子）。动手：在一个标准自注意力实现里加入第二、三项，打印同一句话在两种注意力下的分数矩阵对比。",
+  "check": {"source": "https://arxiv.org/abs/2006.03654", "confirmed": "标题、4位作者、arXiv v1于2020-06-05；摘要中MNLI 90.2→91.1、SQuAD v2.0 88.4→90.7、RACE 83.2→86.8、SuperGLUE 89.9/90.3对人类89.8、48层15亿参数；全文（ar5iv）的三项注意力公式、k=512、√(3d)缩放、78G对160G数据、store/mall例子。"}
+}

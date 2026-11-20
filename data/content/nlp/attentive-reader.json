@@ -1,0 +1,37 @@
+{
+  "id": "attentive-reader",
+  "who": "Karl Moritz Hermann, Tomáš Kočiský, Edward Grefenstette, Lasse Espeholt, Will Kay, Mustafa Suleyman, Phil Blunsom · Google DeepMind、牛津大学",
+  "venue": "NeurIPS 2015",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1506.03340"},
+    {"label": "数据集构造代码", "url": "https://github.com/deepmind/rc-data"},
+    {"label": "Chen等人对该数据集的分析", "url": "https://arxiv.org/abs/1606.02858"}
+  ],
+  "problem": "阅读理解一直没有大规模监督数据：现成的问答测试集只有几百题，只能拿来测试，神经网络无从训练，系统只好靠手写语法或信息抽取管线。",
+  "idea": "把CNN和Daily Mail新闻的要点摘要改成完形填空题（挖掉一个实体让模型填），自动得到约100万个“文章-问题-答案”三元组；再用双向LSTM加注意力，让模型按问题去文章里找答案。",
+  "impact": "第一次让阅读理解成为可以端到端训练的监督学习任务，CNN/DM语料后来又成为神经摘要的标准数据集；“按问题对文章做注意力”成为之后SQuAD一代模型的基本骨架。",
+  "background": "2015年之前，让机器“读懂一篇文章再回答问题”主要有两条路：手写语法规则，或者先用信息抽取把文章拆成（主语，谓词，宾语）三元组存成数据库再查询。两者都依赖脆弱的分析管线。监督学习几乎没人做，因为没有数据：人工标注的阅读理解集只有几百道题。也有人用程序生成合成故事和问题（如bAbI），数据要多少有多少，但那是封闭的小世界，和真实新闻的复杂与噪声相差很远。",
+  "method": "**造数据**。CNN和Daily Mail的每篇文章都配有几条人写的要点摘要，而且是改写过的，不是照抄原句。作者把要点里的某个实体换成占位符X，就得到一道完形填空题，答案是被挖掉的实体。共收集CNN约9.3万篇、Daily Mail约22万篇文章，合计约100万道题。\n\n**实体匿名化**。为了不让模型靠常识作弊（比如“X是英国首相”直接猜名人），先做共指消解，把所有实体换成`ent381`这类编号，并且每次读取样本时随机打乱编号。这样模型必须真的在文章里找到答案。\n\n**Attentive Reader**。用两个双向[[c:recurrent-layer]]（[[lstm]]）分别读文章和问题。问题压成一个向量`u`（正反两个方向的最后状态拼接），文章每个位置得到向量`y_d(t)`。然后按问题对文章做注意力（见[[c:attention-concept]]）：\n\n`m(t) = tanh(W_ym·y_d(t) + W_um·u)`，`s(t) ∝ exp(w_msᵀ·m(t))`，`r = Σ_t s(t)·y_d(t)`\n\n`s(t)`就是第t个词被关注的程度。最后把文章摘要`r`与问题`u`组合成`g = tanh(W_rg·r + W_ug·u)`，在候选实体上做[[c:softmax]]分类。另有**Impatient Reader**，每读问题的一个词就重新看一遍文章。",
+  "results": "测试集准确率（CNN / Daily Mail）：Attentive Reader为63.0% / 69.0%，Impatient Reader为63.8% / 68.0%；不用注意力、把文章和问题串起来读的Deep LSTM Reader为57.0% / 62.2%；把注意力权重全设成相等的Uniform Reader只有39.4% / 34.4%。基于框架语义分析的传统管线为40.2% / 35.5%，按词距离对齐的启发式基线为50.9% / 55.5%。注意力权重画成热力图后能看到模型确实盯住了答案附近的句子。",
+  "legacy": "一年后，Chen、Bolton和Manning用一个更简单的注意力模型在同一数据上做到73.6% / 76.6%，并人工检查发现约25%的样本因共指错误或问题含糊几乎无法回答，说明数据集离天花板不远、噪声不小。同期[[squad]]用众包让人针对维基百科段落出题、答案是原文片段，取代完形填空成为主流基准，[[match-lstm]]、[[bidaf]]、[[drqa]]都沿用了“问题向量对文章逐词注意力”的思路。CNN/DM语料则被[[pointer-generator]]等工作改造成摘要数据集，沿用至今。",
+  "limits": [
+    {"text": "完形填空题由摘要自动生成，加上共指消解出错，约四分之一样本含糊或无解，题目也偏浅，测不出真正的推理。", "solved_by": ["squad"]},
+    {"text": "答案只能是文章中出现过的匿名实体，不能回答需要一段原文或自由文本作答的问题。", "solved_by": ["match-lstm", "squad"]},
+    {"text": "整篇文章被压成一个加权平均向量r后才做判断，注意力只做一次，细粒度的问题-文章交互在早期就被丢掉。", "solved_by": ["bidaf"]},
+    {"text": "每题都给定了相关文章，没有处理“先从海量文档里找到相关段落”的检索问题。", "solved_by": ["drqa"]}
+  ],
+  "relations": [
+    {"to": "bahdanau-attention", "type": "extends", "note": "把翻译中“解码器按当前状态对源句加权”的注意力搬到阅读理解：用问题向量对文章每个词打分加权。"},
+    {"to": "lstm", "type": "uses", "note": "文章和问题都用双向LSTM编码，Deep LSTM Reader更是直接把文章和问题串起来让LSTM读完。"},
+    {"to": "memn2n", "type": "extends", "note": "论文自述是记忆网络问答的推广：记忆网络在句子级、用词袋表示做注意力，Attentive Reader改成在词级、用带上下文的LSTM表示做注意力。"},
+    {"to": "memory-networks", "type": "rivals", "note": "记忆网络主要在合成的bAbI问答上验证，本文认为合成数据难以迁移到真实文本，改为构造真实新闻上的大规模数据。"}
+  ],
+  "prereq": ["recurrent-layer", "attention-concept", "softmax", "embedding", "supervised-learning"],
+  "terms": [
+    {"t": "完形填空（Cloze）题", "d": "把一句话里的某个词挖掉让人填回去的题型。这里挖掉的是摘要中的一个实体。"},
+    {"t": "实体匿名化", "d": "把文中的人名、机构名等统一换成无意义的编号（ent1、ent2…），并每次随机重排，迫使模型从文章本身而不是背下来的常识里找答案。"},
+    {"t": "共指消解", "d": "判断文中哪些说法指的是同一个对象，例如“克拉克森”“他”“这位主持人”。"}
+  ],
+  "learn": "先补[[c:attention-concept]]和[[c:recurrent-layer]]，读过[[bahdanau-attention]]。读原文第2节（数据怎么造、为什么要匿名化）和第3.2节Attentive Reader的三行公式，再看表5。接着读Chen等人2016年的分析论文，体会“模型分数高”和“数据集真能测出理解”之间的差别。动手：用PyTorch实现一个双向LSTM加问题注意力的读者模型，在CNN数据的一小部分上训练。",
+  "check": {"source": "https://arxiv.org/html/1506.03340", "confirmed": "标题、7位作者、arXiv首次提交2015-06-10；第2节CNN 93k、Daily Mail 220k篇文章与约1M数据点，表1查询数（CNN训练380,298、Daily Mail训练879,450），Attentive Reader公式，表5各模型测试准确率（63.0/69.0、63.8/68.0、57.0/62.2、39.4/34.4、40.2/35.5、50.9/55.5）。另核对arXiv 1606.02858：73.6%/76.6%与约25%样本属共指错误或含糊。"}
+}

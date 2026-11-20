@@ -1,0 +1,33 @@
+{
+  "id": "graves-deep-rnn",
+  "who": "Alex Graves, Abdel-rahman Mohamed, Geoffrey Hinton · 多伦多大学",
+  "venue": "ICASSP 2013",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1303.5778"}
+  ],
+  "problem": "CTC加LSTM在手写识别上很成功，但在语音上一直打不过深层前馈网络；当时的RNN都只有一层，缺少深度。",
+  "idea": "把多层双向LSTM一层层堆起来，用CTC或RNN-Transducer端到端训练，再配合权重噪声正则化。",
+  "impact": "在TIMIT音素识别上做到17.7%，第一次让循环网络超过深层前馈网络，此后深层双向LSTM成为语音识别的主力结构好几年。",
+  "background": "2012年，[[dnn-hmm]]用深层前馈网络把语音识别的错误率大幅拉低，但前馈网络每次只看固定的十几帧。循环网络（见[[c:recurrent-layer]]）理论上能用整句上下文，[[ctc]]又让它可以不靠逐帧对齐直接学习“声音序列→音素序列”（见[[c:sequence-alignment]]），[[lstm]]加CTC已在手写识别上拿到当时最好的成绩。可在语音上，RNN的成绩一直不如深层前馈网络。作者认为差在“深”：此前的RNN只有一个循环层，而DNN的成功恰恰来自多层表示。",
+  "method": "**深层双向LSTM**。每一层同时有一个从左往右和一个从右往左的LSTM，两者的输出拼起来交给上一层，这样每一帧的表示既看到过去也看到未来；这样的层堆1到5层。\n\n**两种输出方式**。一是[[ctc]]：每帧输出一个音素或“空白”的概率，训练时对所有可能的对齐路径求和。二是[[rnn-t]]（论文称Transducer）：额外加一个只看已输出音素的预测网络，相当于一个内置的音素语言模型，弥补CTC各帧输出相互独立的假设。还有一种做法是先分别训好CTC网络和预测网络，再拿它们初始化Transducer（称PreTrans）。\n\n**正则化**。先正常训练到验证集似然最高，再在权重上加标准差0.075的高斯噪声继续训练。输入是40维梅尔滤波器组加能量及一、二阶差分，共123维。",
+  "results": "TIMIT核心测试集音素错误率：CTC从1层的23.9%降到5层的18.4%；参数量都约380万时，tanh单元的三层网络是37.6%，单向LSTM是19.6%，双向LSTM是18.6%，说明LSTM、双向和深度都关键，且深度比加宽更重要。预训练初始化的三层Transducer达到17.7%，低于当时DNN系统约20.5%–20.7%的最好成绩。作者也说明所有实验只跑了一次，随机性带来的方差未知。",
+  "legacy": "这篇论文让“深层双向LSTM加CTC/Transducer”成为端到端语音识别的标准起点：[[deepspeech]]和[[deepspeech-2]]用的就是循环网络加CTC，[[lstm-am]]把深层LSTM搬到大词汇量的混合系统里。Transducer这条线后来发展成[[streaming-rnnt-mobile]]那样的手机端流式识别。2020年前后，LSTM编码器被[[conformer]]等基于注意力的结构取代。",
+  "limits": [
+    {"text": "只在TIMIT这个约5小时的小规模音素识别任务上验证，没有做大词汇量、按词计分的识别。", "solved_by": ["lstm-am", "deepspeech"]},
+    {"text": "双向结构要等整句说完才能输出结果，不能边听边识别。", "solved_by": ["streaming-rnnt-mobile"]},
+    {"text": "LSTM逐帧递归，长句训练无法在时间维度上并行，训练一个模型要上百轮。", "solved_by": ["conformer"]}
+  ],
+  "relations": [
+    {"to": "ctc", "type": "uses", "note": "主要训练目标就是CTC，用它绕开逐帧对齐。"},
+    {"to": "rnn-t", "type": "extends", "note": "把Graves自己几个月前提出的Transducer与深层双向LSTM结合，并用预训练初始化，拿到最好的17.7%。"},
+    {"to": "lstm", "type": "uses", "note": "以LSTM作为循环单元；同等参数下tanh单元的RNN错误率高出一倍。"},
+    {"to": "dnn-hmm", "type": "rivals", "note": "同一时期的深层前馈混合系统路线；这篇证明加了深度的RNN在TIMIT上能超过它。"},
+    {"to": "timit", "type": "uses", "note": "全部实验都在TIMIT上做：462名说话人训练，24人核心测试集评测，61个音素训练、映射成39类计分。"},
+    {"to": "mohamed-dbn-phone", "type": "rivals", "note": "同一实验室在TIMIT上的DBN前馈方案；深层LSTM在同一基准上把错误率进一步压低。"}
+  ],
+  "terms": [
+    {"t": "双向RNN", "d": "同时用一个正向和一个反向的循环网络读整个序列，再把两边在每个时刻的状态拼起来，使每一帧都能利用前后文。"},
+    {"t": "权重噪声", "d": "训练时给网络权重加上随机高斯扰动，迫使模型对参数的小变化不敏感，是一种正则化手段。"}
+  ],
+  "check": {"source": "https://arxiv.org/abs/1303.5778", "confirmed": "标题、3位作者、arXiv首次提交2013-03-22；正文表1：CTC 1层23.9%→5层18.4%，tanh 37.6%、单向19.6%、双向18.6%，PreTrans 17.7%；噪声σ=0.075；输入123维；实验只跑一次。"}
+}

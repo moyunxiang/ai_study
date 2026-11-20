@@ -1,0 +1,42 @@
+{
+  "id": "muon",
+  "who": "Keller Jordan, Yuchen Jin, Vlado Boza, Jiacheng You, Franz Cesista, Laker Newhouse, Jeremy Bernstein · 个人博客与modded-nanogpt速通社区",
+  "venue": "技术博客 2024-12",
+  "links": [
+    {"label": "原始博客", "url": "https://kellerjordan.github.io/posts/muon/"},
+    {"label": "modded-nanogpt速通仓库", "url": "https://github.com/KellerJordan/modded-nanogpt"},
+    {"label": "Old Optimizer, New Norm（理论来源）", "url": "https://arxiv.org/abs/2409.20325"}
+  ],
+  "problem": "AdamW统治大模型训练多年，号称更好的新优化器大多因为对比的AdamW基线没调好而无法复现；同时Adam逐坐标缩放，不利用权重是一个矩阵这一结构。",
+  "idea": "对隐藏层的每个权重矩阵，先算动量，再用5步Newton–Schulz迭代把动量矩阵近似正交化（奇异值都拉到1附近）作为更新方向；嵌入层、输出层和向量参数仍用AdamW。",
+  "impact": "在公开的NanoGPT训练速通竞赛中把纪录提速35%，此后一直被保留；训练1.5B模型达到GPT-2 XL水平只需10个8×H100小时（AdamW要13.3小时）。后被Moonlight、Kimi K2扩展到大模型。",
+  "background": "[[adam]]和[[adamw]]对每个参数坐标单独估计梯度尺度，不管这些坐标同属一个矩阵。利用矩阵结构的二阶方法如[[kfac]]、[[shampoo]]理论上更好，但要算矩阵的逆四次方根，开销大、要高精度，很少用于大模型预训练。\n\n另一个问题是证据。作者认为优化器文献里“坟场”般堆满了号称打败AdamW却没人采用的方法，最常见的原因是对比时AdamW没调好。[[modded-nanogpt]]提供了一个检验场：在[[nanogpt]]的GPT-2小模型上，比谁用最少时间把FineWeb验证损失降到3.28。纪录本身就是调得最好的基线，新方法若是虚假的改进，下一个人把它换回AdamW就能刷新纪录。",
+  "method": "**定义**。对每个二维权重矩阵W，取小批量梯度G：\n\n`B ← μB + G`（[[momentum]]，默认用Nesterov形式）\n`O ← NewtonSchulz5(B)`\n`W ← W − η·O`\n\n**正交化是什么**。设`B = USVᵀ`（[[c:eigen-svd]]），正交化就是把它换成`UVᵀ`：保留方向，所有奇异值变成1。作者观察到SGD动量和Adam给Transformer矩阵的更新条件数很大，几乎是低秩的，少数方向占了主导；正交化等于放大那些幅度小但对学习同样重要的“稀有方向”。\n\n**为什么用Newton–Schulz**。直接做SVD太慢。先把B除以它的Frobenius范数，使奇异值落在[0,1]，再迭代`X ← aX + b(XXᵀ)X + c(XXᵀ)²X`。每一步相当于对每个奇异值s做`φ(s) = as + bs³ + cs⁵`，系数(3.4445, −4.7750, 2.0315)让小奇异值快速升到0.7到1.3之间；不要求精确到1，经验上不影响训练。迭代只用矩阵乘法，可以在bfloat16下稳定运行。\n\n**代价**。额外计算约为`T·m/B`（T=5步，m为模型宽度，B为每批token数）：NanoGPT速通约0.7%，若用于Llama 405B训练约0.5%。显存与SGD动量相同，只存一份动量，比Adam少一半。\n\n**与Shampoo的关系**。Shampoo去掉累积后，更新`(GGᵀ)^{−1/4} G (GᵀG)^{−1/4}`恰好等于`UVᵀ`，所以Muon可看作“无累积的Shampoo”加动量，并换成更便宜的迭代。",
+  "results": "博客列出的结果：CIFAR-10训练到94%精度的速度纪录从3.3降到2.6个A100秒；NanoGPT速通纪录提速1.35倍，并在774M和1.5B参数上继续显示优势；1.5B参数Transformer在HellaSwag上达到GPT-2 XL水平只需10个8×H100小时，同样目标AdamW需13.3小时。2024年10月15日换用Muon创下纪录后，之后由7位研究者刷新的12个纪录都保留了Muon。",
+  "legacy": "博客结尾留下的问题——能否扩展到20B以上参数、能否在大集群上高效分布式实现——几个月内就有了回答：[[muon-scalable]]加入权重衰减并按矩阵形状调整更新尺度，训练了16B参数的MoE模型Moonlight；[[kimi-k2]]在万亿参数规模上用它的改进版MuonClip，解决注意力logit爆炸。[[deepseek-v4]]等后续模型也采用了Muon。它让“按矩阵整体设计更新”的优化器重新成为研究热点。",
+  "pitfalls": "- Muon只用于隐藏层的二维矩阵；嵌入层、最后的分类头以及偏置、归一化增益仍要用AdamW，否则效果变差。\n- 正交化后更新的整体尺度与AdamW不同，直接沿用AdamW的学习率不行；要么重调，要么按[[muon-scalable]]的方法换算。\n- 主要证据来自小模型速通竞赛，博客本身不是同行评审论文；作者明确把大规模、微调和强化学习上的效果列为未知。",
+  "limits": [
+    {"text": "只在约15亿参数以下验证，能否扩展到数百亿参数、上万亿token的训练当时未知。", "solved_by": ["muon-scalable", "kimi-k2"]},
+    {"text": "Newton–Schulz需要完整的梯度矩阵，在按参数切分的大规模分布式训练中如何高效实现没有答案。", "solved_by": ["muon-scalable"]},
+    {"text": "原版不含权重衰减，更新尺度也与AdamW不匹配，长时间训练时权重和激活会变得过大。", "solved_by": ["muon-scalable"]},
+    {"text": "在更大模型上，注意力logit会持续增大，造成损失尖峰。", "solved_by": ["kimi-k2"]},
+    {"text": "微调和强化学习阶段是否同样有效，以及为什么输出层必须用AdamW，都缺少理论解释。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "momentum", "type": "uses", "note": "Muon的第一步就是普通的SGD动量（Nesterov形式），正交化只是对动量矩阵的后处理。"},
+    {"to": "shampoo", "type": "extends", "note": "去掉预条件累积的Shampoo更新恰好是正交化的梯度；Muon加上动量，并用Newton–Schulz代替昂贵的逆四次方根。"},
+    {"to": "adamw", "type": "rivals", "note": "在NanoGPT速通中样本效率和墙钟时间都胜过精调的AdamW，但嵌入层和输出层仍交给AdamW。"},
+    {"to": "nanogpt", "type": "uses", "note": "以nanoGPT的GPT-2小模型训练为基准任务，证据主要来自在其上的速通纪录。"},
+    {"to": "modded-nanogpt", "type": "uses", "note": "借助速通竞赛的“纪录即最强基线”机制，回避了新优化器常见的弱基线问题。"},
+    {"to": "kfac", "type": "rivals", "note": "同样利用矩阵结构改造梯度，但不估计曲率，只需几次矩阵乘法，开销低于1%。"}
+  ],
+  "prereq": ["gradient-descent", "momentum", "adaptive-optimizer", "eigen-svd", "matrix-multiplication", "learning-rate"],
+  "terms": [
+    {"t": "正交化", "d": "把矩阵的奇异值分解USVᵀ换成UVᵀ，保持方向不变、把所有奇异值变成1。"},
+    {"t": "Newton–Schulz迭代", "d": "只用矩阵乘法逐步把矩阵推向最近的正交矩阵的迭代法，比SVD快，能在低精度下运行。"},
+    {"t": "条件数", "d": "最大奇异值与最小奇异值之比；越大说明矩阵越接近低秩，少数方向占主导。"},
+    {"t": "训练速通", "d": "公开竞赛：在固定硬件上用最短时间把模型训练到指定验证损失，所有改动都要能复现。"}
+  ],
+  "learn": "先补[[c:eigen-svd]]和[[c:momentum]]，看懂[[adamw]]的更新规则。读博客的“Design”一节，自己验证一步Newton–Schulz等于对奇异值作用一个五次多项式；再读与Shampoo关系一节。动手：在numpy里对随机矩阵跑5步迭代，画出奇异值前后的分布；然后在nanoGPT上把隐藏层换成Muon、其余参数用AdamW，对比验证损失曲线。",
+  "check": {"source": "https://kellerjordan.github.io/posts/muon/", "confirmed": "博客日期2024-12-08、作者列表（引用条目）；定义与NewtonSchulz5代码、系数(3.4445, −4.7750, 2.0315)、5步、奇异值落在0.7–1.3、bfloat16稳定；CIFAR-10 3.3→2.6 A100秒、NanoGPT 1.35倍、774M与1.5B、10对13.3个8×H100小时；FLOP开销公式及0.7%、0.5%；与Shampoo的推导；嵌入与输出层用AdamW、Nesterov、QKV分开；10/15/24纪录提速35%、之后12个纪录7位研究者；开放问题（20B+、分布式、微调与RL）。Muon is Scalable摘要（arXiv 2502.16982）：权重衰减、更新尺度、Moonlight 16B、5.7T。Kimi K2的MuonClip依据本站kimi-k2节点所核对的arXiv 2507.20534。"}
+}

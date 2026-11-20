@@ -1,0 +1,37 @@
+{
+  "id": "options",
+  "who": "Richard S. Sutton, Doina Precup, Satinder Singh · AT&T实验室 / 马萨诸塞大学",
+  "venue": "Artificial Intelligence 112, 1999",
+  "links": [
+    {"label": "论文PDF（Sutton主页）", "url": "http://incompleteideas.net/papers/SPS-aij.pdf"},
+    {"label": "Wikipedia：Hierarchical RL", "url": "https://en.wikipedia.org/wiki/Hierarchical_reinforcement_learning"}
+  ],
+  "problem": "MDP里的动作都只持续一步：要“走到隔壁房间”，就得一格一格地规划和学习。人类和机器人显然在多个时间尺度上思考，但这种“持续一段时间的动作”在RL里没有统一、可证明的表述。",
+  "idea": "定义option：一个可以在某些状态启动（启动集I）、按自己的策略π执行、按终止条件β随机结束的“宏动作”。原始动作是只持续一步的option；在option之上，问题变成半马尔可夫决策过程，规划和Q学习都可以照搬。",
+  "impact": "成为分层强化学习的标准框架，Option-Critic、FeUdal Networks、技能发现等工作都用这套语言；Sutton近年的Alberta计划和OaK架构仍把option作为核心部件。",
+  "background": "[[q-learning]]和[[dyna]]里，智能体每一步只能选一个原始动作，价值也只在相邻两步之间传播。在一个四房间的网格里，从一个房间走到另一个房间要十几步，价值信息就得经过十几轮迭代才能传过去。\n\n分层的想法早已有之：[[feudal-rl]]让上级给下级派目标；经典规划里有宏操作符（把几步操作打包成一个）。但它们各有专门的结构，没有和MDP理论对接；半马尔可夫决策过程（SMDP）理论能处理持续时间不等的动作，却把这些动作当作不透明的黑箱，无法利用其内部结构。",
+  "method": "**option的定义**：三元组`⟨I, π, β⟩`。只在启动集`I`中的状态可以开始；开始后按策略`π`选原始动作；每到一个新状态`s`，以概率`β(s)`结束，然后由上层重新选择。例如“开门”：在门前可启动，策略是伸手、握把、转动，门开了就终止。\n\n**与SMDP的关系**：在一组option上做决策就是一个SMDP，于是有option版的Bellman方程和**SMDP Q学习**（见[[c:bellman-equation]]）：\n\n`Q(s, o) ← Q(s, o) + α[r + γᵏ max_{o′} Q(s′, o′) − Q(s, o)]`\n\n其中`k`是option执行的步数，`r`是这期间的折扣累计奖励。\n\n**介于MDP与SMDP之间**：论文的新东西都来自“打开黑箱”：（1）**中断**：执行中若发现换一个option更好（`Q(s,o) < V(s)`）就提前终止，定理2证明这样不会变差；（2）**option内学习**：执行某个option的每一步，都能顺便更新所有与这一步一致的option的价值，不必等它跑完；（3）**子目标**：给option的终止状态设子目标值，用来学习或改进option自身。",
+  "results": "四房间网格（动作2/3概率按意愿移动，`γ = 0.9`）中，每个房间给两个“走到门口”的option。用价值迭代规划：只用原始动作时，每迭代一次准确价值只往外扩一格；用门口option时，第一次迭代与目标相邻的房间全部估准，第二次所有状态都估准——规划从“逐格”变成“逐房间”。目标在房间中央时，原始动作加option的组合到第4次迭代就基本得到正确价值，而只用原始动作此时只有离目标3步以内的状态有非零值。SMDP Q学习中，带option的方法第一回合就快得多地到达目标。",
+  "legacy": "[[option-critic]]用策略梯度端到端地同时学option的策略和终止条件；[[feudal-networks]]把封建式分层与深度网络结合；[[diayn]]等无监督技能发现可以看成自动产生option。Sutton后来的[[alberta-plan]]和[[oak]]把“由子目标产生option、再学习option模型用于规划”作为通往通用智能体的主线。",
+  "pitfalls": "- option不只是固定的动作序列（开环宏），它是闭环策略：执行中会根据当前状态选动作，也可以按β随机结束。\n- 加入更多option并不保证规划更快；论文引用的结果表明，option用得不当反而会拖慢价值迭代。",
+  "limits": [
+    {"text": "option和子目标都要人事先给定，论文明确不讨论子目标从何而来。", "solved_by": ["option-critic", "diayn"]},
+    {"text": "option并不必然降低计算量，加得太多或初值不当反而会拖慢规划。", "solved_by": []},
+    {"text": "实验都在表格小网格上，与函数近似、状态抽象的结合以及子任务之间的迁移，论文自认尚未解决。", "solved_by": ["feudal-networks", "option-critic"]}
+  ],
+  "relations": [
+    {"to": "q-learning", "type": "extends", "note": "把Q学习从原始动作推广到持续多步的option，得到SMDP Q学习和option内Q学习。"},
+    {"to": "feudal-rl", "type": "rivals", "note": "封建式RL用固定的管理者-下属层级传达目标；options不规定层级结构，任何闭环子策略都可以和原始动作混用。"},
+    {"to": "dyna", "type": "extends", "note": "沿用“学模型再规划”的思路，但模型是option级的：直接预测执行完一个option后会到哪里、得多少奖励。"},
+    {"to": "howard-policy-iteration", "type": "extends", "note": "中断定理是策略改进定理在半马尔可夫option上的推广。"},
+    {"to": "strips", "type": "solves", "note": "经典规划的宏操作符是确定性的开环序列；option是带随机终止的闭环策略，并有完整的价值理论。"}
+  ],
+  "prereq": ["mdp", "bellman-equation", "policy-value", "td-error", "model-based-rl"],
+  "terms": [
+    {"t": "option", "d": "可在一段时间内持续执行的闭环“宏动作”，由启动集、内部策略和终止条件三部分组成。"},
+    {"t": "半马尔可夫决策过程（SMDP）", "d": "动作的持续时间可以不同、且是随机的决策过程；在option上做决策就是一个SMDP。"},
+    {"t": "option内学习", "d": "执行一个option的每一步，都用这一步的经验同时更新所有与之一致的option的价值或模型，而不是等option结束才更新一次。"}
+  ],
+  "learn": "先掌握表格Q学习和价值迭代。读原文第2节（option定义）、第3节（四房间规划与SMDP Q学习）和第4节（中断）。动手：实现四房间网格，分别用原始动作、门口option、两者混合做Q学习，画出每回合步数曲线，复现图6。",
+  "check": {"source": "http://incompleteideas.net/papers/SPS-aij.pdf", "confirmed": "原文PDF：标题、三位作者与单位、Artificial Intelligence 112 (1999) 181–211；option三元组定义、SMDP Q学习更新式、定理2（中断）；四房间：2/3与1/9的移动概率、γ=0.9、8个门口option、价值迭代第1/2次迭代结果、目标在房间中央时第4次迭代、ε=0.1；结论中“子目标来源、状态抽象、迁移尚未解决”。"}
+}

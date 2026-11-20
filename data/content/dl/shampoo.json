@@ -1,0 +1,52 @@
+{
+ "id": "shampoo",
+ "who": "Gupta, Koren, Singer · Google Brain / Princeton",
+ "venue": "ICML 2018",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/1802.09568"
+  }
+ ],
+ "problem": "[[adagrad]]类方法只用对角预条件，丢掉了参数之间的相关性；完整矩阵预条件虽然更强，却要存储和求逆维度平方的矩阵，无法用在大模型上。",
+ "idea": "对每个张量参数，沿每个维度各维护一个小的预条件矩阵，用它们左右乘梯度，形成对完整预条件的Kronecker近似。",
+ "impact": "一种内存和计算开销可接受的非对角优化器，其思想是后续大规模训练里Distributed Shampoo和Muon等方法的来源。",
+ "method": "以一个权重矩阵W（m×n）为例，Shampoo维护一个m×m的左预条件L和一个n×n的右预条件R，它们分别累积梯度G的`GGᵀ`与`GᵀG`。更新为`W ← W − η · L^{−1/4} G R^{−1/4}`：沿行方向和列方向各自缩放梯度，相当于对完整矩阵预条件的一个Kronecker积近似。对更高阶张量，每个维度各有一个预条件矩阵，其余维度被收缩掉。因此存储只需`m² + n²`而不是`(mn)²`。\n\n作者证明了随机凸优化中的收敛保证，证明基于矩阵迹不等式；摘要称在最先进的深度学习模型上收敛明显快于常用优化器，且每步运行时间与SGD、AdaGrad、Adam相当。",
+ "limits": [
+  {
+   "text": "需要定期计算矩阵的逆根，在GPU上开销大且数值敏感；对特别宽的层，预条件矩阵本身依然很大，大规模使用需要大量工程优化。",
+   "solved_by": [
+    "muon"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "adagrad",
+   "type": "extends",
+   "note": "把AdaGrad的对角预条件推广为逐维度的矩阵预条件，保留参数间的相关性"
+  },
+  {
+   "to": "kfac",
+   "type": "rivals",
+   "note": "同样用Kronecker结构的预条件；K-FAC基于Fisher信息和层的输入输出统计，Shampoo基于梯度本身的累积"
+  },
+  {
+   "to": "adam",
+   "type": "rivals",
+   "note": "主流自适应优化器，对角预条件；Shampoo尝试用更强的预条件在收敛速度上超越它"
+  }
+ ],
+ "prereq": [
+  "adaptive-optimizer",
+  "jacobian-hessian",
+  "matrix-multiplication",
+  "gradient-descent"
+ ],
+ "terms": [],
+ "learn": "先复习AdaGrad，读原文第1–3节（算法1），再看后续Distributed Shampoo的工程实现，在小MLP上手写矩阵版Shampoo。",
+ "check": {
+  "source": "https://arxiv.org/abs/1802.09568",
+  "confirmed": "标题、作者、2018-02-26首次提交；摘要称Shampoo为每个维度维护预条件矩阵，建立了随机凸设置下的收敛保证，在先进深度学习模型上收敛更快，每步时间与SGD、AdaGrad、Adam相当。更新公式为我对原文算法的转述。"
+ }
+}

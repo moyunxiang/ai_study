@@ -1,0 +1,50 @@
+{
+  "id": "bnn",
+  "who": "Matthieu Courbariaux, Itay Hubara, Daniel Soudry, Ran El-Yaniv, Yoshua Bengio",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1602.02830"
+    }
+  ],
+  "problem": "[[deep-compression]]把权重压到5位，但推理时仍是浮点乘加；能不能让权重和激活都只有+1或-1，把乘法换成按位运算？",
+  "idea": "训练时用二值权重和激活做前向，用实数权重做累积更新，反向时用直通估计器（STE）绕过符号函数不可导的问题。",
+  "impact": "证明了权重与激活都二值化的网络可以训练，并在专用核上显著加速，开启极低比特网络研究。",
+  "method": "前向传播中，权重和激活都经过符号函数变成+1或-1，于是乘法变成同号为+1的异或运算，累加用计数（popcount）实现。符号函数的导数几乎处处为零，无法反传，作者用直通估计器：反向时把梯度当作恒等传过去，但当输入绝对值超过1时置零。为了让小的梯度更新有效，网络保留实数权重作为「隐权重」，每步更新它，前向时再二值化。\n\n论文在Torch7和[[theano]]上实验，在MNIST、CIFAR-10、SVHN上达到接近当时最好的结果；用自写的二值矩阵乘GPU核，MNIST网络的推理比未优化核快7倍。",
+  "limits": [
+    {
+      "text": "在ImageNet这类大数据集上精度损失明显，论文只验证了小数据集。",
+      "solved_by": [
+        "xnor-net"
+      ]
+    },
+    {
+      "text": "训练仍需保留实数权重和浮点梯度，训练开销没有降低。",
+      "solved_by": [
+        "bitnet"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "deep-compression",
+      "type": "extends",
+      "note": "把降低权重位数推到极端：权重和激活都是1位。"
+    },
+    {
+      "to": "theano",
+      "type": "uses",
+      "note": "实验在Theano和Torch7两个框架上实现。"
+    }
+  ],
+  "prereq": [
+    "backpropagation",
+    "neuron-activation",
+    "params-flops"
+  ],
+  "learn": "读摘要和第1节；用PyTorch实现带STE的sign函数，训练一个二值MLP。",
+  "check": {
+    "source": "https://arxiv.org/abs/1602.02830",
+    "confirmed": "arXiv abs页：Binarized Neural Networks，Courbariaux、Hubara、Soudry、El-Yaniv、Bengio，日期2016/02/09；摘要中的MNIST/CIFAR-10/SVHN、Torch7与Theano、GPU核加速7倍。STE细节为一般了解。"
+  }
+}

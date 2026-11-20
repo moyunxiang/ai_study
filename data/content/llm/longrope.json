@@ -1,0 +1,55 @@
+{
+  "id": "longrope",
+  "who": "Yiran Ding, Li Lyna Zhang, Chengruidong Zhang 等 · Microsoft Research",
+  "venue": "ICML 2024",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2402.13753"
+    }
+  ],
+  "problem": "把[[rope]]模型的窗口拉长，需要微调很长的文本，而长文本稀缺、微调昂贵，当时窗口大多停在约128K。",
+  "idea": "用搜索找出RoPE各维度、各位置的非均匀缩放系数，再分阶段微调，把窗口推到2048K个token。",
+  "impact": "说明预训练模型只靠改动位置编码加极少的微调，就能把窗口放大数十倍，且基本保住短文本性能。",
+  "method": "[[position-interpolation]]和[[yarn]]把长位置按统一比例压缩回训练过的范围。LongRoPE发现这种压缩应该是非均匀的：RoPE不同维度的频率不同、序列开头的若干token也该区别对待。于是用一个高效搜索为每个维度找出缩放系数，作为微调前更好的初始化；不微调时就能实现8倍的窗口扩展。\n\n第二步是渐进扩展：先微调到256K长度，再在已扩展的模型上做第二次位置插值，得到2048K窗口，微调只需约1K步（训练长度256K以内）。最后在8K长度上重新调整系数，找回短文本性能。\n\n实验在LLaMA2和Mistral上，模型结构只改了位置编码部分，可以复用已有优化。",
+  "limits": [
+    {
+      "text": "2048K窗口是外推出来的，在这么长的输入上真正能用多少信息（而不只是困惑度不爆）需要另外检验。",
+      "solved_by": [
+        "ruler"
+      ]
+    },
+    {
+      "text": "每个模型都要单独搜索系数，并且长窗口下短文本性能需要额外再校准。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "yarn",
+      "type": "extends",
+      "note": "同样改RoPE插值，但把统一缩放换成按维度搜索的非均匀缩放。"
+    },
+    {
+      "to": "position-interpolation",
+      "type": "extends",
+      "note": "在线性位置插值的基础上，引入非均匀性和渐进式扩展。"
+    },
+    {
+      "to": "rope",
+      "type": "uses",
+      "note": "整个方法只修改RoPE的频率缩放，不改模型其余部分。"
+    }
+  ],
+  "prereq": [
+    "positional-encoding",
+    "context-window",
+    "self-attention",
+    "pretrain-finetune"
+  ],
+  "learn": "先读[[rope]]与[[position-interpolation]]；然后读原文第3节的非均匀性分析和搜索流程；动手：用不同的插值比例，观察长输入上困惑度的变化。",
+  "check": {
+    "source": "https://arxiv.org/abs/2402.13753",
+    "confirmed": "标题、8位作者、arXiv首次提交2024-02-21；摘要中2048k窗口、最多约1k步微调、8倍无需微调扩展。"
+  }
+}

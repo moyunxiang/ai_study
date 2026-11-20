@@ -1,0 +1,40 @@
+{
+  "id": "qwen3",
+  "who": "Qwen Team（An Yang, Anfeng Li, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao et al.） · 阿里巴巴通义千问",
+  "venue": "产品发布 2025 / 技术报告",
+  "links": [
+    {"label": "官方博客（2025-04-29）", "url": "https://qwenlm.github.io/blog/qwen3/"},
+    {"label": "技术报告arXiv", "url": "https://arxiv.org/abs/2505.09388"},
+    {"label": "技术报告HTML全文", "url": "https://arxiv.org/html/2505.09388v1"}
+  ],
+  "problem": "推理模型（如QwQ、DeepSeek-R1）和聊天模型是两个独立模型：难题要切到慢而啰嗦的推理模型，简单问题又不想等它想半天；小模型各自走一遍完整后训练也很贵。",
+  "idea": "用四阶段后训练把“思考”和“不思考”两种模式融进同一个模型，用户在提示里写/think或/no_think切换，并可设定思考预算；小模型直接从旗舰模型蒸馏。",
+  "impact": "一次开源从0.6B到235B共8个稠密和MoE模型（Apache 2.0），旗舰235B-A22B官方称与o1、o3-mini、DeepSeek-V3等相当，小模型通过蒸馏只用约1/10的后训练算力。",
+  "background": "[[qwen2.5]]是2024年最受欢迎的开源模型之一，但它不会长思考；阿里的推理模型是单独的[[qwq]]。[[deepseek-r1]]（2025年1月）公开了用强化学习训练长思维链的方法（见[[c:reasoning-tokens]]），各家开始做推理模型。问题在于推理模型对所有问题都先想很久：问“今天星期几”也要写几百个token的思考，延迟高、费用高，所以产品里往往要同时部署两个模型。[[claude-3.7-sonnet]]（2025年2月）首次在闭源模型上把两种模式合进一个模型，开源侧还没有。",
+  "method": "**模型**。6个稠密模型（0.6B–32B）和2个MoE模型：Qwen3-30B-A3B与旗舰Qwen3-235B-A22B（名称中A后面是激活参数）。MoE采用[[deepseekmoe]]式的细粒度专家，128个专家每个token选8个，但**不用共享专家**；负载均衡用按全局批次统计的均衡损失。注意力加入QK-Norm以稳定训练。\n\n**预训练**。约36万亿token、119种语言和方言（Qwen2.5为29种），是上一代的两倍；部分数据用Qwen2.5-VL从PDF中提取文本得到。分三段：30万亿以上token的通用阶段，提高STEM、代码与合成推理数据比例的推理阶段，最后的长上下文阶段。\n\n**四阶段后训练（旗舰模型）**。\n- 长思维链冷启动：用精选的带验证答案的数学、代码、逻辑题做SFT。\n- 推理强化学习：只用3995个“问题—验证器”对，用[[grpo]]训练；235B模型的AIME’24在170步RL中从70.1升到85.1。\n- 思考模式融合：把思考数据和不思考数据混合做SFT，聊天模板里用/think与/no_think标记，不思考时输出一个空的思考块。\n- 通用强化学习：覆盖指令遵循、格式、偏好对齐和智能体工具调用等20多类任务。\n\n**思考预算**。思考长度达到用户设定的阈值时，系统强行插入一句“考虑到用户时间有限，我必须直接根据已有思考给出答案”并结束思考块。论文指出这个能力并非专门训练，而是模式融合后自然出现的。\n\n**强到弱蒸馏**。5个小稠密模型和30B-A3B不走四阶段流程，而是先离线学习教师在两种模式下的输出，再在线对齐教师的输出分布（见[[c:knowledge-distillation]]），GPU小时只需四阶段流程的约1/10。",
+  "results": "Qwen3-235B-A22B在思考模式下AIME’24为85.7、AIME’25为81.5、LiveCodeBench v5为70.7、CodeForces评分2056、BFCL v3为70.8，官方称与o1、o3-mini、DeepSeek-V3等领先模型相当。基座模型方面，Qwen3 MoE基座以不到一半的激活参数超过Qwen2.5 MoE，以约1/10的激活参数达到Qwen2.5稠密基座的水平。所有模型以Apache 2.0开放权重。",
+  "legacy": "混合思考没有成为定局：2025年7月阿里发布的Qwen3-235B-A22B-Instruct-2507只支持不思考模式，思考版单独发布，等于又把两种模式拆开。架构上，[[qwen3-next]]随后尝试了线性注意力与全注意力混合的结构，多模态方向则有[[qwen3-vl]]与[[qwen3.5]]。",
+  "pitfalls": "- 名称中的“A22B”指每个token激活220亿参数，总参数是2350亿，部署时全部参数都要加载。\n- 思考预算是在推理时硬性截断思考，预算过小时答案质量会下降；它不是让模型“想得更聪明”，只是限制想多久。\n- 混合模式并非没有代价：阿里后来把两种模式拆回两个模型，说明在一个模型里兼顾两者会互相牵制。",
+  "limits": [
+    {"text": "思考与不思考两种模式共用一套权重，相互牵制，任一模式的效果都可能不如专门训练的单模式模型。", "solved_by": ["gpt-5"]},
+    {"text": "仍是标准全注意力，长上下文推理和长思维链生成的成本随长度快速上升。", "solved_by": ["qwen3-next"]},
+    {"text": "思考预算靠在固定长度处强行截断，模型不能根据题目难度自动决定想多久。", "solved_by": ["gpt-5"]},
+    {"text": "只支持文本，图像、视频理解需另用视觉语言模型。", "solved_by": ["qwen3-vl", "qwen3.5"]}
+  ],
+  "relations": [
+    {"to": "qwen2.5", "type": "extends", "note": "数据从约18T加到36T、语言从29种扩到119种，加入思考模式与MoE旗舰。"},
+    {"to": "deepseek-r1", "type": "extends", "note": "沿用R1的冷启动加GRPO推理强化学习路线，并在其后增加模式融合与通用RL两个阶段。"},
+    {"to": "qwq", "type": "extends", "note": "把单独的推理模型QwQ与聊天模型合并成一个可切换模式的模型。"},
+    {"to": "deepseekmoe", "type": "uses", "note": "MoE层采用细粒度专家切分，但去掉了共享专家。"},
+    {"to": "claude-3.7-sonnet", "type": "rivals", "note": "两者都把推理与普通回答合进一个模型；Claude由API参数控制，Qwen3用提示中的/think、/no_think标记并开放权重。"},
+    {"to": "grpo", "type": "uses", "note": "推理强化学习阶段用GRPO，在3995个可验证问题上训练。"}
+  ],
+  "prereq": ["reasoning-tokens", "mixture-of-experts", "knowledge-distillation", "instruction-tuning", "policy-gradient-concept"],
+  "terms": [
+    {"t": "混合思考（hybrid thinking）", "d": "同一个模型既能先写一段思考再回答，也能直接回答，由用户或系统用指令切换。"},
+    {"t": "强到弱蒸馏", "d": "用大模型（教师）的输出和概率分布训练小模型（学生），让小模型不必重复昂贵的强化学习流程。"},
+    {"t": "QK-Norm", "d": "在计算注意力分数前对查询和键各做一次归一化，防止分数过大导致训练不稳定。"}
+  ],
+  "learn": "先读[[deepseek-r1]]理解冷启动加RL的推理训练。再读技术报告第4节（四阶段后训练，表9聊天模板）和第4.5节蒸馏。动手：下载Qwen3-0.6B或1.7B，同一组数学题分别用/think与/no_think运行，比较准确率和输出长度。",
+  "check": {"source": "https://arxiv.org/html/2505.09388v1", "confirmed": "博客发布时间2025-04-29；技术报告arXiv v1 2025-05-14：0.6B–235B稠密与MoE、思考/不思考融合与思考预算、29→119种语言、约36T token且为上一代两倍、Qwen2.5-VL提取PDF文本、128专家选8且无共享专家、全局批次均衡损失、QK-Norm、三段预训练（S1超过30T token）、3995个问题—验证器对与GRPO、AIME’24 70.1→85.1（170步）、/think与/no_think模板、截断思考的插入语、强到弱蒸馏约1/10 GPU小时、旗舰AIME’24 85.7/AIME’25 81.5/LiveCodeBench v5 70.7/CodeForces 2056/BFCL v3 70.8、MoE基座以1/10激活参数对标Qwen2.5稠密基座、Apache 2.0。Hugging Face上Qwen3-235B-A22B-Instruct-2507模型卡注明只支持非思考模式。"}
+}

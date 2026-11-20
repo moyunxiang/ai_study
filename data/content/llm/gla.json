@@ -1,0 +1,67 @@
+{
+  "id": "gla",
+  "who": "Songlin Yang, Bailin Wang, Yikang Shen, Rameswar Panda, Yoon Kim · MIT / MIT-IBM Watson AI Lab",
+  "venue": "ICML 2024",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2312.06635"
+    }
+  ],
+  "problem": "[[linear-attention]]可以并行训练、又能当RNN逐步推理，但效果通常不如softmax注意力，而且实现没有考虑GPU内存读写，实际比[[flashattention]]还慢。",
+  "idea": "先写出一个分块、减少显存搬运的线性注意力算法（FlashLinearAttention），再给状态更新加上依赖输入的门控，得到GLA。",
+  "impact": "让线性注意力在训练速度和语言建模质量上都能与Transformer同台比较，后续门控线性RNN系工作大多沿用这个训练算法。",
+  "method": "线性注意力把注意力写成一个矩阵形状的隐状态（2D状态）：每来一个token就往状态里累加一项，输出由查询和状态相乘得到。推理时只需常数大小的状态，不像[[c:kv-cache]]那样随长度增长。\n\n本文第一步是工程：设计一个在「并行程度」和「显存搬运量」之间折中的分块算法，片内并行算、片间递推，使它在序列长度1K这种短序列上就比[[flashattention]]-2快。\n\n第二步是方法：给状态加一个随输入变化的遗忘门（类似[[c:gating]]），让模型自己决定旧信息保留多少，这就是门控线性注意力（GLA）。摘要称GLA在中等规模语言建模上与LLaMA架构的Transformer、[[retnet]]和[[mamba]]相当，并且在长度泛化上很强：在2K长度训练后，可泛化到超过20K的序列而困惑度没有明显恶化。",
+  "limits": [
+    {
+      "text": "只在中等规模的语言建模上验证，在大模型和需要精确回忆的任务上是否追得上softmax注意力没有定论。",
+      "solved_by": [
+        "jamba",
+        "minimax-01",
+        "kimi-linear"
+      ]
+    },
+    {
+      "text": "固定大小的状态是有损压缩，需要从长上下文里精确检索某一条信息时天然吃亏。",
+      "solved_by": [
+        "gated-deltanet",
+        "mamba-2"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "linear-attention",
+      "type": "extends",
+      "note": "在线性注意力上加入依赖输入的门控，并给出硬件友好的分块训练算法。"
+    },
+    {
+      "to": "retnet",
+      "type": "rivals",
+      "note": "RetNet用固定衰减率，GLA改为数据相关的门控，在语言建模上表现相当或更好。"
+    },
+    {
+      "to": "flashattention",
+      "type": "uses",
+      "note": "借用FlashAttention的I/O感知思路来设计线性注意力的分块实现。"
+    }
+  ],
+  "prereq": [
+    "self-attention",
+    "kv-cache",
+    "gating",
+    "big-o",
+    "recurrent-layer"
+  ],
+  "terms": [
+    {
+      "t": "2D隐状态",
+      "d": "线性注意力里的隐状态是一个矩阵（键维度×值维度），每步累加新的键值外积。"
+    }
+  ],
+  "learn": "先会[[c:self-attention]]和[[linear-attention]]的递推形式；读原文第3节的分块算法与第4节门控；动手：用PyTorch写一个逐token递推的线性注意力，再改成分块版并核对输出一致。",
+  "check": {
+    "source": "https://arxiv.org/abs/2312.06635",
+    "confirmed": "标题、5位作者、arXiv首次提交2023-12-11；摘要中比FlashAttention-2更快（1K长度）、与LLaMA/RetNet/Mamba相当、2K训练泛化到20K以上。"
+  }
+}

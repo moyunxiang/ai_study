@@ -1,0 +1,38 @@
+{
+  "id": "adamw",
+  "who": "Ilya Loshchilov, Frank Hutter · University of Freiburg",
+  "venue": "ICLR 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1711.05101"},
+    {"label": "官方代码", "url": "https://github.com/loshchil/AdamW-and-SGDW"},
+    {"label": "PyTorch AdamW文档", "url": "https://pytorch.org/docs/2.15/generated/torch.optim.AdamW.html"}
+  ],
+  "problem": "深度学习库都把“权重衰减”实现成在损失里加L2项；对SGD两者等价，对Adam却不等价，导致Adam的正则化失效，在图像分类上一直比不过带动量的SGD。",
+  "idea": "把权重衰减从梯度里拿出来：Adam照常用损失的梯度算自适应步长，参数再单独乘一个略小于1的系数缩小，两步互不干扰。",
+  "impact": "CIFAR-10和ImageNet32x32上测试误差相对降低约15%，最优衰减系数与学习率基本脱钩；此后AdamW成为训练Transformer和大语言模型的默认优化器。",
+  "background": "[[weight-decay]]的原始定义是每一步把参数按比例缩小：`θ ← (1 − λ)θ − η∇f`。在损失里加一项`(λ'/2)‖θ‖²`（L2正则，见[[c:regularization]]）后，梯度多出`λ'θ`，用普通[[sgd]]更新时恰好得到同样的效果，只是系数差一个学习率倍数。所以TensorFlow、PyTorch等库都把二者当成一回事，只提供L2写法。\n\n[[adam]]出现后，人们发现它训练快，但在CIFAR等图像分类任务上，最终精度总比精调过的SGD加[[momentum]]差一截，一度被归结为“自适应方法泛化差”。这篇论文指出，至少有一部分原因出在这个被忽略的实现细节上。",
+  "method": "**为什么在Adam里不等价**。Adam把每个坐标的梯度除以它的历史梯度平方均值的平方根`√v`。L2项`λ'θ`混进梯度后也被一起除掉：一个参数如果历史梯度很大，`√v`大，它受到的正则拉力就被压小。结果是最该约束的大梯度参数反而几乎不被约束，正则强度还和学习率、梯度尺度缠在一起。\n\n**解耦的做法（AdamW）**。梯度只来自损失本身，衰减项单独加在更新上、不经过`√v`缩放：\n\n`m ← β₁m + (1−β₁)g，  v ← β₂v + (1−β₂)g²`\n\n`θ ← θ − η_t (α · m̂ / (√v̂ + ε) + λθ)`\n\n其中g是损失的梯度，`m̂`、`v̂`是偏差校正后的一阶、二阶矩，`η_t`是学习率调度的乘子。这样每个参数每步都按同一比例缩小，与它的梯度大小无关。同样的解耦也用到带动量的SGD上，称为SGDW。\n\n**附带的两点**。一是归一化权重衰减：按批大小和总训练步数换算λ，让同一个值在不同训练长度下都合适。二是把作者此前的余弦退火与热重启（[[sgdr]]）接到Adam上，得到AdamWR。",
+  "results": "实验用26层2×64d的Shake-Shake ResNet在CIFAR-10上训练，以及降采样到32×32的ImageNet。超参数网格图显示：Adam加L2时，最优学习率和最优正则系数沿对角线强相关，调一个就得重调另一个；AdamW的最优区域基本是横平竖直的，两者可以分开调。默认学习率0.001下，AdamW比Adam加L2的测试误差相对降低15%，两个数据集上都成立，并缩小了与SGDWR之间的大部分差距。作者也承认结果只来自图像分类，需要在更多任务上验证。",
+  "legacy": "论文摘要提到TensorFlow和PyTorch社区很快就实现了它，PyTorch后来提供了独立的AdamW优化器。此后的大语言模型普遍用它训练，例如[[llama-1]]用AdamW，β₂=0.95、权重衰减0.1、配合余弦学习率。后来的新优化器大多拿它当基线：[[lion]]用符号更新省掉二阶矩，[[muon]]和[[muon-scalable]]对矩阵参数做正交化更新，但它们都保留了解耦的权重衰减。",
+  "pitfalls": "- 在PyTorch里，Adam的weight_decay参数仍是L2写法，只有AdamW才是解耦衰减，两者同一个数值效果差别很大。\n- 不同实现对衰减项是否乘学习率不一致：PyTorch文档里AdamW每步先做`θ ← θ − γλθ`（γ是学习率），所以调学习率时实际衰减强度也跟着变。\n- 解耦解决的是正则化失效的问题，不等于Adam在所有任务上都能追平SGD。",
+  "limits": [
+    {"text": "实验只覆盖CIFAR-10和ImageNet32x32两类图像分类，在语言模型等任务上是否同样有效当时没有验证。", "solved_by": ["llama-1"]},
+    {"text": "衰减系数的合适取值仍随训练长度和模型规模变化，归一化权重衰减只是经验换算，没有给出可靠的缩放规则。", "solved_by": []},
+    {"text": "仍要为每个参数保存一阶和二阶两份状态，优化器显存是参数量的两倍，大模型上负担很重。", "solved_by": ["adafactor", "lion"]},
+    {"text": "仍是逐坐标的对角缩放，不利用权重矩阵的整体结构，后来的矩阵级优化器在相同算力下训练得更快。", "solved_by": ["muon", "muon-scalable"]}
+  ],
+  "relations": [
+    {"to": "adam", "type": "solves", "note": "指出Adam中L2正则会被自适应步长缩放而失效，改为解耦的权重衰减后泛化明显变好。"},
+    {"to": "weight-decay", "type": "extends", "note": "恢复了权重衰减“每步按比例缩小参数”的原始定义，并说明它与L2正则只在SGD下等价。"},
+    {"to": "sgdr", "type": "uses", "note": "把作者自己的余弦退火与热重启接到AdamW上，得到AdamWR，改善任意时刻停止时的精度。"},
+    {"to": "momentum", "type": "extends", "note": "同样的解耦也用于带动量的SGD，得到SGDW，并让学习率与衰减系数的最优值互不牵连。"}
+  ],
+  "prereq": ["gradient-descent", "sgd-minibatch", "adaptive-optimizer", "regularization", "learning-rate", "momentum"],
+  "terms": [
+    {"t": "L2正则", "d": "在损失里加上参数平方和乘一个系数，让优化倾向于较小的参数；它通过梯度起作用。"},
+    {"t": "解耦权重衰减", "d": "不通过梯度，而是在更新时直接把参数乘以略小于1的系数，与优化器如何缩放梯度无关。"},
+    {"t": "热重启", "d": "学习率按余弦曲线降到很小后突然跳回初值再降一次，好处是每个周期末都能得到一个可用的模型。"}
+  ],
+  "learn": "先补[[c:adaptive-optimizer]]和[[c:regularization]]，把[[adam]]的更新公式写熟。读原文第2节（命题1、2说明为何不等价）和图2的超参数网格。动手：在CIFAR-10上训练一个小ResNet，分别用torch.optim.Adam(weight_decay=…)和torch.optim.AdamW(weight_decay=…)扫一遍学习率与衰减系数，画出与图2类似的热力图。",
+  "check": {"source": "https://arxiv.org/html/1711.05101", "confirmed": "arXiv记录：标题、两位作者、v1提交2017-11-14；正文中“大梯度参数被正则化得更少”的论证、Algorithm 2的更新式、26 2x64d ResNet、15% relative improvement（CIFAR-10与ImageNet32x32）、归一化权重衰减与AdamWR；官方代码README注明ICLR 2019；LLaMA论文（arXiv 2302.13971）第2.3节AdamW、β₂=0.95、weight decay 0.1；PyTorch 2.15 AdamW文档中的θ ← θ − γλθ。"}
+}

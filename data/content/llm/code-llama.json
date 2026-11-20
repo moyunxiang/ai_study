@@ -1,0 +1,38 @@
+{
+  "id": "code-llama",
+  "who": "Baptiste Rozière, Jonas Gehring, Fabian Gloeckle, Sten Sootla, Itai Gat, Xiaoqing Ellen Tan, Yossi Adi, Jingyu Liu et al. · Meta",
+  "venue": "arXiv 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2308.12950"},
+    {"label": "代码", "url": "https://github.com/meta-llama/codellama"}
+  ],
+  "problem": "开放代码模型（StarCoder等）在HumanEval上只有三成左右，与GPT-4的67%差距巨大；上下文多为8K以内，放不下多个源文件；从头训练一个大代码模型代价高昂。",
+  "idea": "不从头训练，而是从通用的Llama 2出发，在5000亿token以代码为主的数据上继续训练，再分别加上中间填充、16K长上下文微调（调大RoPE基频）、Python专精和指令微调，得到一个系列。",
+  "impact": "开放代码模型的HumanEval首次超过50%（后来的70B指令版达67.8%），7B的Python版就超过通用的Llama 2 70B；“通用基座＋代码继续预训练＋长上下文微调”成为之后代码模型的标准配方。",
+  "background": "[[codex]]本身就是在GPT-3上继续用代码训练得到的，说明通用语言知识对写代码有帮助。开源一侧，[[starcoder]]从头在1万亿token的代码上训练，HumanEval 33.6%；通用的[[llama-2]] 70B只有30.5%。闭源的[[gpt-4]]为67.0%。\n\n实际的编程助手还需要两种能力：一是在编辑器里根据光标前后的代码补全中间（[[fim]]）；二是看到足够多的上下文，比如整个文件甚至多个文件。Llama 2只有4096个token，而一个中等规模的源文件就可能超过这个长度。",
+  "method": "**分阶段专精**，全部从Llama 2权重初始化：\n\n1. **代码继续预训练**：7B/13B/34B在5000亿个token上训练（论文后续版本加入的70B为1万亿），数据以近似去重的公开代码为主，另有8%与代码相关的自然语言（如问答讨论），再混入少量普通文本以保留语言能力。7B、13B、70B同时以[[fim]]目标训练：一部分样本把代码切成前缀、中间、后缀，按“前缀-后缀-中间”或“后缀-前缀-中间”的顺序排列，让模型学会补中间。\n\n2. **长上下文微调**：在16,384长度的序列上继续训练，并把[[rope]]的基频θ从10,000调到1,000,000。基频越大，每个维度旋转得越慢，同样的角度范围能覆盖更长的距离。模型在推理时可以稳定处理到约10万个token。\n\n3. **Python专精**：再用1000亿个Python为主的token训练，得到Code Llama - Python。\n\n4. **指令微调**：除Llama 2的指令数据外，用自举方式造代码数据（见[[self-instruct]]）：让Llama 2 70B出6.2万道面试风格的题目，去重后约5.2万道；每题让Code Llama 7B写单元测试和10个解答，**运行测试**，保留第一个通过的解答，最终约1.4万组“题目-测试-解答”。这里用执行反馈代替了昂贵的人工标注。",
+  "results": "HumanEval pass@1（贪心解码）：Code Llama 34B为48.8%，Python版34B为53.7%，最初发布中最好；论文v3加入的Code Llama - Instruct 70B达67.8%，与GPT-4报告的67.0%持平。MBPP最高约65%。Code Llama - Python 7B（HumanEval 38.4%）超过Llama 2 70B（30.5%）。在多语言代码评测MultiPL-E上所有尺寸都超过此前公开模型。长上下文方面，困惑度在10万token以内持续下降，在一个仿照[[lost-in-the-middle]]设计的代码检索任务中，模型在训练长度16K以内表现良好，超过16K后准确率下降。",
+  "legacy": "Code Llama以与Llama 2相同的许可证发布，允许商用，成为2023年下半年开源编程助手的主要底座。“调大RoPE基频”与[[yarn]]等插值方法一起，成为后来扩展上下文时常用的两类手段。此后[[deepseek-coder]]、[[starcoder2]]和[[qwen2.5-coder]]继续抬高开放代码模型的水平，评测重心也从函数级小题转向[[swe-bench]]这类真实仓库任务。",
+  "pitfalls": "- 基频调大不是免费的：论文报告长上下文微调后，模型在短序列代码基准上略有下降，需要在长短之间权衡。\n- 最受关注的67.8%来自2024年1月加入的70B指令版，2023年8月首发时最好成绩是34B的50%出头。",
+  "limits": [
+    {"text": "评测以HumanEval和MBPP这类独立函数题为主，不能反映修改真实仓库、跨文件调试的能力。", "solved_by": ["swe-bench", "swe-agent"]},
+    {"text": "指令版的对齐主要靠自动生成的题目与单元测试，没有用代码执行结果做强化学习。", "solved_by": ["deepseek-r1", "swe-rl"]},
+    {"text": "虽能接受10万token输入，但只在约16K长度上训练，更长时的真实利用能力未经充分检验。", "solved_by": ["deepseek-coder-v2", "qwen2.5-coder"]}
+  ],
+  "relations": [
+    {"to": "llama-2", "type": "extends", "note": "从Llama 2权重出发，在代码为主的数据上继续预训练，而不是从头训练。"},
+    {"to": "fim", "type": "uses", "note": "7B、13B、70B同时以中间填充目标训练，支持编辑器中的代码补全。"},
+    {"to": "rope", "type": "extends", "note": "把RoPE的基频从10,000调到1,000,000来扩展上下文，是位置插值之外的另一条扩展路线。"},
+    {"to": "starcoder", "type": "solves", "note": "StarCoder从头训练、HumanEval约三成；Code Llama利用通用基座的语言知识，把开放模型推过50%。"},
+    {"to": "self-instruct", "type": "extends", "note": "沿用模型自己出题的思路，并加入执行单元测试的筛选，把文本自举变成可验证的代码自举。"},
+    {"to": "lost-in-the-middle", "type": "uses", "note": "借鉴其“把关键信息放在不同位置”的设定，设计了代码版的长上下文检索测试。"}
+  ],
+  "prereq": ["pretrain-finetune", "positional-encoding", "context-window", "instruction-tuning", "benchmark", "tokenization"],
+  "terms": [
+    {"t": "继续预训练", "d": "在已训练好的通用模型上，用某一领域的大量无标注数据接着做预训练，让它专精该领域，成本远低于从头训练。"},
+    {"t": "RoPE基频", "d": "RoPE中决定各维度旋转速度的常数（原始为10,000）。调大后所有维度转得更慢，模型能区分的距离更长。"},
+    {"t": "执行反馈", "d": "把模型写的代码真正运行一遍，用是否通过测试来判断好坏，而不依赖人工评判。"}
+  ],
+  "learn": "先读[[rope]]和[[fim]]。读Code Llama论文第2节（四个训练阶段，尤其2.4长上下文和2.5自举指令数据）和表2。动手：取一个开源代码模型，写一个函数前后文用FIM格式让它补中间；再复现自举流程的缩小版——让模型出10道题、写测试和解答，用Python执行筛选。",
+  "check": {"source": "https://arxiv.org/abs/2308.12950", "confirmed": "标题、作者、arXiv v1于2023-08-24（v3于2024-01-31）；PDF：7B/13B/34B训练500B token、70B为1T、8%代码相关自然语言、7B/13B/70B带FIM（PSM/SPM各半）、16,384长度微调、θ从10,000调到1,000,000、可处理至10万token、Python再训100B、自举数据6.2万题→约5.2万→约1.4万三元组、表2 pass@1（Code Llama 34B 48.8%，Python 34B 53.7%，Python 7B 38.4%，Instruct 70B 67.8%，Llama 2 70B 30.5%，StarCoder Python 33.6%，GPT-4 67.0%）；第3.3节：超过16K时检索准确率下降、长上下文微调略微损害短序列基准。"}
+}

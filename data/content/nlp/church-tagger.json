@@ -1,0 +1,39 @@
+{
+  "id": "church-tagger",
+  "who": "Kenneth Ward Church · 贝尔实验室",
+  "venue": "ANLP 1988（Second Conference on Applied Natural Language Processing），pp. 136–143",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/A88-1019/"},
+    {"label": "PDF", "url": "https://aclanthology.org/A88-1019.pdf"},
+    {"label": "Jurafsky & Martin《Speech and Language Processing》在线版（序列标注一章）", "url": "https://web.stanford.edu/~jurafsky/slp3/"}
+  ],
+  "problem": "词典里几乎每个词都有多个词性（I、see、a在词典里都可以是名词），靠语法规则排除歧义既难写又不可靠；乔姆斯基又早已宣判n-gram不适合描述语法。",
+  "idea": "不追求“可能”，只找“最可能”：从人工标注的Brown语料统计“这个词通常是什么词性”和“三个词性连在一起有多常见”，用动态规划在线性时间内挑出概率乘积最大的词性序列。",
+  "impact": "在不受限的真实文本上把词性标注做到95–99%的正确率，让统计方法在NLP里第一次站稳脚跟；“标注语料 + 概率模型 + 动态规划解码”成为此后十几年序列标注的标准做法。",
+  "background": "词性标注要给句子里每个词标上名词、动词、冠词等。难点是歧义：table可以是“桌子”也可以是“搁置（议案）”，wind作名词和动词时读音不同——Church关心的正是语音合成里的这类问题。\n\n当时的主流是手写规则的句法分析器，词典只列出“可能”的词性。“I see a bird”在词典里每个词都有歧义（I、see、a都能当名词，bird能当不及物动词），而“I see a bird”被分析成名词串在语法上也说得通，规则很难排除。另一方面，[[chomsky-syntactic]]论证有限状态的n-gram模型不可能描述英语语法，这让很多人认为统计方法不适合做语言分析。\n\n与此同时，IBM语音组已经在[[hmm-asr]]中证明了n-gram统计模型的威力，而一百万词、人工逐词标注了词性的[[brown-corpus]]提供了足够的训练数据。",
+  "method": "**两种概率**，都直接从Brown语料数出来：\n- **词汇概率** `P(词性 | 词)`：see在语料中出现772次，771次是动词，所以 `P(VB|see)=771/772`；I有5837/5838次是代词。\n- **上下文概率** `P(X | Y, Z)`：词性X后面紧跟Y、Z的可能性，即三元组频率除以二元组频率。例如动词出现在“冠词 名词”之前的概率是 `3412/53091 = 0.064`，名词出现在同一位置的概率只有 `629/53091 = 0.01`。\n\n**打分与搜索**。一个词性序列的得分是所有词汇概率与上下文概率的乘积（实际用对数概率相加）。“I see a bird”中三个词各有两种词性，共8种组合，枚举后“代词 动词 冠词 名词”遥遥领先。由于每个概率最多只看相邻两个词性，可以用[[viterbi]]式的动态规划逐词推进、随时丢弃不可能胜出的部分路径，计算量与句子长度成正比。\n\n**名词短语**。论文后半用同样的思路找非递归名词短语：统计任意两个相邻词性之间插入左括号或右括号的概率（冠词后面开始新名词短语的概率为0，动词和名词之间几乎是1），再找概率最大的括号方案。",
+  "results": "按正确的定义不同，词性标注正确率为95–99%；附录中一段400词的样本被判为99.5%正确。大多数错误来自词典缺陷，而不是三元模型过于简化——在这个任务上，长距离依存“至少大部分时候”并不重要。名词短语识别在一段样本中243个括号只漏了5个。同期兰开斯特大学的CLAWS系统在LOB语料上报告了96.7%。",
+  "legacy": "同一年IBM的Jelinek团队提出“每开除一个语言学家，系统性能就上升”的说法（[[jelinek-linguist]]），统计方法开始全面进入NLP。词性标注很快成为检验新学习方法的标准任务：[[brill-tagger]]用学出来的转换规则与之竞争，[[maxent-nlp]]、[[memm]]、[[crf]]逐步换成可以加入任意特征的判别式模型，[[penn-treebank]]提供了更大、更规范的标注语料。神经网络时代[[bilstm-crf]]等模型进一步提高了正确率，词性标注随后基本被视为已解决的问题，并在大模型时代淡出独立任务。",
+  "pitfalls": "- 通常说的“HMM词性标注”用的是发射概率 `P(词|词性)`；Church用的是 `P(词性|词)`，并且上下文是从右往左看，严格说不是标准HMM，但解码思路相同。\n- 95–99%的跨度不是不同测试集，而是“什么算正确”的口径不同；而且大量常用词本身几乎没有歧义（如I、see、a、bird），所以简单基线本来就不低。",
+  "limits": [
+    {"text": "没见过的词（新词、专有名词、拼写变体）没有词汇概率，大部分错误都出在词典上；生成式模型很难加入后缀、大小写这类线索。", "solved_by": ["maxent-nlp", "memm", "crf"]},
+    {"text": "只看相邻两个词性，无法利用更远的上下文。", "solved_by": ["bilstm-crf"]},
+    {"text": "依赖一百万词的人工标注语料，换一种语言或领域就要重新标注。", "solved_by": ["brill-tagger", "turian-word-reps"]},
+    {"text": "名词短语识别只处理不嵌套的短语，不能得到完整的句法结构。", "solved_by": ["collins-parser"]}
+  ],
+  "relations": [
+    {"to": "hmm-asr", "type": "extends", "note": "把IBM语音识别中的n-gram概率模型和动态规划解码，从“听写单词”搬到“给单词标词性”。"},
+    {"to": "brown-corpus", "type": "uses", "note": "所有概率都从人工标注了词性的一百万词Brown语料中直接统计。"},
+    {"to": "viterbi", "type": "uses", "note": "用只保留最优部分路径的动态规划，在线性时间内找到概率最大的词性序列。"},
+    {"to": "chomsky-syntactic", "type": "rivals", "note": "乔姆斯基论证n-gram不能描述语法；Church指出对词性标注这类任务，局部的三元统计已经足够好。"},
+    {"to": "shannon-ngram", "type": "extends", "note": "把香农的n-gram近似从字母和单词序列推广到词性序列。"}
+  ],
+  "prereq": ["hmm-concept", "markov-chain", "n-gram", "dynamic-programming", "mle", "conditional-bayes"],
+  "terms": [
+    {"t": "词性标注（POS tagging）", "d": "给句子中每个词标上名词、动词、形容词等类别，是句法分析、语音合成和信息抽取的前置步骤。"},
+    {"t": "词汇概率 / 上下文概率", "d": "前者衡量“这个词通常当什么词性用”，后者衡量“这几个词性连在一起有多常见”。两者相乘就是一种词性序列的得分。"},
+    {"t": "非递归名词短语", "d": "不内嵌其他短语的最小名词短语，如“the defense contractor”。后来的“组块分析”（chunking）就是这个任务。"}
+  ],
+  "learn": "先补[[c:hmm-concept]]和[[c:dynamic-programming]]。读原文第3节，跟着“I see a bird”和“Can they can cans”两个例子手算一遍对数得分。动手：用NLTK自带的Brown语料训练一个二元或三元HMM标注器，实现Viterbi解码，比较“每个词取最常见词性”的基线与HMM的正确率差多少。",
+  "check": {"source": "https://aclanthology.org/A88-1019.pdf", "confirmed": "原文：作者Church（Bell Labs），ACL Anthology A88-1019，页码136起；95–99%与400词样本99.5%；771/772、5837/5838、3412/53091=0.064、629/53091=0.01；“Most errors are attributable to defects in the lexicon”；LOB 96.7%；243个名词短语括号漏5个。"}
+}

@@ -1,0 +1,62 @@
+{
+  "id": "linear-attention",
+  "who": "Angelos Katharopoulos, Apoorv Vyas, Nikolaos Pappas, François Fleuret · Idiap / EPFL",
+  "venue": "ICML 2020",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2006.16236"
+    }
+  ],
+  "problem": "[[transformer]]自注意力的复杂度随序列长度平方增长，自回归生成时每步都要回看全部历史。",
+  "idea": "把softmax注意力换成核特征映射的内积，利用矩阵乘法的结合律把复杂度降到线性，并发现它可以写成RNN。",
+  "impact": "开启了线性注意力与“Transformer即RNN”这条线，之后的RetNet、Mamba-2、TTT都在此基础上展开。",
+  "method": "标准注意力是`softmax(QKᵀ)V`，必须先算出`N×N`的矩阵。论文用一个特征映射`φ`把相似度写成`φ(q)·φ(k)`，于是输出变成`φ(Q)(φ(K)ᵀV)`，先算后一个括号，复杂度从`O(N²)`降到`O(N)`。\n\n自回归时，因果掩码下可以维护一个累计状态`S = Σ φ(kᵢ)vᵢᵀ`和一个累计分母，每来一个新词只需更新状态并读出，这就是一个状态大小固定的RNN。摘要称这样的线性Transformer与标准Transformer效果相近，在很长序列的自回归预测上最多快4000倍。",
+  "limits": [
+    {
+      "text": "核特征映射近似不了softmax的“尖锐”选择，检索类任务上明显弱于标准注意力。",
+      "solved_by": [
+        "mamba",
+        "gated-deltanet"
+      ]
+    },
+    {
+      "text": "固定大小的状态会随序列变长而遗忘，且没有选择性地写入与擦除。",
+      "solved_by": [
+        "mamba",
+        "ttt"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "transformer",
+      "type": "extends",
+      "note": "保留注意力的形式，但用核特征映射替换softmax，把平方复杂度降为线性。"
+    },
+    {
+      "to": "fast-weights",
+      "type": "extends",
+      "note": "累计状态`Σ φ(k)vᵀ`正是快速权重式的外积记忆。"
+    }
+  ],
+  "prereq": [
+    "self-attention",
+    "softmax",
+    "kernel-trick",
+    "recurrent-layer",
+    "kv-cache",
+    "big-o"
+  ],
+  "terms": [
+    {
+      "t": "特征映射",
+      "d": "把向量映射成另一个向量的函数φ，使得φ(q)·φ(k)近似原相似度函数（如指数核）。"
+    }
+  ],
+  "learn": "先弄懂[[c:self-attention]]的矩阵形式；读原文第3节的线性化与第3.4节的RNN等价；用NumPy写出因果线性注意力的递推版与矩阵版并核对输出一致。",
+  "check": {
+    "source": "https://arxiv.org/abs/2006.16236",
+    "confirmed": "arXiv abs页：标题、4位作者、v1提交2020-06-29；摘要中O(N²)到O(N)、4000倍加速、与RNN的联系。"
+  }
+}

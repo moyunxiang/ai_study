@@ -1,0 +1,112 @@
+{
+  "id": "deepseek-v3",
+  "who": "DeepSeek-AI（Aixin Liu, Bei Feng, Bing Xue, Bingxuan Wang et al.） · 深度求索",
+  "venue": "arXiv 2024",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2412.19437"
+    },
+    {
+      "label": "论文HTML全文",
+      "url": "https://arxiv.org/html/2412.19437v2"
+    },
+    {
+      "label": "代码与权重",
+      "url": "https://github.com/deepseek-ai/DeepSeek-V3"
+    }
+  ],
+  "problem": "开源模型与GPT-4o、Claude 3.5 Sonnet仍有差距；把MoE继续放大，又会被负载均衡、跨机通信和显存卡住，而DeepSeek手里只有2048张H800。",
+  "idea": "沿用MLA与DeepSeekMoE，放大到671B总参数、37B激活；用无辅助损失的负载均衡和多token预测提升效果，再用FP8混合精度训练和DualPipe流水线把通信开销藏进计算里。",
+  "impact": "完整训练只用278.8万H800 GPU小时（按租价约558万美元），成为当时最强的开源模型、与GPT-4o和Claude 3.5 Sonnet相当；它的基座随后训练出DeepSeek-R1。",
+  "background": "[[deepseek-v2]]已经证明MLA加DeepSeekMoE可以又强又便宜，但它离[[gpt-4]]级别还有距离。开源最强的稠密模型[[llama-3.1]] 405B每个token要算全部参数，训练用了约3.8×10²⁵ FLOPs、上万张H100。\n\n要把MoE继续放大，有三个卡点。一是**负载均衡**：靠辅助损失让专家负载平均（如[[switch-transformer]]），损失权重大了会伤害主任务。二是**通信**：专家分布在不同机器上，每个token要经网络发出去再收回来，跨节点专家并行时计算与通信之比约为1:1，GPU一半时间在等数据（论文给出节点内NVLink 160GB/s，跨节点InfiniBand只有50GB/s）。三是**精度**：用FP8训练能省一半显存和带宽，但FP8的数值范围窄，激活里少数特别大的值会让量化误差失控。",
+  "method": "**架构**。61层，MLA注意力；除前三层外都是MoE层，每层1个共享专家加256个路由专家，每个token选8个，且最多发往4个节点（[[c:mixture-of-experts]]）。\n\n**无辅助损失负载均衡**（[[aux-loss-free]]）。给每个专家一个偏置b_i，只在**选专家**时加到亲和度分数上，计算输出权重时不用它。每一步结束后，过载专家的偏置减去γ、空闲专家的加上γ。负载靠这个反馈回路自动拉平，不再有干扰梯度的辅助损失。\n\n**多token预测**（[[multi-token-prediction]]）。主模型预测下一个token的同时，附加一个小模块用主模型的表示再预测下下个token，给训练提供更密的信号。推理时这个模块可以拿来做[[speculative-decoding]]。\n\n**FP8训练**（[[fp8]]）。矩阵乘法用FP8，但缩放粒度很细：激活每1×128个元素一组、权重每128×128一块各算一个缩放因子，这样一个离群值只影响它所在的小组；累加则定期转到FP32。与BF16基线相比，相对损失误差始终低于0.25%。\n\n**DualPipe**。一种双向流水线调度，把一个前向块和一个反向块配对，让一方计算时另一方的全对全通信同时进行，通信几乎被完全隐藏，因此不需要昂贵的张量并行。\n\n**后训练**。在14.8T token预训练和128K上下文扩展之后做SFT和RL，并从DeepSeek-R1系列模型蒸馏推理能力，同时控制回答长度。",
+  "results": "每训练1万亿token只需18万H800 GPU小时，在2048张H800上约3.7天。总计278.8万GPU小时：预训练266.4万、上下文扩展11.9万、后训练0.5万，按每卡时2美元计为557.6万美元。全程没有出现不可恢复的损失尖峰，也没有回滚。\n\n对话模型MMLU 88.5、MMLU-Pro 75.9、GPQA 59.1；AIME 2024为39.2、MATH-500为90.2，官方称在非长思维链模型中最好，比第二名Qwen2.5 72B高约10个百分点；SWE-bench Verified为42.0，低于Claude 3.5 Sonnet（10月版）的50.8。多token预测的第二个token接受率85%–90%，解码速度提高到1.8倍。",
+  "legacy": "一个月后，以V3-Base为起点的[[deepseek-r1]]发布，二者共同引发了[[deepseek-moment]]：市场开始质疑前沿模型必须花数亿美元训练。V3的架构被[[kimi-k2]]等大模型几乎原样采用，DeepSeek自己的[[nsa]]和[[deepseek-v3.2]]则在它之上替换注意力。",
+  "pitfalls": "- 557.6万美元只是**正式训练那一次**的GPU租金折算，论文明确说不包括此前的架构、算法和数据研究与消融实验，也不包括购买集群的成本。\n- 671B是总参数，每个token只激活37B；但部署时全部参数都要放进显存，论文自己承认推荐的部署单元很大，小团队负担重。",
+  "limits": [
+    {
+      "text": "推荐的部署单元很大（预填充最少4个节点32张GPU），小团队难以自行部署（作者在结论中自述）。",
+      "solved_by": []
+    },
+    {
+      "text": "仍是标准的全注意力，128K上下文下每个查询都要看全部历史token，长上下文推理和长轨迹强化学习很贵。",
+      "solved_by": [
+        "nsa",
+        "deepseek-v3.2"
+      ]
+    },
+    {
+      "text": "本身不是长思维链推理模型，只是从R1蒸馏了部分推理能力；竞赛数学与o1级模型仍有差距。",
+      "solved_by": [
+        "deepseek-r1"
+      ]
+    },
+    {
+      "text": "代码库级编程（SWE-bench Verified 42.0）仍明显落后Claude 3.5 Sonnet。",
+      "solved_by": [
+        "kimi-k2",
+        "deepseek-v3.2"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "deepseek-v2",
+      "type": "extends",
+      "note": "保留MLA与DeepSeekMoE，把规模从236B/21B放大到671B/37B，并把设备受限路由改为最多4个节点。"
+    },
+    {
+      "to": "aux-loss-free",
+      "type": "uses",
+      "note": "首次在超大规模模型上用偏置项动态调节代替辅助均衡损失。"
+    },
+    {
+      "to": "multi-token-prediction",
+      "type": "uses",
+      "note": "加入深度为1的多token预测训练目标，并将该模块复用于推测解码。"
+    },
+    {
+      "to": "switch-transformer",
+      "type": "solves",
+      "note": "解决了Switch以来依赖辅助损失做负载均衡、损失权重难调且损害效果的问题。"
+    },
+    {
+      "to": "llama-3.1",
+      "type": "rivals",
+      "note": "与稠密的Llama 3.1 405B相比，V3每个token只激活37B，训练算力远少，多数基准却更好。"
+    },
+    {
+      "to": "llama-3",
+      "type": "rivals",
+      "note": "论文以LLaMA-3.1 405B为主要开源对照基座，展示MoE路线在同等或更低成本下胜过稠密路线。"
+    }
+  ],
+  "prereq": [
+    "mixture-of-experts",
+    "kv-cache",
+    "floating-point",
+    "distributed-training",
+    "params-flops",
+    "knowledge-distillation"
+  ],
+  "terms": [
+    {
+      "t": "DualPipe",
+      "d": "DeepSeek的双向流水线并行调度：从流水线两端同时送入微批次，并把前向与反向块配对重叠，使专家并行的全对全通信几乎全部藏在计算后面。"
+    },
+    {
+      "t": "细粒度量化",
+      "d": "不是整个张量共用一个缩放因子，而是每一小组元素（如1×128）各有自己的缩放因子，一个离群值只影响它所在的组。"
+    },
+    {
+      "t": "节点受限路由",
+      "d": "每个token选专家时最多只能选落在4个节点上的专家，从而限制最慢的跨机网络流量。"
+    }
+  ],
+  "learn": "先读[[deepseek-v2]]掌握MLA，再读[[aux-loss-free]]。原文重点读第2.1.2节（无辅助损失均衡，公式16）、第2.2节（MTP图3）、第3.2节（DualPipe图4–5）和第3.3节（FP8图7）。动手：写一个小MoE，分别用辅助损失和偏置调节两种方式做负载均衡，记录每个专家的负载曲线和验证损失。",
+  "check": {
+    "source": "https://arxiv.org/html/2412.19437v2",
+    "confirmed": "标题、作者DeepSeek-AI、arXiv v1提交于2024-12-27；摘要中的671B/37B、14.8T token、2.788M H800 GPU小时、无不可恢复损失尖峰与回滚；正文中前三层稠密、1共享+256路由选8、最多4个节点、偏置b_i与γ更新规则、MTP深度1、2048张H800、每万亿token 18万GPU小时/3.7天、表1成本2664K/119K/5K与557.6万美元及不含研究成本的说明、1×128与128×128分块缩放、FP8相对损失误差低于0.25%、跨节点计算通信比约1:1、MMLU 88.5/MMLU-Pro 75.9/GPQA 59.1、表6中AIME 2024 39.2、MATH-500 90.2、SWE Verified 42.0对Claude-3.5-Sonnet 50.8、第二token接受率85–90%与1.8倍TPS、结论中关于部署单元过大的局限。"
+  }
+}

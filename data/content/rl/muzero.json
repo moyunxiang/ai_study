@@ -1,0 +1,40 @@
+{
+  "id": "muzero",
+  "who": "Schrittwieser, Antonoglou, Hubert, Simonyan, Sifre, Schmitt, Guez, Lockhart et al. · DeepMind",
+  "venue": "arXiv 2019；Nature 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1911.08265"},
+    {"label": "Nature版", "url": "https://www.nature.com/articles/s41586-020-03051-4"},
+    {"label": "ar5iv全文", "url": "https://ar5iv.labs.arxiv.org/html/1911.08265"}
+  ],
+  "problem": "AlphaZero的树搜索需要一个完美的规则模拟器；而Atari这类视觉环境规则未知，学一个能逐像素预测未来画面的模型又很难，基于模型的方法在Atari上一直不如无模型方法。",
+  "idea": "不预测画面，只学一个在“隐状态”里展开的模型：它只需要预测搜索真正用到的三样东西——每一步的奖励、局面价值和策略，然后照AlphaZero的方式在这个学出来的模型里做MCTS。",
+  "impact": "同一算法不给规则，在围棋、国际象棋、将棋上达到AlphaZero水平，在57个Atari游戏上刷新平均和中位数纪录，让“规划+学习的模型”第一次在视觉复杂环境上全面胜过无模型方法。",
+  "background": "[[alphazero]]的强大来自[[mcts]]：在脑子里把棋往下推演几百步再决定。推演需要知道“走了这步之后棋盘变成什么样”，也就是规则。棋类有规则，Atari、机器人、现实世界没有。\n\n[[c:model-based-rl]]的传统做法是先学一个环境模型，如[[world-models]]、[[simple-atari]]用神经网络重建或预测下一帧画面，然后在模型里规划或训练。但Atari画面里大量像素与决策无关，逐像素预测既难又浪费，误差还会在多步推演中累积，所以这些方法在Atari上始终打不过[[r2d2]]这样的无模型方法。",
+  "method": "**三个函数**（都是神经网络）：\n\n- 表示函数`h`：把过去的观测（棋盘或最近几帧画面）编码成初始隐状态`s⁰ = h(o_1…o_t)`。\n- 动态函数`g`：给定隐状态和一个假想动作，输出下一隐状态和即时奖励`(r^k, s^k) = g(s^{k−1}, a^k)`。\n- 预测函数`f`：从隐状态输出策略和价值`(p^k, v^k) = f(s^k)`，与AlphaZero的网络头一样。\n\n**规划**。每一步用`h`得到根节点，然后完全在隐空间里做MCTS：展开节点时调用`g`，估值时调用`f`，不再需要真实规则。\n\n**训练**。从回放池取一段真实轨迹，用`h`编码起点，再按真实执行过的动作用`g`连续展开K=5步。每一步的三个预测分别对齐三个目标：奖励对齐真实奖励，策略对齐当时MCTS的访问分布，价值对齐n步回报（见[[c:td-error]]）。三项损失之和通过展开过程反向传播。\n\n**关键点**：隐状态没有任何“必须能还原画面”或“必须等于真实状态”的约束。它只要对预测奖励、价值、策略有用就行——模型学的是“对决策等价”的规则，而不是物理上真实的规则。",
+  "results": "棋类：不知道规则，在围棋上略超AlphaZero，在国际象棋和将棋上与AlphaZero持平。Atari 57个游戏：中位数人类标准化得分2041%、平均4999%，高于R2D2的1921%和4025%，在57个游戏中的42个上超过R2D2，所有游戏上都超过此前最好的基于模型方法SimPLe。限制每个游戏2亿帧时，MuZero Reanalyze（用最新网络对旧轨迹重新搜索产生新目标）中位数达731%，高于IMPALA的192%、Rainbow的231%。",
+  "legacy": "MuZero衍生出一个家族：[[efficientzero]]把它推到Atari 100k的少样本设置，[[sampled-muzero]]支持大规模和连续动作，[[stochastic-muzero]]处理随机环境；工程上被用于YouTube视频压缩（[[muzero-vp9]]）。“只建模与价值相关的部分”的思路也影响了[[td-mpc]]等连续控制方法，与[[dreamer]]系列“学会重建观测的世界模型”形成两条并行路线。",
+  "pitfalls": "- MuZero学的“模型”不能用来生成画面或解释环境，它只是搜索内部使用的隐状态转移。\n- 它并非样本高效：大数据设置下每个游戏用了约200亿帧。",
+  "limits": [
+    {"text": "样本效率低：标准设置每个Atari游戏约200亿帧，在只允许10万步交互的设置下表现不佳。", "solved_by": ["efficientzero"]},
+    {"text": "动态函数是确定性的，无法正确表示掷骰子、随机发牌等随机环境。", "solved_by": ["stochastic-muzero"]},
+    {"text": "MCTS要枚举所有动作，只适用于小规模离散动作空间，连续控制和组合动作无法直接用。", "solved_by": ["sampled-muzero"]},
+    {"text": "不处理扑克这类不完全信息博弈，论文明确将其排除在外。", "solved_by": ["student-of-games"]}
+  ],
+  "relations": [
+    {"to": "alphazero", "type": "solves", "note": "去掉AlphaZero对已知规则模拟器的依赖，用学出的隐空间模型代替规则，搜索与训练方式其余不变。"},
+    {"to": "world-models", "type": "rivals", "note": "World Models学习重建观测的生成式模型；MuZero只学预测奖励、价值、策略的模型，在Atari上效果更好，代表“价值等价模型”路线。"},
+    {"to": "r2d2", "type": "solves", "note": "此前Atari最强的是无模型的R2D2；MuZero让基于模型的规划方法首次在平均和中位数上都超过它。"},
+    {"to": "simple-atari", "type": "solves", "note": "SimPLe预测像素画面做基于模型的RL；MuZero在全部57个游戏上都超过它。"},
+    {"to": "mcts", "type": "uses", "note": "在学出的隐空间模型中执行AlphaZero式的MCTS，节点展开调用动态函数。"},
+    {"to": "dyna", "type": "extends", "note": "延续Dyna“学模型并用模型规划”的思想，但模型只服务于搜索中的价值与策略预测。"}
+  ],
+  "prereq": ["model-based-rl", "tree-search", "policy-value", "td-error", "self-play", "recurrent-layer"],
+  "terms": [
+    {"t": "隐状态", "d": "网络内部的一个向量，用来代替真实环境状态做推演；它的含义不由人规定，只要对预测奖励、价值和策略有用即可。"},
+    {"t": "价值等价模型", "d": "不要求模型预测出真实的下一状态，只要求在模型中推演出的价值和奖励与真实环境一致。"},
+    {"t": "Reanalyze", "d": "用最新的网络对回放池中的旧轨迹重新做一遍MCTS，生成更好的训练目标，以提高数据利用率。"}
+  ],
+  "learn": "先读[[alphazero]]和[[c:model-based-rl]]。读原文第3节（三个函数与训练目标）和附录中的伪代码；DeepMind公开的MuZero伪代码很短，值得逐行读。动手：用开源的muzero-general在CartPole或井字棋上训练，把展开步数K从5改成1，观察对效果的影响。",
+  "check": {"source": "https://ar5iv.labs.arxiv.org/html/1911.08265", "confirmed": "标题、作者（DeepMind）、arXiv 1911编号；摘要中不给规则达到AlphaZero水平；正文中围棋略超AlphaZero、57个游戏中42个超过R2D2、全部超过SimPLe；表1：MuZero中位数2041.1%、平均4999.2%、200亿帧，R2D2 1920.6%、4024.9%，Reanalyze 731.1%，IMPALA 191.8%，Rainbow 231.1%。"}
+}

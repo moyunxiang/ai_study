@@ -1,0 +1,50 @@
+{
+ "id": "batch-invariance",
+ "who": "Horace He 与 Thinking Machines Lab 同事",
+ "links": [
+  {
+   "label": "博客",
+   "url": "https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/"
+  }
+ ],
+ "problem": "温度设为0的LLM推理，同样的输入每次输出仍可能不同；常见解释是浮点加法不满足结合律加并发，但这不能解释为什么单次运行总是一致。",
+ "idea": "真正原因是前向计算缺少「批不变性」：同一请求的结果取决于同时处理的批大小，而批大小随服务器负载变化；让核函数对批大小不变即可得到可复现输出。",
+ "impact": "给出可复现推理的具体做法，并使得「真正的在线策略强化学习」成为可能。",
+ "method": "文章（2025年9月10日）先做实验：对Qwen3-235B-A22B-Instruct-2507在温度0下采样1000次，提示是「Tell me about Richard Feynman」，每次生成1000个词元，得到80种不同输出，最常见的出现78次，前102个词元完全一致，第103个词元开始分叉。\n\n作者指出：每个核函数单独看是运行间确定的，但当它被用在整体推理系统中时，整个系统对用户来说是不确定的，因为服务器负载决定了批大小，而RMSNorm、矩阵乘、注意力的归约顺序会随批大小变化，浮点加法顺序不同结果就不同。解决办法是写批不变的内核（固定归约策略，不随批大小改变），代价是一定的性能损失，文章也给出了性能测试和对强化学习的好处。",
+ "legacy": "这篇文章让「推理引擎做到逐位可复现」成为一个明确的工程目标，推理框架陆续加入确定性模式。",
+ "limits": [
+  {
+   "text": "批不变内核比最快的内核慢，是否在吞吐与可复现之间取舍取决于场景。",
+   "solved_by": []
+  },
+  {
+   "text": "只保证同一软硬件版本内可复现，换GPU或库版本结果仍可能不同。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "vllm",
+   "type": "extends",
+   "note": "指出vLLM、SGLang等引擎即使温度为0也不确定，并给出在其中实现批不变的方法。"
+  }
+ ],
+ "prereq": [
+  "floating-point",
+  "decoding-sampling",
+  "kv-cache",
+  "throughput-latency",
+  "on-off-policy"
+ ],
+ "terms": [
+  {
+   "t": "批不变性",
+   "d": "同一个请求的计算结果不依赖与它一起处理的其他请求数量。"
+  }
+ ],
+ "learn": "先了解浮点加法不满足结合律 → 读原博客的内核一节 → 在vLLM中试用确定性模式并比较吞吐。",
+ "check": {
+  "source": "https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/",
+  "confirmed": "发布日期2025-09-10；1000次采样、80种不同输出、最常见78次、前102个词元一致、批大小导致的不确定性。"
+ }
+}

@@ -1,0 +1,109 @@
+{
+  "id": "sentence-bert",
+  "who": "Nils Reimers, Iryna Gurevych · 达姆施塔特工业大学UKP实验室",
+  "venue": "EMNLP-IJCNLP 2019",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1908.10084"
+    },
+    {
+      "label": "sentence-transformers库",
+      "url": "https://github.com/UKPLab/sentence-transformers"
+    }
+  ],
+  "problem": "BERT判断两句话是否相似时必须把两句一起送进网络（交叉编码），在1万个句子里找最相似的一对要做约5000万次推理、约65小时；而直接取BERT输出的平均向量或CLS向量当句向量，效果还不如平均GloVe。",
+  "idea": "让同一个BERT分别编码两句话（孪生网络，权重共享），对输出做平均池化得到句向量，再在自然语言推理数据上用分类目标或三元组损失微调，使语义相近的句子在向量空间中靠近，之后直接用余弦相似度比较。",
+  "impact": "同样的“1万句找最相似一对”从65小时缩短到约5秒，且在语义相似度任务上大幅超过InferSent和Universal Sentence Encoder；其开源库sentence-transformers成为语义检索、聚类、RAG向量化最常用的工具之一。",
+  "background": "[[bert]]在句对任务上很强，做法是把两句话用分隔符拼成一个序列送进网络，让每个词都能看到另一句的每个词（交叉编码器）。这对“判断一对句子”很好，但对“在大量句子里找相似的”非常不划算：n个句子两两比较需要`n(n−1)/2`次完整推理，n=10,000时约5000万次。语义搜索、聚类都要求每句话先独立变成一个向量，然后用便宜的余弦相似度（见[[c:dot-product]]）比较。\n\n当时有人直接把单句送进BERT，取所有词向量的平均或[CLS]位置的向量当句向量，但没人系统评测过。专门的句向量方法如[[skip-thought]]、[[infersent]]（在[[snli]]上训练BiLSTM）、Universal Sentence Encoder都是从随机初始化开始训练的，没有用上BERT的预训练知识。",
+  "method": "**孪生结构**。两个句子分别通过同一个BERT（或RoBERTa），对最后一层所有词的输出取平均（MEAN池化，默认），得到固定长度的句向量`u`和`v`。也试了[CLS]向量和逐维取最大值。\n\n**三种训练目标**，按手头数据选择：\n\n- **分类**：`o = softmax(W·[u; v; |u − v|])`，在SNLI（57万对）和MultiNLI（43万对）上做蕴含、矛盾、中立三分类，交叉熵损失。这是默认的预训练方式，只训练1个epoch。\n- **回归**：直接以`cos(u, v)`拟合人工给出的相似度分数，均方误差损失。\n- **三元组**：给定锚句a、相似句p、不相似句n，最小化`max(‖s_a − s_p‖ − ‖s_a − s_n‖ + ε, 0)`，要求a与p的距离至少比a与n近ε。这一损失来自人脸识别中的[[facenet]]（见[[c:contrastive-learning]]）。\n\n**使用时**只需对每句编码一次，存下向量。新查询来了，编码一次，再与所有已存向量算余弦相似度，或交给[[faiss]]这类向量检索库。消融显示分类目标中最关键的是`|u − v|`这一项。",
+  "results": "无监督设定（只在NLI上训练、不看STS数据）的7个语义相似度任务平均Spearman相关（×100）：平均GloVe向量61.32，直接平均BERT输出54.81，BERT的CLS向量只有29.19；InferSent 65.01，Universal Sentence Encoder 71.22；SBERT-NLI-base 74.89，large 76.55。STS基准上先在NLI再在STSb上训练的SBERT-large达到86.10，仍低于同样设定下交叉编码的BERT-large（88.77），这是换取速度的代价。速度方面，论文称1万句找最相似一对的时间从BERT的约65小时降到约5秒。跨话题的论点相似度任务上，SBERT比同话题设定下降约7个点。",
+  "legacy": "sentence-transformers库把这套做法变成了几行代码可用的工具，“双塔编码 + 余弦相似度”成为语义检索的标准结构：[[dpr]]用同样的双编码器做开放域问答检索；[[simcse]]去掉了对NLI标注数据的依赖，用dropout噪声做无监督对比学习；[[e5]]、[[bge]]、[[openai-embeddings]]等通用嵌入模型在大规模弱监督句对上训练，并在[[mteb]]上比较。[[colbert]]则保留词级向量，在速度和精度之间取折中。今天检索增强生成（[[rag]]）中把文档切块并向量化，基本沿用这一结构。",
+  "limits": [
+    {
+      "text": "需要NLI这类人工标注的句对来微调，没有标注数据的领域和语言难以训练。",
+      "solved_by": [
+        "simcse",
+        "contriever"
+      ]
+    },
+    {
+      "text": "两句话各自压成一个向量，丢掉了词与词之间的细粒度交互，精度低于交叉编码器（STS基准86.10对88.77）。",
+      "solved_by": [
+        "colbert"
+      ]
+    },
+    {
+      "text": "迁移到训练数据没覆盖的话题或领域时效果明显下降（论点相似度跨话题下降约7个点）。",
+      "solved_by": [
+        "e5",
+        "bge"
+      ]
+    },
+    {
+      "text": "只在英语上训练和评测，缺乏统一的多任务嵌入评测标准。",
+      "solved_by": [
+        "mteb"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "bert",
+      "type": "extends",
+      "note": "在预训练BERT上加池化层和孪生结构微调，把只能做交叉编码的BERT变成能独立输出句向量的编码器。"
+    },
+    {
+      "to": "infersent",
+      "type": "solves",
+      "note": "沿用InferSent在NLI数据上训练句向量和[u; v; |u−v|]分类头的做法，但从预训练BERT出发，STS平均相关从65.01提高到74.89以上。"
+    },
+    {
+      "to": "facenet",
+      "type": "uses",
+      "note": "三元组损失直接借用人脸识别中拉近同类、推远异类的做法。"
+    },
+    {
+      "to": "snli",
+      "type": "uses",
+      "note": "主要用SNLI加MultiNLI约100万句对做分类目标的微调。"
+    },
+    {
+      "to": "dssm",
+      "type": "extends",
+      "note": "DSSM早已用双塔网络分别编码查询和文档再比较余弦相似度；SBERT把同样的结构放到预训练Transformer上。"
+    },
+    {
+      "to": "skip-thought",
+      "type": "rivals",
+      "note": "Skip-Thought通过预测相邻句子无监督学句向量；论文对比显示基于BERT微调的SBERT在语义相似度上明显更好。"
+    }
+  ],
+  "prereq": [
+    "embedding",
+    "dot-product",
+    "transformer-block",
+    "pretrain-finetune",
+    "contrastive-learning",
+    "retrieval"
+  ],
+  "terms": [
+    {
+      "t": "孪生网络（siamese network）",
+      "d": "两个输入分别通过同一个网络（共享全部权重）得到各自的向量，再比较这两个向量。"
+    },
+    {
+      "t": "交叉编码器 / 双编码器",
+      "d": "交叉编码器把两段文本拼在一起送入模型，精度高但每对都要重新算；双编码器各自编码成向量，可以预先算好、快速比较。"
+    },
+    {
+      "t": "Spearman相关",
+      "d": "比较两组数的排序是否一致的指标，1表示排序完全相同。语义相似度评测中用来衡量模型打分与人工打分的一致程度。"
+    }
+  ],
+  "learn": "先补[[c:embedding]]、[[c:dot-product]]和[[c:contrastive-learning]]，读过[[bert]]。读原文第3节（三种目标函数）和表1，再看第6节消融。动手：安装sentence-transformers，用一个预训练模型对一组句子编码，做语义搜索和聚类；再对比直接平均BERT输出得到的句向量，体会微调的作用。",
+  "check": {
+    "source": "https://arxiv.org/html/1908.10084",
+    "confirmed": "标题、2位作者、arXiv首次提交2019-08-27；摘要约5000万次推理/约65小时对约5秒；正文MEAN池化、分类目标公式、三元组损失、SNLI 57万与MultiNLI 43万对、1个epoch；表1平均值61.32、54.81、29.19、65.01、71.22、74.89、76.55；表2 SBERT-NLI-STSb-large 86.10与BERT-NLI-STSb-large 88.77；跨话题下降约7个点；CPU上InferSent快约65%；消融中|u−v|最关键。"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "id": "rnd",
+  "who": "Yuri Burda, Harrison Edwards, Amos Storkey, Oleg Klimov · OpenAI / 爱丁堡大学",
+  "venue": "ICLR 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1810.12894"},
+    {"label": "ar5iv全文", "url": "https://ar5iv.labs.arxiv.org/html/1810.12894"},
+    {"label": "OpenAI博客", "url": "https://openai.com/index/reinforcement-learning-with-prediction-based-rewards/"}
+  ],
+  "problem": "稀疏奖励游戏（如《蒙特祖玛的复仇》）里随机探索几乎永远拿不到第一个奖励；用“预测下一帧的误差”当好奇心奖励，又会被随机噪声（如一台雪花电视）吸引住。",
+  "idea": "固定一个随机初始化的网络，再训练另一个网络去模仿它的输出；对没见过的状态模仿得差、误差大，就给大奖励。目标是确定的函数，噪声无法制造“永远学不会”的误差。",
+  "impact": "第一个不靠人类示范、不读取游戏内部状态，就在《蒙特祖玛的复仇》上超过人类平均分的方法；实现只需两个小网络，成为好奇心探索最常用的基线。",
+  "background": "Atari里有一组“难探索”游戏：Montezuma's Revenge、Pitfall!、Private Eye等。奖励极其稀疏，随机乱按几百万步也碰不到一次得分，[[dqn]]在Montezuma上几乎是0分。\n\n解决思路是给智能体额外的**内在奖励**，鼓励它去新地方。[[count-based-exploration]]用密度模型估计“伪计数”，访问越少奖励越高，但密度模型难训。[[icm]]等“好奇心”方法用前向模型预测下一步观测，把预测误差当奖励——没见过的东西预测不准，误差大。但预测误差还来自另一个源头：**环境本身的随机性**。墙上有台播放随机雪花的电视，下一帧永远预测不准，智能体就会一直盯着它看。这就是“噪声电视”问题。",
+  "method": "**两个网络**。目标网络`f`：随机初始化后冻结，把观测映射成一个向量。预测网络`f̂`：用智能体实际收集到的观测训练，最小化`‖f̂(x) − f(x)‖²`。内在奖励就是这个误差：\n\n`i_t = ‖f̂(x_{t+1}) − f(x_{t+1})‖²`\n\n**为什么有效**。见过很多次的观测，预测网络已经学会模仿，误差小；新观测上误差大——这相当于一种可学习的计数（见[[c:knowledge-distillation]]，这里蒸馏的对象是随机网络）。由于`f`是确定的函数，没有随机性可言，“噪声电视”无法让误差居高不下；也不需要预测下一帧，绕开了动力学建模。\n\n**与外在奖励结合**。在[[ppo]]上用两个价值头分别估计外在回报和内在回报：内在回报按“非回合制”计算（游戏结束不清零，否则智能体会害怕死后从头再来，失去探索动力），外在回报照常按回合计算，两者用不同折扣率，最后加权相加作为优势。另外对观测和内在奖励都做归一化，否则奖励尺度随训练漂移。",
+  "results": "Montezuma's Revenge上最终平均8152分，同设置下的PPO为2497分，此前最好结果3700分，人类平均4753分；最好的智能体常能找到第一关24个房间中的22个，偶尔通关第一关。Venture、Gravitar也达到当时最佳。但在Pitfall!上仍是−3分，与PPO一样毫无进展。论文还发现，即使完全不用游戏分数、只最大化RND奖励，智能体也能稳定找到Montezuma一半以上的房间。",
+  "legacy": "RND成为内在奖励的标准组件：[[ngu]]用它作为“跨回合”的新奇度信号、再配合回合内记忆，[[agent57]]继承了这一设计。同期的[[go-explore]]指出，仅靠内在奖励的方法会“忘记”还没探索完的区域，并在Montezuma和Pitfall上大幅超过RND。",
+  "limits": [
+    {"text": "在Pitfall!等游戏上毫无进展；一旦某片区域被探索过、奖励消失，智能体不会主动回到那里继续向外探索。", "solved_by": ["go-explore", "agent57"]},
+    {"text": "新奇度只按“整个训练期间见过多少次”计算，同一回合内反复转圈不会受罚，回合内探索不足。", "solved_by": ["ngu"]},
+    {"text": "主要实验要处理十亿量级的游戏帧，规模扩展实验多达160亿帧，样本效率极低。", "solved_by": []},
+    {"text": "内在奖励与外在奖励的权重、折扣率等需要按游戏调参。", "solved_by": ["agent57"]}
+  ],
+  "relations": [
+    {"to": "icm", "type": "solves", "note": "ICM用前向模型预测误差做好奇心，会被随机噪声吸引；RND改为预测一个确定的随机网络，避开了噪声电视问题，也不需动力学模型。"},
+    {"to": "count-based-exploration", "type": "rivals", "note": "伪计数用密度模型估计访问次数；RND用蒸馏误差隐式地起到计数作用，实现更简单、在Montezuma上分数更高。"},
+    {"to": "ppo", "type": "uses", "note": "在PPO上加第二个价值头估计内在回报，并分别使用回合制与非回合制回报。"},
+    {"to": "schmidhuber-curiosity", "type": "extends", "note": "延续“把预测误差当好奇心奖励”的思想，换成一个不受环境随机性影响的预测目标。"}
+  ],
+  "prereq": ["exploration-exploitation", "reward-return", "policy-gradient-concept", "actor-critic", "knowledge-distillation"],
+  "terms": [
+    {"t": "内在奖励", "d": "不来自环境、由智能体自己计算的奖励，如新奇度、好奇心，用来驱动探索。"},
+    {"t": "噪声电视问题", "d": "以预测误差为好奇心的智能体，会被纯随机、永远无法预测的东西（如雪花屏电视）吸引，停在原地不再探索。"},
+    {"t": "难探索游戏", "d": "Atari中奖励极稀疏、随机策略几乎得不到分的一类游戏，Montezuma's Revenge是代表。"}
+  ],
+  "learn": "先补[[c:exploration-exploitation]]，读[[icm]]的讲解理解好奇心方法与噪声电视问题。读原文第2节（2.2节对预测误差来源的分析）和第3节的消融。动手：在MiniGrid或简单迷宫上给PPO加一个RND奖励，对比有无内在奖励时探索到的格子数。",
+  "check": {"source": "https://ar5iv.labs.arxiv.org/html/1810.12894", "confirmed": "标题、作者（OpenAI、爱丁堡）、arXiv 1810编号；摘要中首次在不用示范和内部状态下超过人类平均；正文24个房间中找到22个；表1：Montezuma RND 8152、PPO 2497、此前SOTA 3700、人类4753，Pitfall RND −3；3.4节规模实验0.5B、2B、16B帧。"}
+}

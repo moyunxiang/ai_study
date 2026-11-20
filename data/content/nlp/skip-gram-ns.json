@@ -1,0 +1,38 @@
+{
+  "id": "skip-gram-ns",
+  "who": "Tomas Mikolov, Ilya Sutskever, Kai Chen, Greg Corrado, Jeffrey Dean · Google",
+  "venue": "NIPS 2013",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1310.4546"},
+    {"label": "word2vec Explained（Goldberg & Levy推导笔记）", "url": "https://arxiv.org/abs/1402.3722"}
+  ],
+  "problem": "Skip-gram已经很快，但层次softmax实现复杂；“the”“a”这类高频词占了大量训练样本却几乎不提供信息；而且“Air Canada”这种短语的意思不是两个词义的简单组合，没有自己的向量。",
+  "idea": "三个简单改动：把每次预测改成“区分真上下文词与随机抽来的k个噪声词”的二分类（负采样）；按频率随机丢弃高频词（下采样）；先用共现统计把常见短语合并成一个token，再当作普通词训练。",
+  "impact": "负采样成为word2vec工具的默认训练方式，单机一天可训练超过1000亿词；“正例对比少量负例”的做法后来广泛用于推荐、图嵌入和对比学习，也直接启发了从矩阵分解角度解释词向量的研究。",
+  "background": "[[word2vec]]提出的Skip-gram用中间词向量预测周围词，输出层靠[[hierarchical-softmax]]把计算量降到`log₂V`。但仍有三个问题。\n\n一是层次softmax要先建霍夫曼树，每个词的预测是沿树走的一串二分类，实现和调优都麻烦。Mnih和Teh用[[nce]]（噪声对比估计）训练语言模型，避开了全词表softmax，但NCE为了近似最大化对数概率，需要同时用到样本和噪声分布的数值概率。\n\n二是词频极不均衡：the、in、a出现上亿次，与几乎任何词共现，模型在它们上面反复训练，收益很小。\n\n三是短语。“Boston Globe”是一份报纸，“Air Canada”是一家航空公司，它们的意思不能由组成词的向量相加得到，而整词模型没有办法表示。",
+  "method": "**负采样（NEG）**。对一个训练对（中心词`w_I`，上下文词`w_O`），不再计算`w_O`在整个词表上的概率，而是最大化\n\n`log σ(v'_{w_O}ᵀ v_{w_I}) + Σ_{i=1..k} E_{w_i ~ P_n(w)} [ log σ(−v'_{w_i}ᵀ v_{w_I}) ]`\n\n其中σ是sigmoid，`v`和`v'`是输入和输出向量。意思是：让真实上下文词与中心词的内积大（σ接近1），让k个按噪声分布随机抽出的词与中心词的内积小。每个训练对只需更新k+1个输出向量，而不是V个。小数据集k取5到20，大数据集取2到5就够。与NCE的区别是，NEG只需要样本本身，不需要噪声分布的数值概率，因此不再保证近似softmax的对数概率，但词向量质量不受影响。噪声分布取一元词频的3/4次方`U(w)^{3/4}/Z`，比直接用词频或均匀分布明显更好，它让低频词被抽中的机会适当增加。\n\n**高频词下采样**。训练集中每个词`w_i`以概率`P(w_i) = 1 − √(t / f(w_i))`被丢弃，`f`是词频，`t`一般取`10⁻⁵`。频率低于t的词全部保留，越高频丢得越多，但不改变频率排序。\n\n**短语**。用`score(w_i, w_j) = (count(w_i w_j) − δ) / (count(w_i) × count(w_j))`给相邻词对打分（与[[pmi-collocation]]的互信息思路相近），δ用来避免罕见词凑成短语；超过阈值的词对合并成一个token，如“New_York_Times”。重复2到4遍、逐步降低阈值，可以得到更长的短语。",
+  "results": "10亿词新闻语料、300维Skip-gram的词类比测试（表1）：NEG-5耗时38分钟、总准确率59%，NEG-15为61%，层次softmax为47%，NCE-5为53%；加上`10⁻⁵`下采样后，NEG-5只需14分钟、准确率60%，层次softmax升到55%，训练时间普遍缩短到原来的约一半到三分之一。\n\n新建的短语类比测试集有3,218题（如“Montreal : Montreal Canadiens = Toronto : Toronto Maple Leafs”）。在约330亿词上训练1000维模型，准确率72%；数据减到60亿词时为66%。\n\n向量还呈现可加性：`vec(Russia) + vec(river)`接近`vec(Volga River)`，`vec(Germany) + vec(capital)`接近`vec(Berlin)`。",
+  "legacy": "负采样几乎立刻成为训练词向量的标准方法，[[glove]]、[[fasttext]]、[[doc2vec]]的实验都以带负采样的Skip-gram为基线或基础。[[levy-goldberg-pmi]]证明它在隐式分解一个移位了`log k`的点互信息矩阵，把预测式词向量和计数式方法统一起来。\n\n“一个正例配若干随机负例、用sigmoid或softmax区分”的对比式目标此后到处出现：DeepWalk等图嵌入、推荐系统中的物品向量、[[transe]]的负例三元组，直到[[c:contrastive-learning]]中的InfoNCE，再到[[clip]]用一个批次内的其他样本作负例。短语检测也被作为预处理步骤集成进gensim等工具。",
+  "pitfalls": "- 负采样的目标不是语言模型的似然，训练出的模型不能给句子一个合法的概率，它只是为学词向量而设计的。\n- 3/4次方、`t = 10⁻⁵`、k的取值都是经验选择，论文没有理论推导；比较不同词向量方法时，应当让这些设置保持一致，否则差异可能来自超参数而非模型。",
+  "limits": [
+    {"text": "负采样不再近似任何归一化概率，为什么它学到的向量具有线性类比结构，论文没有解释。", "solved_by": ["levy-goldberg-pmi", "glove"]},
+    {"text": "短语靠共现计数和人工阈值预先合并，只能覆盖常见的固定搭配，句子、段落等更长文本的表示仍无从谈起。", "solved_by": ["doc2vec", "skip-thought"]},
+    {"text": "向量仍与上下文无关，同一个词在所有句子中共用一个向量。", "solved_by": ["elmo", "bert"]},
+    {"text": "噪声分布的3/4次方、下采样阈值、负例个数等都是经验调出来的，换语料或任务时需要重新调。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "word2vec", "type": "extends", "note": "在同一个Skip-gram结构上加入负采样、高频词下采样和短语向量，速度和词向量质量都明显提高。"},
+    {"to": "hierarchical-softmax", "type": "rivals", "note": "两种替代全词表softmax的方案：负采样在词类比上更好更简单，层次softmax配合下采样在短语任务上最好；此后负采样成为默认。"},
+    {"to": "nce", "type": "extends", "note": "把噪声对比估计简化为只需样本、不需噪声概率数值的负采样，放弃了对softmax的近似，换来更简单的实现。"},
+    {"to": "pmi-collocation", "type": "uses", "note": "短语检测的打分公式与用互信息找搭配的思路相同：两个词共同出现的次数远超独立假设时，就视为一个短语。"},
+    {"to": "collobert-weston", "type": "extends", "note": "Collobert和Weston用“真窗口得分高于替换中间词的假窗口”的排序损失训练词向量；负采样同样用随机替换词作负例，但改成每次只更新少量向量的逻辑回归。"}
+  ],
+  "prereq": ["embedding", "logistic-regression", "dot-product", "probability-basics", "sgd-minibatch", "contrastive-learning"],
+  "terms": [
+    {"t": "负采样", "d": "训练时为每个真实样本随机抽几个“假”样本，只要求模型把真的和假的区分开，而不用对整个词表做归一化。"},
+    {"t": "下采样（subsampling）", "d": "按频率随机丢掉一部分高频词的出现，减少无信息的训练样本，也让低频词的相对权重变大。"},
+    {"t": "可加组合性", "d": "两个词向量相加后的最近邻常常是它们组合起来的意思，如“德国”+“首都”≈“柏林”。"}
+  ],
+  "learn": "先读[[word2vec]]，补[[c:logistic-regression]]。读原文第2.2节（NEG目标函数）、第2.3节（下采样）、第4节（短语）和表1、表3；Goldberg与Levy的推导笔记（链接）把目标函数的梯度一步步写了出来。动手：用NumPy从零实现带负采样和下采样的Skip-gram，在text8语料上训练，比较k = 2和k = 15的类比准确率与速度。",
+  "check": {"source": "https://arxiv.org/abs/1310.4546", "confirmed": "标题、5位作者（Google），arXiv v1于2013-10-16提交；PDF中NEG目标、k取5–20/2–5、U(w)^{3/4}、下采样公式与t≈10⁻⁵、短语打分公式与2–4遍；表1的NEG-5 38分钟59%、NEG-15 61%、HS 47%、NCE-5 53%，下采样后NEG-5 14分钟60%、HS 55%；短语测试集3218题、330亿词1000维72%、60亿词66%；“单机一天超过1000亿词”；Russia+river≈Volga River、Germany+capital≈Berlin。"}
+}

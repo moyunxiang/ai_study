@@ -1,0 +1,48 @@
+{
+ "id": "stealing-production-lm",
+ "who": "Nicholas Carlini, Daniel Paleka, Krishnamurthy Dvijotham, Thomas Steinke, Jonathan Hayase, Matthew Jagielski 等 · Google DeepMind / ETH / OpenAI / 华盛顿大学等",
+ "venue": "arXiv 2024",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2403.06634"
+  }
+ ],
+ "problem": "此前的[[model-stealing]]多针对小模型或需要大量查询；人们不清楚能否从ChatGPT这类黑盒API里偷出真实的模型信息。",
+ "idea": "利用模型最后一层输出的logits总落在一个低维子空间里这一事实，对API做少量查询，就能恢复最后的嵌入投影层（至多差一个线性变换）。",
+ "impact": "第一次从生产级商用语言模型中精确提取出非平凡的参数信息，推动API厂商隐藏或限制logit相关接口。",
+ "method": "语言模型的最后一步，是把宽度为h的隐藏向量乘以一个词表大小×h的投影矩阵，得到每个词的logits。因此无论查询什么提示，输出的logits向量都落在一个最多h维的子空间里，而词表往往有几万甚至十几万维。\n\n攻击者只要用足够多的随机提示向API要回完整的logits（或通过logit偏置等接口技巧推算出它们），把这些向量堆成矩阵再做奇异值分解（见[[c:eigen-svd]]），奇异值会在第h个之后骤降，这个位置就是隐藏维度，对应的子空间就是投影矩阵的列空间，因此能恢复投影层，只差一个未知的可逆线性变换。\n\n作者在OpenAI的Ada和Babbage上以不到20美元的查询成本恢复了整个投影矩阵，确认它们的隐藏维度分别是1024和2048；对gpt-3.5-turbo，恢复了隐藏维度，并估计恢复整个矩阵的成本不到2000美元。",
+ "limits": [
+  {
+   "text": "攻击只拿到最后一层，无法恢复其余的参数，因此离“完整偷走模型”还很远。",
+   "solved_by": []
+  },
+  {
+   "text": "防御依赖厂商调整API，例如不再暴露完整logits或logit偏置，攻击与防御仍在博弈。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "model-stealing",
+   "type": "extends",
+   "note": "从Tramèr等人用预测API复制小型模型，推进到对生产级大语言模型提取精确的结构信息。"
+  }
+ ],
+ "prereq": [
+  "softmax",
+  "embedding",
+  "dot-product"
+ ],
+ "terms": [
+  {
+   "t": "logits",
+   "d": "softmax之前的原始分数向量，每个词对应一个数。"
+  }
+ ],
+ "learn": "先补奇异值分解和logits的含义；读论文的攻击描述和防御一节；用一个小的GPT-2自己做一遍隐藏维度的恢复实验。",
+ "check": {
+  "source": "https://arxiv.org/abs/2403.06634",
+  "confirmed": "核对标题、作者、2024-03-11提交日期，摘要中的Ada/Babbage隐藏维度1024和2048、低于20美元和gpt-3.5-turbo约2000美元的估计。"
+ }
+}

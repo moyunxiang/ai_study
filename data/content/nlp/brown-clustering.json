@@ -1,0 +1,39 @@
+{
+  "id": "brown-clustering",
+  "who": "Peter F. Brown, Vincent J. Della Pietra, Peter V. deSouza, Jenifer C. Lai, Robert L. Mercer · IBM沃森研究中心",
+  "venue": "Computational Linguistics, Vol. 18, No. 4, pp. 467–480, 1992",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/J92-4003/"},
+    {"label": "PDF", "url": "https://aclanthology.org/J92-4003.pdf"},
+    {"label": "Wikipedia: Brown clustering", "url": "https://en.wikipedia.org/wiki/Brown_clustering"}
+  ],
+  "problem": "n-gram语言模型要为每个词组合单独估计概率，即使用3.66亿词训练，新文本中仍有14.7%的三元组从没见过；而“Thursday”学到的规律无法分给“Friday”。",
+  "idea": "按“左右邻居相似”把词自动聚成类，在类上建n-gram：P(词|前文) = P(词|它的类) × P(类|前一个类)。聚类目标是让相邻两个类之间的互信息最大，用自底向上逐步合并的贪心算法求解。",
+  "impact": "第一个大规模、完全无监督地从文本里学出词类的方法。得到的层次化词簇在神经词向量普及之前，一直是NER、句法分析等任务里最好用的“词表示”特征。",
+  "background": "IBM语音组的语言模型是插值三元模型：用3.66亿词训练，在Brown语料（约101万词）上困惑度244。数据再多，稀疏仍然无法回避——论文统计，新的英语文本中有14.7%的三元组和2.2%的二元组在这么大的训练集里一次都没出现过，最大似然估计给它们的概率是0。[[katz-backoff]]这类平滑方法只是回退到更短的上下文，并不利用“词与词相似”这一信息。\n\n[[harris-distributional]]早就指出，出现在相似环境里的词意义也相似。Thursday附近的词分布和Friday附近的很像（只是很少有人说“Thank God it's Thursday”）。如果能把这类词自动归在一起，没见过的组合就可以借用相似组合的统计。",
+  "method": "**类n-gram模型**。用函数π把V个词分成C个类，二元类模型为\n\n`P(w_k | w_{k−1}) = P(w_k | c_k) · P(c_k | c_{k−1})`\n\n参数从V²量级降到 `C² + V` 量级。\n\n**聚类目标**。论文证明：对二元类模型，训练数据的最大似然等价于让**相邻两个类之间的平均互信息**最大（见[[c:mutual-information]]）\n\n`I = Σ P(c₁c₂) log [P(c₁c₂) / (P(c₁)P(c₂))]`\n\n直观地说，就是让“知道前一个词的类”尽可能多地告诉你“后一个词的类”。\n\n**贪心合并**。一开始每个词自成一类；每一步尝试所有类对，合并那一对使互信息损失最小的，做V−C次后剩下C类，再逐个把词挪到更合适的类里微调。如果一直合并到只剩一类，合并的顺序就形成一棵二叉树：每个词对应一条从根出发的0/1路径，路径前缀越长，词越相似。\n\n**加速**。朴素实现是V⁵量级，作者通过缓存中间量让每次合并的评估变成常数时间；但对超过5000词的词表仍不实用，于是改为按频率依次加入新词，始终只维护C+1个类。",
+  "results": "在26万词的词表上聚出1000类，许多类非常整齐，例如“Friday Monday Thursday Wednesday Tuesday Saturday Sunday weekends…”，也有句法性质的类。类三元组中从未见过的比例从14.7%降到约3.8%。但单独的类三元模型在Brown语料上困惑度271，比词模型的244差；与词模型插值后为236，只是小幅改进。论文还用互信息找“粘连词对”（如Humpty Dumpty），并用1001词窗口内的共现找出主题性的语义类。",
+  "legacy": "作为语言模型，它的增益很小；它真正的生命力在于作为特征。层次路径的前缀可以给出不同粒度的词簇，后来被大量用于命名实体识别和依存句法分析，在缺标注数据时效果尤其明显。[[turian-word-reps]]把Brown聚类与神经词向量放在同一组任务上比较，结论是两者都有用、可以叠加。之后[[nplm]]、[[word2vec]]用连续向量替代离散类别，解决了“一个词只能属于一个类”的问题；但“用上下文统计给词分组”的目标与Brown聚类一脉相承。",
+  "pitfalls": "- Brown聚类是**硬聚类**：每个词只属于一个类，不能表达多义。\n- 它只看紧邻的前后一个词，所以学到的类偏句法（星期、地名、动词形态），这和看整篇文档共现的[[lsa]]得到的“主题相似”不同。",
+  "limits": [
+    {"text": "每个词只能属于一个离散的类，无法表达多义词，也无法表达“部分相似”。", "solved_by": ["nplm", "word2vec", "elmo"]},
+    {"text": "贪心合并计算量大，完整建树只能处理约5000词，更大的词表必须用近似算法。", "solved_by": ["word2vec"]},
+    {"text": "作为语言模型提升有限：类模型单独使用困惑度反而变差，与词模型插值后仅从244降到236。", "solved_by": ["nplm", "rnnlm"]},
+    {"text": "只利用紧邻的左右一个词，忽略更宽的上下文。", "solved_by": ["word2vec", "glove"]}
+  ],
+  "relations": [
+    {"to": "shannon-ngram", "type": "extends", "note": "保留n-gram语言模型的框架，但把预测的单位从词换成词类，以减少需要估计的参数。"},
+    {"to": "harris-distributional", "type": "extends", "note": "把“出现在相似环境里的词相似”具体化为“使相邻类互信息最大”的可优化目标。"},
+    {"to": "katz-backoff", "type": "rivals", "note": "回退平滑靠缩短上下文对付稀疏；类模型靠在相似词之间共享统计对付稀疏，两者后来常插值结合。"},
+    {"to": "pmi-collocation", "type": "extends", "note": "同样用互信息衡量词的共现强度，这里把它从“找搭配”推广为聚类的优化目标。"},
+    {"to": "lsa", "type": "rivals", "note": "同期从语料自动学词的相似性：LSA用整篇文档的共现得到连续向量，偏主题；Brown聚类用相邻词得到离散类，偏句法。"}
+  ],
+  "prereq": ["n-gram", "language-model", "mutual-information", "perplexity", "clustering", "distributional-hypothesis"],
+  "terms": [
+    {"t": "类n-gram模型", "d": "先预测下一个词的类，再在类内部预测具体是哪个词。相似词共享类级别的统计，没见过的词组合也能得到合理概率。"},
+    {"t": "平均互信息", "d": "衡量“知道前一个类”能减少多少“下一个类”的不确定性，单位是比特。越大说明类的划分越能捕捉相邻规律。"},
+    {"t": "粘连词对（sticky pair）", "d": "相邻出现的互信息远大于0的两个词，如Humpty Dumpty。它们几乎总是一起出现，可看作一个整体。"}
+  ],
+  "learn": "先补[[c:mutual-information]]和[[c:perplexity]]。读原文第3节（类模型与最大似然等价于最大化互信息的推导）和表2的聚类样例。动手：在几百万词语料上跑开源的brown-cluster实现（Percy Liang的版本），查看几个词的二进制路径，再把4位、6位、10位前缀作为特征加到一个NER或词性标注器里，比较效果。",
+  "check": {"source": "https://aclanthology.org/J92-4003.pdf", "confirmed": "ACL Anthology确认CL 18(4):467–480，1992，五位作者；原文：365,893,263词、14.7%/2.2%未见、Brown语料1,014,312词、困惑度244；类模型公式与参数量；最大似然等价于最大化相邻类平均互信息；贪心合并、朴素V⁵、建树可用至5000词；260,741词聚成1000类、星期类示例；类三元组未见约3.8%；困惑度271与插值后236；Humpty Dumpty与1001词窗口。"}
+}

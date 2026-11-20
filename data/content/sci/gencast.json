@@ -1,0 +1,89 @@
+{
+  "id": "gencast",
+  "who": "Price, Sanchez-Gonzalez, Alet, Andersson, El-Kadi, Masters, Ewalds, Stott, Mohamed, Battaglia, Lam, Willson · Google DeepMind",
+  "venue": "Nature 2024",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2312.15796"
+    }
+  ],
+  "problem": "[[graphcast]]这类确定性模型一次只给一条预报，且越往后越模糊；而天气本质上不确定，决策需要的是一组可能情景的概率分布。",
+  "idea": "用扩散模型生成集合：每次从噪声出发，以前两个时刻的大气状态为条件，去噪得到下一个12小时的状态，反复滚动得到15天预报，多次采样即得集合。",
+  "impact": "论文称在评估的1320个目标中97.4%比ECMWF的集合预报ENS更准，而且单个集合成员8分钟生成。",
+  "background": "业务预报用集合预报（ECMWF的ENS有50个成员）来表达不确定性：对初始条件与模式加扰动、反复积分。这种方法算力昂贵。确定性机器学习模型使用均方误差训练，输出的是条件期望，细节被平滑掉，再用它加噪声做集合，质量不好。应该直接学习预报的概率分布。",
+  "method": "GenCast是一个条件扩散模型（见[[c:diffusion-process]]与[[ddpm]]）。它在0.25度网格上对80多个地面与大气变量的下一个12小时状态建模：条件是当前与之前一步的全球状态，去噪网络采用与[[graphcast]]类似的图网络、球面网格表示加Transformer处理器，采样时用多步去噪得到一个样本。循环自回归生成30步，得到15天的随机预报；每次用不同的随机数，就得到一个集合成员，扩散的随机性自然保证了不同成员间的分布合理。训练使用ERA5再分析。",
+  "results": "摘要报告：GenCast以12小时为步长生成15天的0.25度全球预报，覆盖80多个地面和大气变量，每个成员8分钟；在评估的1320个目标中，97.4%的技能高于ENS，并在极端天气、热带气旋与风电预测上也更优。",
+  "legacy": "GenCast与[[neuralgcm]]一道证明了机器学习模型在集合预报上也能超越业务系统，直接影响了ECMWF的集合版AIFS的路线（[[aifs-operational]]）。扩散模型也因此成为气象AI的主流概率建模手段。",
+  "limits": [
+    {
+      "text": "集合成员间的物理一致性（如空间相关结构）没有被严格保证，对尾部极端事件仍需评估。",
+      "solved_by": []
+    },
+    {
+      "text": "分辨率0.25度、12小时步长，对中小尺度强对流和日变化不够。",
+      "solved_by": [
+        "aurora"
+      ]
+    },
+    {
+      "text": "用ERA5训练，依赖再分析而非实时观测同化，实际业务需要稳健的初始场。",
+      "solved_by": [
+        "aifs-operational"
+      ]
+    },
+    {
+      "text": "采样需要几十步去噪，单个成员成本虽低，但大集合的总成本仍不可忽略。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "graphcast",
+      "type": "extends",
+      "note": "沿用其图网络与球面网格结构，把确定性输出改为扩散采样。"
+    },
+    {
+      "to": "ddpm",
+      "type": "uses",
+      "note": "采用去噪扩散概率模型作为生成框架。"
+    },
+    {
+      "to": "neuralgcm",
+      "type": "rivals",
+      "note": "同月提出的概率预报路线：NeuralGCM靠可微物理核心，GenCast完全靠扩散模型。"
+    },
+    {
+      "to": "weatherbench2",
+      "type": "uses",
+      "note": "用WeatherBench 2的集合评估指标与ENS基线比较。"
+    },
+    {
+      "to": "fourcastnet",
+      "type": "extends",
+      "note": "继承其用ERA5训练、0.25度全球数据驱动预报的设定，进一步做到概率预报。"
+    }
+  ],
+  "prereq": [
+    "diffusion-process",
+    "noise-schedule",
+    "autoregressive",
+    "monte-carlo",
+    "message-passing"
+  ],
+  "terms": [
+    {
+      "t": "集合预报",
+      "d": "同时跑多条略有差异的预报，用它们的分布来表示预报的不确定性。"
+    },
+    {
+      "t": "CRPS",
+      "d": "评估概率预报的常用分数，既衡量预报准确，也衡量离散度是否合理，越小越好。"
+    }
+  ],
+  "learn": "先读[[c:diffusion-process]]与[[c:noise-schedule]]。对照原文，观察一次热带气旋过程的多条集合成员，看路径分布是否包含真实路径。",
+  "check": {
+    "source": "https://arxiv.org/abs/2312.15796",
+    "confirmed": "标题、作者、v1日期2023-12-25；摘要中15天、12小时步长、0.25度、80多个变量、8分钟、97.4%/1320个目标优于ENS。"
+  }
+}

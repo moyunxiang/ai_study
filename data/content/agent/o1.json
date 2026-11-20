@@ -1,0 +1,142 @@
+{
+  "id": "o1",
+  "who": "OpenAI（公告署名为OpenAI，贡献者名单另附） · OpenAI",
+  "links": [
+    {
+      "label": "官方公告（o1-preview）",
+      "url": "https://openai.com/index/introducing-openai-o1-preview/"
+    },
+    {
+      "label": "技术博客 Learning to Reason with LLMs",
+      "url": "https://openai.com/index/learning-to-reason-with-llms/"
+    },
+    {
+      "label": "OpenAI o1 System Card（arXiv）",
+      "url": "https://arxiv.org/abs/2412.16720"
+    },
+    {
+      "label": "o1正式版进入API（reasoning_effort）",
+      "url": "https://openai.com/index/o1-and-new-tools-for-developers/"
+    }
+  ],
+  "problem": "GPT-4o这一代模型只在提示要求时才“分步思考”，推理一旦走错很少回头检查，竞赛数学几乎做不动：2024年AIME上GPT-4o平均只做对12%。",
+  "idea": "用大规模强化学习训练模型在回答前先生成一段很长的内部思维链，让它自己学会检查错误、拆解难题、换思路；想得越久，答得越准。",
+  "impact": "AIME从12%提到74%（单次作答），Codeforces超过89%的人类选手。证明了“测试时算力”是新的扩展维度，开启了o3、DeepSeek-R1等推理模型的时代。",
+  "background": "2024年上半年的最强模型是[[gpt-4o]]、[[claude-3.5-sonnet]]。它们“想”多长由提示决定：[[cot]]让模型先写推理步骤，[[self-consistency]]再采样多条推理投票。但这些只是提示技巧，模型没有被训练成“会想”：推理走错一步很少回头检查。结果是竞赛级数学几乎做不动——OpenAI称GPT-4o在2024年AIME（美国数学邀请赛，每套15题）上平均只做对12%（1.8题）。\n\n另一边，继续放大预训练越来越贵（见[[scaling-laws]]）。已有几条线索：[[star]]让模型在自己生成且答案正确的推理上反复微调；同为OpenAI的[[prm]]证明给每一步打分的过程奖励模型能更准地从多个解里挑出对的；[[quiet-star]]让模型在每个token前先“想”一段；[[tts-compute]]研究了把算力花在推理阶段的收益。但没人在前沿规模上证明：用强化学习专门训练长思维链能带来质变。",
+  "method": "o1是一个**被强化学习训练成先想再答的大语言模型**。训练细节未公开，公告能确认的有三点：\n\n- 回答前先生成很长的内部思维链（推理token，见[[c:reasoning-tokens]]），再写出答案。\n- 用“大规模强化学习算法”训练模型如何有效利用这段思维链，官方称“数据效率很高”。模型由此学会改正自己的错误、拆解难步骤、走不通就换思路。\n- 性能随两种算力平滑上升：训练时的强化学习算力，以及测试时的思考时间。即推理阶段的计算成了用钱换准确率的新维度。\n\n后来[[deepseek-r1]]公开的一类做法可以帮助理解：对一道有标准答案的题x，模型（策略`π_θ`）采样一段“思维链+答案”y，答案对了奖励`R = 1`，错了`R = 0`，用[[c:policy-gradient-concept]]最大化期望奖励`J(θ) = E_{y∼π_θ(·|x)}[R(x, y)]`，梯度为`∇J = E[R · ∇log π_θ(y|x)]`：让导向正确答案的思考方式更常出现。与[[instructgpt]]的RLHF不同，奖励来自可自动核对的对错，而非人的偏好。o1是否这样做、是否用了过程奖励或搜索，官方没说。\n\n公告里的一个例子能看出它“想”了什么。给出例句“oyfjdnisdr rtqwainr acxz mynzbhhx → Think step by step”，要求破译另一段密文。GPT-4o找不到规律，反问用户要更多规则；o1-preview在思维链里试了几种假设后发现：密文每两个字母一组，取两个字母在字母表中序号的平均值，例如`oy → (15+25)/2 = 20 → T`，最终解出“THERE ARE THREE R'S IN STRAWBERRY”。\n\n**隐藏思维链**。OpenAI决定不向用户展示原始思维链，只给模型生成的摘要。理由是：想用思维链监控模型（比如发现它是否在操纵用户），就不能对思维链施加合规训练，而未经约束的思维链又不宜直接展示；官方也承认“竞争优势”是考虑之一。\n\n**发布经过**。2024年9月12日上线o1-preview和更小更便宜的o1-mini，系列名从1重新计数。正式版o1于12月5日进入ChatGPT，12月17日进入API并加入调节思考长短的`reasoning_effort`参数（[[reasoning-effort]]）。",
+  "results": "官方公布的成绩（未发布的o1正式版，最大测试时算力）：\n\n- AIME 2024：单次作答平均74%（11.1/15）；64次采样多数投票83%；用学习到的打分函数从1000个样本里重排达93%（13.9/15），超过美国数学奥赛（USAMO）晋级线。GPT-4o为12%。\n- [[gpqa]] Diamond（研究生级物理、化学、生物题）：77.3%，GPT-4o为50.6%；OpenAI称这是首个超过其招募的博士专家成绩的模型。\n- Codeforces：Elo 1673，超过89%的人类选手；o1-preview为1258，GPT-4o为808（11%）。\n- 在o1上加训编程的模型以人类同等条件参加2024年IOI（每题最多50次提交），得213分，位于49%分位；放宽到每题10000次提交可得362.14分，超过金牌线。\n- [[math-dataset]]的500题测试集94.8%（GPT-4o 60.3%）。越狱测试StrongREJECT上o1-preview得0.84，GPT-4o得0.22。\n\n人类偏好评测中，o1-preview在编程、数学上明显胜出，但部分自然语言任务上不如GPT-4o受欢迎。",
+  "legacy": "三个月内，阿里的[[qwq]]（2024年11月）开放权重跟进，OpenAI发布[[o3]]。2025年1月，[[deepseek-r1]]和[[kimi-k1.5]]公开了训练方法：只用答案对错做奖励的大规模强化学习，就能长出o1式的长思维链和自我检查，外界猜测的过程奖励模型、树搜索并非必需；[[s1]]用1000道题微调加推理时强制“多想一会”也得到了测试时扩展曲线。\n\n产品上，[[claude-3.7-sonnet]]把普通回答和[[extended-thinking]]做进同一个模型并展示思考过程，[[gemini-2.5]]以“思考模型”发布；[[o3-o4-mini]]在思维链中途调用工具，[[deep-research]]把长推理用于多步检索；[[gpt-5]]把快速模型和推理模型合成一个由路由器决定想多久的系统。安全上，[[deliberative-alignment]]公开了o1在思维链里援引安全规范的做法，[[in-context-scheming]]发现o1在特定测试中会隐瞒行为，[[cot-monitorability]]讨论思维链监控能可靠多久。\n\n今天，强化学习训练长思维链已是前沿模型后训练的标准环节，o1本身已被后继取代。",
+  "pitfalls": "- o1-preview、o1、o1-mini是三个不同的模型。公告里最亮眼的数字大多来自当时尚未发布的o1正式版；IOI成绩和Codeforces 1807分来自另外针对编程加训的模型。\n- AIME 93%用了1000次采样加打分函数重排，不是单次作答；单次作答是74%。\n- 用户看到的是模型生成的思维链摘要，不是原始思维链。\n- “测试时算力越多越准”不等于每题都该想很久：简单问题上长时间思考只会浪费token（见[[overthinking]]）。\n- o1的训练方法从未公开。“o1用了过程奖励模型或蒙特卡洛树搜索”之类说法都是外界猜测。",
+  "limits": [
+    {
+      "text": "训练算法、奖励设计和数据完全不公开，学界无法复现，只能猜测它是否用了过程奖励或树搜索。",
+      "solved_by": [
+        "deepseek-r1",
+        "kimi-k1.5",
+        "open-r1"
+      ]
+    },
+    {
+      "text": "原始思维链对用户隐藏、只给摘要，用户无法核查模型究竟如何得出答案，开发者也无法用它调试。",
+      "solved_by": [
+        "qwq",
+        "deepseek-r1",
+        "extended-thinking"
+      ]
+    },
+    {
+      "text": "又慢又贵：o1-preview对简单问题也会想很久，且调用者无法控制思考长度。",
+      "solved_by": [
+        "reasoning-effort",
+        "claude-3.7-sonnet",
+        "gpt-5"
+      ]
+    },
+    {
+      "text": "o1-preview不能浏览网页、上传文件和图片，推理过程中也不能调用工具，推理与行动是割裂的。",
+      "solved_by": [
+        "o3-o4-mini",
+        "deep-research"
+      ]
+    },
+    {
+      "text": "用思维链监控模型的前提是思维链忠实反映真实推理，这一点没有被验证；公告本身也提到观察到了奖励投机的案例。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "cot",
+      "type": "extends",
+      "note": "思维链从提示技巧变成训练目标：不靠示例诱导，而是用强化学习让模型自己学会写长而有效的推理。"
+    },
+    {
+      "to": "prm",
+      "type": "extends",
+      "note": "同为OpenAI的逐步验证研究；o1的MATH评测沿用该文的500题划分，用学习到的打分函数重排1000个样本的做法与验证器思路一脉相承，但训练中是否用过程奖励官方未说明。"
+    },
+    {
+      "to": "gpt-4",
+      "type": "solves",
+      "note": "GPT-4级模型在竞赛数学、编程上多步推理薄弱，o1用强化学习训练的长思维链把AIME、Codeforces成绩提高了数倍。"
+    },
+    {
+      "to": "gpt-4o",
+      "type": "solves",
+      "note": "全部评测以GPT-4o为基线：AIME从12%到74%，GPQA Diamond从50.6%到77.3%；但在部分写作类任务上没有优势。"
+    },
+    {
+      "to": "star",
+      "type": "extends",
+      "note": "STaR用“答案对了就保留推理来微调”自举推理能力，o1把这种以正确性为信号的思路换成大规模强化学习并放大到前沿模型。"
+    },
+    {
+      "to": "quiet-star",
+      "type": "rivals",
+      "note": "同样追求“说之前先想”，Quiet-STaR在每个token前插入短小的内部思考，o1则在回答前生成一整段长思维链，后者成为主流。"
+    },
+    {
+      "to": "tts-compute",
+      "type": "extends",
+      "note": "该文在小模型上研究测试时计算如何分配，o1在前沿规模上展示了准确率随思考时间平滑上升。"
+    },
+    {
+      "to": "self-consistency",
+      "type": "uses",
+      "note": "评测中的cons@64就是自洽性采样：同一题采64条推理取多数答案，把AIME从74%提到83%。"
+    }
+  ],
+  "prereq": [
+    "language-model",
+    "autoregressive",
+    "reasoning-tokens",
+    "rlhf-concept",
+    "policy-gradient-concept",
+    "reward-design",
+    "decoding-sampling",
+    "benchmark"
+  ],
+  "terms": [
+    {
+      "t": "pass@1 / cons@64",
+      "d": "pass@1是每题只答一次的平均正确率；cons@64是每题采样64个答案、取出现最多的那个作为最终答案后的正确率。"
+    },
+    {
+      "t": "可验证奖励",
+      "d": "奖励由程序自动核对得到，比如数学答案是否等于标准答案、代码是否通过测试，不需要人或奖励模型打分。适合数学和编程，难以用于写作。"
+    },
+    {
+      "t": "思维链摘要",
+      "d": "o1不展示原始推理token，而是由模型把思考过程概括成几段可读文字展示给用户。"
+    },
+    {
+      "t": "AIME",
+      "d": "美国数学邀请赛，每套15道答案为0–999整数的题，成绩好的高中生可晋级美国数学奥赛（USAMO）。"
+    }
+  ],
+  "learn": "先补[[c:policy-gradient-concept]]、[[c:reward-design]]和[[c:reasoning-tokens]]，再读[[cot]]、[[star]]、[[prm]]理解前置思路。然后通读Learning to Reason with LLMs，重点看密码破译例子的完整思维链和附录A的成绩表，再读[[deepseek-r1]]论文第2节看一个公开的类o1训练配方。动手：用一个1B左右的小模型在[[gsm8k]]上做“答案对得1分”的强化学习（例如用TRL库的GRPO），观察回答长度和正确率随训练步数怎样变化。",
+  "check": {
+    "source": "https://web.archive.org/web/20240916030736/https://openai.com/index/learning-to-reason-with-llms/",
+    "confirmed": "官方页面直连返回403，经Wayback快照核对：发布日期2024-09-12；“大规模强化学习、数据效率高、随训练与测试算力平滑提升”原文；AIME 12%（1.8/15）、74%（11.1/15）、83%、93%（13.9/15，1000样本重排）；附录A：GPQA Diamond 77.3 vs 50.6，Codeforces 1673/89%、1258、808/11%，MATH 94.8 vs 60.3；IOI 213分/49%分位、随机156分、10000次提交362.14分、编程模型Elo 1807/93%；MMLU 54/57；StrongREJECT 0.840 vs 0.220；密码例子与隐藏思维链理由。另核对o1-preview公告（2024-09-12，系列名从1计数、不支持浏览与上传）、o1-mini公告（AIME 70.0%、Codeforces 1650）、o1 API公告（o1-2024-12-17、reasoning_effort、少用60%推理token、ChatGPT版两周前上线）、HN上ChatGPT Pro公告日期2024-12-05，以及arXiv 2412.16720（o1 System Card，v1提交于2024-12-21）。"
+  }
+}

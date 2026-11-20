@@ -1,0 +1,56 @@
+{
+ "id": "w2v-bert",
+ "who": "Yu-An Chung, Yu Zhang, Wei Han, Chung-Cheng Chiu, James Qin, Ruoming Pang, Yonghui Wu · Google Brain / MIT",
+ "venue": "ASRU 2021",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2108.06209"
+  }
+ ],
+ "problem": "[[hubert]]靠反复聚类、重训来产生遮蔽预测的目标，流程笨重；vq-wav2vec则要先后训练两个互相分离的模块，无法联合优化。",
+ "idea": "在一个Conformer模型里同时做两件事：前半部分用对比学习把连续语音量化成离散token，后半部分用这些token做遮蔽语言建模，两个损失一起端到端优化。",
+ "impact": "给出了“量化加遮蔽预测”一体化的预训练配方，其中间层特征后来成为[[audiolm]]的语义token来源，也被[[usm]]等沿用。",
+ "method": "w2v-BERT由三个模块串起来：特征编码器（卷积降采样）、对比模块（若干层[[conformer]]，配一个向量量化器，沿用[[wav2vec-2]]的对比任务，学会把连续语音离散成有区分度的码字）、遮蔽预测模块（更多层Conformer，在被遮住的位置上预测对比模块给出的离散码字，即BERT式的[[c:masked-modeling]]）。\n\n与[[hubert]]的区别在于：目标token不是离线k-means得来，而是由同一个网络在线产生；两个自监督任务同时训练，不需要多轮迭代。",
+ "results": "在LibriSpeech上使用Libri-Light 60k无标注数据，相对已发表的Conformer版wav2vec 2.0和HuBERT，test-clean/test-other的词错误率相对降低5%到10%（论文摘要数字）；在Google语音搜索流量数据上，相对内部的Conformer版wav2vec 2.0降低超过30%。",
+ "limits": [
+  {
+   "text": "预训练规模较大，对比与遮蔽两个损失的权重、码本大小需要调；离散token也不保证与音素对齐。",
+   "solved_by": []
+  },
+  {
+   "text": "只做表示学习，下游仍要有标注数据微调。",
+   "solved_by": [
+    "usm"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "wav2vec-2",
+   "type": "extends",
+   "note": "保留其对比学习的量化机制，作为第一阶段。"
+  },
+  {
+   "to": "bert",
+   "type": "uses",
+   "note": "借用BERT的遮蔽语言建模作为第二阶段的训练目标。"
+  },
+  {
+   "to": "conformer",
+   "type": "uses",
+   "note": "用Conformer作为两个模块的主干网络。"
+  }
+ ],
+ "prereq": [
+  "self-supervised",
+  "contrastive-learning",
+  "masked-modeling",
+  "transformer-block"
+ ],
+ "learn": "先看[[wav2vec-2]]和[[hubert]]，再读本文第3节的模型结构图；对照[[audiolm]]看它的特征怎样被拿去做语义token。",
+ "check": {
+  "source": "https://arxiv.org/abs/2108.06209",
+  "confirmed": "核对arXiv页：标题、2021-08-07提交；摘要写明用Libri-Light 60k做无标注数据，相比基于Conformer的wav2vec 2.0与HuBERT在test-clean/test-other上相对降低5%到10% WER，在Google Voice Search数据上相对内部基线好30%以上。"
+ }
+}

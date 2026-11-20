@@ -1,0 +1,58 @@
+{
+  "id": "parallel-wavenet",
+  "who": "van den Oord, Li, Babuschkin, Simonyan, Vinyals, Kavukcuoglu et al. · DeepMind / Google",
+  "venue": "ICML 2018",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1711.10433"
+    }
+  ],
+  "problem": "WaveNet音质最好，但一次只能生成一个采样点，很难放到大规模并行硬件上，无法在线服务。",
+  "idea": "提出概率密度蒸馏：用训练好的WaveNet当老师，教一个并行的前馈网络学生一次性生成整段波形。",
+  "impact": "让WaveNet音质的语音合成第一次能在线部署，并成为Google Assistant中使用的声音。",
+  "method": "[[wavenet]]的自回归生成要对每个采样点（一秒语音有上万个）依次做一次前向计算，GPU并行用不上。直接训练一个并行模型又很难达到同样音质。\n\n论文的办法是**概率密度蒸馏**（见[[distillation]]）。学生网络是一个**逆自回归流**（[[iaf]]）：输入一串白噪声，各位置并行地变换成波形。因为流模型可以精确算出自己生成的每个样本的概率，就能让学生生成一批样本，再让**已训练好的WaveNet老师**给这些样本打分，目标是最小化学生分布与老师分布之间的KL散度（见[[c:kl-divergence]]），并辅以几项额外损失（如感知损失）保证音质。老师在训练时只需要『评分』，评分可以并行完成，所以训练是高效的。\n\n摘要称，该方法在音质上与原WaveNet无显著差异，生成速度比实时快20倍以上，已被Google Assistant上线使用，覆盖多个英语和日语声音。",
+  "limits": [
+    {
+      "text": "训练流程复杂：需要先训好一个完整的WaveNet老师，再做蒸馏，还要多项辅助损失调参。",
+      "solved_by": [
+        "waveglow",
+        "melgan",
+        "hifi-gan"
+      ]
+    },
+    {
+      "text": "逆自回归流学生模型很大，推理仍需要可观算力。",
+      "solved_by": [
+        "hifi-gan"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "wavenet",
+      "type": "solves",
+      "note": "解决WaveNet逐采样点生成太慢的问题，把它蒸馏成并行前馈网络，速度提升20倍以上。"
+    },
+    {
+      "to": "distillation",
+      "type": "uses",
+      "note": "以老师WaveNet的概率评分为目标训练学生，是分布层面的蒸馏。"
+    },
+    {
+      "to": "realnvp",
+      "type": "uses",
+      "note": "学生网络使用流（逆自回归流）结构，可精确计算样本概率。"
+    }
+  ],
+  "prereq": [
+    "knowledge-distillation",
+    "normalizing-flow",
+    "autoregressive",
+    "vocoder-codec"
+  ],
+  "check": {
+    "source": "https://arxiv.org/abs/1711.10433",
+    "confirmed": "核对标题、作者、2017-11-28提交；摘要写明Probability Density Distillation、20倍以上快于实时、Google Assistant已上线、多个英语日语声音。"
+  }
+}

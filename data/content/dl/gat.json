@@ -1,0 +1,39 @@
+{
+  "id": "gat",
+  "who": "Petar Veličković, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro Liò, Yoshua Bengio · Cambridge / UAB / MILA",
+  "venue": "ICLR 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1710.10903"},
+    {"label": "官方代码", "url": "https://github.com/PetarV-/GAT"},
+    {"label": "GATv2：How Attentive are Graph Attention Networks?", "url": "https://arxiv.org/abs/2105.14491"}
+  ],
+  "problem": "GCN按节点度数给邻居分配固定权重，不能按内容区分哪个邻居更重要；谱方法又依赖整张图的拉普拉斯矩阵，难以用到训练时没见过的新图。",
+  "idea": "把自注意力搬到图上，但只在相邻节点之间计算：每条边算一个打分，在邻居范围内做softmax，再按权重汇总邻居特征，并用多头注意力稳定训练。",
+  "impact": "Cora、Citeseer上比GCN高1.5和1.6个百分点，归纳任务PPI上micro-F1从0.768升到0.973；成为图神经网络最常用的基线之一。",
+  "background": "2017年图神经网络（见[[c:message-passing]]）有两条路。谱方法（[[spectral-gnn]]、[[chebnet]]）把卷积定义在图拉普拉斯矩阵的特征向量上，要对整张图做矩阵运算，学到的滤波器与训练用的那张图绑在一起。[[gcn]]把它简化成一条便宜的规则：每个节点把自己和邻居的特征按度数归一化后加权求和，`h_i' = σ(Σ_j W h_j / √(d_i·d_j))`。\n\n问题在于权重完全由图结构决定。一篇论文引用了10篇文献，哪怕其中两篇与它的主题高度相关、其余只是顺手引用，GCN也只能给它们大致相同的权重。同期的[[graphsage]]为了处理新图，用采样邻居加固定的均值、池化或LSTM聚合，同样没有“按内容挑邻居”的能力。",
+  "method": "GAT把[[transformer]]的自注意力（见[[c:self-attention]]）限制在图的边上，称为掩码注意力。每层先用一个共享矩阵W把每个节点特征变成`Wh_i`，然后对每条边(i, j)算打分，再在i的邻居集合内做[[c:softmax]]：\n\n`e_ij = LeakyReLU(aᵀ [Wh_i ∥ Wh_j])`\n\n`α_ij = exp(e_ij) / Σ_{k∈N(i)} exp(e_ik)`\n\n`h_i' = σ(Σ_{j∈N(i)} α_ij · W h_j)`\n\n其中∥是向量拼接，a是一个可学习的向量，LeakyReLU负半轴斜率取0.2。邻居集合N(i)包含i自己。\n\n**多头**。和Transformer一样，K个头各自独立算一套α和W，结果拼接起来；输出层改为对各头求平均。在Cora上的配置是两层：第一层8个头、每头8维，共64维，接ELU激活；第二层直接输出类别。\n\n计算只沿着边进行，各条边可以并行，开销与边数成正比；不需要特征分解，也不需要事先知道整张图的结构，所以训练好的模型可以直接用在新图上。",
+  "results": "转导任务（同一张图里只有少量节点有标签）上，100次运行平均：Cora 83.0%±0.7、Citeseer 72.5%±0.7、Pubmed 79.0%±0.3；GCN分别为81.5%、70.3%、79.0%，前两个高1.5和1.6个百分点，Pubmed持平。归纳任务PPI（蛋白质相互作用网络，两张测试图在训练时完全没见过）上，GAT的micro-F1为0.973±0.002，作者调到最好的GraphSAGE为0.768；把注意力换成常数权重、其余不变的Const-GAT为0.934，说明按内容加权本身带来了约4个点。",
+  "legacy": "GAT与GCN、GraphSAGE一起成为图学习的标准基线，“对邻居做注意力”也被看作[[mpnn]]框架里一种具体的消息函数。[[superglue]]用图注意力在两张图片的关键点之间做匹配。后续工作陆续指出它的局限：[[gin]]证明加权平均式的聚合区分不了某些邻居组合；2021年的GATv2证明GAT的打分可以拆成“只看i”加“只看j”两部分，所以对任何查询节点，邻居的排名都一样，作者称之为静态注意力，只需把LeakyReLU挪到与a相乘之前就能修好。",
+  "pitfalls": "- GAT的注意力只覆盖一阶邻居，不是让所有节点两两互看；后者属于图Transformer一类方法。\n- 学到的注意力权重不一定可解释，GATv2的分析表明很多情况下它近似于一个与查询节点无关的全局排序。\n- Pubmed上GAT与GCN打平，所以“注意力总比固定权重好”并不成立，提升依赖数据集。",
+  "limits": [
+    {"text": "打分`aᵀ[Wh_i ∥ Wh_j]`是两端各自打分再相加，邻居的排名与查询节点无关（静态注意力），有些简单的图问题连训练集都拟合不了。", "solved_by": []},
+    {"text": "聚合是归一化的加权平均，邻居特征相同、只是数量不同的两种结构会得到一样的结果，区分图结构的能力有上限。", "solved_by": ["gin"]},
+    {"text": "每层只在一阶邻居之间传递信息，远处的节点要堆很多层才能互相影响，而层数一多节点表示会变得相近，实际只能用两三层。", "solved_by": []},
+    {"text": "打分只用节点特征，不直接利用边上的信息（如化学键类型、原子间距离），用于分子和物理系统时需要另外设计。", "solved_by": ["nequip"]}
+  ],
+  "relations": [
+    {"to": "gcn", "type": "solves", "note": "把GCN由度数决定的固定邻居权重，换成按节点内容学出来的注意力权重。"},
+    {"to": "transformer", "type": "uses", "note": "直接借用了自注意力和多头的做法，只是把注意力范围限制在图的边上。"},
+    {"to": "spectral-gnn", "type": "solves", "note": "谱方法要对拉普拉斯矩阵做特征分解且依赖整张图；GAT只沿边做局部计算，能直接用于新图。"},
+    {"to": "graphsage", "type": "rivals", "note": "同年的归纳式GNN，用采样加固定聚合器；在PPI上GAT的0.973远高于GraphSAGE的0.768。"},
+    {"to": "mpnn", "type": "extends", "note": "可以看作消息传递框架的一个实例：消息是Wh_j，聚合方式换成注意力加权求和。"}
+  ],
+  "prereq": ["graph-basics", "message-passing", "attention-concept", "self-attention", "softmax", "mlp"],
+  "terms": [
+    {"t": "转导与归纳", "d": "转导：训练和测试在同一张图上，只是测试节点没有标签；归纳：测试时用的是训练中完全没见过的新图。"},
+    {"t": "LeakyReLU", "d": "ReLU的变体，负半轴不是0而是一个小斜率（GAT里取0.2），避免负值区梯度完全消失。"},
+    {"t": "静态注意力", "d": "GATv2提出的概念：不管从哪个节点出发，对一组邻居打分的高低顺序都一样，只是归一化范围不同。"}
+  ],
+  "learn": "先补[[c:graph-basics]]、[[c:message-passing]]和[[c:self-attention]]，读一遍[[gcn]]。然后读原文第2.1节（三个公式）和表2、表3。动手：用PyTorch Geometric在Cora上分别跑GCNConv和GATConv，比较精度，再把GAT的注意力权重打印出来看看是否真的有区分度。",
+  "check": {"source": "https://arxiv.org/html/1710.10903", "confirmed": "arXiv记录：标题、6位作者、v1提交2017-10-30；正文中的打分公式、LeakyReLU斜率0.2、Cora配置8头×8维、表2的83.0/72.5/79.0与GCN的81.5/70.3/79.0、表3的PPI 0.973、GraphSAGE* 0.768、Const-GAT 0.934；GitHub README注明ICLR 2018；GATv2摘要（arXiv 2105.14491）中的静态注意力结论。"}
+}

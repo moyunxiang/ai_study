@@ -1,0 +1,36 @@
+{
+  "id": "improved-gan",
+  "who": "Tim Salimans, Ian Goodfellow, Wojciech Zaremba, Vicki Cheung, Alec Radford, Xi Chen · OpenAI",
+  "venue": "NeurIPS 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1606.03498"},
+    {"label": "官方代码", "url": "https://github.com/openai/improved-gan"}
+  ],
+  "problem": "GAN训练是两个网络找纳什均衡，用梯度下降常常不收敛、来回震荡或模式坍塌；同时GAN没有似然，缺少一个自动的指标来比较生成质量。",
+  "idea": "提出一组稳定训练的技巧（特征匹配、小批量判别、历史平均、单侧标签平滑、虚拟批归一化），把GAN用于半监督分类，并提出用Inception网络自动打分的Inception Score。",
+  "impact": "Inception Score成为此后几年GAN论文的标准指标；小批量判别等技巧被后续模型广泛沿用；GAN半监督分类在当时刷新了少标签基准。",
+  "background": "[[dcgan]]给出了一套能稳定训练的卷积结构，但GAN训练本质上仍不稳定。原因在于它是一个两人博弈（见[[c:nash-equilibrium]]）：G和D各自对自己的损失做梯度下降，而梯度下降只保证找到单个函数的极小值，不保证找到博弈的均衡点，两个网络可能绕着均衡点转圈。另一个顽疾是模式坍塌（见[[c:mode-collapse]]）：G发现某几种样本能骗过D，就只生成这几种。\n\n评估也是难题。[[gan]]无法计算似然，原论文用的Parzen窗口估计在高维下很不可靠，大家主要靠肉眼挑图比较。",
+  "method": "**稳定训练的技巧**：\n\n- **特征匹配**：G不再直接最大化D的输出，而是让生成样本在D某个中间层上的平均特征与真实数据的平均特征一致：`‖E_x f(x) − E_z f(G(z))‖²`。目标更平稳，不会追着D的最新弱点跑。\n- **小批量判别**：坍塌时同一批生成样本彼此极像。让D在判断一个样本时，额外看到它与同批其他样本的相似度，D就能识破“全批长得一样”，从而逼G生成多样的样本。\n- **历史平均**：在损失中惩罚参数偏离其历史平均值，抑制来回震荡。\n- **单侧标签平滑**：真实样本的目标标签从1降到0.9之类的值，但假样本的标签保持0，防止D过度自信。\n- **虚拟批归一化**：每个样本用一个固定参考批的统计量做批归一化（见[[batchnorm]]），避免同批样本通过批统计互相影响。\n\n**半监督学习**。把D改成一个K+1类分类器：K个真实类别加一个“生成的”类别。有标签的数据按普通分类训练，无标签数据只要求判为“某个真实类”，生成数据判为第K+1类。GAN由此帮分类器利用了大量无标签数据。\n\n**Inception Score**（见[[c:generation-metrics]]）。把生成图像送进预训练的Inception分类网络（[[googlenet]]系列），得到类别分布`p(y|x)`：\n\n`IS = exp(E_x[KL(p(y|x) ‖ p(y))])`\n\n单张图的`p(y|x)`越尖锐（看得出是什么），所有图的平均`p(y)`越平坦（各类都有），分数越高。作者建议用约5万张样本计算。",
+  "results": "半监督分类：CIFAR-10只用4000个标签时，单模型测试错误率18.63%，10个模型集成为15.59%；SVHN用1000个标签错误率8.11%；MNIST用100个标签时单模型只错93个测试样本。Inception Score在CIFAR-10上：真实数据为11.24，最佳生成模型为8.09。人工评测中，标注者区分真假MNIST样本的准确率只有52.4%（随机猜为50%）；CIFAR-10上为78.7%。在128×128的ImageNet上，模型学会了毛发、眼睛、鼻子等局部特征，但动物的整体结构常常不对。",
+  "legacy": "Inception Score被大量采用，但很快暴露出问题：它不看真实数据分布，对同一类内部的多样性不敏感。2017年提出的[[fid]]改为比较生成样本与真实样本在Inception特征空间的统计差异，逐渐取代了IS。[[wgan]]、[[wgan-gp]]与[[spectral-norm]]从损失和网络约束的角度更系统地解决了训练稳定性；小批量判别的思想在[[progan]]中被简化为“小批量标准差”层。",
+  "limits": [
+    {"text": "各项技巧都是经验性的，缺乏统一理论，换数据集和结构后仍可能训练失败。", "solved_by": ["wgan", "wgan-gp", "spectral-norm"]},
+    {"text": "Inception Score不与真实数据比较，对类内多样性和模式丢失不敏感，且依赖ImageNet分类器，不适用于其他领域。", "solved_by": ["fid"]},
+    {"text": "在ImageNet等多类别、高分辨率数据上生成的物体结构仍然错乱。", "solved_by": ["progan", "biggan"]},
+    {"text": "特征匹配提升了半监督分类，却往往让样本视觉质量变差，分类与生成两个目标存在冲突。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "dcgan", "type": "extends", "note": "以DCGAN的卷积结构为基础，补上一组训练技巧来进一步缓解不收敛与模式坍塌。"},
+    {"to": "gan", "type": "solves", "note": "针对原始GAN难以收敛、模式坍塌、缺乏评估指标三个问题分别给出办法。"},
+    {"to": "googlenet", "type": "uses", "note": "用预训练的Inception网络对生成图像分类，构成Inception Score。"},
+    {"to": "batchnorm", "type": "extends", "note": "提出虚拟批归一化，用固定参考批的统计量替代当前批，避免批内样本相互干扰。"},
+    {"to": "cgan", "type": "extends", "note": "把类别信息放进判别器输出（K+1类），使GAN可以直接用于半监督分类。"}
+  ],
+  "prereq": ["adversarial-training", "mode-collapse", "nash-equilibrium", "kl-divergence", "semi-supervised", "generation-metrics"],
+  "terms": [
+    {"t": "小批量判别", "d": "判别器在判断每个样本时额外看到它与同一小批量中其他样本的相似度，从而能识别出生成器只产出相似样本的坍塌状态。"},
+    {"t": "Inception Score", "d": "用Inception分类器评估生成图像：每张图分类越明确、整体类别越均衡，分数越高。"}
+  ],
+  "learn": "先读[[gan]]和[[dcgan]]，补[[c:mode-collapse]]和[[c:generation-metrics]]。原文第3节逐条讲技巧，第4节讲Inception Score，第5节讲半监督学习，都很短。动手：在二维多峰数据上训练普通GAN，观察坍塌，再加上小批量判别，比较生成样本覆盖了几个峰。",
+  "check": {"source": "https://arxiv.org/abs/1606.03498", "confirmed": "标题、6位作者、arXiv v1提交于2016-06-10；正文（ar5iv）中的五项技巧、K+1类半监督、IS公式与5万张样本建议，CIFAR-10 4000标签错误率18.63%/集成15.59%、SVHN 8.11%、MNIST 100标签单模型93个错误、IS真实数据11.24与最佳8.09、人工评测52.4%与78.7%。"}
+}

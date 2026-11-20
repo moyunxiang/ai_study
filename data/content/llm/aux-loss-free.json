@@ -1,0 +1,49 @@
+{
+  "id": "aux-loss-free",
+  "who": "Lean Wang, Huazuo Gao, Chenggang Zhao, Xu Sun, Damai Dai · DeepSeek-AI / 北京大学",
+  "venue": "arXiv 2024",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2408.15664"
+    }
+  ],
+  "problem": "MoE训练需要让各专家的负载均衡，否则路由塌缩。传统办法加一个辅助损失，但辅助损失太大会干扰主任务的梯度、损害效果。",
+  "idea": "不再加损失，而是给每个专家的路由分数加一个偏置，根据最近的负载动态调整：过载的专家偏置调小，空闲的调大。",
+  "impact": "在不产生干扰梯度的前提下维持均衡，被[[deepseek-v3]]采用。",
+  "method": "在top-K选择专家之前，先给每个专家的路由分数加一个只用于选择的偏置项。每个训练步统计各专家这一步的负载：被选得太多的专家，偏置减小一点；被选得太少的，偏置增加一点。这个偏置只影响选哪些专家，不参与梯度回传，所以不会像辅助损失那样引入干扰梯度。\n\n作者在最多3B参数、最多2000亿token的MoE模型上验证，称它同时带来更好的效果和更好的负载均衡。",
+  "limits": [
+    {
+      "text": "只在最多3B参数、2000亿token的规模上验证，更大规模的效果由后续模型实践；偏置的更新步长是一个新超参数。",
+      "solved_by": [
+        "deepseek-v3"
+      ]
+    },
+    {
+      "text": "序列内的均衡（不是整个批次的均衡）仍需额外手段，以防单条序列里负载极不均匀。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "deepseekmoe",
+      "type": "extends",
+      "note": "在DeepSeekMoE的细粒度专家基础上，替换其辅助损失式的负载均衡。"
+    },
+    {
+      "to": "switch-transformer",
+      "type": "solves",
+      "note": "Switch等使用辅助损失来均衡负载，会干扰主任务梯度；这里用偏置调整来避免。"
+    }
+  ],
+  "prereq": [
+    "mixture-of-experts",
+    "gradient-descent",
+    "loss-function"
+  ],
+  "learn": "先读[[switch-transformer]]里的负载均衡损失；读本文第3节的偏置更新规则；动手：用玩具MoE比较有无辅助损失的专家负载分布。",
+  "check": {
+    "source": "https://arxiv.org/abs/2408.15664",
+    "confirmed": "标题、5位作者、arXiv首次提交2024-08-28；摘要中偏置加在top-K之前、按最近负载动态更新、最多3B参数/200B token的验证。"
+  }
+}

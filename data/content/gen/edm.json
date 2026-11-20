@@ -1,0 +1,38 @@
+{
+  "id": "edm",
+  "who": "Tero Karras, Miika Aittala, Timo Aila, Samuli Laine · NVIDIA",
+  "venue": "NeurIPS 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2206.00364"},
+    {"label": "官方代码 NVlabs/edm", "url": "https://github.com/NVlabs/edm"}
+  ],
+  "problem": "DDPM、DDIM、Score SDE各有一套记号和理论，设计选择互相缠在一起，没人说得清哪个改动真正有用，采样又要上百上千步。",
+  "idea": "把所有扩散模型拆成几个可独立选择的部件（噪声尺度、采样器、网络输入输出缩放、训练噪声分布），逐一做实验，给出一套简单的最优配方。",
+  "impact": "CIFAR-10上35次网络调用就达到FID 1.79，“EDM配方”成为之后几年训练和采样扩散模型的默认参考，一致性模型等工作都建在它上面。",
+  "background": "到2022年，扩散模型已经有好几套说法：[[ddpm]]是离散的马尔可夫链，[[score-sde]]是连续时间的随机微分方程，[[ddim]]是一个确定性的采样过程，[[improved-ddpm]]和[[adm]]又各自加了技巧。每篇论文都把“噪声怎么加、网络预测什么、损失怎么加权、采样怎么走”一揽子打包，看起来这些选择都由理论推出、彼此不可分。结果是：想改进其中一处，很难判断该改哪里；采样也普遍需要几百上千步。",
+  "method": "作者先把所有方法统一写成一个“概率流ODE”：数据被加上标准差为σ的高斯噪声，去噪就是让σ从大到小走，\n\n`dx/dt = −σ̇(t)·σ(t)·∇ₓ log p(x; σ(t))`\n\n其中`∇ₓ log p`是分数（见[[c:score-function]]），由一个去噪网络D(x; σ)估计：`∇ₓ log p ≈ (D(x; σ) − x)/σ²`。在这个框架下，各家方法只是在几个独立的旋钮上做了不同选择。他们给出的推荐：\n\n**噪声调度**：直接令`σ(t) = t`，不再额外缩放x。这样ODE的轨迹接近直线，用大步长走误差小。\n\n**采样器**：用二阶的Heun方法代替一阶欧拉法：先按当前斜率走一步，在新位置再算一次斜率，取两者平均重新走。每步多一次网络调用，但同样精度下步数少很多。时间步不均匀分布，`σ_i = (σ_max^(1/ρ) + i/(N−1)·(σ_min^(1/ρ) − σ_max^(1/ρ)))^ρ`，取ρ=7、σ从80降到0.002，即在低噪声处走得更密。18步Heun共35次网络调用。\n\n**网络的预处理（preconditioning）**：网络F不直接输出去噪结果，而是\n\n`D(x; σ) = c_skip(σ)·x + c_out(σ)·F(c_in(σ)·x; c_noise(σ))`\n\n其中σ_data=0.5，`c_skip = σ_data²/(σ²+σ_data²)`，`c_out = σ·σ_data/√(σ²+σ_data²)`，`c_in = 1/√(σ²+σ_data²)`，`c_noise = ¼·ln σ`。作用是让网络的输入和要学的目标在任何噪声水平下都保持单位方差：噪声小时主要靠跳连直接输出x，噪声大时主要靠网络预测。\n\n**训练**：训练时的噪声水平按`ln σ ~ N(−1.2, 1.2²)`采样，把算力集中在中等噪声（太小的噪声去不去都一样，太大的噪声什么也学不到），损失权重取`λ(σ) = (σ²+σ_data²)/(σ·σ_data)²`。",
+  "results": "CIFAR-10上类别条件FID 1.79、无条件FID 1.97，均为当时最好，每张图只要35次网络调用。只换采样器，不重新训练，一个已有的ImageNet-64模型FID就从2.07降到1.55；按新配方重新训练后达到1.36。",
+  "legacy": "EDM的记号（σ参数化、预处理系数、对数正态噪声分布）成了后续研究的通用语言：[[consistency-models]]、[[dmd]]、[[scm]]都以它为基线和框架；同一团队的[[edm2]]继续研究大网络的训练动力学，[[autoguidance]]改进引导；[[jit]]等工作仍沿用它的设计。工业界的Stable Diffusion系列和许多开源训练库都内置了EDM采样器和Karras噪声表。之后[[flow-matching]]与[[rectified-flow]]用直线插值给出了另一种同样简洁的统一表述，大模型训练更多转向后者。",
+  "pitfalls": "- EDM的贡献不是新模型结构，而是把已有方法的选择拆开、各自调到最好。很多改进只换采样器就能拿到，不必重训。\n- Heun“步数少”要按网络调用次数算：18步实际是35次调用。",
+  "limits": [
+    {"text": "仍需要几十次网络调用才能出一张好图，离一步生成还很远。", "solved_by": ["consistency-models", "dmd", "scm"]},
+    {"text": "实验集中在CIFAR-10、ImageNet-64等小分辨率像素空间，大模型、潜空间、文生图的训练动力学没有涉及。", "solved_by": ["edm2"]},
+    {"text": "随机采样（引入额外噪声的churn）的超参需要按数据集手调，没有通用设置。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "score-sde", "type": "extends", "note": "沿用Score SDE的概率流ODE视角，但把其中缠在一起的设计选择拆成独立部件并逐个优化。"},
+    {"to": "ddim", "type": "extends", "note": "DDIM的确定性采样对应其中一种ODE离散化；EDM换成σ(t)=t与二阶Heun，步数更少。"},
+    {"to": "ddpm", "type": "solves", "note": "DDPM需要上千步采样、设计选择缺乏解释；EDM用35次调用达到更好的FID。"},
+    {"to": "adm", "type": "extends", "note": "直接拿ADM训练好的ImageNet-64模型换采样器，FID从2.07降到1.55。"},
+    {"to": "improved-ddpm", "type": "extends", "note": "沿用其网络结构，把学习方差、余弦调度等技巧纳入统一框架重新比较。"},
+    {"to": "dpm-solver", "type": "rivals", "note": "同月发布、同样用高阶ODE求解器减少步数；DPM-Solver利用半线性结构做解析近似，EDM用通用的Heun法配合新的噪声参数化。"}
+  ],
+  "prereq": ["diffusion-process", "score-function", "ode-sde", "noise-schedule", "gaussian", "generation-metrics"],
+  "terms": [
+    {"t": "Heun方法", "d": "二阶的ODE数值解法：先按起点斜率试走一步，再在终点算一次斜率，用两个斜率的平均重新走。"},
+    {"t": "预处理系数", "d": "把网络输入、输出按噪声水平缩放的几个系数，保证网络在任何噪声下面对的都是数值大小相近的任务。"},
+    {"t": "NFE", "d": "生成一张图需要调用神经网络的次数，比“步数”更准确地衡量采样成本。"}
+  ],
+  "learn": "先读[[ddpm]]和[[score-sde]]，补[[c:ode-sde]]和[[c:score-function]]。读原文第2节和表1（各方法在统一框架下的对照），然后第3节采样器、第5节预处理与训练。动手：读NVlabs/edm仓库里约50行的edm_sampler函数，在二维玩具数据上分别用欧拉法和Heun法采样，比较相同网络调用次数下的样本质量。",
+  "check": {"source": "https://arxiv.org/abs/2206.00364", "confirmed": "标题、4位作者、v1提交于2022-06-01、NeurIPS 2022；摘要中FID 1.79/1.97、35次调用、ImageNet-64 2.07→1.55→1.36。预处理系数、σ_data=0.5、P_mean=−1.2/P_std=1.2、σ 80→0.002、ρ=7、18步Heun核对自官方代码github.com/NVlabs/edm（networks.py、loss.py、generate.py）。"}
+}

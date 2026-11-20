@@ -1,0 +1,40 @@
+{
+  "id": "grounding-dino",
+  "who": "Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao Zhang, Jie Yang, Qing Jiang, Chunyuan Li et al. · 清华大学 / IDEA研究院 / 港科大 / 微软研究院等",
+  "venue": "ECCV 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2303.05499"},
+    {"label": "官方代码", "url": "https://github.com/IDEA-Research/GroundingDINO"},
+    {"label": "Grounded SAM", "url": "https://arxiv.org/abs/2401.14159"}
+  ],
+  "problem": "传统检测器只能框出训练时定义好的几十上百类；GLIP等把检测改成“短语定位”实现了开放词表，但文字与图像只在少数环节融合，基于DETR的最强检测器也还没接上语言。",
+  "idea": "以当时最强的DETR类检测器DINO为底座，在特征增强、查询初始化和解码三个阶段都让图像与文字互相做注意力，再用检测、短语定位和图文描述数据做大规模预训练，输入任意类别名或指代短语就能框出对应物体。",
+  "impact": "不用任何COCO训练数据在COCO上达到52.5 AP，ODinW零样本平均26.1 AP创纪录；开源后与SAM组合成“用文字检测并分割任何东西”的Grounded-SAM流程，成为自动标注和图像编辑的常用工具。",
+  "background": "目标检测（见[[c:vision-tasks]]）长期是“闭集”的：[[faster-rcnn]]、[[detr]]这类模型的分类头只有固定的C个输出，想多认一类就得重新标注、重新训练。[[clip]]证明了用文字定义类别可以零样本识别整张图，但检测要的是每个物体的位置。\n\n此前的开放词表检测有两条路。一条是把CLIP的知识蒸馏进检测器（[[vild]]），或在CLIP的ViT上直接加检测头（[[owl-vit]]）。另一条是[[mdetr]]和[[glip]]的做法：把检测改写成“短语定位”——把所有类别名拼成一句话，模型要做的是把每个框和句中对应的词配上；这样检测数据、定位数据和图文描述数据都能一起训练。但GLIP基于传统检测器，文字和图像只在特征层面融合。同期基于DETR的[[dino-detr]]在COCO上已是最强检测器，却还只能做闭集检测。",
+  "method": "Grounding DINO是“双编码器、单解码器”结构：图像用[[swin]]提取多尺度特征，文字用[[bert]]编码。输入文字可以是“cat . dog . person .”这样的类别名列表，也可以是“左边穿红衣服的人”这样的指代表达。\n\n**三处融合**。\n- **特征增强器**（6层）：图像特征做可变形自注意力，文字特征做自注意力，然后图到文、文到图各做一次交叉注意力，两边特征互相“看过”对方。\n- **语言引导的查询选择**：算出每个图像位置与每个文字token的相似度`X_I·X_Tᵀ`，每个位置取它与所有token的最大值，选出得分最高的900个位置来初始化解码器的查询——也就是让文字决定“先看哪里”。\n- **跨模态解码器**（6层）：每层在DINO解码器的基础上多一个文本交叉注意力，让每个物体查询同时读取图像和文字。\n\n**输出与损失**。每个查询给出一个框（用L1和GIoU损失回归），分类则沿用[[glip]]：查询向量与每个文字token做内积，得到“这个框对应哪个词”的logits，用focal loss训练。与DETR一样，先用匈牙利匹配把预测与真值一一配对。\n\n**子句级文本表示**。把很多类别名拼成一句话时，BERT会让不相关的类别名互相注意（“猫”的特征受到“汽车”影响）。作者用注意力掩码切断不同类别名之间的注意力，每个类别名只看自己内部的词。\n\n**数据**。Objects365等检测数据、GoldG短语定位数据，以及400万条图文描述（Cap4M，用伪标签）。",
+  "results": "COCO零样本（训练不含任何COCO数据）：Swin-L版本52.5 AP，GLIP-L为49.8 AP；在COCO上微调后test-dev达到63.0 AP。ODinW（真实场景下的一组小检测数据集）零样本平均26.1 AP，为当时最好。加入Cap4M描述数据后Grounding DINO涨1.8 AP，GLIP只涨1.1 AP，作者据此认为它更能随数据规模提升。论文也报告了短板：在LVIS的长尾稀有类上不如GLIP。",
+  "legacy": "Grounding DINO开源后迅速被当作“文字→框”的通用组件。[[sam]]发布后，社区很快把两者串联：先用Grounding DINO按文字出框，再用SAM把框变成精细掩码，这一组合后来整理成Grounded SAM（2024年论文），还可以接上[[stable-diffusion]]做按文字指定区域的图像编辑；它也被大量用来给数据自动打框标注。\n\n此后的路线分成两支：一支继续做更快、更强的专用开放词表检测，如可实时运行的[[yolo-world]]，以及把文字概念直接用于分割的[[sam-3]]；另一支让多模态大模型自己输出坐标，如[[kosmos-2]]、[[qwen2.5-vl]]，适合需要推理的指代（[[lisa]]）。",
+  "limits": [
+    {"text": "只输出框不输出掩码，做分割必须再外接SAM这样的模型。", "solved_by": ["sam-3"]},
+    {"text": "文字端是BERT、最多256个token，只理解类别名和简单指代，无法处理“能用来切蛋糕的东西”这种需要推理的描述。", "solved_by": ["lisa", "qwen2.5-vl"]},
+    {"text": "Swin-L骨干加多层跨模态注意力，推理慢，难以实时运行。", "solved_by": ["yolo-world"]},
+    {"text": "长尾稀有类别上不如GLIP，在某些情况下会把不存在的东西框出来（作者称为幻觉式误检）。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "glip", "type": "extends", "note": "沿用GLIP“检测即短语定位”的统一表述和查询-词元对比分类损失，但换成DETR类检测器并在三个阶段加入跨模态融合，零样本COCO从49.8提高到52.5 AP。"},
+    {"to": "dino-detr", "type": "uses", "note": "底座就是DINO检测器：900个查询、混合查询选择、动态锚框都直接沿用，只在各模块中加入文字分支。"},
+    {"to": "detr", "type": "uses", "note": "继承DETR的集合预测与匈牙利匹配，不需要锚框和非极大值抑制。"},
+    {"to": "mdetr", "type": "extends", "note": "MDETR最早用文字调制DETR做端到端定位；Grounding DINO把这一思路做到更强的检测器和更大规模的数据上。"},
+    {"to": "owl-vit", "type": "rivals", "note": "OWL-ViT在CLIP式双塔上直接加检测头，图文融合很浅；Grounding DINO选择深度融合，在COCO零样本和指代表达上更强，代价是更慢。"},
+    {"to": "clip", "type": "extends", "note": "把CLIP“用文字定义类别”的零样本思想从整图分类推广到逐个物体的检测。"}
+  ],
+  "prereq": ["vision-tasks", "iou-map", "self-attention", "contrastive-learning", "zero-few-shot", "embedding"],
+  "terms": [
+    {"t": "开放集（开放词表）检测", "d": "检测的类别不在训练时固定，推理时用文字随时指定要找什么。"},
+    {"t": "指代表达理解（REC）", "d": "给一句描述某个具体物体的话（如“左边那只黑狗”），在图中框出它。"},
+    {"t": "匈牙利匹配", "d": "DETR类检测器的训练方法：把N个预测框和真值框做一对一最优配对，再只对配上的算损失，因此不需要非极大值抑制去重。"},
+    {"t": "可变形注意力", "d": "每个查询只在少数几个学习出来的采样点上做注意力，而不是对整张特征图做，从而能处理高分辨率多尺度特征。"}
+  ],
+  "learn": "先读懂[[detr]]的集合预测和匈牙利匹配，再看[[glip]]如何把检测改写成短语定位。读原文第3节和图3（三处融合），以及第3.4节的子句级掩码。动手：用官方代码对一张图依次输入“dog .”“dog . red ball .”“the dog on the left”，比较输出框；再接上SAM，体会Grounded-SAM的流程。",
+  "check": {"source": "https://arxiv.org/abs/2303.05499", "confirmed": "标题、作者、arXiv v1于2023-03-09提交；摘要中COCO零样本52.5 AP、ODinW零样本26.1 AP；正文（ar5iv）中三处融合模块、900个查询、6层增强器与6层解码器、最大256个文本token、Swin-T/L与BERT-base、GLIP-L零样本49.8、COCO微调test-dev 63.0、Cap4M带来+1.8对GLIP的+1.1、LVIS稀有类弱于GLIP、局限章节（不能分割、误检）；GitHub仓库标注ECCV 2024；Grounded SAM论文（arXiv 2401.14159，2024-01-25）。"}
+}

@@ -1,0 +1,44 @@
+{
+  "id": "word2vec",
+  "who": "Tomas Mikolov, Kai Chen, Greg Corrado, Jeffrey Dean · Google",
+  "venue": "ICLR 2013 Workshop",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1301.3781"},
+    {"label": "word2vec原始代码（Google Code存档）", "url": "https://code.google.com/archive/p/word2vec/"},
+    {"label": "The Illustrated Word2vec", "url": "https://jalammar.github.io/illustrated-word2vec/"}
+  ],
+  "problem": "神经语言模型能学出好的词向量，但大部分计算花在非线性隐层和整个词表的输出层上，在几亿词上训练就要几周；而词向量的质量恰恰最依赖数据量和维度。",
+  "idea": "干脆不做完整的语言模型：去掉非线性隐层，只留“词向量→对数线性分类器”。CBOW用周围的词预测中间词，Skip-gram用中间词预测周围的词，输出层用霍夫曼树层次softmax，计算量从与词表大小成正比降到与其对数成正比。",
+  "impact": "单机不到一天就能在16亿词上训练出高质量词向量，向量还呈现“king − man + woman ≈ queen”式的线性规律。开源工具和预训练向量让词向量在2013–2018年成为几乎所有NLP模型的默认输入层。",
+  "background": "[[nplm]]、[[rnnlm]]和[[collobert-weston]]都证明了神经网络学出的词向量有用，问题是太贵。论文把每个训练样本的计算量写成公式。前馈神经语言模型（N个上下文词、D维词向量、H个隐单元、V个词）：\n\n`Q = N×D + N×D×H + H×V`\n\n即使用层次softmax把`H×V`降到`H×log₂V`，主要开销仍在非线性隐层`N×D×H`。循环网络语言模型是`Q = H×H + H×V`，同样被隐层主导。于是公开的词向量大多只在几千万到几亿词上训练、维度50到100：Collobert-Weston的语言模型要训练数周，Mikolov自己用于对比的RNNLM在一个CPU上训了约8周。\n\nMikolov此前的工作发现，可以先用一个只有单隐层的简单网络学词向量，再拿它去训练完整的语言模型。这篇论文就专注于那第一步：怎样以最低的计算量学出最好的词向量。",
+  "method": "**两种结构**（都没有非线性隐层，见[[c:embedding]]）：\n\n- **CBOW**（连续词袋）：取当前词前后各4个词，把它们的向量直接平均，送进一个对数线性分类器预测中间那个词。上下文词的顺序被忽略，所以叫“词袋”。计算量`Q = N×D + D×log₂V`。\n- **Skip-gram**：反过来，用中间词的向量分别预测前后一定距离内的每个词。实验中最大距离C取10；每次随机取一个`R ∈ [1, C]`，只预测前后各R个词，这样近处的词被抽到的次数多、权重自然更大。计算量`Q = C×(D + D×log₂V)`。\n\n**层次softmax**（[[hierarchical-softmax]]）。正常的[[c:softmax]]要对V个词都算分数再归一化。这里把词表组织成一棵**霍夫曼树**：高频词路径短、低频词路径长，预测一个词变成沿根到叶子走一串二分类，每个二分类是一个sigmoid。词表100万时，需要计算的节点数约为`log₂(一元困惑度)`，比`log₂V ≈ 20`还少。\n\n**为什么向量会有“代数”**。训练目标迫使出现在相似上下文里的词得到相似的向量（[[c:distributional-hypothesis]]）。如果“big→biggest”与“small→smallest”在上下文中的差异相似，那么两个差向量就会相近，于是`vector(biggest) − vector(big) + vector(small)`的最近邻就是smallest。论文据此构造了一个测试集：8,869道语义题（如首都与国家）和10,675道句法题（如比较级、复数），答案必须恰好是最近的那个词才算对。\n\n**训练**。随机梯度下降，学习率从0.025线性降到0；大规模实验放在Google的DistBelief分布式框架上异步训练。",
+  "results": "**同数据同维度比较**（640维）：语义/句法准确率，RNNLM 9%/36%，前馈NNLM 23%/53%，CBOW 24%/64%，Skip-gram 55%/59%。Skip-gram在语义题上大幅领先。\n\n**与公开向量比较**（完整测试集总准确率）：Collobert-Weston 50维11.0%，Mikolov RNNLM 640维24.6%；单CPU训练的300维CBOW 36.1%（约1天）、Skip-gram 53.3%（约3天），只用了7.83亿词。\n\n**规模**。用DistBelief在60亿词Google新闻语料上训练1000维向量：CBOW总准确率63.7%（2天×140核），Skip-gram 65.6%（2.5天×125核），而100维NNLM要14天×180核才到50.8%。表2显示，维度和数据量必须同时增大，准确率才会持续上升。\n\n**句子补全**：微软句子补全挑战上，Skip-gram单独48.0%，与RNNLM组合后58.9%，超过此前最好的55.4%。",
+  "legacy": "同年10月的续作[[skip-gram-ns]]提出负采样、高频词下采样和短语向量，开源工具随之流行，Google新闻上训练的300维向量成为标准资源。此后：[[glove]]用全局共现矩阵学到同样的线性结构，[[levy-goldberg-pmi]]证明带负采样的Skip-gram在隐式分解一个PMI矩阵，[[fasttext]]加入子词以处理未登录词，[[doc2vec]]推广到段落，[[transe]]把“关系是向量平移”的思想用于知识图谱，[[muse]]利用不同语言词向量空间的相似结构做无平行语料的词翻译，[[word-embedding-bias]]则揭示向量中“man − woman ≈ programmer − homemaker”式的性别偏见。\n\n2018年起，[[elmo]]和[[bert]]的上下文相关表示取代了静态词向量作为模型输入。但“通过预测上下文学表示”这一自监督思想，以及“嵌入表把离散符号变成向量”这一步，在今天的大模型中依然如故。",
+  "pitfalls": "- 论文标题里的“word2vec”其实是后来开源工具的名字；这篇提出的是CBOW和Skip-gram两种结构，负采样出自同年的续作[[skip-gram-ns]]。\n- 类比测试要求答案恰好是最近邻，而且排除题目中的三个词；同义词也算错，所以准确率天然达不到100%，不同论文的类比分数只有在同一测试集、同一规则下才可比。\n- 它不是语言模型：CBOW和Skip-gram不能给句子打概率，也不能生成文本，只是为了学词向量设计的简化分类器。",
+  "limits": [
+    {"text": "每个词只有一个固定向量，“bank”是银行还是河岸、“苹果”是水果还是公司都无法区分。", "solved_by": ["cove", "elmo", "bert"]},
+    {"text": "以整词为单位，看不到词的内部结构，词表外的新词、拼写变体和罕见的形态变化没有向量。", "solved_by": ["fasttext", "bpe"]},
+    {"text": "“New York”“Air Canada”这类意义不能由单词组合得到的短语没有自己的向量；高频词（the、of）占据大量训练计算却几乎不提供信息。", "solved_by": ["skip-gram-ns"]},
+    {"text": "为什么向量相减能表达语义关系、它和传统共现矩阵方法是什么关系，论文没有给出理论解释。", "solved_by": ["levy-goldberg-pmi", "glove"]},
+    {"text": "向量忠实复制语料中的社会偏见，例如职业词与性别词的关联，会被下游模型继承。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "nplm", "type": "solves", "note": "NPLM的计算主要耗在非线性隐层和全词表输出上；去掉隐层并用层次softmax后，训练快了几个数量级，词向量质量反而更好。"},
+    {"to": "rnnlm", "type": "extends", "note": "作者此前用RNNLM的输入矩阵当词向量；这里把语言模型简化成只学词向量的对数线性模型，并在同数据上直接比较，RNNLM向量语义准确率只有9%。"},
+    {"to": "hierarchical-softmax", "type": "uses", "note": "输出层用霍夫曼树组织的层次softmax，把每个样本的输出计算从V降到约log₂V。"},
+    {"to": "log-bilinear-lm", "type": "extends", "note": "延续Mnih和Hinton用对数双线性模型去掉非线性的思路，进一步把上下文直接平均或逐个预测，结构更简单。"},
+    {"to": "nce", "type": "rivals", "note": "同为避免全词表softmax的办法：本文用层次softmax，同期Mnih和Teh用NCE训练语言模型；几个月后的续作把NCE简化为负采样并取代了层次softmax。"},
+    {"to": "collobert-weston", "type": "solves", "note": "Collobert-Weston的词向量要训练数周、在本文类比测试上总准确率只有11.0%；Skip-gram单CPU三天达到53.3%。"},
+    {"to": "lsa", "type": "rivals", "note": "同为从语料学词的向量表示：LSA对共现矩阵做SVD，word2vec在局部窗口上做预测；后者在类比任务上远好于LSA，两派后来被证明在理论上相通。"},
+    {"to": "harris-distributional", "type": "uses", "note": "“用上下文预测词、用词预测上下文”是分布假说最直接的可训练形式。"}
+  ],
+  "prereq": ["embedding", "one-hot", "softmax", "distributional-hypothesis", "dot-product", "sgd-minibatch", "big-o"],
+  "terms": [
+    {"t": "CBOW", "d": "连续词袋模型：把上下文窗口内各词的向量取平均，用它预测中间的词。训练快，句法类比好。"},
+    {"t": "Skip-gram", "d": "跳字模型：用中间词的向量分别预测窗口内的每个上下文词。训练稍慢，语义类比和低频词表现更好。"},
+    {"t": "霍夫曼树", "d": "按频率构造的二叉编码树，高频词离根近、编码短。层次softmax用它让常见词的预测只需很少几步二分类。"},
+    {"t": "词类比测试", "d": "给出a:b = c:?，用向量b − a + c找余弦最近的词（排除a、b、c），看是否等于正确答案，如Athens:Greece = Berlin:Germany。"}
+  ],
+  "learn": "先补[[c:embedding]]、[[c:softmax]]和[[c:dot-product]]，读过[[nplm]]。读原文第2节（各模型计算量公式）、第3节（两种结构与图1）、表3和表6；接着读[[skip-gram-ns]]，那才是工具实际默认用的训练方法。动手：用gensim在维基百科子集上训练Skip-gram，做“国家−首都”类比和最近邻查询；再自己用NumPy写一个带负采样的Skip-gram，在text8语料上跑通。",
+  "check": {"source": "https://arxiv.org/abs/1301.3781", "confirmed": "标题、4位作者（Google），arXiv v1于2013-01-16提交（v3 2013-09-07）；摘要“less than a day… 1.6 billion words”；PDF中复杂度公式(2)–(5)、8869语义/10675句法题、学习率0.025、表3的9/36、23/53、24/64、55/59，表4的C&W 11.0%、RNNLM 24.6%、CBOW 36.1%、Skip-gram 53.3%，表5训练1天/3天，表6的NNLM 50.8%（14×180）、CBOW 63.7%（2×140）、Skip-gram 65.6%（2.5×125），表7句子补全48.0%与58.9%（此前55.4%），代码地址code.google.com/p/word2vec。"}
+}

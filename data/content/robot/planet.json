@@ -1,0 +1,54 @@
+{
+ "id": "planet",
+ "who": "Hafner, Lillicrap, Fischer, Villegas, Ha, Lee, Davidson · Google Brain / DeepMind / Univ. of Michigan",
+ "venue": "ICML 2019",
+ "links": [
+  {
+   "label": "原文",
+   "url": "https://arxiv.org/abs/1811.04551"
+  }
+ ],
+ "problem": "从像素学世界模型的方法，预测几步后误差就累积得很厉害，没法拿来做规划，所以基于图像的控制几乎都靠无模型强化学习，要消耗大量交互。",
+ "idea": "学一个同时含确定性和随机成分的隐空间动力学模型，并用“潜在过冲”训练它做多步预测，然后在隐空间里在线规划动作，不再训练策略网络。",
+ "impact": "证明纯模型方法可以只靠像素学会连续控制，是[[dreamer]]系列“在隐空间想象”路线的直接起点。",
+ "method": "PlaNet（Deep Planning Network）先用图像编码器把每帧压成一个隐状态，隐状态的转移同时有两部分：一条确定性的循环状态（RNN）负责记住长期信息，一个随机变量负责表达不确定性。这套结构叫循环状态空间模型。\n\n训练目标是变分下界（见[[c:elbo]]）：重建图像和奖励，并让后验贴近先验。论文额外提出“潜在过冲”（latent overshooting）：不只训练一步预测，还让模型从隐状态连续往前推多步，并要求多步预测的分布与真实编码一致，以此压低多步预测误差。\n\n行动时没有策略网络。每一步都用交叉熵方法（CEM）这类随机搜索：采样许多候选动作序列，在隐空间里推演并累加预测的奖励，挑出最好的序列，只执行第一个动作，然后重新规划（这就是[[mpc]]的思路）。规划只在小得多的隐空间中进行，所以比在像素空间推演快。",
+ "legacy": "[[dreamer]]把在线规划换成在想象中训练策略，[[dreamerv2]]、[[dreamerv3]]继续沿用循环状态空间模型。",
+ "limits": [
+  {
+   "text": "每个动作都要在线重复采样和推演，决策较慢；模型只在训练分布附近可靠。",
+   "solved_by": [
+    "dreamer"
+   ]
+  },
+  {
+   "text": "只在连续控制的几个任务上验证，没有处理Atari这类视觉复杂、奖励稀疏的环境。",
+   "solved_by": [
+    "dreamerv2"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "world-models",
+   "type": "extends",
+   "note": "沿用“用隐变量模型学环境、再在其中使用”的思路，但改用可规划的循环状态空间模型并联合训练奖励预测，而不是先训VAE再训控制器。"
+  },
+  {
+   "to": "mpc",
+   "type": "uses",
+   "note": "动作选择就是滚动时域的模型预测控制，只是动力学模型换成学出来的隐空间模型。"
+  }
+ ],
+ "prereq": [
+  "model-based-rl",
+  "world-model-concept",
+  "elbo",
+  "latent-variable",
+  "planning-mpc"
+ ],
+ "learn": "先读[[world-models]]了解为什么要在隐空间建模，再读PlaNet的模型一节和潜在过冲一节；动手可以复现RSSM的几行核心代码。",
+ "check": {
+  "source": "https://arxiv.org/abs/1811.04551",
+  "confirmed": "核对arXiv页：标题、七位作者、v1日期2018-11-12；摘要中的确定性加随机转移、latent overshooting、隐空间在线规划。"
+ }
+}

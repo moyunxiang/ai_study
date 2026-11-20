@@ -1,0 +1,37 @@
+{
+  "id": "q-learning",
+  "who": "Christopher J. C. H. Watkins, Peter Dayan · 伦敦 / 爱丁堡大学",
+  "venue": "Machine Learning 8, 1992",
+  "links": [
+    {"label": "Springer", "url": "https://link.springer.com/article/10.1007/BF00992698"},
+    {"label": "论文PDF（Dayan主页）", "url": "https://www.gatsby.ucl.ac.uk/~dayan/papers/cjch.pdf"},
+    {"label": "Sutton & Barto教材6.5节", "url": "http://incompleteideas.net/book/the-book-2nd.html"}
+  ],
+  "problem": "TD学习只能评估状态好坏，不直接告诉你该选哪个动作；动态规划能求最优策略却要先知道环境模型。Watkins 1989年提出的Q学习也还没有完整的收敛证明。",
+  "idea": "给每个“状态+动作”学一个值Q(s,a)，更新目标用下一状态所有动作中最大的Q值；并用一个构造出来的“动作回放过程”证明：表格Q学习在每对状态动作被无限次尝试、学习率适当递减时，以概率1收敛到最优。",
+  "impact": "它是第一个有收敛保证、无需模型、还能用任意探索策略收集数据（离策略）的最优控制算法，后来的DQN、Double DQN和Rainbow都是它的神经网络版本。",
+  "background": "到1989年，[[td-learning]]解决了“预测”：学会一个状态大概值多少。可知道状态值并不够选动作——要比较各个动作，还得知道每个动作会把你带到哪里，也就是需要环境模型。[[bellman]]的动态规划恰恰要求模型已知。另一种做法是先学模型再做动态规划，但在模型还很粗糙的早期，按它行事代价很高。\n\n[[watkins-thesis]]提出了不需要模型的Q学习，并给出了收敛性的思路，但证明并不完整。这篇两人合写的技术短文专门补上这一步。",
+  "method": "定义动作价值`Q*(s,a)`：在状态s做动作a、之后一直按最优策略行事能得到的期望折扣回报（见[[c:policy-value]]）。知道了它，最优策略就是每个状态里选Q最大的动作，不再需要模型。\n\n每经历一次转移`(s, a, r, s′)`，做一次更新（见[[c:td-error]]）：\n\n`Q(s,a) ← Q(s,a) + α[r + γ·max_{a′} Q(s′,a′) − Q(s,a)]`\n\n例如`Q(s,右) = 0.5`，这一步奖励`r = 0`，`γ = 0.9`，下一状态最大的Q是1.0，`α = 0.1`，则新值为`0.5 + 0.1×(0 + 0.9×1.0 − 0.5) = 0.54`。\n\n关键在max：目标值用的是“下一步做最好的动作”，与实际下一步做了什么无关。所以数据可以由任何探索策略产生（比如10%概率随机走），学到的仍是最优策略的价值——这就是**离策略**（见[[c:on-off-policy]]）。\n\n**收敛定理**：奖励有界、Q用表格表示、每对`(s,a)`被尝试无限次，且第i次更新的学习率满足`Σα_i = ∞`、`Σα_i² < ∞`（来自[[sgd]]的随机逼近条件），则Q以概率1收敛到Q*。证明构造了一个人工的“动作回放过程”（ARP）：把过去的经历像一叠卡片一样堆起来，证明当前的Q值恰好是这个人工过程的最优值，而它随卡片增多趋近真实过程。",
+  "results": "这是一篇理论短文，没有实验。论文还概述了两个推广：无折扣但最终会进入终止状态的过程，以及每步同时更新多个Q值的情形。论文明确指出，表格之外的表示（函数近似）下Watkins 1989年已发现Q学习可能不收敛。",
+  "legacy": "[[sarsa]]把max换成实际执行的下一个动作，得到同策略版本；[[independent-q]]和[[markov-games]]把它搬到多智能体。函数近似下的不稳定由[[baird-counterexample]]明确展示，直到[[dqn]]用卷积网络、[[experience-replay]]和目标网络让它在Atari上稳定工作；max带来的过高估计由[[double-q]]和[[double-dqn]]修正。",
+  "limits": [
+    {"text": "收敛只对表格成立；换成线性或神经网络近似后可能发散。", "solved_by": ["dqn-nature", "gradient-td"]},
+    {"text": "目标里的max会系统性高估Q值，噪声越大高估越严重。", "solved_by": ["double-q", "double-dqn"]},
+    {"text": "要求每对状态动作被无限次尝试，但没有说如何高效探索，大状态空间里学得很慢。", "solved_by": ["e3-pac", "ucrl2", "count-based-exploration"]},
+    {"text": "需要对所有动作取max，只适用于少量离散动作，连续动作无法直接使用。", "solved_by": ["dpg", "ddpg"]}
+  ],
+  "relations": [
+    {"to": "watkins-thesis", "type": "extends", "note": "Q学习在1989年博士论文中提出；这篇给出了论文里只有轮廓的严格收敛证明。"},
+    {"to": "td-learning", "type": "extends", "note": "把TD的“用下一步估计修正当前估计”从状态价值推广到动作价值，并用max把预测变成控制。"},
+    {"to": "bellman", "type": "solves", "note": "动态规划要求已知转移概率和奖励；Q学习只用采样到的转移逼近Bellman最优方程，不需要模型。"},
+    {"to": "sgd", "type": "uses", "note": "学习率条件Σα=∞、Σα²<∞来自Robbins–Monro随机逼近，是收敛证明的前提。"},
+    {"to": "howard-policy-iteration", "type": "rivals", "note": "策略迭代先完整评估再改进，需要模型；Q学习把评估和改进揉进每一步的增量更新，属于异步、无模型的动态规划。"}
+  ],
+  "prereq": ["mdp", "bellman-equation", "policy-value", "td-error", "on-off-policy", "exploration-exploitation"],
+  "terms": [
+    {"t": "动作价值Q(s,a)", "d": "在状态s先做动作a、之后按某策略行事所能得到的期望折扣回报。Q*指最优策略下的动作价值。"},
+    {"t": "动作回放过程（ARP）", "d": "证明中构造的人工马尔可夫过程：把已发生的每次经历当作一张卡片叠起来，按学习率随机抽取，以此证明Q值逼近最优。"}
+  ],
+  "learn": "先懂[[c:bellman-equation]]和[[c:td-error]]。读原文第2节（问题与算法）和第3节的证明思路，附录可以跳过。动手：在FrozenLake或悬崖行走网格上写表格Q学习，用ε-贪心探索，再与SARSA对比路线差异（Sutton & Barto例6.6）。",
+  "check": {"source": "https://www.gatsby.ucl.ac.uk/~dayan/papers/cjch.pdf", "confirmed": "原文PDF与Springer页面：标题、两位作者及单位、Machine Learning 8:279–292、1992年5月；更新式、定理条件（奖励有界、表格表示、无限次访问、学习率条件）、以概率1收敛、ARP证明、两个推广、函数近似下可能不收敛的说明；无实验。"}
+}

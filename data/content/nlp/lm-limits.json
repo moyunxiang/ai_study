@@ -1,0 +1,109 @@
+{
+  "id": "lm-limits",
+  "who": "Rafal Jozefowicz, Oriol Vinyals, Mike Schuster, Noam Shazeer, Yonghui Wu · Google Brain",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1602.02410"
+    },
+    {
+      "label": "公开的模型与代码（tensorflow/models lm_1b）",
+      "url": "https://github.com/tensorflow/models/tree/archive/research/lm_1b"
+    }
+  ],
+  "problem": "神经语言模型的研究大多在百万词级的Penn Treebank上做，那里主要矛盾是过拟合；真正大的语料（10亿词、近80万词表）上，最好的结果仍是RNN加9-gram特征或巨型n-gram模型，困惑度51.3。",
+  "idea": "在10亿词基准上把LSTM尽量做大（单层8192个单元、带投影），用重要性采样近似80万类的softmax，再用字符卷积代替词向量输入层；系统比较各种设计，发现“模型越大越好”。",
+  "impact": "单模型困惑度从51.3降到30.0、集成降到23.7，说明大数据上的瓶颈是模型容量而非过拟合；其CNN-BIG-LSTM直接成为ELMo的底座，也是后来规模化语言模型研究的起点之一。",
+  "background": "[[rnnlm]]之后，神经语言模型（见[[c:language-model]]）的论文几乎都在Penn Treebank上比较：约100万词、1万词表。数据这么小，主要问题是过拟合，大家拼的是正则化技巧。\n\n作者认为这偏离了真正的问题。在Chelba等人2013年发布的10亿词基准（One Billion Word，约8亿训练词、793,471个词的词表）上，n-gram方法依然很强：5-gram Kneser-Ney模型困惑度67.6，此前最好的单模型是带9-gram特征的RNN（51.3），集成也只到41.0。神经网络在这里有两大障碍：词表太大，输出层softmax每步要和近80万个词向量做内积；以及大模型能否训得动。[[char-aware-lm]]刚证明可以用字符卷积来构造词向量，但只在小数据上试过。",
+  "method": "**大LSTM加投影**。[[lstm]]的隐状态做得很宽（最大8192维），再用一个线性层投影到1024或2048维，减少后续矩阵的大小。dropout放在每层LSTM前后，遗忘门偏置初始化为1。\n\n**重要性采样近似softmax**。每步不计算全部793,471个词的分数，而是随机抽8192个“噪声词”，和真实下一个词一起近似归一化（见[[c:importance-sampling]]）。这8192个样本在整个批次（128句×20步=2560个位置）里共享，计算量约降低到百分之一。论文证明它和[[nce]]形式上相近，实验中收敛更快、效果更好。\n\n**字符CNN输入**。按[[char-aware-lm]]的做法，把每个词的字符序列过一维卷积和最大池化得到词向量，输入层参数减少到约十一分之一，没见过的词也能得到合理的向量。\n\n**CNN softmax**。输出层也用字符卷积生成每个词的输出向量，再加一个低维“修正”向量补偿拼写相近而意思不同的词，用少得多的参数接近完整softmax。",
+  "results": "10亿词基准测试困惑度（见[[c:perplexity]]）：2层LSTM-8192-1024（BIG LSTM）30.6，换成字符CNN输入后30.0，参数10.4亿（其中8.2亿在softmax前的线性层），而此前51.3的模型有200亿参数，约为20倍。同等大小下普通RNN比LSTM差约5个困惑度。CNN softmax仅2.9亿参数达到39.8，加128维修正向量后3.9亿参数达到35.8。10个最好的LSTM集成再加一个稀疏n-gram模型达到23.7，比此前最好的41.0降低40%以上。训练用32块Tesla K40 GPU，最好的模型训练了3周。",
+  "legacy": "这篇是“把语言模型做大”路线的早期证据：[[elmo]]直接采用其中最好的CNN-BIG-LSTM结构（维度减半）作为双向语言模型；[[sentiment-neuron]]和[[gated-cnn-lm]]都以它为对比基线；作者之一Shazeer随后在同一基准上用[[sparse-moe]]把参数推到上千亿级。[[scaling-laws]]系统地给出了“模型越大、数据越多、损失越低”的幂律。字符输出层没有成功，词级或子词级输出一直沿用。",
+  "limits": [
+    {
+      "text": "最好的模型要在32块GPU上训练3周，LSTM必须逐词循环计算，无法在序列内并行，继续放大非常昂贵。",
+      "solved_by": [
+        "gated-cnn-lm",
+        "transformer"
+      ]
+    },
+    {
+      "text": "参数大头在80万词的输出层上，模型容量被大量花在罕见词上，用字符逐字预测替代时困惑度明显变差（47.9）。",
+      "solved_by": [
+        "gpt-2"
+      ]
+    },
+    {
+      "text": "只给出“越大越好”的经验观察，没有回答固定算力下模型、数据该各放大多少。",
+      "solved_by": [
+        "scaling-laws",
+        "chinchilla"
+      ]
+    },
+    {
+      "text": "10亿词基准的句子是打乱的，模型只能看到单句上下文，学不到跨句、篇章级的依赖。",
+      "solved_by": [
+        "transformer-xl",
+        "gpt-2"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "rnnlm",
+      "type": "extends",
+      "note": "沿着RNN语言模型的路线，换成大LSTM、在千倍于Penn Treebank的语料上系统地放大。"
+    },
+    {
+      "to": "char-aware-lm",
+      "type": "uses",
+      "note": "输入层直接采用Kim等人的字符卷积词向量结构，只把卷积特征数加到4096。"
+    },
+    {
+      "to": "lstm",
+      "type": "uses",
+      "note": "主体是带投影层的大LSTM，并发现同等规模下比普通RNN好约5个困惑度。"
+    },
+    {
+      "to": "nce",
+      "type": "rivals",
+      "note": "论文比较了NCE与重要性采样两种近似大softmax的方法，后者训练更快、困惑度更低。"
+    },
+    {
+      "to": "ngram-smoothing",
+      "type": "solves",
+      "note": "在n-gram最擅长的大语料上，单个LSTM（30.0）也远好于Kneser-Ney 5-gram（67.6），且在罕见词上优势最大。"
+    },
+    {
+      "to": "hierarchical-softmax",
+      "type": "rivals",
+      "note": "层次softmax是另一种解决大词表的方案，论文选择了基于采样的近似。"
+    }
+  ],
+  "prereq": [
+    "language-model",
+    "perplexity",
+    "recurrent-layer",
+    "softmax",
+    "importance-sampling",
+    "params-flops"
+  ],
+  "terms": [
+    {
+      "t": "10亿词基准（One Billion Word Benchmark）",
+      "d": "2013年Chelba等人整理的语言模型数据集，取自新闻，约8亿训练词，句子已打乱并去重。"
+    },
+    {
+      "t": "投影层（projection）",
+      "d": "在宽的LSTM隐状态之后加一个线性层把它压到更低维度，减少后面矩阵乘法的大小。"
+    },
+    {
+      "t": "CNN softmax",
+      "d": "不给每个输出词单独存一个向量，而是用字符卷积根据拼写算出它的输出向量，参数量与词表大小基本无关。"
+    }
+  ],
+  "learn": "先补[[c:perplexity]]、[[c:softmax]]和[[c:importance-sampling]]，读过[[rnnlm]]和[[char-aware-lm]]。读原文第3节（采样近似与CNN softmax）和表1，按参数量和困惑度两列对照着看。动手：在一个中等语料上训练两个大小不同的LSTM语言模型，画出困惑度随参数量的变化；再把完整softmax换成采样近似，比较速度。",
+  "check": {
+    "source": "https://arxiv.org/html/1602.02410",
+    "confirmed": "标题、5位作者、arXiv首次提交2016-02-07；正文约0.8B词、793,471词表、8192个共享负样本与2560个位置、约百倍计算节省；表1各模型困惑度与参数量（30.6/1.8B、30.0/1.04B、39.8/0.29B、35.8/0.39B、47.9、51.3/20B、67.6）；表2集成23.7与41.0；RNN差约5；820M在softmax前线性层；32块K40训练3周。"
+  }
+}

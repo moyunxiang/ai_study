@@ -1,0 +1,41 @@
+{
+  "id": "bahdanau-attention",
+  "who": "Dzmitry Bahdanau, Kyunghyun Cho, Yoshua Bengio · 蒙特利尔大学",
+  "venue": "ICLR 2015",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1409.0473"},
+    {"label": "ar5iv全文", "url": "https://ar5iv.org/abs/1409.0473"},
+    {"label": "Distill：Attention and Augmented RNNs", "url": "https://distill.pub/2016/augmented-rnns/"}
+  ],
+  "problem": "编码器-解码器把整句源语言压成一个固定长度向量，句子一长信息就装不下，翻译质量随句长急剧下降。",
+  "idea": "编码器保留每个源词位置的向量；解码器每生成一个词，先给所有源位置打分、用softmax变成权重，再按权重加权求和得到当步专属的上下文向量——即“软对齐”。",
+  "impact": "注意力从此成为序列模型的标准部件，扩展到图像描述、语音识别、阅读理解，三年后Transformer干脆只保留注意力。",
+  "background": "2014年，[[cho-encdec]]和[[seq2seq]]提出了神经翻译的基本形态：编码器RNN读完源句，把最后的隐状态当作整句的表示`c`，解码器只根据这一个向量生成全部译文。\n\n作者的判断是：不管句子有5个词还是50个词，都要塞进同样维度（比如1000维）的向量，这本身就是瓶颈。实验印证了这一点：基本编码器-解码器的BLEU随句长增加而大幅下滑。[[seq2seq]]靠把源句倒序、堆4层LSTM勉强缓解，但没有改变“一个向量装一整句”的结构。\n\n而在传统统计翻译里，翻某个词时只需看源句中与它对齐的那几个词——[[ibm-models]]和[[hmm-alignment]]把对齐当作隐变量单独建模。问题是：能不能让神经网络自己学会“翻到这里时该看源句哪里”，并且和翻译一起端到端训练？",
+  "method": "**编码器：给每个位置一个“注解”**。用[[bidirectional-rnn]]（门控单元来自[[cho-encdec]]），正向RNN从左读到右，反向RNN从右读到左，把两者在第j个词处的隐状态拼起来得到`h_j`。这样`h_j`既包含整句信息，又以第j个词附近为重点。\n\n**解码器：每步重新“查”一遍源句**（见[[c:attention-concept]]）。生成第i个目标词前，用上一步的解码器状态`s_{i−1}`与每个`h_j`算一个匹配分数，分数过[[c:softmax]]得到权重，再加权求和：\n\n`e_ij = v_aᵀ · tanh(W_a·s_{i−1} + U_a·h_j)`\n`α_ij = exp(e_ij) / Σ_k exp(e_ik)`\n`c_i = Σ_j α_ij · h_j`\n\n然后`c_i`与`s_{i−1}`、上一个输出词一起更新解码器状态并预测`y_i`。打分函数是一个单隐层的小网络，作者称之为对齐模型。\n\n**为什么叫软对齐**。`α_ij`是一组和为1的权重，可以理解成“第i个译词对应第j个源词的概率”。它不做硬性选择，所以处处可导，整个模型（编码器、对齐模型、解码器）可以用反向传播一起训练，不需要任何对齐标注。\n\n举个例子：英语“European Economic Area”译成法语“zone économique européenne”，词序相反。可视化`α`矩阵可以看到，模型生成zone时把权重放在Area上，跳过前两个词，然后再一格一格往回看——它自己学会了调序。\n\n代价是每对句子要算`T_x × T_y`次打分，所以对齐模型故意做得很小。",
+  "results": "WMT’14英法任务，训练语料按Cho等人的方法筛到3.48亿词，两种语言各取最常见的3万词，其余记为UNK，测试集3003句。训练句长上限50的模型（RNNsearch-50）BLEU 26.75，同等条件下不带注意力的RNNencdec-50只有17.82；训练更久的版本达到28.45。只看不含未登录词的句子，RNNsearch-50更久版本得36.15，略高于短语统计系统Moses的35.63。最关键的是句长曲线：RNNencdec随句子变长急剧下滑，RNNsearch-50到50词以上也没有明显下降。每个模型训练约5天。",
+  "legacy": "注意力几乎立刻被推广：[[luong-attention]]简化了打分函数并比较全局与局部注意力；[[show-attend-tell]]让图像描述模型“看”图的不同区域；[[chorowski-attention]]与[[las]]把它用到语音识别；[[pointer-net]]把注意力权重直接当作输出；[[attentive-reader]]和[[bidaf]]把它用于阅读理解；[[tacotron]]用它对齐文字和声音。工业上[[gnmt]]把带注意力的深层LSTM部署到谷歌翻译。\n\n2017年[[transformer]]去掉了RNN，只用注意力（并让一句话内部的词互相注意，即自注意力），成为今天所有大模型的基础。`Q·Kᵀ`打分加softmax再加权求和V，就是这里`e → α → c`三步的矩阵化版本。",
+  "pitfalls": "- 论文把模型叫RNNsearch，把打分网络叫“对齐模型”，只在3.1节顺带说这“实现了解码器里的注意力机制”；“注意力”成为通用名称是之后的事。\n- 这里的注意力是解码器看编码器（跨序列）。同一序列内部的词互相看，即自注意力，是后来[[lstmn]]、[[transformer]]等的工作。\n- 注意力权重常被画成对齐图来“解释”模型，但权重高不等于模型真的依赖那个词做决定，见[[attention-not-explanation]]。",
+  "limits": [
+    {"text": "注意力只是挂在RNN上的部件，编码和解码仍要逐词串行计算，训练一个模型约需5天。", "solved_by": ["convs2s", "transformer"]},
+    {"text": "每种语言只保留3万个常用词，其余都是UNK，含生僻词的句子仍然大量失分。", "solved_by": ["bpe", "gnmt"]},
+    {"text": "每一步独立计算注意力，不记得哪些源词已经翻过，长句里会重复翻译或漏译。", "solved_by": ["coverage-nmt", "gnmt"]},
+    {"text": "只有译文看源句的跨序列注意力，句子内部的词之间仍靠RNN一步步传递信息。", "solved_by": ["lstmn", "transformer"]},
+    {"text": "注意力权重看起来像对齐，但并不保证反映模型的真实决策依据，用它解释模型并不可靠。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "cho-encdec", "type": "solves", "note": "解决了编码器-解码器把整句压成固定长度向量导致长句质量崩溃的问题，并沿用其门控循环单元。"},
+    {"to": "seq2seq", "type": "rivals", "note": "同月发表的两条路线：Seq2Seq靠倒序输入和深层LSTM硬扛长句，本文用注意力绕开瓶颈；后来两者合流，注意力成为标配。"},
+    {"to": "bidirectional-rnn", "type": "uses", "note": "用双向RNN给每个源词生成同时包含左右上下文的注解向量。"},
+    {"to": "ibm-models", "type": "rivals", "note": "统计翻译把词对齐当作离散隐变量单独估计；本文的软对齐是连续权重，与翻译一起端到端学习。"},
+    {"to": "graves-generating", "type": "extends", "note": "Graves在手写生成里用过可微的“软窗口”关注输入的不同位置，本文把类似思想变成按内容打分的对齐，用于翻译。"},
+    {"to": "phrase-smt", "type": "rivals", "note": "在不含未登录词的句子上BLEU 36.15，略超短语系统Moses的35.63，但全测试集上仍落后。"}
+  ],
+  "prereq": ["recurrent-layer", "gating", "encoder-decoder", "softmax", "attention-concept", "embedding", "text-metrics"],
+  "terms": [
+    {"t": "注解（annotation）", "d": "编码器在每个源词位置输出的向量，由正向和反向RNN的隐状态拼接而成，相当于“带上下文的这个词”。"},
+    {"t": "上下文向量c_i", "d": "解码第i个词时，对所有注解按注意力权重加权求和得到的向量。每一步都不同，取代了原来全句共用的那一个向量。"},
+    {"t": "软对齐", "d": "用一组和为1的连续权重表示译词与源词的对应关系，而不是硬性地指定对应哪个词，因此可以求梯度。"}
+  ],
+  "learn": "先确认会[[c:softmax]]和[[c:recurrent-layer]]，读过[[seq2seq]]。然后读原文第3节（3.1解码器、3.2编码器）和附录A.1.2的对齐模型公式，再看图2的句长曲线和图3的对齐矩阵。Distill的Attention and Augmented RNNs有很好的动图。动手：在一个小的英法或日期格式转换数据集上，给自己写的编码器-解码器加上这一层注意力，画出`α`矩阵看它是否学出了对齐。",
+  "check": {"source": "https://arxiv.org/abs/1409.0473", "confirmed": "标题、3位作者、arXiv v1提交于2014-09-01；全文（ar5iv）中的对齐公式e_ij、α_ij、c_i与v_aᵀtanh(W_a s + U_a h)、3万词表、3.48亿词语料、3003句测试集、表1（RNNencdec-50 17.82、RNNsearch-50 26.75、RNNsearch-50* 28.45/36.15、Moses 33.30/35.63）、约5天训练、European Economic Area对齐示例。"}
+}

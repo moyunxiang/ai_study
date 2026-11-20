@@ -1,0 +1,36 @@
+{
+  "id": "encodec",
+  "who": "Alexandre Défossez, Jade Copet, Gabriel Synnaeve, Yossi Adi · Meta AI (FAIR)",
+  "venue": "TMLR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2210.13438"},
+    {"label": "GitHub", "url": "https://github.com/facebookresearch/encodec"}
+  ],
+  "problem": "神经音频编解码器SoundStream证明了“编码器+残差向量量化+解码器”的路线，但训练要多个判别器、损失权重难调，对音乐和48kHz立体声的支持也有限，且没有开源权重。",
+  "idea": "沿用同一框架，只用一个多尺度频谱判别器，并提出“损失平衡器”让每个损失的权重直接等于它在总梯度中所占的比例；同时支持24kHz单声道与48kHz立体声，开源代码和模型。",
+  "impact": "3kbps的EnCodec在听感测试中胜过6kbps的Lyra-v2和12kbps的Opus；开源后成为MusicGen、VALL-E等音频语言模型最常用的“音频分词器”。",
+  "background": "要让语言模型生成声音，先得把连续的波形变成离散token。[[soundstream]]给出的做法是一个卷积[[c:autoencoder]]：编码器把波形压成低帧率的向量序列，用残差向量量化（[[c:vector-quantization]]）变成整数，解码器再还原波形，用[[gan]]式的判别器保证听感。但它要同时训练好几种判别器，各项损失的数值量级差别很大，调权重全凭经验；评测主要在语音上，权重也没有公开。",
+  "method": "**结构**。编码器是一串步长为2、4、5、8的一维卷积，把24kHz波形每320个采样压成一帧，即每秒75帧，再接两层LSTM。解码器结构对称，用转置卷积还原。流式版本只用因果卷积，收到前320个采样（约13毫秒）就能输出。\n\n**残差向量量化（RVQ）**。每帧向量先在第1个码本（1024个码字）里找最近的码字，再把剩下的误差交给第2个码本量化，依此类推，最多32层。每层码本10比特，所以码本数直接决定码率：用2层是75×2×10=1.5kbps，用32层是24kbps。训练时随机丢掉后面若干层，一个模型就能在1.5、3、6、12、24kbps之间切换（见[[c:vocoder-codec]]）。\n\n**损失与平衡器**。损失包括波形和多尺度梅尔谱上的重建误差、对抗损失、判别器特征匹配损失和量化承诺损失。判别器只用一种：在5种窗长的STFT复数谱上做二维卷积的多尺度判别器。各损失梯度量级差别很大，作者把每个损失的梯度先归一化，再按设定的权重混合，于是权重0.1就表示“这个损失贡献10%的梯度”，与它本身数值大小无关。\n\n**熵编码**。另训一个5层的小Transformer预测下一帧的码字，用算术编码再压缩20%到30%，仍能在单个CPU核上实时运行。",
+  "results": "在MUSHRA主观听感测试（满分100）里，24kHz流式版本在每个码率上都胜过基线：3kbps的EnCodec平均分高于6kbps的Lyra-v2和12kbps的Opus。干净语音上，6kbps EnCodec得83.1，同码率Opus只有30.1。48kHz立体声音乐上，6kbps EnCodec得82.9，与64kbps的MP3（82.7）相当。",
+  "legacy": "EnCodec最大的用处不在通信，而在生成：[[vall-e]]用它的8层码本作为TTS的目标token，[[musicgen]]用32kHz版本的4层码本生成音乐，[[naturalspeech-2]]用类似的编解码器潜空间做扩散。之后[[dac]]改进码本利用率、提高通用音频质量，[[speechtokenizer]]让第一层码本带上语义，[[wavtokenizer]]把每秒的token数大幅压低。",
+  "limits": [
+    {"text": "每秒75帧、每帧多层码本，一段10秒音频就是几千个token，语言模型直接建模序列太长。", "solved_by": ["musicgen", "wavtokenizer"]},
+    {"text": "码本只为重建波形而学，第一层码本混着音色、内容和噪声，不直接对应语义，语言模型难以从中学到“说了什么”。", "solved_by": ["speechtokenizer"]},
+    {"text": "部分码字很少被用到，高码率下对音乐和通用音频仍有可闻失真。", "solved_by": ["dac"]}
+  ],
+  "relations": [
+    {"to": "soundstream", "type": "extends", "note": "沿用卷积编码器、残差向量量化和对抗训练的框架，简化判别器并加入损失平衡器，扩展到48kHz立体声。"},
+    {"to": "vq-vae", "type": "uses", "note": "码本查找、直通梯度和承诺损失都来自VQ-VAE，RVQ只是把它逐层叠加在残差上。"},
+    {"to": "gan", "type": "uses", "note": "用判别器的对抗损失和特征匹配损失替代单纯的均方误差，避免重建声音发闷。"},
+    {"to": "hifi-gan", "type": "rivals", "note": "HiFi-GAN用多尺度与多周期波形判别器；EnCodec改用单一的多尺度STFT判别器，消融显示单用它已经足够且训练更快。"},
+    {"to": "transformer", "type": "uses", "note": "用一个5层小Transformer预测码字分布，配合算术编码再降20%到30%码率。"}
+  ],
+  "prereq": ["vocoder-codec", "vector-quantization", "autoencoder", "adversarial-training", "waveform-spectrogram", "fourier-transform"],
+  "terms": [
+    {"t": "残差向量量化RVQ", "d": "用多个码本逐级量化：第一级量化原向量，第二级量化第一级的误差，依此类推。层数越多还原越精细，码率也越高。"},
+    {"t": "kbps", "d": "每秒千比特，衡量压缩后的数据率。普通电话语音约十几kbps，MP3音乐常用128kbps。"},
+    {"t": "MUSHRA", "d": "一种主观听感测试：听者对同一段音频的多个压缩版本和隐藏的原始音频分别打0到100分。"}
+  ],
+  "learn": "先读[[soundstream]]弄懂RVQ。读原文第3节（结构、量化、平衡器）和表1。动手：pip安装encodec，把一段音乐分别压到1.5、6、24kbps，听差别并打印码字矩阵的形状（码本数×帧数）。",
+  "check": {"source": "https://arxiv.org/html/2210.13438v1", "confirmed": "arXiv 2022-10-24提交，4位作者；Semantic Scholar显示发表于TMLR。正文核对：步长(2,4,5,8)、24kHz下75帧/秒、最多32个1024项码本、1.5至24kbps、13毫秒初始延迟、5种STFT窗长的判别器、5层熵编码Transformer、表1中干净语音6kbps EnCodec 83.1 vs Opus 30.1、3kbps优于Lyra-v2 6kbps与Opus 12kbps、表4立体声6kbps 82.9 vs MP3 64kbps 82.7、熵编码增益20%至30%。"}
+}

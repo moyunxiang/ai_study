@@ -1,0 +1,34 @@
+{
+  "id": "slam-probabilistic",
+  "who": "Randall C. Smith, Peter Cheeseman · SRI International / NASA Ames",
+  "venue": "International Journal of Robotics Research 5(4), 1986",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1177/027836498600500404"},
+    {"label": "Durrant-Whyte & Bailey SLAM教程（上）", "url": "https://people.eecs.berkeley.edu/~pabbeel/cs287-fa09/readings/Durrant-Whyte_Bailey_SLAM-tutorial-I.pdf"}
+  ],
+  "problem": "机器人每走一步、每测一次都有误差，误差层层叠加后它到底在哪、看到的物体在哪？当时没有统一的方法表示和传播这种空间不确定性。",
+  "idea": "把每个相对位姿关系表示成“均值 + 协方差”，给出两种基本运算：串联两段关系时用一阶线性化传播协方差，多个独立估计同一关系时用卡尔曼式加权融合。",
+  "impact": "为“同时定位与建图”（SLAM）提供了概率表示的基础；随后的工作证明必须把机器人位姿和所有路标放进一个联合状态一起估计，这就是EKF-SLAM。",
+  "background": "1980年代的移动机器人靠里程计（数轮子转了几圈）和声呐、相机估计自己的位置。问题是误差会累积：机器人转弯时朝向偏了1度，走10米后横向就偏出十几厘米；它再用这个有误差的位置去记录路标，路标位置也跟着错。\n\n据Durrant-Whyte与Bailey的回顾，概率SLAM问题起源于1986年在旧金山召开的IEEE机器人与自动化会议，Cheeseman、Crowley、Durrant-Whyte等人在会上讨论如何做“一致的”概率建图。当时概率方法刚开始进入机器人和AI领域，而[[kalman-filter]]早已是航天导航的标准工具，问题是怎么把它用到机器人与物体之间一连串的坐标系关系上。",
+  "method": "论文把机器人、相机、物体之间的每个相对关系看作一个“不确定的坐标变换”：平面上是`(x, y, θ)`的均值，加一个3×3协方差矩阵（见[[c:covariance]]）。在此之上定义两种运算。\n\n**串联（compounding）**。已知A到B、B到C的关系，求A到C：`x₃ = x₁ + x₂·cosθ₁ − y₂·sinθ₁`，`y₃ = y₁ + x₂·sinθ₁ + y₂·cosθ₁`，`θ₃ = θ₁ + θ₂`。这是非线性的，所以在均值处求雅可比矩阵J（见[[c:jacobian-hessian]]），协方差近似为`C₃ ≈ J·C·Jᵀ`。直观上：朝向的一点误差，经过越长的平移，放大成越大的横向误差。\n\n**融合（merging）**。两个独立来源都估计了同一关系（比如里程计推算和传感器直接测量），就按协方差加权合并：`K = C₁(C₁ + C₂)⁻¹`，新均值`x = x₁ + K(x₂ − x₁)`，新协方差`C = C₁ − K·C₁`。这正是卡尔曼滤波的校正步。\n\n有了这两种运算，任意一张由不确定关系连成的网络都可以化简成一个关系及其误差。论文的例子是：判断机器人手臂上的相机是否很可能看得到某个参考物体，以及加装一个传感器能把定位精度提高多少。论文称计算结果与独立的蒙特卡洛模拟吻合良好，并可推广到六自由度。",
+  "legacy": "紧接着，Smith、Self与Cheeseman的论文指出：机器人用同一个有误差的位姿去观测所有路标，所以各路标的估计必然相互关联。要得到一致的解，状态向量必须同时包含机器人位姿和每一个路标的位置，每次观测后整体更新，计算量随路标数平方增长。这就是EKF-SLAM。1995年的机器人研究国际研讨会（ISRR）上，有综述论文首次提出SLAM这一缩写，并给出了收敛性结果：路标之间的关联不是该消除的麻烦，反而越强越好。\n\n平方增长的计算量和线性化误差，后来分别由[[fastslam]]（粒子滤波 + 每个路标单独的小滤波器）和基于关键帧与光束法平差的图优化方法（如[[orb-slam]]）缓解。这些概率方法被系统整理进[[probabilistic-robotics]]。",
+  "limits": [
+    {"text": "完整的联合协方差随路标数n平方增长、每次更新也要O(n²)，地图一大就算不动。", "solved_by": ["fastslam", "orb-slam"]},
+    {"text": "靠一阶线性化传播误差，朝向误差大时近似失真，滤波器会过度自信甚至发散。", "solved_by": ["fastslam", "orb-slam"]},
+    {"text": "默认知道每次测量对应哪个路标（数据关联）；认错路标或回到旧地点时（回环），整张地图可能被拉坏。", "solved_by": ["orb-slam"]},
+    {"text": "地图只是稀疏的点状路标，不包含表面、可通行区域等对导航和操作有用的稠密几何。", "solved_by": ["kinectfusion", "mast3r-slam"]}
+  ],
+  "relations": [
+    {"to": "kalman-filter", "type": "extends", "note": "把卡尔曼滤波的协方差传播和加权融合，推广到机器人、相机和物体之间一串串非线性坐标变换上。"},
+    {"to": "shakey", "type": "solves", "note": "Shakey一代机器人把位置当作确定的事实来规划；这里给出了表示和传播位置误差的统一方法，让机器人能判断自己知道得够不够准。"},
+    {"to": "ransac", "type": "rivals", "note": "同一时期处理几何估计误差的另一条路：RANSAC对付少数严重错误的测量（离群点），这里对付所有测量都有的小高斯误差；现代SLAM两者并用。"}
+  ],
+  "prereq": ["covariance", "gaussian", "jacobian-hessian", "camera-geometry", "state-action-observation"],
+  "terms": [
+    {"t": "SLAM", "d": "同时定位与建图：机器人在未知环境里一边建地图，一边用这张地图确定自己的位置。两件事互相依赖，必须一起估计。"},
+    {"t": "里程计", "d": "根据轮子转数或惯性传感器推算位移。短时间准，但误差随行驶距离不断累积。"},
+    {"t": "数据关联", "d": "判断这次看到的特征是地图里已有的哪个路标，还是一个新路标。判断错一次，估计就会被严重带偏。"}
+  ],
+  "learn": "先补[[c:covariance]]、[[c:jacobian-hessian]]，并确认读懂了[[kalman-filter]]的预测和校正两步。然后读Durrant-Whyte与Bailey教程上篇的第2节（历史）和第3、4节（EKF-SLAM），对照理解“路标为什么相互关联”。动手：用NumPy模拟一个机器人绕圈行驶并观测5个路标，实现EKF-SLAM，画出协方差椭圆，观察回到起点重新看到第一个路标时所有椭圆如何一起缩小。",
+  "check": {"source": "https://doi.org/10.1177/027836498600500404 ; https://api.openalex.org/works/doi:10.1177/027836498600500404 ; https://people.eecs.berkeley.edu/~pabbeel/cs287-fa09/readings/Durrant-Whyte_Bailey_SLAM-tutorial-I.pdf", "confirmed": "Crossref：标题、作者Smith与Cheeseman、IJRR第5卷、56–68页、1986年12月；OpenAlex：作者机构与摘要（坐标系关系的均值与协方差、相机视野例子、与蒙特卡洛模拟吻合、可推广到六自由度）。教程：1986年IEEE ICRA旧金山会议为概率SLAM起源、Smith-Self-Cheeseman指出路标相关性与平方增长计算量、1995年ISRR首次提出SLAM缩写与收敛结果。"}
+}

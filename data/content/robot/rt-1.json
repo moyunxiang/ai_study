@@ -1,0 +1,109 @@
+{
+  "id": "rt-1",
+  "who": "Anthony Brohan, Noah Brown, Justice Carbajal, Yevgen Chebotar, Joseph Dabis, Chelsea Finn, Keerthana Gopalakrishnan, Karol Hausman et al.（共51位） · Robotics at Google / Everyday Robots",
+  "venue": "RSS 2023",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2212.06817"
+    },
+    {
+      "label": "项目主页（含视频）",
+      "url": "https://robotics-transformer1.github.io"
+    }
+  ],
+  "problem": "机器人策略通常一个任务一个模型、各自小数据训练，多任务模型容量一大就跑不动实时控制；视觉和语言里“大数据+大模型带来泛化”的规律，在机器人上还没被证明。",
+  "idea": "用13台机器人花17个月采集13万条、700多种指令的真机示范，训练一个35M参数的Transformer：语言调制的EfficientNet把图像压成少量token，Transformer输出离散化的动作token，每秒3次闭环控制。",
+  "impact": "见过的700多条指令成功率97%，对新指令、干扰物和新背景的泛化比此前最好方法分别高25%、36%、18%；证明了“多任务、大数据、Transformer”在真实机器人上可行，成为RT-2和Open X-Embodiment的直接基础。",
+  "background": "2022年的机器人模仿学习大多是“一个任务、一套数据、一个模型”。[[bc-z]]尝试用一个语言条件模型做上百个任务，但对没见过的指令泛化很差。DeepMind的[[gato]]用一个大Transformer同时玩游戏、聊天和控制机械臂，但机器人部分数据少、推理慢。\n\n[[saycan]]则暴露了另一个瓶颈：大语言模型规划得再好，执行要靠几百个单独训练的技能，底层技能不稳，整条长任务就会失败。视觉和语言领域已经反复证明：数据足够多样、模型容量足够大，泛化能力会显著提升。机器人能否也这样？难点有两个：真机数据很难大规模采集；大模型推理慢，而控制需要实时。",
+  "method": "**数据**。在办公室厨房里搭建“机器人教室”，13台Everyday Robots移动机械臂经17个月遥操作采集约13万条示范，覆盖700多条指令，如“把可乐罐放到绿色薯片袋旁边”“打开抽屉”。\n\n**图像与语言编码**。输入是最近6帧图像和一句指令。指令先用预训练的Universal Sentence Encoder编码成向量；图像经过在[[imagenet]]上预训练的[[efficientnet]]-B3，但在网络中间插入FiLM层：用语言向量算出每个通道的缩放和偏移，让“看什么”由指令决定。每帧输出81个视觉—语言token。\n\n**压缩token**。用TokenLearner把每帧81个token压到8个，6帧共48个，这是能实时运行的关键。\n\n**Transformer输出动作**。一个8层、仅解码器的[[transformer]]（19M参数）读入48个token，输出动作。动作共11维：机械臂7维（位置、姿态、夹爪开合）、底盘3维，以及一个“控制机械臂/控制底盘/结束”的模式切换。每个连续维度均匀切成256个箱子，变成分类问题，用交叉熵训练（见[[c:imitation-learning]]）。全模型35M参数，以3 Hz闭环控制。",
+  "results": "评测共约3000次真机试验。见过的任务成功率97%，BC-Z为72%、Gato为65%；没见过的指令76%，BC-Z为19%；有干扰物时83%、换新背景59%，均大幅领先。作为SayCan的底层执行器，可完成多达50步的长程任务。把[[qt-opt]]在另一种机械臂（Kuka）上采的20.9万条抓取数据混入训练，原任务性能保持，且新任务有提升。",
+  "legacy": "RT-1证明了机器人策略也遵循“数据多样性比数据量更重要、大模型能吸收异构数据”的规律。半年后的[[rt-2]]把同样的动作离散化方式套到预训练视觉语言模型上，形成VLA；[[open-x]]把RT-1的数据格式推广到多家机构的多种机器人；[[simpler]]等评测工作也常以RT-1为基准。",
+  "limits": [
+    {
+      "text": "所有知识都来自13万条机器人示范，对示范里没出现过的物体和概念（比如“灭绝的动物”）几乎没有泛化能力。",
+      "solved_by": [
+        "rt-2"
+      ]
+    },
+    {
+      "text": "动作按256个箱子离散化、3 Hz低频输出，适合拿放类任务，做不了需要高频精细控制的双手灵巧操作。",
+      "solved_by": [
+        "aloha-act",
+        "diffusion-policy",
+        "pi0"
+      ]
+    },
+    {
+      "text": "数据只来自一种机器人、一个公司17个月的采集，换一种机器人就要从头采数据。",
+      "solved_by": [
+        "open-x"
+      ]
+    },
+    {
+      "text": "纯模仿学习，策略最多和示范者一样好，失败后也不会从经验中自我改进。",
+      "solved_by": [
+        "pi-star-0.6"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "transformer",
+      "type": "uses",
+      "note": "动作由一个8层仅解码器的Transformer基于图像—语言token生成。"
+    },
+    {
+      "to": "saycan",
+      "type": "solves",
+      "note": "SayCan的长程任务常因底层技能不稳而失败；RT-1作为统一的底层策略，让SayCan能完成多达50步的任务。"
+    },
+    {
+      "to": "bc-z",
+      "type": "solves",
+      "note": "BC-Z对新指令只有19%成功率，RT-1以更大的数据和Transformer结构提到76%。"
+    },
+    {
+      "to": "gato",
+      "type": "rivals",
+      "note": "同为用Transformer做通用控制；Gato追求跨领域通用，RT-1专注真机操作并针对实时性做了压缩，在同一数据上明显更好。"
+    },
+    {
+      "to": "efficientnet",
+      "type": "uses",
+      "note": "图像编码器是ImageNet预训练的EfficientNet-B3，加FiLM层接受语言调制。"
+    },
+    {
+      "to": "qt-opt",
+      "type": "uses",
+      "note": "把QT-Opt在Kuka机械臂上采集的抓取数据混入训练，验证跨机器人数据的吸收能力。"
+    }
+  ],
+  "terms": [
+    {
+      "t": "FiLM（特征线性调制）",
+      "d": "用一个条件向量（这里是指令嵌入）为网络每个通道算出缩放系数γ和偏移β，把特征变成γ·x+β，从而让同一个网络按条件改变关注点。"
+    },
+    {
+      "t": "TokenLearner",
+      "d": "一个学出来的模块，从大量视觉token中自适应地汇聚出少数几个最有用的token，以减少后续Transformer的计算量。"
+    },
+    {
+      "t": "动作离散化",
+      "d": "把连续的动作值按区间切成若干个箱子，只预测落在哪个箱子里，把回归问题变成分类问题，便于用Transformer按token输出。"
+    }
+  ],
+  "prereq": [
+    "imitation-learning",
+    "transformer-block",
+    "conv-layer",
+    "embedding",
+    "cross-entropy",
+    "teleoperation"
+  ],
+  "learn": "先补Transformer与行为克隆 → 读原文第5节（数据与模型）和表2、表4 → 动手：用开源的RT-1 TensorFlow代码或LeRobot里的复现，在Open X-Embodiment的一个子集上训练，体会动作离散化对精度的影响。",
+  "check": {
+    "source": "https://arxiv.org/abs/2212.06817 ；https://arxiv.org/html/2212.06817",
+    "confirmed": "标题、作者（51位）、2022-12-13首次提交；13台机器人、17个月、约13万条、700多条指令、约3000次评测；FiLM EfficientNet-B3输出81个token、TokenLearner压到8个、6帧48个token、8层Transformer 19M、总35M参数、3 Hz、11维动作每维256箱；表2：RT-1 97/76/83/59，BC-Z 72/19/47/41，Gato 65/52/43/35；SayCan中多达50步；混入QT-Opt的20.9万条Kuka数据。"
+  }
+}

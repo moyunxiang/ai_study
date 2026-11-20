@@ -1,0 +1,136 @@
+{
+  "id": "instructgpt",
+  "who": "Long Ouyang, Jeff Wu, Xu Jiang, Diogo Almeida, Carroll L. Wainwright, Pamela Mishkin, Chong Zhang, Sandhini Agarwal et al.（含John Schulman、Paul Christiano、Jan Leike、Ryan Lowe） · OpenAI",
+  "venue": "NeurIPS 2022",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2203.02155"
+    },
+    {
+      "label": "Hugging Face：Illustrating RLHF",
+      "url": "https://huggingface.co/blog/rlhf"
+    },
+    {
+      "label": "Chip Huyen：RLHF详解",
+      "url": "https://huyenchip.com/2023/05/02/rlhf.html"
+    }
+  ],
+  "problem": "GPT-3只学过“续写网页”，并不懂“照用户说的做”：你让它写一首诗，它可能接着写出五个类似的问题；它还会编造事实、输出有害内容。把模型做大并不能解决这个错位。",
+  "idea": "三步走：先请标注员为真实用户提示写示范答案做监督微调；再让标注员给模型的多个回答排序，训练一个奖励模型；最后用PPO强化学习让模型最大化奖励，同时用KL惩罚防止偏离太远。",
+  "impact": "13亿参数的InstructGPT比1750亿参数的GPT-3更受标注员青睐；这套SFT→奖励模型→PPO的流程被ChatGPT直接沿用，成为此后几年对话模型后训练的标准配方。",
+  "background": "[[gpt-3]]通过API开放后，用户发现它很难用：预训练目标是“预测互联网文本的下一个词”，而不是“帮用户完成任务”。要它干活，得精心设计少样本提示，把任务伪装成一段待续写的文本。它还会一本正经地编造（见[[c:hallucination]]）、复述偏见和有毒内容。作者把这称为**错位**：模型的训练目标与用户的意图不一致。按[[hhh-assistant]]的说法，人们希望模型有用、诚实、无害。\n\n当时有两条路。一条是指令微调：[[flan]]和[[t0]]把公开NLP数据集改写成指令再训练。另一条是从人类反馈中学习：[[human-preferences]]在游戏和机器人上用人类两两比较训练奖励，[[rlhf-lm]]和[[summarize-hf]]把它搬到语言模型，但只做了摘要、续写风格这类单一任务。真实用户的需求五花八门——在API提示里，生成类占45.6%，开放问答12.4%，头脑风暴11.2%——公开数据集覆盖不了。",
+  "method": "从GPT-3（1.3B、6B、175B三个尺寸）出发，由约40名经过筛选的外包标注员提供数据，分三步。\n\n**第一步：监督微调（SFT）**。约1.3万条提示（来自API用户和标注员自写），标注员写出理想回答，用普通的下一个词预测在这些示范上微调GPT-3。\n\n**第二步：训练奖励模型（RM）**。约3.3万条提示，每条让模型生成K=4到9个回答，标注员从好到差排序，一次排序可拆出 `C(K,2)` 对比较。奖励模型是去掉输出层、改为输出一个标量分数的6B模型，损失函数为\n\n`loss = −E[ log σ( r(x, y_w) − r(x, y_l) ) ]`\n\n其中 `y_w` 是被排在前面的回答，`y_l` 是排在后面的。直观地说：让好回答的分数比差回答高，分差越大损失越小。同一条提示的所有比较放进同一个批次，避免过拟合。\n\n**第三步：强化学习（PPO）**。约3.1万条API提示作为环境：模型生成一个回答，奖励模型打分，这就是一局。用[[ppo]]最大化\n\n`r(x, y) − β·log(π_RL(y|x) / π_SFT(y|x))`\n\n第二项是逐token的KL惩罚（见[[c:kl-divergence]]，`β = 0.02`）：不许策略离SFT模型太远，否则它会钻奖励模型的空子，生成分数高但质量差的文本（见[[c:reward-design]]）。纯PPO会让模型在SQuAD、DROP、翻译等公开数据集上变差，作者称为**对齐税**；解决办法是在PPO更新中混入预训练数据的语言模型梯度（PPO-ptx），论文里的InstructGPT默认就是这个版本。",
+  "results": "在API提示分布上由标注员盲评：1.3B的InstructGPT比175B的GPT-3更受偏好，参数少100倍；175B的InstructGPT以85±3%的比例胜过GPT-3，对精心设计了少样本提示的GPT-3也有71±4%。没参与训练数据标注的“留出”标注员给出了相近的偏好。\n\n真实性：TruthfulQA上给出真实且有信息量回答的比例约为GPT-3的两倍；在摘要、封闭问答这类“不应引入输入以外信息”的任务中，编造率从41%降到21%。毒性：被要求礼貌回答时，有毒输出约少25%；但偏见指标（Winogender、CrowS-Pairs）没有改善。\n\n与指令微调对比：在同一个175B GPT-3上分别用FLAN和T0数据微调，胜率只有29.8%和26.8%，InstructGPT为73.4%（都相对SFT基线）。原因是公开NLP数据集与用户的真实用法差别很大。",
+  "legacy": "OpenAI在论文之前的2022年1月27日已用博客公布了这些模型。2022年11月，[[chatgpt]]用同一套方法训练对话模型，RLHF（见[[c:rlhf-concept]]）随之成为行业标准，[[llama-2]]等开源模型也采用了SFT加RLHF。\n\n后续工作主要在简化和替换其中的部件：[[constitutional-ai]]和[[rlaif]]用AI反馈替代部分人工标注；[[dpo]]证明可以跳过显式奖励模型和PPO，直接在偏好数据上做分类式训练；[[rm-overoptimization]]量化了奖励模型被过度优化的规律。到推理模型时代，PPO式的强化学习又以“可验证奖励”的形式回到中心（[[grpo]]）。“先SFT、再偏好优化”的两阶段结构至今仍在使用。",
+  "pitfalls": "- RLHF不是让模型“更聪明”：它主要改变的是模型选择怎样回答，而不是知道什么。论文中的公开基准分数甚至略有下降。\n- 模型对齐的是约40名标注员和OpenAI研究者写的标注指南，而不是“全人类的价值观”，作者在论文中专门讨论了这一点。\n- 1.3B胜过175B指的是在API用户提示上的人类偏好，不代表在知识和推理基准上更强。",
+  "limits": [
+    {
+      "text": "需要大量人工示范和排序，再加上奖励模型和PPO三个阶段，流程复杂、超参数敏感、成本高。",
+      "solved_by": [
+        "dpo",
+        "rlaif",
+        "constitutional-ai"
+      ]
+    },
+    {
+      "text": "奖励模型只是人类偏好的有限近似，强化学习越用力越容易钻空子，只能靠KL惩罚和人工检查压住。",
+      "solved_by": [
+        "rm-overoptimization"
+      ]
+    },
+    {
+      "text": "以“有用”为主要目标，用户明确要求时模型仍会照做有害请求；有用和无害之间的取舍没有系统处理。",
+      "solved_by": [
+        "hh-rlhf",
+        "constitutional-ai"
+      ]
+    },
+    {
+      "text": "对齐的对象是少数标注员和研究者写的指南，标注员之间的一致率约73%，谁的偏好才算数没有答案。",
+      "solved_by": [
+        "constitutional-ai",
+        "claude-constitution"
+      ]
+    },
+    {
+      "text": "仍会编造事实（封闭任务中21%）、偏见指标没有改善，并会顺着带有错误前提的问题回答。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "gpt-3",
+      "type": "solves",
+      "note": "GPT-3只会续写、不懂听指令，还会编造和输出有害内容；InstructGPT用人类反馈微调纠正了这一错位。"
+    },
+    {
+      "to": "summarize-hf",
+      "type": "solves",
+      "note": "前作的RLHF只针对摘要一个任务；本文把同一套方法推广到真实用户的各种指令上。"
+    },
+    {
+      "to": "rlhf-lm",
+      "type": "extends",
+      "note": "沿用“人类比较→奖励模型→PPO+KL惩罚”的框架，并在前面加了一步监督微调。"
+    },
+    {
+      "to": "human-preferences",
+      "type": "extends",
+      "note": "从人类两两比较中学奖励函数的思路来自这篇工作，从Atari和机器人搬到了通用语言助手。"
+    },
+    {
+      "to": "ppo",
+      "type": "uses",
+      "note": "第三步的强化学习算法，奖励模型同时初始化价值函数。"
+    },
+    {
+      "to": "flan",
+      "type": "rivals",
+      "note": "同期的指令微调路线，用改写的公开NLP数据集；在API用户提示上，FLAN微调的GPT-3胜率29.8%，远低于InstructGPT的73.4%。"
+    },
+    {
+      "to": "t0",
+      "type": "rivals",
+      "note": "同为指令微调路线，T0++数据微调的GPT-3胜率26.8%；说明公开数据集与真实使用差距很大。"
+    },
+    {
+      "to": "hhh-assistant",
+      "type": "uses",
+      "note": "借用“有用、诚实、无害”的框架来定义对齐目标和标注指南。"
+    }
+  ],
+  "prereq": [
+    "language-model",
+    "pretrain-finetune",
+    "instruction-tuning",
+    "rlhf-concept",
+    "policy-gradient-concept",
+    "kl-divergence",
+    "reward-design",
+    "logistic-regression"
+  ],
+  "terms": [
+    {
+      "t": "监督微调（SFT）",
+      "d": "在人工写好的“提示→理想回答”数据上，用普通的下一个词预测损失继续训练模型。"
+    },
+    {
+      "t": "奖励模型",
+      "d": "一个输入“提示+回答”、输出一个分数的网络，用人类的排序数据训练，代替人来给模型的回答打分。"
+    },
+    {
+      "t": "对齐税",
+      "d": "为了让模型更符合人类意图而付出的代价，这里指RLHF后模型在部分公开基准上分数下降。"
+    },
+    {
+      "t": "PPO-ptx",
+      "d": "在PPO的更新中混入预训练数据上的语言模型损失，用来减少对齐税。"
+    }
+  ],
+  "learn": "先补[[c:policy-gradient-concept]]、[[c:kl-divergence]]，读[[summarize-hf]]了解RLHF的雏形。然后读原文第3节（数据与三步方法，图2）、第4.1节（API提示上的结果）和第5.3节（局限）。配合Hugging Face的RLHF图解。动手：用TRL库在一个小模型上走一遍SFT→训练奖励模型→PPO，再与[[dpo]]的单步训练对比。",
+  "check": {
+    "source": "https://arxiv.org/abs/2203.02155",
+    "confirmed": "标题、作者、v1提交于2022-03-04；摘要中的1.3B胜过175B与100倍参数差；ar5iv正文中的约40名标注员、13k/33k/31k提示、K=4–9、奖励模型损失式(1)与6B RM、目标式(2)与β=0.02、PPO-ptx与对齐税、85±3%与71±4%、TruthfulQA约两倍、幻觉21% vs 41%、毒性少约25%、偏见无改善、FLAN 29.8%/T0 26.8%/InstructGPT 73.4%、用例分布45.6%/12.4%/11.2%、标注员一致率72.6%与约73%。；OpenAI博客《Aligning Language Models to Follow Instructions》的发布日期2022-01-27（经Hacker News记录核对）。"
+  }
+}

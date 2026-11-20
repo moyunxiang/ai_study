@@ -1,0 +1,36 @@
+{
+  "id": "td-learning",
+  "who": "Richard S. Sutton · GTE实验室",
+  "venue": "Machine Learning 3(1), 1988",
+  "links": [
+    {"label": "论文PDF（含勘误）", "url": "http://incompleteideas.net/papers/sutton-88-with-erratum.pdf"},
+    {"label": "Sutton & Barto教材第6章", "url": "http://incompleteideas.net/book/the-book-2nd.html"}
+  ],
+  "problem": "多步预测（比如周一预测周六会不会下雨）的传统学法是等结果出来再拿预测和结果对比，既要存下整条序列，也浪费了中间信息；Samuel和actor-critic里已有的“用后一个预测修正前一个”的做法没人说得清为什么有效。",
+  "idea": "把这类方法统一成TD(λ)：用相邻两次预测之差作误差信号，配合按时间指数衰减的资格迹，每一步就能增量更新；并证明线性TD(0)在吸收马尔可夫链上收敛到最优估计。",
+  "impact": "TD误差成为强化学习的核心计算单元：Q-learning、TD-Gammon、DQN、多巴胺理论和现代actor-critic都建在它上面。",
+  "background": "很多学习问题本质上是**预测**：给一个棋局，预测最终会不会赢。监督学习的做法是把每个时刻的观测和最终结果配成一对，误差是“预测 − 最终结果”，所以必须等序列结束才能学，还要存下所有中间观测。\n\n[[samuel-checkers]]的跳棋程序和[[actor-critic-1983]]里的评论家已经在用另一种误差：后一个时刻的预测减去前一个时刻的预测。它们效果不错，但这种“拿猜测去学猜测”的做法看起来不可靠，没有理论说明它会收敛到什么。[[bellman]]的动态规划知道正确的价值满足递推关系，但需要已知的环境模型。",
+  "method": "设第t步的预测是`P_t = wᵀx_t`（线性情形，见[[c:td-error]]）。监督学习的更新等价于`Δw_t = α(z − P_t)∇P_t`，`z`是最终结果。Sutton证明它可以改写成逐步累加的形式，然后推广为**TD(λ)**：\n\n`Δw_t = α(P_{t+1} − P_t) Σ_{k≤t} λ^{t−k} ∇P_k`\n\n求和项可以递推成资格迹`e_{t+1} = ∇P_{t+1} + λe_t`，不用存历史。λ=1时与Widrow–Hoff监督学习完全等价（定理1）；λ=0时只修正最近一步：`Δw_t = α(P_{t+1} − P_t)∇P_t`，即把监督学习里的真实结果`z`换成下一步的预测。\n\n直观例子：一个从没见过的新局面，走到了一个已知90%会输的坏局面，最后侥幸赢了。监督学习会把新局面记成“好”；TD会把它往坏局面的评估靠，判断更合理。",
+  "results": "在7个状态的有界随机游走（从中间状态D出发，等概率左右走，走到右端结果为1）上，用100个训练集、每个10条序列比较。反复训练到收敛时，所有λ<1的TD都比λ=1（Widrow–Hoff）误差低，λ=0最好；每个训练集只看一遍时，最好的λ在0.3附近。定理2证明：对任意吸收马尔可夫链、线性无关的观测向量，学习率足够小时线性TD(0)在期望意义下收敛到理想预测，且其解与马尔可夫过程的最大似然估计一致。",
+  "legacy": "Watkins把它扩展到选动作，得到[[q-learning]]；[[td-gammon]]把TD(λ)和神经网络结合，下到了世界顶级水平；[[dopamine-td]]在猴脑多巴胺神经元里找到了TD误差的对应物。此后的[[dqn]]、[[gae]]（用λ加权的多步TD误差估计优势）都直接依赖它。",
+  "limits": [
+    {"text": "只解决预测问题，没有说如何利用预测来选择动作、改进策略。", "solved_by": ["watkins-thesis", "q-learning", "sarsa"]},
+    {"text": "收敛证明只覆盖线性TD(0)、期望意义下、观测向量线性无关（基本等于表格）的情形。", "solved_by": ["tsitsiklis-van-roy"]},
+    {"text": "与非线性函数近似或离策略数据结合时可能发散，论文没有讨论。", "solved_by": ["gradient-td", "dqn-nature"]},
+    {"text": "实验只在5个非终止状态的随机游走上做，能否用于大规模真实问题未知。", "solved_by": ["td-gammon"]}
+  ],
+  "relations": [
+    {"to": "actor-critic-1983", "type": "extends", "note": "把评论家里的预测更新规则单独拿出来，推广成TD(λ)家族并给出收敛分析。"},
+    {"to": "samuel-checkers", "type": "solves", "note": "Samuel用后续评估修正当前评估的做法缺乏理论，TD给出了一般形式和收敛证明。"},
+    {"to": "bellman", "type": "solves", "note": "动态规划需要已知模型；TD只用采样到的相邻两步就能逼近同一递推关系。"},
+    {"to": "adaline", "type": "extends", "note": "TD(1)与Widrow–Hoff规则等价；TD(λ<1)把其中的真实结果换成下一步预测。"},
+    {"to": "rescorla-wagner", "type": "extends", "note": "同样是误差驱动，但误差定义在相邻时刻之间，能解释刺激与奖励间隔一段时间的情况。"}
+  ],
+  "prereq": ["td-error", "markov-chain", "gradient-descent", "linear-regression", "reward-return"],
+  "terms": [
+    {"t": "TD(λ)", "d": "一族时序差分方法。λ控制每个预测误差往回修正多远：λ=0只改上一步，λ=1等价于等到结局再统一修正。"},
+    {"t": "吸收马尔可夫链", "d": "最终必然进入某个终止状态、不会无限循环的马尔可夫链，比如一局总会结束的棋。"}
+  ],
+  "learn": "先懂[[c:markov-chain]]和[[c:td-error]]。读原文第2节（从监督学习推出TD(λ)）和第3节的随机游走实验。动手复现图3与图4：5个状态、100个训练集、比较不同λ和α，这是Sutton & Barto教材第6–7章的标准练习。",
+  "check": {"source": "http://incompleteideas.net/papers/sutton-88-with-erratum.pdf", "confirmed": "标题、作者与单位、Machine Learning 3:9–44（1988）；公式(2)(3)(4)与资格迹递推；定理1、定理2的条件；随机游走：从D出发、100个训练集×10条序列、λ取0/0.1/0.3/0.5/0.7/0.9/1；反复训练λ=0最好、单遍训练最佳λ约0.3；勘误替换了图3。"}
+}

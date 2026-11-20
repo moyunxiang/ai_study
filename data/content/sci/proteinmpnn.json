@@ -1,0 +1,93 @@
+{
+  "id": "proteinmpnn",
+  "who": "Dauparas, Anishchenko, Bennett, Bai, Ragotte, Milles, Wicky, Baker et al. · University of Washington Institute for Protein Design",
+  "venue": "Science 2022",
+  "links": [
+    {
+      "label": "Science",
+      "url": "https://www.science.org/doi/10.1126/science.add2187"
+    },
+    {
+      "label": "bioRxiv",
+      "url": "https://www.biorxiv.org/content/10.1101/2022.06.03.494563"
+    }
+  ],
+  "problem": "蛋白质结构预测被深度学习解决了，但反过来的「逆折叠」——给定骨架设计出能折叠成它的氨基酸序列——仍主要靠Rosetta这类基于物理能量函数的方法，成功率低、要反复试。",
+  "idea": "用消息传递网络把骨架的几何关系编码成图，再逐个自回归地解码氨基酸序列，直接学习骨架到序列的映射。",
+  "impact": "序列设计变成秒级的神经网络推理，实验成功率远高于Rosetta，成为RFdiffusion等蛋白质设计流程里默认的序列设计步骤。",
+  "background": "蛋白质设计分两步：先设计一个理想的三维骨架，再找一条能折叠成这个骨架的氨基酸序列。第二步叫逆折叠或序列设计。多年来大部分已被实验验证的新蛋白，序列都是用Rosetta做能量最小化加蒙特卡洛搜索得到的，慢，而且对骨架的细微误差很敏感。[[alphafold-2]]能很准地判断一条序列折成什么样，但它是正向的，不能直接给出序列。",
+  "method": "ProteinMPNN是一个[[mpnn]]风格的编码器-解码器。**编码器**：每个氨基酸残基是图的一个节点，连到空间上最近的若干个邻居（论文用最近邻图）；边特征不只是Cα之间的距离，而是主链上N、Cα、C、O、Cβ几种原子两两距离的组合，几何信息更完整，经过几层消息传递得到每个位置的表示。**解码器**：自回归地逐位置预测氨基酸（见[[c:autoregressive]]），但解码顺序不是固定的从头到尾，而是训练时随机打乱，因此推理时可以任意指定顺序，也能把某些位置固定、让多条链共享同一种氨基酸。训练时还对骨架坐标加噪声，让模型对预测骨架中的小误差更稳健。\n\n温度采样可以控制多样性：温度低时序列更接近最可能的，高时更多样。",
+  "results": "在天然蛋白质骨架上，序列恢复率（预测序列和天然序列相同的位置比例）为52.4%，Rosetta为32.9%。论文用X射线晶体学、冷冻电镜和功能实验证明，它能「救回」此前用Rosetta或AlphaFold设计失败的单体、环状同源寡聚体、四面体纳米颗粒和结合蛋白。",
+  "legacy": "ProteinMPNN与[[rfdiffusion]]组合成标准流程：先用扩散生成骨架，再用ProteinMPNN设计序列，最后用[[alphafold-2]]检验。后续的[[chroma]]、[[esm3]]等生成模型把骨架与序列统一建模。它的自回归逆折叠范式也被扩展到含配体、核酸的LigandMPNN等工作（未在此核对）。",
+  "limits": [
+    {
+      "text": "只设计序列，必须有现成的骨架；骨架本身怎么来仍是单独问题。",
+      "solved_by": [
+        "rfdiffusion",
+        "chroma"
+      ]
+    },
+    {
+      "text": "序列恢复率不到六成，说明同一骨架对应多种合理序列，模型无法评估功能，只保证「可折叠」。",
+      "solved_by": [
+        "esm3"
+      ]
+    },
+    {
+      "text": "训练在天然蛋白数据上，对设计结合小分子、金属等非蛋白成分的支持有限。",
+      "solved_by": [
+        "alphafold-3"
+      ]
+    },
+    {
+      "text": "需要结构预测网络和实验来筛选，没有把「设计—验证」闭环到一个模型里。",
+      "solved_by": [
+        "esm3"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "mpnn",
+      "type": "uses",
+      "note": "以消息传递神经网络为编码器，在蛋白质残基图上传播几何信息。"
+    },
+    {
+      "to": "alphafold-2",
+      "type": "uses",
+      "note": "用AlphaFold 2预测设计出的序列是否折叠回目标骨架，作为主要的计算筛选手段。"
+    },
+    {
+      "to": "alphafold-2",
+      "type": "solves",
+      "note": "结构预测只能「序列到结构」；ProteinMPNN补上「结构到序列」的反向一步。"
+    },
+    {
+      "to": "alphafold-multimer",
+      "type": "uses",
+      "note": "多链复合物设计时用其预测结果评估界面。"
+    }
+  ],
+  "prereq": [
+    "message-passing",
+    "autoregressive",
+    "encoder-decoder",
+    "embedding",
+    "decoding-sampling"
+  ],
+  "terms": [
+    {
+      "t": "逆折叠",
+      "d": "给定蛋白质三维骨架，反推出能折叠成它的氨基酸序列，是蛋白质结构预测的反问题。"
+    },
+    {
+      "t": "序列恢复率",
+      "d": "在已知天然蛋白骨架上，设计出的序列与天然序列相同氨基酸的位置所占比例。"
+    }
+  ],
+  "learn": "先读[[c:message-passing]]与[[c:autoregressive]]。看原文方法与实验验证部分，运行官方ProteinMPNN代码，对一个PDB骨架采样几条序列，再用AlphaFold或ESMFold预测它们的结构。",
+  "check": {
+    "source": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI:10.1126/science.add2187&resultType=core&format=json",
+    "confirmed": "Europe PMC记录的Science摘要：序列恢复率52.4%对Rosetta 32.9%、实验验证；Science发表日期2022-09-15，bioRxiv首发为2022年6月（DOI 10.1101/2022.06.03.494563，由骨架日期字段推断，未在页面逐字核实）。"
+  }
+}

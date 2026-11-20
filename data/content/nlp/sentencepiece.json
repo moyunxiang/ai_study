@@ -1,0 +1,36 @@
+{
+  "id": "sentencepiece",
+  "who": "Taku Kudo, John Richardson · Google",
+  "venue": "EMNLP 2018（系统演示）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1808.06226"},
+    {"label": "GitHub", "url": "https://github.com/google/sentencepiece"}
+  ],
+  "problem": "BPE等子词工具假设输入已经按空格切好词，中文、日文得先跑一个语言专属的分词器；切完再拼回去时空格信息丢失，还原不唯一；预处理规则散落在各种脚本里，换一套设置结果就变。",
+  "idea": "直接在原始句子上训练子词模型：把空格当成普通字符（用▁表示）一起参与切分，保证“编码再解码”能逐字还原原文；把字符归一化规则和词表全部打包进一个模型文件，提供C++、Python和TensorFlow接口在线调用。",
+  "impact": "第一次给出与语言无关、可逆、自包含的子词分词器，同时支持BPE和Unigram两种算法；T5、XLM-R、LLaMA等大量预训练模型都用它构建词表。",
+  "background": "[[bpe]]和[[wordpiece]]解决了词表外词的问题，但工程上仍有麻烦。以subword-nmt为例，它要求输入已经按词切开：英语用[[moses]]的分词脚本，日语要先用KyTea、中文要先跑分词器（见[[chinese-segmentation-tagging]]）。每种语言一套外部工具，系统就谈不上端到端。\n\n还原也有问题：subword-nmt用`@@`标记词内断点，`Hello world.`切成`[Hello] [wor] [@@ld] [@@.]`，至于原文中“world”和句号之间有没有空格、有几个空格，信息已经丢了，还原需要针对每种语言的规则。此外，论文指出预处理方式的细微差别就能让BLEU明显变化，可这些设置通常写在零散的命令行参数里，很难复现。",
+  "method": "**无损分词**。先把空格替换成元符号`▁`（U+2581），然后把整句当作字符序列切分。`Hello world.`可能被切成`[Hello] [▁wor] [ld] [.]`，解码时只要把所有片段直接拼接、再把`▁`换回空格即可：\n\n`Decode(Encode(Normalize(text))) = Normalize(text)`\n\n因为空格只是普通符号，中文、日文这种没有空格的语言不需要预先分词，同一套流程适用于任何语言。\n\n**两种算法**。训练器可以选BPE，也可以选[[subword-regularization]]提出的Unigram语言模型。词表大小直接指定（如`--vocab_size=8000`），而不是像subword-nmt那样指定合并次数。Unigram模式还支持按概率采样不同切分，例如“New York”可能被切成`[▁New] [▁York]`或`[▁New] [▁Y] [o] [r] [k]`，用于子词正则化训练。\n\n**归一化与自包含**。默认用Unicode NFKC把全角字母、兼容字符等统一成标准形式，也可以用TSV文件自定义规则。归一化规则、词表和切分参数都存进同一个模型文件，拿到这个文件就能完全复现分词结果。\n\n**速度**。BPE训练用`O(N log N)`的实现代替朴素的`O(N²)`，Unigram的切分是线性时间，可以在训练时在线调用。",
+  "results": "日英翻译（KFTT维基百科语料，44万句，使用[[gnmt]]模型）：日→英，80k词级模型BLEU 28.24，8k共享SentencePiece直接用原始句子训练为29.55，先预分词再训练为29.85；英→日分别为20.06、21.62、20.86，即不预分词反而更好，作者认为这是因为无监督切分能为日语找到更合适的领域词汇。速度（16k词表）：在不预分词的日语原始文本上，SentencePiece切分用时5.9秒，subword-nmt为216.2秒，约快380倍（论文表述）；切分速度英语约每秒2.1万句、日语约每秒7.4万句。",
+  "legacy": "SentencePiece迅速成为多语言和大模型的通用分词器：[[t5]]、[[xlm-r]]（Unigram模式，直接作用于100种语言的原始文本）、[[llama-1]]（BPE模式）等都用它训练词表。“把空格当成普通符号”的做法也被[[gpt-2]]式的字节级BPE以另一种方式实现。之后的研究在两个方向继续：词表在多种语言间分配不均、低资源文字被切得很碎，[[byt5]]、[[blt]]尝试直接在字节上建模以绕开分词器。",
+  "limits": [
+    {"text": "仍以字符为基本单位，训练语料没覆盖到的罕见字符会变成未知符号，对字符极多的文字尤其麻烦。", "solved_by": ["gpt-2"]},
+    {"text": "多语言共用一个固定大小的词表时，高资源语言占据大部分子词，低资源语言的句子被切得很碎，序列更长、效果更差。", "solved_by": ["byt5", "blt"]},
+    {"text": "切分完全由频率统计决定，片段不一定对应有意义的语素，数字、代码等也常被切得不一致。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "bpe", "type": "extends", "note": "实现了BPE算法，但去掉了“先按空格预分词”的前提，并把空格编码进子词，做到可逆还原。"},
+    {"to": "subword-regularization", "type": "uses", "note": "同一作者提出的Unigram语言模型切分和子词采样，是SentencePiece的默认算法。"},
+    {"to": "wordpiece", "type": "rivals", "note": "WordPiece同样需要预分词并用##等标记词内片段；SentencePiece直接在原始文本上工作，并以开源工具形式广泛流行。"},
+    {"to": "moses", "type": "solves", "note": "不再依赖Moses分词脚本、KyTea等语言专属的预处理工具，系统从原始文本到id完全端到端。"},
+    {"to": "gnmt", "type": "uses", "note": "翻译实验使用GNMT实现（LSTM改为6层512维）。"}
+  ],
+  "prereq": ["tokenization", "one-hot", "language-model", "probability-basics"],
+  "terms": [
+    {"t": "预分词（pre-tokenization）", "d": "在学习子词之前，先用规则或分词器把句子切成词。英语一般按空格和标点切，中文、日文需要专门的分词器。"},
+    {"t": "无损分词", "d": "分词结果保留了还原原文所需的全部信息，解码后能一字不差地得到（归一化后的）原句。"},
+    {"t": "Unicode NFKC归一化", "d": "把外观或含义相同但编码不同的字符统一成标准形式，例如全角“Ａ”变成半角“A”。"}
+  ],
+  "learn": "先读过[[bpe]]和[[subword-regularization]]，补[[c:tokenization]]。读原文第3.1节（无损分词）和表1、表2。动手：pip安装sentencepiece，在一份中英混合语料上分别训练BPE和Unigram模型（如8000词表），对比同一句话的切分；用采样接口观察“New York”的多种切法；再检查解码结果是否与原文完全一致。",
+  "check": {"source": "https://arxiv.org/html/1808.06226", "confirmed": "标题、2位作者、arXiv首次提交2018-08-19；正文▁（U+2581）示例与Decode(Encode(Normalize))公式、subword-nmt的@@表示、O(N log N)、默认NFKC、自包含模型；表1 KFTT（44万句）日→英28.24/29.55/29.85、英→日20.06/21.62/20.86；表2切分5.9秒对216.2秒、约380倍、2.1万与7.4万句/秒。另核对XLM-R（arXiv 1911.02116）与LLaMA（arXiv 2302.13971）正文中使用SentencePiece的表述。"}
+}

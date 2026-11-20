@@ -1,0 +1,8 @@
+{
+  "key": "elbo",
+  "short": "真实后验算不出来时，用一个简单的分布q去近似它，并最大化对数似然的一个下界ELBO。抬高ELBO同时做到两件事：让模型更好地解释数据，让q更接近真实后验。",
+  "body": "[[c:latent-variable]]模型的似然`p(x) = ∫ p(z) p(x | z) dz`要对所有z积分。当z是几百维的连续向量、`p(x | z)`是一个神经网络时，这个积分没法算，[[c:em-algorithm]]需要的精确后验`p(z | x)`也算不出来。变分推断的办法是：不求精确答案，而是在一族容易处理的分布里找一个最接近后验的q(z)，并优化一个算得出来的目标。\n\n**推导**。对任意分布q(z)，可以证明\n\n`log p(x) = ELBO(q) + KL(q(z) ‖ p(z | x))`\n\n其中\n\n`ELBO(q) = E_{z~q}[log p(x, z) − log q(z)]`\n\n因为[[c:kl-divergence]]非负，ELBO总是`log p(x)`的下界（Evidence Lower BOund，evidence指`p(x)`）。两者之差恰好是q与真实后验的KL。所以在固定模型时最大化ELBO等价于让q逼近后验；同时对模型参数最大化ELBO，又会抬高`log p(x)`本身。\n\n**常用的拆法**。把`log p(x, z)`拆成`log p(x | z) + log p(z)`：\n\n`ELBO = E_{z~q}[log p(x | z)] − KL(q(z) ‖ p(z))`\n\n第一项是**重建项**：从q中抽z，看能否还原x；第二项是**正则项**：q不要偏离先验太远。期望用[[c:monte-carlo]]采样估计，对q的参数求梯度则要靠[[c:reparameterization]]。\n\n**它出现在哪里**。[[variational-inference]]系统地提出了这套方法；[[vae]]用一个编码器网络对每个x输出q(z | x)的均值和方差，同时训练编码器和解码器来最大化ELBO；[[posterior-collapse]]描述了KL项过强时q直接退化为先验、z被忽略的问题；[[ddpm]]的训练目标同样来自ELBO，其中“隐变量”是整条加噪轨迹，[[vdm]]进一步把扩散模型完整地写成变分模型。",
+  "example": "隐变量z ∈ {0, 1}，先验各0.5；p(x | z=0) = 0.2，p(x | z=1) = 0.6。于是p(x) = 0.4，log p(x) ≈ −0.916；真实后验是(0.25, 0.75)。取q = (0.5, 0.5)：ELBO = 0.5×ln(0.1/0.5) + 0.5×ln(0.3/0.5) ≈ −1.060，比log p(x)低0.144，这恰好等于KL(q ‖ 后验)。换成q = (0.1, 0.9)，ELBO ≈ −0.989，差距缩小到0.072；取q = 后验(0.25, 0.75)，ELBO = −0.916，下界变得紧贴。",
+  "pitfalls": "- ELBO高不等于后验近似好：如果q的分布族太简单（比如只能是单峰高斯），即使ELBO最大化了，q与真实后验之间仍可能有很大差距。\n- 用ELBO比较两个模型的似然时要小心，因为两个下界的松紧程度可能不同。",
+  "needs": ["latent-variable", "kl-divergence", "em-algorithm", "monte-carlo"]
+}

@@ -1,0 +1,48 @@
+{
+  "id": "adafactor",
+  "who": "Noam Shazeer, Mitchell Stern · Google Brain",
+  "venue": "ICML 2018",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1804.04235"
+    }
+  ],
+  "problem": "[[adam]]为每个参数多存一份二阶矩估计，优化器状态占的显存和模型参数一样多，大Transformer训练时很吃紧。",
+  "idea": "对每个权重矩阵只存行和与列和，用它们的外积近似出逐参数的二阶矩，把额外显存从参数量降到行数加列数。",
+  "impact": "让大模型训练省下优化器显存，成为T5等谷歌模型的常用优化器。",
+  "method": "[[adam]]对每个参数保存梯度平方的滑动平均，用它的平方根的倒数缩放更新，所以每个参数要多存一个同形状的数。Adafactor观察到：对`n×m`的权重矩阵，只要保留每行和每列的滑动平均和，就能用它们的乘积除以总和估计出每个位置的二阶矩，存储从`n·m`降到`n+m`，即亚线性。\n\n论文还指出两点：二阶矩衰减太慢时，自适应方法会产生比预期大得多的更新，于是加了更新裁剪和逐步增大的衰减率；并去掉动量，按参数自身的尺度缩放更新。摘要称在WMT 2014英德翻译的Transformer上，去掉动量并配合这些改动后，效果与Adam的已发表设置相当，而优化器几乎不占额外存储。",
+  "limits": [
+    {
+      "text": "去掉动量、近似二阶矩后，在部分任务上训练稳定性和最终效果不如[[adamw]]，大模型预训练里仍常需要调参或回到AdamW。",
+      "solved_by": [
+        "lion"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "adam",
+      "type": "extends",
+      "note": "保留Adam按二阶矩缩放更新的思路，但把逐参数的二阶矩换成行列分解的近似以省显存。"
+    }
+  ],
+  "prereq": [
+    "adaptive-optimizer",
+    "momentum",
+    "params-flops",
+    "memory-bandwidth",
+    "low-rank"
+  ],
+  "terms": [
+    {
+      "t": "更新裁剪",
+      "d": "当某步更新的均方根超过阈值时按比例缩小，防止二阶矩过时导致的过大步长。"
+    }
+  ],
+  "learn": "先会[[c:adaptive-optimizer]]与Adam的公式；读原文第3、4节的行列分解与更新裁剪；动手把一个线性层的二阶矩用行列外积重构，比较与完整二阶矩的差异。",
+  "check": {
+    "source": "https://arxiv.org/abs/1804.04235",
+    "confirmed": "arXiv abs页：标题、作者（Shazeer, Stern）、v1提交日期2018-04-11；摘要中行/列和近似、更新裁剪、WMT 2014英德实验。"
+  }
+}

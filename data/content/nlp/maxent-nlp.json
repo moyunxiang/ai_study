@@ -1,0 +1,40 @@
+{
+  "id": "maxent-nlp",
+  "who": "Adam L. Berger, Stephen A. Della Pietra, Vincent J. Della Pietra · IBM沃森研究中心（发表时作者已分别转到哥伦比亚大学和文艺复兴科技公司）",
+  "venue": "Computational Linguistics, Vol. 22, No. 1, pp. 39–71, 1996",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/J96-1002/"},
+    {"label": "PDF", "url": "https://aclanthology.org/J96-1002.pdf"},
+    {"label": "Wikipedia: Principle of maximum entropy", "url": "https://en.wikipedia.org/wiki/Principle_of_maximum_entropy"}
+  ],
+  "problem": "统计NLP模型想用的上下文线索很多（前后几个词、词性、大小写……），彼此高度相关；生成式模型要求为每种组合估计概率或假设各线索独立，加一条新线索就得重新设计模型。",
+  "idea": "只要求模型在每条“特征”上的期望与训练数据一致，在满足这些约束的所有分布中挑熵最大（最不做多余假设）的那一个。解必然是指数形式 `p(y|x) ∝ exp(Σλᵢfᵢ(x,y))`，并且等价于最大似然；再用增益贪心地自动挑选特征。",
+  "impact": "把“任意特征 + 对数线性模型”带进NLP，此后十年的词性标注、命名实体识别、句法分析和翻译特征组合，大多建立在这类模型及其后继MEMM、CRF之上；它在数学上就是多类逻辑回归，也是今天神经网络softmax输出层的直接前身。",
+  "background": "IBM的翻译系统[[candide]]基于[[ibm-models]]，其翻译概率不看上下文：英语in译成dans的概率永远是0.3004，译成pendant永远是0.0044，不管后面跟的是“the committee”还是“1992年”。论文举例，系统把“les chances sont supérieures à 50%”译成“the odds are superior to 50%”，而懂行的译者看到后面有“50%”，会选greater。\n\n要让模型看上下文，困难在于线索太多且互相重叠。像[[church-tagger]]那样的生成式模型只能用少数几种固定的概率因子；若把每种线索组合都当作一个条件来计数，数据马上就不够了。需要一种能把大量重叠的特征统一放进一个模型、并能自动决定用哪些特征的方法。",
+  "method": "**例子**。专家把in译成五个法语词之一：dans、en、à、au cours de、pendant。只知道“必选其一”时，最不偏不倚的分布是各1/5；若再从数据中得知“dans或à占一半”，则在满足这条约束的分布里，仍应让其余部分尽量均匀。最大熵原则就是：**对已知的建模，对未知的不做假设**。\n\n**特征与约束**。特征是二值函数，例如 `f(x,y)=1` 当且仅当 y=dans 且 in后面三个词里有April。约束要求：模型下f的期望 = 训练数据中f的经验期望。\n\n**解的形式**。在所有满足约束的条件分布中最大化条件熵 `H(p) = −Σ p̃(x)p(y|x)log p(y|x)`。用拉格朗日乘子求解（见[[c:lagrange-duality]]），得到\n\n`p(y|x) = exp(Σᵢ λᵢ fᵢ(x,y)) / Z(x)`\n\nZ(x)使概率归一。论文证明：这个最大熵解恰好也是同一指数族中**使训练数据似然最大**的模型，两个看似不同的原则殊途同归。凸优化保证解唯一。\n\n**训练**。用改进的迭代尺度法（IIS）逐个调整λ。\n\n**特征选择**。候选特征有成千上万。从空模型（均匀分布）开始，每一轮估计每个候选特征加入后对数似然能提高多少，加入增益最大的那个，重复直到增益很小或在留出数据上开始过拟合。",
+  "results": "论文在Candide中做了三项应用：上下文相关的词翻译（自动选出“in后面有April则倾向dans”之类的特征）、把长句切成可以分别翻译的片段、以及决定法语“名词 de 名词”结构翻成英语时要不要交换两个名词的顺序。最后一项最直观：在71,555个测试样例中，“从不交换”的基线正确率70.2%，用358个约束的最大熵模型为80.4%，其中需要交换的21,326例中答对49.2%。",
+  "legacy": "同年Ratnaparkhi用最大熵模型做词性标注，此后它迅速成为NLP分类问题的默认工具。[[memm]]把它串成序列模型，[[crf]]改为对整个序列归一化以解决标签偏置；[[log-linear-smt]]把翻译中的语言模型、翻译模型等都当作特征，用同样的对数线性形式组合；[[sentiment-ml]]等文本分类工作也把它作为主力方法之一。\n\n它与[[logistic-regression]]在数学上是同一个模型，只是来自信息论的不同推导。神经网络时代，特征从人工模板变成网络自动学出的向量（[[collobert-weston]]），但最后一层 `softmax(W·h)` 仍是同一个指数形式。",
+  "pitfalls": "- “最大熵”并不是让输出更随机，而是在**满足所有观测约束**的前提下不再添加任何额外假设；约束越多，模型越尖锐。\n- 最大熵模型与多类逻辑回归是同一个东西。区别只在叙述方式：一个从约束和熵出发，一个从线性分数和softmax出发。\n- 特征需要人工设计模板，模型只负责给它们定权重。",
+  "limits": [
+    {"text": "特征全靠人工设计模板，组合特征需要手写，质量取决于设计者的语言学直觉。", "solved_by": ["collobert-weston", "word2vec"]},
+    {"text": "每个决定独立分类，用于序列标注时只能逐个位置局部归一化，无法让整个标签序列一起最优。", "solved_by": ["crf", "structured-perceptron"]},
+    {"text": "迭代尺度法收敛慢，逐个评估候选特征增益的特征选择计算量很大。", "solved_by": []},
+    {"text": "特征多、数据少时容易过拟合，论文只能靠留出数据提前停止加特征。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "statistical-mt-1990", "type": "extends", "note": "在同一团队的统计翻译框架里，为原本不看上下文的翻译和调序决策加入任意上下文特征。"},
+    {"to": "ibm-models", "type": "solves", "note": "IBM模型的翻译概率与上下文无关（in永远以0.3004译成dans）；最大熵模型让翻译选择依赖周围的词。"},
+    {"to": "candide", "type": "extends", "note": "三个应用都作为Candide翻译系统的组件实现和测试。"},
+    {"to": "church-tagger", "type": "rivals", "note": "HMM式生成模型只能用少数固定概率因子；最大熵判别模型可以同时使用大量重叠特征，很快在词性标注等任务上取而代之。"},
+    {"to": "logistic-regression", "type": "rivals", "note": "数学上是同一个对数线性模型：统计学从回归出发，这里从最大熵原则出发，并带来了自动特征选择。"},
+    {"to": "shannon-ngram", "type": "uses", "note": "以香农的熵作为“不确定性”的度量，选择满足约束的熵最大的分布。"}
+  ],
+  "prereq": ["entropy", "logistic-regression", "softmax", "mle", "lagrange-duality", "convexity", "feature-representation"],
+  "terms": [
+    {"t": "特征函数", "d": "把一个（上下文，输出）对映射为0或1的指示函数，比如“输出是dans且后面有April”。模型为每个特征学一个权重λ。"},
+    {"t": "对数线性模型", "d": "取对数后概率是特征的线性组合的模型，即 `log p(y|x) = Σλᵢfᵢ(x,y) − log Z(x)`。逻辑回归、最大熵、CRF都属于这一族。"},
+    {"t": "迭代尺度法（IIS）", "d": "一种逐步调整每个特征权重、使模型期望逼近经验期望的训练算法。后来多被L-BFGS等通用优化方法取代。"}
+  ],
+  "learn": "先补[[c:entropy]]、[[c:logistic-regression]]和[[c:lagrange-duality]]。读原文第2节（in的翻译例子）和第3节（从熵最大推出指数形式、与最大似然的对偶）。动手：用scikit-learn的LogisticRegression（多类、带L2正则）做一个“in该译成什么”或词性标注的小实验，自己设计前后词、后缀等特征，打印权重最大的特征，与论文表5对照。",
+  "check": {"source": "https://aclanthology.org/J96-1002.pdf", "confirmed": "ACL Anthology确认CL 22(1):39–71，1996，三位作者；原文：in的五个法语译法例子与“dans或à占50%”；条件熵定义、p_λ(y|x)=exp(Σλᵢfᵢ)/Z_λ(x)、与最大似然对偶（表1）、改进迭代尺度法、增益式特征选择；dans 0.3004、pendant 0.0044；supérieures à 50%的错误例子；三项应用；名词de名词：358个约束、71,555测试、基线70.2%、最大熵80.4%、交换类49.2%。Ratnaparkhi 1996词性标注器为背景知识，未在本次核对。"}
+}

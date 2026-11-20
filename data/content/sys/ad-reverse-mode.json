@@ -1,0 +1,34 @@
+{
+  "id": "ad-reverse-mode",
+  "who": "Seppo Linnainmaa · 赫尔辛基大学",
+  "venue": "赫尔辛基大学硕士论文（芬兰语）1970；英文期刊版 BIT 1976",
+  "links": [
+    {"label": "BIT 1976英文版（DOI）", "url": "https://doi.org/10.1007/bf01931367"},
+    {"label": "Griewank：Who invented the reverse mode of differentiation?", "url": "https://doi.org/10.4171/dms/6/38"},
+    {"label": "Schmidhuber：Who Invented Backpropagation?", "url": "https://people.idsia.ch/~juergen/who-invented-backpropagation.html"}
+  ],
+  "problem": "前向自动微分每次只能求出对一个输入的导数；一个函数有n个输入，要得到完整梯度就得把整个计算重复n遍。",
+  "idea": "先正向算一遍并记下所有中间结果，再从输出往回走，用链式法则把“输出对每个中间量的导数”一步步传回输入，一次反向扫描就得到全部偏导。",
+  "impact": "求完整梯度的代价与输入个数无关，只是计算函数本身的常数倍。今天所有深度学习框架里的反向传播都是这个方法。",
+  "background": "要优化或分析一个程序算出来的函数，就需要它的导数。当时常见的办法有两种：手推公式（易错，函数一大就推不动）和有限差分（每个输入扰动一次，既慢又有截断误差）。[[wengert-list]]提出把计算拆成一串只含一个基本运算的步骤，沿着这串步骤同时传播数值和导数，这就是**前向模式**自动微分（见[[c:autodiff]]）。\n\n前向模式的问题在于方向：它一次只跟踪“所有中间量对某一个输入的导数”。函数有n个输入、1个输出时，要得到梯度就得跑n遍。Linnainmaa当时研究的是数值分析问题：一个算法的最终舍入误差，怎样表示为每一步局部舍入误差的加权和——这里的权重恰好就是最终结果对每个中间量的偏导数，而中间量有成千上万个，逐个前向求是不可接受的。",
+  "method": "核心观察：链式法则（[[c:chain-rule]]）既可以从输入往输出乘，也可以从输出往输入乘。反向模式分两遍：\n\n- **正向遍**：按顺序执行计算，把每个中间变量的值存下来。\n- **反向遍**：给每个中间量v配一个“伴随量”`v̄ = ∂y/∂v`。从输出开始令`ȳ = 1`，倒序访问每一步；若某步是`w = g(u, v)`，就把`w̄·∂g/∂u`累加到`ū`、把`w̄·∂g/∂v`累加到`v̄`。\n\n例子：`y = x₁·x₂ + sin(x₁)`。正向得到`v₃ = x₁·x₂`、`v₄ = sin(x₁)`、`y = v₃ + v₄`。反向：`ȳ = 1`，于是`v̄₃ = 1`、`v̄₄ = 1`；再由`v₃`得`x̄₂ = v̄₃·x₁`、`x̄₁ += v̄₃·x₂`，由`v₄`得`x̄₁ += v̄₄·cos(x₁)`。一次反向扫描同时得到`∂y/∂x₁ = x₂ + cos(x₁)`和`∂y/∂x₂ = x₁`。\n\n反向遍里每个基本运算只被访问一次、只做几次乘加，所以总代价与正向计算同一量级，**与输入个数n无关**。论文附有实现这一过程的FORTRAN程序，处理的是任意的、可能稀疏连接的计算图，而不限于逐层的矩阵结构。",
+  "legacy": "这项工作在数值分析圈子里流传，神经网络研究者长期不知道它。[[werbos]]在1974年博士论文里独立提出用类似方法训练网络，[[speelpenning]]在1980年写出了自动生成梯度代码的程序，1986年[[backprop]]让它在神经网络界普及——反向传播本质上就是反向模式自动微分用在“标量损失对百万个参数”的场景。\n\n后来的框架只是把它工程化：[[theano]]和[[tensorflow]]先建静态计算图再反向求导，[[chainer]]、[[autograd-hips]]和[[pytorch]]在运行时记录“磁带”再倒放。",
+  "pitfalls": "- 反向模式适合“输入多、输出少”（如标量损失对大量参数）；输入少、输出多时前向模式更省，两者不是谁取代谁。\n- 它不是符号求导：不产生导数的表达式，只在一个具体输入点上算出导数的数值。\n- 省下的是计算时间，代价是要保存正向遍的全部中间值，显存往往才是瓶颈。",
+  "limits": [
+    {"text": "写成芬兰语硕士论文、动机是舍入误差分析，没有和神经网络或优化联系起来，此后十几年神经网络界并不知道这一方法。", "solved_by": ["werbos", "backprop"]},
+    {"text": "反向遍需要正向遍的全部中间值，存储量随计算步数线性增长，深而长的计算会被内存卡住。", "solved_by": ["grad-checkpointing"]},
+    {"text": "需要人为把程序整理成计算序列，没有能直接作用于普通源代码或数组程序的通用工具。", "solved_by": ["speelpenning", "theano", "autograd-hips", "pytorch"]}
+  ],
+  "relations": [
+    {"to": "wengert-list", "type": "extends", "note": "沿用Wengert把计算拆成基本运算序列的表示，但把导数的传播方向从前向改为反向。"},
+    {"to": "minsky-steps", "type": "solves", "note": "Minsky提出的信用分配问题在可微系统里就是求每个中间量对结果的偏导，反向模式给出了高效算法，尽管当时两者没被联系起来。"},
+    {"to": "perceptrons-book", "type": "solves", "note": "《Perceptrons》之后多层网络缺少可行的训练方法；反向模式提供了所需的高效求梯度工具，只是要到1980年代才被用上。"}
+  ],
+  "prereq": ["chain-rule", "derivative-gradient", "autodiff", "graph-basics", "big-o"],
+  "terms": [
+    {"t": "前向模式 / 反向模式", "d": "自动微分的两种传播方向。前向模式一遍求出所有量对一个输入的导数；反向模式一遍求出一个输出对所有量的导数。"},
+    {"t": "伴随量（adjoint）", "d": "反向模式中每个中间变量附带的数，等于最终输出对该变量的偏导数，在深度学习里通常就叫这个变量的“梯度”。"}
+  ],
+  "learn": "先复习[[c:chain-rule]]，在纸上把上面`x₁·x₂ + sin(x₁)`的例子正向、反向各算一遍。然后读Griewank的短文《Who invented the reverse mode of differentiation?》了解来龙去脉。动手：用Python写一个不到100行的标量自动微分类（每个节点记住父节点和局部导数，backward时倒序拓扑遍历），这就是Karpathy的micrograd。",
+  "check": {"source": "https://people.idsia.ch/~juergen/who-invented-backpropagation.html", "confirmed": "Linnainmaa 1970年硕士论文首次描述任意稀疏图上的反向模式、附FORTRAN代码、英文版发表于1976（DOI 10.1007/bf01931367，BIT，标题Taylor expansion of the accumulated rounding error）；维基百科Seppo Linnainmaa条目确认1970年硕士、1974年博士。"}
+}

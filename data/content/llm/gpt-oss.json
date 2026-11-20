@@ -1,0 +1,106 @@
+{
+  "id": "gpt-oss",
+  "who": "OpenAI（Sandhini Agarwal, Lama Ahmad, Jason Ai, Sam Altman et al.）",
+  "venue": "模型卡 2025（arXiv）",
+  "links": [
+    {
+      "label": "官方公告（2025-08-05）",
+      "url": "https://openai.com/index/introducing-gpt-oss/"
+    },
+    {
+      "label": "模型卡arXiv",
+      "url": "https://arxiv.org/abs/2508.10925"
+    },
+    {
+      "label": "模型卡HTML全文",
+      "url": "https://arxiv.org/html/2508.10925v1"
+    }
+  ],
+  "problem": "OpenAI自GPT-2之后再没开放过语言模型权重；开源推理模型多是数百B参数的大MoE，一张卡放不下，而能本地跑的小模型推理能力又弱。",
+  "idea": "发布两个开放权重的推理MoE模型：120b每个token只激活5.1B参数，MoE权重量化成约4.25比特的MXFP4，一张80GB GPU即可运行；用与o3类似的思维链强化学习训练，支持低、中、高三档推理强度和工具调用。",
+  "impact": "以Apache 2.0开放的120b在核心推理基准上接近o4-mini，20b可在16GB内存的设备上运行；它也公开了一套带“通道”的harmony对话格式，以及不对思维链做直接监督的立场。",
+  "background": "OpenAI的上一个开放权重语言模型是2019年的[[gpt-2]]。此后它的前沿推理模型[[o1]]、[[o3]]都只通过API提供。开源一侧，[[deepseek-r1]]、[[qwen3]]等推理模型在2025年上半年进步很快，但旗舰多是数百B甚至上千B参数，部署要多卡；小尺寸版本则推理能力差距明显。\n\n另一个问题是推理开销。推理模型对任何问题都先写很长的思维链（见[[c:reasoning-tokens]]），开发者希望能按任务调节“想多少”。",
+  "method": "**架构**。基于GPT-2/GPT-3的自回归MoE Transformer（见[[c:mixture-of-experts]]）：120b有36层、每层128个专家，20b有24层、32个专家，都是每个token选4个专家，按所选专家的softmax分数加权。总参数116.8B/20.9B，激活5.1B/3.6B。\n\n注意力层交替使用两种模式：带宽128个token的局部窗口注意力，和完整的稠密注意力，这一做法沿袭GPT-3（源头是[[sparse-transformer]]）。64个查询头共享8组KV（[[gqa]]），稠密层用[[yarn]]扩到131072个token。每个头在softmax的分母里加了一个可学习的偏置，相当于一个“什么都不看”的选项，与[[streamingllm]]的注意力汇聚作用类似。\n\n**量化**。MoE权重占总参数90%以上，把它们量化成MXFP4（每参数约4.25比特，见[[c:quantization-concept]]）后，120b的检查点只有60.8GiB，单张80GB GPU能放下；20b为12.8GiB。\n\n**训练**。以英语为主的纯文本数据，侧重STEM、代码和常识，复用GPT-4o的生化危险内容过滤，知识截止2024年6月。120b在H100上训练用了210万GPU小时。后训练用与o3类似的思维链强化学习。\n\n**harmony格式与推理强度**。对话格式区分System > Developer > User > Assistant > Tool的指令优先级，并用“通道”区分消息用途：analysis放思维链，commentary放工具调用，final放给用户看的答案；模型可以在思维链中穿插调用浏览、Python等工具。在系统提示里写入low、medium、high即可切换推理强度，平均思维链长度随之变化。",
+  "results": "高推理强度下（表3）：120b的AIME 2025不用工具92.5%、用工具97.9%；GPQA Diamond 80.1%；MMLU 90.0%；SWE-bench Verified 62.4%；不用工具的HLE 14.9%。20b在AIME上同样很强（不用工具91.7%），官方称它平均每道AIME题用2万多个思维链token。推理强度从低到高，AIME 2025（不用工具）从50.4%升到92.5%。HealthBench上120b接近o3。短板是事实性：SimpleQA准确率只有16.8%（o4-mini为23.4%），幻觉率78.2%。安全上，OpenAI用自己的训练栈对120b做了对抗性微调，评估结论是仍未达到准备度框架中生化与网络能力的“高”级别。",
+  "legacy": "gpt-oss与同期的[[kimi-k2]]、[[qwen3]]一起，使2025年下半年的开源推理模型形成美中多家并立的格局，也让研究者第一次能在OpenAI自家的推理模型上研究未经监督的思维链与CoT监控（见[[cot-monitorability]]）。同月发布的[[gpt-5]]则代表OpenAI闭源一侧的路线。",
+  "pitfalls": "- “120b”是约定俗成的叫法，实际总参数116.8B；每个token只激活5.1B，所以速度接近一个5B模型，但显存要装下全部参数。\n- 模型输出的完整思维链没有经过安全对齐，可能包含不当内容，官方建议不要直接展示给终端用户。\n- 知识截止于2024年6月，且是以英语为主的纯文本模型。",
+  "limits": [
+    {
+      "text": "参数小、知识少，事实性问答明显较弱：SimpleQA准确率16.8%、幻觉率78.2%。",
+      "solved_by": []
+    },
+    {
+      "text": "只处理文本，以英语数据为主，不能看图或听音频。",
+      "solved_by": []
+    },
+    {
+      "text": "开放权重意味着任何人都能微调去掉安全行为；官方只能评估“最坏情况微调后”仍未达到高风险等级，无法阻止滥用。",
+      "solved_by": []
+    },
+    {
+      "text": "推理强度只有低、中、高三档，需要人为设定，模型不会自己判断该想多久。",
+      "solved_by": [
+        "gpt-5"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "o3",
+      "type": "extends",
+      "note": "后训练采用与o3类似的思维链强化学习，并把o3的工具内推理能力带到开放权重的小模型上。"
+    },
+    {
+      "to": "sparse-moe",
+      "type": "uses",
+      "note": "前馈层是每层128（或32）个专家、top-4路由的稀疏MoE，激活参数只有总参数的约4%–17%。"
+    },
+    {
+      "to": "gqa",
+      "type": "uses",
+      "note": "64个查询头共享8组KV，减小128K上下文下的KV缓存。"
+    },
+    {
+      "to": "gpt-2",
+      "type": "extends",
+      "note": "OpenAI自GPT-2以来首次开放语言模型权重，架构也明确声明建立在GPT-2/GPT-3之上。"
+    },
+    {
+      "to": "streamingllm",
+      "type": "uses",
+      "note": "在softmax分母中加入可学习偏置，起到注意力汇聚的作用，让某个头可以“什么都不看”。"
+    },
+    {
+      "to": "qwen3",
+      "type": "rivals",
+      "note": "同为可调节思考的开放权重推理模型；Qwen3提供0.6B到235B多个尺寸，gpt-oss只有两档但主打单卡部署。"
+    }
+  ],
+  "prereq": [
+    "mixture-of-experts",
+    "quantization-concept",
+    "reasoning-tokens",
+    "kv-cache",
+    "tool-calling",
+    "instruction-tuning"
+  ],
+  "terms": [
+    {
+      "t": "MXFP4",
+      "d": "一种4比特浮点格式：每32个数共享一个8比特缩放因子，平均约4.25比特每个参数，比BF16省约3/4显存。"
+    },
+    {
+      "t": "harmony格式",
+      "d": "gpt-oss使用的对话格式，用特殊token标出消息边界，并用analysis、commentary、final等“通道”区分思维链、工具调用和最终回答。"
+    },
+    {
+      "t": "推理强度（reasoning effort）",
+      "d": "在系统提示中指定的思考档位（低、中、高），档位越高平均思维链越长，准确率通常越高。"
+    }
+  ],
+  "learn": "先补[[c:quantization-concept]]与[[c:mixture-of-experts]]，算一算116.8B参数在BF16和4.25比特下各需要多少显存。再读模型卡第2节（架构、量化、harmony格式、推理强度）和表3。动手：在16GB显存或内存的机器上用开源推理框架运行gpt-oss-20b，对同一题分别用low和high，比较答案和思维链长度。",
+  "check": {
+    "source": "https://arxiv.org/html/2508.10925v1",
+    "confirmed": "模型卡arXiv v1提交于2025-08-08，官方公告2025-08-05；36/24层、116.8B/20.9B总参数与5.1B/3.6B激活、128/32专家top-4、MXFP4约4.25比特且MoE权重占90%以上、单张80GB GPU与16GB、检查点60.8GiB/12.8GiB、交替128 token带状窗口与稠密注意力、64查询头8组KV、YaRN扩到131072、softmax分母的可学习偏置、o200k_harmony、知识截止2024年6月、210万H100小时、类o3的CoT RL、harmony指令层级与通道、low/medium/high；表3中AIME 2025 92.5/97.9、GPQA 80.1、MMLU 90.0、SWE-bench 62.4、HLE 14.9、20b AIME 91.7与低档50.4；表9中SimpleQA 0.168/幻觉率0.782对o4-mini 0.234；对抗性微调后仍未达High。公告：自GPT-2以来首个开放权重语言模型、不对CoT做直接监督、以英语为主的纯文本数据。"
+  }
+}

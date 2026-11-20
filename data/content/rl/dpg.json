@@ -1,0 +1,36 @@
+{
+ "id": "dpg",
+ "who": "Silver, Lever, Heess, Degris, Wierstra, Riedmiller · DeepMind / 伦敦大学学院",
+ "venue": "ICML 2014",
+ "links": [
+  {"label": "PMLR", "url": "https://proceedings.mlr.press/v32/silver14.html"},
+  {"label": "Spinning Up：DDPG（含DPG推导）", "url": "https://spinningup.openai.com/en/latest/algorithms/ddpg.html"}
+ ],
+ "problem": "连续动作下，随机策略梯度要在状态和动作两个空间上求期望，动作维度一高，梯度估计的方差就大到难以学习；而对Q值做全局argmax又太贵。",
+ "idea": "让策略直接输出一个确定的动作μ(s)，证明它的梯度就是Q对动作的梯度乘以μ对参数的梯度；探索交给另一个带噪声的行为策略，做离策略actor-critic。",
+ "impact": "给出了连续控制里“沿着Q的梯度推动作”的理论依据，次年被[[ddpg]]配上深度网络，成为[[td3]]、[[maddpg]]等一整族算法的基础。",
+ "background": "策略梯度方法（见[[c:policy-gradient-concept]]）直接调整策略参数，让高回报的动作变得更可能。[[pg-theorem]]给出了随机策略的梯度公式`∇J = E_{s,a}[∇θ log π(a|s) · Q(s,a)]`，它要对状态**和**动作同时取期望：每个状态都要采样很多动作才能估准方向。机械臂、肌肉控制这类任务的动作是几十维的连续向量，采样估计的方差随维度迅速变大。\n\n值函数方法也不好用：[[q-learning]]每步要对动作取max，在连续空间里这本身就是一个优化问题，每个状态都解一次代价太高。",
+ "method": "核心想法：既然对Q做全局最大化太贵，就让策略朝Q上升最快的方向挪一点。设策略是确定性的`a = μθ(s)`，论文证明了**确定性策略梯度定理**：\n\n`∇θ J = E_s[ ∇θ μθ(s) · ∇ₐ Q(s,a)|ₐ₌μθ(s) ]`\n\n读法：critic告诉你“在这个状态下，动作往哪个方向改Q会变大”（`∇ₐQ`），再通过链式法则（见[[c:chain-rule]]）传回策略参数。期望只对状态取，不再对动作积分，所以估计方差小得多。论文还证明它是随机策略梯度在策略方差趋于0时的极限情形，因此原有的策略梯度理论（如兼容函数近似）都能沿用。\n\n确定性策略本身不探索，所以采用离策略的[[c:actor-critic]]：用一个加了高斯噪声的行为策略去收集数据，critic学目标策略的`Q(s,a)`，actor按上式更新。论文给出的COPDAC-Q用Q-learning式的critic，COPDAC-GQ则用[[gradient-td]]式的梯度Q学习critic，以保证在线性近似下收敛。",
+ "results": "在二次型代价的连续老虎机上，动作维度分别取10、25、50，确定性方法明显优于随机actor-critic，而且差距随维度增大而扩大。在山地车、倒立摆和二维水坑世界这些低维动作任务上，COPDAC-Q略优于随机actor-critic和OffPAC。在章鱼臂任务（6节手臂、50个状态变量、20个连续动作变量）上，它直接在完整动作空间里学会了击中目标，而以前的工作要先把动作压缩成6个预设的“宏动作”。",
+ "legacy": "论文的实验全是线性函数近似。2015年[[ddpg]]把actor和critic都换成深度网络，再加上[[dqn]]的经验回放和目标网络，成为第一个能从像素学连续控制的通用算法。之后[[td3]]修了critic高估，[[maddpg]]把它推广到多智能体。相对的另一条路线是保留随机策略、加熵正则的[[sac]]，在许多机器人任务上更稳。",
+ "limits": [
+  {"text": "实验只用线性函数近似和低维小任务，是否能配合深度网络从高维观测学习尚未验证。", "solved_by": ["ddpg"]},
+  {"text": "actor完全依赖critic给的∇ₐQ，critic一旦高估或在某处梯度错误，策略会被直接带偏。", "solved_by": ["td3"]},
+  {"text": "确定性策略自身不探索，只能靠人为加噪声，噪声大小难调，在稀疏奖励任务上很弱。", "solved_by": ["sac", "her"]}
+ ],
+ "relations": [
+  {"to": "pg-theorem", "type": "extends", "note": "把随机策略梯度定理推广到确定性策略，并证明前者在方差趋于0时退化为后者。"},
+  {"to": "actor-critic-1983", "type": "extends", "note": "沿用actor与critic分工的结构，但actor的更新信号从TD误差换成了critic对动作的梯度。"},
+  {"to": "q-learning", "type": "uses", "note": "COPDAC-Q的critic用Q-learning式的TD更新学习动作值。"},
+  {"to": "gradient-td", "type": "uses", "note": "COPDAC-GQ用梯度TD式的critic，保证离策略+线性近似下的收敛。"},
+  {"to": "natural-pg", "type": "extends", "note": "论文说明确定性策略梯度也可以和自然梯度结合，Fisher度量可视为方差趋于0的极限。"}
+ ],
+ "prereq": ["policy-gradient-concept", "actor-critic", "on-off-policy", "chain-rule", "policy-value", "expectation-variance"],
+ "terms": [
+  {"t": "确定性策略", "d": "给定状态只输出一个动作（例如力矩向量），而不是一个动作的概率分布。"},
+  {"t": "行为策略与目标策略", "d": "离策略学习里，实际用来收集数据的策略（带噪声、负责探索）和正在被学习、最终要用的策略可以不同。"},
+  {"t": "兼容函数近似", "d": "一类特殊的critic形式，保证用它代替真实Q值时算出的策略梯度没有偏差。"}
+ ],
+ "learn": "先补[[c:policy-gradient-concept]]和[[c:actor-critic]]。读原文第3节（定理与直觉）和第4节（离策略算法），附录的证明可跳过。然后直接读[[ddpg]]并实现它，体会actor的损失其实就是`−Q(s, μ(s))`。",
+ "check": {"source": "https://proceedings.mlr.press/v32/silver14.html", "confirmed": "标题、6位作者、ICML 2014（PMLR 32）；正文PDF中的方差趋于0的极限结论、COPDAC-Q/GQ、老虎机维度10/25/50、山地车/倒立摆/水坑世界上略优、章鱼臂6节/50状态变量/20动作变量及以前的6个宏动作。"}
+}

@@ -1,0 +1,40 @@
+{
+  "id": "sphinx",
+  "who": "Kai-Fu Lee（李开复）, Hsiao-Wuen Hon, Raj Reddy · 卡内基梅隆大学",
+  "venue": "Lee博士论文 1988；IEEE Trans. ASSP 1990",
+  "links": [
+    {"label": "论文（IEEE TASSP 1990）", "url": "https://doi.org/10.1109/29.45616"},
+    {"label": "Lee博士论文（ACM DL）", "url": "https://dl.acm.org/citation.cfm?id=914540"},
+    {"label": "CMU Sphinx项目主页", "url": "https://cmusphinx.github.io"}
+  ],
+  "problem": "1980年代中期，大词表、不针对特定说话人、连续说话这三个条件同时满足的识别被普遍认为做不到：要么限定说话人先录音训练，要么一个词一个词停顿着说。",
+  "idea": "全面采用HMM统计建模，用多码本离散HMM加上广义三音子和功能词专用音素模型来处理协同发音，在DARPA的千词任务上第一次同时做到三个条件。",
+  "impact": "证明了“说话人无关的大词表连续识别”可行，让HMM路线在DARPA评测中确立主导地位；其后续版本开源，成为学术界和产品中常用的识别引擎。",
+  "background": "[[hmm-asr]]在IBM已经证明了统计方法的威力，但IBM的系统需要每个用户先录一段话做适应，用户说话时也要在词与词之间稍作停顿。同在CMU的[[harpy]]能识别连续语音，但词表只有约1000词、依赖手写的知识网络，同样是针对少数说话人。当时不少人认为，不同人的口音、语速差别太大，“说话人无关的大词表连续识别”在可预见的将来做不到。\n\n1987年起，[[darpa-eval]]发布了一套约1000词的海军资源管理（Resource Management）任务，各家在同一测试集上比词错误率（见[[c:word-error-rate]]）。Lee的博士论文就是在这个任务上回答“能不能做到”。",
+  "method": "SPHINX的骨架是标准的[[c:hmm-concept]]：每个音素是一个小HMM，词由音素串联而成，句子由词按语法相连，解码用[[viterbi]]搜索，参数用[[baum-welch]]重估。它的贡献在于为“说话人无关”和“连续语音”加了几样关键部件：\n\n- **多码本离散HMM**。每帧先算基于[[lpc]]的倒谱系数，再把倒谱、倒谱差分和能量分别做[[c:vector-quantization]]，各得一个码字编号。HMM的每个状态对三个码本各有一个离散分布，合起来描述一帧。\n\n- **广义三音子**。同一个音素在不同左右邻音之间发音差别很大（协同发音）。为每种“左邻-中心-右邻”组合单独建模（三音子）效果最好，但组合太多、数据不够。SPHINX先训练所有出现过的三音子，再自底向上把相似的合并成数量少得多的若干类，在精度和可训练性之间折中。\n\n- **功能词专用模型**。the、a、of这类功能词出现极频繁，又说得又快又含糊，最容易认错，就单独为它们里的音素建模。\n\n此外还加入了词时长建模，并在语言约束上比较了三种设置：不用语法、词对语法和二元文法（见[[c:n-gram]]）。",
+  "results": "在997词的资源管理任务上，不用语法（[[c:perplexity]]997）、词对语法（困惑度60）和二元文法（困惑度20）三种设置下，词准确率分别为71%、94%和96%（据1990年IEEE TASSP论文摘要）。测试说话人都不在训练集中。",
+  "legacy": "SPHINX让HMM加统计语言模型成为DARPA评测中的标准方案。后续的Sphinx-II改用半连续HMM（所有状态共享一组高斯，只学各自的混合权重），在1992年11月的DARPA评测中，5000词说话人无关任务的错误率降到5%；Sphinx-III转为连续高斯混合HMM，Sphinx-4用Java重写。2000年CMU以BSD式许可开源Sphinx-2，后来又有面向嵌入式的PocketSphinx，以及公开的发音词典CMUdict，直到[[kaldi]]出现前一直是最常用的开源识别器之一。\n\n今天SPHINX已只有历史意义：离散码本被[[htk]]式的连续高斯混合取代，广义三音子被[[tied-state]]的决策树绑定取代，声学模型再后来又被[[dnn-hmm]]取代。",
+  "pitfalls": "- SPHINX第一版的特征是基于LPC的倒谱，而不是MFCC；MFCC进入Sphinx是后续版本的事。\n- “说话人无关”指测试者的声音没在训练集中出现过，并不是对任何口音、噪声都鲁棒：它是在安静环境下的朗读语音上测的。",
+  "limits": [
+    {"text": "离散HMM先把每帧向量量化成码字编号，量化误差无法在后续训练中弥补，精度受限。", "solved_by": ["htk", "tied-state"]},
+    {"text": "广义三音子是对训练集里出现过的组合自底向上聚类，训练数据中没出现过的三音子没有好的办法得到模型。", "solved_by": ["tied-state"]},
+    {"text": "只在约1000词、安静环境下的朗读语音上验证，离自然对话、电话语音还很远。", "solved_by": ["switchboard", "cd-dnn-hmm"]},
+    {"text": "声学模型用最大似然训练，并不直接优化区分不同词的能力；1986年提出的MMI区分性训练直到大词表任务上的MPE等方法出现才真正普及。", "solved_by": ["mpe", "lf-mmi"]}
+  ],
+  "relations": [
+    {"to": "hmm-asr", "type": "extends", "note": "沿用IBM的HMM统计框架，把它从需要说话人适应、词间停顿的听写，推进到说话人无关的连续识别。"},
+    {"to": "darpa-eval", "type": "uses", "note": "以DARPA发布的约1000词资源管理任务为测试平台，在统一测试集上报告词准确率。"},
+    {"to": "mfcc", "type": "rivals", "note": "第一版SPHINX用的是基于LPC的倒谱而非MFCC，两种倒谱特征在当时并存；Sphinx后续版本和整个HMM时代最终都以MFCC为默认特征。"},
+    {"to": "lpc", "type": "uses", "note": "每帧特征是由线性预测分析导出的倒谱系数及其差分。"},
+    {"to": "harpy", "type": "extends", "note": "同出CMU Reddy的团队；Harpy把知识编译成固定网络，SPHINX换成可从数据训练的HMM，并把目标从特定说话人扩展到说话人无关。"},
+    {"to": "baum-welch", "type": "uses", "note": "所有音素HMM的参数都用Baum-Welch前向-后向算法从数据中重估。"}
+  ],
+  "prereq": ["hmm-concept", "phoneme-acoustic", "vector-quantization", "n-gram", "perplexity", "word-error-rate"],
+  "terms": [
+    {"t": "说话人无关（speaker-independent）", "d": "系统不需要新用户先录音训练或适应，测试者的声音在训练数据里从未出现。"},
+    {"t": "三音子（triphone）", "d": "把同一个音素按它左边和右边的邻音区分开分别建模，例如“a在k之后、t之前”是一个单独的模型。"},
+    {"t": "协同发音（coarticulation）", "d": "连续说话时发一个音的口型会受前后音影响，同一个音素在不同上下文里声学表现不同。"}
+  ],
+  "learn": "先补[[c:hmm-concept]]和[[c:phoneme-acoustic]]。然后读1990年IEEE TASSP论文的第2–4节，重点看多码本和广义三音子两部分。想动手可以装PocketSphinx，用自带的英文模型识别一段录音，再看它的配置里有哪些声学模型、词典和语言模型文件，体会GMM-HMM系统的三大组件。",
+  "check": {"source": "https://doi.org/10.1109/29.45616", "confirmed": "OpenAlex记录：Lee、Hon、Reddy，IEEE TASSP 1990；摘要中的离散HMM加LPC参数、多码本、功能词相关音素模型与广义三音子、困惑度997/60/20下词准确率71/94/96%、997词任务。Lee博士论文1988年见ACM DL记录。Sphinx-II在1992年11月DARPA评测5000词任务错误率5%见Huang等1993 HLT论文摘要；开源年份、Sphinx 2–4的区别见Wikipedia CMU Sphinx条目。"}
+}

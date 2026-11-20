@@ -1,0 +1,31 @@
+{
+  "id": "baum-welch",
+  "who": "Leonard E. Baum, Ted Petrie, George Soules, Norman Weiss · 美国国防分析研究所（IDA，普林斯顿）",
+  "venue": "Annals of Mathematical Statistics 41(1), 1970",
+  "links": [
+    {"label": "论文（Project Euclid）", "url": "https://doi.org/10.1214/aoms/1177697196"},
+    {"label": "Wikipedia：Baum–Welch algorithm", "url": "https://en.wikipedia.org/wiki/Baum%E2%80%93Welch_algorithm"}
+  ],
+  "problem": "观测序列背后有一串看不见的状态（隐马尔可夫模型），参数要从只有观测、没有状态标注的数据里估出来，而所有可能的状态路径数随长度指数增长。",
+  "idea": "用前向-后向两遍动态规划算出每个时刻处在每个状态的后验概率，按这些“软计数”重新估计转移和输出概率，反复迭代；论文证明每次迭代似然都不会下降。",
+  "impact": "让HMM第一次可以从无标注对齐的数据中自动训练，成为此后三十多年语音识别声学模型的标准训练方法，也是EM算法的早期特例。",
+  "background": "隐马尔可夫模型（见[[c:hmm-concept]]）假设：系统在若干隐藏状态之间按[[c:markov-chain]]跳转，每个状态按自己的概率分布吐出一个观测。语音很符合这个图景：一个音在发音过程中经历开头、稳定段、结尾几个阶段（状态），每个阶段产生一帧帧声学特征（观测）。\n\n难点在训练：我们只听到声音，不知道每一帧属于哪个状态。直接做[[c:mle]]需要对所有可能的状态路径求和，长度为T、有N个状态时路径数是N的T次方，无法枚举；也没有闭式解。",
+  "method": "参数是`θ = (A, B, π)`：转移矩阵`a_ij = P(下一状态j | 当前状态i)`，输出概率`b_j(y)`，初始分布`π`。\n\n**前向**：`α_i(t)`=看到前t个观测且此刻在状态i的概率，递推`α_i(t+1) = b_i(y_{t+1}) · Σ_j α_j(t)·a_ji`。\n\n**后向**：`β_i(t)`=已知此刻在状态i、看到其余观测的概率，从末尾往前递推。两遍都只需`O(N²T)`次运算（见[[c:dynamic-programming]]）。\n\n**软计数**：`γ_i(t) ∝ α_i(t)·β_i(t)`是t时刻处在状态i的后验概率；`ξ_ij(t)`是t时刻从i跳到j的后验概率。\n\n**重估**：`a_ij ← Σ_t ξ_ij(t) / Σ_t γ_i(t)`，即“预计从i跳到j的次数 ÷ 预计离开i的次数”；`b_j`同理用γ加权统计。用新参数重算前向后向，循环直到收敛。\n\n例如一段语音有100帧、某个音的HMM有3个状态，算法不会硬性指定第40帧属于状态2，而是给出“第40帧在状态2的概率是0.7”这样的软分配，再按软分配统计。论文的核心贡献是证明这个变换使观测序列的似然单调不减。这正是后来[[em]]所说的E步和M步（见[[c:em-algorithm]]）。",
+  "legacy": "IDA的这套方法经James Baker（[[dragon-1975]]）和IBM的Jelinek团队（[[hmm-asr]]）引入语音识别，从此声学模型可以用大量录音加文字转写自动训练，不再需要人工切分每个音。1977年[[em]]把它推广为一般的不完全数据最大似然框架。在[[htk]]、[[sphinx]]、[[kaldi]]里，前向-后向重估一直是GMM-HMM训练的核心步骤；深度学习时代的[[ctc]]和[[rnn-t]]计算损失时用的也是同样的前向-后向求和。生物信息学的基因序列分析和NLP的[[church-tagger]]也用它。",
+  "limits": [
+    {"text": "只保证收敛到局部极大值，结果依赖初始参数；长序列下α、β连乘会数值下溢，需要额外的缩放技巧。", "solved_by": []},
+    {"text": "论文的收敛证明针对特定的输出分布族（离散或对数凹密度），还没有适用于任意隐变量模型的一般框架，语音所需的高斯混合输出也要后人补上。", "solved_by": ["em"]},
+    {"text": "目标是最大化训练数据的似然，而不是最小化识别错误；模型假设不准时，似然最高不等于识别最准。", "solved_by": ["mmi-training", "mpe", "lf-mmi"]}
+  ],
+  "relations": [
+    {"to": "shannon-ngram", "type": "extends", "note": "香农用可见的马尔可夫链描述符号序列；这里在马尔可夫链下面再加一层“状态看不见、只看到它的输出”，并给出估计参数的方法。"},
+    {"to": "viterbi", "type": "rivals", "note": "两者都在同一张状态-时间网格上做动态规划：Viterbi取最优的一条路径，Baum-Welch对所有路径求和；语音系统最终让两者分工，Viterbi负责解码，Baum-Welch负责训练。"}
+  ],
+  "prereq": ["hmm-concept", "markov-chain", "mle", "dynamic-programming", "conditional-bayes", "latent-variable"],
+  "terms": [
+    {"t": "前向-后向算法", "d": "从序列开头向后、从末尾向前各做一遍动态规划，合起来得到每个时刻处在每个状态的后验概率。"},
+    {"t": "软计数", "d": "不把每帧硬分给某个状态，而是按后验概率分摊。一帧可以算0.7个状态2、0.3个状态3。"}
+  ],
+  "learn": "先补[[c:markov-chain]]、[[c:hmm-concept]]和[[c:dynamic-programming]]。然后读[[hmm-tutorial]]（Rabiner 1989）第III节的问题1和问题3，那是对本算法最清楚的讲解。动手：用NumPy写一个离散输出HMM的前向、后向和重估，用一个已知参数的HMM生成数据，看能否把参数估回来，并观察对数似然逐轮上升。",
+  "check": {"source": "https://api.crossref.org/works/10.1214/aoms/1177697196", "confirmed": "Crossref：标题、四位作者Baum/Petrie/Soules/Weiss、Annals of Mathematical Statistics 41卷1期164–171页、1970年2月。算法步骤与公式对照Wikipedia Baum–Welch条目；IDA出处、离散与对数凹密度的适用范围见Juang & Rabiner语音识别简史。"}
+}

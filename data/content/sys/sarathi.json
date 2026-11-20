@@ -1,0 +1,52 @@
+{
+ "id": "sarathi",
+ "who": "Amey Agrawal, Ashish Panwar, Jayashree Mohan, Nipun Kwatra, Bhargav S. Gulavani, Ramachandran Ramjee · Microsoft Research India / Georgia Tech",
+ "venue": "OSDI 2024 (SARATHI-Serve)",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2308.16369"
+  }
+ ],
+ "problem": "预填充（读取提示）计算密集、解码逐token生成受带宽限制，两者混在一起时，长提示的预填充会卡住正在解码的请求，GPU利用率还很低。",
+ "idea": "把长提示的预填充切成小块，每块与其他请求的解码捎带在同一批里算，让计算和访存互相填补。",
+ "impact": "为服务系统提供了分块预填充，后来成为[[vllm]]等主流引擎的标准功能。",
+ "method": "在[[orca-serving]]的连续批处理基础上，SARATHI把预填充按固定的块大小拆开，每次迭代把一个预填充块与若干解码请求拼成一批。解码本来是内存受限，GPU算力闲着；预填充块补上计算，使整批更接近算力上限，而解码请求几乎不受影响。切块还让各批大小接近，减小流水线并行里的气泡。摘要报告：LLaMA-13B在A6000上解码吞吐最多提高10倍，端到端吞吐提高1.33倍；LLaMA-33B在A100上端到端提高1.25倍、解码最多4.25倍；GPT-3配合流水线并行时空泡减少6.29倍、端到端提高1.91倍。",
+ "limits": [
+  {
+   "text": "块大小需要权衡：太小增加开销，太大又拖慢解码延迟。",
+   "solved_by": [
+    "distserve"
+   ]
+  },
+  {
+   "text": "预填充与解码仍共用同一批GPU，相互干扰没有彻底消除。",
+   "solved_by": [
+    "distserve"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "orca-serving",
+   "type": "extends",
+   "note": "在迭代级调度上，把预填充也切块并捎带解码。"
+  },
+  {
+   "to": "vllm",
+   "type": "rivals",
+   "note": "同期的高吞吐服务思路；vLLM侧重显存管理，SARATHI侧重调度与计算填充。"
+  }
+ ],
+ "prereq": [
+  "kv-cache",
+  "throughput-latency",
+  "memory-bandwidth",
+  "training-vs-inference"
+ ],
+ "learn": "读论文动机一节中的预填充/解码性能分析，再看vLLM的chunked prefill参数。",
+ "check": {
+  "source": "https://arxiv.org/abs/2308.16369",
+  "confirmed": "标题、6位作者、v1于2023-08-31；摘要各项倍数：10倍、1.33倍、1.25倍、4.25倍、6.29倍、1.91倍。"
+ }
+}

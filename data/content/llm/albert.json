@@ -1,0 +1,34 @@
+{
+  "id": "albert",
+  "who": "Zhenzhong Lan, Mingda Chen, Sebastian Goodman, Kevin Gimpel, Piyush Sharma, Radu Soricut · Google Research / 丰田工业大学芝加哥分校",
+  "venue": "ICLR 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1909.11942"},
+    {"label": "官方代码", "url": "https://github.com/google-research/ALBERT"}
+  ],
+  "problem": "BERT越大越好，但再往上加宽加深，GPU/TPU显存先装不下，训练也越来越慢。",
+  "idea": "两招砍参数：把大词嵌入矩阵拆成两个小矩阵相乘，所有层共用同一套参数；再把下一句预测换成判断两句顺序是否颠倒。",
+  "impact": "与BERT-large结构相近的配置参数少18倍；最大的ALBERT以约七成的BERT-large参数刷新了GLUE、RACE、SQuAD纪录，但也暴露出“参数少不等于算得快”。",
+  "background": "[[bert]]和[[roberta]]都表明：模型越大，下游效果越好。可当时一块加速器的显存只有十几GB，BERT-large已有3.4亿参数，再放大就要切分模型，训练时间也成倍增加。\n\n参数里有一大块是词嵌入：词表V约3万，每个词的嵌入维度E与隐藏层宽度H相等，嵌入矩阵就是V×H。H从1024加到4096时，这一项增长4倍，可词嵌入只是查表得到的、与上下文无关的表示，未必需要那么宽。",
+  "method": "**嵌入分解**（见[[c:low-rank]]）。先把词映射到一个小维度E=128，再用一个E×H的矩阵投影到隐藏层宽度。参数量从 `O(V×H)` 降到 `O(V×E + E×H)`。以V=30000、H=4096为例，原本约1.2亿，分解后约380万+52万。\n\n**跨层参数共享**。借鉴[[universal-transformer]]：所有Transformer层用同一组注意力和前馈参数，相当于把同一层反复应用多次。层数从12加到24，参数量不变。消融显示主要的性能损失来自共享前馈层，共享注意力几乎不掉分。\n\n**句序预测（SOP）**。作者认为NSP太简单：负例取自另一篇文档，模型只要判断“两句是不是同一个话题”就能答对。SOP的正例同样是同一文档中的连续两段，负例则是**同样两段、顺序对调**，话题线索失效，只能靠连贯性判断。实验中，用NSP训练的模型做SOP只有随机水平，用SOP训练的模型却能较好地做NSP。",
+  "results": "ALBERT-large只有1800万参数，约为BERT-large（3.34亿）的1/18，训练时遍历数据的速度快约1.7倍。最大的ALBERT-xxlarge（H=4096、12层，约2.35亿参数，约为BERT-large的70%）在GLUE上得到89.4，RACE准确率89.4%，SQuAD 2.0 F1 92.2，均为当时最好。但xxlarge因为每层很宽，单步计算反而比BERT-large慢约3倍。",
+  "legacy": "SOP和嵌入分解被后续一些中文与小型模型沿用。但跨层共享没有成为大模型主流：它节省的是存储，不是计算，而后来的瓶颈主要是计算和推理延迟；同等计算下独立参数更强。“参数量”和“计算量”必须分开看，这一点后来在[[c:params-flops]]和MoE（[[switch-transformer]]）的讨论中反复出现，只是方向相反——MoE是参数多、计算少。",
+  "limits": [
+    {"text": "参数虽少，计算量没有减少，xxlarge训练和推理都比BERT-large慢约3倍。", "solved_by": []},
+    {"text": "所有层共享参数会损失表达能力，同等计算下不如每层独立的模型。", "solved_by": []},
+    {"text": "仍是只从15%被遮位置学习的掩码语言模型，预训练效率不高。", "solved_by": ["electra"]}
+  ],
+  "relations": [
+    {"to": "bert", "type": "solves", "note": "针对BERT放大时的显存瓶颈，用嵌入分解和层共享把参数压到1/18；并以SOP替换效果可疑的NSP。"},
+    {"to": "universal-transformer", "type": "uses", "note": "跨层共享参数的做法来自Universal Transformer。"},
+    {"to": "roberta", "type": "rivals", "note": "同期都指出NSP有问题：RoBERTa直接去掉，ALBERT改成更难的句序预测。"},
+    {"to": "glue", "type": "uses", "note": "在GLUE、RACE、SQuAD上评测，GLUE得分89.4。"}
+  ],
+  "prereq": ["masked-modeling", "embedding", "low-rank", "params-flops", "transformer-block"],
+  "terms": [
+    {"t": "跨层参数共享", "d": "多层Transformer使用同一套权重，等于把一层反复迭代多次，参数量与层数无关。"},
+    {"t": "句序预测（SOP）", "d": "给两段连续文本，判断它们是原顺序还是被对调了，用来学习句间连贯性。"}
+  ],
+  "learn": "先读懂[[bert]]，复习[[c:low-rank]]。读ALBERT第3节三个设计和表1的参数配置，以及第4节关于共享策略的消融。动手：手算BERT-base嵌入层在E=768和E=128时的参数量，再用代码实现一个共享权重的12层编码器。",
+  "check": {"source": "https://arxiv.org/abs/1909.11942", "confirmed": "标题、6位作者、arXiv首次提交2019-09-26；正文（ar5iv）中O(V×H)→O(V×E+E×H)、E=128、18M vs 334M、1.7倍更快、xxlarge约70%参数且慢约3倍、GLUE 89.4/RACE 89.4%/SQuAD 2.0 92.2、NSP做不了SOP。"}
+}

@@ -1,0 +1,38 @@
+{
+  "id": "mpc",
+  "who": "Charles R. Cutler, B. L. Ramaker · Shell Oil（DMC）；同期Richalet等人（法国，IDCOM/MPHC）",
+  "venue": "Joint Automatic Control Conference 1980",
+  "links": [
+    {"label": "Rawlings, Mayne & Diehl《Model Predictive Control》（免费教材）", "url": "https://sites.engineering.ucsb.edu/~jbraw/mpc/"},
+    {"label": "Wikipedia: Model predictive control", "url": "https://en.wikipedia.org/wiki/Model_predictive_control"}
+  ],
+  "problem": "炼油厂这类多变量过程，阀门开度、温度上下限都有硬约束，PID只看当前误差、不会提前动作，LQR又不能处理约束。",
+  "idea": "每个控制周期用模型预测未来一段时间的输出，在线解一个带约束的优化问题，求出未来一串控制量，只执行第一步，下一周期用新测量重新算（滚动时域）。",
+  "impact": "1980年代起成为石化过程控制的标准方法，后来进入机器人与自动驾驶；“学一个模型 + 在线规划”的深度学习路线（Visual Foresight、PlaNet、TD-MPC）本质上都是MPC。",
+  "background": "1970年代的工业控制主要靠[[pid]]：把测量值和设定值的误差按比例、积分、微分加权后调节执行器。一个回路管一个变量还行，但炼油装置里几十个变量相互耦合：加大一个阀门，三个温度、两个压力都会跟着变；而且很多量有硬上下限，比如阀门开度不能超过100%、反应器温度不能越过安全线。PID既不能提前看到未来，也不知道约束在哪。\n\n理论上更优的[[lqr]]给出了多变量的最优反馈，但它假设没有约束，并且需要准确的状态空间模型。工厂工程师手里往往只有做阶跃实验得到的经验曲线，而不是一套微分方程。\n\n思想本身更早就有：Rawlings等人的教材指出，Propoi在1963年就提出了用线性规划处理带约束线性系统的类似方法，Lee与Markus在1967年的书里也描述过“测状态、快速算开环最优控制、只用前一小段、再重测重算”的做法。缺的是能在工厂里落地的算法。1978年Richalet等人发表了用于工业过程的模型预测启发式控制，1980年Shell的Cutler与Ramaker发表动态矩阵控制（DMC），两者引发了工业界的大规模采用。",
+  "method": "**滚动时域**（receding horizon，见[[c:planning-mpc]]）。在时刻t：\n\n- 用模型预测未来P步的输出；\n- 求未来M步的控制增量，使代价最小：`J = Σ (r_i − y_i)² + λ·Σ Δu_i²`，即跟踪设定值r，同时别让执行器动作太猛；\n- 满足约束：`u_min ≤ u ≤ u_max`，`y_min ≤ y ≤ y_max`；\n- 只执行第一步`Δu_1`，到t+1时用新的测量重来一遍。\n\n为什么只执行一步？因为模型有误差、扰动随时会来，每步重算等于不断用现实纠正预测，这就把一个开环优化变成了闭环反馈。\n\n**DMC的模型：阶跃响应**。DMC不要求写微分方程，只要做实验：把输入突然加一个单位，记录输出在之后各步上升了多少，得到系数`a_1, a_2, …`。线性叠加后，未来输出 = 不再动作时的“自由响应” + 动态矩阵A × 未来的控制增量：`y = y_free + A·Δu`，A由这些系数排成下三角矩阵，故名“动态矩阵”。无约束时解是一个最小二乘：`Δu = (AᵀA + λI)⁻¹Aᵀ(r − y_free)`。\n\n**一个小例子**。加热炉温度：阶跃响应系数是0.2、0.5、0.8（加热功率加1个单位，1、2、3步后温度分别升0.2、0.5、0.8度）。目标100度，若不动作未来三步都停在80度，误差都是20。只优化一步增量、λ=0时，`Δu = (0.2+0.5+0.8)×20 / (0.2²+0.5²+0.8²) = 30/0.93 ≈ 32`。若执行器每步最多只能加20，就必须把约束放进优化，而不是事后截断；1986年García与Morshedi把这一步写成二次规划（QDMC），带约束的二次规划从此成为MPC的标准形式。\n\n**状态从哪来**。模型需要当前状态作为起点，测不全时通常用[[kalman-filter]]估计。",
+  "results": "MPC是一类方法而不是一个基准结果。Rawlings、Mayne与Diehl的教材总结：Richalet等人（1978）和Cutler与Ramaker（1980）之后的一系列论文让它在过程控制工业中站稳，成为处理带硬约束控制问题最有用的现代控制方法，应用数以千计。维基百科称它自1980年代起用于化工厂和炼油厂。Cutler在Shell推动DMC成为复杂过程的标准控制方法，1984年创办DMC公司，1996年将其卖给Aspen Technology。",
+  "legacy": "早期工业MPC并不保证闭环稳定：优化有限时域代价不一定稳定。1980年代末到1990年代，学界用终端代价和终端约束补上了稳定性理论，非线性MPC随后发展起来。\n\n在机器人和学习领域，MPC是“有模型就能规划”的通用框架。四足和人形机器人的步态控制大量使用MPC；深度学习之后，人们把手工模型换成学出来的模型：[[visual-foresight]]用视频预测模型做MPC推物体，[[pets]]和[[planet]]用学到的动力学配合交叉熵方法采样规划，[[td-mpc]]、[[td-mpc2]]用学到的价值函数补上短时域之外的回报，[[dino-wm]]和[[nwm]]在预训练视觉特征或视频生成模型里做MPC。[[muzero]]的树搜索也可以看作离散动作下的同类思想。",
+  "pitfalls": "- MPC不是一个具体算法，而是“预测—优化—只执行第一步—重来”的框架；DMC、GPC、非线性MPC、基于采样的MPPI都是它的实现。\n- 每步解出的是开环计划，但因为每步都重算，整体是闭环控制；把它和一次性离线规划混为一谈是常见误解。\n- MPC的效果几乎完全取决于模型精度。模型错了，优化得越精细，偏得越远。",
+  "limits": [
+    {"text": "需要准确的预测模型；DMC的线性阶跃响应只适合近似线性的慢过程，接触、摩擦、图像输入这类问题写不出模型。", "solved_by": ["visual-foresight", "pets", "planet"]},
+    {"text": "每个控制周期都要在线解一次优化，炼油厂几分钟一次没问题，腿式机器人要在毫秒内算完，非线性问题更难实时。", "solved_by": ["legged-rl", "td-mpc"]},
+    {"text": "只看有限时域，时域外的后果被忽略，容易短视；有限时域优化也不自动保证闭环稳定。", "solved_by": ["td-mpc", "td-mpc2"]},
+    {"text": "代价函数和约束要人来设计，复杂任务（如“把桌子收拾干净”）很难写成二次代价。", "solved_by": ["dino-wm"]}
+  ],
+  "relations": [
+    {"to": "lqr", "type": "extends", "note": "LQR是无约束、无限时域的二次最优控制；MPC改成有限时域并在线滚动求解，从而能把执行器和安全约束放进优化。"},
+    {"to": "kalman-filter", "type": "uses", "note": "MPC每步需要当前状态作为预测起点，状态测不全时用卡尔曼滤波估计，“估计 + 优化”的组合成为标准架构。"},
+    {"to": "pid", "type": "solves", "note": "PID只看当前误差、不会提前动作、难以处理多变量耦合和硬约束，MPC用模型预测和约束优化解决了这三点。"},
+    {"to": "bellman", "type": "rivals", "note": "动态规划离线算出对所有状态都适用的最优策略，维数一高就算不动；MPC只对当前状态在线求一条最优开环轨迹，对确定性问题两者结果相同。"}
+  ],
+  "prereq": ["planning-mpc", "control-loop", "state-action-observation", "linear-regression", "convexity", "dynamic-programming"],
+  "terms": [
+    {"t": "滚动时域", "d": "每次只规划未来固定长度的一段，执行第一步后窗口整体往前挪一步再重新规划，像开车时始终只看前方几十米。"},
+    {"t": "阶跃响应", "d": "把输入突然调高一个单位后，输出随时间变化的曲线。DMC直接用这条曲线上的采样值当模型。"},
+    {"t": "硬约束", "d": "任何时候都不能违反的限制，比如阀门开度在0到100%之间。与之相对的软约束只是在代价里加惩罚。"},
+    {"t": "二次规划（QP）", "d": "目标是二次函数、约束是线性不等式的优化问题，是凸的，有成熟快速的求解器，线性MPC每一步解的就是它。"}
+  ],
+  "learn": "先补[[c:control-loop]]、[[c:linear-regression]]（最小二乘）和[[c:convexity]]。读Rawlings等人教材第1章和第2章开头，理解有限时域优化与滚动执行；维基百科的MPC条目有一段简明原理介绍。动手：用Python和cvxpy为一个二阶质量—弹簧系统写线性MPC，加上力的上下限，对比无约束LQR被截断后的表现；再把模型故意改错10%，观察每步重算如何把误差拉回来。",
+  "check": {"source": "https://sites.engineering.ucsb.edu/~jbraw/mpc/MPC-book-2nd-edition-1st-printing.pdf ; https://en.wikipedia.org/wiki/Model_predictive_control ; https://en.wikipedia.org/wiki/Charles_R._Cutler", "confirmed": "Rawlings等教材2.11节：Propoi 1963、Lee与Markus 1967、Richalet等1978、Cutler与Ramaker 1980（Joint Automatic Control Conference）、García与Morshedi 1986，“thousands of applications”，早期文献未解决稳定性问题；维基：滚动时域原理、二次代价形式、1980年代起用于化工与炼油；Cutler条目：Shell开发DMC、1984年创办DMC公司、1996年售予Aspen Technology。"}
+}

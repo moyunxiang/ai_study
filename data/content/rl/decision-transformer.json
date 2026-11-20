@@ -1,0 +1,38 @@
+{
+  "id": "decision-transformer",
+  "who": "Lili Chen, Kevin Lu, Aravind Rajeswaran, Kimin Lee, Aditya Grover, Michael Laskin, Pieter Abbeel, Aravind Srinivas, Igor Mordatch · UC伯克利 / FAIR / Google Brain",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2106.01345"},
+    {"label": "项目页与代码", "url": "https://sites.google.com/berkeley.edu/decision-transformer"},
+    {"label": "ar5iv全文", "url": "https://ar5iv.labs.arxiv.org/html/2106.01345"}
+  ],
+  "problem": "离线RL的主流方法（如CQL）基于值函数和自举，要处理外推误差、调很多超参数，训练不稳定；而语言模型那边，Transformer的简单序列建模已经被证明能随规模稳定扩展。",
+  "idea": "把RL轨迹写成一串token：（剩余回报、状态、动作）、（剩余回报、状态、动作）……用GPT式因果Transformer预测下一个动作。测试时在开头填上想要的高回报，模型就生成能达到这个回报的动作。",
+  "impact": "不用价值函数、不用策略梯度，仅靠监督式序列建模就在Atari和D4RL离线基准上与CQL等专用算法持平或更好，开启了“把RL当序列建模”的一系列工作（多游戏DT、Gato等）。",
+  "background": "离线RL（见[[c:offline-rl]]）要从固定数据中学出比数据更好的策略。[[bcq]]、[[cql]]等方法都建立在TD学习（见[[c:td-error]]）上：学一个Q函数，再在它上面改进策略。这条路有三个老问题：自举会传播误差；必须想办法压住对数据外动作的高估；还有“致命三元组”带来的不稳定（见[[deadly-triad]]）。\n\n另一条朴素路线是行为克隆（见[[c:imitation-learning]]）：直接模仿数据中的动作。它稳定，但数据里好坏混杂时只能学到平均水平。\n\n同时，[[gpt-2]]、[[gpt-3]]显示，一个只做“预测下一个token”的因果Transformer，配上足够数据就能学会各种技能，而且训练稳定、容易扩展。作者想问：能不能把RL也变成这样一个序列预测问题？",
+  "method": "**关键改动：用“剩余回报”代替奖励**。对一条轨迹，第t步的剩余回报（return-to-go）是从这一步到结束能拿到的奖励总和`R̂_t = Σ_{t'≥t} r_{t'}`。轨迹表示为\n\n`(R̂_1, s_1, a_1, R̂_2, s_2, a_2, …, R̂_T, s_T, a_T)`\n\n每个元素经各自的线性层嵌入，加上表示时间步的位置嵌入，送入带因果掩码的GPT（见[[c:autoregressive]]）。训练目标就是在每个状态token处预测动作：离散动作用交叉熵，连续动作用均方误差。只看最近K步（如K=30）。\n\n**测试时**。先给定一个期望回报（比如数据中最好的回报）作为第一个`R̂`，输入当前状态，模型输出动作；执行后拿到奖励`r`，把下一个剩余回报设为`R̂ − r`，继续生成。期望回报相当于一个“提示词”，告诉模型要表现出什么水平。\n\n**直观例子**（论文图2）：在一个有向图上找最短路，训练数据全是随机游走。只要在每个节点上要求“最大的剩余回报”，模型就能拼出最短路径——它从随机数据中学会了“什么样的动作对应高回报”。\n\n与行为克隆唯一的区别就是多了剩余回报这个条件；网络和超参数完全相同的行为克隆基线在实验中明显更差。",
+  "results": "D4RL连续控制（HalfCheetah、Hopper、Walker）：不含Reacher的平均归一化得分74.7，CQL为63.9，行为克隆46.4；在Medium-Replay这类混杂质量的数据上优势最大（Hopper 82.7对CQL 48.6）。Atari（DQN回放数据的1%）：Breakout 267.5、Pong 106.1，与CQL在4个游戏中的3个上相当，Qbert明显落后（15.4对104.2）。论文还发现，模型实际达到的回报大体跟随给定的期望回报变化，但超出数据最高回报后就不再上升。",
+  "legacy": "同月的[[trajectory-transformer]]也提出把RL当序列建模，但配合束搜索规划。此后[[multi-game-dt]]用一个DT玩46个Atari游戏，[[gato]]把同样的“一切皆token”扩展到600多个任务，[[algorithm-distillation]]让Transformer在上下文中学会RL算法本身。另一方面，后续研究发现DT很难把不同轨迹的好片段“拼接”起来，在AntMaze等需要拼接的任务上远不如[[iql]]；[[td3-bc]]、[[iql]]等简单TD方法在D4RL上也很快超过了它。",
+  "pitfalls": "- DT不是在“学一个更好的策略”，而是在学“给定回报下数据会怎么做”；它无法稳定生成比数据中最好轨迹更好的行为。\n- 在随机环境中，高回报可能来自运气而非好动作，以高回报为条件反而会学到错误的行为。",
+  "limits": [
+    {"text": "缺少动态规划，难以把多条次优轨迹的片段拼接成更好的轨迹，在需要拼接的任务上表现很差。", "solved_by": ["iql"]},
+    {"text": "在随机环境中，以“高回报”为条件会把运气好的轨迹当成好策略来模仿。", "solved_by": []},
+    {"text": "纯离线，无法通过与环境交互继续改进；期望回报这个条件也需要人为设定。", "solved_by": []},
+    {"text": "每个环境单独训练一个模型，没有体现序列模型跨任务共享知识的潜力。", "solved_by": ["multi-game-dt", "gato"]}
+  ],
+  "relations": [
+    {"to": "gpt-2", "type": "uses", "note": "直接使用GPT式的因果Transformer作为策略网络，把RL轨迹当作token序列做下一个token预测。"},
+    {"to": "cql", "type": "rivals", "note": "CQL代表基于值函数的离线RL；DT不学Q函数，只做条件序列建模，在D4RL平均分上超过当时的CQL。"},
+    {"to": "transformer", "type": "uses", "note": "以带因果掩码的自注意力处理最近K步的回报、状态、动作序列。"},
+    {"to": "trajectory-transformer", "type": "rivals", "note": "同月提出的另一种序列建模RL：Trajectory Transformer离散化所有维度并用束搜索规划，DT以回报为条件直接生成动作，更简单。"},
+    {"to": "bcq", "type": "solves", "note": "绕开BCQ等方法需要专门处理的外推误差问题：不查询数据外动作的价值，也就没有自举误差。"}
+  ],
+  "prereq": ["offline-rl", "imitation-learning", "reward-return", "autoregressive", "self-attention"],
+  "terms": [
+    {"t": "剩余回报（return-to-go）", "d": "从当前时刻起到回合结束将获得的奖励总和；DT用它作为条件，告诉模型“接下来要拿多少分”。"},
+    {"t": "轨迹拼接", "d": "把数据中不同轨迹里的好片段组合成一条比任何原始轨迹都好的路线，动态规划方法天然具备这种能力。"}
+  ],
+  "learn": "先补[[c:offline-rl]]和[[c:autoregressive]]，读[[gpt-2]]或[[transformer]]的讲解。读原文第3节（轨迹表示与算法1伪代码）和第5节的讨论。动手：官方代码不长，在D4RL的hopper-medium-replay上训练DT，再把条件回报从低到高调节，画出“目标回报—实际回报”曲线。",
+  "check": {"source": "https://ar5iv.labs.arxiv.org/html/2106.01345", "confirmed": "标题、9位作者、arXiv 2106编号；表1 Atari 1%数据Breakout 267.5、Pong 106.1、Qbert 15.4对CQL 104.2，K=30；表2 D4RL平均（不含Reacher）DT 74.7、CQL 63.9、BC 46.4，Medium-Replay Hopper 82.7对48.6；图2最短路径例子。"}
+}

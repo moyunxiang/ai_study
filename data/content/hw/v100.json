@@ -1,0 +1,38 @@
+{
+  "id": "v100",
+  "who": "NVIDIA",
+  "venue": "GTC 2017（2017年5月10日发布）",
+  "links": [
+    {"label": "NVIDIA新闻稿：Volta发布", "url": "https://nvidianews.nvidia.com/news/nvidia-launches-revolutionary-volta-gpu-platform-fueling-next-era-of-ai-and-high-performance-computing"},
+    {"label": "维基百科：Volta架构", "url": "https://en.wikipedia.org/wiki/Volta_(microarchitecture)"},
+    {"label": "Inside Volta（NVIDIA技术博客）", "url": "https://developer.nvidia.com/blog/inside-volta/"}
+  ],
+  "problem": "GPU的通用CUDA核心一次只做一个标量乘加，而深度学习几乎全是矩阵乘法；谷歌TPU已经证明专用矩阵单元能效高得多，GPU面临被专用芯片取代的压力。",
+  "idea": "在GPU里加入专做小矩阵乘加的Tensor Core：每个单元一次完成4×4矩阵的`D = A×B + C`，FP16输入、FP32累加。V100集成640个，官方称深度学习算力120 TFLOPS。",
+  "impact": "GPU从此变成“通用核心+矩阵加速单元”的混合体，此后每一代NVIDIA GPU都在扩充Tensor Core。V100成为2018–2020年训练大模型的主力，GPT-3就是在V100集群上训练的。",
+  "background": "2016年的[[dgx-1]]用的是Pascal架构的P100。它的计算单元是数千个CUDA核心，每个核心每拍做一次浮点乘加（FMA）。这对图形和科学计算很灵活，但深度学习的主要负载是大矩阵乘法（见[[c:matrix-multiplication]]），用标量单元去拼，大量能耗花在取指令、搬寄存器上，而不是乘法本身。\n\n同一时期，谷歌公开了[[tpu]]：一块只做矩阵乘的芯片，能效比K80 GPU高几十倍。如果GPU不改，在数据中心AI这块最赚钱的市场上就可能输给专用芯片。",
+  "method": "**Tensor Core**。每个Tensor Core每拍完成一次`D = A×B + C`，其中A、B是4×4的FP16矩阵，C、D可以是FP16或FP32。一次就是64个乘加，乘法用FP16（面积小、速度快），累加用FP32（避免很多小数相加时丢精度，见[[c:floating-point]]）。程序员不直接写4×4，而是通过CUDA 9的warp级矩阵接口或[[cudnn]]、cuBLAS库调用，库会把大矩阵乘切成小块喂给Tensor Core。\n\n可以把它看作把[[systolic-array]]的思路缩小成很多个小块，嵌进GPU的每个流处理器里，同时保留原来的CUDA核心继续跑非矩阵计算。\n\n**其他规格**（据新闻稿与维基百科）：台积电12nm FinFET工艺，约211亿个晶体管，芯片面积815mm²；640个Tensor Core；HBM2显存，带宽900GB/s（比上一代高50%，见[[hbm]]）；第二代[[nvlink]]，GPU之间的带宽是上一代的2倍。",
+  "results": "NVIDIA官方称：V100深度学习算力120 TFLOPS，峰值算力是Pascal的5倍、Maxwell的15倍。\n\n实际影响体现在之后几年的训练记录里：同年的[[mixed-precision]]训练方法就是围绕Tensor Core设计的——FP16存储和计算、FP32保留一份权重主副本并做累加、配合损失缩放；论文称这几乎把训练显存需求减半。美国橡树岭的[[summit]]超算装了V100；[[gpt-3]]论文写明模型在微软提供的高带宽集群上用V100训练（见[[ms-openai-sc]]）。",
+  "legacy": "Tensor Core成为NVIDIA GPU的核心卖点：2018年的[[turing-rtx]]把它带进消费级显卡，[[a100]]加入TF32、BF16和结构化稀疏，[[h100]]加入FP8，[[blackwell]]加入FP4。GPU与TPU这类专用芯片的路线差别因此缩小，NVIDIA靠“兼容CUDA生态+专用矩阵单元”守住了训练市场。",
+  "pitfalls": "- “120 TFLOPS”只指Tensor Core做FP16矩阵乘的峰值；普通FP32运算的峰值只有十几TFLOPS。不用混合精度、不走Tensor Core的代码拿不到这个数。\n- FP16的数值范围很窄，小梯度会下溢成0，所以用V100训练时必须配合损失缩放；后来的BF16才缓解这个问题。",
+  "limits": [
+    {"text": "Tensor Core只支持FP16输入，数值范围窄，训练要依赖损失缩放等技巧防止梯度下溢。", "solved_by": ["mixed-precision", "a100", "bf16"]},
+    {"text": "单卡显存只有几十GB，几十亿参数以上的模型放不进一张卡，需要另行发明模型切分方法。", "solved_by": ["megatron", "zero", "a100"]},
+    {"text": "NVLink只连同一台服务器里的8块卡，跨服务器通信仍受网卡带宽限制，限制了大规模训练的扩展效率。", "solved_by": ["mellanox", "h100"]}
+  ],
+  "relations": [
+    {"to": "dgx-1", "type": "extends", "note": "接替P100成为DGX整机里的GPU，延续8卡NVLink互连的整机形态。"},
+    {"to": "tpu", "type": "rivals", "note": "TPU用整颗芯片做一个大脉动阵列；V100保留通用GPU，只在其中嵌入大量小矩阵单元，以兼容CUDA生态换取灵活性。"},
+    {"to": "cuda", "type": "uses", "note": "Tensor Core通过CUDA 9的新接口暴露给程序员，老代码换上新库即可受益。"},
+    {"to": "cudnn", "type": "uses", "note": "cuDNN和cuBLAS把卷积、矩阵乘自动映射到Tensor Core上。"},
+    {"to": "hbm", "type": "uses", "note": "用HBM2提供900GB/s带宽，喂饱大幅增加的算力。"},
+    {"to": "nvlink", "type": "uses", "note": "第二代NVLink把GPU间带宽提高到上一代的2倍。"}
+  ],
+  "prereq": ["cpu-gpu", "matrix-multiplication", "floating-point", "memory-bandwidth", "params-flops"],
+  "terms": [
+    {"t": "Tensor Core", "d": "NVIDIA GPU里专做小矩阵乘加的硬件单元。V100中每个单元一次做4×4矩阵乘加，后续代际扩大了尺寸并增加了精度格式。"},
+    {"t": "FMA（融合乘加）", "d": "一次完成`a×b+c`并只舍入一次的运算，是浮点矩阵乘法的基本操作。"}
+  ],
+  "learn": "先补[[c:floating-point]]，搞清FP16和FP32的范围与精度差别。然后读NVIDIA技术博客Inside Volta中的Tensor Core一节，再读[[mixed-precision]]论文第3节，理解为什么需要FP32累加和损失缩放。动手：在任意GPU上用PyTorch分别以FP32和FP16跑同一个大矩阵乘，比较速度与结果误差。",
+  "check": {"source": "https://nvidianews.nvidia.com/news/nvidia-launches-revolutionary-volta-gpu-platform-fueling-next-era-of-ai-and-high-performance-computing", "confirmed": "2017-05-10发布；210亿晶体管、640个Tensor Core、120 TFLOPS、比Pascal高5倍/比Maxwell高15倍、900GB/s HBM2比上代高50%、NVLink吞吐2倍。维基百科Volta：台积电12nm、21.1B晶体管、815mm²、Tensor Core为4×4 FP16矩阵乘加FP32累加。混合精度论文（arXiv 1710.03740）关于Tensor Core与显存减半的表述；GPT-3论文关于V100集群的表述。"}
+}

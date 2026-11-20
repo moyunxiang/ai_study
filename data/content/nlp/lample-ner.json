@@ -1,0 +1,39 @@
+{
+  "id": "lample-ner",
+  "who": "Guillaume Lample, Miguel Ballesteros, Sandeep Subramanian, Kazuya Kawakami, Chris Dyer · 卡内基梅隆大学等",
+  "venue": "NAACL 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1603.01360"},
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/N16-1030/"},
+    {"label": "LSTM-CRF代码", "url": "https://github.com/glample/tagger"}
+  ],
+  "problem": "命名实体识别的最好系统依赖大量手工特征（前后缀、大小写规则）和地名人名词典，每换一种语言都要重做；标注数据又很少，纯数据驱动的模型很难学好罕见词。",
+  "idea": "每个词的表示由两部分拼成：从无标注语料预训练的词向量，加上用双向LSTM读该词字符得到的拼写向量；句子层面用双向LSTM读上下文，顶上接CRF联合解码整条标签序列。",
+  "impact": "不用任何词典和语言专属特征，在英、德、荷、西四种语言上达到或接近最好结果；“字符BiLSTM + 词向量 + BiLSTM-CRF”成为2016–2018年序列标注的标准模板，ELMo和BERT出现前几乎所有NER系统都以它为基线。",
+  "background": "命名实体识别（NER）要在句子里找出人名、地名、机构名等，并标出类型。标注通常用IOB格式：每个词标为B-PER（人名开头）、I-PER（人名内部）或O（不是实体）等。\n\n2016年前的强系统，如基于[[crf]]或感知机的模型，靠人工设计的特征：词是否首字母大写、有什么后缀、是否出现在地名词典里。这些特征强依赖语言，德语名词都大写，英语的规则就不管用。[[collobert-weston]]和[[bilstm-crf]]已经用神经网络学上下文特征，但最好的版本仍要加拼写特征和词典。另一个难点是数据量：[[conll-2003]]这类标注集规模很小，大量人名、地名在训练集里只出现一两次，甚至没出现过，单独为每个词学一个向量根本学不好。",
+  "method": "**词的表示 = 词向量 ⊕ 字符向量**。\n\n- 词向量：在大规模无标注语料上用skip-n-gram（[[word2vec]]的变体）预训练，再微调。\n- 字符向量：把“Mars”拆成M、a、r、s，用一个正向和一个反向[[lstm]]各读一遍，拼接两者的最终状态。作者的理由是：正向LSTM的末状态偏向记住后缀，反向偏向记住前缀，而前缀、后缀和词干携带的信息不同，比位置无关的卷积更合适。\n- 在拼好的向量上加dropout（丢弃率0.5），否则模型会只依赖预训练词向量，忽略字符信息。\n\n**句子层：BiLSTM-CRF**。双向LSTM读整句，为每个位置输出对每个标签的分数`P_i,y`。CRF层再学一个标签转移矩阵`A`，整条标签序列的得分是\n\n`s(X, y) = Σ_i A_(y_i, y_(i+1)) + Σ_i P_(i, y_i)`\n\n训练时最大化正确序列在所有可能序列中的[[c:softmax]]概率，测试时用维特比算法（[[c:dynamic-programming]]）找得分最高的序列。转移矩阵会学到“I-PER不能跟在B-LOC后面”这类约束，这是逐词独立分类做不到的。\n\n论文还提出另一种转移式模型Stack-LSTM，用类似依存分析（[[nivre-parser]]）的移进-归约动作直接切分实体块。",
+  "results": "CoNLL-2003英语测试集F1（见[[c:classification-metrics]]）：LSTM-CRF为90.94，去掉字符向量为90.20，Stack-LSTM为90.33；当时使用外部词典或额外标注数据的最好系统为91.2。德语78.76、荷兰语81.74、西班牙语85.75，均超过此前所有方法，包括使用外部资源的系统。消融显示各部分对英语F1的贡献：预训练词向量+7.31，CRF层+1.79，dropout+1.17，字符向量约+0.74。",
+  "legacy": "这套结构很快成为标准做法，Ma和Hovy同年提出用字符CNN替代字符LSTM的同类模型。[[elmo]]在同一类BiLSTM-CRF上换入上下文化的预训练向量，[[bert]]则直接在预训练Transformer上逐词分类，在CoNLL-2003上进一步刷新纪录。CRF层在BERT之后常被省略，因为强编码器已经能隐式学到标签之间的约束；字符级建模则被子词切分（[[bpe]]、[[wordpiece]]）取代。",
+  "limits": [
+    {"text": "预训练只覆盖词向量这一层，每个词仍是与上下文无关的固定向量，BiLSTM和CRF完全从小规模标注数据学起。", "solved_by": ["elmo", "bert"]},
+    {"text": "每种语言都要单独标注数据、单独训练，没有跨语言共享。", "solved_by": ["xlm-r"]},
+    {"text": "IOB标注一个词只能属于一个实体，嵌套实体（如“北京大学”中的“北京”）无法表示。", "solved_by": []},
+    {"text": "模型只在新闻领域的四类实体上验证，迁移到医学、社交媒体等新领域、新实体类型时仍需重新标注。", "solved_by": ["gpt-3"]}
+  ],
+  "relations": [
+    {"to": "bilstm-crf", "type": "extends", "note": "沿用BiLSTM-CRF的句子层结构，但去掉手工拼写特征和词典，改用从字符学出的词表示。"},
+    {"to": "nymble-ner", "type": "solves", "note": "Nymble一类统计NER依赖人工特征和语言专属规则；本文完全不用语言专属资源，在四种语言上都达到当时最好。"},
+    {"to": "crf", "type": "uses", "note": "顶层用线性链CRF对整条标签序列联合打分，消融中贡献1.79 F1。"},
+    {"to": "word2vec", "type": "uses", "note": "词向量用skip-n-gram（word2vec的变体）在无标注语料上预训练，是贡献最大的组件（+7.31 F1）。"},
+    {"to": "char-aware-lm", "type": "rivals", "note": "同期用字符卷积构造词向量；本文认为前后缀信息与位置有关，选择双向字符LSTM。"},
+    {"to": "conll-2003", "type": "uses", "note": "在CoNLL-2002/2003四种语言的NER数据上评测。"}
+  ],
+  "prereq": ["recurrent-layer", "embedding", "graphical-model", "dynamic-programming", "classification-metrics", "dropout-concept"],
+  "terms": [
+    {"t": "命名实体识别（NER）", "d": "在文本中找出人名、地名、机构名等专有名称，并标出它们的类型。"},
+    {"t": "IOB标注", "d": "把实体识别变成逐词打标签：B表示实体开头，I表示实体内部，O表示不属于实体。"},
+    {"t": "维特比算法", "d": "在所有可能的标签序列里找总分最高的一条的动态规划算法，复杂度与句长成正比、与标签数平方成正比。"}
+  ],
+  "learn": "先补[[c:recurrent-layer]]、[[c:graphical-model]]和[[c:dynamic-programming]]，读过[[crf]]和[[bilstm-crf]]。读原文第2节（CRF打分和归一化公式）和第4.1节（字符模型），再看表5的消融。动手：用PyTorch实现BiLSTM-CRF，自己写前向算法和维特比解码，在CoNLL-2003上训练，再分别去掉字符向量和CRF层看F1变化。",
+  "check": {"source": "https://arxiv.org/html/1603.01360", "confirmed": "标题、5位作者、arXiv首次提交2016-03-04；正文字符BiLSTM设计理由、dropout 0.5；表1英语LSTM-CRF 90.94、无字符90.20、S-LSTM 90.33、带词典最好91.2；表2–4德78.76、荷81.74、西85.75；第5.4节消融+7.31、+1.79、+1.17、+0.74。NAACL 2016对应ACL Anthology N16-1030。"}
+}

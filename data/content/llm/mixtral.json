@@ -1,0 +1,108 @@
+{
+  "id": "mixtral",
+  "who": "Albert Q. Jiang, Alexandre Sablayrolles, Antoine Roux, Arthur Mensch, Blanche Savary, Chris Bamford, Devendra Singh Chaplot, Diego de las Casas et al. · Mistral AI",
+  "venue": "arXiv 2024",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2401.04088"
+    },
+    {
+      "label": "官方博客（2023-12-11）",
+      "url": "https://mistral.ai/news/mixtral-of-experts"
+    },
+    {
+      "label": "论文HTML全文",
+      "url": "https://arxiv.org/html/2401.04088v1"
+    }
+  ],
+  "problem": "MoE在谷歌内部做到万亿参数，但开源社区没有一个好用的MoE模型；开源最强的Llama 2 70B每生成一个token要动用全部700亿参数，又慢又贵。",
+  "idea": "把Mistral 7B每层的前馈网络复制成8个专家，路由器为每个token每层挑2个，总参数470亿而每个token只算130亿，以Apache 2.0开放权重。",
+  "impact": "第一个被广泛使用的开源MoE模型：以约1/5的激活参数追平或超过Llama 2 70B和GPT-3.5，把MoE带进了开源生态和推理框架。",
+  "background": "[[c:mixture-of-experts]]的思路是：模型里放很多个前馈子网络（专家），每个token只交给其中少数几个处理，于是参数量可以很大而每个token的计算量不变。[[sparse-moe]]、[[gshard]]、[[switch-transformer]]已经在谷歌内部把它做到数千亿乃至万亿参数，但这些模型没有开放，实现也依赖TPU和专门的并行框架。开源社区在2023年的主力是稠密模型[[llama-2]]，其中70B版本质量最好，但每个token都要算全部参数。同年10月，同一团队的[[mistral-7b]]证明了小模型加好数据能打过Llama 2 13B，下一步自然是：能不能用MoE把容量放大而不增加推理成本？",
+  "method": "**结构**。与Mistral 7B相同的32层解码器（隐维4096、32个查询头、8个KV头的[[gqa]]，词表3.2万），唯一的改动是每层的前馈网络换成8个独立的SwiGLU专家。上下文32K，且是完整的稠密注意力，不再用Mistral 7B的滑动窗口。\n\n**路由**。每层有一个线性路由器 `W_g`，对输入向量x打出8个分数，只保留最大的2个做[[c:softmax]]：\n\n`y = Σ_i Softmax(Top2(x·W_g))_i · SwiGLU_i(x)`\n\n例如某个token的分数是（3.1, 0.2, 2.7, …），就只走专家1和专家3，按约0.6:0.4加权求和，其余6个专家不计算。不同层、不同token选的专家都可以不同。\n\n**参数怎么算**。注意力等共享部分只有一份，所以总参数是46.7B而不是8×7B=56B；每个token实际经过的是12.9B。\n\n**指令版**。先做监督微调，再用[[dpo]]在成对偏好数据上对齐，没有用PPO。团队同时向[[vllm]]提交了集成MegaBlocks稀疏矩阵内核的代码，让社区能直接部署。",
+  "results": "基座模型在论文的全部基准上追平或超过Llama 2 70B，数学和代码优势最大：GSM8K 74.4%、HumanEval 40.2%，MMLU 70.6%（Llama 2 70B为69.9%）。法、德、西、意四种语言上也明显超过Llama 2 70B。32K长度内的passkey检索准确率100%。Instruct版MT-Bench 8.30，在2023年12月22日的Chatbot Arena上Elo 1121，高于Claude-2.1、GPT-3.5-Turbo和Gemini Pro。\n\n路由分析的结果出人意料：按学科（arXiv、生物、哲学）统计，专家选择的分布几乎一样，没有“数学专家”“生物专家”；专家更像按语法分工，例如Python的缩进token总是去同一个专家，相邻token也常常选同一个专家。",
+  "legacy": "Mixtral之后，开源大模型迅速转向MoE：同月的[[deepseekmoe]]针对“专家不分工”提出更细的专家和共享专家，后来的[[deepseek-v3]]、[[qwen3]]、[[llama-4]]、[[gpt-oss]]都是MoE。[[minimax-01]]直接以Mixtral式MoE为基础再换掉注意力。推理框架为它补齐了MoE内核，“总参数/激活参数”也成了描述模型规模的标准写法。",
+  "pitfalls": "- “8x7B”不是8个独立的7B模型，也不是56B参数：注意力层是共享的，总参数46.7B。\n- 激活参数少只省**计算**，不省**显存**：部署时47B参数必须全部加载，比13B稠密模型占用大得多。\n- 论文发布于2024年1月，但权重和官方博客在2023年12月就已公开。",
+  "limits": [
+    {
+      "text": "专家只有8个、每次选2个，组合方式太少；路由分析显示专家没有形成按知识领域的分工，大量知识可能在各专家里重复存储。",
+      "solved_by": [
+        "deepseekmoe"
+      ]
+    },
+    {
+      "text": "全部470亿参数都要放进显存，单张消费级显卡放不下，MoE的省钱只体现在计算上。",
+      "solved_by": []
+    },
+    {
+      "text": "训练数据只说“来自开放网络”，数据量、配比和训练算力都没有公开，结果无法复现。",
+      "solved_by": []
+    },
+    {
+      "text": "仍用每层都计算完整注意力的标准结构，32K之外的长上下文和KV缓存开销没有改善。",
+      "solved_by": [
+        "deepseek-v2",
+        "minimax-01"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "mistral-7b",
+      "type": "extends",
+      "note": "架构完全沿用Mistral 7B，只把每层前馈网络换成8个专家，并去掉滑动窗口改为32K稠密注意力。"
+    },
+    {
+      "to": "switch-transformer",
+      "type": "extends",
+      "note": "Switch证明了稀疏MoE可以做到万亿参数但未开放；Mixtral把同一思路做成可下载、可在GPU上部署的开源模型，并从top-1路由改回top-2。"
+    },
+    {
+      "to": "sparse-moe",
+      "type": "uses",
+      "note": "门控公式Softmax(TopK(x·W_g))直接来自2017年的稀疏门控MoE层。"
+    },
+    {
+      "to": "gshard",
+      "type": "uses",
+      "note": "每个token选2个专家的top-2路由与GShard相同。"
+    },
+    {
+      "to": "llama-2",
+      "type": "rivals",
+      "note": "以约1/5的激活参数追平或超过Llama 2 70B，成为当时开源模型的新标杆。"
+    },
+    {
+      "to": "dpo",
+      "type": "uses",
+      "note": "指令版用SFT加DPO对齐，是DPO较早在知名开源模型上的大规模使用。"
+    }
+  ],
+  "prereq": [
+    "mixture-of-experts",
+    "transformer-block",
+    "softmax",
+    "params-flops",
+    "self-attention"
+  ],
+  "terms": [
+    {
+      "t": "激活参数",
+      "d": "处理一个token时实际参与计算的参数量。MoE模型的总参数远大于激活参数，推理计算量由后者决定。"
+    },
+    {
+      "t": "top-k路由",
+      "d": "路由器给每个专家打分，只把token交给分数最高的k个专家，再按softmax权重合并它们的输出。"
+    },
+    {
+      "t": "SwiGLU",
+      "d": "一种带门控的前馈层：一路线性变换经过Swish激活后与另一路线性变换逐元素相乘，再投影回去，是Llama系模型的标准前馈结构。"
+    }
+  ],
+  "learn": "先读[[c:mixture-of-experts]]，再回看[[switch-transformer]]的路由与负载均衡。读原文第2节（只有一个公式）和第5节路由分析，看图8的逐token专家着色。动手：在nanoGPT里把MLP换成4个专家、top-2路由，打印每个专家接收的token比例，看看不加负载均衡损失会发生什么。",
+  "check": {
+    "source": "https://arxiv.org/html/2401.04088v1",
+    "confirmed": "标题、作者、arXiv v1提交于2024-01-08，官方博客发布于2023-12-11；表1结构参数（32层、dim 4096、8个KV头、32K、词表32000、8专家top-2）、46.7B/12.9B（博客）、表2中MMLU 70.6%/GSM8K 74.4%/HumanEval 40.2%、表3中Llama 2 70B的MMLU 69.9%、MT-Bench 8.30、Arena Elo 1121、passkey 100%、第5节“没有观察到按主题分配专家的明显模式”。"
+  }
+}

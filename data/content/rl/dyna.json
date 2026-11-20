@@ -1,0 +1,37 @@
+{
+  "id": "dyna",
+  "who": "Richard S. Sutton · GTE实验室",
+  "venue": "ICML 1990",
+  "links": [
+    {"label": "论文PDF（Sutton主页）", "url": "http://incompleteideas.net/papers/sutton-90.pdf"},
+    {"label": "Sutton & Barto教材第8章", "url": "http://incompleteideas.net/book/the-book-2nd.html"}
+  ],
+  "problem": "纯试错学习每走一步真实环境只能学到一点，学得很慢；传统AI规划又要求事先给出准确的世界模型，而且算得慢，来不及实时反应。",
+  "idea": "边与环境交互边学一个世界模型，每走一步真实的，就用模型“想象”k步假想经验，并用同一套TD或Q学习规则更新——学习和规划用的是同一个算法，只是数据来源不同。",
+  "impact": "奠定了“学模型、在模型里练”的基于模型强化学习框架，后来的MBPO、Dreamer、MuZero都可以看成它的深度版本。",
+  "background": "1990年前后有三种让智能体做决策的思路：传统AI的**规划**（根据目标和世界模型推出最佳动作），但计算量大且依赖准确的模型；把规划结果预先编译成“情境→动作”规则，但环境一变规则就过时；以及[[actor-critic-1983]]、[[td-learning]]那样的**试错学习**，不需要模型，但每次真实经验只更新一点点，学得很慢。\n\n[[bellman]]的动态规划本身不是学习方法，它需要完整的模型；[[watkins-thesis]]刚指出Q学习可以看成增量式的动态规划。Sutton的问题是：能不能把这三件事放进同一个循环？",
+  "method": "核心观察是：**规划就是从假想经验中试错学习**。Dyna的内循环（见[[c:model-based-rl]]）：\n\n- 决定这一步用真实经验还是假想经验；\n- 真实经验：在当前状态执行动作，得到下一状态和奖励，顺便更新世界模型（这里就是一张“状态+动作→下一状态+奖励”的表）；\n- 假想经验：从见过的状态里随机挑一个，让模型给出结果；\n- 无论哪种，都用同一条TD规则更新价值和策略。\n\n每走一步真实的，做k步假想的。论文给了两个版本：**Dyna-PI**近似[[howard-policy-iteration]]，用评估函数加策略表；**Dyna-Q**直接用Q学习，更简单。\n\n为了应对环境变化，**Dyna-Q+**给很久没试过的“状态-动作”加一个探索奖励`ε√n`（n是距上次真实尝试的步数），而且把它加在Q值更新里而不是只加在选动作时，于是规划会主动“计划”出一条去探索的路线。",
+  "results": "6×9的迷宫，只有到达终点得奖励1，平均100次运行：k=0（纯试错）路径长度下降很慢；k=100时一般到第4趟就找到并走上最优路径。原因很直观：没有规划时每趟只往回多学一步；有规划时，第一趟学到的那一步会在假想经验中迅速往回传播。\n\n环境变化实验（k=10，50次运行平均）：原路被堵后，Dyna-PI几乎再也拿不到奖励，两种Dyna-Q约800步后找到新路；出现捷径时只有Dyna-Q+发现了它，代价是在静态阶段奖励率略低。",
+  "legacy": "[[experience-replay]]可以看成Dyna的“无模型”版本：直接重放存下的真实经验。[[pilco]]、[[pets]]、[[mbpo]]把表格模型换成高斯过程或神经网络集成；[[world-models]]、[[dreamer]]在学到的潜空间里想象轨迹训练策略；[[muzero]]把学到的模型用于树搜索。Sutton后来的[[alberta-plan]]仍把Dyna式的规划列为核心组件。",
+  "limits": [
+    {"text": "模型、价值和策略都是表格，只适用于能全部枚举的小状态空间；论文自己列为第一条局限。", "solved_by": ["pilco", "mbpo", "dreamer"]},
+    {"text": "学到的模型一旦有误差，规划会利用这些错误，论文只在确定性小迷宫上验证，没有处理模型偏差。", "solved_by": ["pets", "mbpo"]},
+    {"text": "假设智能体能直接看到真实状态；现实中状态只能从观测历史中估计。", "solved_by": ["pomdp", "world-models", "muzero"]},
+    {"text": "假想经验从见过的状态中均匀随机挑选，搜索控制非常粗糙，大问题里大量计算浪费在无关状态上。", "solved_by": ["per", "muzero"]}
+  ],
+  "relations": [
+    {"to": "td-learning", "type": "uses", "note": "真实经验和假想经验都用TD误差更新评估函数，规划与学习共用一条规则。"},
+    {"to": "watkins-thesis", "type": "uses", "note": "Dyna-Q直接以Watkins刚提出的Q学习为内核，比Dyna-PI更简单、更适合变化的环境。"},
+    {"to": "howard-policy-iteration", "type": "extends", "note": "Dyna-PI是策略迭代的增量、采样式近似：评估和改进交替进行，但不需要已知模型。"},
+    {"to": "bellman", "type": "solves", "note": "动态规划需要事先给定完整模型；Dyna在线学出模型再对它做近似动态规划。"},
+    {"to": "actor-critic-1983", "type": "extends", "note": "Dyna-PI的策略和评估更新就是actor-critic，k=0时退化为纯试错的actor-critic。"},
+    {"to": "schmidhuber-wm-1990", "type": "rivals", "note": "同年的另一条路：Schmidhuber用可微的神经网络世界模型，通过模型反传梯度来改进控制器；Dyna用模型生成样本。后来两条路线都被深度模型RL继承。"}
+  ],
+  "prereq": ["mdp", "policy-value", "td-error", "model-based-rl", "exploration-exploitation", "dynamic-programming"],
+  "terms": [
+    {"t": "假想经验", "d": "不是在真实环境中得到，而是向学到的世界模型询问“在这个状态做这个动作会怎样”得到的转移样本。"},
+    {"t": "规划步数k", "d": "每执行一步真实动作后，用模型生成并学习的假想转移数量。k越大，同样多的真实经验学得越快，但计算越多。"}
+  ],
+  "learn": "先学会表格Q学习。读原文第2节（Dyna-PI）和第5–6节（Dyna-Q+与环境变化实验）。动手：在6×9迷宫里实现Dyna-Q，画出k=0、5、50时每趟步数的曲线，再做一次中途堵路实验，对照Sutton & Barto教材第8章。",
+  "check": {"source": "http://incompleteideas.net/papers/sutton-90.pdf", "confirmed": "下载原文并OCR：ICML第7届会议论文集pp.216–224（1990）、作者单位GTE；Dyna-PI内循环8步；6×9迷宫、k=0/10/100、100次运行平均、k=100约第4趟找到最优；探索奖励ε√n加在Q更新式(5)；阻断实验1000步后换迷宫、50次运行、Dyna-Q约800步后找到新路；第7节列出的局限。"}
+}

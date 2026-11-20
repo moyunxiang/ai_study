@@ -1,0 +1,38 @@
+{
+  "id": "mohamed-dbn-phone",
+  "who": "Abdel-rahman Mohamed, George Dahl, Geoffrey Hinton · 多伦多大学",
+  "venue": "NIPS 2009 Workshop on Deep Learning for Speech Recognition and Related Applications",
+  "links": [
+    {"label": "论文PDF", "url": "https://www.cs.toronto.edu/~asamir/papers/NIPS09.pdf"},
+    {"label": "期刊扩展版：Acoustic Modeling Using Deep Belief Networks（IEEE TASLP 2012）", "url": "https://doi.org/10.1109/tasl.2011.2109382"}
+  ],
+  "problem": "HMM的发射概率由高斯混合给出，二十年来几乎没被撼动；1990年代的神经网络混合系统只有一个隐层，加深之后又训练不动，始终没能明显胜过精调的GMM系统。",
+  "idea": "先用受限玻尔兹曼机逐层无监督预训练一个多层网络，学会建模11帧语音的统计结构，再接上183个HMM状态的输出层用反向传播微调，把这个深层网络当作混合NN/HMM中的状态打分器。",
+  "impact": "在TIMIT核心测试集上音素错误率23.0%，比此前文献最好结果低1.4个百分点。这是深度学习在语音上的第一个有说服力的结果，直接引出微软、谷歌、IBM在大词表任务上的DNN声学模型，几年内GMM被淘汰。",
+  "background": "2009年，几乎所有识别器都是[[hmm-asr]]加高斯混合（GMM），配合[[tied-state]]三音子和区分性训练调了二十年。[[hybrid-nn-hmm]]早已提出用神经网络替GMM打分，但当时的网络只有一个隐层，加深后用[[c:backpropagation]]从随机初始化训练会陷入很差的解，效果不比GMM好多少。\n\n2006年Hinton等提出[[dbn]]：用无监督的方式逐层预训练，给深层网络一个好的起点，这在手写数字等任务上已经奏效。Hinton组的问题是：同样的方法能不能让深层网络在语音上胜过GMM？他们选了TIMIT音素识别（[[timit]]）作为试验场：数据小、结果容易与文献比较。",
+  "method": "**输入与输出**。每10毫秒一帧，特征是12阶[[mfcc]]加能量及其一阶、二阶差分（39维）。网络的输入是以当前帧为中心的11帧拼接，输出是183个类别——61个音素、每个音素的HMM有3个状态。\n\n**预训练**。把网络看成一摞受限玻尔兹曼机（RBM）：每个RBM是一层可见单元加一层隐单元的无向图，用[[contrastive-divergence]]训练，让它能“重建”下层输入。第一层RBM直接建模这11帧的MFCC（实值输入），学到后把隐层激活当作下一层RBM的输入，依此逐层堆叠。这一步不用任何标签。\n\n**微调**。在预训练好的各层上面加一个输出层，用HMM强制对齐得到的逐帧状态标签，以[[c:cross-entropy]]为目标用反向传播把整个网络一起调整。\n\n**解码**。网络输出的状态后验除以先验，作为HMM的发射概率，配合从训练集估计的音素二元文法，用Viterbi解码。\n\n论文系统地比较了不同层数和每层宽度（1024、2048、3072个单元），以及在输出前加一个128单元的瓶颈层。训练在NVIDIA Tesla S1070的GPU上进行，最大的模型预训练遍历一次训练集约5分钟、微调一轮约13分钟。",
+  "results": "在TIMIT 24位说话人的核心测试集上（61音素映射到39类计分）：从1层加到2层错误率明显下降，4层后测试集错误率稳定在23%–24%；每层2048单元的4层网络加128单元瓶颈层效果最好，音素错误率23.0%。文献中此前最好的结果是24.40%，其他方法在24.8%到36%之间（据论文表4）。",
+  "legacy": "这篇短文发表后进展非常快：[[cd-dnn-hmm]]把输出从183个单音素状态换成数千个绑定三音子状态，在大词表任务上大幅超过GMM；2012年[[dnn-hmm]]由多伦多、微软、谷歌、IBM四组联合综述，宣告DNN声学模型成为标准。期刊扩展版（Mohamed、Dahl、Hinton，IEEE TASLP 2012）给出了更完整的实验。\n\n被替换的部分也很明确：RBM预训练在数据量足够、用上[[relu]]和[[dropout]]之后被证明可以省掉；MFCC输入被DCT之前的对数梅尔滤波器组取代；逐帧交叉熵训练又加上了序列级区分性训练（如[[lf-mmi]]）。保留下来的是“深层网络加HMM”这一结构。",
+  "pitfalls": "- 这篇工作的网络仍是混合NN/HMM中的打分器，不是端到端识别：对齐、解码、语言模型都还靠HMM。\n- TIMIT是音素识别，句子少、无需词典和词级语言模型；它证明了声学建模能力，但能否推广到大词表任务是后续工作才回答的。",
+  "limits": [
+    {"text": "只在TIMIT小规模音素识别上验证，输出是上下文无关的单音素状态，离大词表连续识别还有距离。", "solved_by": ["cd-dnn-hmm", "dnn-hmm"]},
+    {"text": "RBM逐层预训练步骤繁琐、耗时，而且依赖较多经验技巧。", "solved_by": ["relu", "dropout"]},
+    {"text": "仍按HMM强制对齐给出的逐帧标签训练，目标与整句错误率不一致，也离不开GMM系统做初始对齐。", "solved_by": ["graves-deep-rnn", "lf-mmi"]}
+  ],
+  "relations": [
+    {"to": "dbn", "type": "uses", "note": "直接把深度信念网络的逐层无监督预训练拿来初始化声学模型。"},
+    {"to": "hybrid-nn-hmm", "type": "extends", "note": "沿用后验除以先验接入HMM的混合框架，把单隐层网络换成预训练过的多层网络。"},
+    {"to": "contrastive-divergence", "type": "uses", "note": "每一层RBM都用对比散度训练。"},
+    {"to": "timit", "type": "uses", "note": "以TIMIT核心测试集为基准，与文献中十种方法比较音素错误率。"},
+    {"to": "mfcc", "type": "uses", "note": "输入是11帧拼接的MFCC加能量及其一、二阶差分。"},
+    {"to": "gpu-dl-2009", "type": "uses", "note": "同年证明GPU能大幅加速深层网络训练；本文的预训练和微调也全部在GPU上完成。"}
+  ],
+  "prereq": ["mlp", "backpropagation", "energy-based", "pretrain-finetune", "hmm-concept", "cross-entropy"],
+  "terms": [
+    {"t": "受限玻尔兹曼机（RBM）", "d": "一层可见单元和一层隐单元组成的无向概率模型，层内没有连接。它学的是输入数据的分布，可以逐层堆叠成深度信念网络。"},
+    {"t": "音素错误率（PER）", "d": "识别出的音素串与参考答案之间的编辑距离（替换、删除、插入）除以参考音素总数。"},
+    {"t": "瓶颈层", "d": "比前后各层窄得多的一层（这里是128个单元），迫使网络压缩信息，可减轻过拟合。"}
+  ],
+  "learn": "先补[[c:mlp]]、[[c:pretrain-finetune]]和[[c:energy-based]]中关于RBM的部分。读本文第2节（DBN与微调）和第4节的实验。动手：在Kaldi的TIMIT配方中跑通GMM基线和nnet DNN配方，比较两者的音素错误率；再试试去掉预训练、改用ReLU直接训练，看差距还有多大。",
+  "check": {"source": "https://www.cs.toronto.edu/~asamir/papers/NIPS09.pdf", "confirmed": "论文PDF：标题、三位作者、多伦多大学；TIMIT 462人训练集、50人开发集、24人核心测试集、12阶MFCC+能量+一二阶差分、11帧输入、183个目标类、音素二元文法、4层2048单元加128瓶颈层PER 23.0%、比文献最好低1.4%、表4中此前结果24.40%至36%、Tesla S1070上预训练每遍约5分钟、微调每轮约13分钟。期刊扩展版见OpenAlex记录doi:10.1109/tasl.2011.2109382。"}
+}

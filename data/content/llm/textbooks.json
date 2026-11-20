@@ -1,0 +1,37 @@
+{
+  "id": "textbooks",
+  "who": "Suriya Gunasekar, Yi Zhang, Jyoti Aneja, Caio César Teodoro Mendes, Allie Del Giorno, Sivakanth Gopi, Mojan Javaheripi, Piero Kauffmann et al.（含Sébastien Bubeck、Ronen Eldan、Yuanzhi Li） · Microsoft Research",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2306.11644"},
+    {"label": "模型权重phi-1", "url": "https://huggingface.co/microsoft/phi-1"}
+  ],
+  "problem": "按缩放定律，代码模型要变强就得同时加大参数和数据；但网上的代码大多是配置文件、样板和缺乏解释的片段，对“学会编程”帮助很小，用它们训练效率很低。",
+  "idea": "不追求数据量，而追求“教科书质量”：用GPT-4标注、训练分类器从网上代码里挑出有教学价值的约6B token，再让GPT-3.5写约1B token的Python教科书和约180M token的习题，只用这些训练一个1.3B的小模型。",
+  "impact": "1.3B参数、8张A100训练4天的phi-1在HumanEval上达到50.6%，超过参数大10倍、数据多100倍的开源代码模型，让“数据质量可以替代规模”成为研究热点，开启了微软Phi系列小模型。",
+  "background": "[[scaling-laws]]和[[chinchilla]]描绘的路线是：损失随参数量和训练数据量的增加按幂律下降，想要更好就得两者一起加大。代码模型也照此发展：[[codex]]、[[starcoder]]都在数千亿乃至上万亿个token的GitHub代码上训练。\n\n但作者认为网上的代码对学习者并不友好：大量文件只是定义常量或配置，复杂算法分散在很多文件里，几乎没有讲解。人类学编程靠的是讲清楚概念、配有循序渐进习题的教科书。几周前，同组的[[tinystories]]已经证明：用GPT生成的、只含3–4岁儿童词汇的短故事数据集，能让1000万参数以下的模型写出通顺连贯的英文故事。本文把这个想法推广到代码。",
+  "method": "**1. 过滤现有代码（约6B token）**。从去重后的The Stack Python部分和StackOverflow（共3500多万个文件、350多亿token）中抽约10万个样本，让[[gpt-4]]判断它对“想学基础编程概念的学生”有多大教学价值。再用这些标注训练一个随机森林分类器（输入是预训练代码模型给出的文件嵌入），给全部数据打分并只保留高分部分。\n\n**2. 合成教科书（不到1B token）**。让GPT-3.5写夹杂讲解和代码的Python教科书。难点是多样性：直接让模型写，会反复生成相同的概念和解法。借鉴TinyStories，在提示里随机指定主题和目标读者等约束，强迫输出更分散。\n\n**3. 合成习题（不到180M token）**。GPT-3.5生成的“函数签名＋文档字符串＋参考实现”形式的练习，格式与HumanEval题目相似。\n\n**训练**。24层、隐藏维度2048的解码器，用[[flashattention]]和[[rope]]。前两部分合称CodeTextbook，在上面训练约8遍（共约51B个token，770 GPU小时）得到phi-1-base；再用习题集微调得到phi-1。",
+  "results": "在[[humaneval]]上pass@1为50.6%，MBPP为55.5%；没有习题微调的phi-1-base已有29%；350M参数的phi-1-small有45%。作为对比，在未过滤的The Stack＋StackOverflow上训练350M模型，看了约200B个token后HumanEval停在12.19%；只换成过滤后的数据，36k步就到17.68%。为回应“习题与HumanEval太像”的质疑，作者删掉与HumanEval题目相似的40%以上习题后重新训练，phi-1仍明显超过15.5B的StarCoder。",
+  "legacy": "微软沿这条路线做了[[phi-1.5]]（把合成教科书扩展到常识推理）、[[phi-2]]、[[phi-3]]和[[phi-4]]，“小模型＋合成数据”成为端侧模型的常见配方；用强模型给网页数据打“教育价值”分再筛选的做法，也被后来的[[fineweb]]等大规模开放数据集采用。另一面，由于评测题与合成数据风格接近，[[contamination]]等工作提醒人们，小模型在公开基准上的高分需要谨慎看待。",
+  "pitfalls": "- phi-1只擅长**Python基础函数题**。论文自己承认它在多语言、特定API和第三方库上远不如大模型，提示稍有语法错误效果就明显下降。\n- 这里的“合成数据”来自更强的GPT-3.5/GPT-4，本质上包含了对强模型知识的蒸馏，不是凭空造出能力。",
+  "limits": [
+    {"text": "只会Python，缺少大模型掌握的特定API和不常用库的知识。", "solved_by": ["phi-3", "deepseek-coder"]},
+    {"text": "数据结构化、风格单一，对提示中的措辞变化和语法错误不鲁棒。", "solved_by": ["phi-3"]},
+    {"text": "合成习题的格式与HumanEval相近，即使做了剪枝实验，基准分数是否高估了真实编程能力仍有争议。", "solved_by": ["livecodebench"]},
+    {"text": "依赖GPT-3.5/GPT-4生成和标注数据，方法的上限受教师模型限制，也受其服务条款约束。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "tinystories", "type": "extends", "note": "把“用大模型生成简单而高质量的数据训练极小模型”的思路从儿童故事推广到代码，并沿用其在提示中注入随机约束以增加多样性的技巧。"},
+    {"to": "humaneval", "type": "uses", "note": "以HumanEval pass@1为主要指标，并专门设计剪枝实验检查合成习题是否与它重复。"},
+    {"to": "codex", "type": "rivals", "note": "Codex路线靠海量GitHub代码和大模型；phi-1用不到10B token的高质量数据和1.3B参数达到更高的HumanEval分数。"},
+    {"to": "starcoder", "type": "rivals", "note": "15.5B、1T token的StarCoder是论文的主要对照，phi-1在HumanEval上超过它，但通用性和多语言能力远不如它。"},
+    {"to": "chinchilla", "type": "rivals", "note": "缩放定律假设数据质量固定；本文说明提高数据质量可以改变缩放曲线，用小得多的规模达到同等效果。"},
+    {"to": "self-instruct", "type": "extends", "note": "同样用大模型生成训练数据，但从指令微调扩展到预训练语料本身。"}
+  ],
+  "prereq": ["language-model", "scaling-law-concept", "knowledge-distillation", "benchmark", "data-contamination", "decision-tree"],
+  "terms": [
+    {"t": "教科书质量数据", "d": "清晰、自成一体、有讲解、难度循序渐进的训练数据，与网上零散的代码片段相对。"},
+    {"t": "数据剪枝去污染", "d": "从训练集中删掉与测试题相似的样本后重新训练，看分数是否明显下降，用来检验高分是否来自见过类似题目。"}
+  ],
+  "learn": "先读[[tinystories]]的摘要了解思路，再读本文第2节（三类数据怎么来）和第5节（剪枝实验）。动手：选一小批GitHub Python文件，让一个开源模型给它们的“教学价值”打1–5分，看看高分和低分文件分别是什么样子。",
+  "check": {"source": "https://arxiv.org/abs/2306.11644", "confirmed": "标题、作者、arXiv v1于2023-06-20；摘要：1.3B、8张A100训练4天、6B网页+1B合成、HumanEval 50.6%/MBPP 55.5%、phi-1-small 350M 45%；PDF：3500万文件/350亿token、约10万样本GPT-4标注、随机森林分类器、180M习题、24层/2048维/FlashAttention/RoPE、约8遍51B token/770 GPU小时、phi-1-base 29%、未过滤12.19%（约200B token）vs过滤17.68%（36k步）、剪枝40%以上仍超StarCoder、局限（仅Python、API知识、对提示变化不鲁棒）、教科书多样性靠限定主题与目标读者。另核对phi-1.5（2309.05463，转向常识推理）与FineWeb（2406.17557，FineWeb-Edu按教育价值筛选）摘要。"}
+}

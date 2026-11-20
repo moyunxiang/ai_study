@@ -1,0 +1,39 @@
+{
+  "id": "starcoder",
+  "who": "Raymond Li, Loubna Ben Allal, Yangtian Zi, Niklas Muennighoff, Denis Kocetkov, Chenghao Mou, Marc Marone, Christopher Akiki et al. · BigCode（Hugging Face与ServiceNow牵头的开放协作）",
+  "venue": "TMLR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2305.06161"},
+    {"label": "模型权重", "url": "https://huggingface.co/bigcode/starcoder"}
+  ],
+  "problem": "最好的代码模型（Codex及GitHub Copilot背后的模型）不公开；开源代码模型要么规模小，要么训练数据来路不明，开发者无法得知自己的代码是否被拿去训练。",
+  "idea": "只用许可证宽松的GitHub代码构建数据集The Stack，提供查询和退出机制，训练一个15.5B、8K上下文、支持中间填充、用多查询注意力加速推理的开放代码模型。",
+  "impact": "第一个效果追平OpenAI code-cushman-001的开放代码大模型，并把数据治理（许可证筛选、退出机制、隐私信息去除、溯源工具）做成了可复用的样板。",
+  "background": "[[codex]]证明了在GitHub代码上训练的语言模型能根据注释写出函数，其后续版本支撑了[[copilot]]，但模型和数据都不公开。开源的[[codegen]]等模型规模和效果有限；而且这些模型的训练数据都直接抓取了公共仓库，不管许可证是否允许，代码作者既不知情也无法退出，引发了版权和隐私争议。\n\nBigCode是以Hugging Face和ServiceNow为主的开放协作项目，目标是像[[bloom]]那样公开地训练代码模型，同时认真处理数据的合法性问题。",
+  "method": "**数据**。The Stack v1.2收录了6.4TB许可证宽松（如MIT、Apache）的源代码，配有“Am I in The Stack”查询工具和退出流程。从中选了86种编程语言，再加上GitHub issues、Git提交记录和Jupyter笔记本，去重和过滤后约815GB。用作者标注的PII数据集训练了一个识别模型，去除代码里的邮箱、密钥、IP地址等隐私信息。\n\n**模型**。15.5B参数的解码器，40层，上下文8192个token（借助[[flashattention]]），三个关键设计：\n- [[mqa]]：所有注意力头共用一组K、V，大批量推理时显存带宽压力小得多（见[[c:kv-cache]]）；\n- [[fim]]：训练时以50%概率把一段代码的中间部分挪到末尾，让模型学会根据前后文补全中间，这正是编辑器里补全代码所需要的；\n- 字节级BPE分词，词表49,152。\n\n**训练**。StarCoderBase在512张A100上训练1万亿个token；再在350亿个Python token上继续训练2轮，得到Python专精的StarCoder。",
+  "results": "Python代码题pass@1（见[[c:benchmark]]）：StarCoder在[[humaneval]]上33.6%、MBPP上52.7%；StarCoderBase分别为30.4%和49.0%。对比：OpenAI的code-cushman-001（12B）33.5%/45.9%，[[llama-1]]-65B为23.7%/37.7%，[[palm]]-540B为26.2%/36.8%。论文称用特定提示时StarCoder的HumanEval可达40%。在多语言评测MultiPL-E上，StarCoderBase超过所有开源多语言代码模型。训练共用32万GPU小时，估算排放约16.7吨CO2当量。",
+  "legacy": "StarCoder以带用途限制的OpenRAIL-M许可证发布，允许商用。同年[[code-llama]]在Llama 2基础上把开放代码模型的HumanEval推到60%以上；2024年[[starcoder2]]与Software Heritage合作构建了大约4倍的数据（The Stack v2）继续这条路线；[[deepseek-coder]]则在项目级代码语料上用16K窗口做填空式训练。The Stack数据集本身被大量后续代码模型复用。",
+  "pitfalls": "- “许可证宽松”不等于“作者同意被用于训练”。The Stack采用的是事后退出（opt-out）而非事先同意（opt-in），这一点在社区里仍有争议。\n- HumanEval和MBPP都是几十行以内的函数级小题，高分不代表能处理真实项目中的跨文件修改。",
+  "limits": [
+    {"text": "绝对水平仍远落后于闭源的GPT-4，HumanEval只有三成左右。", "solved_by": ["code-llama", "deepseek-coder"]},
+    {"text": "8K上下文放不下一个仓库的多个文件，难以做跨文件的代码理解和修改。", "solved_by": ["code-llama", "starcoder2", "deepseek-coder"]},
+    {"text": "只是基座模型，没有指令微调，需要精心设计的提示才能当编程助手用。", "solved_by": ["code-llama"]},
+    {"text": "评测停留在函数级编程小题，无法衡量真实软件工程任务中的表现。", "solved_by": ["swe-bench"]}
+  ],
+  "relations": [
+    {"to": "fim", "type": "uses", "note": "按FIM论文的建议以0.5的比例做中间填充变换，使模型能根据前后文补全中间代码。"},
+    {"to": "mqa", "type": "uses", "note": "采用多查询注意力，降低大批量推理时读取KV缓存的显存带宽开销。"},
+    {"to": "codegen", "type": "solves", "note": "CodeGen等开源代码模型效果有限且数据来源不透明；StarCoder效果更好，并且只用许可证宽松、可退出的数据。"},
+    {"to": "codex", "type": "rivals", "note": "Codex系列闭源；StarCoder作为开放模型在HumanEval上追平了code-cushman-001。"},
+    {"to": "humaneval", "type": "uses", "note": "以HumanEval和MBPP的pass@1作为主要Python评测指标。"},
+    {"to": "bloom", "type": "extends", "note": "沿用BigScience式的开放协作与负责任AI许可证，把对象从多语言文本换成代码。"}
+  ],
+  "prereq": ["language-model", "autoregressive", "tokenization", "kv-cache", "context-window", "benchmark"],
+  "terms": [
+    {"t": "The Stack", "d": "BigCode发布的开源代码数据集，只收录许可证宽松的GitHub仓库，并允许代码作者查询和申请移除自己的代码。"},
+    {"t": "pass@k", "d": "代码评测指标：对每道题采样k个程序，只要有一个通过全部单元测试就算答对，再对所有题取平均。"},
+    {"t": "PII", "d": "个人身份信息，如姓名、邮箱、电话、密钥等。训练前从数据中检测并替换掉，避免模型记住并泄露。"}
+  ],
+  "learn": "先了解[[codex]]和[[humaneval]]的pass@k定义，再读[[fim]]理解中间填充。读StarCoder论文第3节（数据）、第5节（训练）和表12。动手：用Hugging Face加载StarCoder的小号版本，分别用普通续写和`<fim_prefix>…<fim_suffix>…<fim_middle>`格式补全一个函数，比较效果。",
+  "check": {"source": "https://arxiv.org/abs/2305.06161", "confirmed": "标题、作者、arXiv v1于2023-05-09、PDF页眉TMLR 12/2023；PDF：The Stack v1.2 6.4TB、Am I in The Stack与退出流程、86种语言、815GB、PII模型、15.5B/40层/8192上下文、MQA、FIM率0.5、词表49,152、512张A100、250k步×4M token=1T、Python继续训练2轮、表12 pass@1（StarCoder 33.6/52.7，StarCoderBase 30.4/49.0，cushman-001 33.5/45.9，LLaMA-65B 23.7/37.7，PaLM 26.2/36.8）、摘要中40%、320,256 GPU小时与16.68吨CO2e、OpenRAIL-M许可、作者单位含Hugging Face与ServiceNow。另核对Code Llama（2308.12950）、StarCoder2（2402.19173）、DeepSeek-Coder（2401.14196）摘要。"}
+}

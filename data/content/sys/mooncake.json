@@ -1,0 +1,54 @@
+{
+ "id": "mooncake",
+ "who": "Qin, Li, He, Zhang, Wu, Zheng, Xu et al. · 月之暗面(Moonshot AI), 清华大学",
+ "venue": "FAST 2025",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2407.00079"
+  }
+ ],
+ "problem": "[[distserve]]把预填充和解码分开后，长上下文和多轮对话里大量请求其实有重复前缀，每次重算预填充非常浪费，而GPU显存放不下这么多KV缓存。",
+ "idea": "把KV缓存当作一等公民：预填充与解码集群分离，同时用GPU集群里闲置的CPU内存、DRAM和SSD搭一个分布式KV缓存池，调度器以缓存命中为中心做决策。",
+ "impact": "这是Kimi在线服务的真实架构，把前缀缓存和分离式部署结合起来，影响了后来的KV缓存池方案。",
+ "method": "Mooncake是Kimi的服务平台。架构上分三层：预填充集群、解码集群，以及利用GPU机器闲置CPU/DRAM/SSD组成的KV缓存池，缓存之间通过高速网络传输。核心是以KV缓存为中心的调度器：新请求来时，先看哪些节点缓存了它的前缀，再在命中率和延迟目标（SLO）之间权衡，把请求调到合适的预填充节点。\n\n论文还关注过载场景，提出基于预测的提前拒绝策略：预判一个请求最终会超时就直接拒绝，避免白白占用资源。",
+ "results": "摘要称在某些模拟场景下，相比基线吞吐最高提升525%且满足SLO；在真实负载下，Kimi可多处理75%的请求。",
+ "legacy": "此后相关思想进入通用推理框架，如[[nvidia-dynamo]]中的KV感知路由和分级缓存。",
+ "limits": [
+  {
+   "text": "缓存池依赖RDMA等高速网络，网络条件差时命中收益被传输抵消。",
+   "solved_by": []
+  },
+  {
+   "text": "缓存命中率取决于负载的前缀重复度，对前缀分散的请求提升有限。",
+   "solved_by": [
+    "nvidia-dynamo"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "distserve",
+   "type": "extends",
+   "note": "在预填充-解码分离的基础上，加入全局KV缓存池和以缓存为中心的调度。"
+  }
+ ],
+ "prereq": [
+  "kv-cache",
+  "throughput-latency",
+  "memory-bandwidth",
+  "interconnect",
+  "context-window"
+ ],
+ "terms": [
+  {
+   "t": "SLO",
+   "d": "服务等级目标，如首词延迟不超过多少毫秒。"
+  }
+ ],
+ "learn": "先读DistServe和vLLM → 读Mooncake第4节调度器 → 看开源的Mooncake Transfer Engine项目。",
+ "check": {
+  "source": "https://arxiv.org/abs/2407.00079",
+  "confirmed": "标题、作者、2024-06-24；摘要的KVCache-centric、525%吞吐、Kimi多处理75%请求。FAST 2025按已知信息，未核对。"
+ }
+}

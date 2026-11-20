@@ -1,0 +1,104 @@
+{
+  "id": "gnmt",
+  "who": "Yonghui Wu, Mike Schuster, Zhifeng Chen, Quoc V. Le, Mohammad Norouzi, Wolfgang Macherey, Maxim Krikun, Yuan Cao et al. · Google",
+  "links": [
+    {
+      "label": "arXiv技术报告",
+      "url": "https://arxiv.org/abs/1609.08144"
+    },
+    {
+      "label": "Google Research博客：上线公告",
+      "url": "https://research.google/blog/a-neural-network-for-machine-translation-at-production-scale/"
+    }
+  ],
+  "problem": "神经机器翻译在公开基准上已追平短语翻译，但训练和推理都太慢、罕见词处理差、长句常漏译，没人敢把它放进每天处理海量请求的线上产品。",
+  "idea": "把注意力Seq2Seq做成工程上可部署的系统：8层编码器+8层解码器的LSTM加残差连接，多GPU模型并行，WordPiece子词，束搜索加长度归一化和覆盖惩罚，推理用低精度运算跑在TPU上。",
+  "impact": "2016年9月谷歌翻译中译英全部切换到GNMT，谷歌翻译从此由统计翻译转向神经翻译；人工评测中翻译错误比原短语系统平均减少约60%，详细公开的工程方案也让其他翻译服务有了可照做的样板。",
+  "background": "[[seq2seq]]和[[bahdanau-attention]]证明了端到端神经翻译可行，但在2016年它离产品还很远。谷歌翻译从2006年起一直用[[phrase-smt]]（见[[google-translate]]）。神经翻译有三个实际障碍：一是**慢**，深层LSTM训练要很多天，线上逐词解码加束搜索的延迟也难以接受；二是**罕见词**，固定词表外的词变成UNK；三是**漏译**，模型有时会跳过源句的一部分，生成一句通顺但不完整的译文。此外，LSTM层数一多就训不动，论文报告普通堆叠LSTM在4层时还行，6层勉强，超过8层就很差。",
+  "method": "**结构**。编码器8层LSTM，只有最底层是双向的，其余单向；解码器8层；注意力用解码器最底层的输出去查编码器最顶层的输出，这样解码器的其他层可以和注意力计算错开，便于流水并行。每层放在不同GPU上（模型并行，见[[c:distributed-training]]）。\n\n**残差连接**（见[[c:residual-connection]]，思路来自[[resnet]]）。第i层LSTM的输入与输出相加后再送入下一层：`x_t^i = m_t^i + x_t^(i−1)`，这让8层LSTM能顺利训练。\n\n**子词**。采用[[wordpiece]]，源端和目标端共享约3.2万个词片。例如“Jet makers feud”被切成`_J et _makers _fe ud`，下划线标记词首，可无歧义地还原原文。\n\n**束搜索打分**（见[[c:decoding-sampling]]）。\n\n`s(Y, X) = log P(Y|X) / lp(Y) + cp(X; Y)`\n\n长度惩罚`lp(Y) = ((5 + |Y|) / 6)^α`抵消“短句概率天然更高”的偏好；覆盖惩罚（借鉴[[coverage-nmt]]）`cp = β · Σ_i log(min(Σ_j p_i,j, 1))`在某个源词累计得到的注意力不足1时扣分，鼓励覆盖整个源句。实验中取α=β=0.2。\n\n**低精度推理**。训练时就约束数值范围，推理时用8位整数运算，在[[tpu]]上运行。还尝试了用强化学习直接优化BLEU。",
+  "results": "WMT14英→法单模型BLEU 38.95，英→德24.61；8个模型集成并经RL微调后分别为41.16和26.30。在TPU上用量化推理比CPU快3.4倍，BLEU无损失。RL微调能提高BLEU，但人工评测看不出差别。\n\n生产数据上的人工并排评分（0–6分，评审员看同一源句的多个译文打分）：英→西班牙语短语系统4.885、GNMT 5.428、人工译文5.504；中→英为3.694、4.263、4.636。按“GNMT缩小了短语系统与人工之间差距的百分比”计算，六个语言方向在58%–87%之间，即摘要里“平均减少约60%翻译错误”的来源。官方博客称上线时中译英每天约1800万次翻译全部由GNMT完成。训练一个基础英法模型约需96块K80 GPU跑6天。",
+  "legacy": "同年11月的[[multilingual-nmt]]在GNMT上只加一个目标语言标记，就让一个模型翻译多种语言并实现零样本翻译。2017年上线的[[deepl]]等商业翻译服务也都基于神经网络。2017年的[[transformer]]直接拿GNMT当主要对比对象，用自注意力取代循环层，用一小部分训练成本超过了它。GNMT里的长度惩罚公式、共享子词词表、残差堆叠等工程细节则被长期沿用。",
+  "limits": [
+    {
+      "text": "8层LSTM必须逐词顺序计算，训练一个模型要近百块GPU跑数天，序列内无法并行。",
+      "solved_by": [
+        "transformer",
+        "convs2s"
+      ]
+    },
+    {
+      "text": "每个语言对单独训练一个模型，上百种语言就要维护上万个模型，低资源语言对得不到高资源语言的帮助。",
+      "solved_by": [
+        "multilingual-nmt",
+        "m2m-100"
+      ]
+    },
+    {
+      "text": "逐句独立翻译，看不到上下文，代词、术语前后不一致；人工评测也只用孤立的简单句。",
+      "solved_by": []
+    },
+    {
+      "text": "BLEU与人的判断脱节：RL直接优化BLEU能涨分，人工评分却不变，说明自动指标并不可靠。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "seq2seq",
+      "type": "extends",
+      "note": "沿用深层LSTM编码器-解码器，把层数加到8+8，并解决了训练速度和部署问题。"
+    },
+    {
+      "to": "bahdanau-attention",
+      "type": "uses",
+      "note": "注意力机制是核心部件，但改为用解码器底层查编码器顶层，以提高并行度。"
+    },
+    {
+      "to": "wordpiece",
+      "type": "uses",
+      "note": "用WordPiece子词（共享约3.2万词片）解决罕见词问题，取代UNK加回退词典。"
+    },
+    {
+      "to": "bpe",
+      "type": "rivals",
+      "note": "论文并列引用了BPE子词方案；两者思路相近，GNMT选择了谷歌内部为语音识别开发的WordPiece。"
+    },
+    {
+      "to": "phrase-smt",
+      "type": "solves",
+      "note": "在生产数据上，人工并排评测显示它把短语翻译与人工译文之间的差距缩小了58%–87%，取代短语系统上线。"
+    },
+    {
+      "to": "tpu",
+      "type": "uses",
+      "note": "推理用8位量化运算跑在TPU上，比CPU快3.4倍，是能上线的关键。"
+    }
+  ],
+  "prereq": [
+    "encoder-decoder",
+    "attention-concept",
+    "residual-connection",
+    "tokenization",
+    "decoding-sampling",
+    "quantization-concept"
+  ],
+  "terms": [
+    {
+      "t": "并排评测（side-by-side）",
+      "d": "让双语评审员同时看同一句原文的几个译文（如两个系统和人工译文）并分别打分，比BLEU更接近真实感受。"
+    },
+    {
+      "t": "长度归一化",
+      "d": "束搜索按对数概率之和打分时，句子越长累加的负数越多，模型会偏好短译文；除以与长度相关的因子可以抵消这种偏差。"
+    },
+    {
+      "t": "覆盖惩罚",
+      "d": "统计每个源词累计被注意了多少，若某些源词几乎没被看过就扣分，用来减少漏译。"
+    }
+  ],
+  "learn": "先补[[c:encoder-decoder]]、[[c:attention-concept]]和[[c:decoding-sampling]]，读过[[seq2seq]]和[[bahdanau-attention]]。读原文第3节（结构与残差）、第4节（WordPiece）和第7节（束搜索打分公式），再看表10理解“60%”是怎么算出来的。动手：在一个现成的小翻译模型上实现带长度惩罚和覆盖惩罚的束搜索，对比α、β取不同值时的BLEU和译文长度。",
+  "check": {
+    "source": "https://arxiv.org/html/1609.08144",
+    "confirmed": "标题、arXiv首次提交2016-09-26、作者列表；正文8+8层结构、残差公式、WordPiece示例与32K词表、束搜索公式及α=β=0.2、TPU比CPU快3.4倍、单模型38.95/24.61、集成41.16/26.30、RL不改善人工评分、表10各方向评分与58%–87%、96块K80约6天。另核对Google Research博客2016-09-27：中译英100%切换、每天约1800万次翻译。"
+  }
+}

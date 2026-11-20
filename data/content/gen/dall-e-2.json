@@ -1,0 +1,36 @@
+{
+  "id": "dall-e-2",
+  "who": "Aditya Ramesh, Prafulla Dhariwal, Alex Nichol, Casey Chu, Mark Chen · OpenAI",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2204.06125"},
+    {"label": "OpenAI产品页", "url": "https://openai.com/index/dall-e-2/"}
+  ],
+  "problem": "GLIDE这类直接用文字条件的扩散模型画得逼真，但同一句话生成的图很相似、多样性差，而且没有利用CLIP已经学到的图文对齐空间。",
+  "idea": "分两步：先用“先验”模型把文本的CLIP向量变成一个图像的CLIP向量，再用扩散解码器把这个图像向量画成图（unCLIP），最后两级扩散超分到1024×1024。",
+  "impact": "第一次让大众看到照片级、可控风格的文生图，产品化带来了“提示词”文化；它的两阶段先验思路也影响了后续视频模型。",
+  "background": "[[dall-e]]用离散token加自回归Transformer做出了第一个令人惊讶的文生图模型，但分辨率和逼真度有限。2021年底的[[glide]]换成像素扩散，直接用文本做条件，加上引导（见[[c:guidance]]）后画面逼真得多，可代价是多样性：引导越强，同一句话的结果越像。\n\n另一方面，[[clip]]已经在4亿图文对上学出了一个图文共享的向量空间：一张图和描述它的句子，向量很接近。这个空间里包含了大量关于风格、构图、物体的语义信息。OpenAI的问题是：能不能把CLIP空间当作“中间语言”，先在里面决定画什么，再把它渲染成像素？",
+  "method": "整体叫unCLIP，因为它在做CLIP图像编码器的逆过程。\n\n**解码器**：一个35亿参数的扩散模型，以CLIP图像向量为条件生成64×64的图（在[[glide]]的结构上改出来，把CLIP向量投影后加到时间步嵌入里，并作为额外的几个token接入注意力）。再用两个扩散上采样器依次放大到256×256（7亿参数）和1024×1024（3亿参数），这是[[cascaded-diffusion]]的做法。\n\n**先验（prior）**：给定文本，生成一个合理的CLIP图像向量。为什么需要这一步？因为“一只戴帽子的狗”对应很多不同的图，文本向量只有一个，先验负责从中采样一个具体的图像向量，多样性就来自这里。作者试了两种先验：把向量离散化后自回归生成，或者直接对向量做扩散。两者都是10亿参数，扩散先验在同等规模下效果更好、训练更省。\n\n**额外能力**：因为图像被压成了CLIP向量，可以对一张图的向量加少量变化生成“变体”，也可以在两张图的向量之间插值，或者沿着两句文本向量之差的方向编辑图片。",
+  "results": "MS-COCO零样本FID 10.39（扩散先验），优于GLIDE的12.24。人工评测中，相对GLIDE，unCLIP在多样性上以70.5%胜出，与文本的贴合度为45.3%、逼真度为48.9%，即逼真度上人们仍略偏好GLIDE。",
+  "legacy": "DALL·E 2于2022年4月以候补名单方式开放，和同年的[[midjourney]]、[[stable-diffusion]]一起把文生图推向大众。它的“文本→图像嵌入先验→解码器”结构被[[make-a-video]]直接复用。不过之后主流转向更简单的单阶段做法：[[imagen]]证明用大语言模型T5做文本编码器、直接条件化扩散就够了；OpenAI自己在[[dall-e-3]]中把重点转向训练数据的描述质量，不再使用CLIP先验。",
+  "pitfalls": "- “DALL·E 2是DALL·E的放大版”不对。两者完全不同：DALL·E是离散token加自回归，DALL·E 2是CLIP向量加扩散。\n- 先验不是可有可无的。作者实验中去掉先验、直接用文本向量当图像向量，效果明显变差。",
+  "limits": [
+    {"text": "属性绑定差：作者承认它比GLIDE更容易把颜色、位置等属性安到错误的物体上（比如红方块和蓝方块弄反）。", "solved_by": ["imagen", "dall-e-3"]},
+    {"text": "几乎不能在图里写出正确的文字。", "solved_by": ["ideogram", "dall-e-3"]},
+    {"text": "基础分辨率只有64×64，复杂场景里的细节靠超分补，常常出错。", "solved_by": ["sdxl"]},
+    {"text": "模型和权重不公开，只能通过OpenAI的接口使用，研究者无法复现或改造。", "solved_by": ["stable-diffusion"]}
+  ],
+  "relations": [
+    {"to": "glide", "type": "extends", "note": "解码器在GLIDE的扩散结构上改造，条件从文本换成CLIP图像向量，以此换回多样性。"},
+    {"to": "clip", "type": "uses", "note": "把冻结的CLIP图文共享空间当作中间表示，先验和解码器都围绕CLIP向量构建。"},
+    {"to": "dall-e", "type": "extends", "note": "同名后继，但路线从离散token自回归换成了扩散，分辨率从256提到1024。"},
+    {"to": "cascaded-diffusion", "type": "uses", "note": "64→256→1024的两级扩散上采样器沿用级联扩散的做法。"},
+    {"to": "ldm", "type": "rivals", "note": "同期的另一种降低高分辨率成本的办法：LDM在压缩潜空间里扩散，DALL·E 2在低分辨率像素上扩散再级联放大；后来潜空间路线成为主流。"}
+  ],
+  "prereq": ["diffusion-process", "contrastive-learning", "embedding", "guidance", "generation-metrics"],
+  "terms": [
+    {"t": "unCLIP", "d": "论文给方法起的名字：CLIP把图编码成向量，unCLIP把向量解码回图。"},
+    {"t": "先验（prior）", "d": "这里指从文本生成CLIP图像向量的模型，负责决定“具体画哪一种”。"}
+  ],
+  "learn": "先读[[clip]]和[[glide]]，确认会[[c:diffusion-process]]。读原文第2节（方法）和第3节（图像操控），看图3的变体和插值例子。动手：用开源的Karlo或diffusers里的unCLIP管线，对同一张图生成变体，观察哪些属性被CLIP向量保留、哪些被丢掉。",
+  "check": {"source": "https://arxiv.org/abs/2204.06125", "confirmed": "标题、5位作者；正文（ar5iv）中解码器3.5B、上采样器700M/300M、先验1B、COCO FID 10.39对GLIDE 12.24、人工评测70.5%/45.3%/48.9%、局限一节的属性绑定与文字问题。"}
+}

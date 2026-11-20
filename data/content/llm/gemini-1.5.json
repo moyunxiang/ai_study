@@ -1,0 +1,38 @@
+{
+  "id": "gemini-1.5",
+  "who": "Gemini Team（Petko Georgiev, Ving Ian Lei, Ryan Burnell, Libin Bai et al.） · Google DeepMind",
+  "venue": "技术报告 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2403.05530"},
+    {"label": "官方博客（2024-02-15）", "url": "https://blog.google/technology/ai/google-gemini-next-generation-model-february-2024/"},
+    {"label": "论文HTML全文", "url": "https://arxiv.org/html/2403.05530"}
+  ],
+  "problem": "2024年初主流模型上下文是128K（GPT-4 Turbo）到200K（Claude），一部电影、一个大代码仓库、几百页文档仍放不进去，只能切块后靠检索拼凑。",
+  "idea": "改用稀疏MoE架构降低训练和推理成本，并把上下文扩到生产环境100万token、研究中1000万token，让模型一次读完整个材料。",
+  "impact": "长上下文从“几十页”跳到“几本书、几小时视频”：大海捞针检索在百万token内超过99%，还能只凭一本语法书在上下文里学会翻译一门几乎没有网络语料的语言。",
+  "background": "长上下文的瓶颈有两层。一是**算力**：自注意力的计算和[[c:kv-cache]]随长度增长，[[transformer]]原版只能处理几百个token。[[flashattention]]、[[ring-attention]]解决了“算得动”的问题，[[rope]]插值类方法（如[[yarn]]）解决了“训练长度之外能否泛化”的问题。二是**能用**：模型能放进长输入，不代表能在里面准确找到并使用信息。2024年初最长的商用窗口是[[claude-2]]系列的20万token和GPT-4 Turbo的12.8万token。两个月前的[[gemini-1]]只有3.2万。",
+  "method": "**稀疏MoE**。报告称1.5 Pro是基于Transformer的稀疏[[c:mixture-of-experts]]模型，建立在谷歌从[[sparse-moe]]、[[gshard]]到[[switch-transformer]]的MoE研究之上：每个输入只激活一部分专家，所以总参数可以很大，而训练与推理计算比同等质量的稠密模型少。官方称1.5 Pro的质量与1.0 Ultra相当，但训练计算明显更少。\n\n**长上下文**。生产环境开放100万token（标准版12.8万），研究中测试到1000万token。官方博客给的直观换算：100万token约等于1小时视频、11小时音频、3万行代码或70万个英文单词。视频按帧、音频按声学特征直接进入同一序列，延续1.0的原生多模态。报告**没有公开**实现长上下文的具体技术，只说是“架构和训练上的一系列改进”。\n\n**Flash**。5月更新版本加入1.5 Flash：同样的长上下文，注意力与前馈并行计算以降低延迟，并在训练中在线蒸馏自1.5 Pro（见[[c:knowledge-distillation]]）。\n\n**怎样衡量“真的用上了”**。除了大海捞针（在长文本中埋一句话让模型找出），报告还测了下一个token的损失随上下文位置如何下降，并设计了多轮指代消解MRCR：在长对话中区分“关于企鹅的诗”和“关于企鹅的第一首诗”。",
+  "results": "文本、视频、音频三种模态的大海捞针召回在100万token内超过99.7%，文本扩到1000万token（约700万词）仍超过99%。代码上的负对数似然一直下降到1000万token，在100万（文档）和200万（代码）以内符合幂律 `L(x) = α·x^β + γ`。给模型一本约500页的Kalamang语语法书、一本词典和约400个平行句（这门语言使用者不足200人），它的英译Kalamang水平接近用同样材料学习的人。核心能力上，1.5 Pro在45项基准中的35项超过1.0 Ultra。",
+  "legacy": "百万token成为谷歌系模型的标配，并延续到[[gemini-2.5]]、[[gemini-3]]；[[minimax-01]]、[[llama-4]]等也开始宣传百万级上下文。它也引发了“有了长上下文还要不要检索”的讨论（见[[rag-vs-long-context]]）。同时，[[ruler]]等更难的长上下文基准显示，大海捞针接近满分并不代表在长文本上做多跳推理、聚合统计也一样好。",
+  "pitfalls": "- 大海捞针只考“找一句话”，是长上下文能力的下限测试；多处信息的整合与推理会差得多，报告自己的MRCR曲线也随长度下降。\n- 1000万token只在研究中测试，生产环境开放的是100万（后来200万）token；而且实现方法未公开，不能说是哪项具体技术带来的。\n- 长上下文按输入token计费，把一整本书放进每次请求非常贵，配合[[prompt-caching]]才实用。",
+  "limits": [
+    {"text": "长上下文的实现方法与模型规模都未公开，学术界无法复现或分析它为何有效。", "solved_by": ["minimax-01", "nsa", "kimi-linear"]},
+    {"text": "百万token的预填充延迟和成本很高，每次请求都要把整份材料重新算一遍。", "solved_by": ["prompt-caching"]},
+    {"text": "检索单个事实近乎完美，但在长文本中整合多处信息、做多步推理时准确率明显下降。", "solved_by": []},
+    {"text": "仍是“一问一答”的非推理模型，复杂数学与编程题上不如之后的推理模型。", "solved_by": ["o1", "gemini-2.5"]}
+  ],
+  "relations": [
+    {"to": "gemini-1", "type": "extends", "note": "延续原生多模态，把上下文从3.2万扩到100万token，并以更少的训练计算达到1.0 Ultra的质量。"},
+    {"to": "switch-transformer", "type": "uses", "note": "从稠密模型改为稀疏MoE，报告明确把它放在谷歌Sparse MoE、GShard、Switch这条研究线上。"},
+    {"to": "transformer", "type": "solves", "note": "原始Transformer上下文只有几百token的限制，被推进到百万乃至千万token量级。"},
+    {"to": "claude-2", "type": "rivals", "note": "此前最长的商用窗口是Claude的20万token；Gemini 1.5把上限一次提高到5倍，并在多轮指代消解上超过Claude 3与GPT-4 Turbo。"},
+    {"to": "ring-attention", "type": "rivals", "note": "同期学术界的百万token方案靠序列并行把注意力分摊到多卡；Gemini 1.5的工程方案没有公开。"}
+  ],
+  "prereq": ["context-window", "self-attention", "kv-cache", "mixture-of-experts", "in-context-learning", "scaling-law-concept"],
+  "terms": [
+    {"t": "大海捞针（needle in a haystack）", "d": "在很长的无关文本中某个位置插入一句特定的话，问模型这句话的内容，按插入位置和总长度画出召回率热图。"},
+    {"t": "MRCR", "d": "多轮指代消解：长对话里有多首主题相近的诗或文章，要求模型准确复现“关于某主题的第几首”，比单针检索难得多。"}
+  ],
+  "learn": "先补[[c:context-window]]和[[c:kv-cache]]，算一算100万token的KV缓存在一个普通70B模型上有多大，理解为什么长上下文难。然后读报告第5.2节（大海捞针、MRCR、Kalamang翻译），注意图1和图7。最后自己做一次实验：把一份长文档喂给支持长上下文的模型，分别问单点事实和需要汇总多处的问题，比较准确率。",
+  "check": {"source": "https://arxiv.org/html/2403.05530", "confirmed": "标题、Gemini Team、arXiv v1提交于2024-03-08，官方博客2024-02-15；博客中的MoE架构、标准128K/私测1M、1小时视频/11小时音频/3万行代码/70万词、1.5 Pro质量与1.0 Ultra相当而计算更少；论文中的稀疏MoE描述、>99.7%召回至1M、10M token（约700万词）>99%、NLL幂律形式与1M/2M拐点、Kalamang约500页语法书与不足200名使用者、对1.0 Ultra胜35/45、Flash在线蒸馏自1.5 Pro、Claude 3.0 200K与GPT-4 Turbo 128K对比。"}
+}

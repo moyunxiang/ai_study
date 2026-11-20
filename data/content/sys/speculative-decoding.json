@@ -1,0 +1,51 @@
+{
+ "id": "speculative-decoding",
+ "who": "Yaniv Leviathan, Matan Kalman, Yossi Matias · Google Research",
+ "venue": "ICML 2023",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2211.17192"
+  }
+ ],
+ "problem": "自回归生成每个token都要完整跑一遍大模型，而且受显存带宽限制，算力利用率很低（见[[c:memory-bandwidth]]）。",
+ "idea": "用一个小的草稿模型先猜后面几个token，再让大模型一次并行验证，并用拒绝采样保证输出分布与原模型完全一致。",
+ "impact": "在不改变输出分布的前提下让大模型推理快2到3倍，成为之后各类推测解码方法的原型。",
+ "method": "小模型自回归地给出k个候选token，大模型对这k个位置做一次前向，得到每个位置的概率。对第i个候选，若大模型概率`p`不小于小模型概率`q`就接受，否则以`p/q`的概率接受；第一次被拒绝时，从修正后的分布`max(0, p−q)`重新采样一个token并停止。可以证明，这样得到的token与直接从大模型采样同分布，所以质量无损。每次大模型调用至少产出一个token，猜得越准一次产出越多。摘要称在T5-XXL上相对标准T5X实现提速2到3倍，输出与原来完全一致。与[[blockwise-decoding]]相比，它不需要训练或改动大模型。",
+ "limits": [
+  {
+   "text": "需要额外的草稿模型，接受率取决于它与大模型的匹配程度；批量大时收益下降。",
+   "solved_by": [
+    "medusa",
+    "eagle"
+   ]
+  },
+  {
+   "text": "要在服务系统里与连续批处理配合，工程复杂。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "blockwise-decoding",
+   "type": "solves",
+   "note": "后者要改模型并只做贪心验证；本文用拒绝采样在不改模型的前提下保持采样分布。"
+  },
+  {
+   "to": "distillation",
+   "type": "uses",
+   "note": "草稿模型常用蒸馏得到，以提高接受率。"
+  }
+ ],
+ "prereq": [
+  "decoding-sampling",
+  "autoregressive",
+  "kv-cache",
+  "throughput-latency"
+ ],
+ "learn": "读论文第3节的算法和证明，然后用一个小模型做草稿、一个大模型做目标，自己实现接受-拒绝循环。",
+ "check": {
+  "source": "https://arxiv.org/abs/2211.17192",
+  "confirmed": "标题、3位作者、v1于2022-11-30；摘要：T5-XXL上2X-3X加速且输出相同。"
+ }
+}

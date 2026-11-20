@@ -1,0 +1,102 @@
+{
+  "id": "awd-lstm",
+  "who": "Stephen Merity, Nitish Shirish Keskar, Richard Socher · Salesforce Research",
+  "venue": "ICLR 2018",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1708.02182"
+    },
+    {
+      "label": "代码",
+      "url": "https://github.com/salesforce/awd-lstm-lm"
+    }
+  ],
+  "problem": "小数据上的LSTM语言模型严重过拟合，而现有的循环层正则化方法要改LSTM内部计算，用不了cuDNN这类高速实现；同时大家在设计越来越复杂的新循环单元，普通LSTM是否真的不够用并不清楚。",
+  "idea": "不改LSTM本身，而是对隐藏到隐藏的权重矩阵做DropConnect（随机置零部分权重），再叠加嵌入dropout、权重共享、激活正则、随机截断长度等一整套正则化，并用一个自动决定何时开始平均的平均SGD（NT-ASGD）训练。",
+  "impact": "普通三层LSTM在Penn Treebank上困惑度57.3、WikiText-2上65.8，超过神经架构搜索出来的复杂单元；它成为2017–2018年语言模型的标准强基线，并被ULMFiT直接用作预训练骨干。",
+  "background": "[[lm-limits]]说明在10亿词这样的大语料上，主要矛盾是模型容量；而在[[penn-treebank]]（约100万词、1万词表）和[[wikitext]]-2（约为PTB的两倍）这类小数据上，主要矛盾是过拟合。\n\n给循环网络加[[dropout]]并不简单：每个时间步都对隐状态随机丢弃，会破坏长期记忆。Gal和Ghahramani提出在所有时间步共用同一个丢弃掩码（变分dropout），但这需要改写LSTM的内部循环，就不能用NVIDIA cuDNN这类黑盒实现，而后者通常快很多倍。另一方面，循环高速网络、[[nas]]搜出的循环单元等新结构不断刷新纪录，让人以为普通[[lstm]]已经落伍。",
+  "method": "**权重丢弃的LSTM（weight-dropped LSTM）**。在每个批次开始前，对LSTM的隐藏到隐藏权重矩阵`[U_i, U_f, U_o, U_c]`做一次DropConnect（随机把50%的权重置零），整个前向和反向过程都用这一份被丢弃过的权重。效果类似于“所有时间步共用同一掩码”，但不改LSTM的计算公式，可以直接调用cuDNN。\n\n**NT-ASGD**。语言模型训练中，普通SGD往往比Adam更好。平均SGD（ASGD）在某个时刻T之后输出各步权重的平均值，理论性质好，但T难以手动设定。作者的规则是：每个epoch检查一次验证集损失，如果比5次之前的最好值还差（非单调条件），就从这一刻开始平均。\n\n**其他正则化**：\n\n- **随机截断长度**：反向传播长度按`N(70, 5)`抽样（5%概率取`N(35, 5)`），并按长度缩放学习率，让每个词都有机会处于窗口的不同位置；\n- **嵌入dropout**：以10%概率丢弃整个词的向量，这个词在本次前向传播中所有出现都消失；\n- **权重共享**（[[weight-tying]]）：输入嵌入矩阵与输出softmax矩阵共享，并把嵌入降到400维；\n- **激活正则AR与时间激活正则TAR**：分别对最后一层输出的L2范数`α‖h_t‖²`和相邻时刻差值`β‖h_t − h_(t+1)‖²`加惩罚（见[[c:regularization]]）。\n\n模型是三层LSTM，隐层1150维，训练750个epoch，梯度裁剪0.25，学习率30。",
+  "results": "单模型测试困惑度（见[[c:perplexity]]）：Penn Treebank上24M参数的AWD-LSTM为57.3，对比NAS单元（54M参数）62.4、Melis等人调参后的4层LSTM 58.3、变分LSTM大模型（66M）75.2；WikiText-2上33M参数为65.8。在训练好的模型上加一个无需训练的神经缓存（记住最近出现的词），进一步降到52.8和52.0，说明模型本身仍记不住近期出现的词。消融（PTB测试集）：去掉权重丢弃升到68.9，去掉NT-ASGD升到63.7，嵌入恢复全尺寸升到65.6。",
+  "legacy": "AWD-LSTM成为当时语言建模和文本分类的默认骨干：[[ulmfit]]直接把它当作预训练语言模型，加上分层微调策略在文本分类上大幅领先；它和同期Melis等人的工作一起说明“调好正则化和优化的普通LSTM并不输给复杂新结构”，提醒研究者重视基线。随后[[transformer-xl]]和[[gpt-2]]等Transformer语言模型在这些数据集上全面超过LSTM。",
+  "limits": [
+    {
+      "text": "正则化组合与超参数针对百万词级的小数据反复试出，在大数据上意义不大，换数据集往往要重新调。",
+      "solved_by": [
+        "gpt-2"
+      ]
+    },
+    {
+      "text": "加一个不需训练的缓存就能降低6–11个困惑度，说明LSTM记不住几百个词之前出现过的内容，长程依赖仍弱。",
+      "solved_by": [
+        "transformer-xl"
+      ]
+    },
+    {
+      "text": "LSTM逐词计算无法在序列内并行，在PTB上要训练750个epoch，难以扩展到大模型。",
+      "solved_by": [
+        "transformer-xl",
+        "gpt-2"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "lstm",
+      "type": "extends",
+      "note": "不改LSTM结构，只用正则化和优化技巧，就让普通LSTM超过了更复杂的新循环单元。"
+    },
+    {
+      "to": "dropout",
+      "type": "extends",
+      "note": "把dropout推广到循环权重（DropConnect作用于隐藏到隐藏矩阵）和整个词嵌入，解决了循环网络里dropout会破坏记忆、又要改内部实现的问题。"
+    },
+    {
+      "to": "lm-limits",
+      "type": "rivals",
+      "note": "后者认为大语料上的瓶颈是容量；本文针对小语料，问题是过拟合，两者共同说明了语言模型的两种局面。"
+    },
+    {
+      "to": "weight-tying",
+      "type": "uses",
+      "note": "输入嵌入与softmax权重共享，并把嵌入降到400维；恢复全尺寸嵌入会让PTB困惑度升高约8。"
+    },
+    {
+      "to": "nas",
+      "type": "rivals",
+      "note": "NAS用强化学习搜出专门的循环单元（PTB 62.4）；本文证明调好正则化的普通LSTM（57.3）更好。"
+    },
+    {
+      "to": "wikitext",
+      "type": "uses",
+      "note": "在WikiText-2和Penn Treebank上评测。"
+    }
+  ],
+  "prereq": [
+    "recurrent-layer",
+    "language-model",
+    "perplexity",
+    "dropout-concept",
+    "regularization",
+    "sgd-minibatch"
+  ],
+  "terms": [
+    {
+      "t": "DropConnect",
+      "d": "dropout的变体：不是随机丢弃神经元的输出，而是随机把权重矩阵中的一部分元素置零。"
+    },
+    {
+      "t": "平均SGD（ASGD）",
+      "d": "训练后期不取最后一步的权重，而取从某一步开始所有权重的平均值，能抵消SGD在最优点附近的来回震荡。"
+    },
+    {
+      "t": "神经缓存",
+      "d": "把最近若干个时刻的隐状态和对应的词存起来，预测时如果当前状态与某个缓存状态相似，就提高那个词的概率；不需要训练，只调三个超参数。"
+    }
+  ],
+  "learn": "先补[[c:dropout-concept]]、[[c:regularization]]和[[c:perplexity]]，读过[[lstm]]。读原文第2–4节，每一节就是一种技巧；再看表4的消融，判断哪些技巧最重要。动手：官方仓库代码不长，在PTB上先只开权重丢弃训练，再逐项加入其他技巧，记录验证困惑度的变化。",
+  "check": {
+    "source": "https://arxiv.org/html/1708.02182",
+    "confirmed": "标题、3位作者、arXiv首次提交2017-08-07；摘要57.3/65.8/52.8/52.0；正文DropConnect作用于U矩阵、NT-ASGD规则n=5、BPTT长度N(70,5)与N(35,5)、各dropout值、AR/TAR公式、3层1150维、400维嵌入、750 epoch、裁剪0.25、学习率30；表1 PTB对比（NAS 62.4、Melis 58.3、变分LSTM 75.2）；表2 WT2 33M参数；表4消融68.9、63.7、65.6、62.7；缓存降6与11个点。"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "id": "ulmfit",
+  "who": "Jeremy Howard, Sebastian Ruder · fast.ai / 旧金山大学 / NUI Galway",
+  "venue": "ACL 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1801.06146"},
+    {"label": "fast.ai 介绍文章", "url": "https://nlp.fast.ai/classification/2018/05/15/introducing-ulmfit.html"}
+  ],
+  "problem": "视觉里“ImageNet预训练+微调”早已是常规，NLP却仍要为每个任务从头训练专门模型；直接微调语言模型又容易过拟合、忘掉预训练学到的东西。",
+  "idea": "先在维基百科上训练一个LSTM语言模型，再在目标领域文本上微调它，最后加分类头微调；用分层学习率、先升后降的学习率和逐层解冻三招防止遗忘。",
+  "impact": "第一次让同一个预训练语言模型、同一套超参数在六个文本分类任务上全面超过专门设计的模型，把“预训练+整体微调”的范式带进NLP。",
+  "background": "2017年前后，NLP的迁移学习基本只停在第一层：用[[word2vec]]之类的预训练词向量初始化嵌入层，模型其余部分从零训练。视觉早已不同，[[alexnet]]之后，人们先在ImageNet上训练整个网络，再拿到新任务上微调。\n\n[[semi-supervised-seq]]已经试过先训练语言模型再微调，但需要大量领域内数据，在小数据上效果不稳。直接拿语言模型微调还有个更普遍的问题：学习率一大，预训练学到的通用知识很快被覆盖，即[[catastrophic-forgetting]]；学习率太小又收敛慢、反而过拟合。",
+  "method": "**三步走**。① 在[[wikitext]]-103（约2.86万篇维基文章、1.03亿词）上预训练一个3层[[awd-lstm]][[c:language-model]]。② 在目标任务的文本上继续做语言模型训练，让它适应领域用词。③ 在顶上加两层分类器，再整体微调。\n\n**分层学习率**。不同层学到的东西通用程度不同，低层更通用，应该少动。于是每层用不同学习率，`η^(l−1) = η^l / 2.6`，即每往下一层，学习率除以2.6。\n\n**斜三角学习率**。训练开始的一小段时间（论文取10%）学习率线性升高，让模型迅速找到适合新任务的区域，然后在剩余时间里线性降低做细调（见[[c:learning-rate]]）。\n\n**逐层解冻**。分类阶段不一次放开所有层：第一轮只训练最后一层，下一轮再解冻倒数第二层，依次往下，直到全部层一起训练。",
+  "results": "六个文本分类数据集上的错误率普遍下降18–24%。IMDb影评情感分类错误率4.6%，此前最好结果为5.9%、基于翻译编码器的[[cove]]为8.2%。在IMDb上只用100条标注样本，就能达到从零训练用10倍数据的效果；再加5万条无标注文本做第二步，相当于从零训练用100倍数据。",
+  "legacy": "五个月后[[gpt-1]]把LSTM换成Transformer、沿用“预训练语言模型+整体微调”的思路，并把它推广到蕴含、问答等句对任务；[[bert]]再把方向改成双向。“预训练—领域继续预训练—任务微调”的三段式和分层学习率至今仍常见于领域模型训练。",
+  "limits": [
+    {"text": "用的是单向LSTM，按时间步串行计算，难以扩大规模，也只看到左侧上下文。", "solved_by": ["gpt-1", "bert"]},
+    {"text": "只在文本分类上验证，句对、问答等结构化输入的任务怎么套用没有给出方案。", "solved_by": ["gpt-1"]},
+    {"text": "预训练语料只有1亿词的维基百科，远未用上网络规模的文本。", "solved_by": ["gpt-2", "roberta"]},
+    {"text": "每个任务都要完整微调并保存一份模型副本。", "solved_by": ["adapters", "gpt-3", "lora"]}
+  ],
+  "relations": [
+    {"to": "rnnlm", "type": "extends", "note": "把循环网络语言模型从只用于预测下一个词，变成迁移到下游任务的通用起点。"},
+    {"to": "awd-lstm", "type": "uses", "note": "预训练模型直接采用AWD-LSTM的结构与正则化方案。"},
+    {"to": "semi-supervised-seq", "type": "solves", "note": "Dai与Le的语言模型预训练需要大量领域内数据、小数据上不稳；ULMFiT用通用语料预训练加三种微调技巧解决。"},
+    {"to": "cove", "type": "rivals", "note": "CoVe把翻译模型的编码器当固定特征；ULMFiT整体微调语言模型，在IMDb上错误率从8.2%降到4.6%。"},
+    {"to": "catastrophic-forgetting", "type": "solves", "note": "分层学习率和逐层解冻专门用来避免微调时冲掉预训练知识。"},
+    {"to": "wikitext", "type": "uses", "note": "在WikiText-103上做通用领域预训练。"}
+  ],
+  "prereq": ["language-model", "recurrent-layer", "pretrain-finetune", "transfer-learning", "learning-rate"],
+  "terms": [
+    {"t": "分层学习率", "d": "原文叫discriminative fine-tuning：给网络不同层设不同学习率，低层小、高层大。"},
+    {"t": "逐层解冻", "d": "微调时从最后一层开始，每轮多放开一层参与训练，避免一开始就大幅改动通用的低层。"}
+  ],
+  "learn": "先补[[c:language-model]]和[[c:pretrain-finetune]]。读原文第3节的三种技巧和图1，再看fast.ai的介绍文章。动手：用任意小型预训练模型在IMDb上分别做“一次性全部微调”和“逐层解冻+分层学习率”，比较只有几百条标注时的差距。",
+  "check": {"source": "https://arxiv.org/abs/1801.06146", "confirmed": "标题、作者、arXiv首次提交2018-01-18；正文（ar5iv）中WikiText-103 28,595篇/1.03亿词、η^(l−1)=η^l/2.6、IMDb错误率4.6 vs 5.9 vs CoVe 8.2、18–24%、100条标注对应10倍/100倍数据。"}
+}

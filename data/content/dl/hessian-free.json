@@ -1,0 +1,22 @@
+{
+  "id": "hessian-free",
+  "who": "James Martens · University of Toronto",
+  "venue": "ICML 2010",
+  "links": [{"label": "ICML论文PDF", "url": "https://icml.cc/Conferences/2010/papers/458.pdf"}],
+  "problem": "二阶优化（牛顿法）理论上收敛快，但深层网络的Hessian矩阵有参数个数平方那么大，存不下也求不了逆；一阶方法在深层和循环网络上又很慢。",
+  "idea": "不显式构造Hessian，而是用共轭梯度法迭代求解牛顿方程，只需要“Hessian乘向量”这一种运算，它可以用一次额外的反传高效算出。",
+  "impact": "第一次不借助预训练就让深层自编码器和循环网络用二阶方法训练得很好，直接促成了Sutskever等人对优化与初始化的研究，也是后来K-FAC的先行者。",
+  "method": "每一步，牛顿法要解线性方程`H·d = −g`得到更新方向`d`。作者用共轭梯度（CG）法迭代求解，它只需要反复计算矩阵与向量的乘积`H·v`，不需要看到`H`本身。`H·v`可以通过一次类似反向传播的过程精确算出，成本与计算一次梯度同阶。\n\n几个让它在神经网络上真正可行的关键处理：（1）用高斯-牛顿矩阵（一个半正定的近似）代替真正的Hessian，避免曲率为负；（2）加阻尼项，用信赖域式的调节让每步更新保持在近似可信的范围；（3）用大批量数据估计曲率，CG只迭代有限步就停；（4）在较大的小批量上计算。\n\n论文称，该方法在深层自编码器等任务上，不需要预训练就能达到与预训练相当或更好的结果。（具体数字未核对，故不引用。）",
+  "limits": [
+    {"text": "每次更新需要几十次CG迭代，每次迭代要对大批量数据算一次`H·v`，相比一阶方法每步代价高得多，不容易扩展到超大模型。", "solved_by": ["kfac", "adam"]},
+    {"text": "需要仔细调阻尼和CG迭代次数，实现复杂；后来发现简单的动量加良好初始化也能达到类似效果。", "solved_by": ["nesterov-dl"]}
+  ],
+  "relations": [
+    {"to": "natural-gradient", "type": "uses", "note": "用高斯-牛顿近似（与Fisher矩阵紧密相关）作曲率矩阵，在每步用CG求近似自然梯度方向。"},
+    {"to": "lbfgs", "type": "rivals", "note": "同为二阶近似方法：L-BFGS用历史梯度差拼出曲率，Hessian-free用共轭梯度加Hessian乘向量直接求牛顿方向。"}
+  ],
+  "prereq": ["jacobian-hessian", "gradient-descent", "backpropagation", "loss-landscape", "convexity"],
+  "terms": [{"t": "共轭梯度法", "d": "解线性方程组的迭代算法，每步只需要矩阵乘向量，不需要矩阵本身，对大而稀疏的问题很高效。"}, {"t": "高斯-牛顿矩阵", "d": "Hessian的一种半正定近似，由输出对参数的Jacobian构成，不含二阶导项。"}],
+  "learn": "先学[[c:jacobian-hessian]]和[[c:gradient-descent]]，读论文第2–3节。想看工程细节可读Martens之后的改进论文。动手：用PyTorch的Hessian-vector product实现一个小网络上的CG牛顿步。",
+  "check": {"source": "https://icml.cc/Conferences/2010/papers/458.pdf", "confirmed": "ICML 2010会议论文PDF能下载（本次会话中确认文件存在，但文字为压缩流，未能抽出可读内容）；标题、作者与方法要点来自已有了解；Crossref另见同作者2012年Tricks of the Trade章节‘Training Deep and Recurrent Networks with Hessian-Free Optimization’。"}
+}

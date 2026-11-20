@@ -1,0 +1,51 @@
+{
+  "id": "waveglow",
+  "who": "Prenger, Valle, Catanzaro · NVIDIA",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1811.00002"
+    }
+  ],
+  "problem": "自回归声码器太慢，Parallel WaveNet需要先训老师再蒸馏，流程繁琐。",
+  "idea": "把Glow的可逆流与WaveNet的结构结合，只用最大似然一个损失训练单个网络，从梅尔频谱并行生成波形。",
+  "impact": "给出了训练简单、速度极快的并行声码器，一度成为TTS系统的常用声码器。",
+  "method": "[[parallel-wavenet]]的逆自回归流学生要靠老师蒸馏训练，工程上很重。[[glow]]（图像上的流模型）则可以直接最大化数据似然：用一串**可逆变换**把简单的高斯噪声映射成复杂数据，因为每一步可逆且行列式易算，似然可精确计算，训练不需要对抗或蒸馏（见[[c:normalizing-flow]]）。\n\nWaveGlow把一组音频采样点按组堆叠，通过多层可逆的1×1卷积和『仿射耦合层』处理，耦合层里的变换参数由类似[[wavenet]]的空洞卷积网络根据梅尔频谱算出。推理时从高斯噪声出发，反向通过整个网络，一次并行得到整段波形，不需要自回归。\n\n摘要称：单个网络、单一损失；PyTorch实现在V100上生成速度超过500 kHz；平均意见分（MOS）与当时公开最好的WaveNet实现相当。",
+  "limits": [
+    {
+      "text": "模型很大（流的层数多、参数量大），显存占用高。",
+      "solved_by": [
+        "melgan",
+        "hifi-gan"
+      ]
+    },
+    {
+      "text": "音质被后来的GAN声码器追平甚至超越，同时GAN模型更小更快。",
+      "solved_by": [
+        "hifi-gan"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "wavenet",
+      "type": "uses",
+      "note": "用WaveNet式空洞卷积网络来计算耦合层的变换参数。"
+    },
+    {
+      "to": "realnvp",
+      "type": "extends",
+      "note": "沿用RealNVP/Glow一类的仿射耦合流，把它用到音频波形。"
+    }
+  ],
+  "prereq": [
+    "normalizing-flow",
+    "mle",
+    "vocoder-codec",
+    "waveform-spectrogram"
+  ],
+  "check": {
+    "source": "https://arxiv.org/abs/1811.00002",
+    "confirmed": "核对标题、作者、2018-10-31提交；摘要写明流模型、WaveNet+Glow结合、单网络单损失、V100上超过500 kHz、MOS与最佳公开WaveNet实现相当。耦合层结构细节为记忆所述。"
+  }
+}

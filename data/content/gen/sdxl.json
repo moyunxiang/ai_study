@@ -1,0 +1,37 @@
+{
+  "id": "sdxl",
+  "who": "Dustin Podell, Zion English, Kyle Lacey, Andreas Blattmann, Tim Dockhorn, Jonas Müller, Joe Penna, Robin Rombach · Stability AI",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2307.01952"},
+    {"label": "代码 Stability-AI/generative-models", "url": "https://github.com/Stability-AI/generative-models"}
+  ],
+  "problem": "Stable Diffusion 1.x/2.x原生只有512或768分辨率，裁剪训练导致物体常被切掉一半，质量明显落后于Midjourney等闭源模型。",
+  "idea": "U-Net放大到26亿参数、换用两个更大的文本编码器，把原图尺寸和裁剪位置当作条件输入，按宽高比分桶训练到约1024²，再接一个细化模型补细节。",
+  "impact": "开源模型首次在人工评测中与Midjourney v5.1打平甚至略胜，成为2023至2024年开源社区微调、LoRA和ControlNet生态的主力底座。",
+  "background": "[[stable-diffusion]]发布一年后，开源文生图和闭源服务的差距反而拉大了：[[midjourney-v5]]的照片感和构图明显更好。SD的问题有几方面：U-Net只有约8.6亿参数；训练时把图像缩放后中心裁剪成正方形，模型学到了“物体被切掉一半”的构图；为了凑够统一分辨率，小于目标尺寸的图像要么丢掉（浪费数据），要么放大（模型学到模糊）；文本编码器只有一个CLIP ViT-L，理解复杂提示的能力有限。",
+  "method": "SDXL仍是[[ldm]]式的潜空间U-Net扩散，改进集中在规模和数据处理上：\n\n**更大的网络**：U-Net参数增至26亿，约为SD 1.x的三倍，注意力块集中在较低分辨率的层。文本编码器同时用OpenCLIP ViT-bigG和CLIP ViT-L，把两者倒数第二层输出拼接，合计约8.17亿参数。\n\n**尺寸条件**：把每张训练图的原始宽高编码后加到时间步嵌入里。这样小图不必丢弃，模型知道“这是一张原本很小的图”；推理时把尺寸设大，就得到清晰的结果。\n\n**裁剪条件**：训练时随机裁剪，把裁剪的左上角坐标也作为条件。推理时设为(0, 0)，模型就倾向生成主体居中、完整的构图，解决了SD里头被切掉的问题。\n\n**多宽高比训练**：先在256²训练60万步、512²训练20万步，再把数据按宽高比分桶（总像素约1024²，边长为64的倍数）微调，桶尺寸同样作为条件。\n\n**细化模型（refiner）**：另训一个专门处理高质量高分辨率数据的潜空间扩散模型，对基础模型的输出先加少量噪声再去噪（即[[sdedit]]的做法），补充背景和人脸的细节。这一步可选。",
+  "results": "在四方偏好评测中，SDXL加细化模型获48.44%的选择，基础SDXL为36.93%，SD 1.5和SD 2.1分别只有7.91%和6.71%。在PartiPrompts的17153次两两比较中，SDXL 0.9以54.9%对Midjourney v5.1略占上风。",
+  "legacy": "SDXL的权重公开后，社区围绕它训练了大量风格模型和LoRA，[[controlnet]]、[[ip-adapter]]都推出了SDXL版本。它直接衍生出一步到四步的[[add]]（SDXL Turbo）、[[lcm]]的SDXL版本，以及偏好对齐的[[diffusion-dpo]]。尺寸、裁剪条件和宽高比分桶成为之后文生图训练的常规做法。2024年，Stability AI的下一代[[sd3]]放弃U-Net，改用MM-DiT和整流流，开源生态的主力随后转向[[flux]]。",
+  "pitfalls": "- SDXL的“1024”是指约1024²的像素总量，宽高比可变；论文的训练从256²开始逐步提高。\n- 细化模型不是超分辨率模型，它在同一分辨率的潜空间上做轻度加噪去噪。",
+  "limits": [
+    {"text": "仍需约50步采样，在消费级显卡上生成一张1024图要十几秒。", "solved_by": ["add", "lcm"]},
+    {"text": "图中文字依然经常拼错，复杂空间关系和多物体属性绑定仍不可靠。", "solved_by": ["sd3", "dall-e-3"]},
+    {"text": "U-Net骨干继续放大的空间有限，扩展性不如Transformer。", "solved_by": ["sd3", "pixart-alpha"]},
+    {"text": "基础模型加细化模型两段式，显存和推理成本高。", "solved_by": ["flux"]}
+  ],
+  "relations": [
+    {"to": "ldm", "type": "extends", "note": "沿用LDM的潜空间U-Net扩散结构，把规模放大到26亿参数并重新训练自编码器。"},
+    {"to": "stable-diffusion", "type": "solves", "note": "用尺寸、裁剪条件和多宽高比训练解决了SD原生分辨率低、主体被裁切的问题，人工评测中大幅领先SD 1.5/2.1。"},
+    {"to": "midjourney-v5", "type": "rivals", "note": "当时最受欢迎的闭源模型；SDXL 0.9在PartiPrompts上以54.9%对Midjourney v5.1略胜。"},
+    {"to": "sdedit", "type": "uses", "note": "细化模型用SDEdit式的加噪再去噪来补细节。"},
+    {"to": "clip", "type": "uses", "note": "同时使用OpenCLIP ViT-bigG与CLIP ViT-L两个文本编码器。"}
+  ],
+  "prereq": ["diffusion-process", "latent-space", "guidance", "embedding", "data-augmentation"],
+  "terms": [
+    {"t": "微条件（micro-conditioning）", "d": "把原图尺寸、裁剪坐标、宽高比这类元信息当作额外条件输入模型，推理时可以手动设定。"},
+    {"t": "宽高比分桶", "d": "把训练图按宽高比分组，每批只取同一组的图，这样不必把所有图裁成正方形。"}
+  ],
+  "learn": "先读[[ldm]]和[[stable-diffusion]]。读原文第2节（各项改进）和图3、图4对比“有无裁剪条件”的生成结果。动手：用diffusers加载SDXL，分别把original_size设成小尺寸和大尺寸、把crops_coords_top_left设成非零，观察画面变化。",
+  "check": {"source": "https://arxiv.org/abs/2307.01952", "confirmed": "标题、8位作者、v1提交于2023-07-04；正文（ar5iv）中2.6B U-Net对860M/865M、文本编码器817M、尺寸与裁剪条件、256²60万步与512²20万步、宽高比分桶、偏好评测48.44%/36.93%/7.91%/6.71%、对Midjourney v5.1的54.9%（17153次比较）。"}
+}

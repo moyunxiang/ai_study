@@ -1,0 +1,33 @@
+{
+ "id": "double-dqn",
+ "who": "van Hasselt, Guez, Silver · Google DeepMind",
+ "venue": "AAAI 2016",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1509.06461"}
+ ],
+ "problem": "[[dqn-nature]]的TD目标里用max同时挑动作和给它估值，任何估计误差都会被max往上偏，作者发现DQN在所测的全部49款游戏上都高估了Q值，有的游戏因此学崩。",
+ "idea": "只改目标里的一行：用在线网络选出下一状态的最佳动作，再用目标网络给这个动作估值，把“选择”和“评估”分到两套参数上。",
+ "impact": "几乎零额外开销就消除了大部分高估，49款游戏的中位数分数明显提升；“选与评分离”成为后续值函数算法的标配（[[rainbow]]、[[td3]]）。",
+ "background": "[[q-learning]]的目标是`r + γ·maxₐ Q(s',a)`。设想某状态下所有动作的真实价值都是0，但估计值带有正负随机误差：取max时，总会挑中那个碰巧被高估最多的动作，所以max的期望大于0。误差平均为零，max之后却系统性偏高。\n\n2010年的[[double-q]]在表格情形下给出了解法：维护两张Q表，一张选动作、另一张估值。但在深度网络时代，大家普遍认为这种高估在实践中无关紧要；即便DQN训练不稳定，也常被归因于离策略学习加函数近似的固有问题（见[[baird-counterexample]]）。",
+ "method": "**先证明问题真实存在**。论文给出一个下界定理：只要各动作的估计整体上无偏、但不全对，`maxₐ Q(s,a)`就至少比真实值高出一个与误差大小相关的正数；动作越多，高估通常越严重。随后在Atari上把DQN预测的Q值与按其策略实际拿到的折扣回报对比，发现高估普遍存在。\n\n**再做最小改动**。DQN已经有两套参数：在线网络θ和每隔一段时间复制过来的目标网络θ⁻。Double DQN的目标改成：\n\n`y = r + γ · Q( s', argmaxₐ Q(s',a; θ), θ⁻ )`\n\n即用在线网络θ选出`a* = argmaxₐ Q(s',a;θ)`，再用目标网络θ⁻查这个动作的值。两套参数的误差不完全相关，被θ偶然高估的动作在θ⁻那里不一定也被高估，偏差因而大幅减小。除了这一行，算法、网络和超参数都与DQN完全相同。",
+ "results": "在49款Atari游戏、每局最多5分钟的标准评测上，人类归一化分数的中位数从DQN的93.5%升到114.7%，平均数从241.1%升到330.3%。在更难的“人类开局”评测中（从人类玩家录像中的状态开始），中位数从47.5%升到88.4%；把目标网络的同步间隔从1万帧调到3万帧的调参版达到116.7%。Asterix、Wizard of Wor等游戏中，DQN的Q值估计会一路飙升、分数随之崩溃，Double DQN的估计则稳定且接近真实回报——说明此前的训练不稳定很大程度上来自高估本身。",
+ "legacy": "Double DQN成为[[rainbow]]的组成部分，并被[[apex]]、[[r2d2]]等分布式值函数智能体沿用。同样的思路在连续控制中演变为[[td3]]的“截断双Q”：训练两个critic、取二者较小值作为目标，修正了[[ddpg]]的高估。",
+ "limits": [
+  {"text": "目标网络只是在线网络的延迟副本，两者误差高度相关，选与评并未完全解耦，高估只是减轻而非消除。", "solved_by": ["td3"]},
+  {"text": "方法依赖对动作取argmax，只适用于离散动作，连续控制的actor-critic里的高估仍未解决。", "solved_by": ["td3"]},
+  {"text": "只修正了估值偏差；回放抽样效率、探索、网络结构等DQN的其他短板原样保留。", "solved_by": ["per", "dueling-dqn", "rainbow"]}
+ ],
+ "relations": [
+  {"to": "dqn-nature", "type": "solves", "note": "揭示并修正了Nature DQN在全部49款游戏上的Q值高估，只改了TD目标的计算。"},
+  {"to": "double-q", "type": "extends", "note": "把表格Double Q-learning的“两套估计、一选一评”搬到深度网络，并用现成的目标网络充当第二套估计。"},
+  {"to": "q-learning", "type": "solves", "note": "从理论上证明Q-learning的max目标在任意估计误差下都会上偏，并给出低成本修正。"},
+  {"to": "baird-counterexample", "type": "extends", "note": "此前常把DQN的不稳定归因于Baird等指出的离策略+函数近似发散问题；本文的实验表明在Atari上主要元凶是高估。"}
+ ],
+ "prereq": ["td-error", "bellman-equation", "on-off-policy", "expectation-variance", "bias-variance"],
+ "terms": [
+  {"t": "高估偏差", "d": "对一组带噪声的估计取最大值时，结果的期望大于真实最大值。Q-learning的目标里每一步都在做这样的max。"},
+  {"t": "人类开局", "d": "从人类玩家录像中抽取的游戏状态开始评测，而不是从固定开局开始，用来检验智能体是不是只背熟了某条路线。"}
+ ],
+ "learn": "先读懂[[dqn-nature]]的目标网络。读原文“Overoptimism due to estimation errors”一节和图1，再看Double DQN一节的一行公式。动手：在自己的DQN里把目标改成argmax用在线网络、估值用目标网络，同时记录预测Q值与实际回报的差距，比较两者。",
+ "check": {"source": "https://arxiv.org/abs/1509.06461", "confirmed": "标题、3位作者、arXiv v1于2015-09-22、AAAI 2016；正文中的下界定理、Double DQN目标公式、49款游戏均有高估、中位数93.5%→114.7%与平均数241.1%→330.3%、人类开局47.5%→88.4%及调参版116.7%（同步间隔10000→30000帧）、Asterix与Wizard of Wor的不稳定。"}
+}

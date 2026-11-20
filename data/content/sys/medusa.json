@@ -1,0 +1,53 @@
+{
+ "id": "medusa",
+ "who": "Cai, Li, Geng, Peng, Lee, Chen, Dao et al. · Princeton, UIUC, CMU, Together AI",
+ "venue": "ICML 2024",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2401.10774"
+  }
+ ],
+ "problem": "解码每步都要把整个模型从显存读一遍才生成一个词；[[speculative-decoding]]要另配一个小的草稿模型，训练、对齐、部署都麻烦。",
+ "idea": "在原模型最后一层上再加几个轻量解码头，每个头预测后面第k个词，用树形注意力一次验证多个候选。",
+ "impact": "让推测解码不再需要独立草稿模型，改一个模型就能加速，成为后续EAGLE等方法的对照基线。",
+ "method": "Medusa在基座模型的顶层隐状态上并联多个额外的解码头：第1个头预测下一个词之后的第2个词，第2个头预测第3个词，以此类推。每步各头给出若干候选，组合成一棵候选树，再用树形注意力（一次前向让不同分支互不可见又共享前缀）并行验证，接受最长的合格前缀。\n\n训练有两档：Medusa-1冻结基座，只训练新头，所以输出分布不变；Medusa-2和基座联合微调，预测更准、加速更大，但需要专门的训练配方保护基座能力。没有训练数据时可用自蒸馏。",
+ "legacy": "其后的[[eagle]]指出只靠词级特征预测较难，改为在特征层做自回归，获得更高的接受率。",
+ "limits": [
+  {
+   "text": "各个头只依据当前隐状态独立预测，预测越远越不准，接受长度有限。",
+   "solved_by": [
+    "eagle"
+   ]
+  },
+  {
+   "text": "Medusa-2联合训练有损伤基座能力的风险。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "speculative-decoding",
+   "type": "solves",
+   "note": "推测解码需要单独的草稿模型；Medusa用附加的解码头取代它。"
+  }
+ ],
+ "prereq": [
+  "autoregressive",
+  "decoding-sampling",
+  "kv-cache",
+  "memory-bandwidth",
+  "self-attention"
+ ],
+ "terms": [
+  {
+   "t": "解码头",
+   "d": "接在模型最后一层之上的小网络，用来预测更远位置的词。"
+  }
+ ],
+ "learn": "先读推测解码原论文 → 读Medusa第3节树形注意力 → 在vLLM或TensorRT-LLM中试用Medusa头。",
+ "check": {
+  "source": "https://arxiv.org/abs/2401.10774",
+  "confirmed": "标题、作者、2024-01-19；摘要中的多解码头、树形注意力、Medusa-1冻结基座、Medusa-2联合训练。"
+ }
+}

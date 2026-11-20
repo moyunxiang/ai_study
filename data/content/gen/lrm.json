@@ -1,0 +1,39 @@
+{
+  "id": "lrm",
+  "who": "Yicong Hong, Kai Zhang, Jiuxiang Gu, Sai Bi, Yang Zhou, Difan Liu, Feng Liu, Hao Tan et al. · Adobe Research / 澳大利亚国立大学",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2311.04400"},
+    {"label": "项目页", "url": "https://yiconghong.me/LRM/"}
+  ],
+  "problem": "从一张照片得到3D模型，要么靠DreamFusion式逐个物体优化（每个要几十分钟到几小时），要么靠只在小类别数据上训练的小网络，泛化很差。",
+  "idea": "用一个5亿参数的Transformer在约100万个3D物体上训练，直接把单张图像的特征“翻译”成三平面NeRF表示，一次前向就出3D。",
+  "impact": "单图到3D从“逐个优化”变成“前馈5秒”，证明3D重建也能像语言、图像那样靠大模型加大数据取胜，催生了一大批前馈式3D重建和生成模型。",
+  "background": "2022到2023年，图像生成模型飞速进步，3D却跟不上。主流的[[dreamfusion]]、[[magic3d]]用2D扩散模型当“评委”，对每个物体从零优化一个NeRF，一个物体要几十分钟以上，而且常出现多面头（Janus问题）。[[zero123]]让扩散模型生成新视角图，但仍需后续优化才能得到一致的3D。\n\n另一条路是前馈网络直接从图像预测3D，速度快，但过去的模型都很小，只在ShapeNet这类几十个类别的数据上训练，遇到没见过的物体就失败。问题的根源在于缺数据：直到[[objaverse]]（2022年底）才出现几十万量级的开放3D资产库。作者的问题是：有了这些数据，大Transformer能不能学会通用的单图三维重建？",
+  "method": "**图像编码**：用预训练的[[dino]] ViT-B/16把512×512的输入图像编码成1025个768维的特征token（保留所有图块的特征，而不只是全局向量）。\n\n**图像到三平面的Transformer解码器**：三平面（triplane）是三个互相垂直的二维特征平面，空间中任一点的特征由它在三个平面上的投影位置取特征再组合得到（这种表示来自[[eg3d]]）。解码器从一组可学习的三平面token（3×32×32个）出发，经过16层Transformer：每层先用交叉注意力读取图像特征，再做自注意力让三个平面之间交换信息，最后上采样成3个64×64×80的平面。相机参数（外参矩阵、焦距、主点，共20维）通过自适应层归一化注入，告诉模型这张图是从什么角度拍的。\n\n**渲染与监督**：查询三平面上的特征，送入一个小MLP输出颜色和密度，再用[[nerf]]的体渲染（见[[c:volume-rendering]]）画出其他视角的图。训练时用多视角图像的重建损失（像素误差加感知损失）监督，不需要任何3D标注。\n\n**数据**：Objaverse中约73万个合成物体的渲染图，加上MVImgNet中约22万段真实物体的环绕视频，总计约100万个物体。",
+  "results": "模型约5亿可学习参数，在128张A100上训练约3天。推理时单张A100不到5秒就能得到一个3D网格（前向约1.14秒，其余是网格提取）。它能处理真实照片、生成模型产出的图片等各种开放域输入，而此前的前馈方法只能处理训练类别内的物体。",
+  "legacy": "LRM之后，前馈式大重建模型迅速成为3D生成的主线：Instant3D等先用多视图扩散（如[[mvdream]]）生成几张视图，再交给LRM式模型重建；GS-LRM等把输出换成[[3dgs]]。[[clay]]和[[trellis]]进一步把“重建”变成“在3D潜空间里生成”，[[hunyuan3d-2]]则把形状和纹理分开生成。“用大Transformer从图像直接推断3D”的思路也延伸到场景级重建和世界模型（如[[marble]]）。",
+  "limits": [
+    {"text": "确定性回归会对不确定的部分取平均，被遮挡的背面纹理常常模糊。", "solved_by": ["trellis", "clay"]},
+    {"text": "只能处理去掉背景的单个物体，无法重建复杂场景。", "solved_by": ["marble"]},
+    {"text": "假设材质是漫反射，金属、玻璃等随视角变化的外观无法还原，也不输出可编辑的PBR材质。", "solved_by": ["hunyuan3d-2"]},
+    {"text": "三平面分辨率只有64×64，几何细节有限，网格靠Marching Cubes提取，拓扑质量一般。", "solved_by": ["trellis"]}
+  ],
+  "relations": [
+    {"to": "dino", "type": "uses", "note": "用预训练的DINO ViT-B/16作图像编码器，保留全部图块特征。"},
+    {"to": "transformer", "type": "uses", "note": "核心是16层交叉注意力加自注意力的Transformer，把图像token映射成三平面token。"},
+    {"to": "nerf", "type": "uses", "note": "输出用三平面NeRF表示，并用体渲染在多视角图像上监督。"},
+    {"to": "eg3d", "type": "uses", "note": "三平面表示来自EG3D。"},
+    {"to": "objaverse", "type": "uses", "note": "训练数据的主体是Objaverse中约73万个3D物体的渲染图。"},
+    {"to": "dreamfusion", "type": "solves", "note": "DreamFusion对每个物体要长时间优化；LRM一次前向不到5秒。"},
+    {"to": "zero123", "type": "rivals", "note": "Zero-1-to-3用扩散模型生成新视角图像，LRM直接预测3D表示；后来两者常组合成“多视图生成+重建”流水线。"}
+  ],
+  "prereq": ["3d-representation", "volume-rendering", "camera-geometry", "self-attention", "transformer-block"],
+  "terms": [
+    {"t": "三平面（triplane）", "d": "用三个互相垂直的二维特征图表示3D空间：空间点投影到三个平面上取特征再相加或拼接，比三维体素省内存得多。"},
+    {"t": "前馈重建", "d": "训练好后对新输入只需一次网络前向计算就得到结果，不需要对每个样本单独优化。"},
+    {"t": "Marching Cubes", "d": "从三维密度场中提取等值面、生成三角网格的经典算法。"}
+  ],
+  "learn": "先补[[c:3d-representation]]、[[c:volume-rendering]]，读[[nerf]]和[[eg3d]]了解三平面。读原文第3节（模型结构）和图2。动手：用开源复现OpenLRM在几张自己拍的去背景物体照片上跑重建，观察背面纹理的模糊。",
+  "check": {"source": "https://arxiv.org/abs/2311.04400", "confirmed": "标题与作者、机构；正文（ar5iv）中5亿参数、DINO ViT-B/16与1025个768维token、16层解码器、三平面3×64×64×80、20维相机特征、73万Objaverse与22万MVImgNet、128张A100约3天、推理不到5秒、作者列出的局限。"}
+}

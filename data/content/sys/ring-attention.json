@@ -1,0 +1,48 @@
+{
+ "id": "ring-attention",
+ "who": "Hao Liu, Matei Zaharia, Pieter Abbeel · UC Berkeley",
+ "venue": "ICLR 2024",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2310.01889"
+  }
+ ],
+ "problem": "自注意力的激活和KV占用随序列长度增长，单卡放不下几十万token以上的上下文。",
+ "idea": "把序列切给多张卡，每卡只存自己那一段，KV块在环形拓扑上依次传递，边传边用分块注意力计算，使通信被计算掩盖。",
+ "impact": "让可训练的上下文长度随设备数线性扩展，为百万级上下文训练提供了方法。",
+ "method": "基础是[[flashattention]]用的分块注意力：借助[[online-softmax]]，一个查询可以对键值块逐块累积结果，不必一次放下整个注意力矩阵。Ring Attention把序列均分到N张卡，每卡负责一段查询，并持有一段KV；各卡把自己的KV块发给环上的下一张卡，同时用刚收到的块计算，N轮后每个查询都看到了所有KV。只要每块的计算时间不短于传输时间，通信就完全被隐藏。摘要称可处理的序列长度是此前内存高效Transformer的设备数倍，上下文可达百万token量级，摘要未给具体数字。",
+ "limits": [
+  {
+   "text": "要求设备间带宽足够高，才能让通信被计算掩盖；注意力计算量仍是序列长度的平方。",
+   "solved_by": []
+  },
+  {
+   "text": "需要大量设备同时参与，成本高。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "flashattention",
+   "type": "extends",
+   "note": "借鉴其分块注意力，推广到跨设备。"
+  },
+  {
+   "to": "online-softmax",
+   "type": "uses",
+   "note": "用在线softmax让各块结果可累加。"
+  }
+ ],
+ "prereq": [
+  "self-attention",
+  "context-window",
+  "kv-cache",
+  "distributed-training"
+ ],
+ "learn": "先读[[flashattention]]，再读论文第3节环形通信的示意图，用多进程模拟一遍。",
+ "check": {
+  "source": "https://arxiv.org/abs/2310.01889",
+  "confirmed": "标题、3位作者、v1于2023-10-03；摘要：序列长度随设备数扩展、百万量级，无具体数字。"
+ }
+}

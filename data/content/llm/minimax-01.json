@@ -1,0 +1,40 @@
+{
+  "id": "minimax-01",
+  "who": "MiniMax（Aonian Li, Bangwei Gong, Bo Yang, Boji Shan, Chang Liu, Cheng Zhu, Chunhao Zhang, Congchao Guo et al.）",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2501.08313"},
+    {"label": "论文HTML全文", "url": "https://arxiv.org/html/2501.08313v1"},
+    {"label": "代码与权重", "url": "https://github.com/MiniMax-AI"}
+  ],
+  "problem": "softmax注意力的计算随长度平方增长，主流开源模型停在128K上下文；线性注意力虽是线性复杂度，却从未在几百亿参数的商用级模型上成功过，而且检索能力差。",
+  "idea": "每8层里7层用线性注意力的高效实现“闪电注意力”，只留1层标准softmax注意力负责精确检索，再配上32专家的MoE，做成456B总参数、45.9B激活的模型。",
+  "impact": "第一个大规模商用级的线性注意力模型：训练长度100万token、推理可外推到400万，官方称标准基准与GPT-4o、Claude 3.5 Sonnet相当；“线性+少量全注意力”的混合架构由此成为长上下文模型的一条主线。",
+  "background": "[[transformer]]的softmax注意力要算每对token之间的分数，长度N时计算是 `O(N²)`。[[flashattention]]让它算得更快、更省显存，但没有改变平方复杂度。[[linear-attention]]把softmax换成核函数后可以改变计算顺序，复杂度降到 `O(N)`，[[retnet]]、[[mamba]]等也走类似路线（见[[c:state-space-model]]、[[c:efficient-attention]]），但它们都停留在几十亿参数以内。原因有二：因果语言建模下线性注意力要做逐位置累加（cumsum），在GPU上跑不快；纯线性模型把全部历史压进一个固定大小的状态里，“在长文中找出某一句话”这类检索任务明显变差。",
+  "method": "**线性注意力为什么能线性**。softmax注意力先算 `Q·Kᵀ`（N×N矩阵）再乘V。去掉softmax后，可以先算 `Kᵀ·V`（d×d矩阵，d是头维度）再左乘Q——这就是“右乘”技巧，代价与N成正比。因果情形下要逐步累加：`kv_t = kv_(t−1) + k_t·v_tᵀ`，`o_t = q_tᵀ·kv_t`，这个循环难以并行。\n\n**闪电注意力**。把序列切成块：块内用带因果掩码的普通“左乘”（块很小，平方代价可以接受），块与块之间用累加好的 `KV` 状态做右乘。这样避开了逐位置的cumsum，整体仍是线性复杂度。论文的速度测试中，它的训练速度不随序列长度下降，并且是唯一快过FlashAttention-2的线性模型。\n\n**混合结构**。小规模实验发现纯线性注意力在一般任务上与softmax相当，但大海捞针明显落后。于是每7个闪电注意力层后接1个softmax注意力层（使用[[gqa]]），共80层。\n\n**MoE与规模**。每层32个专家、top-2路由（与[[mixtral]]相同的选法），加一个全局路由器做负载均衡。总参数定为456B，是为了在8卡、每卡80GB、8比特量化的单机上能处理100万token。训练在1500到2500张H800上进行，并为线性注意力专门实现了序列并行和推理内核。",
+  "results": "训练上下文100万token，推理可外推到400万；官方称在标准学术基准上与GPT-4o、Claude 3.5 Sonnet相当，而上下文长20–32倍，在长上下文基准[[ruler]]上的优势随长度增大而扩大。推理内核在H20上端到端算力利用率超过75%。同时发布的视觉语言模型MiniMax-VL-01在此基础上用5120亿视觉语言token继续训练。",
+  "legacy": "混合线性注意力随后被[[kimi-linear]]、[[qwen3-next]]等采用，它们换用了表达力更强的门控delta规则（[[gated-deltanet]]）。另一条路线是DeepSeek的稀疏注意力[[nsa]]，保留softmax但只看少数token。值得注意的是，MiniMax自己的下一代[[minimax-m2]]又回到了全注意力，团队专门写了技术博客解释原因——线性混合架构在复杂推理和智能体任务上的利弊仍有争论。",
+  "pitfalls": "- 它不是纯线性模型：每8层仍有1层完整softmax注意力，这一层的计算和KV缓存仍随长度增长，论文自己把“彻底去掉softmax注意力”列为未来工作。\n- 400万token是推理时的外推结果，训练只到100万。",
+  "limits": [
+    {"text": "仍保留1/8的softmax注意力层，长度继续增加时这部分的平方计算和KV缓存仍是瓶颈（作者自述）。", "solved_by": ["kimi-linear"]},
+    {"text": "长上下文评测多是合成的检索任务，真实文档分析、长文推理能力评估不足（作者自述）。", "solved_by": []},
+    {"text": "预训练代码数据有限，复杂编程任务表现较弱（作者自述）。", "solved_by": ["minimax-m2"]},
+    {"text": "线性注意力的固定大小状态表达能力有限，简单的“加性”更新容易让旧信息互相干扰。", "solved_by": ["kimi-linear", "qwen3-next"]}
+  ],
+  "relations": [
+    {"to": "linear-attention", "type": "extends", "note": "首次把线性注意力用到456B参数的商用级模型上，并用分块计算解决了因果情形下cumsum慢的问题。"},
+    {"to": "mixtral", "type": "uses", "note": "前馈层沿用Mixtral式的top-2 MoE，扩到每层32个专家。"},
+    {"to": "flashattention", "type": "rivals", "note": "同为面向硬件的注意力实现；FlashAttention加速平方复杂度的softmax注意力，闪电注意力把复杂度本身降为线性，长序列上更快。"},
+    {"to": "gemini-1.5", "type": "rivals", "note": "百万级上下文的另一种实现：Gemini 1.5未公开方法，MiniMax-01公开了混合线性注意力方案与权重。"},
+    {"to": "mamba", "type": "rivals", "note": "同为用固定大小状态替代KV缓存的线性复杂度序列模型；论文测试中纯线性模型都在检索上不足，因此采用混合结构。"},
+    {"to": "gqa", "type": "uses", "note": "保留的softmax注意力层使用分组查询注意力，组大小为8。"}
+  ],
+  "prereq": ["self-attention", "big-o", "efficient-attention", "state-space-model", "mixture-of-experts", "kv-cache"],
+  "terms": [
+    {"t": "闪电注意力（Lightning Attention）", "d": "线性注意力的一种分块实现：块内用带掩码的普通矩阵乘，块间用累积的KV状态，避免逐位置累加，使因果线性注意力在GPU上跑得快。"},
+    {"t": "右乘技巧", "d": "利用矩阵乘法结合律，把 (Q·Kᵀ)·V 改成 Q·(Kᵀ·V)，中间结果从N×N变成d×d，计算量从与N²成正比变为与N成正比。"},
+    {"t": "混合注意力", "d": "在一个模型里按固定比例交替放置线性注意力层和标准注意力层，前者负责高效处理长序列，后者负责精确检索。"}
+  ],
+  "learn": "先补[[c:self-attention]]和[[c:big-o]]，手算一遍 (QKᵀ)V 与 Q(KᵀV) 的计算量。再读[[linear-attention]]。原文读第2.2节（闪电注意力公式4–7、图5）和第2.2.3节（为什么要混合）。动手：用PyTorch实现因果线性注意力的循环版与分块版，验证结果一致并比较速度。",
+  "check": {"source": "https://arxiv.org/html/2501.08313v1", "confirmed": "标题、作者MiniMax、arXiv v1提交于2025-01-14；摘要中的32专家、456B/45.9B、训练1M/推理4M、与GPT-4o和Claude-3.5-Sonnet相当、20–32倍上下文、VL-01用512B视觉语言token；正文中每7个线性层接1个softmax层共80层、GQA组大小8、top-2、右乘技巧与kv递推公式、块内左乘块间右乘、纯线性注意力检索不足、速度超过FlashAttention-2、8卡640GB 8比特单机1M token的约束、1500–2500张H800、H20上MFU超过75%、结论中的三条局限。MiniMax-M2回到全注意力：见HN收录的MiniMax技术博客标题“Why Did M2 End Up as a Full Attention Model?”。"}
+}

@@ -1,0 +1,38 @@
+{
+  "id": "llava-1.5",
+  "who": "Haotian Liu, Chunyuan Li, Yuheng Li, Yong Jae Lee · 威斯康星大学麦迪逊分校 / 微软研究院",
+  "venue": "CVPR 2024 (Highlight)",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2310.03744"},
+    {"label": "项目页", "url": "https://llava-vl.github.io/"}
+  ],
+  "problem": "原版LLaVA对话很好，但在VQA等要求简短答案的学术基准上很差；InstructBLIP加了学术数据又不会写长回答。开源模型的训练配方五花八门，没人说得清哪些改动真正有用。",
+  "idea": "只对LLaVA做几处小改：线性投影换成两层MLP，CLIP换成336像素版本，加入学术VQA数据并在题目后加一句“请用一个词或短语回答”的格式提示，全部只用公开数据。",
+  "impact": "13B模型只用约120万条公开数据、单机8块A100约一天训完，就在11个基准上达到当时最好；它成了此后一年开源多模态模型最常用的基线和起点。",
+  "background": "2023年中，开源多模态模型分成两派。[[llava]]用GPT-4生成的对话数据训练，聊天能力强，但在VQAv2这类“答案就一个词”的学术基准上成绩很低。[[instructblip]]在[[blip-2]]基础上加入大量学术VQA数据，基准分数上去了，可遇到需要详细回答的问题也只回一两个词——作者认为原因是同一句提问不知道该长答还是短答，而且InstructBLIP只微调Q-Former、不动语言模型。[[qwen-vl]]成绩好，但用了14亿对预训练数据，部分还是不公开的内部数据。大家无法判断：好成绩到底来自结构、数据量，还是数据格式？",
+  "method": "作者在LLaVA框架内逐项加改动并测量效果，最后留下的改动只有这几处：\n\n**响应格式提示**。对需要简短答案的VQA数据，在问题末尾统一加上“Answer the question using a single word or phrase.”。同时语言模型参与微调，于是模型学会按用户的要求切换长短：带这句提示就简答，不带就详细回答。这样不需要像以往那样用ChatGPT改写VQA答案。\n\n**MLP连接器**。受[[simclr]]等自监督工作中“线性投影换成MLP效果更好”的启发，把LLaVA的单层线性投影换成两层MLP。\n\n**更多学术数据**。加入VQAv2、GQA、OKVQA、A-OKVQA、OCR类数据（OCRVQA、TextCaps）、区域级数据和纯文本ShareGPT对话；指令微调数据共66.5万条，对齐阶段55.8万对图文。\n\n**更高分辨率、更大模型**。视觉编码器换成CLIP ViT-L/14-336px（这是CLIP开放的最高分辨率），语言模型扩到13B。\n\n训练流程仍是LLaVA的两阶段，8块A100上预训练约6小时、指令微调约20小时。\n\n作者还试了**LLaVA-1.5-HD**：把高分辨率图切成若干块分别送进编码器，再拼上一张缩小的全图特征，绕开了CLIP只能输入336像素的限制。",
+  "results": "13B版本在VQAv2上80.0%、GQA 63.3%、TextVQA 61.3%，5个学术基准中4个第一，对手Qwen-VL-Chat用了14亿对预训练数据，而LLaVA-1.5的预训练只用了55.8万对。InstructBLIP-13B在VisWiz上33.4%，LLaVA-1.5-13B为53.6%。数据效率实验显示，随机去掉一半训练数据，仍能保持全量数据98%以上的性能。切图的HD版本把VQAv2进一步提到81.8%，并减少了幻觉。论文自己列出的局限包括：高分辨率训练耗时更长、不支持多图理解、某些领域的解题能力有限、仍会产生幻觉。",
+  "legacy": "LLaVA-1.5的“CLIP-336+两层MLP+开源LLM+公开数据混合”几乎成了开源多模态模型的标准底座，大量论文以它为对照或直接在其代码上改。HD版本的切图思路三个月后发展为[[llava-next]]的任意分辨率（AnyRes），[[internvl-1.5]]、[[minicpm-v]]等也采用动态切图。对它的系统性诊断也催生了新方向：[[eyes-wide-shut]]用LLaVA-1.5发现CLIP特征的视觉盲区，[[cambrian-1]]据此转向以视觉为中心的编码器研究；[[eve]]则尝试彻底去掉视觉编码器。",
+  "limits": [
+    {"text": "受CLIP最大336像素的限制，文档、小字和细节仍看不清；切图的HD版本只是初步探索且训练更慢。", "solved_by": ["llava-next", "internvl-1.5", "qwen2-vl"]},
+    {"text": "只支持单张图片，不能理解多张图之间的关系，也不能处理视频。", "solved_by": ["llava-onevision", "mm1"]},
+    {"text": "视觉能力受限于CLIP，在一些简单的视觉模式（方向、计数、细微差别）上答错并编造解释，幻觉仍然存在。", "solved_by": ["eyes-wide-shut", "cambrian-1"]},
+    {"text": "数学、科学等需要多步推理的看图解题能力有限。", "solved_by": ["glm-4.1v-thinking", "internvl3.5"]}
+  ],
+  "relations": [
+    {"to": "llava", "type": "extends", "note": "同一团队的改进版：结构与两阶段训练不变，只换MLP连接器、更高分辨率编码器并加入学术数据和格式提示。"},
+    {"to": "instructblip", "type": "solves", "note": "InstructBLIP加学术数据后长短回答失衡；LLaVA-1.5用格式提示加微调语言模型解决了这一问题，并以约1/100的预训练数据取得更好成绩。"},
+    {"to": "qwen-vl", "type": "rivals", "note": "Qwen-VL用14亿对预训练数据（含内部数据）和448像素输入；LLaVA-1.5只用公开数据，在5个学术基准中4个胜出。"},
+    {"to": "blip-2", "type": "rivals", "note": "论文结论之一是LLaVA式全连接连接器足够强且数据效率高，不需要BLIP-2那样先在1.29亿图文对上预训练Q-Former。"},
+    {"to": "clip", "type": "uses", "note": "视觉编码器换为CLIP ViT-L/14-336px。"},
+    {"to": "simclr", "type": "uses", "note": "把线性投影换成两层MLP的做法借鉴自SimCLR等自监督学习的投影头。"}
+  ],
+  "prereq": ["instruction-tuning", "mlp", "image-patch", "benchmark", "ablation-baseline", "hallucination"],
+  "terms": [
+    {"t": "响应格式提示", "d": "在问题后附加的固定指令（如“请用一个词或短语回答”），告诉模型输出的长度和格式，让同一个模型同时适应简答题和开放问答。"},
+    {"t": "AnyRes / 切图", "d": "把高分辨率图像切成若干块，每块按编码器的原生分辨率单独编码，再把所有块的特征拼在一起交给语言模型。"},
+    {"t": "学术任务数据", "d": "VQAv2、GQA、OCR问答等传统基准的训练集，答案短而客观，与GPT生成的长对话数据互补。"}
+  ],
+  "learn": "先读[[llava]]的结构和两阶段训练。然后读本文第3节和表2，按行看每个改动带来多少提升，这是一份很好的消融实验范例。动手：用官方仓库的脚本在单机上复现指令微调阶段的一个小子集（比如10%数据），比较带和不带格式提示时模型对VQA问题的回答长度。",
+  "check": {"source": "https://arxiv.org/abs/2310.03744", "confirmed": "标题、4位作者、arXiv v1于2023-10-05提交、CVPR 2024 Highlight；摘要中CLIP-ViT-L-336px、MLP投影、格式提示、11个基准、1.2M公开数据、单机8×A100约1天；正文（ar5iv）中格式提示原文、MLP借鉴自监督学习、558K/665K、6小时+20小时、表3中VQAv2 80.0/GQA 63.3/TextVQA 61.3/VisWiz 53.6对InstructBLIP 33.4、Qwen-VL 1.4B预训练、5个中4个第一、HD版VQAv2 81.8、50%数据保持98%以上性能、局限段落。"}
+}

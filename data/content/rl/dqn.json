@@ -1,0 +1,44 @@
+{
+ "id": "dqn",
+ "who": "Mnih, Kavukcuoglu, Silver, Graves, Antonoglou, Wierstra, Riedmiller · DeepMind",
+ "venue": "NIPS 2013 Deep Learning Workshop",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1312.5602"},
+  {"label": "Nature版（2015）", "url": "https://www.nature.com/articles/nature14236"},
+  {"label": "Spinning Up：Q-learning系", "url": "https://spinningup.openai.com/en/latest/spinningup/rl_intro2.html"}
+ ],
+ "problem": "Q-learning配上神经网络这类非线性函数近似，训练常常发散；以前能用的强化学习都靠手工设计的状态特征，没人能直接从原始像素学会控制。",
+ "idea": "用卷积网络直接把4帧游戏画面映射成每个动作的Q值，用经验回放打乱样本相关性，用固定一轮的旧参数算目标，再用小批量SGD训练。",
+ "impact": "同一个网络、同一组超参数，只看像素就在7款Atari游戏中的3款超过人类专家，开启了“深度强化学习”这一领域。",
+ "background": "强化学习的目标是让智能体通过试错学会在环境中拿到尽量多的累计奖励（见[[c:reward-return]]）。[[q-learning]]是最经典的做法：学一个函数`Q(s,a)`，表示在状态s做动作a之后能拿到的期望回报，然后每步选Q最大的动作。状态少时可以用一张表存Q值；但一帧Atari画面有160×210个像素，状态数天文数字，必须用函数近似。\n\n问题在于，用神经网络近似Q值一直很不稳定。理论上，离策略学习+函数近似+自举（用自己的估计当目标）这三者凑在一起就可能发散，[[baird-counterexample]]给出了线性情形下的反例。实践中，[[td-gammon]]在双陆棋上成功过，但后来移植到别的游戏大多失败。[[nfq]]用多层网络做批量Q迭代，能在小控制问题上工作，但每轮都要在全部数据上重训，难以扩展到大网络和海量画面。\n\n另一边，2012年的[[alexnet]]刚证明了卷积网络能从原始像素学出好特征。[[ale]]则提供了几十款Atari游戏的统一接口。问题是：能不能把两者接起来，让一个网络只看画面和分数，学会玩游戏？",
+ "method": "**网络**。每帧画面转灰度、缩到84×84，把最近4帧叠成一个84×84×4的输入（单帧看不出球往哪飞）。网络是两层卷积（16个8×8卷积核步长4，32个4×4卷积核步长2，见[[c:conv-layer]]）加一个256单元的全连接层，输出层每个合法动作一个数，即该动作的Q值。一次前向就得到所有动作的Q值，选最大的即可。\n\n**目标与损失**。根据[[c:bellman-equation]]，最优Q值应满足`Q(s,a) = E[r + γ·maxₐ' Q(s',a')]`。于是把右边当作“标签”，用均方误差训练：\n\n`L(θ) = E[(y − Q(s,a;θ))²]，y = r + γ·maxₐ' Q(s',a';θ_旧)`\n\n这正是[[c:td-error]]的平方。论文强调计算目标y时用的是上一轮迭代的参数，并在这一轮优化中保持不变，让“标签”不要随每一步梯度更新而漂移。\n\n**经验回放**（来自[[experience-replay]]）。智能体每走一步，就把`(s, a, r, s')`存进一个容量100万帧的回放池；训练时从池里随机抽32条做一个小批量。这有两个作用：相邻帧高度相关，随机抽样打破了这种相关性，更接近监督学习要求的独立同分布；每条经验可以被反复利用多次，提高了数据效率。因为训练用的数据来自旧策略，所以算法必须是离策略的（见[[c:on-off-policy]]），Q-learning恰好满足。\n\n**其他细节**。探索用ε-贪心：以ε的概率随机按键，ε在前100万帧内从1线性降到0.1（见[[c:exploration-exploitation]]）。每4帧才决策一次、同一动作重复4帧，省下计算。各游戏分数尺度差别大，训练时把正奖励一律记为+1、负奖励记为−1，这样同一学习率能通用于所有游戏。优化器是[[rmsprop]]，共训练1000万帧。",
+ "results": "在7款游戏（Beam Rider、Breakout、Enduro、Pong、Q*bert、Seaquest、Space Invaders）上，网络结构和超参数完全不变，其中6款超过此前所有方法（包括使用手工特征的[[ale]]基线），并在Breakout、Enduro和Pong上超过人类专家。例如Breakout平均168分，人类专家31分；Pong平均20分（满分21），人类−3分。Q*bert、Seaquest、Space Invaders离人类水平还差很远——这几款需要更长远的策略。",
+ "legacy": "这篇工作坊论文发表约一个月后，Google收购了DeepMind（[[deepmind-acquired]]）。2015年的[[dqn-nature]]加入了周期同步的独立目标网络，扩展到49款游戏，并成为后续一切改进的基准。此后几年的工作几乎都在修补它的某个部件：[[double-dqn]]修高估，[[per]]改回放的抽样方式，[[dueling-dqn]]改网络结构，[[c51]]把Q值换成分布，[[rainbow]]把这些合在一起。[[ddpg]]把同样的套路搬到连续动作，[[a3c]]则尝试用并行代替回放池。[[alphago]]也出自同一团队，把深度网络带进了围棋。\n\n今天，“回放池+目标网络+TD损失”仍是所有值函数类深度RL算法（包括[[sac]]、[[td3]]）的骨架。",
+ "pitfalls": "- 这一版**没有**独立的目标网络：论文只说目标用上一轮迭代的参数。“每隔C步把网络整体复制一份当目标”是2015年Nature版加上的。\n- 经验回放不是这篇发明的，而是Lin在1992年提出的；这篇的贡献是证明它是让深度网络+Q-learning稳定的关键。\n- “超过人类”只指7款中的3款，而且是单个专家玩家的分数；其余游戏差距很大。",
+ "limits": [
+  {"text": "目标里的max同时负责挑动作和估值，噪声会被系统性地放大，Q值普遍被高估，策略因此变差。", "solved_by": ["double-dqn"]},
+  {"text": "目标随网络每次更新而变化，训练曲线波动大、偶尔崩溃。", "solved_by": ["dqn-nature"]},
+  {"text": "回放池均匀抽样，大量“已经学会”的平凡经验被反复训练，少数关键经验很少被抽到。", "solved_by": ["per"]},
+  {"text": "需要1000万帧（约46小时实时游戏）才学会一款游戏，远比人类慢；ε-贪心在奖励稀疏的游戏里几乎找不到奖励。", "solved_by": ["simple-atari", "bbf", "rnd", "agent57"]},
+  {"text": "每步要对所有动作取max，只能处理少量离散动作，无法用于关节力矩这类连续控制。", "solved_by": ["ddpg"]}
+ ],
+ "relations": [
+  {"to": "q-learning", "type": "extends", "note": "核心更新规则就是Q-learning，只是把Q表换成了卷积网络，用梯度下降拟合TD目标。"},
+  {"to": "experience-replay", "type": "uses", "note": "直接采用Lin 1992年的经验回放，用随机抽样打破相邻帧的相关性并重复利用数据。"},
+  {"to": "nfq", "type": "solves", "note": "NFQ每轮要在全部数据上重新训练网络，无法扩展；DQN改为从回放池抽小批量做SGD，能用大网络处理海量画面。"},
+  {"to": "alexnet", "type": "uses", "note": "借用刚被AlexNet证明有效的卷积网络+ReLU，从原始像素直接学特征，取代手工特征。"},
+  {"to": "ale", "type": "uses", "note": "实验全部在ALE上进行，并在6/7款游戏上超过ALE论文中的手工特征基线。"},
+  {"to": "td-gammon", "type": "extends", "note": "TD-Gammon证明过神经网络+TD学习能下好双陆棋但难以推广；DQN在多款游戏上用同一套设置做到了。"},
+  {"to": "baird-counterexample", "type": "solves", "note": "离策略+函数近似+自举理论上会发散，DQN用回放和固定目标在实践中让它稳定下来（并未给出理论保证）。"},
+  {"to": "rmsprop", "type": "uses", "note": "用RMSProp做小批量优化。"}
+ ],
+ "prereq": ["mdp", "policy-value", "bellman-equation", "td-error", "exploration-exploitation", "on-off-policy", "conv-layer", "sgd-minibatch"],
+ "terms": [
+  {"t": "Q值", "d": "在状态s下先做动作a、之后一直按当前策略行动，能拿到的期望折扣回报。知道了Q值，选Q最大的动作就是贪心策略。"},
+  {"t": "ε-贪心", "d": "以概率ε随机选动作（探索），否则选当前Q值最大的动作（利用）。"},
+  {"t": "帧跳过", "d": "每隔k帧才让网络决策一次，中间几帧重复上一个动作，用更少的计算玩完同样长的游戏。"},
+  {"t": "奖励裁剪", "d": "把正奖励统一记为+1、负奖励记为−1。代价是智能体分不清大奖励和小奖励。"}
+ ],
+ "learn": "先补[[c:mdp]]、[[c:bellman-equation]]和[[c:td-error]]，在网格世界上写一个表格Q-learning。然后读原文第4节（Deep Reinforcement Learning）和算法1。动手：用PyTorch在CartPole上写一个带回放池的DQN，再换成Pong的像素输入，对比加不加回放池的训练曲线。CleanRL的dqn_atari.py是很好的单文件参考。",
+ "check": {"source": "https://arxiv.org/abs/1312.5602", "confirmed": "标题、7位作者、arXiv v1于2013-12-19提交；正文（ar5iv）中的84×84×4输入、16@8×8/4与32@4×4/2卷积、256单元全连接、RMSProp、批大小32、ε从1降到0.1（前100万帧）、1000万帧训练、100万帧回放池、k=4、奖励裁剪、7款游戏、Breakout 168对31与Pong 20对−3，以及正文未描述独立目标网络。"}
+}

@@ -1,0 +1,100 @@
+{
+  "id": "dinov2",
+  "who": "Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel Haziza et al. · Meta AI Research / Inria",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2304.07193"
+    },
+    {
+      "label": "官方代码与模型",
+      "url": "https://github.com/facebookresearch/dinov2"
+    }
+  ],
+  "problem": "自监督方法大多只在130万张的ImageNet上训练；换成海量网络图片后特征质量反而下降，冻结特征也比不上用图文对训练的CLIP。",
+  "idea": "自动从12亿张网络图片中检索出与精选数据集相似、且去重和均衡后的1.42亿张图；在上面用DINO加iBOT的自蒸馏损失训练10亿参数的ViT-g，再蒸馏成小模型。",
+  "impact": "第一次让纯自监督、无文本的视觉特征在冻结状态下全面追平或超过OpenCLIP；DINOv2成为深度估计、三维重建、机器人和多模态模型最常用的视觉骨干之一。",
+  "background": "[[dino]]和[[ibot]]证明了ViT上的自蒸馏能学到很好的特征，但只在ImageNet上训练。直接换成大规模未整理的网络图片（此前SEER等工作的做法）会让特征变差：网络图片里大量重复、类别极不均衡。另一方面，[[clip]]及其开源复现OpenCLIP用数亿图文对训练，冻结特征在分类上很强，但文字描述往往只覆盖图像的主要内容，像素级的细节信息较弱。[[mae]]的特征则要微调才好用。\n\n论文的目标是“通用视觉特征”：不经微调，直接把冻结的特征拿去做分类、分割、深度估计、检索都好用。",
+  "method": "**数据：LVD-142M**。从公开网络爬取数据中得到12亿张去重后的图片，用自监督模型把所有图片编码成向量；以ImageNet-22k、Google Landmarks等若干精选数据集为“种子”，为每张种子图检索最相近的4张网络图片（小数据集则通过k-means聚类后按簇取样）。整个流程在20个8卡V100节点上不到两天完成，得到1.42亿张多样且均衡的图片，无需任何人工标注。\n\n**训练目标**。学生—教师自蒸馏（教师是学生的滑动平均）：图像级用[[dino]]的损失，让学生在各个裁剪上的[CLS]输出逼近教师；块级用[[ibot]]的损失，遮住学生输入的部分图像块，让学生在这些位置的输出逼近教师在可见图上对应位置的输出。教师输出的居中改用[[swav]]的Sinkhorn-Knopp归一化，再加一个KoLeo正则项鼓励批内特征均匀散开。训练末期短暂提高分辨率到518×518。\n\n**工程**。自己实现的[[flashattention]]、跳过被丢弃残差的高效随机深度、FSDP分片，使训练比iBOT实现快约2倍、显存只用1/3。最大的ViT-g/14约10亿参数，再把它当作冻结的老师蒸馏出ViT-S、B、L三个小模型。",
+  "results": "ImageNet-1k冻结特征线性评估：ViT-g/14为86.5%，k近邻83.5%；蒸馏出的ViT-L/14为86.3%，ViT-B/14为84.5%。作为对比，用ImageNet-22k训练的iBOT ViT-L为82.3%。与图文弱监督模型相比，ViT-g比OpenCLIP ViT-G/14高0.3%、比EVA-CLIP高0.1%，在ImageNet-V2上比EVA-CLIP高1.1%。消融显示：在同样数量的未整理图片上训练，大多数基准都不如LVD-142M，说明数据整理是关键。冻结特征加线性层就能做语义分割和单目深度估计，在像素级任务上明显强于OpenCLIP。",
+  "legacy": "DINOv2很快成为视觉系统的默认特征提取器：[[depth-anything]]用它做深度估计的编码器，[[lrm]]和[[trellis]]用它编码输入图像，[[openvla]]把它与SigLIP特征拼接作为机器人的视觉输入，[[vggt]]、[[mapanything]]等三维重建模型基于它初始化，[[am-radio]]把它和CLIP、SAM一起蒸馏。后续研究发现DINOv2的注意力图中有高范数的异常token，[[vit-registers]]加入额外“寄存器”token解决；[[dinov3]]进一步扩大到数十亿参数和更多数据。",
+  "pitfalls": "- DINOv2不是“在海量未整理数据上训练”，恰恰相反，它的关键贡献之一是自动整理数据；未整理数据在论文消融里表现更差。\n- 它的特征不和文字对齐，不能像CLIP那样直接用文本做零样本分类；需要零样本文本能力时仍要配合文本模型。",
+  "limits": [
+    {
+      "text": "大模型的特征图上出现少数高范数的异常token，破坏注意力图和稠密特征的干净程度。",
+      "solved_by": [
+        "vit-registers"
+      ]
+    },
+    {
+      "text": "特征不与语言对齐，无法直接用文字检索或零样本分类。",
+      "solved_by": []
+    },
+    {
+      "text": "数据整理依赖人工挑选的“种子”数据集，规模和覆盖面受种子限制；进一步放大模型时稠密特征质量会退化。",
+      "solved_by": [
+        "web-ssl",
+        "dinov3"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "dino",
+      "type": "extends",
+      "note": "保留DINO的图像级自蒸馏损失和动量教师，把数据扩大到1.42亿张、模型扩大到10亿参数。"
+    },
+    {
+      "to": "ibot",
+      "type": "uses",
+      "note": "加入iBOT的块级掩码自蒸馏损失，使块特征可直接用于分割和深度等稠密任务。"
+    },
+    {
+      "to": "mae",
+      "type": "rivals",
+      "note": "MAE的特征要微调才好用；DINOv2追求冻结即可用的特征，线性评估远高于MAE。"
+    },
+    {
+      "to": "clip",
+      "type": "rivals",
+      "note": "以OpenCLIP为主要对手，证明不用文本监督也能得到同等甚至更好的通用特征，像素级任务上更强。"
+    },
+    {
+      "to": "swav",
+      "type": "uses",
+      "note": "用SwAV的Sinkhorn-Knopp归一化代替DINO的居中操作。"
+    },
+    {
+      "to": "flashattention",
+      "type": "uses",
+      "note": "自行实现FlashAttention以降低自注意力的显存和时间。"
+    }
+  ],
+  "prereq": [
+    "self-supervised",
+    "knowledge-distillation",
+    "image-patch",
+    "masked-modeling",
+    "retrieval",
+    "k-nearest-neighbors"
+  ],
+  "terms": [
+    {
+      "t": "LVD-142M",
+      "d": "DINOv2自动整理的1.42亿张图片训练集，用检索方法从12亿张网络图片中挑出与精选数据集相似且均衡的部分。"
+    },
+    {
+      "t": "冻结特征",
+      "d": "预训练模型参数不再更新，只在其输出上训练一个简单的线性层或用k近邻，衡量特征本身的通用性。"
+    },
+    {
+      "t": "KoLeo正则",
+      "d": "基于最近邻距离的熵估计构造的正则项，鼓励一个批次内的特征在空间中均匀散开。"
+    }
+  ],
+  "learn": "先读[[dino]]和[[ibot]]。读原文第3节（数据整理流程，图3）、第4节（损失组合）和表4。动手：用torch.hub加载dinov2_vits14，对几张图提取块特征后做PCA，把前三个主成分映射成RGB，观察它如何不经训练就分出物体部件。",
+  "check": {
+    "source": "https://arxiv.org/abs/2304.07193",
+    "confirmed": "标题、作者（Meta AI与Inria）、arXiv v1提交于2023-04-14；摘要中1B参数ViT与蒸馏、超过OpenCLIP；正文中12亿去重图片、每张种子检索4个近邻、20个8卡V100节点不到两天、LVD-142M、DINO+iBOT损失与Sinkhorn-Knopp和KoLeo、518分辨率、比iBOT快2倍且显存1/3、表4中ViT-g 86.5/83.5、ViT-L 86.3、ViT-B 84.5、iBOT ViT-L 82.3、比OpenCLIP高0.3%、比EVA-CLIP高0.1%（ImageNet-V2高1.1%）。"
+  }
+}

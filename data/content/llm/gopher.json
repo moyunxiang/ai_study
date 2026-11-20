@@ -1,0 +1,106 @@
+{
+  "id": "gopher",
+  "who": "Jack W. Rae, Sebastian Borgeaud, Trevor Cai, Katie Millican, Jordan Hoffmann, Francis Song, John Aslanides, Sarah Henderson et al. · DeepMind",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2112.11446"
+    },
+    {
+      "label": "DeepMind博客：Language modelling at scale",
+      "url": "https://deepmind.google/discover/blog/language-modelling-at-scale-gopher-ethical-considerations-and-retrieval/"
+    }
+  ],
+  "problem": "GPT-3之后，“把模型继续做大”到底能换来什么、换不来什么，缺少一个在上百个任务上系统比较、并公开训练细节的研究。",
+  "idea": "训练从4400万到2800亿参数的6个模型，统一用自建的10.5TB语料MassiveText和3000亿token，在152个任务上逐项比较规模带来的收益，并分析毒性和偏见。",
+  "impact": "2800亿参数的Gopher在可比较的任务中约81%超过此前最好的语言模型，MMLU从GPT-3的43.9%升到60.0%；同时发现数学和逻辑推理几乎不随规模变好。",
+  "background": "[[gpt-3]]和[[scaling-laws]]让业界相信：参数越多，效果按幂律持续变好（见[[c:scaling-law-concept]]）。2021年下半年，[[jurassic-1]]等1750亿级模型相继出现，但大多只报告少数基准。几个关键问题仍不清楚：规模的收益在不同类型的任务上是否一样？数据的质量有多重要？模型变大后，生成有害内容的倾向是变好还是变坏？DeepMind的这篇长篇报告想用一个模型家族、一套数据、一大批任务把这些问题量化出来。",
+  "method": "**模型**。沿用[[gpt-2]]式的自回归Transformer，改了两处：用[[rmsnorm]]代替LayerNorm；用[[transformer-xl]]的相对位置编码代替绝对位置编码。6个尺寸从44M到280B，最大的Gopher有80层、128个头、隐藏维度16384。所有模型都训练3000亿token、上下文2048，用Adam加余弦学习率衰减；Gopher的批大小在训练中从300万token增大到600万。\n\n**数据MassiveText**。共23.5亿篇文档、约10.5TB，来自网页（MassiveWeb）、书籍、新闻、C4、GitHub代码和维基百科，按调好的比例采样（网页48%、书籍27%）。网页部分经过质量过滤（例如必须含有the、and等常见词中的至少两个）、去除大量重复的文本、相似文档去重，并删去与测试集重叠的文档。作者验证了每一步过滤都让下游效果变好。\n\n**工程**。用JAX在TPUv3上训练。半精度参数加单精度Adam状态共2.5TiB，每个TPUv3核心只有16GiB，所以组合使用优化器状态切分（来自[[zero]]）、模型并行和重计算。\n\n**评测**。152个任务，包括语言建模、阅读理解、事实核查、常识、[[mmlu]]的57个学科和BIG-bench的62个任务。",
+  "results": "在有可比结果的124个任务中，Gopher在100个（约81%）上超过GPT-3、Jurassic-1、Megatron-Turing NLG等此前最好的结果。MMLU五样本平均60.0%，GPT-3为43.9%；高中阅读理解RACE-h从47.9%升到71.6%。与同家族7.1B模型相比，51%的任务提升超过25%，但约10%的任务没有任何提升；收益最大的是阅读理解、事实核查和毒性识别，数学和逻辑推理收益很小，部分题目上甚至不如小模型。毒性方面：给有毒的提示时，模型越大越容易生成有毒续写，但识别毒性也越准。",
+  "legacy": "仅仅三个多月后，同一团队的[[chinchilla]]指出：Gopher和GPT-3这样的模型参数太多、训练数据太少，用Gopher的算力训一个70B的模型、喂4倍数据，全面更好。MassiveText和它的过滤流程被Chinchilla、[[retro]]沿用，“精心过滤网页数据”后来成为[[fineweb]]等开源数据集的核心。Gopher本身没有公开权重；“规模不足以带来推理能力”的结论，则被随后的[[cot]]部分改写——推理能力需要换一种提示方式才能被引出。",
+  "limits": [
+    {
+      "text": "2800亿参数只训练了3000亿token，按后来的计算最优配比，数据远远不够、算力分配不划算。",
+      "solved_by": [
+        "chinchilla"
+      ]
+    },
+    {
+      "text": "数学和多步逻辑推理几乎不随规模提升，单靠放大模型解决不了。",
+      "solved_by": [
+        "cot",
+        "self-consistency"
+      ]
+    },
+    {
+      "text": "只是语言模型，用对话提示扮演助手时经常编造事实、偶尔输出有害内容，越大的模型续写有毒提示时越毒。",
+      "solved_by": [
+        "instructgpt",
+        "sparrow",
+        "hh-rlhf"
+      ]
+    },
+    {
+      "text": "权重和数据都不公开，外部无法复现或研究。",
+      "solved_by": [
+        "opt",
+        "bloom"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "gpt-3",
+      "type": "extends",
+      "note": "同样是只有解码器的自回归模型，规模从175B做到280B，并把评测从几十个任务扩到152个。"
+    },
+    {
+      "to": "scaling-laws",
+      "type": "uses",
+      "note": "沿用“固定3000亿token、主要放大参数”的规模化思路；正是这一做法随后被Chinchilla修正。"
+    },
+    {
+      "to": "rmsnorm",
+      "type": "uses",
+      "note": "用更省计算的RMSNorm替代LayerNorm，这一改动后来被LLaMA等主流模型继承。"
+    },
+    {
+      "to": "transformer-xl",
+      "type": "uses",
+      "note": "采用其相对位置编码，以便在比训练更长的文档上评估。"
+    },
+    {
+      "to": "mmlu",
+      "type": "uses",
+      "note": "在57个学科的MMLU上把五样本准确率从GPT-3的43.9%提到60.0%。"
+    },
+    {
+      "to": "jurassic-1",
+      "type": "rivals",
+      "note": "同期的178B模型；Gopher在多数可比任务上超过它，但两者都没有回答“参数和数据该怎么分配”。"
+    }
+  ],
+  "prereq": [
+    "language-model",
+    "scaling-law-concept",
+    "params-flops",
+    "normalization-layer",
+    "benchmark",
+    "distributed-training"
+  ],
+  "terms": [
+    {
+      "t": "MassiveText",
+      "d": "DeepMind为训练Gopher自建的英文语料集合，包含网页、书籍、新闻、代码和维基百科，经过多级质量过滤和去重。"
+    },
+    {
+      "t": "质量过滤",
+      "d": "用一组简单规则（文档长度、符号比例、是否含常见英文词、重复片段比例等）丢弃低质量网页，比直接用全部爬取文本训练效果更好。"
+    }
+  ],
+  "learn": "先懂[[c:scaling-law-concept]]和[[c:params-flops]]。读原文第3节（模型、训练、MassiveText）和第4节的图2、表5（MMLU），附录A的数据过滤规则值得细看。动手：写一个脚本，按论文的“停用词至少两个”“重复n-gram比例”规则过滤一小批Common Crawl网页，人工检查被删掉的是什么。",
+  "check": {
+    "source": "https://arxiv.org/abs/2112.11446",
+    "confirmed": "标题、作者、v1提交于2021-12-08；摘要中的280B、152个任务、推理收益小；ar5iv正文中的6个模型44M–280B、RMSNorm与相对位置编码、300B token、2048上下文、MassiveText 23.5亿文档/10.5TB及采样比例、2.5TiB与16GiB、100/124任务约81%、MMLU 60.0% vs 43.9%、RACE-h 47.9%→71.6%、16个任务（10.5%）无提升与79个（51.2%）提升超25%、毒性随规模的变化。"
+  }
+}

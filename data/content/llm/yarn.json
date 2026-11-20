@@ -1,0 +1,37 @@
+{
+  "id": "yarn",
+  "who": "Bowen Peng, Jeffrey Quesnelle, Honglu Fan, Enrico Shippole · Nous Research / EleutherAI / 日内瓦大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2309.00071"},
+    {"label": "代码", "url": "https://github.com/jquesnelle/yarn"}
+  ],
+  "problem": "位置插值把RoPE的所有维度一律压缩，高频维度里相邻token变得难以区分；扩展倍数到8倍左右模型就开始退化，而且需要较多的长文本微调。",
+  "idea": "按维度的“波长”区别对待：转得快的高频维度不插值，转得慢的低频维度完全插值，中间平滑过渡；再给注意力softmax加一个随扩展倍数变化的温度。合起来叫YaRN。",
+  "impact": "只用约为此前方法1/10的token、1/2.5的训练步数，就把Llama 2扩展到64K乃至128K上下文；此后被DeepSeek-V3等开源模型用于在预训练之后扩展上下文。",
+  "background": "[[rope]]让第m个位置的第d组维度旋转`m·θ_d`角度，`θ_d = b^(−2d/|D|)`（b通常为10000）。不同维度转速差别极大：转一整圈所需的token数叫**波长**，`λ_d = 2π/θ_d`。低维的波长只有几个token，高维的波长可能比整个训练长度还长。\n\n[[position-interpolation]]把位置统一乘以`1/s`（s是扩展倍数），等于把每个维度都放慢s倍。这对低频维度正好——它们本来就没转完一圈，压缩后仍在见过的范围内；但对高频维度是损失——原本相邻token之间的角度差被缩小s倍，模型分不清近处的词序。作者统计，此前用位置插值的微调大约只能扩到s≈8。社区开发者bloc97提出的“NTK感知”插值改为高频少压、低频多压，效果更好，但不容易确定该用多大的基频。",
+  "method": "**按波长分段插值（NTK-by-parts）**。对每个维度算比值`r(d) = L/λ_d`，即在原训练长度L内该维度转了多少圈：\n- `r < α`（转不到一圈的低频维度）：完全按位置插值，`θ_d → θ_d/s`，避免外推；\n- `r > β`（转了很多圈的高频维度）：不改，保留近距离的分辨率；\n- 介于两者之间：用斜坡函数`γ(r)`线性混合，`θ′_d = (1−γ)·θ_d/s + γ·θ_d`。\n对Llama系模型，作者取α=1、β=32。\n\n**注意力温度**。上下文变长后，softmax要在更多token上分配注意力，分布变得更平、熵升高。YaRN把注意力分数除以温度t：`softmax(q·k/(t·√|D|))`，并给出经验公式`√(1/t) = 0.1·ln(s) + 1`。实现上只需把旋转后的Q、K同乘一个系数，不改注意力代码，也不增加推理开销。\n\n**动态缩放**。推理时按当前实际长度动态选择s，在训练长度内不改动，超出后逐步放大，使模型平滑退化而不是突然崩溃。",
+  "results": "把Llama 2 7B和13B（原上下文4K）在PG19长文本上微调：s=16时训练400步，s=32时在其基础上再训练200步，训练数据都只有64K长度。在10篇128K长度的Proof-pile文档上，s=32的7B模型从8K到128K困惑度一路下降（3.56→2.37），说明它能外推到比微调数据更长的上下文。论文称所需token约为此前方法的1/10、训练步数约1/2.5。在LLaMA 7B扩展16倍的对照中，YaRN在HellaSwag和TruthfulQA上优于位置插值，短上下文能力损失较小，但MMLU仍从35.7降到30.0。",
+  "legacy": "YaRN成为开源模型扩展上下文的常用工具，例如[[deepseek-v3]]在预训练后用YaRN分两个阶段把上下文从4K扩到32K、再到128K。[[longrope]]进一步用搜索为每个维度找最佳缩放系数，把扩展推到更大的倍数。与[[code-llama]]“直接调大基频”的做法一起，“预训练用短上下文、最后阶段用RoPE缩放扩长”成为长上下文模型的常见流程。",
+  "pitfalls": "- YaRN仍然需要少量微调才能达到最好效果；不微调直接用（配合动态缩放）也能工作，但效果较差。\n- 困惑度和口令检索好，不代表模型能在长文中做复杂推理，见[[lost-in-the-middle]]和[[ruler]]。",
+  "limits": [
+    {"text": "α、β和温度公式都是在Llama系模型上凭经验调出来的，换模型或换更大倍数时不一定最优。", "solved_by": ["longrope"]},
+    {"text": "扩展后短上下文能力仍有下降，例如LLaMA 7B扩16倍后MMLU从35.7降到30.0。", "solved_by": ["longrope"]},
+    {"text": "只用困惑度和口令检索验证，没有检验长文中的多跳推理和信息综合。", "solved_by": ["ruler"]},
+    {"text": "上下文变长后注意力计算量随长度平方增长，128K的推理与训练成本依然很高。", "solved_by": ["ring-attention", "deepseek-v3.2"]}
+  ],
+  "relations": [
+    {"to": "position-interpolation", "type": "solves", "note": "位置插值均匀压缩所有维度，损失高频维度的近距离分辨率；YaRN只压缩低频维度，扩展倍数更大、所需数据更少。"},
+    {"to": "rope", "type": "extends", "note": "从RoPE各维度的波长出发，分维度修改旋转频率，并在旋转后的Q、K上乘温度系数。"},
+    {"to": "llama-2", "type": "uses", "note": "在Llama 2 7B和13B上把4K上下文扩展到64K和128K。"},
+    {"to": "code-llama", "type": "rivals", "note": "Code Llama把RoPE基频整体调大（属于NTK感知类做法）；YaRN按波长分段处理，并加入注意力温度。"},
+    {"to": "flashattention-2", "type": "uses", "note": "用FlashAttention-2和FSDP在64K长度序列上微调。"}
+  ],
+  "prereq": ["positional-encoding", "fourier-transform", "softmax", "entropy", "context-window", "perplexity"],
+  "terms": [
+    {"t": "波长", "d": "RoPE中某一组维度旋转一整圈（2π）所需的token数。波长短的维度区分近处位置，波长长的维度区分远处位置。"},
+    {"t": "NTK感知插值", "d": "社区提出的RoPE扩展方法，通过调大基频让高频维度少压缩、低频维度多压缩，名字来自神经正切核理论中关于高频信息的分析。"},
+    {"t": "动态缩放", "d": "推理时按当前序列的实际长度选择缩放倍数，而不是固定一个倍数。"}
+  ],
+  "learn": "先读[[rope]]和[[position-interpolation]]。读YaRN论文第3节，按3.1→3.2→3.3的顺序理解从“NTK感知”到“分段”再到“温度”的演进。动手：对一个d=128的RoPE，算出每组维度的波长和`r(d)`，标出哪些维度会被插值、哪些不动；然后在Hugging Face模型里设置`rope_scaling={type: yarn, factor: 4}`，比较长文本困惑度。",
+  "check": {"source": "https://arxiv.org/abs/2309.00071", "confirmed": "标题、4位作者及单位、arXiv v1于2023-08-31；PDF：波长定义、位置插值只能扩到约s=8、NTK-aware来自bloc97、式(10)–(13)斜坡函数与α=1、β=32、式(14)(15)温度√(1/t)=0.1ln(s)+1、动态缩放、Llama 2 7B/13B在PG19上s=16训练400步+s=32再200步（64K数据）、表1困惑度（7B s=32：8K 3.56→128K 2.37）、摘要10x更少token与2.5x更少步数、表2 LLaMA 7B扩16倍的Open LLM基准（MMLU 35.7→30.0）。DeepSeek-V3技术报告（arXiv 2412.19437 HTML）：预训练后用YaRN把上下文从4K扩到32K再到128K。"}
+}

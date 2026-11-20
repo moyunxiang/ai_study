@@ -1,0 +1,40 @@
+{
+  "id": "theano",
+  "who": "James Bergstra, Olivier Breuleux, Frédéric Bastien, Pascal Lamblin, Razvan Pascanu, Guillaume Desjardins, Joseph Turian, David Warde-Farley, Yoshua Bengio · 蒙特利尔大学LISA实验室（后来的MILA）",
+  "venue": "SciPy 2010（Python in Science Conference）",
+  "links": [
+    {"label": "SciPy 2010论文", "url": "https://proceedings.scipy.org/articles/Majora-92bf1922-003"},
+    {"label": "论文PDF（蒙特利尔大学）", "url": "https://www.iro.umontreal.ca/~lisa/pointeurs/theano_scipy2010.pdf"},
+    {"label": "维基百科：Theano", "url": "https://en.wikipedia.org/wiki/Theano_(software)"}
+  ],
+  "problem": "训练神经网络要手推每一层的梯度、手写CUDA代码才能用GPU，一个新模型从想法到能跑要花几周，还容易出错。",
+  "idea": "用户用类NumPy语法写出数学表达式，Theano把它当作符号计算图：自动求梯度，做代数化简与数值稳定化，再生成并编译C++或CUDA代码执行。",
+  "impact": "第一个被广泛使用的“写公式、自动求导、自动上GPU”的深度学习工具，2010—2015年蒙特利尔学派和大量论文用它实现；计算图加自动微分的设计被TensorFlow直接继承。",
+  "background": "2009年前后，[[gpu-dl-2009]]等工作证明用GPU训练深度网络能大幅提速，但前提是自己写[[cuda]]内核。同时，每换一种网络结构，就要在纸上用链式法则推一遍梯度（[[backprop]]），再手写成代码，改一个层就要重推。[[numpy]]让Python里写矩阵运算很方便，但它既不能求导、也不能上GPU，而且每个运算立即执行、产生大量临时数组。研究者想要的是：像写数学公式一样写模型，剩下的交给工具。",
+  "method": "Theano的思路是把Python当作描述计算的语言，而不是执行计算的语言。\n\n**符号表达式**。用户先声明符号变量，例如`x = T.matrix()`、`w = shared(...)`，再写`p = 1 / (1 + T.exp(-T.dot(x, w)))`。这一步什么都不算，只是构造了一张计算图（见[[c:autodiff]]）。\n\n**自动求导**。`T.grad(cost, w)`在图上做反向模式微分（[[ad-reverse-mode]]），生成一张新的、表示梯度的计算图。\n\n**编译**。调用`theano.function([x, y], cost, updates=...)`时，计算图依次经过：\n\n- **规范化**：合并重复子表达式（自动求导常产生大量重复），化简`exp(log(x))`为`x`，常量直接算出。\n- **数值稳定化**：例如`log(1 + exp(x))`在双精度下x大于709就会溢出成无穷，Theano把它替换成大x时直接返回x的稳定写法。\n- **特化**：`pow(x, 2)`换成`sqr(x)`，标量乘加的矩阵运算合并成一次BLAS的GEMM（见[[blas]]），逐元素运算融合成一个循环，`a*b + c`不再生成临时数组。\n- **转移到GPU**：float32的共享变量默认放在GPU上，凡是有GPU实现的运算自动替换。\n- **代码生成**：约80%的运算会按数据类型、维数生成专门的C++或CUDA代码，编译成Python可加载的模块。\n\n用户拿到的是一个普通的Python函数，调用它就执行优化后的原生代码。",
+  "results": "论文测试了单隐层MLP（60个784维样本乘784×500矩阵、tanh、再乘500×10矩阵）和卷积网络。官方称常见机器学习算法在CPU上比C/C++、NumPy/SciPy、MATLAB实现快1.6到7.5倍，在GPU（GeForce GTX 285，单精度）上快6.5到44倍。",
+  "legacy": "Theano在2010年代前半期支撑了大量深度学习研究，[[keras]]最初就是Theano的高层封装。它的核心设计——先建静态计算图、在图上自动微分、再编译优化——被[[tensorflow]]继承和工程化。另一方面，“先定义图再运行”导致调试困难、动态结构难写，[[chainer]]和[[pytorch]]转向边运行边建图。2017年9月MILA宣布在1.0版后停止主要开发，理由是业界已有强大的竞争产品；此后由PyMC团队接手维护并分叉为Aesara等项目。",
+  "pitfalls": "- Theano的符号求导不是数学软件那种符号推导公式，而是在计算图上做反向模式自动微分，产生的仍是一张可执行的图。\n- 构造表达式时没有任何数值被计算，打印中间变量看到的是符号而不是值，这是初学者最常困惑的地方。",
+  "limits": [
+    {"text": "先定义整张图再编译运行，图里看不到真实数值，报错信息指向编译后的代码，调试很困难。", "solved_by": ["chainer", "pytorch"]},
+    {"text": "静态图难以表达随输入变化的结构（变长序列、树形网络），循环要用专门的scan算子，写起来别扭且慢。", "solved_by": ["chainer", "pytorch"]},
+    {"text": "编译一个大模型可能要几分钟，每次改代码都要重新编译，拖慢实验节奏。", "solved_by": ["pytorch"]},
+    {"text": "基本只面向单机单卡，缺少多机分布式训练和生产部署的支持。", "solved_by": ["tensorflow"]}
+  ],
+  "relations": [
+    {"to": "numpy", "type": "extends", "note": "沿用NumPy的数组语法和语义，但把立即执行改成构建符号图再编译。"},
+    {"to": "ad-reverse-mode", "type": "uses", "note": "T.grad在计算图上执行反向模式自动微分，自动生成梯度图。"},
+    {"to": "backprop", "type": "solves", "note": "免去了为每种网络手工推导和实现反向传播的工作，改模型不再需要重推梯度。"},
+    {"to": "cuda", "type": "uses", "note": "为计算图中的运算自动生成并编译CUDA代码，用户无需手写GPU内核。"},
+    {"to": "gpu-dl-2009", "type": "solves", "note": "GPU训练的速度优势此前要靠手写CUDA才能拿到，Theano让普通研究者用Python就能享受到。"},
+    {"to": "blas", "type": "uses", "note": "在特化阶段把矩阵乘加合并成BLAS的GEMM调用，CPU上依赖MKL等优化实现。"}
+  ],
+  "prereq": ["autodiff", "backpropagation", "vector-matrix", "cpu-gpu", "floating-point"],
+  "terms": [
+    {"t": "计算图（静态图）", "d": "把一段计算表示成节点为运算、边为数据的有向图。静态图先完整定义再执行，便于整体优化，但运行前看不到具体数值。"},
+    {"t": "共享变量（shared variable）", "d": "Theano里保存模型参数的变量，值在多次函数调用之间保留，可放在GPU显存中，并可通过updates参数原地更新。"},
+    {"t": "算子融合", "d": "把多个逐元素运算合成一个循环一次算完，避免中间结果写回内存，节省带宽。"}
+  ],
+  "learn": "先确认理解[[c:autodiff]]和[[numpy]]的数组运算。读论文的Logistic Regression案例（图1—4）和“What happens under the hood”一节，这是理解所有静态图框架的最好入口。动手：不装Theano也可以，用JAX的`jax.grad`和`jax.jit`复现论文里的逻辑回归例子，再用`jax.make_jaxpr`打印出计算图，对照论文的编译阶段看它做了哪些化简。",
+  "check": {"source": "https://www.iro.umontreal.ca/~lisa/pointeurs/theano_scipy2010.pdf", "confirmed": "标题、9位作者、SciPy 2010（2010-06-28）；摘要中CPU快1.6–7.5倍、GPU快6.5–44倍；正文中MLP基准的矩阵规模、GTX 285、编译五阶段、log(1+exp(x))在x>709溢出、约80%运算生成C/CUDA代码。维基百科确认2017-09-28宣布停止主要开发、1.0.0于2017-11-15发布、PyMC接手维护。"}
+}

@@ -1,0 +1,39 @@
+{
+  "id": "neural-ode",
+  "who": "Ricky T. Q. Chen, Yulia Rubanova, Jesse Bettencourt, David Duvenaud · University of Toronto / Vector Institute",
+  "venue": "NeurIPS 2018（最佳论文）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1806.07366"},
+    {"label": "NeurIPS论文页", "url": "https://papers.nips.cc/paper/2018/hash/69386f6bb1dfed68692a24c8686939b9-Abstract.html"},
+    {"label": "torchdiffeq代码库", "url": "https://github.com/rtqichen/torchdiffeq"}
+  ],
+  "problem": "残差网络是一层层离散的更新，层数要人工定、显存随层数线性增长；不规则采样的时间序列和需要算雅可比行列式的标准化流也都卡在“离散步”上。",
+  "idea": "让神经网络只描述隐状态的变化率dh/dt = f(h, t)，前向传播交给现成的ODE求解器去积分，反向传播用伴随方法解另一条反向ODE，显存不随深度增长。",
+  "impact": "把“网络深度”变成连续的积分时间，打开了连续标准化流、潜变量ODE等方向；概率流ODE、流匹配等后来的生成模型都沿用了“用ODE把噪声搬成数据”的视角。",
+  "background": "[[resnet]]的每个残差块做的是`h_{t+1} = h_t + f(h_t, θ_t)`。这正是数值求解常微分方程（见[[c:ode-sde]]）时最简单的欧拉法走一步。已有工作指出了这个对应关系，但网络仍是固定层数的离散结构：训练时每一层的中间激活都要存下来供[[c:backpropagation]]使用，显存随层数线性增长；层数也与输入无关，简单样本和困难样本走同样多步。\n\n另外两个领域也卡在离散步上。处理病历、传感器这类采样时间不规则的序列，RNN（见[[c:recurrent-layer]]）只能把时间切成固定格子，缺失值很难处理。标准化流（见[[c:normalizing-flow]]，如[[realnvp]]）每层都要算雅可比矩阵的行列式，代价是维度的三次方，只好把层设计成特殊的耦合结构来降低成本。",
+  "method": "**连续深度**。把层数取到无穷、步长取到0，得到`dh(t)/dt = f(h(t), t, θ)`。f是一个普通神经网络，输出“状态此刻往哪个方向变、变多快”。给定输入`h(0)`，输出就是`h(T) = ODESolve(h(0), f, 0, T, θ)`。求解器可以是自适应步长的Runge-Kutta法：它根据误差容限自己决定要算f多少次（NFE，函数求值次数），这相当于“隐式的层数”，并且对不同输入可以不同。容限调松就更快但更不准。\n\n**伴随方法求梯度**。直接对求解器内部的每一步反向传播要存下所有中间状态。论文改用1962年Pontryagin等人的伴随灵敏度方法：定义伴随量`a(t) = ∂L/∂h(t)`，它满足`da/dt = −aᵀ ∂f/∂h`。从终点出发把h、a和参数梯度拼成一个增广系统，再调用一次求解器倒着积分回去，就得到所有梯度。整个过程只需存当前状态，显存为O(1)，且把求解器当黑箱，不用改它的内部。\n\n**连续标准化流**。论文证明，若`dz/dt = f(z, t)`，则对数密度满足`∂log p(z(t))/∂t = −tr(∂f/∂z)`。行列式变成了迹：迹是线性的，可以按隐藏单元拆开求和，f也不必设计成可逆结构。\n\n**潜变量ODE**。用RNN把一段不规则采样的观测编码成初始潜状态，再用神经ODE在任意时刻解出潜状态并解码，自然地插值和外推。",
+  "results": "MNIST上，ResNet测试误差0.41%、0.60M参数、显存O(L)；把残差块换成ODE求解模块的ODE-Net为0.42%、0.22M参数、显存O(1)。容限与精度、前向耗时之间呈可控的权衡；训练过程中NFE逐渐增多。连续流在二维密度拟合上比同等规模的离散planar flow更容易训练。在不规则采样的螺旋轨迹上，潜变量ODE的重建和外推明显好于RNN。论文获NeurIPS 2018最佳论文。",
+  "legacy": "直接的后续有[[ffjord]]（用随机迹估计把连续流做到图像规模）和[[hnn]]（让网络学哈密顿量，保证能量守恒）。更大的影响在生成模型：[[score-sde]]把扩散模型的采样写成一条“概率流ODE”，[[ddim]]式的确定性采样本质上就是解ODE；[[flow-matching]]与[[rectified-flow]]直接回归连续流的速度场，绕开了训练时反复解ODE的开销，成为今天图像、视频生成的主流训练目标。伴随方法和torchdiffeq也被物理、生物建模广泛使用。",
+  "pitfalls": "- 神经ODE不会自动更省计算：显存省了，但每次前向、反向都要让求解器反复调用f，计算量由误差容限和数据决定，训练往往比同等规模的ResNet慢。\n- 早期版本称反向传播只需要前向一半左右的函数求值次数；2026年的v6修订说明这是实验日志的bug，修正后两者中位数比约为0.8。\n- ODE的解轨迹不能相交，输入空间的拓扑结构被保留，因此存在它无法表示的函数，这是结构限制而不是训练不够。",
+  "limits": [
+    {"text": "连续流训练时每一步都要完整解一次ODE，函数求值次数在训练中还会逐渐增多，速度慢、开销难以预估。", "solved_by": ["flow-matching", "rectified-flow"]},
+    {"text": "连续流要精确计算雅可比矩阵的迹，代价随维度平方增长，论文里只能做低维或特殊结构的f。", "solved_by": ["ffjord"]},
+    {"text": "ODE的流是同胚映射，轨迹不能交叉，有些简单函数根本无法表示（后来的Augmented Neural ODEs通过增加维度绕开）。", "solved_by": []},
+    {"text": "图像实验只到MNIST规模，在大规模分类上并不比ResNet更好，连续深度在判别任务中的实际收益有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "resnet", "type": "extends", "note": "把残差块看成欧拉法的一步，取步长趋于0的极限，得到连续深度的网络。"},
+    {"to": "realnvp", "type": "solves", "note": "离散流为了算行列式只能用受限的耦合层；连续流把行列式换成迹，f不必可逆、结构可以自由设计。"},
+    {"to": "ad-reverse-mode", "type": "extends", "note": "伴随方法是连续时间版的反向模式求导：倒着积分一条ODE得到梯度，而不是存下每一步再回传。"},
+    {"to": "vae", "type": "uses", "note": "潜变量ODE沿用VAE的编码器-解码器与变分训练框架，只把潜空间的演化换成ODE。"},
+    {"to": "rnn-elman", "type": "rivals", "note": "处理不规则采样的时间序列时，RNN要把时间离散成格子，潜变量ODE可在任意时刻求值，在螺旋数据上外推更好。"}
+  ],
+  "prereq": ["ode-sde", "residual-connection", "backpropagation", "chain-rule", "jacobian-hessian", "normalizing-flow"],
+  "terms": [
+    {"t": "ODE求解器", "d": "给定初值和变化率函数，数值地求出未来某时刻状态的算法，如欧拉法、Runge-Kutta法；自适应求解器会按误差自动调步长。"},
+    {"t": "伴随灵敏度方法", "d": "来自最优控制的一种求梯度方式：从终点开始倒着解一条关于“损失对状态的偏导”的微分方程，不需要存储前向的中间结果。"},
+    {"t": "NFE", "d": "函数求值次数，求解器调用f的次数，决定了一次前向的计算量，可以看作隐式的层数。"}
+  ],
+  "learn": "先补[[c:ode-sde]]里的欧拉法和[[c:residual-connection]]，并理解[[c:normalizing-flow]]的变量替换公式。读原文第2节（伴随方法与算法1）和第4节（瞬时变量替换定理）。动手：用torchdiffeq在二维螺旋数据上训练一个潜变量ODE，或把一个小ResNet的残差块换成odeint，比较显存和NFE。",
+  "check": {"source": "https://arxiv.org/html/1806.07366", "confirmed": "arXiv记录：标题、四位作者、v1提交2018-06-19（v6更新于2026-10-09）；正文中残差块即欧拉离散、伴随灵敏度方法、表1（ResNet 0.41%/0.60M/O(L)，ODE-Net 0.42%/0.22M/O(1)）、NFE随训练增加、Theorem 1的−tr(df/dz)、关于反向NFE比例约0.8的2026年更正；NeurIPS 2018论文页；neurips.cc 2018 Awards页列为Best Paper。"}
+}

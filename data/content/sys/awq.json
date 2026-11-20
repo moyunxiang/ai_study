@@ -1,0 +1,49 @@
+{
+ "id": "awq",
+ "who": "Ji Lin, Jiaming Tang, Haotian Tang, Shang Yang, Wei-Ming Chen, Wei-Chen Wang, Guangxuan Xiao, Xingyu Dang, Chuang Gan, Song Han · MIT / SJTU / NVIDIA / UMass",
+ "venue": "MLSys 2024",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2306.00978"
+  }
+ ],
+ "problem": "[[gptq]]靠重建误差补偿，容易对校准集过拟合；权重等量化时一小部分重要通道的误差占了主要影响。",
+ "idea": "根据激活的大小找出约1%的重要权重通道，先放大它们再量化，等价于保护这些通道，同时全部仍用低比特整数。",
+ "impact": "在不依赖反向传播和重建的前提下做到4位量化，并带来本地设备上的实际加速。",
+ "method": "关键观察：权重的重要性由对应的激活决定，而不是权重本身大小；保护1%的重要权重就能显著降低量化误差。直接保留成FP16会让数据格式混乱，AWQ改为在量化前给这些通道乘以一个缩放因子`s`（相应地激活除以`s`，数学上等价），使其相对量化步长更大、误差更小，缩放因子通过在激活统计上搜索得到。它配套提供TinyChat推理框架，摘要称在桌面和移动GPU上比Hugging Face的FP16实现快3倍以上，并使700亿参数的Llama-2能部署到移动GPU。思路与[[smoothquant]]的等价缩放相近。",
+ "limits": [
+  {
+   "text": "只量化权重，到3位以下精度仍会下降。",
+   "solved_by": [
+    "bitnet"
+   ]
+  },
+  {
+   "text": "依赖校准集的激活统计，对分布外数据的稳健性有限。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "gptq",
+   "type": "rivals",
+   "note": "同为4位权重量化：GPTQ靠逐列误差补偿，AWQ靠按激活保护重要通道，不需要重建。"
+  },
+  {
+   "to": "smoothquant",
+   "type": "extends",
+   "note": "借用等价缩放的思路，但把它用于保护权重量化中的重要通道。"
+  }
+ ],
+ "prereq": [
+  "quantization-concept",
+  "memory-bandwidth",
+  "throughput-latency"
+ ],
+ "learn": "读论文的观察和缩放搜索两节，用AutoAWQ量化一个7B模型并与[[gptq]]版本比较。",
+ "check": {
+  "source": "https://arxiv.org/abs/2306.00978",
+  "confirmed": "标题、10位作者、v1于2023-06-01；摘要：约1%重要权重、TinyChat 3倍以上加速、70B Llama-2上移动GPU。"
+ }
+}

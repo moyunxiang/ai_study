@@ -1,0 +1,34 @@
+{
+  "id": "rrt",
+  "who": "Steven M. LaValle · Iowa State University（后与James Kuffner合作推广）",
+  "venue": "Iowa State University技术报告TR 98-11, 1998",
+  "links": [
+    {"label": "技术报告PDF", "url": "http://lavalle.pl/papers/Lav98c.pdf"},
+    {"label": "LaValle: About RRTs", "url": "http://lavalle.pl/rrt/about.html"},
+    {"label": "Wikipedia: RRT", "url": "https://en.wikipedia.org/wiki/Rapidly_exploring_random_tree"}
+  ],
+  "problem": "机械臂有六七个关节、汽车不能横着走，路径规划要在高维且带运动约束的空间里进行；网格搜索维数一高就爆炸，PRM又难以连接带约束的状态。",
+  "idea": "从起点长一棵树：每次在空间里随机撒一个点，找树上离它最近的节点，朝它前进一小步，若不碰撞就加入树。随机点天然落在大片未探索区域，树会迅速铺满空间。",
+  "impact": "成为机器人和自动驾驶中最常用的采样式规划器之一，衍生出RRT-Connect、RRT*等大量变体，至今是机械臂运动规划库的标准组件。",
+  "background": "运动规划的问题是：给定机器人的起始姿态和目标姿态，找一条不碰撞的路径。机器人的“姿态”要用所有关节角一起描述，一个7关节机械臂的状态就是7维空间里的一个点，这个空间叫位形空间（configuration space）。\n\n把空间切成网格再用[[a-star]]搜索，在2维很好用；但每维切100格，7维就是10¹⁴个格子，根本存不下（见[[c:curse-of-dimensionality]]）。1996年的[[prm-planning]]改用随机采样：先在空间里撒大量无碰撞点，把相近的点连成一张路图，再在图上搜索。PRM适合在同一环境里反复查询，但每次连边都要解“从A精确走到B”的问题。对汽车、带速度的机器人这类有微分约束的系统（汽车不能原地横移），这个两点连接问题本身就很难。",
+  "method": "RRT只需要一个更简单的操作：从已有状态出发，施加一个控制，前进一小段。算法循环K次：\n\n- 随机采样一个状态`q_rand`；\n- 在树中找离它最近的节点`q_near`；\n- 从`q_near`朝`q_rand`方向前进固定步长`Δq`，得到`q_new`（有运动约束时，就选一个控制输入并数值积分一小段时间）；\n- 若这一小段不碰撞，把`q_new`和边`(q_near, q_new)`加入树。\n\n**为什么会“快速”探索**。树上每个节点被选为扩展点的概率，正比于它的Voronoi区域（空间中离它比离其他节点都近的那片区域）的大小。树边缘的节点面对大片空白，Voronoi区域最大，所以最常被扩展，树会自动向未探索区域生长。LaValle用平面正方形里从中心(50,50)出发的例子演示：树很快伸向四个角，而“随机选节点、随机选动作”的朴素随机树只会在起点附近打转。\n\n**朝目标偏置**。实际实现中，以一个小概率直接把目标当作采样点，树就会在探索之余向目标收拢；也可以从起点和终点各长一棵树、让它们相向生长（后来的RRT-Connect）。",
+  "legacy": "LaValle与Kuffner在2001年的IJRR论文中把RRT系统化地用于带动力学约束的规划。它简单、无需预处理、对维数不敏感，成为机械臂规划软件的标准组件，也被[[darpa-urban-challenge]]中的参赛车辆用于实时轨迹规划。2010年起的RRT*等变体解决了路径不最优的问题。\n\n在学习时代，RRT常被用作生成演示数据的“专家”，或与学习到的采样分布、碰撞检测网络结合；但对于抓取、插入这类与物体接触的操作任务，主流已转向从演示中直接学策略（如[[diffusion-policy]]）。",
+  "limits": [
+    {"text": "只保证找到一条可行路径，不保证最短；已证明在温和条件下RRT路径代价几乎必然收敛到非最优值，实际路径弯弯曲曲，需要后处理平滑。", "solved_by": []},
+    {"text": "狭窄通道（如穿过只比机械臂略宽的缝隙）被随机点采中的概率极低，树可能长时间找不到通过的路。", "solved_by": []},
+    {"text": "假设环境几何已知且静止、给出的是开环轨迹；对接触丰富的操作和动态变化的场景无能为力。", "solved_by": ["diffusion-policy"]}
+  ],
+  "relations": [
+    {"to": "prm-planning", "type": "solves", "note": "PRM要在任意两点之间精确连边，有微分约束时很难；RRT只需从已有节点施加控制向前走一步，天然适用于汽车等非完整约束系统，且无需预先建图。"},
+    {"to": "a-star", "type": "solves", "note": "A*需要把空间离散成网格，格子数随维数指数增长；RRT用随机采样绕开了显式离散化，在7维以上的机械臂空间仍可用。"},
+    {"to": "mcmc", "type": "uses", "note": "同属用随机采样代替穷举的蒙特卡洛思路：RRT可以看作一种把搜索偏向最大Voronoi区域的蒙特卡洛方法。"}
+  ],
+  "prereq": ["graph-basics", "tree-search", "curse-of-dimensionality", "monte-carlo", "kinematics-dof"],
+  "terms": [
+    {"t": "位形空间", "d": "把机器人所有关节角（或位置与朝向）合起来看成一个点所在的空间。障碍物在这个空间里变成一片禁区，规划就是在其中找一条连通的曲线。"},
+    {"t": "微分约束 / 非完整约束", "d": "对运动方式而不只是位置的限制，例如汽车只能沿车头方向前进、转弯半径有下限，不能直接平移到旁边的车位。"},
+    {"t": "Voronoi区域", "d": "对一组点，每个点“管辖”的那片离它最近的区域。RRT扩展哪个节点，取决于随机点落在谁的Voronoi区域里。"}
+  ],
+  "learn": "先熟悉[[c:graph-basics]]与[[c:tree-search]]，以及位形空间的概念（[[c:kinematics-dof]]）。读LaValle的About RRTs页面和技术报告的算法部分。动手：用Python在一个带矩形障碍物的二维平面上实现RRT（约50行），画出每100次迭代后的树；再加上10%的目标偏置和双向生长，比较找到路径所需的迭代次数。",
+  "check": {"source": "http://lavalle.pl/rrt/about.html ; https://en.wikipedia.org/wiki/Rapidly_exploring_random_tree", "confirmed": "维基参考文献：LaValle 1998年10月，技术报告TR 98-11，Iowa State University计算机系；LaValle与Kuffner 2001 IJRR 20(5)《Randomized Kinodynamic Planning》；算法伪代码、Voronoi偏置、目标偏置、RRT路径几乎必然收敛到非最优值及RRT*（Karaman与Frazzoli 2010）。LaValle页面：适用于非完整/动力学约束、从(50,50)出发的正方形例子与朴素随机树对比。"}
+}

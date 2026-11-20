@@ -1,0 +1,54 @@
+{
+ "id": "prompt-caching",
+ "who": "Anthropic",
+ "links": [
+  {
+   "label": "公告",
+   "url": "https://www.anthropic.com/news/prompt-caching"
+  }
+ ],
+ "problem": "很多应用每次请求都携带同样的长前缀（系统提示、文档、代码库、几十个示例），每次都要重新处理，既慢又贵。",
+ "idea": "API允许开发者标记要缓存的前缀，之后的请求命中同一前缀时直接复用已算好的状态，缓存读取按低价计费。",
+ "impact": "把推理引擎内部的前缀缓存（见[[vllm]]、[[sglang]]）变成对开发者可见、可计费的产品能力，之后各家API都跟进。",
+ "method": "公告发布时（Hacker News记录显示2024-08-14）还是公开测试版；页面更新写明，2024年12月17日起在Anthropic API上正式可用，Amazon Bedrock和Google Cloud Vertex AI上为预览。官方称，对长提示可降低最高90%的成本和最高85%的延迟。\n\n原理上，模型处理一段提示后会得到每层的KV缓存（见[[c:kv-cache]]）。如果下一次请求的开头与之前完全相同，这部分KV就不必重算，而是从缓存中读取。适用场景包括长对话、带文档的问答、代码库问答、大量示例的提示。",
+ "legacy": "此后各大模型API都提供了类似的上下文缓存；长上下文代理应用的成本结构因此改变，开发者开始刻意把稳定内容放在提示开头。",
+ "limits": [
+  {
+   "text": "只对完全相同的前缀有效，提示中间有一处变化，其后的缓存都失效。",
+   "solved_by": []
+  },
+  {
+   "text": "缓存有存活时间，过期后要重新付写入的成本。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "vllm",
+   "type": "extends",
+   "note": "vLLM等引擎内部做前缀KV复用，Prompt Caching把它做成API层面的产品特性。"
+  },
+  {
+   "to": "sglang",
+   "type": "extends",
+   "note": "SGLang的RadixAttention同样按前缀复用KV，这里变成可计费的接口。"
+  }
+ ],
+ "prereq": [
+  "kv-cache",
+  "throughput-latency",
+  "context-window",
+  "training-vs-inference"
+ ],
+ "terms": [
+  {
+   "t": "前缀缓存",
+   "d": "把提示开头部分已经算好的KV状态保存下来，下次遇到相同开头直接复用。"
+  }
+ ],
+ "learn": "先读vLLM与SGLang中的前缀缓存 → 阅读官方文档的cache_control用法 → 对比缓存命中与未命中的计费。",
+ "check": {
+  "source": "https://www.anthropic.com/news/prompt-caching 与 HN 记录",
+  "confirmed": "公告正文的最高省90%成本、85%延迟、2024-12-17正式可用；HN条目显示首发约2024-08-14（页面元数据日期2025-08-14与之矛盾，以HN和正文更新记录为准）。"
+ }
+}

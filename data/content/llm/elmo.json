@@ -1,0 +1,35 @@
+{
+  "id": "elmo",
+  "who": "Peters, Neumann, Iyyer, Gardner, Clark, Lee, Zettlemoyer · 艾伦人工智能研究所 / 华盛顿大学",
+  "venue": "NAACL 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1802.05365"},
+    {"label": "The Illustrated BERT, ELMo, and co.", "url": "https://jalammar.github.io/illustrated-bert/"}
+  ],
+  "problem": "word2vec给每个词只有一个固定向量，“bank”在“河岸”和“银行”里是同一个向量，模型分不清一词多义。",
+  "idea": "预训练一个双向LSTM语言模型，把一个词在具体句子里经过的各层隐状态加权求和，作为这个词“随上下文变化”的向量，接到任何下游模型上。",
+  "impact": "只把词向量换成ELMo，六个主流任务全部刷新纪录，让“上下文相关的预训练表示”成为2018年NLP的共识，几个月后被BERT接棒。",
+  "background": "2013年起，[[word2vec]]和[[glove]]式的词向量是NLP模型的标配输入。它们是一张查找表：一个词一个向量，与它所在的句子无关。可词义取决于上下文：play在“play the piano”和“a Shakespeare play”里意思完全不同（见[[c:distributional-hypothesis]]）。\n\n2017年的[[cove]]迈出了一步：用机器翻译模型的LSTM编码器给词生成上下文相关的向量。但翻译需要平行语料，数量有限，而且它只用了编码器的最顶层。",
+  "method": "**双向语言模型（biLM）**。训练两个[[c:language-model]]：前向的根据前文预测下一个词，后向的根据后文预测前一个词，两者共享最底层的字符表示和最顶层的softmax。结构沿用[[lm-limits]]里最好的CNN-BIG-LSTM并把维度减半：输入用2048个字符n-gram卷积核读出词形（所以没见过的词也有向量），上面是2层双向LSTM，每层4096个单元、投影到512维。在10亿词基准上训练10轮。\n\n**加权混合各层**。一个词在biLM里有三层表示：字符层h_0、第一层LSTM h_1、第二层h_2。ELMo不只取最顶层，而是让每个下游任务自己学一组权重：\n\n`ELMo_k = γ · Σ_j s_j · h_(k,j)`\n\n其中s_j是经过softmax归一化的层权重，γ是整体缩放系数。分析发现低层更多编码句法（适合词性标注），高层更多编码语义（适合词义消歧），所以让任务自选比例效果最好。\n\n**用法**。biLM参数冻结，ELMo向量和原有词向量拼接后送进各任务原本的模型。",
+  "results": "在问答（SQuAD）、文本蕴含（SNLI）、语义角色标注、指代消解、命名实体识别、情感分类（SST-5）六个任务上，只加ELMo就全部超过当时最好结果，相对错误率下降6%到20%。[[squad]]上F1从基线的81.1提高到85.8，相对错误率降低24.9%。",
+  "legacy": "ELMo说明预训练语言模型的内部状态里装着可迁移的语言知识。几个月后[[gpt-1]]把“当特征用”改成“整体微调”，[[bert]]再用掩码语言模型实现了每一层都同时看两边的深度双向，ELMo很快被取代。它的名字也开启了用芝麻街角色给模型命名的风气。",
+  "limits": [
+    {"text": "前向和后向两个语言模型各自训练、最后拼接，是“浅层”双向：任何一层里，一个方向都看不到另一边的上下文。", "solved_by": ["bert"]},
+    {"text": "只作为冻结特征接到各任务专门设计的模型上，每个任务仍要自己设计网络结构。", "solved_by": ["gpt-1", "bert"]},
+    {"text": "LSTM按时间步串行计算，训练慢，难以继续扩大规模。", "solved_by": ["gpt-1"]}
+  ],
+  "relations": [
+    {"to": "word2vec", "type": "solves", "note": "把一个词一个固定向量，改成根据所在句子动态生成向量，解决一词多义。"},
+    {"to": "lm-limits", "type": "uses", "note": "biLM结构取自该文的CNN-BIG-LSTM，维度减半，并同样在10亿词基准上训练。"},
+    {"to": "lstm", "type": "uses", "note": "两层双向LSTM是生成上下文表示的主体。"},
+    {"to": "cove", "type": "extends", "note": "同样做上下文词向量，但用无需平行语料的语言模型代替翻译编码器，并混合所有层而非只用顶层。"},
+    {"to": "squad", "type": "uses", "note": "在SQuAD等六个基准上验证，问答任务提升最大。"}
+  ],
+  "prereq": ["embedding", "language-model", "recurrent-layer", "distributional-hypothesis", "feature-representation"],
+  "terms": [
+    {"t": "上下文相关词向量", "d": "同一个词在不同句子里得到不同的向量，向量由一个读过整句的模型实时算出。"},
+    {"t": "biLM", "d": "双向语言模型：一个从左往右、一个从右往左的语言模型，分别预测下一个词和上一个词。"}
+  ],
+  "learn": "先补[[c:embedding]]和[[c:language-model]]。读原文第3节的公式(1)和第5节对各层内容的分析，再看The Illustrated BERT, ELMo, and co.。动手：取一个预训练模型，计算“bank”在两个不同句子中的向量余弦相似度，与word2vec对比。",
+  "check": {"source": "https://arxiv.org/abs/1802.05365", "confirmed": "标题、7位作者、arXiv首次提交2018-02-15；正文（ar5iv）中的层加权公式、2层4096单元/512投影/2048字符卷积、六个任务6–20%相对错误率下降、SQuAD 81.1→85.8与24.9%。"}
+}

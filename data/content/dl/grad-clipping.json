@@ -1,0 +1,36 @@
+{
+  "id": "grad-clipping",
+  "who": "Razvan Pascanu, Tomas Mikolov, Yoshua Bengio · Université de Montréal / Brno University of Technology",
+  "venue": "ICML 2013",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1211.5063"},
+    {"label": "ar5iv全文", "url": "https://ar5iv.labs.arxiv.org/html/1211.5063"}
+  ],
+  "problem": "训练RNN时，梯度偶尔会突然暴涨几个数量级，一步更新就把参数甩到很远，损失瞬间变成NaN；而梯度消失又让模型学不到长距离依赖。",
+  "idea": "从动力系统角度解释两种问题：损失曲面上存在陡峭的“悬崖”。对策很简单：梯度范数超过阈值就把整个梯度按比例缩小到阈值，方向不变；另加一个正则项鼓励梯度在时间上反传时保持大小。",
+  "impact": "范数裁剪几乎零成本，却让RNN训练从“经常炸掉”变得稳定，此后成为LSTM、seq2seq直到今天大语言模型训练的标配。",
+  "background": "1994年的[[vanishing-gradient]]已经指出：[[rnn-elman]]这类循环网络用[[bptt]]求梯度时，梯度要乘以同一个循环矩阵很多次。矩阵的最大特征值小于1，远处的梯度指数衰减（消失）；大于1，则指数增长（爆炸）。\n\n2012年前后，人们有几种应对：[[lstm]]用门控结构让信息沿一条近似恒等的路径传递，缓解消失；Martens和Sutskever用二阶的[[hessian-free]]优化训练RNN，效果好但实现复杂、代价高；Mikolov在[[rnnlm]]中对梯度的每个分量单独截断，实践上管用但缺乏解释。爆炸的梯度到底长什么样、怎样处理最合理，并不清楚。",
+  "method": "**诊断**：论文用一个单神经元的线性RNN `x_t = w·x_{t−1}` 说明，损失对w的曲面上会出现很窄、很陡的“墙”。梯度下降走到墙边时，梯度极大，一步就跳出很远，之前的进展全部作废。作者还给出必要条件：tanh激活下，循环矩阵最大特征值大于1时梯度才可能爆炸（sigmoid则是大于4）。\n\n**范数裁剪**（算法1）：\n\n`g ← ∂E/∂θ`\n`若 ‖g‖ ≥ 阈值，则 g ← (阈值 / ‖g‖) · g`\n\n只改梯度的长度、不改方向。在墙边，梯度方向基本是对的（垂直于墙），只是步子太大，缩短步长就能避开跳飞。与Mikolov的逐元素截断不同，这样不会扭曲方向。\n\n**针对消失的软约束**：加正则项\n\n`Ω = Σ_k ( ‖∂E/∂x_{k+1} · ∂x_{k+1}/∂x_k‖ / ‖∂E/∂x_{k+1}‖ − 1 )²`\n\n它惩罚误差信号往回传一步时范数的放大或缩小，鼓励梯度在时间上保持大小。两者合起来称为SGD-CR。",
+  "results": "在Hochreiter和Schmidhuber 1997提出的“时间顺序”人造任务上，序列长于20时普通SGD和只做裁剪的SGD-C都解不了，SGD-CR在长度直到200的序列上成功率100%，还能泛化到两倍于训练长度的序列。Penn Treebank字符级语言模型的测试熵：SGD 1.50、SGD-C 1.42、SGD-CR 1.41比特/字符；训练误差也同步下降，作者据此认为裁剪解决的是优化问题，而不是起正则化作用。",
+  "legacy": "范数裁剪很快成为RNN训练的默认操作，[[seq2seq]]、[[graves-generating]]等都在用。消失问题的那个正则项则用得很少，后来主要靠门控结构（[[cho-encdec]]的GRU、LSTM）和去掉循环的[[transformer]]解决。今天几乎所有大模型的训练配置都对全局梯度范数做裁剪，用来挡住偶发的损失尖峰。",
+  "limits": [
+    {"text": "裁剪只能防止梯度爆炸，不能解决梯度消失；论文的正则项效果有限、计算麻烦，没有被普遍采用。", "solved_by": ["cho-encdec", "transformer"]},
+    {"text": "阈值是要手调的超参数，取多少没有理论指导，设得太小会让训练变慢。", "solved_by": []},
+    {"text": "裁剪治标不治本：大模型训练中的损失尖峰往往源于数值和架构问题，仅靠裁剪挡不住。", "solved_by": ["pre-ln"]}
+  ],
+  "relations": [
+    {"to": "vanishing-gradient", "type": "solves", "note": "对1994年指出的梯度爆炸给出几何解释和范数裁剪这一简单解法，并尝试用正则项缓解消失。"},
+    {"to": "rnn-elman", "type": "solves", "note": "让普通tanh循环网络的训练稳定下来，不必换成更复杂的结构或二阶优化。"},
+    {"to": "rnnlm", "type": "extends", "note": "把Mikolov在RNN语言模型里用的逐元素截断改成按整体范数缩放，保持梯度方向。"},
+    {"to": "hessian-free", "type": "rivals", "note": "Martens与Sutskever用二阶优化训练RNN；本文用一阶SGD加裁剪在同样的人造任务上取得更高成功率，一阶路线后来成为主流。"},
+    {"to": "lstm", "type": "rivals", "note": "LSTM用门控架构绕开消失问题，本文试图在普通RNN上用优化技巧解决；最终门控结构加裁剪的组合成为标准做法。"},
+    {"to": "bptt", "type": "uses", "note": "梯度由随时间反向传播计算，裁剪作用于BPTT得到的整体梯度。"}
+  ],
+  "prereq": ["recurrent-layer", "vanishing-exploding", "backpropagation", "norm", "eigen-svd", "gradient-clipping"],
+  "terms": [
+    {"t": "梯度悬崖", "d": "损失曲面上极窄极陡的区域。梯度在这里突然变得巨大，若按原样更新，参数会被甩到很远。"},
+    {"t": "谱半径", "d": "矩阵特征值绝对值的最大者。循环矩阵的谱半径决定梯度在时间上是指数衰减还是指数增长。"}
+  ],
+  "learn": "先读[[c:recurrent-layer]]和[[c:vanishing-exploding]]，回顾[[vanishing-gradient]]。读原文第2.1节（爆炸与消失的条件）、第3.2节（算法1）和图6的悬崖示意。动手：在PyTorch里训一个字符级tanh RNN，分别不裁剪和用`clip_grad_norm_`裁剪，记录每步梯度范数和损失，观察尖峰。",
+  "check": {"source": "https://arxiv.org/abs/1211.5063", "confirmed": "标题、作者Pascanu/Mikolov/Bengio、arXiv首次提交于2012-11-21；在ar5iv全文中核对了算法1、正则项Ω的形式、tanh下γ=1与sigmoid下γ=1/4的条件、时间顺序任务长度20与200、PTB表2的1.50/1.42/1.41。"}
+}

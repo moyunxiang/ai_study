@@ -1,0 +1,52 @@
+{
+ "id": "gptq",
+ "who": "Elias Frantar, Saleh Ashkboos, Torsten Hoefler, Dan Alistarh · ISTA / ETH Zurich",
+ "venue": "ICLR 2023",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2210.17323"
+  }
+ ],
+ "problem": "千亿参数模型的显存与带宽开销巨大，而此前的训练后量化方法要么在大模型上精度崩，要么算不动。",
+ "idea": "沿用[[obs]]的二阶信息思路，逐列量化权重并用近似逆Hessian把量化误差补偿到未量化的列，几小时内把175B模型压到3–4位。",
+ "impact": "首个对千亿级语言模型做到3–4位几乎无损的训练后量化，成为后续开源量化工具的基础。",
+ "method": "对一层权重矩阵，按列依次量化：量化一列后，把产生的误差用该层输入的Hessian（`2XXᵀ`）的逆来更新还没量化的列，让整层输出尽量不变。GPTQ把OBS里每次选最优权重的昂贵做法，改成固定顺序、按块分批处理，并用Cholesky分解保证数值稳定，复杂度降到可处理上千亿参数。摘要称约4个GPU小时即可量化1750亿参数模型，3到4比特几乎无损，2比特或三值也能给出可用精度；定制内核在A100上端到端比FP16快约3.25倍，A6000上约4.5倍。[[llama-cpp]]等本地推理项目都借鉴或支持GPTQ权重。",
+ "limits": [
+  {
+   "text": "只量化权重，激活仍是高精度，且依赖一小批校准数据，可能在分布外任务上掉点。",
+   "solved_by": [
+    "smoothquant"
+   ]
+  },
+  {
+   "text": "没有区分权重重要性，2比特以下误差仍大。",
+   "solved_by": [
+    "awq"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "obs",
+   "type": "extends",
+   "note": "把OBS的二阶补偿思路改造成可扩展到千亿参数的逐列量化。"
+  },
+  {
+   "to": "deep-compression",
+   "type": "rivals",
+   "note": "后者做剪枝、量化和编码压缩的训练流程，GPTQ免训练、只做训练后量化。"
+  }
+ ],
+ "prereq": [
+  "quantization-concept",
+  "params-flops",
+  "memory-bandwidth",
+  "covariance"
+ ],
+ "learn": "先读[[c:quantization-concept]]，然后读论文算法一节；动手：用AutoGPTQ或llama.cpp工具量化一个小模型并比较困惑度。",
+ "check": {
+  "source": "https://arxiv.org/abs/2210.17323",
+  "confirmed": "标题、4位作者、v1于2022-10-31；约4个GPU小时、175B、3/4比特、A100约3.25倍、A6000约4.5倍。"
+ }
+}

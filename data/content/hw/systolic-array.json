@@ -1,0 +1,35 @@
+{
+ "id": "systolic-array",
+ "who": "H. T. Kung（与Charles E. Leiserson 1978–79年提出） · 卡内基梅隆大学",
+ "venue": "IEEE Computer, vol. 15, no. 1，1982年1月",
+ "links": [
+  {"label": "原文PDF（Kung主页）", "url": "http://www.eecs.harvard.edu/~htk/publication/1982-kung-why-systolic-architecture.pdf"},
+  {"label": "IEEE（DOI）", "url": "https://doi.org/10.1109/MC.1982.1653825"},
+  {"label": "Wikipedia：Systolic array", "url": "https://en.wikipedia.org/wiki/Systolic_array"}
+ ],
+ "problem": "专用计算硬件常常做得很快，造好才发现数据进出跟不上：每次运算都要从存储器取数，运算单元再多也被存储带宽卡住。",
+ "idea": "把大量简单的运算单元排成规则阵列，数据从存储器读出一次后像血液随心跳一样在单元间逐拍传递，每个数据被多次使用后才写回，计算量增加而存储访问不增加。",
+ "impact": "为矩阵乘、卷积这类规则计算给出了“少搬数据、多做运算”的标准硬件结构；三十多年后Google TPU的矩阵单元正是一个大型脉动阵列。",
+ "background": "到1980年前后，[[mead-conway]]让设计一块含数万个门的专用芯片变得可行，但Kung观察到一个矛盾：过去十年元件的成本和体积下降了一个数量级，速度却只是小幅提升，一块芯片上的门并不比十年前的TTL门快多少。所以要提速只能靠并发，也就是同时使用很多运算单元。可是在[[von-neumann]]结构里，每次运算都要从存储器取操作数、再写回结果，运算单元越多，对存储带宽的要求就越高。很多专用机造好之后才发现I/O接口跟不上器件速度。",
+ "method": "Kung用一个数字说明问题：假设存储器每次访问需100纳秒，每个运算至少要读写2个字节，那么无论运算单元多快，每秒最多完成500万次运算。脉动阵列的做法是：数据从存储器读出一次后，依次流过一串处理单元（PE），每个PE在它上面做一次运算再传给下一个；用6个PE串起来，同样的存储带宽就能支撑每秒3000万次运算。\n\n以矩阵乘法`C = A·B`为例（见[[c:matrix-multiplication]]）：把PE排成二维网格，A的各行从左侧逐拍送入并向右传，B的各列从上方逐拍送入并向下传。每个时钟周期，每个PE把从左边和上边收到的两个数相乘、累加到自己保存的部分和上，再把这两个数分别传给右边和下边的邻居。数据走完整个阵列后，每个PE里存的就是C的一个元素。整个过程中，每个A、B元素只从存储器读一次，却参与了一整行或一整列的乘加。\n\nKung强调这种设计的三个好处：单元种类少、结构规则，便于用VLSI实现；单元只与相邻单元通信，导线短；规模可以按需要的性能和可用I/O带宽调整。",
+ "legacy": "此后CMU据此设计了由Intel生产的iWarp等阵列处理器，但通用CPU借[[dennard-scaling]]快速提速，专用阵列机始终没有成为主流。真正的复兴来自深度学习：神经网络的计算几乎全是矩阵乘，恰好是脉动阵列最擅长的。2016年公开的[[tpu]]把一个大型二维脉动阵列作为核心，此后[[tpu-v2]]、各家[[hyperscaler-asic]]以及GPU里的矩阵单元（[[v100]]的Tensor Core）都采用了“数据在阵列中流动复用”的思路。Kung文中关于“问题大于设备时如何分块才能把I/O降到最少”的讨论，也正是后来[[roofline]]模型和[[flashattention]]这类IO感知算法的核心问题。",
+ "limits": [
+  {"text": "阵列针对某一类规则计算硬连线，灵活性差；遇到不规则、数据依赖的计算或不同形状的矩阵，利用率会大幅下降。", "solved_by": ["cuda", "v100"]},
+  {"text": "问题规模大于阵列时必须分块，中间结果要反复写回和读取存储器，I/O又重新成为瓶颈。", "solved_by": ["roofline", "hbm", "flashattention"]},
+  {"text": "1980年代缺少足够大、足够规则的计算需求来摊薄专用芯片的设计成本，通用CPU靠频率提升就能满足多数用户。", "solved_by": ["tpu"]}
+ ],
+ "relations": [
+  {"to": "von-neumann", "type": "solves", "note": "冯·诺依曼结构每次运算都要访问存储器；脉动阵列让数据读一次后在运算单元间多次复用，缓解了处理器与存储器之间的带宽瓶颈。"},
+  {"to": "mead-conway", "type": "uses", "note": "专为VLSI设计：单元简单、结构规则、只与邻居连线，正符合Mead–Conway提倡的规则化芯片设计方法。"},
+  {"to": "moores-law", "type": "uses", "note": "前提是单片能放的门越来越多、但单个门不再明显变快，所以性能只能来自大量单元并发。"},
+  {"to": "amdahl-law", "type": "rivals", "note": "Amdahl主张提升单处理器的串行速度；Kung则为规则计算设计大规模并行的专用阵列，四十年后专用并行硬件在深度学习上胜出。"}
+ ],
+ "prereq": ["matrix-multiplication", "memory-bandwidth", "cpu-gpu", "throughput-latency"],
+ "terms": [
+  {"t": "处理单元（PE）", "d": "阵列中的一个小运算器，通常只会做乘加等少数操作，并有几个寄存器保存部分结果。"},
+  {"t": "数据复用", "d": "一个从存储器读出的数据在被丢弃前参与多次运算。复用次数越多，每次运算分摊的存储访问越少。"},
+  {"t": "脉动（systolic）", "d": "借用心脏收缩的医学名词：数据随时钟一拍一拍地在阵列中推进，像血液随心跳流动。"}
+ ],
+ "learn": "先读[[c:matrix-multiplication]]和[[c:memory-bandwidth]]。然后读原文前四页（Figure 1的5 MOPS对30 MOPS例子和卷积的设计演化）。动手：用Python写一个3×3脉动阵列的逐周期模拟器，打印每个周期每个PE里的部分和，验证结果等于A·B，并数一数每个元素从“存储器”读了几次。之后可读[[tpu]]论文中矩阵单元一节，对照理解。",
+ "check": {"source": "http://www.eecs.harvard.edu/~htk/publication/1982-kung-why-systolic-architecture.pdf", "confirmed": "OCR读取原文前三页：IEEE Computer 1982年1月、Kung（CMU）；元件成本和体积降一个数量级而速度仅小幅提升；100ns存储、每次运算2字节→最多5 MOPS，6个PE的阵列→30 MOPS；血液与心脏、装配线比喻；分块时的I/O下界讨论。Kung与Leiserson 1979年首次发表、iWarp由Intel制造、数据流驱动而非程序计数器见https://en.wikipedia.org/wiki/Systolic_array。"}
+}

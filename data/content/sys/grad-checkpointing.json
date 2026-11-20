@@ -1,0 +1,51 @@
+{
+  "id": "grad-checkpointing",
+  "who": "Tianqi Chen, Bing Xu, Chiyuan Zhang, Carlos Guestrin",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1604.06174"
+    }
+  ],
+  "problem": "训练一个n层的网络，反向传播需要保存每层的中间激活，显存与层数成正比，很多先进模型已经顶到了GPU显存上限。",
+  "idea": "只保存少数几层的激活，其余的在反向传播需要时重新前向计算一次，用算力换显存。",
+  "impact": "成为训练大模型的标准手段，PyTorch、DeepSpeed、Megatron等都提供激活重计算。",
+  "method": "摘要的核心结果：训练n层网络只需 O(√n) 的内存，代价是每个小批量多做一次前向计算。做法是把网络切成约 √n 段，前向时只保留每段边界处的激活；反向传播到某一段时，从该段开头的检查点重新前向算出段内激活，用完即丢。内存从保存全部 n 层降到约 2√n 层，额外计算相当于多做一遍前向。\n\n论文还基于计算图分析实现了自动的就地计算和内存共享，并在[[mxnet]]里实现，使在显存有限时能训练更深的网络（如深层[[resnet]]）。",
+  "limits": [
+    {
+      "text": "额外约一遍前向的计算开销，对计算受限的训练是实实在在的减速。",
+      "solved_by": [
+        "flashattention"
+      ]
+    },
+    {
+      "text": "只减少激活内存，参数、梯度与优化器状态的内存仍需另外处理。",
+      "solved_by": [
+        "zero",
+        "fsdp"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "backprop",
+      "type": "extends",
+      "note": "在反向传播需要保存全部中间值的基础上，用重计算换内存。"
+    },
+    {
+      "to": "mxnet",
+      "type": "uses",
+      "note": "在MXNet的计算图内存优化基础上实现。"
+    }
+  ],
+  "prereq": [
+    "backpropagation",
+    "params-flops",
+    "autodiff"
+  ],
+  "learn": "读摘要和第3节；在PyTorch里用 `torch.utils.checkpoint` 包住几层，对比显存和耗时。",
+  "check": {
+    "source": "https://arxiv.org/abs/1604.06174",
+    "confirmed": "arXiv abs页：Training Deep Nets with Sublinear Memory Cost，Chen、Xu、Zhang、Guestrin，日期2016/04/21；摘要中的O(√n)内存、每个小批量多一次前向、计算图分析的就地操作与内存共享。√n分段细节为对摘要思路的展开。"
+  }
+}

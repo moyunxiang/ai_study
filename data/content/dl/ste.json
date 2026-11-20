@@ -1,0 +1,22 @@
+{
+  "id": "ste",
+  "who": "Yoshua Bengio, Nicholas Léonard, Aaron Courville · 蒙特利尔大学",
+  "venue": "arXiv 2013",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/1308.3432"}],
+  "problem": "二值神经元、硬阈值等操作的输出是0或1的阶跃，导数几乎处处为0，[[backprop]]的梯度传不过去，网络无法端到端训练。",
+  "idea": "前向照常输出离散的0/1，反向时假装这一步是恒等映射，把输出端的梯度原样复制给输入端，这就是直通估计器。",
+  "impact": "成为训练含离散、量化环节的网络的默认技巧，后来的二值网络、VQ-VAE的码本、低比特量化训练都靠它。",
+  "method": "论文研究的问题是：带随机二值神经元的网络，怎么估计损失对神经元输入的梯度。作者比较了四类办法：第一类是无偏的似然比估计，即[[reinforce]]的特例，无偏但方差大；第二类把二值神经元拆成随机二值部分和光滑可导部分，用后者近似它的期望效应；第三类在本来可导的计算图里注入加性或乘性噪声；第四类就是直通估计器（straight-through estimator），论文称其为启发式做法。\n\n以神经元`h = 1[z > u]`（u为随机数，z为sigmoid的输入）为例：真实导数几乎处处为0。直通估计器在反向传播时直接令`∂L/∂z ≈ ∂L/∂h`，即把阶跃当成恒等函数穿过去。它有偏，却几乎不增加计算量，而且方差远低于REINFORCE类方法。\n\n作者用它训练条件计算（conditional computation）的小规模模型：稀疏的随机门控单元大部分时候输出真正的0，从而可以关掉网络中的大块计算。",
+  "limits": [
+    {"text": "它是有偏的启发式估计，没有理论保证梯度方向正确；对多层离散化的深网络，误差会累积，训练可能不稳定。", "solved_by": ["vq-vae"]},
+    {"text": "论文验证的只是小规模实验，条件计算在大模型上的实际加速并未展示。", "solved_by": ["sparse-moe"]}
+  ],
+  "relations": [
+    {"to": "backprop", "type": "extends", "note": "在反向传播不可用的不可导节点上，用「梯度直接复制」的近似把链式法则接通。"},
+    {"to": "reinforce", "type": "rivals", "note": "REINFORCE给出无偏但高方差的离散梯度估计；直通估计器有偏但方差小、实现简单，实践中后者更常用。"}
+  ],
+  "prereq": ["derivative-gradient", "gradient-descent", "gumbel-softmax", "quantization-concept"],
+  "terms": [{"t": "条件计算", "d": "根据输入只激活网络的一部分，其余部分不计算，以降低大模型的计算成本。"}],
+  "learn": "先看[[c:gumbel-softmax]]概念页理解为什么离散变量不能直接求导。再读原文摘要与第4节关于直通估计器的部分，动手用PyTorch写一个`x + (round(x) - x).detach()`的量化层并训练一个小网络。",
+  "check": {"source": "https://arxiv.org/abs/1308.3432", "confirmed": "标题、三位作者、2013-08-15首次提交；摘要中比较四类估计器并命名straight-through estimator，以及条件计算的动机。"}
+}

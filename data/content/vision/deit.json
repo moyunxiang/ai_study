@@ -1,0 +1,38 @@
+{
+  "id": "deit",
+  "who": "Hugo Touvron, Matthieu Cord, Matthijs Douze, Francisco Massa, Alexandre Sablayrolles, Hervé Jégou · Facebook AI / Sorbonne University",
+  "venue": "ICML 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2012.12877"},
+    {"label": "官方代码", "url": "https://github.com/facebookresearch/deit"}
+  ],
+  "problem": "ViT要在3亿张带标签的内部数据上预训练才能超过CNN，只用ImageNet时只有77.9%，外界几乎无法复现和使用。",
+  "idea": "只用ImageNet-1k，靠一整套强数据增强和正则化（RandAugment、Mixup、CutMix、随机擦除、随机深度、重复增强）训练300轮；再加一个专门的“蒸馏token”，让ViT向卷积网络老师学习。",
+  "impact": "单台8卡机器两三天就能把ViT-B训到83.1%，蒸馏后最高85.2%，让ViT成为任何实验室都能训练的骨干；它的训练配方被Swin、DINO等后续工作直接沿用。",
+  "background": "[[vit]]证明了纯Transformer可以做图像分类，但有一个前提：先在Google内部的[[jft-300m]]上预训练。论文自己报告，ViT-B/16只在ImageNet-1k（约130万张）上训练时准确率77.9%，不如同等规模的ResNet。原因被归结为ViT缺少卷积的[[c:inductive-bias]]，需要更多数据才能学会“相邻像素相关”这类常识。\n\n于是出现一个疑问：ViT到底是真的需要海量数据，还是只是没训好？如果只能靠私有数据，绝大多数研究者都用不上它。",
+  "method": "**数据高效的训练配方**。架构与ViT-B完全相同（另给出小模型DeiT-S和DeiT-Ti，分别约2200万和500万参数）。改的只是训练：[[adamw]]优化器，300轮，配合[[randaugment]]、[[mixup]]、[[cutmix]]、随机擦除、[[stochastic-depth]]、重复增强（同一张图在一个批次里出现多份不同增强）。消融表显示这些组件大多缺一不可，例如把AdamW换成SGD会明显变差。\n\n**蒸馏token**（见[[c:knowledge-distillation]]）。普通蒸馏让学生的输出去拟合老师输出的软概率。DeiT在输入序列里除了`[class]` token，再加一个`[distill]` token，二者都通过自注意力与图像块交流。`[class]`的输出用真实标签监督，`[distill]`的输出用老师的预测监督。作者发现用老师预测的**硬标签**（概率最大的那个类）比软概率更好：\n\n`L = ½·CE(ψ(Z_cls), y) + ½·CE(ψ(Z_dist), y_t)`，`y_t = argmax Z_teacher`\n\n老师是同样数据训练的卷积网络[[regnet]]-16GF。推理时把两个token的预测相加。训练后两个token的余弦相似度只有0.06，说明它们学到了不同的东西。",
+  "results": "不蒸馏时，DeiT-B在224分辨率下ImageNet准确率81.8%，在384分辨率微调后83.1%，比原版ViT-B仅用ImageNet时的77.9%高出5个多点。加入蒸馏token后DeiT-B为83.4%（224）和84.5%（384），延长训练后最高85.2%。DeiT-Ti、DeiT-S分别为72.2%和79.8%，蒸馏后74.5%和81.2%。卷积网络当老师比Transformer当老师效果更好，作者推测是学生通过蒸馏继承了卷积的归纳偏置。DeiT-B在单个8卡节点上预训练约53小时。",
+  "legacy": "DeiT让ViT从“Google专属”变成开源社区的常用骨干。它的训练配方几乎原样被[[swin]]、[[pvt]]等后续视觉Transformer采用；[[dino]]的主要实验用DeiT-S大小的ViT；[[how-to-train-vit]]进一步系统研究了数据增强、正则化和数据规模之间的取舍。蒸馏token本身影响较小，但“用卷积老师给ViT补归纳偏置”的思路启发了后续的混合架构，而[[mae]]、[[dinov2]]等自监督方法后来让ViT在不依赖标签和老师的情况下也训得很好。",
+  "pitfalls": "- DeiT没有改变ViT的结构，只改了训练方法。它说明原版ViT在ImageNet上表现差，很大程度上是训练配方的问题，而不只是归纳偏置的问题。\n- 最好的结果仍借助了一个强卷积网络老师，所以“纯Transformer”的成绩里有卷积的贡献。",
+  "limits": [
+    {"text": "仍依赖ImageNet的类别标签和一个预先训练好的卷积老师。", "solved_by": ["dino", "mae"]},
+    {"text": "沿用ViT单一尺度、全局注意力的结构，计算随分辨率平方增长，不便直接用于检测和分割。", "solved_by": ["swin", "pvt"]},
+    {"text": "训练效果高度依赖一长串增强和正则化超参数，换数据或模型规模需重新调。", "solved_by": ["how-to-train-vit"]}
+  ],
+  "relations": [
+    {"to": "vit", "type": "solves", "note": "ViT只用ImageNet时只有77.9%；DeiT不改结构、只改训练配方，同一模型达到81.8%–83.1%，去掉了对JFT-300M的依赖。"},
+    {"to": "distillation", "type": "extends", "note": "在知识蒸馏基础上，为Transformer设计了单独的蒸馏token，并发现硬标签蒸馏优于软标签。"},
+    {"to": "randaugment", "type": "uses", "note": "数据增强的核心组件之一，消融后选择RandAugment而非AutoAugment。"},
+    {"to": "cutmix", "type": "uses", "note": "与Mixup一起作为混合样本增强，是训好ViT的重要正则化。"},
+    {"to": "regnet", "type": "uses", "note": "默认老师是RegNetY-16GF，卷积老师比Transformer老师更有效。"},
+    {"to": "efficientnet", "type": "rivals", "note": "以“精度—吞吐量”权衡与EfficientNet等卷积网络比较，蒸馏后的DeiT与之相当。"}
+  ],
+  "prereq": ["knowledge-distillation", "data-augmentation", "image-patch", "self-attention", "regularization", "inductive-bias"],
+  "terms": [
+    {"t": "蒸馏token", "d": "与[class] token并列加入序列的可学习向量，其输出专门用来拟合老师模型的预测。"},
+    {"t": "硬标签蒸馏", "d": "把老师预测概率最高的类别直接当作标签，用普通交叉熵训练学生，而不是拟合老师的完整概率分布。"},
+    {"t": "重复增强", "d": "在同一个批次里放入同一张图片的多个不同增强版本，DeiT的消融显示它对训练ViT很关键。"}
+  ],
+  "learn": "先读[[vit]]和[[distillation]]。读原文第4节（蒸馏token，公式2、3）和第6节的消融表（表8），看哪些增强去掉后掉点最多。动手：用timm的deit_small_patch16_224在ImageNet子集或CIFAR-100上分别开关Mixup/CutMix训练，比较准确率。",
+  "check": {"source": "https://arxiv.org/abs/2012.12877", "confirmed": "标题、6位作者、arXiv v1提交于2020-12-23；摘要中86M参数、83.1%、最高85.2%、单机少于3天；正文中ViT-B/16仅ImageNet 77.9%、表3各模型准确率（72.2/79.8/81.8/83.1及蒸馏后74.5/81.2/83.4/84.5）、硬蒸馏公式、两个token余弦相似度0.06、老师RegNetY-16GF、8卡53小时、表8训练组件。"}
+}

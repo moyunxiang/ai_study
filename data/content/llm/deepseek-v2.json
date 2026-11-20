@@ -1,0 +1,40 @@
+{
+  "id": "deepseek-v2",
+  "who": "DeepSeek-AI（Aixin Liu, Bei Feng, Bin Wang, Bingxuan Wang et al.） · 深度求索",
+  "venue": "arXiv 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2405.04434"},
+    {"label": "论文HTML全文", "url": "https://arxiv.org/html/2405.04434v5"},
+    {"label": "代码与权重", "url": "https://github.com/deepseek-ai/DeepSeek-V2"}
+  ],
+  "problem": "长上下文推理时KV缓存随长度和头数线性膨胀，限制了批大小和速度；GQA、MQA靠减少KV头来省缓存，但模型效果会变差。",
+  "idea": "提出多头潜注意力MLA：每个token只缓存一个512维的压缩潜向量，推理时把解压矩阵吸收进查询和输出投影；前馈层用放大到236B的DeepSeekMoE。",
+  "impact": "相比DeepSeek 67B，训练成本省42.5%、KV缓存减少93.3%、最大生成吞吐提高到5.76倍；MLA成为DeepSeek-V3、Kimi K2等模型的标准注意力。",
+  "background": "生成文本时，模型要为已生成的每个token、每一层、每个注意力头保存一份键K和值V（见[[c:kv-cache]]），下一步才不用重算。标准多头注意力每个token每层要存 `2·n_h·d_h` 个数：头数128、每头128维时就是32768个数，128K上下文下显存很快被占满，能同时服务的请求数（批大小）上不去。\n\n已有的办法是让多个查询头共享KV：[[mqa]]所有头共享一组，[[gqa]]按组共享。缓存确实小了，但每个头能看到的信息变少，效果下降。另一方面，[[deepseekmoe]]已经在16B规模验证了细粒度专家，[[deepseek-llm]] 67B是团队上一代稠密模型。",
+  "method": "**MLA：把KV压成一个潜向量**。对第t个token的隐状态h，先用一个下投影得到低维潜向量 `c = W_DKV · h`（d_c = 512维），只缓存它；需要时再用上投影还原每个头的键和值：`k_i = W_UK_i · c`，`v_i = W_UV_i · c`。关键在于推理时不必真的还原：注意力分数 `q_iᵀ k_i = (W_UK_iᵀ q_i)ᵀ c`，可以把 `W_UK` 预先乘进查询投影，`W_UV` 乘进输出投影，直接在潜向量上算注意力（见[[c:low-rank]]）。\n\n**解耦的RoPE**。[[rope]]要给键乘上一个随位置变化的旋转矩阵，它夹在 `W_Q` 和 `W_UK` 之间，矩阵就合并不了。解决办法是另开一小路：每个头额外有64维查询、所有头共享一个64维的键，只在这一路上加RoPE，这个键也要缓存。于是每个token每层缓存 `512 + 64 = 576` 个数，约为上面多头注意力32768个数的1.8%，相当于只有2.25组的GQA，但论文的对比实验显示效果反而强于标准多头注意力。\n\n**DeepSeekMoE放大**。60层，除第一层外的前馈层都是MoE：2个共享专家加160个路由专家，每个token选6个。总参数236B，激活21B。为控制跨卡通信，加了**设备受限路由**：路由专家分布在8张卡上，每个token最多只能发往其中3张卡上的专家。\n\n**训练**。8.1T token预训练（中文比英文多约12%），之后用[[yarn]]把上下文从4K扩到128K；对齐先SFT，再用[[grpo]]做强化学习。",
+  "results": "与自家稠密的DeepSeek 67B相比，训练成本省42.5%，KV缓存减少93.3%，最大生成吞吐提高到5.76倍。基座模型MMLU为78.5，略高于Mixtral 8x22B的77.6；中文的C-Eval为81.7、CMMLU为84.0，远高于Mixtral 8x22B。128K以内的大海捞针测试表现良好。同时发布的V2-Lite总参数15.7B、激活2.4B。",
+  "legacy": "[[deepseek-v3]]原样保留MLA和DeepSeekMoE，把规模放大到671B，并换上[[aux-loss-free]]与多token预测。MLA随后被[[kimi-k2]]、[[kimi-linear]]等采用，[[deepseek-v3.2]]的稀疏注意力也建立在MLA之上。设备受限路由则演化为V3的节点受限路由。",
+  "pitfalls": "- MLA不是“更少的头”：查询头仍是128个，每个头都有自己的键和值，只是它们都由同一个潜向量线性生成，所以表达能力介于MHA与MQA之间，而非退化成MQA。\n- “训练成本省42.5%”是与自家67B稠密模型相比，不是与其他公司的模型相比。",
+  "limits": [
+    {"text": "仍依赖三种辅助均衡损失加训练时丢弃token来平衡专家负载，损失权重需要调，且会干扰主任务。", "solved_by": ["aux-loss-free", "deepseek-v3"]},
+    {"text": "整体能力仍明显落后GPT-4，论文把“追平GPT-4”列为下一步目标。", "solved_by": ["deepseek-v3"]},
+    {"text": "只支持文本，数据以中英文为主，作者提醒其他语言能力有限。", "solved_by": []},
+    {"text": "MLA压缩了KV缓存，但每个查询仍要对全部历史token做注意力，计算量随长度平方增长。", "solved_by": ["nsa", "deepseek-v3.2"]}
+  ],
+  "relations": [
+    {"to": "gqa", "type": "solves", "note": "GQA靠减少KV头省缓存而牺牲效果；MLA用低秩压缩把缓存降到相当于2.25组GQA，效果却强于标准多头注意力。"},
+    {"to": "deepseekmoe", "type": "extends", "note": "把细粒度专家加共享专家的结构从16B放大到236B，并加入设备受限路由控制通信。"},
+    {"to": "deepseek-llm", "type": "extends", "note": "以上一代稠密的DeepSeek 67B为对照：更强，同时训练成本省42.5%、KV缓存减少93.3%。"},
+    {"to": "mqa", "type": "rivals", "note": "同为压缩KV缓存的路线；MQA让所有头共享一组KV，MLA让每个头的KV都从一个共享潜向量还原，保留了多头的区分度。"},
+    {"to": "rope", "type": "uses", "note": "RoPE与权重吸收不兼容，因此设计了只在一小路维度上施加RoPE的解耦方案。"},
+    {"to": "grpo", "type": "uses", "note": "对齐阶段沿用DeepSeekMath提出的GRPO做强化学习。"}
+  ],
+  "prereq": ["kv-cache", "self-attention", "low-rank", "mixture-of-experts", "positional-encoding", "memory-bandwidth"],
+  "terms": [
+    {"t": "MLA（多头潜注意力）", "d": "每个token只缓存一个低维潜向量，各注意力头的键和值都由它经线性变换得到；推理时把这些变换合并进查询和输出矩阵，从而直接在潜向量上计算。"},
+    {"t": "权重吸收", "d": "利用矩阵乘法结合律，把两个相邻的线性变换预先乘成一个，省掉中间结果的计算和存储。"},
+    {"t": "设备受限路由", "d": "专家分布在多张卡上时，先选出得分最高的M张卡，再只在这些卡上的专家里选top-k，限制每个token的通信范围。"}
+  ],
+  "learn": "先补[[c:kv-cache]]和[[c:low-rank]]，用纸笔算一遍MHA、GQA、MLA每个token的缓存量。然后读原文第2.1节（公式9–19和表1），重点理解为什么RoPE会破坏权重吸收。动手：用PyTorch实现一个不带RoPE的MLA，验证“先还原K再算注意力”和“把W_UK吸收进查询后直接对潜向量算注意力”结果一致。",
+  "check": {"source": "https://arxiv.org/html/2405.04434v5", "confirmed": "标题、作者DeepSeek-AI、arXiv v1提交于2024-05-07；摘要中的236B/21B、128K、42.5%/93.3%/5.76倍、8.1T token；正文中的MHA缓存2n_h·d_h·l、MLA缓存(d_c+d_h^R)·l且等于2.25组GQA、权重吸收、解耦RoPE、n_h=128、d_h=128、d_c=512、d_h^R=64、60层、2共享+160路由选6、8卡D=8且M=3、中文token比英文多约12%、YaRN由4K扩到128K、GRPO、表中MMLU 78.5对Mixtral 8x22B 77.6、C-Eval 81.7、CMMLU 84.0、V2-Lite 15.7B/2.4B、结论中的局限与“追平GPT-4”目标。"}
+}

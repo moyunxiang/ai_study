@@ -1,0 +1,39 @@
+{
+  "id": "lerobot",
+  "who": "Remi Cadene, Simon Alibert, Alexander Soare, Thomas Wolf等 · Hugging Face",
+  "links": [
+    {"label": "GitHub", "url": "https://github.com/huggingface/lerobot"},
+    {"label": "论文（2026）", "url": "https://arxiv.org/abs/2602.22818"},
+    {"label": "文档", "url": "https://huggingface.co/docs/lerobot"}
+  ],
+  "problem": "机器人学习的代码、数据格式和硬件接口各自为政：每篇论文一套代码、每台机器人一套驱动，想复现ACT或Diffusion Policy得从零搭环境。",
+  "idea": "像Transformers库统一语言模型那样，用一个PyTorch库统一机器人学习全链路：硬件驱动和遥操作、标准数据格式LeRobotDataset、主流策略的参考实现、训练与部署，数据和模型都放在Hugging Face Hub上共享。",
+  "impact": "配合低成本的开源SO-100机械臂，让个人和小团队也能采数据、训练并部署策略；社区在Hub上上传了数千个数据集，SO-10X采集的占一半以上。",
+  "background": "到2024年初，[[aloha-act]]和[[diffusion-policy]]已经证明，几十条人类示范就能教会机械臂完成精细动作。但要真正用起来门槛很高：每篇论文的代码风格不同、依赖不同；数据有的存成HDF5，有的是RLDS，有的是自定义格式；每种机械臂的电机驱动、相机同步都要自己写；工业级机械臂动辄上万美元。\n\n语言模型领域几年前也有类似的碎片化，[[hf-transformers]]用统一的模型接口和[[hf-hub]]上的共享权重解决了它。LeRobot试图在机器人领域复制这条路。",
+  "method": "LeRobot是一个纯Python、基于[[pytorch]]的开源库，2024年1月建仓、5月前后公开推广，覆盖从电机到策略的整条链路：\n\n**硬件层**：统一的`Robot`接口，`get_observation()`读取图像和关节状态，`send_action()`下发动作。最初支持Koch、SO-100和ALOHA三种机械臂，后来扩展到移动底盘和人形。SO-100/SO-101是可3D打印、成本只有工业臂零头的开源机械臂，带一只主动臂用于遥操作。\n\n**数据层**：LeRobotDataset格式，状态和动作存Parquet表，相机画面存成MP4视频，附带语言描述等元数据；可以直接从Hub流式读取，无需先下载整个数据集。\n\n**策略层**：提供[[aloha-act]]、[[diffusion-policy]]、VQ-BeT、TD-MPC等单任务方法的参考实现，后来又加入π0、SmolVLA等多任务VLA和HIL-SERL强化学习。\n\n**推理层**：异步推理，把“算动作”和“执行动作”拆开：策略可以跑在另一台带GPU的机器上，一次预测未来H步的动作块，机器人按固定频率逐步执行，同时下一块已在计算。",
+  "results": "据2026年的论文，库中各策略的规模从ACT的5200万参数到π0的35亿参数不等，fp32下π0在GPU上峰值显存约13GB。社区已在Hub上贡献了数千个数据集、数十万条示范轨迹和数百个模型，其中一半以上的数据集是在SO-10X机械臂上采集的。2025年内支持的机器人从3种增加到8种。",
+  "legacy": "LeRobot把“个人在家用一对低成本开源机械臂采数据、训练ACT”变成了常见做法，也成了Hugging Face自家小型VLA [[smolvla]] 的发布平台；[[pi0]]等开源VLA也被移植进来。它的数据格式逐渐成为开源社区共享真机数据的事实标准之一，与谷歌的RLDS（[[open-x]]使用）并存。",
+  "pitfalls": "- LeRobot是工具库，本身不是一个新模型或新算法；论文直到2026年才发表，比代码晚了两年。\n- 低成本机械臂精度、负载和重复性有限，在SO-100上训出的效果不能直接外推到工业臂或灵巧手。",
+  "limits": [
+    {"text": "社区贡献的数据集规模小、场景和标注质量参差，难以直接拼成高质量的大规模预训练数据。", "solved_by": []},
+    {"text": "缺乏统一的真机评测：每个人在自己的桌子上测成功率，结果无法横向比较。", "solved_by": ["roboarena"]},
+    {"text": "库本身不做量化、图编译等底层推理优化，大模型在廉价硬件上实时运行仍困难。", "solved_by": ["smolvla", "rtc"]},
+    {"text": "支持的硬件和算法远不完整，灵巧手、触觉等模态接入有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "hf-transformers", "type": "extends", "note": "照搬Transformers“统一接口+Hub共享权重”的模式，把它从语言模型搬到机器人策略。"},
+    {"to": "hf-hub", "type": "uses", "note": "数据集和模型都托管在Hub上，支持流式读取和在线可视化。"},
+    {"to": "aloha-act", "type": "uses", "note": "ACT是库里最早、下载量最高的策略之一，ALOHA也是首批支持的硬件。"},
+    {"to": "diffusion-policy", "type": "uses", "note": "提供Diffusion Policy的参考实现，作为单任务模仿学习的主要基线。"},
+    {"to": "pytorch", "type": "uses", "note": "整个库基于PyTorch，刻意避开ROS式的重型中间件，降低入门门槛。"},
+    {"to": "ros", "type": "rivals", "note": "ROS是传统机器人中间件，面向模块化感知-规划-控制；LeRobot只做学习所需的最小硬件接口，面向端到端策略。"}
+  ],
+  "prereq": ["imitation-learning", "teleoperation", "action-chunking", "control-loop", "state-action-observation"],
+  "terms": [
+    {"t": "SO-100 / SO-101", "d": "开源、可3D打印的低成本六自由度机械臂，成对使用：人手动摆动主动臂，从动臂实时跟随，从而采集示范数据。"},
+    {"t": "异步推理", "d": "把模型推理和机器人执行放在两个并行的进程（甚至两台机器）里：执行当前动作块的同时就开始算下一块，避免机器人停下来等模型。"},
+    {"t": "Parquet", "d": "一种按列存储的表格文件格式，读取部分列很快，适合存放高频的关节状态和动作序列。"}
+  ],
+  "learn": "先了解[[c:teleoperation]]和[[c:action-chunking]]。照着官方文档装好LeRobot，先在仿真环境（如ALOHA仿真）里训练一个ACT策略并评测；有条件的话组装一对SO-101，录50条抓放示范，训练后在真机上部署，体会数据质量对成功率的影响。",
+  "check": {"source": "https://github.com/huggingface/lerobot", "confirmed": "GitHub API显示仓库创建于2024-01-26，HN首次讨论2024-05-06；README中的LeRobotDataset（Parquet+MP4）、支持的硬件列表；arXiv 2602.22818（2026-02-26）中的支持策略列表、表2参数量与显存（ACT 52M、π0 3.5B、13.32GB）、SO-10X数据集占50%以上、2025年硬件从3种增至8种、异步推理设计。"}
+}

@@ -1,0 +1,39 @@
+{
+  "id": "mi300x",
+  "who": "AMD",
+  "venue": "AMD Advancing AI（2023年12月6日发布）",
+  "links": [
+    {"label": "AMD新闻稿：MI300系列", "url": "https://www.amd.com/en/newsroom/press-releases/2023-12-6-amd-delivers-leadership-portfolio-of-data-center-a.html"},
+    {"label": "IEEE Spectrum：AMD’s Next GPU Is a 3D-Integrated Superchip", "url": "https://spectrum.ieee.org/amd-mi300"},
+    {"label": "SemiAnalysis：MI300X vs H100 vs H200 训练评测", "url": "https://semianalysis.com/2024/12/22/mi300x-vs-h100-vs-h200-benchmark-part-1-training/"}
+  ],
+  "problem": "H100一卡难求，而大模型推理首先卡在显存：80GB的H100放不下一个70B模型的FP16权重，只能多卡拆分。",
+  "idea": "用小芯片3D堆叠：8块计算芯片用混合键合叠在4块I/O芯片上，再配8个HBM3堆叠，做到单卡192GB显存、5.3TB/s带宽。",
+  "impact": "第一款在规格上压过H100的非NVIDIA训练推理卡，微软、Meta、Oracle等采用，打破了NVIDIA的独家供应；但软件栈ROCm的成熟度成了它最大的短板。",
+  "background": "2023年的[[gpu-shortage]]让买家急于找到NVIDIA之外的第二供应商。AMD此前的[[mi250x]]已用于超算[[frontier]]，但主要面向科学计算，AI软件生态（ROCm，见[[amd-instinct]]）远不如[[cuda]]。\n\n与此同时，大模型推理的瓶颈正在从算力转向显存（见[[c:memory-bandwidth]]）。70B参数的模型用16位存储需要约140GB，[[h100]]只有80GB，必须拆到两块以上GPU上，带来卡间通信和额外成本；生成每个token都要把全部权重从显存读一遍，带宽决定了速度。谁的显存更大、更快，谁在推理上就有优势。",
+  "method": "MI300X不是一块大芯片，而是一组小芯片（见[[chiplets]]）拼成的封装，据维基百科与IEEE Spectrum：\n\n**底层**是4块6nm的I/O芯片（IOD），负责缓存、内存控制和互连。\n\n**上层**是8块5nm的加速器芯片（XCD），共304个计算单元，用台积电SoIC直接叠在I/O芯片上。这里用的是[[hybrid-bonding]]：两块芯片的铜焊盘直接对接，不用焊料凸点，接点更密，上下层之间的带宽更高、能耗更低。\n\n**外圈**是8个HBM3堆叠（见[[hbm]]），和上述芯片一起放在台积电CoWoS硅中介层上（见[[cowos]]）。AMD脚注给出了带宽的算法：内存总线8192位 × 每线5.2Gbps ÷ 8 = 约5.3TB/s。\n\n同一套积木换成3块CPU芯片加6块XCD，就是给超算用的MI300A；MI300X则全部换成XCD，只做加速器。据维基百科规格表，MI300X的FP16密集算力约1307 TFLOPS，功耗750W。",
+  "results": "官方称：单卡192GB HBM3、5.3TB/s峰值带宽，8卡平台共1.5TB显存；是唯一能在单卡上跑Llama 2 70B推理的产品；8卡平台跑BLOOM 176B推理吞吐可达H100 HGX的1.6倍。微软当时已推出基于MI300X的Azure ND MI300x v5虚拟机，Meta、Oracle、戴尔、HPE、联想、超微等宣布采用。\n\n独立评测给出了另一面：SemiAnalysis在2024年12月发布了历时五个月的训练评测，结论是纸面优势没有兑现，AMD公开发布的软件栈问题太多，开箱即用的训练“不可能”，需要AMD工程师逐个修复。",
+  "legacy": "MI300X把AMD带进了大模型市场，也证明小芯片加3D堆叠可以在一个封装里塞进比单芯片多得多的晶体管和显存。NVIDIA随后用141GB的[[h200]]和两颗芯片拼接的[[blackwell]]回应显存竞赛；AMD沿同一架构推出[[mi355x]]，再到整机柜的[[amd-helios]]，并在2025年与OpenAI签下大额供货协议（见[[circular-deals]]）。\n\n它也说明了硬件规格和实际可用性之间的距离：只要软件生态落后，买家宁愿多付钱买NVIDIA。",
+  "pitfalls": "- 192GB是单卡容量，单卡能装下70B模型是在16位精度下；换成FP8或4位量化后，H100也能装下。\n- 峰值TFLOPS和峰值带宽都是理论值，实际吞吐取决于软件能把硬件用到几成。",
+  "limits": [
+    {"text": "ROCm软件栈不成熟，训练时问题频出，纸面规格在实际负载中难以兑现。", "solved_by": []},
+    {"text": "8卡平台之外缺少类似NVLink交换机的大规模高速互连，难以组成NVL72那样的整机柜单一系统。", "solved_by": ["amd-helios", "ualink"]},
+    {"text": "仍受台积电CoWoS和HBM产能限制，与NVIDIA争夺同一批封装和内存。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mi250x", "type": "extends", "note": "前代MI250X只是两块芯片并排；MI300X改为8块计算芯片垂直叠在I/O芯片上，并转向AI市场。"},
+    {"to": "hybrid-bonding", "type": "uses", "note": "用台积电SoIC混合键合把计算芯片直接叠在I/O芯片上，把原本用于CPU缓存堆叠的3D工艺用到了AI加速器上。"},
+    {"to": "hbm", "type": "uses", "note": "8个HBM3堆叠提供192GB和5.3TB/s，显存容量是它主打的卖点。"},
+    {"to": "h100", "type": "rivals", "note": "直接对标H100：显存多一倍以上、带宽更高，但软件生态落后，市场份额仍以NVIDIA为主。"},
+    {"to": "gpu-shortage", "type": "solves", "note": "H100短缺时提供了第二个可大规模采购的高端加速器来源，微软、Meta等借此分散对NVIDIA的依赖。"},
+    {"to": "chiplets", "type": "uses", "note": "15块不同的小芯片在不同制程上制造，再用先进封装拼成一个处理器。"}
+  ],
+  "prereq": ["cpu-gpu", "memory-bandwidth", "chip-supply-chain", "training-vs-inference"],
+  "terms": [
+    {"t": "XCD与IOD", "d": "AMD对两类小芯片的叫法：XCD是负责计算的加速器芯片，IOD是负责缓存、内存控制和互连的I/O芯片。"},
+    {"t": "ROCm", "d": "AMD的GPU编程软件栈，对应NVIDIA的CUDA，包括编译器、数学库和深度学习框架支持。"},
+    {"t": "APU", "d": "把CPU和GPU放在同一封装里、共享同一块内存的处理器。MI300A是数据中心APU。"}
+  ],
+  "learn": "先补[[c:memory-bandwidth]]，算一算70B模型在16位下要多少显存、每生成一个token要读多少数据。再读AMD新闻稿看官方规格和脚注里的带宽算法，读IEEE Spectrum理解3D堆叠。最后读SemiAnalysis的评测开头部分，体会硬件规格与软件可用性的差距。",
+  "check": {"source": "https://www.amd.com/en/newsroom/press-releases/2023-12-6-amd-delivers-leadership-portfolio-of-data-center-a.html", "confirmed": "AMD新闻稿（2023-12-06）：192GB HBM3、5.3TB/s、8192位×5.2Gbps算法、304 CU、5nm/6nm、750W、8卡1.5TB、对H100 HGX推理1.6倍（BLOOM 176B）、单卡跑Llama 2 70B、Azure ND MI300x v5、Meta/Oracle等。维基百科CDNA：8 XCD+4 IOD、15种芯片、FP16 1307.4 TFLOPS。IEEE Spectrum：SoIC混合键合与CoWoS中介层、MI300A为3 CCD+6 XCD。SemiAnalysis（2024-12-22）：五个月评测、纸面优势未兑现、开箱即用训练不可能。"}
+}

@@ -1,0 +1,40 @@
+{
+  "id": "vicuna",
+  "who": "LMSYS（Wei-Lin Chiang, Zhuohan Li, Zi Lin, Ying Sheng, Zhanghao Wu, Hao Zhang, Lianmin Zheng, Siyuan Zhuang et al.） · UC Berkeley / CMU / Stanford / UC San Diego / MBZUAI",
+  "venue": "LMSYS博客 2023-03-30",
+  "links": [
+    {"label": "LMSYS博客", "url": "https://lmsys.org/blog/2023-03-30-vicuna/"},
+    {"label": "FastChat代码", "url": "https://github.com/lm-sys/FastChat"},
+    {"label": "后续评测论文MT-Bench", "url": "https://arxiv.org/abs/2306.05685"}
+  ],
+  "problem": "ChatGPT的训练细节和数据不公开；开源界的Alpaca只用5.2万条单轮、模板化的合成指令，回答短而浅，也没有可靠的办法评估聊天机器人。",
+  "idea": "收集用户在ShareGPT网站上自愿分享的约7万段真实ChatGPT多轮对话，在LLaMA-13B上微调，只在助手回复上算损失；评测时让GPT-4当裁判给两个模型的回答打分。",
+  "impact": "花约300美元训练出当时最受欢迎的开源聊天模型，并引出了“用强模型当评委”的评测方法，直接催生了MT-Bench和Chatbot Arena。",
+  "background": "2023年3月，[[llama-1]]的权重在网上流传，斯坦福随即发布[[alpaca]]：按[[self-instruct]]的流程用text-davinci-003生成5.2万条指令数据，微调LLaMA-7B。Alpaca证明了“几百美元做出一个能听指令的模型”，但数据是单轮的、风格单一，最大长度只有512个token，回答往往简短。\n\n与此同时，[[chatgpt]]的用户在ShareGPT等网站上分享自己的对话记录。这些是真实用户提出的、多轮的、往往很长的问题，配上ChatGPT的完整回答——恰好是开源界最缺的数据。另一个难题是评测：聊天回答没有标准答案，传统基准测不出谁更好用，请人评又贵又慢。",
+  "method": "**数据**。从ShareGPT收集约7万段对话，把网页HTML转回Markdown，过滤不当和低质量样本，并把超长对话切成能放进上下文的片段。\n\n**训练**。在Alpaca训练脚本基础上改进：\n- 最大上下文从512扩到2048，以容纳多轮长对话；\n- 多轮对话整段输入，但**只对助手（ChatGPT）说的部分计算损失**，用户的话只作为条件；\n- 用梯度检查点和[[flashattention]]缓解显存压力；用PyTorch FSDP在8张A100上训练一天。借助SkyPilot使用云上的廉价抢占式实例，官方称13B模型的训练成本从约1000美元降到约300美元，7B从500美元降到约140美元。\n\n**评测**。作者写了80道题，分8类（费米估算、角色扮演、编程数学等，每类10题）。每题把两个模型的回答放进同一个提示，让[[gpt-4]]比较打分。",
+  "results": "按GPT-4裁判的打分，Vicuna-13B达到ChatGPT和Bard质量的90%以上，在90%以上的题目上胜过LLaMA和Alpaca。博客自己在标题的星号里注明这是“有趣但不科学的评测”，并承认GPT-4不擅长评判编程和数学题。官方列出的局限包括推理和数学差、事实准确性和安全性没有专门优化。",
+  "legacy": "Vicuna的评测想法被LMSYS系统化：[[mt-bench]]用80道多轮难题和GPT-4评分，研究了裁判的位置偏差、啰嗦偏差等问题；[[chatbot-arena]]让真实用户对匿名模型两两投票、算[[c:elo-rating]]，成为之后几年最受关注的排行榜之一。Vicuna在线演示和Chatbot Arena也是伯克利同期开发的推理引擎[[vllm]]最早的部署场景。\n\n不久，[[false-promise-imitation]]指出：模仿ChatGPT对话的模型主要学到了风格，在模仿数据没覆盖的任务上几乎没有缩小与ChatGPT的能力差距，而人类评审很容易被流畅的风格骗过。ShareGPT类对话数据后来被整理成[[lmsys-chat-1m]]。",
+  "pitfalls": "- “90%的ChatGPT质量”只来自80道题上GPT-4的主观打分，作者自己声明不严谨，不能理解为能力达到ChatGPT的九成。\n- Vicuna本质上是对ChatGPT输出的蒸馏（见[[c:knowledge-distillation]]），它的上限受限于LLaMA基座的知识，学到的主要是回答的格式和语气。",
+  "limits": [
+    {"text": "评测只有80道题、靠GPT-4单次判断，存在位置偏差和偏爱长回答等问题，结论不可靠。", "solved_by": ["mt-bench", "chatbot-arena"]},
+    {"text": "模仿ChatGPT对话只学到风格，推理、数学和事实性没有真正提升。", "solved_by": ["llama-2", "deepseek-r1"]},
+    {"text": "继承LLaMA的非商业许可，且训练数据来自ChatGPT输出，存在服务条款与授权争议。", "solved_by": ["llama-2"]},
+    {"text": "没有做安全对齐，只靠在线演示前置OpenAI的内容审核接口过滤输入。", "solved_by": ["llama-2", "llama-guard"]}
+  ],
+  "relations": [
+    {"to": "llama-1", "type": "uses", "note": "以LLaMA-13B为基座做全参数微调。"},
+    {"to": "alpaca", "type": "solves", "note": "用真实用户的多轮长对话代替Alpaca的5.2万条单轮合成指令，上下文从512扩到2048，回答更详细、结构更好。"},
+    {"to": "chatgpt", "type": "uses", "note": "训练数据就是用户分享的ChatGPT对话，相当于蒸馏ChatGPT的回答风格。"},
+    {"to": "gpt-4", "type": "uses", "note": "用GPT-4作为裁判比较两个模型的回答，开启了“LLM当评委”的做法。"},
+    {"to": "flashattention", "type": "uses", "note": "用FlashAttention和梯度检查点降低2048长度训练的显存占用。"},
+    {"to": "self-instruct", "type": "rivals", "note": "同为廉价获取指令数据的路线：Self-Instruct让模型自己出题，Vicuna直接收集真人提问与ChatGPT回答；后者数据更贴近真实需求。"}
+  ],
+  "prereq": ["instruction-tuning", "pretrain-finetune", "knowledge-distillation", "context-window", "benchmark", "elo-rating"],
+  "terms": [
+    {"t": "ShareGPT", "d": "一个让用户一键分享自己ChatGPT对话记录的网站和浏览器插件，2023年成为开源对话数据的主要来源。"},
+    {"t": "LLM-as-a-judge", "d": "让一个强大的语言模型阅读问题和候选回答，判断哪个更好或打分，用来代替昂贵的人工评测。"},
+    {"t": "抢占式实例", "d": "云服务商以大幅折扣出租的闲置GPU，可能随时被收回，需要训练程序能断点续训。"}
+  ],
+  "learn": "先了解[[alpaca]]和[[c:instruction-tuning]]。读Vicuna博客的Training和Evaluation两节，再读[[mt-bench]]论文第3节对裁判偏差的分析。动手：用FastChat的对话模板处理几段多轮对话，写出“只在助手回复上计算损失”的标签掩码。",
+  "check": {"source": "https://lmsys.org/blog/2023-03-30-vicuna/", "confirmed": "发布日期2023-03-30；约7万段ShareGPT对话、HTML转Markdown与切分、上下文512→2048、只在助手输出上算损失、梯度检查点与FlashAttention、FSDP 8张A100一天、SkyPilot成本（7B $500→$140，13B $1K→$300）、80题8类、GPT-4评判90%*及“不科学”声明、局限（推理数学、事实性、安全，演示使用OpenAI审核接口）。另核对arXiv 2306.05685（MT-Bench，位置/啰嗦/自我增强偏差）和2305.15717（模仿只学到风格）的摘要；Alpaca博客：5.2万条、text-davinci-003、LLaMA-7B。vLLM博客（2023-06-20）：已在Chatbot Arena和Vicuna Demo部署两个月。"}
+}

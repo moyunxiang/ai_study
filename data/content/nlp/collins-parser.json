@@ -1,0 +1,40 @@
+{
+  "id": "collins-parser",
+  "who": "Michael Collins · 宾夕法尼亚大学",
+  "venue": "ACL/EACL 1997，pp. 16–23",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/P97-1003/"},
+    {"label": "PDF", "url": "https://aclanthology.org/P97-1003.pdf"},
+    {"label": "Collins 2003：Head-Driven Statistical Models for Natural Language Parsing（期刊完整版）", "url": "https://aclanthology.org/J03-4003/"}
+  ],
+  "problem": "普通的概率上下文无关文法（PCFG）只看“NP→DT NN”这类类别规则，不知道具体是哪个词，因而分不清“吃饭用筷子”和“吃带鱼的饭”这类依赖词汇的结构歧义；直接把词加进规则又会让规则数量爆炸。",
+  "idea": "给树上每个短语标出它的“中心词”，把一条规则的生成拆成“先生成中心成分，再向左、向右逐个生成修饰成分，直到STOP”，每一步只依赖中心词和少量上下文；再加上子类框架和wh-移位的概率处理。",
+  "impact": "在Penn Treebank上把句法分析做到约88%的精确率/召回率，成为此后多年的标准基线。“中心词驱动”的思想和它的中心词规则被后来的句法分析、语义角色标注和依存句法广泛沿用。",
+  "background": "[[penn-treebank]]提供了约4万句人工标注句法树的《华尔街日报》文本，统计句法分析有了统一的训练集和测试集。最直接的方法是[[pcfg]]：从树库统计每条规则的概率，用[[cky-parsing]]找概率最大的树。但PCFG的规则里只有类别，例如“VP → V NP PP”和“VP → V NP”的选择与动词是什么无关，而介词短语该挂在动词上还是名词上，恰恰取决于具体的词。\n\n1990年代中期最好的系统（Magerman的决策树分析器、Collins 1996年的模型）都大量使用词汇信息，效果明显好于PCFG，但它们直接估计 `P(树|句子)`，不是生成式模型，而且输出的树里没有补足语/附加语区分、也没有wh-移位留下的空位，下游很难从中读出“谁对谁做了什么”。",
+  "method": "**中心词化**。每个短语从它的中心子成分继承中心词：S(bought) → NP(Marks) VP(bought)。规则于是变成带词的形式，数量极多，无法直接计数。\n\n**模型1：分解生成**。生成一条规则 `P(h) → L_n…L_1 H R_1…R_m` 时分三步：\n1. 以概率 `P_H(H | P, h)` 生成中心成分；\n2. 从中心向右逐个生成修饰成分 `P_R(R_i(r_i) | P, H, h, distance)`，直到生成STOP；\n3. 向左同样处理。\n每个修饰成分只看父类别、中心类别、中心词和一个“距离”特征（中间是否隔着动词、是否紧邻中心），相当于沿着中心词向两侧的0阶马尔可夫过程。例如在“Last week Marks bought Brooks”中，生成S(bought)的左修饰时分别估计NP(Marks)、NP(week)和STOP的概率。\n\n**模型2：子类框架**。先为中心词选一个左右“必需补足语”集合（如bought的左边要一个主语NP-C），生成修饰成分时依据还剩哪些补足语没生成；集合非空时STOP的概率为0。这样能区分补足语和附加语（“that”引导的从句是补足语，“because”引导的是附加语）。\n\n**模型3：wh-移位**。像GPSG那样给非终结符加+gap特征，沿树向下传递，直到在原位置生成一个TRACE，例如“The store that Marks bought TRACE”。\n\n**估计与解析**。稀疏问题用三级回退插值平滑（全部条件→去掉中心词→只留类别），出现少于5次的词替换为未知词；解析用CKY式动态规划图表分析器找概率最大的树。",
+  "results": "在WSJ第02–21节（约4万句）训练、第23节（2416句）测试。全部句子（≤100词）上，模型2/3的带标签精确率/召回率为88.1%/87.5%，比Collins 1996平均提高2.3个百分点，比Magerman 1995的84.3%/84.0%高出约4个百分点；≤40词的句子上为88.6%/88.1%。模型3找出的空位（436个）精确率/召回率为93.3%/90.1%。",
+  "legacy": "这套分析器（及其2003年期刊版）成为英语句法分析的事实标准，很多下游任务直接用它的输出：[[gildea-srl]]的语义角色标注就建立在Collins分析器给出的句法树上。它的中心词规则被广泛用于把短语结构树转换成依存树，为[[nivre-parser]]、[[mstparser]]等依存分析提供训练数据。\n\n后来的工作沿两个方向修正它：[[klein-manning-parser]]和[[berkeley-parser]]证明，不用这么多词汇化、只要把类别细分得当，PCFG也能接近甚至超过它；[[structured-perceptron]]等判别式方法则可以加入任意特征对候选树重排序。神经网络时代，[[chen-manning-parser]]、[[grammar-foreign-language]]和[[biaffine-parser]]用学出来的表示取代了手工设计的条件和平滑。",
+  "pitfalls": "- 88%是按“短语是否覆盖相同词串且标签相同”计算的成分级指标，并不意味着88%的句子整句正确；论文中≤100词的句子只有约六成没有交叉括号错误。\n- 模型2和模型3的分数几乎相同，模型3的价值在于输出空位，而不是提高括号准确率。",
+  "limits": [
+    {"text": "条件和独立性假设、回退层级都是手工设计的，想加入新的信息（如更远的上下文）就得重新设计整个生成过程。", "solved_by": ["structured-perceptron", "chen-manning-parser"]},
+    {"text": "大量词汇化参数极其稀疏，后来发现其中许多并非必需，类别本身的细分同样关键。", "solved_by": ["klein-manning-parser", "berkeley-parser"]},
+    {"text": "依赖针对英语WSJ写的中心词规则和独立的词性标注器，换语言、换领域后性能明显下降。", "solved_by": ["grammar-foreign-language", "biaffine-parser"]},
+    {"text": "输出的是句法树，谁是施事、谁是受事等语义关系仍需另行推断。", "solved_by": ["gildea-srl"]}
+  ],
+  "relations": [
+    {"to": "pcfg", "type": "solves", "note": "PCFG的规则不含词汇，无法处理依赖具体词的结构歧义；中心词化加分解生成让模型能用词汇信息，同时避免规则爆炸。"},
+    {"to": "penn-treebank", "type": "uses", "note": "在Penn Treebank的WSJ部分训练和测试，并用规则从树库中找出每个短语的中心词。"},
+    {"to": "cky-parsing", "type": "uses", "note": "用CKY式的动态规划图表分析器搜索概率最大的句法树。"},
+    {"to": "chomsky-syntactic", "type": "extends", "note": "模型3为生成语法传统中的wh-移位和空位给出了概率化处理，让统计分析器也能输出这类结构。"},
+    {"to": "maxent-nlp", "type": "rivals", "note": "同期最强的分析器多直接估计P(树|句子)；Collins坚持生成式建模，得到更好的结果，判别式方法要到后来的重排序工作才反超。"},
+    {"to": "church-tagger", "type": "uses", "note": "词性标记与词一起由模型生成；对测试中的未知词，直接采用Ratnaparkhi 1996年统计（最大熵）标注器给出的唯一词性。"}
+  ],
+  "prereq": ["graph-basics", "dynamic-programming", "conditional-bayes", "markov-chain", "mle", "n-gram"],
+  "terms": [
+    {"t": "中心词（head word）", "d": "一个短语里起核心作用的词，如动词短语“bought a car”的中心词是bought。短语的性质主要由它决定。"},
+    {"t": "补足语与附加语", "d": "补足语是动词必须带的成分（bought后面的宾语），附加语是可有可无的修饰（last week）。区分它们是读出谓词-论元关系的前提。"},
+    {"t": "PARSEVAL指标", "d": "句法分析的标准评测：预测树中的短语与标准树中覆盖相同词串且标签相同才算对，分别计算精确率与召回率。"}
+  ],
+  "learn": "先确认会[[c:dynamic-programming]]和PCFG的CKY解析。读原文第2.1节（三步生成和距离特征）和第4节（结果表）；想看完整推导读2003年的期刊版第3–6章。动手：用NLTK读Penn Treebank样本，写中心词规则给每个短语标中心词，再统计“动词+介词短语”中介词挂到动词还是名词上的比例，体会为什么需要词汇信息。",
+  "check": {"source": "https://aclanthology.org/P97-1003.pdf", "confirmed": "ACL Anthology确认ACL/EACL 1997，pp. 16–23，作者Collins（论文首页单位为宾夕法尼亚大学）；原文：三步生成与STOP、距离特征、子类框架与+gap/TRACE；WSJ 02–21约40,000句、第23节2,416句；表2：≤40词模型2 LR 88.1/LP 88.6、≤100词LR 87.5/LP 88.1、Magerman 95 84.0/84.3、≤100词0交叉括号约63.9%；平均提升2.3%；空位436个、93.3%/90.1%；少于5次的词替换为未知词。"}
+}

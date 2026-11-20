@@ -1,0 +1,39 @@
+{
+  "id": "kaldi",
+  "who": "Daniel Povey, Arnab Ghoshal, Gilles Boulianne, Lukáš Burget, Ondřej Glembek, Nagendra Goel, Mirko Hannemann, Petr Motlíček et al. · 微软研究院 / 布尔诺理工大学 / 萨尔大学 / 约翰斯·霍普金斯大学2009年夏季研讨会等",
+  "venue": "IEEE ASRU 2011",
+  "links": [
+    {"label": "论文PDF", "url": "https://www.danielpovey.com/files/2011_asru_kaldi.pdf"},
+    {"label": "Kaldi代码（GitHub）", "url": "https://github.com/kaldi-asr/kaldi"},
+    {"label": "Kaldi文档", "url": "https://kaldi-asr.org/doc/"}
+  ],
+  "problem": "研究者要么用许可证限制再分发、代码老旧的HTK，要么各自维护私有系统；拿到一个新数据集，从零搭出与论文可比的强基线往往要几个月。",
+  "idea": "用C++写一个以WFST为核心、以Apache 2.0许可完全开源的识别工具包，并为常用公开语料提供从数据准备到解码打分的完整脚本配方，让任何人一条命令就能复现标准系统。",
+  "impact": "在资源管理和华尔街日报任务上与HTK结果持平；此后十年它成为学术界和不少公司搭建混合识别系统的事实标准，DNN、TDNN、链式模型等神经声学模型都通过它的配方普及开来。",
+  "background": "2011年前后，学术界最常用的是剑桥的[[htk]]：代码可以免费下载，但许可证不允许再分发修改版，结构也是1990年代的风格。[[sphinx]]系列、RWTH的RASR等各有局限。工业界和大实验室内部的系统更强，但不公开，论文里的“基线”很难互相比较。\n\n同时，识别器的技术栈越来越长：[[mfcc]]特征、[[tied-state]]三音子、[[mllr]]类说话人自适应、区分性训练、[[wfst]]解码图……一个研究生要把这些全部搭对，需要大量时间。Kaldi的雏形来自2009年约翰斯·霍普金斯大学（JHU）的夏季研讨会，参与者随后把代码整理成一个通用、开放的工具包。",
+  "method": "**以WFST为核心**。所有训练和解码都在加权有限状态转换器上进行，依赖开源的OpenFst。解码图沿用[[wfst]]的`HCLG = H ∘ C ∘ L ∘ G`构造，但做了两处改动：图的输入符号用更细的transition-id（同时编码共享概率分布、所属音素和HMM内的跳转），这样既能确定化，又能从Viterbi路径还原出音素序列；不做权重前推，而是保证每一步构图都不让概率归一性变差，避免回退语言模型带来的问题。\n\n**声学模型接口与解码器分离**。解码器只要求一个极简接口：给出某一帧、某个输入符号的声学得分。因此GMM、SGMM，以及后来的神经网络，都可以接在同一个解码器上。\n\n**通用的决策树**。音素上下文长度任意，问题可以问窗口内任何位置的音素和HMM状态，问题集可由数据自动聚类生成，不依赖手写语言学知识。\n\n**配方（recipe）**。每个公开语料（RM、WSJ，后来是Switchboard、LibriSpeech等）都有一个egs目录，用shell脚本把数据准备、特征提取、单音素→三音子→LDA+MLLT→说话人自适应训练（SAT）→SGMM等步骤串起来，运行即可得到与论文一致的结果。\n\n**许可**。Apache 2.0，可以自由修改、再分发和商用。",
+  "results": "资源管理任务上，基本三音子GMM系统四个测试集平均词错误率：HTK 4.10%，Kaldi 4.06%，解码速度约0.13倍实时（Intel Xeon 2.27GHz）。WSJ 2万词开放词表、二元文法、SI-284训练：Nov'92/Nov'93上Kaldi为11.8%/15.0%，贝尔实验室公布的系统为11.9%/15.4%，性别相关的HTK系统为11.1%/14.5%。在只用SI-84一半数据训练时，加上9帧拼接+LDA+MLLT+说话人自适应、SGMM和指数变换，WSJ Nov'92从12.5%降到9.0%（据论文表I–III）。",
+  "legacy": "Kaldi很快成为语音研究的公共底座：Karel Veselý的nnet1和Povey的nnet2/nnet3加入了[[cd-dnn-hmm]]式的DNN声学模型；[[tdnn]]结构在Kaldi中复活，[[lf-mmi]]的链式模型、[[x-vector]]说话人嵌入都以Kaldi配方的形式发布。不少公司也在它的基础上搭建自己的识别系统。\n\n端到端时代，[[espnet]]沿用了Kaldi风格的数据目录与配方组织，[[wenet]]在CTC解码中仍用Kaldi式的WFST。Kaldi本身的C++加shell脚本架构与PyTorch生态难以结合，新一代语音工具大多转向PyTorch。",
+  "pitfalls": "- Kaldi最初的1.0版只有GMM和SGMM声学模型，没有神经网络；DNN配方是后来几年陆续加入的。\n- Kaldi不是“一个识别器”，而是一套工具和配方；能拿到好结果的关键在于跟着配方一步步走，而不是只调用某个程序。",
+  "limits": [
+    {"text": "仍是混合系统的多阶段流水线，需要发音词典、GMM对齐、决策树等多个部件，新语言和新任务的搭建门槛很高。", "solved_by": ["espnet", "wenet", "whisper"]},
+    {"text": "C++加大量shell和Perl脚本，没有自动微分，研究新的神经网络结构要手写前向和反向，难以与PyTorch等框架结合。", "solved_by": ["espnet", "pytorch"]},
+    {"text": "静态解码图随语言模型规模急剧变大，大语言模型只能剪枝后使用或在二遍重打分中使用。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "wfst", "type": "uses", "note": "训练与解码全部基于WFST和OpenFst，HCLG构图是整个系统的核心，并改进了权重前推和输入符号的设计。"},
+    {"to": "htk", "type": "solves", "note": "HTK许可证不允许再分发、代码结构老旧；Kaldi以Apache 2.0开源和更现代的C++代码取代了它的位置，在RM和WSJ上结果与HTK持平。"},
+    {"to": "mllr", "type": "uses", "note": "fMLLR等线性变换说话人自适应是配方中的标准步骤，在WSJ上带来明显改善。"},
+    {"to": "tied-state", "type": "extends", "note": "把决策树状态绑定推广到任意上下文长度，问题集可由数据自动生成。"},
+    {"to": "sphinx", "type": "rivals", "note": "同为开源识别器，Sphinx偏向实时应用和嵌入式，Kaldi面向声学建模研究；后者成为2010年代研究界的主流。"},
+    {"to": "cd-dnn-hmm", "type": "uses", "note": "1.0版之后陆续加入的DNN配方，把CD-DNN-HMM式的混合模型变成任何人都能复现的标准流程。"}
+  ],
+  "prereq": ["hmm-concept", "gaussian", "graph-basics", "phoneme-acoustic", "word-error-rate"],
+  "terms": [
+    {"t": "配方（recipe）", "d": "Kaldi中针对某个语料的一整套脚本，从数据准备、特征提取、逐级训练到解码打分，按顺序运行即可复现一个完整系统。"},
+    {"t": "SGMM（子空间高斯混合模型）", "d": "让所有状态的高斯参数都由一个共享的低维子空间生成，每个状态只需少量参数，适合数据较少时使用。"},
+    {"t": "fMLLR", "d": "对每个说话人学一个线性变换作用在特征上，把他的语音特征“归一化”到模型熟悉的分布。"}
+  ],
+  "learn": "先读[[wfst]]和[[htk]]两个节点理解混合系统的组成。然后读Kaldi论文第2、7节，以及官方文档中的“Kaldi for dummies”教程。动手：跑通egs/yesno（几分钟）和egs/mini_librispeech配方，打开run.sh逐段对照每一步在做什么，再查看生成的HCLG.fst大小。",
+  "check": {"source": "https://www.danielpovey.com/files/2011_asru_kaldi.pdf", "confirmed": "论文PDF：标题、作者与机构、Apache 2.0、基于OpenFst、HTK与RASR为主要竞品、transition-id与不做权重前推的设计、DecodableInterface；表I RM平均HTK 4.10%/Kaldi 4.06%、0.13×RT；表II WSJ Nov'92/Nov'93 Bell 11.9/15.4、HTK(+GD) 11.1/14.5、Kaldi 11.8/15.0；表III从12.5%到9.0%；致谢中2009年JHU研讨会。"}
+}

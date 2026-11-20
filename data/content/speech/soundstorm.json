@@ -1,0 +1,52 @@
+{
+ "id": "soundstorm",
+ "who": "Zalán Borsos, Matt Sharifi, Damien Vincent, Eugene Kharitonov, Neil Zeghidour, Marco Tagliasacchi · Google Research",
+ "venue": "arXiv 2023",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2305.09636"
+  }
+ ],
+ "problem": "[[audiolm]]靠逐token自回归，要先生成语义token再生成多层声学token，序列又长又慢，生成几秒音频就要很长时间。",
+ "idea": "保留AudioLM的语义token作条件，改用双向注意力的模型，按“置信度并行解码”分层、多轮地一次填出整层声学码，而不是一个个预测。",
+ "impact": "论文称音质与AudioLM相当且音色、声学条件更一致，速度快两个数量级：在TPU-v4上0.5秒生成30秒音频，并能用文本转写加说话人轮次合成自然对话。",
+ "method": "SoundStorm的输入是AudioLM的语义token，输出是[[soundstream]]神经编解码器的多层码本。编解码器每帧有多层残差码，层越深越精细。模型是一个带双向注意力的Conformer式网络，生成采用类似MaskGIT的置信度并行解码：从最粗的一层开始，每轮同时预测一层里所有位置，保留置信度高的位置，其余再迭代，一层完成后再进入下一层。这样总步数很少，与序列长度几乎无关。\n\n因为是非自回归，它不会像自回归那样逐步累积误差，音色和环境声更稳定。论文还演示：给带说话人轮次的文稿和几秒各说话人提示，就能合成自然的双人对话片段。",
+ "limits": [
+  {
+   "text": "仍依赖上游模型提供语义token，语义序列本身的生成仍然是自回归的、较慢的瓶颈。",
+   "solved_by": [
+    "maskgct"
+   ]
+  },
+  {
+   "text": "没有开源。",
+   "solved_by": [
+    "f5-tts"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "audiolm",
+   "type": "solves",
+   "note": "AudioLM的自回归声学token生成太慢；SoundStorm以并行解码把速度提升约两个数量级。"
+  },
+  {
+   "to": "soundstream",
+   "type": "uses",
+   "note": "目标是SoundStream的多层残差码。"
+  }
+ ],
+ "prereq": [
+  "tokenization",
+  "vocoder-codec",
+  "autoregressive",
+  "transformer-block"
+ ],
+ "learn": "先读[[audiolm]]；读SoundStorm第3节的并行解码流程；对比[[maskgct]]看如何把语义阶段也做成非自回归。",
+ "check": {
+  "source": "https://arxiv.org/abs/2305.09636",
+  "confirmed": "核对arXiv页：标题、2023-05-16提交；摘要写明非自回归、双向注意力加置信度并行解码、以AudioLM语义token为输入生成编解码器token、快两个数量级、TPU-v4上0.5秒生成30秒音频、可合成对话。"
+ }
+}

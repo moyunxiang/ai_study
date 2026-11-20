@@ -1,0 +1,35 @@
+{
+  "id": "gqa",
+  "who": "Joshua Ainslie, James Lee-Thorp, Michiel de Jong, Yury Zemlyanskiy, Federico Lebrón, Sumit Sanghai · Google Research",
+  "venue": "EMNLP 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2305.13245"},
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/2023.emnlp-main.298/"}
+  ],
+  "problem": "逐词生成时每一步都要从显存读出全部历史的键和值（KV缓存），显存带宽成了瓶颈。多查询注意力（MQA）让所有头共用一组K、V，速度快但质量下降、训练不稳，而且要从头再训一个模型。",
+  "idea": "折中：把查询头分成G组，每组共用一组K、V（G=1就是MQA，G=头数就是普通多头注意力）；并提出“补训”方法，把已训练好的多头模型的K、V头按组取平均，再用原预训练5%的算力继续训练。",
+  "impact": "以接近多头注意力的质量获得接近MQA的推理速度，被Llama 2的34B/70B、Mistral 7B等大批后来的开源大模型采用，成为解码器的常见默认配置。",
+  "background": "[[transformer]]的多头注意力里，每个头都有自己的K、V投影。生成第t个词时，模型要把前面所有位置、所有头的K、V（即[[c:kv-cache]]）从显存里读出来。这部分数据量与“层数×头数×每头维度×序列长度”成正比，批量一大、序列一长就远远超过模型计算本身所需的时间——瓶颈在[[c:memory-bandwidth]]，不在算力。\n\n2019年的[[mqa]]让所有查询头共用**一个**K头和**一个**V头，KV缓存缩小为原来的1/H（H是头数）。[[palm]]等模型采用了它，但MQA会损失质量、有时训练不稳定，而已有的多头模型要换成MQA只能从头训练，代价太高。",
+  "method": "**分组查询注意力**。把H个查询头平均分成G组，组内的查询头共用同一组K、V。KV缓存缩小为原来的G/H。例如64个查询头分8组，每8个查询头共享一组K、V，缓存只有多头注意力的1/8，而MQA是1/64。\n\n为什么不直接用MQA？模型越大头数越多，MQA对显存带宽和表示能力的削减越激进；GQA保持固定的组数，就能让削减比例随模型规模保持不变。另一方面，大模型里KV缓存随模型维度线性增长，而参数和计算量随维度平方增长，所以组数多一些带来的额外开销相对很小。\n\n**补训（uptraining）**。不必从头训练：把已有多头检查点中每组的若干个K（V）投影矩阵**取平均**合成一个，再用原预训练步数的一小部分（α=5%）继续预训练，让模型适应新结构。论文比较了取平均、只保留第一个头、随机初始化三种转换方式，取平均最好。",
+  "results": "在T5-XXL上（编码器-解码器，GQA只用在解码器的自注意力和交叉注意力上），在摘要、翻译和问答7个数据集上：多头注意力平均分47.2，每样本推理1.51秒；MQA补训版46.6分、0.24秒；GQA-8补训版47.1分、0.28秒——质量几乎与多头相同，速度接近MQA，并且明显好于更快但更小的T5-Large（46.0分、0.37秒）。",
+  "legacy": "[[llama-2]]的34B和70B采用8组KV的GQA，其附录在30B规模上做了对照实验，GQA与多头注意力效果相近、优于MQA。此后[[mistral-7b]]等开源模型普遍使用GQA。进一步压缩KV缓存的工作有[[deepseek-v2]]的多头潜在注意力（MLA），它把K、V压到一个低维潜在向量里，比GQA更省显存。",
+  "pitfalls": "- GQA省的是**推理时KV缓存的读取**，不是训练计算量；它对短序列、小批量的加速并不明显。\n- 减少K、V头会减少参数，实际模型（如Llama 2）通常会相应加宽前馈层以保持总参数量。",
+  "limits": [
+    {"text": "只在编码器-解码器的T5上验证，没有在当时主流的纯解码器大模型上实验。", "solved_by": ["llama-2", "mistral-7b"]},
+    {"text": "补训后的模型没有与从头训练的GQA模型对比，不知道补训是否有损失。", "solved_by": ["llama-2"]},
+    {"text": "KV缓存仍随序列长度线性增长，百万级上下文下依然是显存瓶颈。", "solved_by": ["deepseek-v2", "deepseek-v3.2"]}
+  ],
+  "relations": [
+    {"to": "mqa", "type": "solves", "note": "MQA只有一组K、V导致质量下降、训练不稳；GQA用若干组K、V在速度与质量之间取中间点。"},
+    {"to": "t5", "type": "uses", "note": "实验在T5.1.1 Large和XXL检查点上进行，从多头注意力补训成MQA或GQA。"},
+    {"to": "transformer", "type": "extends", "note": "修改多头注意力的K、V共享方式，查询头数不变。"},
+    {"to": "palm", "type": "rivals", "note": "PaLM直接采用MQA换取推理速度；GQA表明用少量分组可以在几乎不损失质量的前提下获得接近的速度。"}
+  ],
+  "prereq": ["self-attention", "kv-cache", "memory-bandwidth", "autoregressive", "throughput-latency"],
+  "terms": [
+    {"t": "补训（uptraining）", "d": "把已有的模型检查点改成新结构后，只用原预训练少量的算力继续训练，让模型适应新结构，避免从头训练。"},
+    {"t": "多查询注意力（MQA）", "d": "所有查询头共用同一组键和值的注意力，KV缓存缩小到原来的1/头数。"}
+  ],
+  "learn": "先弄清[[c:kv-cache]]为什么让生成受限于显存带宽。读论文第2节（只有两页）和表1。动手：在一个自己写的多头注意力里加一个参数n_kv_heads，用`repeat_interleave`把K、V复制给各组查询头，然后算一下不同组数下每个token的KV缓存字节数。",
+  "check": {"source": "https://arxiv.org/abs/2305.13245", "confirmed": "标题、6位作者、arXiv v1于2023-05-22；ACL Anthology确认EMNLP 2023；PDF：分组定义（GQA-1=MQA，GQA-H=MHA）、均值池化转换、α=0.05、表1（MHA-Large 0.37s/46.0，MHA-XXL 1.51s/47.2，MQA-XXL 0.24s/46.6，GQA-8-XXL 0.28s/47.1）、GQA未用于编码器自注意力、局限节（未与从头训练比较、只测编码器-解码器）。Llama 2论文：34B/70B用GQA，附录A.2.1在30B/150B token上比较MHA/MQA/GQA；Mistral 7B摘要：采用GQA。"}
+}

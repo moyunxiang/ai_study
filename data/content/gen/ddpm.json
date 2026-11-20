@@ -1,0 +1,44 @@
+{
+  "id": "ddpm",
+  "who": "Jonathan Ho, Ajay Jain, Pieter Abbeel · UC Berkeley",
+  "venue": "NeurIPS 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2006.11239"},
+    {"label": "官方代码", "url": "https://github.com/hojonathanho/diffusion"},
+    {"label": "Hugging Face：The Annotated Diffusion Model", "url": "https://huggingface.co/blog/annotated-diffusion"},
+    {"label": "Lilian Weng：What are Diffusion Models?", "url": "https://lilianweng.github.io/posts/2021-07-11-diffusion-models/"}
+  ],
+  "problem": "2015年提出的扩散模型理论优雅，但图像质量远不如GAN；NCSN用分数和朗之万动力学做出了不错的结果，但两条路线各说各话，训练目标和网络设计都没有找对。",
+  "idea": "把网络的任务定为“预测加进去的噪声ε”，并把变分下界简化成一个不加权的均方误差`‖ε − ε_θ(x_t, t)‖²`；配上带自注意力的U-Net，在1000个噪声级上逐步去噪生成图像。",
+  "impact": "第一次让扩散模型在图像质量上追平甚至超过GAN（CIFAR-10 FID 3.17），训练又像普通回归一样稳定；它确立的训练与采样配方是此后DALL·E 2、Stable Diffusion、Sora等几乎所有扩散模型的起点。",
+  "background": "2020年，逼真图像生成的主力是GAN（[[stylegan2]]、[[biggan]]），但对抗训练不稳定、容易模式坍塌（见[[c:mode-collapse]]）。似然类模型——[[vae]]、流模型（[[glow]]）、自回归模型（[[pixelcnn-pp]]）——训练稳定、覆盖全部数据，但样本质量明显落后。\n\n扩散模型早在[[diffusion-2015]]就提出了：固定地逐步加噪声，再学习逐步去噪。它有清晰的似然下界，但实际样本很差，没人跟进。2019年[[score-matching]]（NCSN）从另一个角度——在多个噪声水平上估计分数、用退火朗之万动力学采样——第一次做出了与GAN可比的图像，但其采样过程是借来的MCMC，噪声级和步长全靠手调，理论上也不是一个完整的概率模型。\n\n这篇论文要回答的是：扩散模型这条有严格概率基础的路线，能不能也生成高质量图像？",
+  "method": "**前向过程**（见[[c:diffusion-process]]）。T=1000步，每步加一点高斯噪声，方差β_t从1×10⁻⁴线性增大到0.02（见[[c:noise-schedule]]）。高斯噪声叠加起来仍是高斯，所以任意一步都可以从原图一步算出：\n\n`x_t = √ᾱ_t · x₀ + √(1−ᾱ_t) · ε，  ε ∼ N(0, I)`\n\n其中`ᾱ_t = Π_{s≤t}(1 − β_s)`。t越大，原图成分越少；t=1000时几乎是纯噪声。训练时不用真的跑1000步，随机抽一个t、一步就能造出x_t。\n\n**反向过程**。生成时学习`p_θ(x_{t−1}|x_t) = N(μ_θ(x_t, t), σ_t²I)`，方差直接固定为σ_t²=β_t，只学均值。\n\n**关键一步：预测噪声**。均值有多种参数化方式：直接预测μ，或预测原图x₀。论文选择让网络预测x_t里所含的噪声ε，再换算出均值：\n\n`μ_θ = (1/√α_t) · (x_t − β_t/√(1−ᾱ_t) · ε_θ(x_t, t))`\n\n把它代入变分下界（见[[c:elbo]]），每一项都变成噪声预测误差乘一个与t有关的权重。作者发现**去掉权重**效果最好：\n\n`L_simple = E_{t, x₀, ε} ‖ε − ε_θ(√ᾱ_t·x₀ + √(1−ᾱ_t)·ε, t)‖²`\n\n训练算法因此只有几行：取一张图，随机选t，加噪声，让网络猜噪声，算均方误差，反向传播。作者还指出，这个目标正是多个噪声水平上的[[denoising-score-matching]]，而采样过程类似退火朗之万动力学——两条路线由此接上。\n\n**采样**。从纯噪声x_T出发，循环t=1000…1：用网络预测噪声，算出μ_θ，再加一点σ_t·z的随机噪声，得到x_{t−1}。\n\n**网络**。基于[[unet]]的结构（参照PixelCNN++与[[wide-resnet]]），用[[groupnorm]]，在16×16分辨率加自注意力；时间步t用Transformer式的正弦编码注入每个残差块。CIFAR-10模型约3570万参数，256×256模型约1.14亿参数。",
+  "results": "CIFAR-10无条件生成：Inception Score 9.46，FID 3.17，当时优于包括条件GAN在内的大多数模型；但测试集负对数似然上界为每维3.75比特，不如最好的似然模型。256×256的LSUN卧室FID 4.90（大模型），教堂7.89，猫19.75，质量接近[[progan]]级GAN。训练在TPU v3-8上进行，CIFAR-10约10.6小时跑80万步。代价在采样：生成256张CIFAR-10图像约需17秒，生成128张256×256图像约需300秒，因为每张图都要1000次网络前向。论文还把反向过程解释为“渐进式有损解压”：大部分比特花在人眼难以察觉的细节上，这解释了为什么样本好看而似然一般。",
+  "legacy": "这篇论文之后，扩散模型迅速成为图像生成的主流。几条直接的后续线：\n\n- **更快的采样**：[[ddim]]把采样改成确定性的非马尔可夫过程，几十步即可；后来又有[[dpm-solver]]、[[progressive-distillation]]、[[consistency-models]]。\n- **更好的训练与似然**：[[improved-ddpm]]学习方差、改用余弦噪声调度；[[vdm]]从变分角度优化似然；[[edm]]系统梳理了设计空间。\n- **统一理论**：[[score-sde]]证明DDPM与NCSN是同一个随机微分方程的两种离散化。\n- **超越GAN与条件生成**：[[adm]]改进网络并加入分类器引导，在ImageNet上击败BigGAN；[[cfg]]去掉分类器；[[sr3]]、[[cascaded-diffusion]]做超分与级联。\n- **潜空间与文生图**：[[ldm]]把扩散搬到VAE的隐空间，演变为Stable Diffusion；[[dall-e-2]]、[[imagen]]用它做文生图；[[dit]]把U-Net换成Transformer，再到[[sora]]做视频。\n\n今天的模型与DDPM相比主要改了：预测目标常换成v或速度（流匹配），噪声调度与损失权重重新设计，采样步数从1000降到几十甚至几步，骨干从U-Net换成Transformer。“加噪—学去噪”的骨架没变。",
+  "pitfalls": "- “预测噪声”不是论文唯一的选择，而是一种参数化。预测ε、预测x₀、预测v（两者组合）在数学上可以互相换算，但训练效果不同。\n- DDPM的FID很好，似然却不突出；“样本质量好”与“似然高”是两回事。\n- 1000步不是扩散模型的本质要求。DDIM证明同一个训练好的模型可以用少得多的步数采样。",
+  "limits": [
+    {"text": "采样需要1000次网络前向，生成一张256×256图像要数秒，比GAN慢上千倍。", "solved_by": ["ddim", "dpm-solver", "progressive-distillation", "consistency-models"]},
+    {"text": "对数似然（每维3.75比特）不及自回归模型和流模型。", "solved_by": ["improved-ddpm", "vdm", "score-sde"]},
+    {"text": "只做无条件生成，没有给出按类别或文本控制生成内容的方法。", "solved_by": ["adm", "cfg", "glide"]},
+    {"text": "直接在像素空间上运行，分辨率一高计算量就急剧上升，256×256已需要上亿参数和数天训练。", "solved_by": ["ldm", "cascaded-diffusion"]},
+    {"text": "线性噪声调度在低分辨率图像上过快破坏信息，方差固定也使少步采样质量差。", "solved_by": ["improved-ddpm", "edm"]}
+  ],
+  "relations": [
+    {"to": "diffusion-2015", "type": "solves", "note": "沿用其前向加噪/反向去噪的框架，通过预测噪声的参数化、简化损失和U-Net，解决了原方法样本质量差的问题。"},
+    {"to": "score-matching", "type": "extends", "note": "证明预测噪声的目标等价于多噪声级去噪分数匹配，采样等价于退火朗之万动力学，把NCSN纳入有严格似然下界的框架，并取得更好的FID。"},
+    {"to": "denoising-score-matching", "type": "uses", "note": "L_simple换个写法就是在一串噪声水平上做去噪分数匹配的加权和。"},
+    {"to": "unet", "type": "uses", "note": "去噪网络采用U-Net结构，输入输出同尺寸，加入自注意力和时间编码。"},
+    {"to": "pixelcnn-pp", "type": "uses", "note": "网络骨干的具体设计参照PixelCNN++的U-Net式结构。"},
+    {"to": "groupnorm", "type": "uses", "note": "残差块中用组归一化，不依赖批量大小。"},
+    {"to": "transformer", "type": "uses", "note": "时间步t用Transformer的正弦位置编码注入网络。"},
+    {"to": "stylegan2", "type": "rivals", "note": "同期最强的GAN；DDPM在CIFAR-10上FID可比，训练稳定、无模式坍塌，但采样慢上千倍，一年后扩散模型全面胜出。"}
+  ],
+  "prereq": ["diffusion-process", "gaussian", "noise-schedule", "elbo", "score-function", "markov-chain", "residual-connection", "self-attention"],
+  "terms": [
+    {"t": "ᾱ_t", "d": "前t步“保留原图比例”的连乘积。x_t中原图的系数是√ᾱ_t，噪声的系数是√(1−ᾱ_t)，ᾱ_t从接近1逐渐降到接近0。"},
+    {"t": "ε预测", "d": "让网络输出它认为x_t中所含的那份高斯噪声，而不是直接输出去噪后的图像。"},
+    {"t": "L_simple", "d": "DDPM的训练损失：真实噪声与预测噪声之间的均方误差，对所有时间步一视同仁，不加变分下界中的权重。"}
+  ],
+  "learn": "先补[[c:gaussian]]（尤其是两个高斯相加仍为高斯）、[[c:elbo]]和[[c:diffusion-process]]，最好先读[[vae]]和[[score-matching]]。原文第2节定义模型，第3.2节推出ε参数化和L_simple，算法1、2各只有几行，一定要看懂。然后对照Hugging Face的The Annotated Diffusion Model逐段读代码。动手：在MNIST或CIFAR-10上从零实现DDPM（一个小U-Net、线性调度、T=1000），训练几小时后观察从噪声到图像的生成过程，再把采样步数减少，看质量怎样下降。",
+  "check": {"source": "https://arxiv.org/abs/2006.11239", "confirmed": "标题、3位作者、arXiv v1提交于2020-06-19；正文（ar5iv）中的T=1000、β从1e-4线性到0.02、闭式q(x_t|x₀)、ε参数化均值公式、L_simple、σ_t²=β_t、U-Net（PixelCNN++/Wide ResNet、组归一化、16×16自注意力、正弦时间编码）、参数量35.7M/114M、CIFAR-10 IS 9.46与FID 3.17、NLL≤3.75、LSUN卧室4.90/教堂7.89/猫19.75、TPU v3-8上80万步约10.6小时、采样时间17秒/300秒、渐进有损压缩解释。"}
+}

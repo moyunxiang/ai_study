@@ -1,0 +1,113 @@
+{
+ "id": "dall-e",
+ "who": "Aditya Ramesh, Mikhail Pavlov, Gabriel Goh, Scott Gray, Chelsea Voss, Alec Radford, Mark Chen, Ilya Sutskever · OpenAI",
+ "venue": "ICML 2021（论文）；OpenAI博客2021-01-05",
+ "links": [
+  {
+   "label": "OpenAI博客",
+   "url": "https://openai.com/index/dall-e/"
+  },
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2102.12092"
+  },
+  {
+   "label": "官方dVAE代码",
+   "url": "https://github.com/openai/DALL-E"
+  }
+ ],
+ "problem": "此前的文生图模型都是在CUB鸟类、MS-COCO等小数据集上训练的GAN，只能画特定领域，物体常常扭曲变形，换一种描述就失灵。",
+ "idea": "把图像也变成token：先用离散VAE把256×256图像压成32×32=1024个图像token，再把最多256个文本token和这些图像token拼成一条序列，用一个120亿参数的GPT式Transformer在2.5亿对网络图文上逐token地做自回归训练。",
+ "impact": "第一次展示了用自然语言就能组合出训练中几乎不可能见过的概念（如“戴红帽子、穿蓝衬衫的刺猬”），把文生图从小领域推向开放域，直接引出DALL·E 2、CogView、Parti等工作和此后的文生图浪潮。",
+ "background": "2016年起，文生图主要用条件GAN做：给定一句描述，生成对应图像。它们在CUB鸟类、牛津花卉等单一领域上效果尚可，但在内容复杂的MS-COCO上，生成的物体经常扭曲、位置不合理，模型规模和数据量都很小。\n\n另一方面，[[gpt-3]]证明了把Transformer和数据规模做大，语言模型会出现零样本能力；[[image-gpt]]则表明同样的自回归Transformer也能逐像素生成图像。问题在于直接把像素当token太长：一张256×256彩色图有近20万个数，Transformer的注意力代价随长度平方增长，无法承受。[[vq-vae]]给出了出路：先把图像压成短得多的离散码序列。",
+ "method": "**第一阶段：离散VAE（dVAE）**。训练一个编码器把256×256 RGB图像压成32×32的网格，每格从8192个可能的码中选一个，相当于一个有8192个“视觉单词”的词表。和[[vq-vae]]不同，它用Gumbel-softmax松弛（见[[c:gumbel-softmax]]）让离散选择变得可导，解码器再把1024个码还原成图像。这一步把Transformer要处理的长度缩小了192倍，代价是细节有所损失。\n\n**第二阶段：自回归Transformer**。把一句话用[[bpe]]切成最多256个文本token，后面接上1024个图像token，组成一条最长1280的序列。用一个120亿参数、64层的仅解码器Transformer（使用[[sparse-transformer]]式的稀疏注意力）对整条序列做下一个token预测（见[[c:autoregressive]]）。训练数据是从互联网收集的约2.5亿对图文，包括[[cc3m]]和经过过滤的YFCC100M子集。\n\n**生成与重排序**。给定文本，模型逐个采样1024个图像token，再交给dVAE解码器得到图像。每句描述采样512张，用[[clip]]按图文匹配程度排序，挑出最好的若干张。\n\n**工程**。在1024块16GB V100上训练，用[[mixed-precision]]、逐残差块的梯度缩放以及PowerSGD梯度压缩来解决显存和通信瓶颈。",
+ "results": "在MS-COCO描述上做零样本生成（训练时没见过MS-COCO的描述），与当时最好的DF-GAN对比的人工评测中，DALL·E的样本在五人多数投票下有90.0%的情况被认为更真实，93.3%被认为更符合描述。FID与之前最好的方法相差约2分以内；若把图像略加模糊，则比之前最好结果好约6分。在CUB鸟类这种专门领域上则明显较差，FID差距接近40分。官方博客展示了控制属性、数量、多物体组合、视角、拟人化和图像补全等能力，同时承认物体增多时颜色与物体的对应容易混淆。",
+ "legacy": "DALL·E一发布就让开放域文生图成为热点。同年清华的[[cogview]]用类似的“VQ-VAE＋Transformer”方案做中文文生图；[[vqgan]]与CLIP组合的开源方案在社区流行；Google的[[parti]]把自回归路线扩展到更大规模。但扩散模型很快在质量与效率上超过了它：[[glide]]和[[dall-e-2]]改用扩散模型生成，[[ldm]]与[[stable-diffusion]]让文生图可以在消费级GPU上运行。自回归的“图像token”思路并未消失：[[maskgit]]、[[muse-t2i]]用并行掩码解码提速，2025年[[gpt-4o-image]]又把图像生成放回大语言模型内部。",
+ "limits": [
+  {
+   "text": "输出只有256×256，dVAE压缩导致细节模糊，必须从512张中用CLIP重排序才能挑出好图。",
+   "solved_by": [
+    "dall-e-2",
+    "glide",
+    "ldm"
+   ]
+  },
+  {
+   "text": "1024个图像token要逐个串行生成，120亿参数的模型生成一张图既慢又贵。",
+   "solved_by": [
+    "ldm",
+    "maskgit",
+    "muse-t2i"
+   ]
+  },
+  {
+   "text": "描述中物体增多时，颜色、属性与物体的对应关系容易错乱，换一种说法常常就失败。",
+   "solved_by": [
+    "imagen",
+    "dall-e-3"
+   ]
+  },
+  {
+   "text": "模型与数据都未公开，研究者无法复现或在其上继续开发。",
+   "solved_by": [
+    "cogview",
+    "stable-diffusion"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "vq-vae",
+   "type": "uses",
+   "note": "采用其“先离散化图像、再对码序列建模”的两阶段思路，并改用Gumbel-softmax松弛训练离散VAE。"
+  },
+  {
+   "to": "gpt-3",
+   "type": "extends",
+   "note": "把GPT-3式的大规模自回归Transformer扩展到文本＋图像token的混合序列，官方称之为120亿参数版本的GPT-3。"
+  },
+  {
+   "to": "image-gpt",
+   "type": "extends",
+   "note": "Image GPT逐像素生成，序列太长只能做低分辨率；DALL·E在压缩后的离散码上建模，并加入文本条件。"
+  },
+  {
+   "to": "clip",
+   "type": "uses",
+   "note": "用同期发布的CLIP对512个候选样本按图文匹配度重排序。"
+  },
+  {
+   "to": "sparse-transformer",
+   "type": "uses",
+   "note": "Transformer使用稀疏注意力模式以降低1280长度序列的计算量。"
+  },
+  {
+   "to": "cc3m",
+   "type": "uses",
+   "note": "Conceptual Captions是其约2.5亿对图文训练数据的组成部分之一。"
+  }
+ ],
+ "prereq": [
+  "autoregressive",
+  "vector-quantization",
+  "gumbel-softmax",
+  "tokenization",
+  "transformer-block",
+  "zero-few-shot"
+ ],
+ "terms": [
+  {
+   "t": "离散VAE（dVAE）",
+   "d": "把图像编码成离散码网格的VAE。DALL·E用它把每张256×256图像变成1024个取值在8192个码中的token。"
+  },
+  {
+   "t": "CLIP重排序",
+   "d": "对同一描述生成多张候选图，用CLIP计算每张图与文字的匹配分数，只保留分数最高的几张。"
+  }
+ ],
+ "learn": "先读[[vq-vae]]和[[gpt-3]]，补[[c:autoregressive]]与[[c:gumbel-softmax]]。原文第2节讲两阶段训练，第2.4–2.5节和附录讲大规模训练的工程问题，第3节是评测。官方博客的交互示例比论文更能说明能力和局限。动手：用开源的minDALL-E或基于VQGAN的小模型，在一个小图文数据集上跑通“图像token化 → Transformer训练 → 采样解码”的完整流程。",
+ "check": {
+  "source": "https://arxiv.org/abs/2102.12092",
+  "confirmed": "论文标题、8位作者、arXiv v1提交于2021-02-24；OpenAI博客发布于2021-01-05、120亿参数、最长1280个token、每句512取32经CLIP重排序、刺猬示例与多物体混淆的局限；正文（ar5iv）中的dVAE 32×32网格与8192个码、最多256个文本BPE token、64层稀疏Transformer、约2.5亿对图文、1024块16GB V100与PowerSGD、对DF-GAN人工评测90.0%/93.3%、MS-COCO FID相差约2分与模糊后好约6分、CUB差近40分。"
+ }
+}

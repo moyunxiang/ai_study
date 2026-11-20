@@ -1,0 +1,104 @@
+{
+  "id": "kimi-linear",
+  "who": "Kimi Team（Yu Zhang, Zongyu Lin, Xingcheng Yao, Jiaxi Hu, Fanqing Meng, Chengyin Liu, Xin Men, Songlin Yang et al.） · 月之暗面Moonshot AI",
+  "venue": "arXiv 2025",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2510.26692"
+    },
+    {
+      "label": "论文HTML全文",
+      "url": "https://arxiv.org/html/2510.26692v2"
+    },
+    {
+      "label": "模型权重",
+      "url": "https://huggingface.co/moonshotai/Kimi-Linear-48B-A3B-Instruct"
+    }
+  ],
+  "problem": "智能体和长思维链让推理时的上下文越来越长，全注意力的KV缓存和解码时间随之膨胀；线性注意力省资源，但此前的混合模型在公平对比下仍打不过全注意力。",
+  "idea": "提出Kimi Delta Attention（KDA）：在门控delta规则上把整头共用一个遗忘率改为每个特征维度各有遗忘率，并设计专门的分块并行算法；每3层KDA配1层不加位置编码的MLA全注意力。",
+  "impact": "在相同数据和训练流程下，首次在短上下文、长上下文和强化学习三种场景都超过全注意力基线，同时KV缓存最多减少75%，100万token时解码吞吐提高到约6倍。",
+  "background": "[[c:state-space-model]]和线性注意力（见[[minimax-01]]）用一个固定大小的状态矩阵 `S` 代替不断增长的KV缓存：每来一个token，就把它的键值写进S，查询时从S里读出。最简单的写法 `S_t = S_(t−1) + k_t·v_tᵀ` 只会累加，旧信息越积越乱。\n\n后来的两项改进是**delta规则**和**门控**。delta规则先用当前的键从S里读出旧值，再按误差修正：`S_t = (I − β_t·k_t·k_tᵀ)·S_(t−1) + β_t·k_t·v_tᵀ`，像一个不断自我纠错的联想记忆。[[gated-deltanet]]再乘上一个0到1之间的遗忘率α_t，让模型主动忘掉过时的内容。但它的α是**每个头一个标量**（与[[mamba-2]]类似），整头的所有维度以同样速度遗忘，记忆管理很粗。\n\n纯线性模型在精确检索上仍不足，因此[[minimax-01]]等采用“多数线性层加少量全注意力层”的混合结构。问题是，在严格相同的数据和训练条件下，这些混合模型能否真正胜过全注意力，此前并没有令人信服的结果。",
+  "method": "**KDA：更细的遗忘门**。把Gated DeltaNet的标量遗忘率换成对角矩阵：\n\n`S_t = (I − β_t·k_t·k_tᵀ)·Diag(α_t)·S_(t−1) + β_t·k_t·v_tᵀ`，`o_t = S_tᵀ·q_t`\n\n`α_t` 是一个向量，状态的每个特征维度各自决定遗忘多快（这一思路类似[[gla]]）。直观地说，一部分维度可以长期保存远处的信息，另一部分快速更新、记录最近的内容，有限的状态空间被用得更充分。论文还指出，这种由数据决定的衰减本身就带有位置信息，可以替代显式位置编码。\n\n**高效的分块算法**。这种转移矩阵属于“对角加低秩”（DPLR）的一个特例。作者利用它的特殊结构设计分块并行算法：块内用矩阵乘法批量计算，块间传递状态，比通用DPLR算法少了一半以上的块级矩阵运算，算子效率约提高一倍。\n\n**混合结构**。每3层KDA后接1层MLA全注意力（3:1，消融显示这一比例在质量与吞吐之间最好；纯全注意力反而表现较差）。MLA层**不加位置编码**（NoPE），位置和“近因”偏好全部交给KDA层负责，这样长上下文外推更好，MLA也更容易高效实现。\n\n**模型**。48B总参数、3B激活的MoE，与基线用完全相同的1.4T token和训练流程对比；另训练了5.7T token、支持100万上下文的版本，后训练沿用并扩展了[[kimi-k2]]的SFT数据。",
+  "results": "1.4T token的公平对比中（基线为全MLA和Gated DeltaNet混合GDN-H），Kimi Linear在基座的MMLU-Pro为51.0（MLA为47.2），在128K的RULER上为84.3（MLA为81.3），同时解码提速3.98倍。100万token解码时，每个输出token耗时1.84毫秒，MLA为11.48毫秒，快约6.3倍；KV缓存最多减少75%。经过相同SFT流程后，在通用、数学与代码任务上也普遍高于MLA基线（例如GPQA-Diamond 62.1对57.1）。作者开源了KDA内核、vLLM集成和模型权重。",
+  "legacy": "Kimi Linear与同期的[[qwen3-next]]一起，把“线性注意力为主、少量全注意力为辅”的混合架构推进到了可以直接替换全注意力的程度；另一条降低长上下文成本的路线是保留softmax、只看少数token的稀疏注意力（[[nsa]]、[[deepseek-v3.2]]）。两条路线谁会成为下一代旗舰模型的主流，仍在竞争中。",
+  "pitfalls": "- 它仍是混合模型：每4层就有1层全注意力，这1/4的层仍需完整KV缓存，所以是“最多减少75%”而不是完全不需要。\n- 公平对比的规模是48B-A3B、1.4T token，还没有在K2那样万亿参数的旗舰规模上验证。\n- NoPE指MLA层不加位置编码，并不是整个模型没有位置信息，位置信息来自KDA的数据相关衰减。",
+  "limits": [
+    {
+      "text": "仍保留1/4的全注意力层，百万级上下文下这部分KV缓存和计算依然随长度增长。",
+      "solved_by": []
+    },
+    {
+      "text": "只在3B激活、48B总参数的规模上做了公平对比，在旗舰规模上的效果尚未公开验证。",
+      "solved_by": []
+    },
+    {
+      "text": "固定大小的状态对“逐字精确回忆很久以前的内容”仍有上限，必须依赖少量全注意力层兜底。",
+      "solved_by": []
+    },
+    {
+      "text": "需要专门的内核和推理框架支持，与为全注意力优化的现有生态相比，部署和调优成本更高。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "gated-deltanet",
+      "type": "extends",
+      "note": "把Gated DeltaNet的每头标量遗忘率改为逐通道的对角门控，并设计更高效的DPLR特例分块算法。"
+    },
+    {
+      "to": "kimi-k2",
+      "type": "uses",
+      "note": "后训练扩展了Kimi K2的SFT数据；全注意力部分沿用K2所用的MLA。"
+    },
+    {
+      "to": "minimax-01",
+      "type": "extends",
+      "note": "MiniMax-01证明了线性注意力为主的混合架构可以做成商用模型，但其线性部分是简单累加的闪电注意力；Kimi Linear换用表达力更强的KDA，并在严格公平的对比下超过全注意力。"
+    },
+    {
+      "to": "gla",
+      "type": "uses",
+      "note": "逐特征维度的遗忘门思路与门控线性注意力GLA一致。"
+    },
+    {
+      "to": "mamba-2",
+      "type": "rivals",
+      "note": "Mamba-2与Gated DeltaNet都用每头一个标量的衰减；KDA认为这太粗，改为逐维衰减。"
+    },
+    {
+      "to": "deepseek-v2",
+      "type": "uses",
+      "note": "混合结构中的全注意力层是DeepSeek-V2提出的MLA，并去掉了RoPE。"
+    }
+  ],
+  "prereq": [
+    "state-space-model",
+    "efficient-attention",
+    "kv-cache",
+    "gating",
+    "self-attention",
+    "mixture-of-experts"
+  ],
+  "terms": [
+    {
+      "t": "delta规则",
+      "d": "一种更新联想记忆的方式：先用键读出当前存的值，再按“目标值减当前值”的误差修正记忆，而不是简单地叠加。"
+    },
+    {
+      "t": "逐通道门控",
+      "d": "遗忘率不是整个注意力头共用一个数，而是状态的每个特征维度各有一个，可以分别决定记多久。"
+    },
+    {
+      "t": "NoPE",
+      "d": "不使用任何显式位置编码。在Kimi Linear中只用于全注意力层，位置信息由线性层的衰减机制提供。"
+    }
+  ],
+  "learn": "先补[[c:state-space-model]]和[[c:efficient-attention]]，再读[[gated-deltanet]]理解delta规则与门控。原文读第2节（从线性注意力到GDN的推导）、第3节（KDA公式1与分块算法）和第7.2节（3:1比例与NoPE消融）。动手：用PyTorch写出KDA的逐步递推版本，与标量门控版本在一个“键值记忆—回忆”玩具任务上比较准确率。",
+  "check": {
+    "source": "https://arxiv.org/html/2510.26692v2",
+    "confirmed": "标题、作者Kimi Team、arXiv v1提交于2025-10-30；摘要中的首次在公平比较中超过全注意力、KDA扩展Gated DeltaNet的细粒度门控、DPLR特例、48B/3B、KV缓存最多减少75%、1M上下文最多6倍解码吞吐；正文中delta规则与GDN公式、KDA公式、GDN/Mamba2为每头标量门、逐通道与GLA类似、算子效率比DPLR约提高100%、3:1比例与纯全注意力表现差、MLA层用NoPE、1.4T token公平对比、MMLU-Pro 51.0、RULER 84.3对MLA 81.3与3.98倍、TPOT 1.84ms对11.48ms（6.3倍）、5.7T与1M上下文版本、SFT数据扩展自K2、SFT后GPQA-Diamond 62.1对57.1。"
+  }
+}

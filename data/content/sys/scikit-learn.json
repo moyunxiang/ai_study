@@ -1,0 +1,38 @@
+{
+  "id": "scikit-learn",
+  "who": "Fabian Pedregosa, Gaël Varoquaux, Alexandre Gramfort, Vincent Michel, Bertrand Thirion, Olivier Grisel, Mathieu Blondel, Peter Prettenhofer et al. · INRIA Saclay等（项目起源于David Cournapeau的GSoC项目）",
+  "venue": "首个公开版本2010-02-01；论文 JMLR 2011",
+  "links": [
+    {"label": "JMLR 2011论文", "url": "https://www.jmlr.org/papers/v12/pedregosa11a.html"},
+    {"label": "API设计论文（arXiv 1309.0238）", "url": "https://arxiv.org/abs/1309.0238"},
+    {"label": "官方用户指南", "url": "https://scikit-learn.org/stable/user_guide.html"}
+  ],
+  "problem": "2010年前后，用SVM、随机森林这类经典算法要么写R、MATLAB，要么拼凑各自接口不同的C/C++库；Python里已有的机器学习包要么慢、要么依赖复杂、要么许可证限制商用。",
+  "idea": "在NumPy/SciPy之上，用同一套极简接口（fit / predict / transform）实现几十种经典算法，性能关键处调用编译代码，BSD许可证允许商用，并配上详尽文档。",
+  "impact": "把“训练一个分类器”降到三行代码，成为数据科学入门和工业界表格数据建模的默认工具；它的估计器接口被后来大量库模仿。",
+  "background": "到2010年，[[svm]]、[[random-forest]]、[[k-means]]等方法已经成熟，但普通工程师和其他学科的研究者很难用上。Java世界有[[weka]]，统计学界用[[r-lang]]，C/C++有[[libsvm]]这样的专用库，各自的数据格式和调用方式都不同。Python凭借[[numpy]]和SciPy正成为科学计算语言，但已有的Python机器学习包要么纯Python实现太慢，要么依赖R、Shogun等外部系统难以安装，要么是GPL许可证，企业不敢用。",
+  "method": "论文强调的设计原则是“少而精”：\n\n- **统一的估计器接口**：任何模型都是一个对象，`fit(X, y)`训练，监督模型用`predict(X)`预测，降维、标准化这类**变换器**用`transform(X)`。接口靠约定而不是继承，外部代码只要实现这几个方法就能接进来。\n- **数据就是NumPy数组**：`X`是样本×特征的矩阵，不另造数据容器，能直接和其他科学计算库互通。\n- **可组合**：`Pipeline`把多个变换器和一个估计器串成一个新估计器（例如先PCA降维再SVM分类）；`GridSearchCV`把任意估计器包起来，用交叉验证在参数网格上搜索最优超参数（见[[c:hyperparameter]]、[[c:train-val-test]]），自己也表现为一个估计器，可以嵌套使用。\n- **性能**：主体用Python写，热点用Cython编译，SVM和线性模型直接绑定[[libsvm]]和LibLinear。\n\n一个完整例子只要几行：`clf = make_pipeline(StandardScaler(), SVC()); clf.fit(X_train, y_train); clf.score(X_test, y_test)`。",
+  "results": "论文在Madelon数据集（4400个样本、500个特征）上对比了几个Python机器学习库，scikit-learn的SVM分类用时5.2秒，是对比中最快的。原因之一是它的libsvm绑定避免了内存复制，开销比原版libsvm的Python绑定少最多40%。0.8版测试覆盖率为81%，附约300页用户指南和60多个示例。",
+  "legacy": "scikit-learn成了Python数据科学栈的标准组件，和[[ipython-notebook]]、pandas一起构成数据分析的日常环境，[[kaggle]]竞赛中大量的特征工程和基线模型都用它完成。它的fit/predict约定被[[xgboost]]等库提供兼容接口，也影响了后来深度学习高层API（如[[keras]]的`model.fit`）的设计。但它刻意不做深度学习和GPU，神经网络很快交给了[[theano]]、[[tensorflow]]和[[pytorch]]。",
+  "pitfalls": "- scikit-learn面向中等规模数据：所有数据通常要能放进单机内存，不适合几亿样本的训练。\n- 在交叉验证之外先用全量数据做标准化或特征选择会造成信息泄漏，正确做法是把预处理放进Pipeline。",
+  "limits": [
+    {"text": "不支持GPU，也不做深度神经网络，图像、语音、文本等需要表示学习的任务很快被深度学习框架接管。", "solved_by": ["theano", "tensorflow", "pytorch"]},
+    {"text": "假设数据能一次放进单机内存，难以处理超大规模数据集的分布式训练。", "solved_by": ["spark"]},
+    {"text": "梯度提升树等表格数据上最强的方法早期实现较慢，后来由专门的库在速度和精度上超越。", "solved_by": ["xgboost"]}
+  ],
+  "relations": [
+    {"to": "numpy", "type": "uses", "note": "以NumPy数组作为唯一的数据容器，依赖只有NumPy和SciPy，安装简单。"},
+    {"to": "libsvm", "type": "uses", "note": "SVM直接绑定并修补了LIBSVM，改进了稠密数据上的效率并减少内存复制。"},
+    {"to": "weka", "type": "rivals", "note": "两者都是通用机器学习工具箱；Weka基于Java并以图形界面为主，scikit-learn以Python库形式嵌入编程工作流，后来在研究和工业界更普及。"},
+    {"to": "svm", "type": "uses", "note": "把SVM等经典算法封装成统一接口的估计器，让非专家也能直接使用。"},
+    {"to": "random-forest", "type": "uses", "note": "提供随机森林等集成方法的高效实现，成为表格数据上的常用基线。"}
+  ],
+  "prereq": ["supervised-learning", "train-val-test", "hyperparameter", "classification-metrics", "vector-matrix"],
+  "terms": [
+    {"t": "估计器（estimator）", "d": "scikit-learn里所有能从数据学习的对象的统称，必有fit方法；分类器、回归器、聚类器、降维器都是估计器。"},
+    {"t": "交叉验证", "d": "把训练数据分成k份，轮流用其中一份验证、其余训练，取平均成绩来估计泛化性能，常用于选超参数。"},
+    {"t": "Cython", "d": "一种语法接近Python、可编译成C的语言，用来给Python程序的热点循环提速或绑定C库。"}
+  ],
+  "learn": "先补[[c:train-val-test]]和[[c:hyperparameter]]。跟着官方教程用iris或digits数据集训练一个分类器，然后把StandardScaler、PCA和SVC串进Pipeline，用GridSearchCV搜索参数。最后读API设计论文（arXiv 1309.0238）第2节，理解为什么接口这样设计。",
+  "check": {"source": "https://www.jmlr.org/papers/volume12/pedregosa11a/pedregosa11a.pdf", "confirmed": "JMLR 12:2825–2830（2011）作者与内容：依赖仅NumPy/SciPy、绑定LibSVM/LibLinear、Cython、fit/predict/transform、GridSearchCV与Pipeline；Madelon数据集4400样本500属性、SVM用时5.2秒、绑定开销少最多40%、0.8版测试覆盖率81%、约300页指南60多个示例。维基百科确认首个公开版本2010-02-01、源自Cournapeau的GSoC项目。"}
+}

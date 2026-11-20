@@ -1,0 +1,97 @@
+{
+  "id": "alibi",
+  "who": "Ofir Press, Noah A. Smith, Mike Lewis · University of Washington / Facebook AI Research / Allen Institute for AI",
+  "venue": "ICLR 2022",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2108.12409"
+    },
+    {
+      "label": "官方代码",
+      "url": "https://github.com/ofirpress/attention_with_linear_biases"
+    }
+  ],
+  "problem": "Transformer在多长的序列上训练，就只能在多长的序列上用：用正弦位置编码的模型只要输入比训练长度多出几十个token，困惑度就急剧变差。",
+  "idea": "不给词向量加任何位置编码，而是在注意力分数上直接减去“距离×斜率”：离得越远扣分越多，每个头用一个固定、不学习的斜率。",
+  "impact": "在1024长度上训练的13亿参数模型，推理时用2048长度，困惑度追平直接在2048上训练的正弦编码模型，训练快11%、省11%显存；后被BLOOM等大模型采用。",
+  "background": "注意力本身不知道词的先后，必须额外注入位置信息（见[[c:positional-encoding]]）。[[transformer]]把正弦向量加到输入词向量上；[[rope]]把位置变成对Q、K的旋转；[[t5]]则继承[[relative-position]]的思路，给每个“相对距离桶”学一个加到注意力分数上的标量。\n\n这引出一个一直没被认真回答的问题：**外推**。训练时只见过长度L的序列，推理时能不能直接喂更长的？如果能，就可以用便宜的短序列训练（注意力的代价随长度平方增长），用的时候再放长。作者在WikiText-103上实测：正弦编码的模型训练长度512，推理时多出约20个token困惑度就开始恶化；rotary能多撑约200个；T5的相对偏置能多撑约600个，但训练速度至少慢一倍，省下的算力全赔回去了。",
+  "method": "ALiBi（Attention with Linear Biases）只改一处：算完查询和键的内积之后、做[[c:softmax]]之前，加一个与距离成正比的负偏置。对第i个位置的查询：\n\n`softmax(q_i·Kᵀ + m·[−(i−1), …, −2, −1, 0])`\n\n也就是看自己扣0分，看前一个词扣m分，看前100个词扣100m分。输入端不再加任何位置向量，偏置也不参与 `√d_k` 缩放。\n\n**斜率m**按头设定且固定不学：8个头时取几何数列 `1/2, 1/4, …, 1/256`；一般地，n个头时首项和公比都是 `2^(−8/n)`。斜率大的头几乎只看最近几个词，斜率小的头能看得较远，相当于让不同头有不同的“视野”。\n\n**为什么能外推**：偏置只依赖相对距离、是一条直线，训练时没见过的更大距离只是同一条直线的延伸，不会出现模型从未见过的位置向量。代价是一种很强的“近因”偏好（[[c:inductive-bias]]）：远处的词被压得很低。",
+  "results": "WikiText-103上，ALiBi模型在训练长度512或1024的基础上，推理长度放到上万个token困惑度也不崩，而正弦、rotary、T5偏置都会逐渐变差；训练和推理速度与正弦编码相差不到1%和3%。在更大的语料上，13亿参数模型（25层、16头）用1024长度训练、2048长度推理，困惑度与在2048上训练的正弦模型相同，训练快11%、显存少11%。\n\n作者也做了分析：推理长度超过训练长度时ALiBi的收益，很大一部分来自更少的token落在序列开头、上下文太短的位置（论文称为early token curse），而不是模型真的利用了更远的历史。",
+  "legacy": "[[bloom]]、MPT等模型直接采用ALiBi。\n\n但主流后来选了另一条路：[[llama-1]]等用[[rope]]，再通过[[position-interpolation]]、[[yarn]]把窗口真正扩到几万甚至十几万，并用少量长文本微调。原因是ALiBi的近因偏置把远处信息线性压低，长距离检索做不好。[[nope-length-gen]]进一步比较了包括ALiBi在内的位置方案在长度泛化上的表现。",
+  "pitfalls": "- “能外推”不等于“能利用长上下文”。ALiBi在更长输入上困惑度不变差，主要是因为它几乎忽略远处的token；要在长文档里找到很远处的信息，它并不擅长。\n- 斜率不是学出来的，ALiBi本身不增加任何参数。",
+  "limits": [
+    {
+      "text": "线性距离惩罚让很远的token几乎得不到注意力，外推时困惑度稳定，但模型并没有真正用上更长的历史，长距离检索类任务表现差。",
+      "solved_by": [
+        "position-interpolation",
+        "yarn"
+      ]
+    },
+    {
+      "text": "实验集中在语言模型困惑度和13亿参数以内的模型，外推能力在下游任务和更大模型上是否成立没有验证。",
+      "solved_by": [
+        "nope-length-gen",
+        "ruler"
+      ]
+    },
+    {
+      "text": "斜率是人为固定的一组几何数列，对需要远近兼顾的任务无法自适应调整。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "relative-position",
+      "type": "extends",
+      "note": "同样把位置信息写在注意力分数上、只依赖相对距离，但把可学习的距离表示换成一条固定直线。"
+    },
+    {
+      "to": "t5",
+      "type": "solves",
+      "note": "T5的相对偏置外推最好，但训练慢一倍以上；ALiBi不需要分桶查表、没有参数，外推更好且几乎不增加开销。"
+    },
+    {
+      "to": "transformer",
+      "type": "solves",
+      "note": "原版正弦位置编码在训练长度之外只能多撑几十个token，ALiBi去掉了它，换成注意力上的距离偏置。"
+    },
+    {
+      "to": "rope",
+      "type": "rivals",
+      "note": "同期的位置方案；论文实测rotary外推弱于ALiBi，但后来大模型多用RoPE并配合插值扩窗口，RoPE成为主流。"
+    },
+    {
+      "to": "transformer-xl",
+      "type": "rivals",
+      "note": "Transformer-XL靠缓存上一段的隐状态延长上下文；ALiBi在WikiText-103上用更长的训练长度（3072）超过了它的困惑度。"
+    }
+  ],
+  "prereq": [
+    "self-attention",
+    "positional-encoding",
+    "softmax",
+    "perplexity",
+    "context-window",
+    "inductive-bias"
+  ],
+  "terms": [
+    {
+      "t": "长度外推",
+      "d": "推理时输入比训练时见过的最长序列更长，模型效果是否还能保持。"
+    },
+    {
+      "t": "斜率m",
+      "d": "ALiBi里每个注意力头的一个固定系数，决定距离每增加1，注意力分数扣多少。"
+    },
+    {
+      "t": "early token curse",
+      "d": "评估时靠近序列开头的token前文太短、预测更难；序列变长后这类token的占比下降，平均困惑度会因此变好。"
+    }
+  ],
+  "learn": "先确认会[[c:self-attention]]和[[c:positional-encoding]]。读原文第2节（各种位置方法的外推对比，图1）和第3节（ALiBi的公式与斜率），再看附录B关于early token curse的分析。动手：在一个小型字符级语言模型上分别用正弦编码和ALiBi训练长度128，测试长度128、256、512的困惑度，再设计一个“答案在很远处”的复制任务，看ALiBi能否做对。",
+  "check": {
+    "source": "https://arxiv.org/abs/2108.12409",
+    "confirmed": "标题、三位作者、v1提交于2021-08-27；摘要中的1.3B、1024→2048、快11%省11%；ar5iv正文中的公式、8头斜率1/2…1/256与2^(−8/n)、正弦约+20/rotary约+200/T5约+600 token的外推、T5偏置至少慢一倍、训练推理速度差1%/3%、25层16头、early token curse分析、L=3072超过Transformer-XL。"
+  }
+}

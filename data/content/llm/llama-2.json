@@ -1,0 +1,39 @@
+{
+  "id": "llama-2",
+  "who": "Hugo Touvron, Louis Martin, Kevin Stone, Peter Albert, Amjad Almahairi, Yasmine Babaei, Nikolay Bashlykov, Soumya Batra et al. · Meta",
+  "venue": "arXiv 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2307.09288"},
+    {"label": "Llama 2社区许可协议", "url": "https://ai.meta.com/llama/license/"}
+  ],
+  "problem": "LLaMA只许非商业研究使用、没有对话版本；开源社区的聊天模型大多靠蒸馏ChatGPT对话做简单微调，没有一家公开过完整的RLHF对齐流程，安全性也无人系统处理。",
+  "idea": "重新训练更大数据、更长上下文的基座模型（7B–70B、2万亿token、4096上下文、大模型用GQA），再用约2.8万条高质量示范和140多万条人类偏好比较，走完SFT→奖励模型→多轮RLHF的流程，得到可商用的Llama 2-Chat。",
+  "impact": "第一个公开详细RLHF配方、允许商用的主流大模型，70B聊天版在人类评测中与ChatGPT相当，成为2023年下半年开源生态的默认底座。",
+  "background": "[[llama-1]]让开源社区第一次拿到强基座，但它限非商业研究使用、只有2048上下文，而且只是基座模型。社区随后做出的[[alpaca]]、[[vicuna]]等聊天模型，本质上是用ChatGPT的输出做监督微调，学到的多是说话风格，也没有专门的安全对齐。\n\n另一方面，[[instructgpt]]和[[hh-rlhf]]描述了RLHF的思路，但OpenAI和Anthropic都没有公开具体的数据规模、奖励模型设计和迭代细节。[[lima]]则主张少量高质量示范就够，RLHF是否必要成了一个开放问题。",
+  "method": "**预训练**。沿用LLaMA的结构和分词器（32k词表），改动三处：训练数据增加40%到2万亿token，上下文从2048翻倍到4096，34B和70B改用[[gqa]]（8组KV）以加快推理。训练共用约330万A100 GPU小时。\n\n**监督微调**。作者发现第三方指令数据质量参差，于是放弃数百万条第三方数据，改为找供应商标注，收集到27,540条就停止，只在回答部分计算损失。\n\n**奖励模型**。收集了1,418,091条Meta自有的人类二选一比较，分别训练“有用性”和“安全性”两个奖励模型。损失在InstructGPT的排序损失上加了一个按偏好强度变化的间隔`m(r)`：\n\n`L = −log σ(r(x, y_c) − r(x, y_r) − m(r))`\n\n其中`y_c`是标注者选中的回答。“明显更好”的样本对要求分差更大。\n\n**迭代RLHF**（见[[c:rlhf-concept]]）。每周收集新偏好数据、更新奖励模型，共做了5轮（V1–V5）。前几轮只用**拒绝采样微调**：每个提示采样K个回答，取奖励最高的那个当新的训练目标；V4之后再在其上跑[[ppo]]。\n\n**Ghost Attention（GAtt）**。让模型在多轮对话中一直记住第一轮的系统指令（如“扮演拿破仑”）：训练数据中把指令拼进每一轮来采样回答，训练时只保留第一轮的指令，并把之前各轮的损失置零。",
+  "results": "Llama 2-70B基座在MMLU上68.9%，与GPT-3.5的70.0%相近，但远低于GPT-4的86.4%；HumanEval 29.9%，GPT-4为67.0%。人类评测中，Llama 2-Chat 70B对ChatGPT胜36%、平31.5%，34B聊天版对同规模开源聊天模型的总胜率超过75%。论文用一大部分篇幅报告安全：红队测试、安全奖励模型和误拒率度量，并因红队测试时间不足推迟发布34B模型。",
+  "legacy": "Llama 2以社区许可证发布，允许商业使用，但月活跃用户超过7亿的公司需另行申请，并且不是OSI意义上的开源许可证。它迅速被大量衍生：[[code-llama]]在其上继续训练代码，[[llama-guard]]做安全分类，[[yarn]]、[[lost-in-the-middle]]等长上下文研究都拿它做实验。拒绝采样加PPO的配方被后来的开源后训练沿用，[[dpo]]类方法则提供了更简单的替代。2024年Meta发布了下一代[[llama-3]]。",
+  "pitfalls": "- “开源”一词要谨慎：Llama 2开放权重，但训练数据不公开，许可证带有用户规模和用途限制。\n- 论文的人类评测用的是Meta自己的约4000条提示（单轮与多轮），作者也承认这些提示不覆盖编程和推理等场景，与ChatGPT“相当”的结论范围有限。",
+  "limits": [
+    {"text": "能力与GPT-4差距很大，尤其是代码和数学：HumanEval 29.9%对67.0%，GSM8K 56.8%对92.0%。", "solved_by": ["code-llama", "llama-3", "deepseek-v3"]},
+    {"text": "上下文只有4096个token，长文档和长对话放不下。", "solved_by": ["code-llama", "yarn", "llama-3.1"]},
+    {"text": "RLHF流程昂贵复杂：需要140多万条人工偏好、两个奖励模型和多轮PPO，社区难以复现。", "solved_by": ["zephyr", "tulu-3"]},
+    {"text": "训练数据不公开，许可证限制超大公司使用、不是真正的开源，研究者无法检查数据或完全复现。", "solved_by": ["olmo", "mistral-7b"]}
+  ],
+  "relations": [
+    {"to": "llama-1", "type": "extends", "note": "同样的结构与分词器，训练数据增加40%、上下文翻倍，并改为允许商用的许可。"},
+    {"to": "gqa", "type": "uses", "note": "34B和70B采用8组KV的分组查询注意力；附录在30B规模上从头训练对比，GQA与多头注意力相近、优于MQA。"},
+    {"to": "instructgpt", "type": "extends", "note": "沿用SFT→奖励模型→RL的三阶段，并公开了数据规模、间隔损失、拒绝采样与多轮迭代等细节。"},
+    {"to": "hh-rlhf", "type": "uses", "note": "安全奖励模型的训练数据混入了Anthropic公开的无害性偏好数据，并沿用了有用性与安全性分开建模的思路。"},
+    {"to": "lima", "type": "extends", "note": "同样发现少量高质量示范胜过大量第三方数据，但认为在此之上仍需要RLHF才能进一步提升。"},
+    {"to": "vicuna", "type": "solves", "note": "开源聊天模型靠蒸馏ChatGPT对话、缺少安全对齐；Llama 2-Chat用自建的人工数据和RLHF，并系统地做了安全评测。"}
+  ],
+  "prereq": ["rlhf-concept", "instruction-tuning", "reward-design", "policy-gradient-concept", "kv-cache", "context-window", "pretrain-finetune"],
+  "terms": [
+    {"t": "拒绝采样微调", "d": "对每个提示生成多个回答，用奖励模型选出最好的一个，把它当作新的监督目标再微调模型。"},
+    {"t": "Ghost Attention（GAtt）", "d": "一种构造多轮训练数据的技巧，让模型在后续每一轮都遵守第一轮给出的系统指令。"},
+    {"t": "误拒（false refusal）", "d": "模型因为不相干的安全顾虑，拒绝回答本来完全正当的请求。"}
+  ],
+  "learn": "先读[[instructgpt]]了解RLHF三阶段。Llama 2论文很长，重点读第3节（3.1 SFT、3.2.2奖励模型与式2、3.2.3迭代微调、3.3 GAtt）和图1、图12的人类评测。动手：用一个开源奖励模型，对同一提示的8个采样回答打分，模拟一轮拒绝采样。",
+  "check": {"source": "https://arxiv.org/abs/2307.09288", "confirmed": "标题、作者、arXiv v1于2023-07-18；PDF：数据增加40%、2T token、上下文4096、34B/70B用GQA、32k词表、3,311,616 GPU小时、SFT 27,540条、1,418,091条Meta偏好、式(1)(2)间隔损失、RLHF V1–V5与V4后加PPO、GAtt做法、表4（MMLU 68.9 vs GPT-3.5 70.0/GPT-4 86.4，HumanEval 29.9 vs 67.0，GSM8K 56.8 vs 92.0）、对ChatGPT胜36%平31.5%、34B胜率>75%、因红队时间不足推迟34B、误拒率度量、人类评测约4000条提示且不含编程与推理类提示（第3.4.2节局限说明）。许可协议页面：发布时月活超过7亿须另行申请。"}
+}

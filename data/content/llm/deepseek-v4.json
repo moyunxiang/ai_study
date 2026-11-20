@@ -1,0 +1,41 @@
+{
+  "id": "deepseek-v4",
+  "who": "DeepSeek-AI（Anyi Xu, Bangcai Lin, Bing Xue, Bingxuan Wang et al.） · 深度求索",
+  "venue": "arXiv 2026（预览版技术报告）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2606.19348"},
+    {"label": "论文HTML全文", "url": "https://arxiv.org/html/2606.19348"},
+    {"label": "推理代码（CSA/HCA实现）", "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/tree/main/inference"}
+  ],
+  "problem": "推理模型靠生成更长的思考链变强，智能体任务又要读海量上下文，但注意力的计算和KV缓存随长度增长，V3.2的稀疏注意力只省了计算、没省存储，百万token仍不现实。",
+  "idea": "混合两种压缩注意力：CSA把每4个token的KV压成一条再做DSA式稀疏选择，HCA把每128个token压成一条后做稠密注意力，两者逐层交替；残差连接换成mHC，优化器换成Muon。",
+  "impact": "官方称在百万token上下文下，V4-Pro单token推理FLOPs只有V3.2的27%、KV缓存只有10%，百万上下文首次成为开源模型的默认配置。",
+  "background": "[[o1]]和[[deepseek-r1]]之后，模型变强的主要办法是测试时生成更长的推理链；同时智能体要在一次任务里读进整个代码库或成堆文档。两者都撞上同一堵墙：标准注意力的计算随长度平方增长，[[c:kv-cache]]随长度线性增长。\n\n[[deepseek-v3.2]]的DSA让每个查询只看2048个被选中的token，计算降下来了，但为了随时能选中任何一个历史token，所有token的KV仍要存着，上下文也停在128K。闭源方面[[gemini-3.1]]等已支持百万token，开源模型缺一个在这个长度上仍然便宜的架构。",
+  "method": "**CSA（压缩稀疏注意力）**。先沿序列方向压缩：每m=4个相邻token的KV，用学习到的权重加权合成一条（相邻块有重叠），序列长度变成1/4。再在压缩后的条目上做DSA：闪电索引器打分，每个查询只取得分最高的k条（Flash取512，Pro取1024）。另外保留最近128个token的滑动窗口，补足局部细节。\n\n**HCA（重度压缩注意力）**。每m′=128个token压成一条，不再做稀疏选择，直接对所有压缩条目做稠密注意力。一本100万token的书只剩约7800条，全看一遍也便宜。CSA负责“精挑细选看细节”，HCA负责“粗看全局”，两种层交替堆叠。\n\n**mHC残差**。把残差流从1份加宽到n份，层间用一个n×n矩阵B混合：`X(l+1) = B·X(l) + C·F(A·X(l))`。普通的[[hyper-connections]]层数一多会数值爆炸，[[mhc]]把B约束成双随机矩阵（每行每列和为1、元素非负，用Sinkhorn-Knopp迭代20次投影），保证 `‖B‖₂ ≤ 1`，信号逐层不会放大。\n\n**其他**。MoE仍用[[deepseekmoe]]，加上[[multi-token-prediction]]；优化器换成[[muon]]（按[[muon-scalable]]的做法）；专家权重和索引器用FP4量化感知训练。V4-Pro共1.6万亿参数、每token激活490亿，V4-Flash为2840亿/130亿，分别预训练约33T和32T token。后训练先为数学、代码、智能体等领域各训一个专家（SFT加[[grpo]]），再用在线策略蒸馏把它们合成一个模型。",
+  "results": "官方称百万token时V4-Pro的单token推理FLOPs为V3.2的27%、KV缓存为10%；V4-Flash分别为10%和7%。V4-Pro-Max在百万token检索任务MRCR上得83.5，高于Gemini-3.1-Pro的76.3、低于Claude Opus 4.6的92.9；SWE-bench Verified为80.6。作者自评推理能力略逊于GPT-5.4和Gemini-3.1-Pro，落后前沿约3到6个月；知识类SimpleQA-Verified为57.9，仍明显低于Gemini-3.1-Pro的75.6。",
+  "legacy": "V4把“压缩加稀疏”的注意力和mHC、Muon这些2025年的新部件第一次同时用到万亿参数规模，证明它们能一起稳定训练。报告列出的后续方向包括简化架构、多模态、以及类似[[engram]]的稀疏嵌入。它仍是预览版，长期效果有待观察。",
+  "pitfalls": "- 压缩不是免费的：MRCR曲线在128K以内很平稳，超过128K后检索准确率开始下降，百万token时虽仍可用但不如短上下文可靠。\n- “开源模型新纪录”是与开源模型比；与同期闭源前沿相比，知识和最难的智能体任务仍有差距。",
+  "limits": [
+    {"text": "为降低风险保留了大量经验性部件和技巧，架构相当复杂，作者自述需要更系统的研究来精简。", "solved_by": []},
+    {"text": "缓解训练不稳定的Anticipatory Routing和SwiGLU Clamping有效，但原理并不清楚，大规模训练的稳定性仍靠经验。", "solved_by": []},
+    {"text": "超过128K后检索准确率逐渐下降，百万token检索仍落后于Claude Opus 4.6。", "solved_by": []},
+    {"text": "只支持文本，尚无多模态能力；知识类基准仍明显落后于Gemini-3.1-Pro。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "deepseek-v3.2", "type": "solves", "note": "V3.2的DSA要保存全部KV且止步128K；CSA先把KV压到1/4再稀疏选择，HCA压到1/128，KV缓存降到V3.2的约10%，上下文扩到百万。"},
+    {"to": "mhc", "type": "uses", "note": "用mHC取代普通残差连接，把层间混合矩阵约束为双随机矩阵，使加宽的残差流在61层的深网络中保持数值稳定。"},
+    {"to": "muon-scalable", "type": "uses", "note": "按Muon规模化的做法用Muon训练万亿参数MoE，官方称收敛更快、更稳定，并为它实现了混合ZeRO切分。"},
+    {"to": "deepseekmoe", "type": "uses", "note": "FFN仍是细粒度路由专家加共享专家的DeepSeekMoE，只改了亲和度激活函数，并在前几层改用哈希路由。"},
+    {"to": "kimi-linear", "type": "rivals", "note": "同为解决长上下文成本：Kimi Linear走线性注意力混合路线，用固定大小状态替代KV缓存；V4保留softmax注意力，靠压缩与稀疏选择降本。"},
+    {"to": "gemini-3.1", "type": "rivals", "note": "论文的主要闭源对标；V4-Pro在百万token检索上超过Gemini-3.1-Pro，但推理与知识仍落后。"}
+  ],
+  "prereq": ["self-attention", "kv-cache", "big-o", "mixture-of-experts", "residual-connection", "adaptive-optimizer", "quantization-concept", "knowledge-distillation"],
+  "terms": [
+    {"t": "KV压缩", "d": "把相邻若干个token的键和值向量加权合成一条，让注意力面对的条目数变成原来的几分之一，代价是丢掉块内细节。"},
+    {"t": "双随机矩阵", "d": "所有元素非负、每行和每列都等于1的方阵。它乘到向量上不会把向量放大，多个相乘仍是双随机矩阵。"},
+    {"t": "滑动窗口注意力", "d": "每个token只看自己前面固定数量（这里是128个）的token，计算量与总长度无关，用来保证局部细节。"},
+    {"t": "在线策略蒸馏", "d": "让学生模型自己生成回答，再用教师模型在这些回答上的概率去纠正学生，比只模仿教师写好的答案更贴近学生实际会犯的错。"}
+  ],
+  "learn": "先读[[deepseek-v3.2]]搞懂DSA，再补[[c:kv-cache]]为什么随长度线性增长。读原文第2.2节（mHC公式1–8）和第2.3节（CSA/HCA），对照开源推理代码看压缩与top-k选择怎么实现。动手：估算一个100万token输入在不压缩、压4倍、压128倍时各要存多少条KV。",
+  "check": {"source": "https://arxiv.org/abs/2606.19348", "confirmed": "标题、作者DeepSeek-AI、arXiv v1提交于2026-04-26；HTML全文中的参数规模（1.6T/49B、284B/13B）、32T/33T预训练token、CSA压缩率m=4与top-k 512/1024、HCA压缩率128、滑动窗口128、mHC的双随机约束与Sinkhorn 20次迭代、百万token下27%/10%与10%/7%、MRCR 1M（Opus 4.6 92.9 / Gemini-3.1-Pro 76.3 / V4-Pro 83.5）、SWE Verified 80.6、SimpleQA-Verified 57.9 vs 75.6、“落后3到6个月”的自评与第6节局限。"}
+}

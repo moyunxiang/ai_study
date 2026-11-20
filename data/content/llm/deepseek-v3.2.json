@@ -1,0 +1,40 @@
+{
+  "id": "deepseek-v3.2",
+  "who": "DeepSeek-AI（Aixin Liu, Aoxue Mei, Bangcai Lin, Bing Xue et al.） · 深度求索",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2512.02556"},
+    {"label": "论文HTML全文", "url": "https://arxiv.org/html/2512.02556"},
+    {"label": "推理代码（含DSA实现）", "url": "https://huggingface.co/deepseek-ai/DeepSeek-V3.2-Exp/tree/main/inference"}
+  ],
+  "problem": "开源模型与闭源前沿的差距在拉大：标准注意力随长度平方增长，长上下文推理和智能体后训练都很贵；开源方后训练投入少，工具调用泛化差。",
+  "idea": "在V3.1的基础上续训，引入DeepSeek稀疏注意力DSA：用一个极轻的“闪电索引器”给历史token打分，每个查询只对得分最高的2048个token做注意力；再把后训练RL算力加到预训练的10%以上，并合成大规模智能体任务。",
+  "impact": "长上下文推理成本明显下降而效果不掉；推理和编码智能体成绩与GPT-5相近，高算力版Speciale拿到IMO、IOI金牌，DSA随后成为DeepSeek-V4压缩稀疏注意力的基础。",
+  "background": "2025年下半年，[[deepseek-r1]]之后的开源模型在推理上追得很快，但论文开头指出一个反向趋势：闭源模型（[[gpt-5]]、[[gemini-3]]、Claude 4.5）进步更陡，差距在扩大。作者归纳了三个原因。\n\n第一是架构：模型仍用标准[[c:self-attention]]，长度为L的序列要算L×L个分数（见[[c:big-o]]），128K上下文的推理和长轨迹强化学习都很贵。DeepSeek此前的[[nsa]]证明了稀疏注意力可以从头训练，但要重新预训练。第二是投入：开源方后训练阶段的算力太少。第三是智能体：开源模型在陌生工具环境里的泛化和遵循指令明显落后。",
+  "method": "**DSA稀疏注意力**。在每层加一个“闪电索引器”：查询token t对每个更早的token s算一个索引分 `I(t,s) = Σ_j w(t,j) · ReLU(q(t,j) · k(s))`，j遍历少量索引头，用ReLU和FP8是为了快。然后只取分数最高的k个token的KV条目，对它们做正常注意力。主注意力的复杂度从 `O(L²)` 降到 `O(L·k)`；索引器本身仍是 `O(L²)`，但每次只是几个小头的点积，比完整的[[deepseek-v2]]式MLA注意力便宜得多。\n\n**怎么从稠密模型改过来**。不重新预训练，而是从128K上下文的V3.1-Terminus续训。先冻结主模型、只训索引器1000步（每步16条128K序列，共21亿token），目标是让索引器的分布去拟合主注意力各头分数之和，损失用[[c:kl-divergence]]；再打开稀疏选择、每个查询选2048个token，全模型一起训15000步，共9437亿token。索引器只从自己的KL损失学习，主模型只从语言建模损失学习。\n\n**放大后训练**。先为数学、编程、逻辑、通用智能体、编码智能体、搜索智能体六个领域各训一个专家并蒸馏（见[[c:knowledge-distillation]]）回一个模型，再用[[grpo]]把推理、智能体和对齐放在同一个RL阶段里训，后训练算力超过预训练的10%。为让大规模RL稳定，作者修正了KL估计的偏差，并把与当前策略偏离太大的负样本序列屏蔽掉。智能体数据来自自动合成的1800多个环境、8.5万条复杂任务。",
+  "results": "官方称V3.2-Exp与V3.1-Terminus在短、长上下文任务上成绩相当，而按H800每卡时2美元估算，长位置token的预填充和解码成本明显更低（论文以曲线给出）。V3.2思考模式AIME 2025为93.1（GPT-5-High为94.6，Gemini-3.0-Pro为95.0），SWE-bench Verified为73.1，Terminal Bench 2.0为46.4，大幅领先此前的开源模型。放宽长度惩罚的V3.2-Speciale在IMO 2025拿到35/42、IOI 2025拿到492/600，都是金牌线，ICPC世界总决赛解出10/12题排第2。",
+  "legacy": "DSA证明了“从稠密模型续训改成稀疏注意力”是可行且便宜的，不必为新架构重练一遍。2026年4月的[[deepseek-v4]]直接把DSA作为部件：先把每4个token的KV压成一条，再在压缩后的条目上做DSA，把百万token上下文变成常规配置。V3.2-Speciale的证明能力则来自同期的[[deepseekmath-v2]]。",
+  "pitfalls": "- DSA省的是注意力的**计算**，不是存储：每个查询要从全部历史token里挑top-k，所以所有token的KV仍要留着。真正压缩KV缓存的是V4。\n- “与GPT-5相当”指推理类基准；论文自己承认知识广度和复杂任务仍不如Gemini-3.0-Pro，而且达到同样质量要生成更多token。",
+  "limits": [
+    {"text": "总训练算力较少，世界知识的广度仍明显落后于闭源前沿模型（作者在结论中自述）。", "solved_by": ["deepseek-v4"]},
+    {"text": "token效率差：要达到Gemini-3.0-Pro的输出质量需要更长的推理链，Speciale尤甚。", "solved_by": []},
+    {"text": "DSA只减少注意力计算，所有历史token的KV缓存仍需完整保存，索引器本身也仍是平方复杂度，百万级上下文依然吃不消。", "solved_by": ["deepseek-v4"]},
+    {"text": "上下文仍是128K，搜索类智能体经常在用满80%时被迫截断或丢弃历史，靠临时的上下文管理策略补救。", "solved_by": ["deepseek-v4"]}
+  ],
+  "relations": [
+    {"to": "deepseek-v3", "type": "extends", "note": "沿用V3的MoE主干与训练方法，从其后续版本V3.1-Terminus续训而来，唯一的架构改动是加入DSA。"},
+    {"to": "nsa", "type": "extends", "note": "同一团队的上一代可训练稀疏注意力；DSA改为逐token的top-k选择加轻量索引器，并且能在已有稠密模型上续训，而不必从头预训练。"},
+    {"to": "deepseek-r1", "type": "extends", "note": "把R1的GRPO强化学习规模化：后训练算力提到预训练的10%以上，并修正KL估计、屏蔽离策略样本以保持稳定。"},
+    {"to": "deepseek-v2", "type": "uses", "note": "DSA建立在V2提出的MLA之上，以MQA模式让每个潜向量KV条目被所有查询头共享，便于高效实现。"},
+    {"to": "deepseekmath-v2", "type": "uses", "note": "Speciale变体引入DeepSeekMath-V2的数据与奖励方法来训练数学证明能力。"},
+    {"to": "gemini-3", "type": "rivals", "note": "论文的主要对标对象；V3.2推理略逊于Gemini-3.0-Pro，Speciale在竞赛成绩上追平但token用量明显更多。"}
+  ],
+  "prereq": ["self-attention", "kv-cache", "big-o", "kl-divergence", "mixture-of-experts", "knowledge-distillation", "policy-gradient-concept"],
+  "terms": [
+    {"t": "闪电索引器", "d": "DSA里的小打分网络：几个低维、用ReLU和FP8计算的注意力头，只负责给历史token排序，决定主注意力看哪些token。"},
+    {"t": "续训（continued pre-training）", "d": "在已训练好的模型上换掉或新增部件后接着训练，让它适应新结构，而不是从随机初始化重练。"},
+    {"t": "离策略序列屏蔽", "d": "强化学习里，若某条采样序列在当前策略下的概率与采样时偏离太大且优势为负，就不用它更新，避免训练与推理框架不一致带来的噪声。"}
+  ],
+  "learn": "先补[[c:self-attention]]与[[c:kv-cache]]，理解为什么注意力是平方复杂度；再看[[nsa]]了解可训练稀疏注意力的思路。读原文第2节（DSA公式1–4与两阶段续训）和第3.1节（GRPO的稳定化技巧）。动手：用PyTorch写一个带top-k选择的注意力，比较k=64与全注意力在一段长文本上的输出差异和耗时。",
+  "check": {"source": "https://arxiv.org/abs/2512.02556", "confirmed": "标题、作者DeepSeek-AI、arXiv v1提交于2025-12-02；HTML全文中的索引器公式、top-k=2048、预热1000步/21亿token、稀疏训练15000步/9437亿token、O(L²)→O(Lk)、后训练算力超预训练10%、1800多环境与8.5万提示、主表AIME 93.1/SWE Verified 73.1（附录表）/Terminal Bench 46.4、Speciale竞赛成绩表（IMO 35/42、IOI 492/600、ICPC 10/12第2）及结论中的三条局限。"}
+}

@@ -1,0 +1,112 @@
+{
+  "id": "palm",
+  "who": "Aakanksha Chowdhery, Sharan Narang, Jacob Devlin, Maarten Bosma, Gaurav Mishra, Adam Roberts, Paul Barham, Hyung Won Chung et al. · Google Research",
+  "venue": "JMLR 2023",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2204.02311"
+    },
+    {
+      "label": "Google Research博客",
+      "url": "https://research.google/blog/pathways-language-model-palm-scaling-to-540-billion-parameters-for-breakthrough-performance/"
+    }
+  ],
+  "problem": "稠密大模型继续放大还能带来什么，尤其是多步推理这类前人认为规模帮不上忙的能力？同时，几千块加速器一起训练一个模型，硬件利用率普遍只有二三成。",
+  "idea": "用Google新的Pathways系统，在两个TPU v4 Pod共6144块芯片上训练5400亿参数的稠密解码器模型，算力利用率达46.2%；再配合思维链提示，测试规模对推理的作用。",
+  "impact": "PaLM在数百个基准上刷新少样本最佳，GSM8K数学题配合思维链和计算器达58%，超过此前微调方法的55%；约四分之一的BIG-bench任务出现“到540B才突然变好”的跳跃。",
+  "background": "[[gpt-3]]之后，[[gopher]]、MT-NLG等把稠密模型推到2800亿到5300亿参数，但[[gopher]]的结论是：阅读理解、知识类任务随规模大幅提升，数学和逻辑推理却提升很小。另一方面，训练这样的模型本身是工程难题：Gopher在4096块TPU v3上、MT-NLG在2240块A100上训练，模型算力利用率（MFU，实际吞吐占理论峰值的比例）只有约30%，还要依赖复杂的流水线并行。\n\n就在PaLM发布前，同组的[[cot]]发现：让模型先写出中间推理步骤再给答案，能大幅提升大模型的算术和常识推理。PaLM要检验的是：把规模推到更大，再加上这种提示方式，推理还上不去吗？",
+  "method": "**结构**。只有解码器的Transformer，有几处后来被广泛沿用的改动：前馈层用[[swiglu]]激活；位置编码用[[rope]]；用[[mqa]]（多头共享一组K、V，生成时显存和带宽开销小得多）；**并行层**——把注意力和前馈并联而非串联，`y = x + MLP(LN(x)) + Attn(LN(x))`，大规模下训练快约15%；去掉所有偏置项以提升稳定性；输入输出共享词嵌入；25.6万词的SentencePiece词表。三个尺寸：8B、62B、540B。\n\n**数据**。7800亿token，多语言社交媒体对话占50%，过滤后的多语言网页27%，英文书籍13%，GitHub代码5%，另有维基百科和新闻。\n\n**训练系统**。每个TPU v4 Pod有3072块芯片，各自存一份完整模型，Pod内部用12路模型并行加256路全分片数据并行；两个Pod之间由Pathways做数据并行、经数据中心网络交换梯度，不用流水线并行。540B模型MFU达46.2%（GPT-3为21.3%，Gopher 32.5%，MT-NLG 30.2%）。\n\n**训练不稳定**。540B训练中损失出现约20次尖峰；作者的处理办法是回到尖峰前约100步的检查点、跳过约200–500个批次。换一个更早的检查点训练同样的数据不会出现尖峰，说明问题出在特定数据与特定参数状态的组合。",
+  "results": "在29个常用英文NLP基准中的28个上取得少样本最佳。BIG-bench上540B超过人类平均成绩；从62B到540B，约25%的任务出现跳跃式提升，远超按8B→62B趋势外推的幅度。GSM8K（8样本思维链）：540B加计算器58%，不加54%，不用思维链只有17%，62B加思维链33%，此前最佳是微调GPT-3加验证器的55%。代码、多语言翻译也表现强劲。",
+  "legacy": "PaLM是“稠密模型最大化”路线的高点。几乎同时发布的[[chinchilla]]指出，这样的模型数据太少；后来的[[palm-2]]转向更小的模型和更多数据。它的结构改动（SwiGLU、RoPE、无偏置等）被[[llama-1]]等继承，MQA后来演化为[[gqa]]。指令微调版Flan-PaLM见[[flan-t5]]，多模态的[[palm-e]]也以它为底座。“规模+思维链能解锁推理”的结论，与[[emergent-abilities]]一起把“涌现”变成热门话题。",
+  "limits": [
+    {
+      "text": "5400亿参数只训练7800亿token，按同期Chinchilla的结论远未达到计算最优，推理成本也极高。",
+      "solved_by": [
+        "palm-2",
+        "llama-1"
+      ]
+    },
+    {
+      "text": "训练中约20次损失尖峰只能靠回退并跳过数据来规避，没有找到原理性的解决办法。",
+      "solved_by": []
+    },
+    {
+      "text": "预训练模型本身不会遵循指令，需要精心设计少样本提示才能发挥能力。",
+      "solved_by": [
+        "flan-t5"
+      ]
+    },
+    {
+      "text": "模型和数据都不公开，外部只能通过论文了解。",
+      "solved_by": [
+        "opt",
+        "bloom",
+        "llama-1"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "gpt-3",
+      "type": "extends",
+      "note": "同样的稠密自回归路线，参数放大3倍到540B，训练数据从3000亿增至7800亿token。"
+    },
+    {
+      "to": "scaling-laws",
+      "type": "uses",
+      "note": "沿用“主要放大参数”的规模化思路，并报告了大多数任务按幂律、部分任务跳跃式提升的现象。"
+    },
+    {
+      "to": "mqa",
+      "type": "uses",
+      "note": "采用多查询注意力，所有头共享一组键和值，大幅降低生成时的显存和带宽开销。"
+    },
+    {
+      "to": "cot",
+      "type": "uses",
+      "note": "用同组提出的思维链提示测试推理，证明规模与思维链结合能在GSM8K上超过微调方法。"
+    },
+    {
+      "to": "tpu-v4",
+      "type": "uses",
+      "note": "在两个TPU v4 Pod共6144块芯片上训练，是当时公开描述的最大TPU配置。"
+    },
+    {
+      "to": "chinchilla",
+      "type": "rivals",
+      "note": "一周前发布的Chinchilla主张小模型多数据；PaLM代表“继续堆参数”的路线，后者随后被放弃。"
+    }
+  ],
+  "prereq": [
+    "language-model",
+    "transformer-block",
+    "scaling-law-concept",
+    "distributed-training",
+    "in-context-learning",
+    "params-flops"
+  ],
+  "terms": [
+    {
+      "t": "MFU（模型算力利用率）",
+      "d": "训练时实际完成的模型计算量占硬件理论峰值的比例；不计重计算等额外开销，用来比较不同系统的训练效率。"
+    },
+    {
+      "t": "Pathways",
+      "d": "Google的分布式机器学习系统，能让一个Python客户端调度跨多个TPU Pod的计算。"
+    },
+    {
+      "t": "并行层",
+      "d": "在一个Transformer层里让注意力和前馈网络同时读取同一个输入、结果相加，而不是先注意力后前馈；可以合并矩阵乘法，提高速度。"
+    },
+    {
+      "t": "损失尖峰",
+      "d": "训练损失突然大幅上升的现象，大模型训练中常见，严重时会导致训练发散。"
+    }
+  ],
+  "learn": "先懂[[c:distributed-training]]和[[c:params-flops]]，读[[cot]]理解思维链。读原文第2节（结构改动清单）、第4节（训练系统和MFU）、第5.1节（损失尖峰）和第6.3节（推理与表10）。动手：按附录B的公式，用论文给出的吞吐量238.3K tokens/s自己算一遍46.2%的MFU。",
+  "check": {
+    "source": "https://arxiv.org/abs/2204.02311",
+    "confirmed": "标题、作者、v1提交于2022-04-05；摘要中的540B、6144块TPU v4、Pathways；ar5iv正文中的SwiGLU/并行层（约快15%）/MQA/RoPE/无偏置/共享嵌入/256k词表、7800亿token与数据配比、MFU 46.2%与GPT-3 21.3%/Gopher 32.5%/MT-NLG 30.2%、每Pod 3072芯片12路模型并行256路数据并行、约20次损失尖峰与回退100步跳过200–500批次、约25% BIG-bench任务跳跃、GSM8K 58%/54%/17%/33%与此前55%；OpenReview收录的JMLR 2023。；29个英文基准中28个少样本最佳（正文与Google Research博客2022-04-04）。"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "cuda-tile",
+  "who": "Jonathan Bentz, Tony Scudiero et al. · NVIDIA",
+  "venue": "NVIDIA Technical Blog，2025-12-04（随CUDA 13.1发布）",
+  "links": [
+    {"label": "NVIDIA官方博客", "url": "https://developer.nvidia.com/blog/focus-on-your-algorithm-nvidia-cuda-tile-handles-the-hardware/"}
+  ],
+  "problem": "写高性能GPU核函数要在线程级手工管理数据搬运和张量核心，换一代GPU常常要重写。",
+  "idea": "按tile（数据块）而不是按线程来编程：开发者只描述对整块数据做什么运算，由编译器决定如何映射到线程、存储层级和张量核心。",
+  "impact": "官方称这是CUDA自2006年问世以来最大的一次更新，为AI核函数提供了与Triton类似、但由NVIDIA官方维护的高层路线。",
+  "method": "CUDA长期采用SIMT模型（单指令多线程，见[[c:cpu-gpu]]）：程序员要决定每个线程处理哪个元素、数据怎样在显存与片上存储间搬运。这样控制最精细，但要写出快的代码很费力，换新架构还要重调。[[cutlass]]这类模板库把经验封装起来，[[triton-lang]]则让程序员以块（tile）为单位写核函数，但它不是NVIDIA官方的底层接口。\n\nCUDA Tile是CUDA 13.1新增的一层。它的基础是**CUDA Tile IR**：一套把张量核心和张量内存加速器（TMA）细节抽象掉的虚拟指令集，程序以tile运算的形式表达，官方称同一份代码可兼容当前和未来几代张量核心架构。多数开发者通过**cuTile Python**使用它，类似用NumPy指定整块数组再做批量运算；编译器和库作者可以直接面向Tile IR。\n\n这种tile编程与原有SIMT模型并存，开发者按工作负载自行选择，而不是二选一。",
+  "limits": [
+    {"text": "官方博客是发布说明，没有给出与手写CUDA、CUTLASS或Triton的性能对比数字，实际效率与覆盖面有待独立评测。", "solved_by": []},
+    {"text": "抽象层越高，越难控制线程级的细节，对FlashAttention这类需要精细流水线的核函数可能仍要回到SIMT。", "solved_by": ["flashattention-4"]}
+  ],
+  "relations": [
+    {"to": "cuda", "type": "extends", "note": "在CUDA平台上新增tile层，与原有SIMT模型并存。"},
+    {"to": "cutlass", "type": "rivals", "note": "两者都想让开发者不必手写张量核心代码：CUTLASS用C++模板库，CUDA Tile用编译器和虚拟指令集。"},
+    {"to": "triton-lang", "type": "rivals", "note": "与Triton同属以tile为单位的核函数编程思路，区别是由NVIDIA官方提供并在驱动与工具链内支持。"}
+  ],
+  "prereq": ["cpu-gpu", "memory-bandwidth"],
+  "terms": [
+    {"t": "tile", "d": "把矩阵或张量切成的一个小块，是一次整体处理的数据单位。"},
+    {"t": "SIMT", "d": "单指令多线程：成千上万个线程执行同一段代码，各自处理不同数据。"}
+  ],
+  "learn": "先弄懂GPU线程、块和显存层级 → 读官方博客及其中链接的cuTile Python文章 → 用cuTile写一个矩阵乘或向量加，对比同功能的Triton版本。",
+  "check": {"source": "https://developer.nvidia.com/blog/focus-on-your-algorithm-nvidia-cuda-tile-handles-the-hardware/", "confirmed": "标题、作者、2025-12-04发布日期；CUDA 13.1、Tile IR虚拟指令集、cuTile Python、与SIMT并存、官方称最大更新均出自该页。"}
+}

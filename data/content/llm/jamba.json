@@ -1,0 +1,59 @@
+{
+  "id": "jamba",
+  "who": "Opher Lieber, Barak Lenz, Hofit Bata 等 · AI21 Labs",
+  "venue": "arXiv 2024",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2403.19887"
+    }
+  ],
+  "problem": "Transformer的KV缓存随长度线性增长、注意力计算量随长度平方增长；[[mamba]]这类状态空间模型成本低，但在需要精确回忆上下文的任务上不如注意力。",
+  "idea": "把Transformer层和Mamba层交替堆叠，再在部分层里加入MoE，兼顾效果、吞吐和显存。",
+  "impact": "第一个在大规模上验证的Transformer-Mamba混合架构，之后「少量注意力加大量线性层」成为主流长上下文方案之一。",
+  "method": "Jamba的基本单元是把若干Mamba层和少量注意力层交错排列：Mamba层负责便宜地压缩历史，注意力层负责需要精确查找的部分，由于只有少数层有KV缓存，缓存占用比纯Transformer小得多。此外在部分层里把前馈网络换成[[c:mixture-of-experts]]（做法参考[[mixtral]]），增加总参数但每个token只激活一部分。\n\n摘要称，这个配置可以放进单张80GB GPU，长上下文表现强，最长支持256K token，同时吞吐高、显存占用低。论文还做了消融：Mamba与注意力如何搭配、专家如何放置都对大规模效果有影响。权重以宽松许可开放。",
+  "limits": [
+    {
+      "text": "混合比例和层排布靠消融摸索，没有理论指导，换规模可能需要重新调。",
+      "solved_by": [
+        "minimax-01",
+        "qwen3-next"
+      ]
+    },
+    {
+      "text": "Mamba层仍然压缩历史，在超长输入里精确检索细节的能力需要用专门的评测检验。",
+      "solved_by": [
+        "ruler"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "mamba",
+      "type": "uses",
+      "note": "把Mamba层作为主体，用选择性状态空间模型以线性成本处理长序列。"
+    },
+    {
+      "to": "mixtral",
+      "type": "uses",
+      "note": "在部分层引入稀疏专家混合，借鉴Mixtral的做法扩大参数而不增加激活计算。"
+    },
+    {
+      "to": "transformer",
+      "type": "extends",
+      "note": "保留少量注意力层，补足纯状态空间模型在精确回忆上的不足。"
+    }
+  ],
+  "prereq": [
+    "self-attention",
+    "kv-cache",
+    "mixture-of-experts",
+    "context-window",
+    "recurrent-layer"
+  ],
+  "learn": "先读[[mamba]]了解选择性状态空间模型；读Jamba第2节的架构图和消融；动手：画出一个Jamba块里每层的类型，并估算它比同样大小的纯注意力模型少多少KV缓存。",
+  "check": {
+    "source": "https://arxiv.org/abs/2403.19887",
+    "confirmed": "标题、arXiv首次提交2024-03-28；摘要中Transformer-Mamba-MoE混合、可放进单张80GB GPU、最长256K上下文。"
+  }
+}

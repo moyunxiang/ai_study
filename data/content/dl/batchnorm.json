@@ -1,0 +1,42 @@
+{
+  "id": "batchnorm",
+  "who": "Sergey Ioffe, Christian Szegedy · Google",
+  "venue": "ICML 2015",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1502.03167"},
+    {"label": "ar5iv全文", "url": "https://ar5iv.labs.arxiv.org/html/1502.03167"},
+    {"label": "D2L：批量规范化", "url": "https://d2l.ai/chapter_convolutional-modern/batch-norm.html"}
+  ],
+  "problem": "深层网络训练很慢：学习率稍大就发散，初始化要小心翼翼，用sigmoid这类会饱和的激活几乎训不动。作者认为原因之一是每层输入的分布随前面层的更新不停漂移。",
+  "idea": "在每一层把一个小批量里每个特征减去批均值、除以批标准差，变成均值0方差1，再乘一个可学的缩放γ、加一个可学的偏移β。归一化本身成了网络的一层，梯度也穿过它反传。",
+  "impact": "学习率可以开大几十倍，Inception达到同样精度只需1/14的步数。ResNet等此后几乎所有卷积网络都在每个卷积后接BN，它也开启了LayerNorm、GroupNorm等整个归一化层家族。",
+  "background": "2014年的[[googlenet]]、[[vgg]]已经有二十多层，但训练要靠很小的学习率和精心设计的初始化（如[[glorot-init]]），整个过程很慢。用sigmoid时问题更严重：只要某层输入的绝对值偏大，激活就落进饱和区，导数接近0，梯度传不回去（见[[vanishing-gradient]]），所以大家改用[[relu]]。\n\n作者把这些困难归结为**内部协变量偏移**：第l层的输入是前面所有层的输出，前面的参数每更新一步，第l层看到的输入分布就变一次，它得不停地适应一个移动的目标。\n\n早就有人知道，把网络的**输入**白化（去均值、去相关、方差归一）能加快收敛。自然的想法是对每一层的输入都这样做，但完整白化要算协方差矩阵及其逆平方根，代价太大；而如果只在优化步骤之外做归一化、梯度却不知道它的存在，参数更新会和归一化相互抵消，偏置可以无限增长而损失不变。",
+  "method": "**两点简化**：一是每个特征维度单独归一化，不做去相关；二是用当前小批量的统计量近似整个数据集的统计量。对一个小批量`B = {x₁,…,x_m}`里的某个激活：\n\n`μ_B = (1/m)·Σ xᵢ`\n`σ_B² = (1/m)·Σ (xᵢ − μ_B)²`\n`x̂ᵢ = (xᵢ − μ_B) / √(σ_B² + ε)`\n`yᵢ = γ·x̂ᵢ + β`\n\n例：某个单元在一个大小为4的批里的值是2、4、6、8，均值5、方差5，归一化后约为−1.34、−0.45、0.45、1.34，再按γ、β缩放平移。\n\n**为什么要γ和β**：如果强行把sigmoid的输入压到均值0方差1，它就只工作在近似线性的中间段，网络的表达能力被削弱。γ、β让网络可以学回任何尺度和偏移，取`γ = √Var[x]`、`β = E[x]`时就恢复成原始激活，所以这一层至少不会比恒等变换更差。\n\n**作为可微的层**：μ_B和σ_B²都是x的函数，反向传播时对它们求导（论文给出完整公式），因此优化器“看得见”归一化，不会出现上面说的偏置漂移。\n\n**放在哪里**：加在线性变换之后、非线性之前，即`z = g(BN(Wu))`；原来的偏置b可以去掉，由β代替。**卷积层**里，同一通道在所有空间位置共享一对γ、β，统计量在批和空间位置上一起算，有效批大小是`m×高×宽`。\n\n**推理时**：测试时不能依赖批里的其他样本，于是改用训练过程中累积的总体均值和方差（方差用无偏估计`m/(m−1)·E[σ_B²]`，实践中用滑动平均），BN退化为一个固定的线性变换，可以并入前一层的权重。\n\n**副作用**：训练时一个样本的输出依赖于同批的其他样本，相当于加了噪声，起到正则化作用，因此可以减弱或去掉dropout。",
+  "results": "在ImageNet上把BN加进Inception：原Inception达到72.2%单裁剪验证精度需要3100万步；只加BN需要1330万步；把学习率提高5倍（BN-x5）只需210万步，即少了14倍；学习率提高30倍（BN-x30）起步稍慢，但最终精度达到74.8%。原始Inception把学习率提高5倍时参数直接溢出。用sigmoid的BN-x5-Sigmoid达到69.8%，而不加BN的sigmoid版Inception始终停在随机猜测水平。6个BN-Inception的集成取得4.9%的top-5验证错误率和4.82%的测试错误率，好于同期[[he-init]]报告的4.94%，也低于人类标注者的估计水平。",
+  "legacy": "同年年底的[[resnet]]在每个卷积后都接BN，152层网络能训起来离不开它；[[inception-v3]]也是在BN-Inception基础上改进的。“conv → BN → ReLU”成为卷积网络的标准积木。\n\nBN依赖批统计量的缺点催生了一系列替代：[[weight-norm]]改为对权重做重参数化，[[layernorm]]在单个样本内部归一化，成为RNN和[[transformer]]的标准配置，[[groupnorm]]解决了检测、分割中批很小时的退化。2018年[[bn-optimization]]用实验表明BN的效果与内部协变量偏移关系不大，更可能是让损失曲面更平滑。到2025年，[[dyt]]甚至尝试在Transformer中用一个逐元素的tanh函数完全替代归一化层。今天卷积网络仍普遍使用BN，Transformer则几乎都用LayerNorm或[[rmsnorm]]。",
+  "pitfalls": "- “减少内部协变量偏移”是论文给出的动机，但后续研究（[[bn-optimization]]）表明这并不是BN有效的主要原因，不要把它当成定论。\n- 训练模式和推理模式下BN的行为不同，部署时忘了切到eval模式、或者微调时批太小，都会导致精度大跌。\n- γ、β和滑动统计量都是模型的一部分，保存和加载模型时要一起带上。",
+  "limits": [
+    {"text": "依赖小批量统计量，批很小时（如检测、分割里每卡只有一两张图）均值和方差估计很不准，精度明显下降。", "solved_by": ["groupnorm", "layernorm", "weight-norm"]},
+    {"text": "难以用于RNN和变长序列：每个时间步要单独维护统计量，序列长度不一时更没法处理。", "solved_by": ["layernorm"]},
+    {"text": "训练用批统计量、测试用总体统计量，两者不一致，数据分布一变就出问题。", "solved_by": ["layernorm", "groupnorm"]},
+    {"text": "“内部协变量偏移”的解释缺乏证据，BN究竟为什么有效在发表时并不清楚。", "solved_by": ["bn-optimization"]},
+    {"text": "同批样本互相耦合，多卡训练要同步统计量，也给推理和对比学习等场景带来额外麻烦。", "solved_by": ["layernorm", "dyt"]}
+  ],
+  "relations": [
+    {"to": "glorot-init", "type": "solves", "note": "Xavier初始化只能保证训练开始时各层激活尺度合适；BN在整个训练过程中持续把激活拉回标准尺度，网络对初始化不再敏感。"},
+    {"to": "vanishing-gradient", "type": "solves", "note": "把激活保持在sigmoid的非饱和区，使sigmoid版Inception也能训练，缓解了饱和造成的梯度消失。"},
+    {"to": "googlenet", "type": "uses", "note": "所有实验都在Inception网络上进行，BN-Inception把它的训练步数减少到1/14并提高了精度。"},
+    {"to": "dropout", "type": "rivals", "note": "BN自带的批噪声起到正则化作用，BN-Inception把dropout降低或去掉；此后卷积网络大多用BN代替dropout。"},
+    {"to": "he-init", "type": "rivals", "note": "同月发表、同样在ImageNet上超过人类估计水平；He初始化从初始化尺度入手，BN从每层归一化入手，后来两者常一起使用。"},
+    {"to": "relu", "type": "uses", "note": "BN-Inception的主干仍用ReLU，BN放在卷积之后、ReLU之前。"},
+    {"to": "sgd", "type": "extends", "note": "利用小批量SGD天然存在的“批”来估计统计量，并让归一化参与反向传播。"}
+  ],
+  "prereq": ["normalization-layer", "sgd-minibatch", "expectation-variance", "learning-rate", "initialization", "conv-layer", "vanishing-exploding"],
+  "terms": [
+    {"t": "内部协变量偏移", "d": "论文提出的说法：训练中前面层的参数变化，使后面层输入的分布不断变化，后面层得一直重新适应。"},
+    {"t": "白化", "d": "把数据变成均值为0、协方差为单位矩阵（各维不相关且方差为1）的线性变换。BN只做了其中“每维去均值、除标准差”的部分。"},
+    {"t": "训练模式与推理模式", "d": "训练时BN用当前批的均值方差并更新滑动平均；推理时冻结并使用滑动平均，输出不再依赖同批其他样本。"}
+  ],
+  "learn": "先读[[c:normalization-layer]]和[[c:expectation-variance]]，复习[[c:sgd-minibatch]]。然后读原文第3节（算法1、2和反向传播公式）和第4.2节（Inception实验与图3）。再读[[bn-optimization]]了解对其机制的争论。动手：用numpy手写BN的前向和反向，与PyTorch的BatchNorm1d对照数值；再在CIFAR-10上训一个不带BN和带BN的VGG小网络，比较能承受的最大学习率。",
+  "check": {"source": "https://arxiv.org/abs/1502.03167", "confirmed": "标题、作者Ioffe与Szegedy、arXiv首次提交于2015-02-11；摘要中的14倍步数、4.9% top-5验证与4.8%测试错误；ar5iv全文中的算法1公式、γ=√Var与β=E恢复恒等、推理用m/(m−1)无偏方差、图3的3100万/1330万/210万步与72.2%、72.7%、73.0%、74.8%、69.8%，BN-x5学习率0.0075与BN-x30的0.045，原Inception的sigmoid版停在随机水平，集成测试误差4.82%对He等的4.94%。"}
+}

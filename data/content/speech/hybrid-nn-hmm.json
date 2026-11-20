@@ -1,0 +1,38 @@
+{
+  "id": "hybrid-nn-hmm",
+  "who": "Hervé Bourlard, Nelson Morgan · 国际计算机科学研究所ICSI（伯克利）；同期Steve Renals、Tony Robinson（剑桥）等",
+  "venue": "Kluwer专著 1994",
+  "links": [
+    {"label": "专著（Springer）", "url": "https://doi.org/10.1007/978-1-4615-3210-1"},
+    {"label": "Bourlard & Wellekens 1990：MLP输出即后验概率", "url": "https://doi.org/10.1109/34.62605"},
+    {"label": "Renals et al. 1994：HMM中的神经网络概率估计器", "url": "https://doi.org/10.1109/89.260359"}
+  ],
+  "problem": "神经网络（如TDNN）擅长给一小段语音分类，却不会处理整句话的时间对齐；HMM会对齐，但它用高斯混合给每帧打分，最大似然训练、只看单帧，区分能力弱。",
+  "idea": "保留HMM负责时间结构和解码，把每个状态的发射概率换成神经网络：网络读入当前帧及前后几帧，输出各音素状态的后验概率，除以该状态的先验，就得到HMM需要的“缩放似然”。",
+  "impact": "给出了神经网络进入大词表连续识别的标准接口。1990年代它与GMM-HMM并存但没能取代后者；2009年后把这里的浅层网络换成深层网络，就是取代GMM的DNN-HMM。",
+  "background": "[[tdnn]]等工作已经证明，用[[backprop]]训练的网络在音素分类上胜过HMM，但它们只能对人工截好的固定片段做判断。连续语音里，每个音素从哪一帧开始、持续多久都不知道，必须靠[[hmm-asr]]式的状态序列和[[viterbi]]搜索来对齐。\n\n另一方面，HMM的每个状态用[[c:gaussian]]混合描述“这一帧在这个状态下长什么样”，参数按最大似然估计：每个状态只管把自己的数据拟合好，不管和别的状态分不分得开；而且一个状态只看当前一帧，相邻帧的信息要靠拼接差分特征。问题是：能不能让一个判别式的网络替HMM打分，而不破坏HMM的概率框架？",
+  "method": "**关键事实**。Bourlard和Wellekens在1990年证明并用实验验证：用最小均方误差或[[c:cross-entropy]]训练的[[c:mlp]]，输出会逼近给定输入时各类别的后验概率`P(q | x)`。这里`q`是HMM状态（当时通常是单音素或其一部分），`x`是输入特征。\n\n**接入HMM**。HMM解码需要的是似然`p(x | q)`。由贝叶斯公式（见[[c:conditional-bayes]]）：\n\n`p(x | q) = P(q | x) · p(x) / P(q)`\n\n`p(x)`对同一帧的所有状态都一样，解码时可以忽略，所以只需把网络输出除以状态先验`P(q)`（训练数据里该状态所占的帧比例），得到缩放似然`P(q | x) / P(q)`，直接代替高斯混合的打分，其余的转移概率、词典、语言模型和Viterbi解码全都不变。\n\n**输入上下文**。网络的输入不是单帧，而是当前帧前后共若干帧拼接成的长向量，于是能看到协同发音带来的变化。剑桥的Robinson用循环网络（见[[c:recurrent-layer]]）代替MLP，让上下文由隐状态携带。\n\n**训练**。先用一个现成系统做强制对齐，给每一帧标上状态，网络按逐帧分类来训练；之后可以用新网络重新对齐、再训练，交替进行，类似Viterbi版的[[c:em-algorithm]]。",
+  "results": "Renals、Morgan、Bourlard等1994年在说话人无关的DARPA资源管理任务上报告：在一个当时先进的HMM系统中加入MLP概率估计器后，识别结果得到改善。Robinson同年在TIMIT和资源管理任务上报告，循环网络估计音素概率的效果可与传统方法相当。",
+  "legacy": "1990年代后期，GMM-HMM凭借[[htk]]等成熟工具、三音子状态绑定和[[mllr]]说话人自适应等配套技术保持主流，混合系统主要在ICSI、剑桥等少数几家使用。原因之一是当时的网络只有一个隐层，输出只有几十个单音素类别，算力也难以支持更大的模型。\n\n转机出现在2009年：[[mohamed-dbn-phone]]用深度信念网络预训练出多层网络，在TIMIT上明显胜过GMM；[[cd-dnn-hmm]]再把输出从单音素换成数千个绑定的三音子状态，在大词表对话识别上大幅降低错误率。它们沿用的正是这里的“后验除以先验”接口。之后[[ctc]]、[[las]]等端到端方法才开始连HMM一起去掉。",
+  "pitfalls": "- 混合系统的网络输出是后验概率，直接拿它当HMM发射概率会偏向出现频繁的状态（比如静音），必须除以先验。\n- “混合”指神经网络和HMM各管一部分，不是把两个完整识别器的结果合并。另有一种“tandem”做法是把网络输出当作新特征再喂给GMM-HMM，二者不同。",
+  "limits": [
+    {"text": "当时的网络只有一个隐层，输出是几十个与上下文无关的单音素类别，建模能力不足以胜过精心调好的三音子GMM系统。", "solved_by": ["mohamed-dbn-phone", "cd-dnn-hmm"]},
+    {"text": "网络按逐帧分类训练，标签来自另一个系统的强制对齐，训练目标与整句识别错误不一致。", "solved_by": ["ctc", "lf-mmi"]},
+    {"text": "仍然依赖发音词典、HMM状态拓扑和单独的语言模型，系统由多个分开优化的部件拼成。", "solved_by": ["ctc", "las", "rnn-t"]}
+  ],
+  "relations": [
+    {"to": "hmm-asr", "type": "extends", "note": "保留HMM的时间结构和解码，只把高斯混合的发射概率换成神经网络给出的缩放似然。"},
+    {"to": "tdnn", "type": "solves", "note": "TDNN只能给截好的固定片段分类；接入HMM后，网络逐帧打分、由HMM完成对齐，神经网络第一次能用于连续语音识别。"},
+    {"to": "backprop", "type": "uses", "note": "MLP或循环网络用反向传播按逐帧交叉熵训练。"},
+    {"to": "viterbi", "type": "uses", "note": "解码和训练标签的强制对齐都用Viterbi算法。"},
+    {"to": "mmi-training", "type": "rivals", "note": "同样针对最大似然GMM缺乏区分能力的问题：MMI在HMM内部改训练准则，混合方法干脆换成判别式的网络。"},
+    {"to": "timit", "type": "uses", "note": "TIMIT音素识别和DARPA资源管理是混合系统报告结果的主要基准。"}
+  ],
+  "prereq": ["hmm-concept", "mlp", "conditional-bayes", "cross-entropy", "phoneme-acoustic", "discriminative-generative"],
+  "terms": [
+    {"t": "缩放似然（scaled likelihood）", "d": "网络输出的后验P(q|x)除以先验P(q)，等于真正的似然p(x|q)再除以一个对所有状态相同的常数p(x)，所以在解码中可以直接代替似然使用。"},
+    {"t": "状态先验", "d": "训练数据中某个HMM状态所占帧数的比例。静音这类状态先验很大，不除掉会被网络过度偏爱。"}
+  ],
+  "learn": "先补[[c:conditional-bayes]]和[[c:hmm-concept]]，弄清似然和后验的区别。然后读Bourlard & Wellekens 1990的结论部分，以及Renals等1994论文中关于缩放似然的推导。动手：在Kaldi的TIMIT配方里先训练GMM-HMM得到对齐，再训练一个小的DNN声学模型，查看它解码时如何用先验修正网络输出。",
+  "check": {"source": "https://doi.org/10.1007/978-1-4615-3210-1", "confirmed": "OpenAlex：Bourlard & Morgan《Connectionist Speech Recognition》，Springer/Kluwer 1994。Bourlard & Wellekens（IEEE TPAMI 1990，doi:10.1109/34.62605）摘要：MLP输出逼近后验概率、可嵌入HMM。Renals等（IEEE TSAP 1994，doi:10.1109/89.260359）摘要：资源管理任务、MLP概率估计器改善HMM系统。Robinson（IEEE TNN 1994，doi:10.1109/72.279192）摘要：循环网络、TIMIT与资源管理、与传统方法相当。"}
+}

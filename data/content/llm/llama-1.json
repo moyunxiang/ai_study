@@ -1,0 +1,38 @@
+{
+  "id": "llama-1",
+  "who": "Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal et al. · Meta AI",
+  "venue": "arXiv 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2302.13971"},
+    {"label": "Meta官方发布", "url": "https://ai.meta.com/blog/large-language-model-llama-meta-ai/"}
+  ],
+  "problem": "最强的语言模型都是千亿参数、用私有数据训练、权重不公开；按Chinchilla的“算力最优”配方训练的模型，推理时依然又大又贵。",
+  "idea": "不追求训练算力最优，而是追求推理成本最低：用只含公开数据的1.0–1.4万亿token，把7B–65B的“小”模型训练得远超常规时长，并把权重开放给研究者。",
+  "impact": "13B模型在多数基准上超过175B的GPT-3，一张GPU就能跑；权重流出后迅速成为整个开源大模型生态的底座，Alpaca、Vicuna、llama.cpp都建立在它上面。",
+  "background": "2022年的大模型竞赛主要比参数量：[[gpt-3]]175B、[[gopher]]280B、[[palm]]540B，都用不公开的数据训练，外界拿不到权重。公开权重的[[opt]]和[[bloom]]规模相当，但效果明显落后。\n\n[[chinchilla]]指出，给定训练算力，参数量和训练token应同比例增加，大约每个参数20个token。但这个“最优”只针对训练成本。模型训练一次，却要被调用无数次，推理成本取决于参数量。按Chinchilla的建议，10B模型训练200B个token就够；LLaMA作者发现7B模型训练到1T个token后效果仍在提升——在小模型上多花训练算力，换来的是更便宜的推理。",
+  "method": "**数据只用公开来源**。约1.4T个token：网页CommonCrawl占67%，C4占15%，GitHub、维基百科、书籍各4.5%，arXiv 2.5%，StackExchange 2%。大部分token只看一遍，维基百科和书籍约看两遍。分词用SentencePiece实现的[[c:tokenization]]（BPE），把数字拆成单个数位。\n\n**结构**。在标准解码器Transformer上采用当时各家验证过的三处改进：\n- 归一化放在每个子层之前（[[pre-ln]]），并用更省计算的[[rmsnorm]]；\n- 前馈层的ReLU换成[[swiglu]]；\n- 去掉绝对位置嵌入，每层对Q、K施加[[rope]]旋转。\n\n**规模与训练**。四个尺寸：6.7B、13B、32.5B、65.2B。前两个训练1.0T个token，后两个1.4T。用[[adamw]]和余弦学习率衰减，并用高效的因果注意力实现和手写反向传播减少显存与计算。65B模型在2048张A100 80GB上每卡每秒约处理380个token，1.4T个token约需21天。上下文长度2048。",
+  "results": "LLaMA-13B在常识推理、问答等多数基准上超过GPT-3（175B），参数只有后者的约1/10。65B与[[chinchilla]]-70B、[[palm]]-540B相当：MMLU五样本准确率63.4%，高于GPT-3的43.9%，低于Chinchilla的67.5%和PaLM-540B的69.3%。代码题HumanEval pass@1为23.7%，与PaLM-62B相当。只用少量指令数据微调后，MMLU升到68.9%。",
+  "legacy": "Meta最初只按个案审批向研究者发放权重、限非商业用途，但一周多后权重就在网上流出（2023年3月初多家媒体报道）。此后几周内，斯坦福用它微调出[[alpaca]]，随后有[[vicuna]]，[[llama-cpp]]让它在笔记本上运行，[[qlora]]让单卡可以微调65B。Meta于7月发布可商用的[[llama-2]]。“公开数据＋RMSNorm＋SwiGLU＋RoPE＋超长训练”的配方成了之后几乎所有开源模型的默认设计。",
+  "pitfalls": "- LLaMA并没有推翻Chinchilla：Chinchilla回答的是“给定训练算力怎样最省”，LLaMA回答的是“考虑推理成本时怎样最省”，两者优化的目标不同。\n- 初版LLaMA不是开源许可证，权重是按申请发放、限非商业研究使用的；广泛流传是因为泄露。",
+  "limits": [
+    {"text": "非商业许可、按申请发放，企业无法合法用于产品。", "solved_by": ["llama-2", "mistral-7b"]},
+    {"text": "只是基座模型，没有经过指令微调和对齐，直接用来对话效果差。", "solved_by": ["alpaca", "vicuna", "llama-2"]},
+    {"text": "上下文只有2048个token，放不下长文档。", "solved_by": ["position-interpolation", "llama-2", "yarn"]},
+    {"text": "代码和数学能力有限，HumanEval pass@1只有23.7%；MMLU仍落后Chinchilla和PaLM。", "solved_by": ["code-llama", "llama-2"]}
+  ],
+  "relations": [
+    {"to": "chinchilla", "type": "extends", "note": "沿用“多给数据”的思路，但把目标从训练算力最优改成推理成本最优，小模型训练到远超Chinchilla建议的token数。"},
+    {"to": "rope", "type": "uses", "note": "用RoPE代替绝对位置嵌入，使其成为之后开源模型的标准位置编码。"},
+    {"to": "pre-ln", "type": "uses", "note": "把归一化放在子层之前以稳定训练，沿用GPT-3的做法。"},
+    {"to": "swiglu", "type": "uses", "note": "前馈层用SwiGLU激活，沿用PaLM的选择。"},
+    {"to": "gpt-3", "type": "solves", "note": "13B模型在多数基准上超过175B的GPT-3，且权重可获得、单卡可运行。"},
+    {"to": "bloom", "type": "rivals", "note": "BLOOM走“大而多语言”路线，只训练了366B个token；LLaMA走“小而训练充分”路线并胜出。"}
+  ],
+  "prereq": ["language-model", "transformer-block", "scaling-law-concept", "params-flops", "tokenization", "positional-encoding", "training-vs-inference"],
+  "terms": [
+    {"t": "推理预算", "d": "模型部署后每次调用所需的计算和显存。参数越少推理越便宜，所以宁愿训练时多花算力，把小模型训得更好。"},
+    {"t": "权重泄露", "d": "本应受控发放的模型参数文件被人公开传播。LLaMA权重在发布后不到两周就在网上流传。"}
+  ],
+  "learn": "先读[[chinchilla]]理解训练算力最优，再读本文第2节（数据表1、结构改动、训练效率）和表2、表9。动手：在[[nanogpt]]上依次把LayerNorm换成RMSNorm、GELU换成SwiGLU、位置嵌入换成RoPE，每次比较同样步数下的验证损失。",
+  "check": {"source": "https://arxiv.org/abs/2302.13971", "confirmed": "标题、作者、arXiv v1于2023-02-27；PDF表1数据配比、表2规模与token数（1.0T/1.4T）、pre-norm/RMSNorm、SwiGLU、RoPE、AdamW余弦调度、380 tokens/sec/GPU×2048张A100约21天、表9 MMLU（65B 63.4，GPT-3 43.9，Chinchilla 67.5，PaLM 69.3）、表8 HumanEval 23.7、指令微调后68.9。Meta博客（2023-02-24）：非商业许可、个案审批。上下文2048见arXiv 2306.15595。泄露报道见Google News：Reuters 2023-03-06、VICE 2023-03-07、The Verge 2023-03-08。"}
+}

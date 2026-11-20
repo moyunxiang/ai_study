@@ -1,0 +1,36 @@
+{
+  "id": "impala",
+  "who": "Espeholt, Soyer, Munos, Simonyan, Mnih, Ward, Doron, Firoiu et al. · DeepMind",
+  "venue": "ICML 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1802.01561"},
+    {"label": "ar5iv全文", "url": "https://ar5iv.labs.arxiv.org/html/1802.01561"}
+  ],
+  "problem": "A3C把采样和学习绑在同一批CPU线程上，吞吐量上不去、用不好GPU；如果让采样者和学习者分开跑，采样用的策略就比正在学的策略旧，产生偏差。",
+  "idea": "大量actor只负责用旧参数跑环境、把整段轨迹发给中心GPU学习者；学习者用V-trace——一种截断的重要性采样修正——抵消“数据来自旧策略”造成的偏差。",
+  "impact": "单个智能体达到每秒25万帧的吞吐，在30个3D任务上同时训练一个网络；分布式actor-learner+V-trace成为DeepMind此后大规模RL（AlphaStar、XLand等）的标准底座。",
+  "background": "[[a3c]]让很多CPU线程各自跑环境、各自算梯度，再异步更新共享参数。这比[[dqn]]快，但每个线程都要算梯度，难以利用GPU批量计算；想把规模做大，瓶颈在通信和计算方式上。更早的[[gorila]]把DQN分布式化，但依赖回放和值函数，扩展到更复杂的策略网络时同样笨重。\n\n直觉上的改法是“分工”：成百上千个便宜的actor只跑环境，一个（或几个）GPU学习者专心批量训练。代价是：actor手里的参数总是落后几步，它们收集的数据来自**旧策略**μ，而学习者要更新的是**新策略**π。直接当作on-policy数据用（见[[c:on-off-policy]]），梯度是有偏的，规模越大偏得越厉害。",
+  "method": "**架构**。每个actor拿最近一次同步的参数跑n步（如20步），把这段轨迹连同每步动作在μ下的概率发到队列；学习者把很多段轨迹拼成大批量，在GPU上一次前向反向，并把新参数广播回去。actor从不算梯度。\n\n**V-trace目标**。对状态`x_s`，价值目标是\n\n`v_s = V(x_s) + Σ_{t=s}^{s+n−1} γ^{t−s} (c_s⋯c_{t−1}) δ_t`\n\n其中`δ_t = ρ_t (r_t + γV(x_{t+1}) − V(x_t))`是带权重的TD误差（见[[c:td-error]]），权重是被截断的重要性比率（见[[c:importance-sampling]]）：`ρ_t = min(ρ̄, π(a_t|x_t)/μ(a_t|x_t))`，`c_i = min(c̄, π/μ)`。\n\n- 当数据恰好是on-policy（π=μ）时，所有比率为1，`v_s`就是普通的n步回报。\n- 截断`c̄`控制收敛速度和方差，避免比率连乘爆炸，思路来自[[retrace]]；截断`ρ̄`决定收敛到哪个价值函数——介于π和μ之间。\n\n策略梯度用`ρ_s ∇log π(a_s|x_s) (r_s + γv_{s+1} − V(x_s))`，即带修正的优势（见[[c:actor-critic]]），再加熵正则。",
+  "results": "多机配置下吞吐达每秒25万帧，论文称比单机A3C快30倍以上。DMLab-30（30个3D任务、一个网络同时学）上，平均人类标准化得分：A3C深网络23.8%，IMPALA深网络46.5%，再加[[pbt]]调超参数到49.4%。Atari-57上每个游戏单独训练的深网络IMPALA中位数191.8%，高于A3C的117.9%；但一个网络同时学57个游戏时只有59.7%。",
+  "legacy": "V-trace和actor-learner分离成了DeepMind大规模RL的默认配方：[[capture-the-flag]]、[[alphastar]]、[[xland]]都在此基础上训练；同年的[[apex]]、[[r2d2]]则在值函数一侧做了同样的“采样与学习分离”。后续SEED RL把推理也集中到学习者，进一步提高吞吐。IMPALA论文里的深层残差卷积网络（常称IMPALA CNN）也成了[[procgen]]等基准的常用网络。",
+  "limits": [
+    {"text": "仍是近似on-policy方法、不使用经验回放，每条数据只用一次，样本效率低，依赖海量环境交互。", "solved_by": []},
+    {"text": "一个网络同时学57个Atari游戏时得分远低于逐个训练，多任务之间的干扰没有解决。", "solved_by": ["multi-game-dt", "gato"]},
+    {"text": "截断`ρ̄`使V-trace收敛到的并不是目标策略π的价值，而是π与μ之间的某个策略，策略越落后偏差越大。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "a3c", "type": "solves", "note": "把A3C中“每个线程既采样又算梯度”拆成actor与GPU学习者，解决吞吐和GPU利用率问题，单机即快一个量级。"},
+    {"to": "retrace", "type": "extends", "note": "沿用Retrace对重要性比率做截断连乘的思路，把它从Q函数改写为状态价值V，并用于策略梯度。"},
+    {"to": "gorila", "type": "extends", "note": "同样是采样与学习分离的分布式架构，但面向actor-critic、在GPU上批量学习，规模和效率更高。"},
+    {"to": "pbt", "type": "uses", "note": "在DMLab-30上用基于种群的训练调整超参数，得分从46.5%提到49.4%。"},
+    {"to": "apex", "type": "rivals", "note": "几乎同时期的分布式方案：Ape-X走值函数+优先回放路线，IMPALA走策略梯度+离策略修正路线，两者分别成为两类方法的分布式标准。"}
+  ],
+  "prereq": ["actor-critic", "on-off-policy", "importance-sampling", "td-error", "distributed-training"],
+  "terms": [
+    {"t": "actor / learner", "d": "actor只负责与环境交互、产生数据；learner只负责用数据更新网络。两者分开后可以各自扩展到不同数量的机器。"},
+    {"t": "策略滞后", "d": "actor使用的参数比learner当前参数旧几次更新，导致数据分布与要学的策略不一致。"},
+    {"t": "人类标准化得分", "d": "`(智能体得分 − 随机得分)/(人类得分 − 随机得分)`，100%表示达到人类水平。"}
+  ],
+  "learn": "先补[[c:actor-critic]]和[[c:importance-sampling]]，读[[a3c]]的讲解。然后读原文第3节（架构）和第4节V-trace的定义与两条性质。动手：在CleanRL或TorchBeast里跑IMPALA，把`ρ̄`、`c̄`改成很大或很小，观察训练稳定性的变化。",
+  "check": {"source": "https://ar5iv.labs.arxiv.org/html/1802.01561", "confirmed": "标题、作者（DeepMind）、arXiv 1802编号；摘要中25万帧/秒、比单机A3C快30倍以上；表3 DMLab-30的23.8%/46.5%/49.4%；表4 Atari-57中位数117.9%/191.8%/59.7%。"}
+}

@@ -1,0 +1,40 @@
+{
+  "id": "score-sde",
+  "who": "Yang Song, Jascha Sohl-Dickstein, Diederik P. Kingma, Abhishek Kumar, Stefano Ermon, Ben Poole · Stanford University / Google Brain",
+  "venue": "ICLR 2021（Oral）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2011.13456"},
+    {"label": "官方代码", "url": "https://github.com/yang-song/score_sde"},
+    {"label": "Yang Song博客", "url": "https://yang-song.net/blog/2021/score/"}
+  ],
+  "problem": "NCSN（分数匹配加朗之万采样）与DDPM（扩散加变分下界）用的是有限个离散噪声级，形式相似却各自独立；噪声级和采样器都要手工设计，也无法精确计算似然。",
+  "idea": "让噪声级数趋于无穷，把加噪写成一个连续时间的随机微分方程（SDE）；只要学到每个时刻的分数，就能解对应的逆向SDE来生成。NCSN和DDPM分别是两种SDE的离散化；同一分数模型还对应一个确定性的常微分方程（概率流ODE）。",
+  "impact": "统一了分数模型与扩散模型，给出了可以直接套用数值求解器的生成框架和精确似然计算方法，CIFAR-10 FID达到2.20；概率流ODE成为DPM-Solver、EDM、一致性模型和流匹配等后续工作的共同出发点。",
+  "background": "2020年有两条看起来不同但效果相近的路线。[[score-matching]]（NCSN）在10个噪声级上学习分数，用退火朗之万动力学采样；[[ddpm]]在1000个噪声级上学习预测噪声，用学到的高斯反向链采样。DDPM论文已经注意到两者的训练目标本质相同，但仍是两套离散的设计：噪声级多少个、间隔怎么取、每级走几步，都靠经验。\n\n还有两个具体的不足：一是采样只能用论文给定的那种迭代方式，不能借用数值分析里成熟的求解器在速度和精度之间做权衡；二是两者都只能给出似然的下界或干脆不给，没法精确计算一张图的概率。",
+  "method": "**前向SDE**（见[[c:ode-sde]]）。把“逐步加噪”变成连续时间t∈[0,1]的随机过程：\n\n`dx = f(x, t)dt + g(t)dw`\n\nf是漂移（确定性的拉动），g是扩散系数（加多少噪声），w是布朗运动。它没有可学习参数，只负责在t=1时把数据变成简单的先验噪声。\n\n**逆向SDE**。1982年的一个数学结论：上述过程在时间上倒过来，也是一个SDE，而其中唯一未知的量是各时刻带噪分布的分数`∇ₓ log p_t(x)`：\n\n`dx = [f(x, t) − g(t)²·∇ₓ log p_t(x)]dt + g(t)dw̄`\n\n所以只要训练一个以时间为条件的网络`s_θ(x, t)`去逼近分数（用连续版的[[denoising-score-matching]]），就能从噪声出发、倒着解这个SDE得到样本。\n\n**两个特例**。方差随时间无限增大的“方差爆炸”SDE（VE），离散化后正是NCSN；方差保持有界的“方差保持”SDE（VP），离散化后正是DDPM。作者还提出方差更小的sub-VP SDE，似然更好。\n\n**预测-校正采样**。每一步先用数值SDE求解器往前走一步（预测），再用几步朗之万MCMC利用分数修正（校正），NCSN和DDPM的采样器都是它的特例。\n\n**概率流ODE**。对每个SDE，都存在一个去掉随机项的常微分方程\n\n`dx = [f(x, t) − ½g(t)²·∇ₓ log p_t(x)]dt`\n\n它在每个时刻的边缘分布与SDE完全相同。于是：可以用任意黑盒ODE求解器自适应地采样；数据与噪声之间成为一一对应的可逆映射，可以编码、插值；还能像[[ffjord]]那样用瞬时变量替换公式**精确**计算对数似然。\n\n**可控生成**。条件分数等于无条件分数加上`∇ₓ log p(y|x)`，于是一个无条件模型配合一个分类器或已知像素，就能做按类生成、图像补全和上色。",
+  "results": "CIFAR-10无条件生成：NCSN++（深层、连续时间、VE SDE）Inception Score 9.89、FID 2.20，当时最佳；DDPM++配sub-VP SDE的似然达到每维2.99比特（均匀去量化数据）。首次用分数模型生成了高保真的1024×1024 CelebA-HQ图像。用概率流ODE采样时，放宽求解误差容限可以把网络调用次数减少90%以上而样本质量没有明显下降。",
+  "legacy": "这篇论文给扩散模型提供了通用语言，之后的工作大多直接用SDE/ODE的写法。基于概率流ODE的专用求解器（[[dpm-solver]]）把采样压到10到20步；[[edm]]在这一框架下系统地拆解了噪声调度、网络预处理和采样器的设计空间；[[consistency-models]]学习把ODE轨迹上任意一点直接映射到终点，实现一步生成；[[flow-matching]]、[[rectified-flow]]与[[stochastic-interpolants]]则跳过SDE，直接学习从噪声到数据的速度场，成为SD3、FLUX的训练方法。条件分数的分解也是[[cfg]]等引导方法的理论基础；[[sdedit]]利用逆向SDE实现了“加噪再去噪”式的图像编辑。",
+  "limits": [
+    {"text": "SDE采样仍需数百到上千步网络调用，通用ODE求解器虽能减少步数，但在很少步数时质量明显下降。", "solved_by": ["dpm-solver", "edm", "consistency-models"]},
+    {"text": "可控生成依赖另外训练一个能处理带噪输入的分类器，条件生成流程繁琐。", "solved_by": ["cfg"]},
+    {"text": "噪声调度、损失权重、网络预处理等设计选择缠在一起，哪些真正重要并不清楚。", "solved_by": ["edm"]},
+    {"text": "从噪声到数据的ODE轨迹是弯曲的，限制了用大步长求解的效果。", "solved_by": ["rectified-flow", "flow-matching"]}
+  ],
+  "relations": [
+    {"to": "ddpm", "type": "extends", "note": "证明DDPM是方差保持SDE的离散化，并把它推广到连续时间，改进后的DDPM++在似然上达到每维2.99比特。"},
+    {"to": "score-matching", "type": "extends", "note": "证明NCSN是方差爆炸SDE的离散化，噪声级从10个推向无穷，改进后的NCSN++在CIFAR-10上FID达到2.20。"},
+    {"to": "denoising-score-matching", "type": "uses", "note": "用连续时间版本的去噪分数匹配训练随时间变化的分数网络。"},
+    {"to": "ffjord", "type": "uses", "note": "借用连续标准化流的瞬时变量替换公式，在概率流ODE上精确计算对数似然。"},
+    {"to": "neural-ode", "type": "uses", "note": "概率流ODE可以用神经ODE的黑盒自适应求解器求解。"},
+    {"to": "ddim", "type": "extends", "note": "DDIM的确定性采样可看作概率流ODE的一种离散化，Score SDE给出了更一般的解释。"},
+    {"to": "diffusion-2015", "type": "extends", "note": "把2015年离散的逐步加噪/去噪框架推向连续时间极限。"}
+  ],
+  "prereq": ["ode-sde", "score-function", "diffusion-process", "langevin-mcmc", "normalizing-flow", "gaussian"],
+  "terms": [
+    {"t": "随机微分方程（SDE）", "d": "带随机噪声项的微分方程，描述一个量在确定性漂移和随机扰动共同作用下如何随时间演化。"},
+    {"t": "概率流ODE", "d": "与扩散SDE每个时刻边缘分布都相同的确定性常微分方程。给定起点，轨迹唯一，因此可逆、可精确算似然。"},
+    {"t": "VE / VP SDE", "d": "方差爆炸/方差保持SDE。前者只加噪声不缩小信号（对应NCSN），后者边加噪边缩小信号使总方差有界（对应DDPM）。"}
+  ],
+  "learn": "先读[[score-matching]]和[[ddpm]]，补[[c:ode-sde]]的基本概念（只需知道欧拉法如何离散化一个微分方程）。原文第3节（SDE框架）和第4节（采样器、概率流ODE）是核心；Yang Song的博客后半部分讲得更直观。动手：在二维数据上训练一个连续时间分数网络，分别用欧拉-丸山法解逆向SDE、用欧拉法解概率流ODE，画出两种轨迹并比较。",
+  "check": {"source": "https://arxiv.org/abs/2011.13456", "confirmed": "标题、6位作者、arXiv v1提交于2020-11-26、comments注明ICLR 2021 Oral；正文（ar5iv）中的前向SDE、逆向SDE依赖分数、VE对应SMLD/NCSN、VP对应DDPM、sub-VP、预测-校正采样、概率流ODE与精确似然、可控生成、NCSN++在CIFAR-10上IS 9.89与FID 2.20、DDPM++ sub-VP 2.99比特每维、首个1024×1024 CelebA-HQ、ODE求解器调用次数可减少90%以上。"}
+}

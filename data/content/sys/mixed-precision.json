@@ -1,0 +1,46 @@
+{
+ "id": "mixed-precision",
+ "who": "Paulius Micikevicius, Sharan Narang, Jonah Alben 等 · NVIDIA · Baidu",
+ "venue": "ICLR 2018",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/1710.03740"
+  }
+ ],
+ "problem": "用FP32训练，显存占用大、速度慢；直接改成FP16又会让小梯度下溢为0，训练发散。",
+ "idea": "权重保留一份FP32主副本，前向和反向用FP16，并对损失放大（loss scaling）防止梯度下溢。",
+ "impact": "使训练显存近乎减半，并能用上Tensor Core，成为现代大模型训练的默认做法。",
+ "method": "论文提出三招。其一，**FP32主权重**：每步用FP16计算前向和梯度，但参数更新累加在FP32副本上，因为小的更新量加到较大的权重上，在FP16里会被舍入吃掉。其二，**损失放大**：梯度数值常小于FP16可表示的最小值，直接计算会变成0；先把损失乘以一个常数，反向得到的梯度整体被放大，更新前再除回去。其三，部分累加（如矩阵乘的内积累加）用FP32。\n\n论文称该方法适用于卷积网络、循环网络和GAN，包括超过1亿参数的模型，显存消耗减少近2倍，并期望半精度硬件带来进一步提速。它与[[v100]]的Tensor Core同期，正好为硬件配上了训练算法。",
+ "limits": [
+  {
+   "text": "FP16的动态范围窄，损失放大的系数要调，仍可能溢出或下溢。",
+   "solved_by": [
+    "bf16"
+   ]
+  },
+  {
+   "text": "更低精度（8位）训练需要更多技巧。",
+   "solved_by": [
+    "fp8"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "v100",
+   "type": "uses",
+   "note": "Tensor Core提供FP16矩阵乘的硬件加速，论文的方法正是为此设计。"
+  }
+ ],
+ "prereq": [
+  "floating-point",
+  "quantization-concept",
+  "memory-bandwidth"
+ ],
+ "learn": "在PyTorch里用torch.cuda.amp训练一个小模型，对比开关前后的显存与速度。",
+ "check": {
+  "source": "https://arxiv.org/abs/1710.03740",
+  "confirmed": "标题、11位作者、v1提交2017-10-10、ICLR 2018；摘要：FP32主副本、损失放大、显存减少约2倍、超1亿参数模型。"
+ }
+}

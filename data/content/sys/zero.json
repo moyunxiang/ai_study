@@ -1,0 +1,55 @@
+{
+ "id": "zero",
+ "who": "Samyam Rajbhandari, Jeff Rasley, Olatunji Ruwase, Yuxiong He · Microsoft",
+ "venue": "SC 2020",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/1910.02054"
+  },
+  {
+   "label": "DeepSpeed",
+   "url": "https://github.com/microsoft/DeepSpeed"
+  }
+ ],
+ "problem": "数据并行里每张卡都保存完整的参数、梯度和优化器状态，大量冗余；模型并行虽省显存，但通信多、扩展差。",
+ "idea": "ZeRO把优化器状态、梯度、参数依次切分到各数据并行卡上，用时再通信取回，消除冗余，同时保持数据并行的便利。",
+ "impact": "显著降低每卡显存，使训练百亿级以上模型成为可能，是DeepSpeed与PyTorch FSDP的基础。",
+ "method": "以Adam混合精度训练为例，一份参数还需要FP32副本、动量和方差，这些**状态**加起来比参数本身占更多显存，而数据并行的每张卡都完整存一份。ZeRO分三个阶段：切分优化器状态；再切分梯度；再切分参数本身，每张卡只保留自己负责的一片，计算某层时临时收集其余分片。这样每卡显存随卡数减少，而通信量与普通数据并行大致同量级。\n\n摘要称其分析显示可扩展到超过1万亿参数；实验在400块GPU上训练超过100B参数的模型，吞吐15 petaflops；相对此前可训练模型规模提升8倍、性能提升10倍；不用模型并行也可训练最大13B的模型，超过[[megatron]]的8.3B和T5的11B；并用它构建了17B的Turing-NLG。",
+ "limits": [
+  {
+   "text": "参数分片后每步需额外通信，网络慢时吞吐下降。",
+   "solved_by": [
+    "fsdp"
+   ]
+  },
+  {
+   "text": "需要框架级集成，早期与PyTorch原生训练方式不统一。",
+   "solved_by": [
+    "fsdp"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "megatron",
+   "type": "extends",
+   "note": "Megatron的张量并行仍让数据并行组内冗余存储，ZeRO用分片消除冗余，可与之组合。"
+  },
+  {
+   "to": "parameter-server",
+   "type": "rivals",
+   "note": "同样想突破单卡容纳极限，参数服务器集中存参数，ZeRO把状态分片到各计算卡。"
+  }
+ ],
+ "prereq": [
+  "distributed-training",
+  "memory-bandwidth",
+  "adaptive-optimizer"
+ ],
+ "learn": "读论文第3节的显存公式，估算7B模型用Adam混合精度时每卡显存，在不同ZeRO阶段如何变化。",
+ "check": {
+  "source": "https://arxiv.org/abs/1910.02054",
+  "confirmed": "标题、4位作者、v1提交2019-10-04；摘要：超万亿参数、400 GPU超100B、15 petaflops、8倍与10倍、13B对8.3B与11B、Turing-NLG 17B。SC 2020与三阶段细节为常识，未核对。"
+ }
+}

@@ -1,0 +1,37 @@
+{
+  "id": "colbert",
+  "who": "Omar Khattab, Matei Zaharia · Stanford University",
+  "venue": "SIGIR 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2004.12832"},
+    {"label": "GitHub: stanford-futuredata/ColBERT", "url": "https://github.com/stanford-futuredata/ColBERT"}
+  ],
+  "problem": "BERT重排序效果大幅领先，但每个查询要把查询和上千篇文档逐对送进BERT，一次查询要十几秒GPU时间，没法直接用于检索。",
+  "idea": "查询和文档各自用BERT编码成一组词向量，文档向量离线算好存起来；在线只算查询，再对每个查询词取它与文档词向量的最大相似度并求和（MaxSim）。",
+  "impact": "把BERT级别的排序质量降到几十毫秒的成本，开创了“多向量/后期交互”这一检索路线，介于单向量稠密检索和逐对交叉编码之间。",
+  "background": "2019年[[monobert]]证明：把查询和文档拼在一起送进[[bert]]打分，MS MARCO上的MRR@10能从[[bm25]]的16.7提高到35左右。代价是每个“查询-文档对”都要完整跑一遍BERT，重排BM25给出的前1000篇，单个查询在V100上要约10.7秒。\n\n另一条路是把查询和文档各压成一个向量再算内积（同月的[[dpr]]就是这样），文档向量可以提前算好，但整段话被压进一个向量，细粒度的词级匹配信息丢掉了。问题是：能不能既提前算文档，又保留词级别的交互？",
+  "method": "**独立编码**。查询前加特殊标记`[Q]`，补足到32个token，不足的位置填`[mask]`（作者称为“查询扩充”，让模型在这些位置学出可能的扩展词）；文档前加`[D]`。两边各过一遍BERT，每个token的输出再经过一个线性层降到128维并做L2归一化。于是查询变成32个向量`E_q`，文档变成几十到上百个向量`E_d`。\n\n**后期交互（MaxSim）**。打分只在两组向量算好之后才发生：\n\n`S(q, d) = Σ_i max_j (E_q,i · E_d,j)`\n\n对每个查询词，在文档里找最像它的那个词，取相似度，再把所有查询词的分数加起来。比如查询“苹果 股价”，“苹果”会匹配到文档里的“Apple”，“股价”匹配到“市值”，两者分别取最大再相加。\n\n**两种用法**。一是重排序：文档向量从磁盘读出，只需编码查询加做MaxSim。二是端到端检索：把全部文档的词向量放进[[faiss]]，每个查询向量先近邻搜出候选文档，再对候选做精确MaxSim。",
+  "results": "MS MARCO重排序（开发集）MRR@10为34.9，接近BERT-base的36.0，好于所有非BERT方法；重排延迟61毫秒，比BERT-base快170多倍，FLOPs少约1.39万倍。端到端检索时MRR@10为36.0，Recall@1000达96.8%，而BM25只有85.7%。880万段落的索引在4块GPU上约3小时建完。",
+  "legacy": "ColBERT之后，“一个文本一个向量”和“逐对交叉编码”之间多了一个中间选项。作者团队后来做了压缩索引、蒸馏训练的ColBERTv2和更快的检索引擎，并把它作为检索器用进了[[dspy]]等系统。多向量的思路也被用到图文检索上。工业界最常用的仍是单向量嵌入（[[openai-embeddings]]、[[bge]]）加交叉编码重排，ColBERT主要用在对精度要求高、能承受较大索引的场景。",
+  "pitfalls": "- ColBERT不是又一个单向量稠密检索器：它每个token都存一个向量，索引大小与语料token数成正比，比DPR大得多。\n- “快170倍”是相对逐对BERT重排而言；端到端检索延迟约458毫秒，仍比BM25慢。",
+  "limits": [
+    {"text": "每个文档token都要存一个128维向量，索引体积比单向量检索大一个数量级以上，内存和磁盘成本高。", "solved_by": []},
+    {"text": "端到端检索要先对32个查询向量各做一次近邻搜索再精排，延迟数百毫秒，难以满足高并发线上服务。", "solved_by": []},
+    {"text": "训练只用MS MARCO上BM25挖出的负例，跨领域、跨语言的效果没有验证。", "solved_by": ["contriever", "bge"]}
+  ],
+  "relations": [
+    {"to": "monobert", "type": "solves", "note": "保留BERT的上下文表示，但把逐对交互推迟到编码之后，解决了BERT重排每个查询要十几秒的成本问题。"},
+    {"to": "bert", "type": "uses", "note": "查询编码器和文档编码器都是BERT-base，只在输出后加一个降维线性层。"},
+    {"to": "bm25", "type": "extends", "note": "重排模式下处理BM25的前1000篇；端到端模式下Recall@1000从BM25的85.7%提到96.8%。"},
+    {"to": "dpr", "type": "rivals", "note": "同月发表的稠密检索：DPR一段话一个向量，便宜但丢掉词级匹配；ColBERT每词一个向量，更准但索引更大。"},
+    {"to": "faiss", "type": "uses", "note": "端到端检索时用FAISS对全部文档词向量做近似近邻搜索，找出候选文档。"}
+  ],
+  "prereq": ["pretrain-finetune", "embedding", "dot-product", "retrieval", "transformer-block"],
+  "terms": [
+    {"t": "后期交互", "d": "查询和文档先各自独立编码，最后才用便宜的运算（这里是MaxSim）让两者交互。区别于把两者拼在一起送进模型的“早期交互”。"},
+    {"t": "MRR@10", "d": "平均倒数排名：第一个相关结果排第k位得1/k分，前10里没有就得0分，再对所有查询取平均。"},
+    {"t": "多向量检索", "d": "一个文档用一组向量（每个token一个）表示，而不是一个向量。"}
+  ],
+  "learn": "先弄懂[[c:retrieval]]里的稠密检索和[[c:dot-product]]，再读原文第3节（尤其3.1的late interaction示意图和MaxSim公式）和表1、表2。动手：用HuggingFace的BERT对几个查询和段落取每个token的输出，手写MaxSim打分，与取[CLS]单向量的内积打分做对比。",
+  "check": {"source": "https://arxiv.org/abs/2004.12832", "confirmed": "标题、作者、arXiv v1于2020-04-27提交、SIGIR 2020；正文（ar5iv）表1重排MRR@10 34.9 vs BERT-base 36.0、延迟61ms vs 10,700ms、13,900×FLOPs；表2端到端MRR@10 36.0、Recall@1000 96.8 vs BM25 85.7、延迟458ms；Nq=32、m=128、约3小时建索引。"}
+}

@@ -1,0 +1,36 @@
+{
+  "id": "darpa-grand-challenge",
+  "who": "DARPA主办；冠军Stanley：Sebastian Thrun, Mike Montemerlo et al. · 斯坦福大学 / 大众汽车电子研究实验室 / Intel Research",
+  "venue": "2005年10月8日比赛；Stanley论文发表于Journal of Field Robotics 23(9), 2006",
+  "links": [
+    {"label": "Stanley论文PDF", "url": "http://robots.stanford.edu/papers/thrun.stanley05.pdf"},
+    {"label": "Wikipedia: DARPA Grand Challenge (2005)", "url": "https://en.wikipedia.org/wiki/DARPA_Grand_Challenge_(2005)"}
+  ],
+  "problem": "2004年首届挑战赛没有一辆车跑完全程，最远的只走了约12公里，不到全程5%：无人车在未知野外地形上看不清路、分不清障碍。",
+  "idea": "斯坦福的Stanley把驾驶当作机器学习和概率推理问题：用卡尔曼滤波估位姿，用概率模型过滤激光误差，再让相机以激光标注的近处路面为样本在线学习、把可行驶区域识别延伸到70米外。",
+  "impact": "五辆车跑完212公里沙漠赛道，Stanley用时6小时54分夺冠，证明了自动驾驶可行；参赛者随后成为谷歌无人车等项目的核心班底。",
+  "background": "DARPA在2003年发起大挑战赛，目标是让无人地面车辆在没有预演过的野外地形上自主行驶。第一届在2004年3月13日举行，奖金100万美元，赛道穿越莫哈韦沙漠、长142英里（约229公里），限时10小时。107支队报名、15支参赛，没有一辆车跑过全程的5%。\n\n此前的无人车研究（CMU的[[navlab]]、德国Dickmanns的[[dickmanns-vamors]]、用神经网络看路的[[alvinn]]）主要在铺装道路上跟车道线，而沙漠里没有车道线：土路、碎石、灌木、陡坡，激光和相机的读数还会随颠簸剧烈抖动。",
+  "method": "第二届于2005年10月8日举行，奖金提高到200万美元，195支队报名、23支进入决赛。比赛开始前两小时，组织方才给出路线文件：每隔约72米一个GPS航点，车辆必须自己处理航点之间的一切。\n\n冠军Stanley是一辆改装的大众途锐（Touareg R5 TDI），车顶装5台SICK激光测距仪（扫描前方25米内的地形剖面）、1台彩色相机、2台24GHz雷达，后备厢里是6台Pentium M计算机。软件的几个关键部件：\n\n**位姿估计**。一个100Hz的无迹卡尔曼滤波器（UKF，[[kalman-filter]]的非线性变体）融合GPS、惯性测量和轮速；GPS信号不可用时切换到更受约束的车辆运动模型。\n\n**激光地形分类**。激光打到前方最远30米，车身俯仰、侧倾估计哪怕错不到0.5度，投影出来的地面高度就会大错，凭空出现“幽灵障碍”。论文的数据里，直接按高度阈值15厘米判断，有12.6%的可行驶区域被误判为障碍。他们改用概率模型，显式建模位姿误差随时间的漂移，只在两个点的高度差在统计上显著时才判为障碍，并在记录下来的行驶数据上用坐标上升法自动调参，误判率降到0.002%。\n\n**自监督视觉**。激光只能可靠检测约22米内的障碍，对应安全车速约25英里/小时；团队估计需要35英里/小时才能按时完赛。于是相机把激光判为“可行驶”的近处路面当作正样本，用高斯混合模型在线学习当前路面的颜色外观，再去识别更远处的同类区域，视觉地图可延伸到70米以外。这是一种无需人工标注的[[c:self-supervised]]学习。",
+  "results": "Stanley以6小时53分58秒跑完212公里（132英里）赛道，排名第一；CMU的Sandstorm（7:05）和H1ghlander（7:14）分列二、三，共五辆车完赛。23支决赛队中除一支外都超过了2004年最好成绩的11.78公里。赛道包括三条狭窄隧道和100多个急弯。",
+  "legacy": "这次比赛把自动驾驶从实验室课题变成了可信的工程目标。两年后的[[darpa-urban-challenge]]把场景换到有其他车辆和交通规则的城市道路；Thrun和多名参赛者随后加入或主导[[google-self-driving]]项目，该项目后来成为Waymo。Stanley的论文本身也是[[probabilistic-robotics]]方法论的一次完整工程示范：定位、感知、速度规划都以概率模型为核心，并用数据自动调参。\n\n它的模块化流水线（定位 → 感知 → 规划 → 控制）成为此后十多年自动驾驶的标准架构，直到[[e2e-driving]]、[[uniad]]和[[fsd-v12]]等端到端方法开始挑战这种分工。",
+  "limits": [
+    {"text": "赛道上没有其他车辆和行人，也没有交通规则，路线由密集GPS航点给出，回避了城市驾驶中最难的交互与决策问题。", "solved_by": ["darpa-urban-challenge"]},
+    {"text": "模块化流水线里有大量手工设计的规则和阈值，每个模块单独调，换一种环境就要重新工程化。", "solved_by": ["e2e-driving", "uniad", "fsd-v12"]},
+    {"text": "依赖5台激光雷达、雷达和高精度GPS/惯导，成本远高于量产车可以接受的水平。", "solved_by": ["tesla-autopilot", "tesla-occupancy"]}
+  ],
+  "relations": [
+    {"to": "alvinn", "type": "extends", "note": "Stanley的视觉模块明确建立在Pomerleau以来的道路识别研究上，但不再离线训练，而是用激光自动标注、在线适应当前路面。"},
+    {"to": "navlab", "type": "extends", "note": "CMU NavLab一脉的Red Whittaker团队获得亚军和季军；比赛把十几年的道路跟踪研究推向了无车道线的野外高速驾驶。"},
+    {"to": "kalman-filter", "type": "uses", "note": "100Hz的无迹卡尔曼滤波融合GPS、惯导和轮速，是全车所有感知模块的位姿基础。"},
+    {"to": "probabilistic-robotics", "type": "uses", "note": "Thrun团队把书中的概率建模思路用于激光地形分类，显式建模位姿误差，把误判率从12.6%降到0.002%。"},
+    {"to": "dickmanns-vamors", "type": "extends", "note": "Dickmanns在1980年代证明了基于视觉的高速道路驾驶；Stanley把视觉与激光融合，把它推广到沙漠越野。"}
+  ],
+  "prereq": ["self-supervised", "gaussian", "state-action-observation", "camera-geometry", "control-loop"],
+  "terms": [
+    {"t": "激光测距仪（LiDAR）", "d": "发射激光并测量回波时间来获得距离的传感器。Stanley用的是单线扫描型，每台只扫一条剖面线，靠车辆前进拼出地形。"},
+    {"t": "无迹卡尔曼滤波UKF", "d": "卡尔曼滤波的非线性版本：不求雅可比矩阵，而是挑几个代表点穿过非线性函数，再用它们重新估计均值和协方差。"},
+    {"t": "自监督学习", "d": "训练标签不来自人工，而是由系统自己产生。Stanley用近处的激光判断给远处的图像分类器提供标签。"}
+  ],
+  "learn": "先读[[kalman-filter]]与[[probabilistic-robotics]]节点。然后读Stanley论文第1–2节（比赛与车辆）、第5节（激光地形分析）和第6节（视觉），重点理解为什么小的位姿误差会造成大的地图错误。动手：找一段带激光点云的公开驾驶数据（如KITTI），按高度阈值做地面/障碍分割，再加入时间上的位姿噪声，观察误判如何出现。",
+  "check": {"source": "http://robots.stanford.edu/papers/thrun.stanley05.pdf ; https://en.wikipedia.org/wiki/DARPA_Grand_Challenge_(2005)", "confirmed": "Stanley论文：作者与机构、JFR 23(9) 661–692；2004年赛事3月13日、100万美元、142英里、107队报名15队参赛无一超过5%；2005年10月8日、200万美元、195队报名23队参赛5队完赛、Stanley用时6:53:58；途锐R5 TDI、5台SICK激光（25米）、彩色相机、两台24GHz雷达、6台Pentium M；100Hz UKF；位姿误差<0.5°、阈值15cm时误判12.6%降至0.002%；激光约22米对应25mph、需35mph、视觉超过70米。维基：212公里、Sandstorm 7:05与H1ghlander 7:14、2004最佳11.78公里、航点间隔72米、三条隧道与100多个急弯、Beer Bottle Pass。"}
+}

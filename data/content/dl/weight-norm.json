@@ -1,0 +1,48 @@
+{
+ "id": "weight-norm",
+ "who": "Salimans, Kingma · OpenAI",
+ "venue": "NeurIPS 2016",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/1602.07868"
+  }
+ ],
+ "problem": "[[batchnorm]]加速训练效果很好，但依赖小批量统计量，在RNN、强化学习和生成模型这类对噪声敏感、批次有依赖的场景里不好用。",
+ "idea": "把每个权重向量重参数化为方向与长度：`w = g·v/‖v‖`，分别优化标量g和方向向量v，从而改善优化问题的条件数，且不依赖批量统计。",
+ "impact": "以极低成本得到BN的一部分提速，适用于RNN、深度强化学习和生成模型等批归一化不太适合的场合。",
+ "method": "设神经元的输出是`y = φ(w·x + b)`。权重归一化把w写成`w = (g/‖v‖)·v`，其中g是一个可学标量，v是与w同形状的向量。这样w的长度恰好等于g，与v的大小无关；梯度下降对g和v分别更新。由于g单独控制尺度，v的梯度总与v自身正交，使得更新步长更稳定、条件数更好。\n\n与BN相比，它不引入样本间的依赖，计算只需对每个输出单元算一次范数，开销更低，所以同样的时间内可以多走一些训练步。作者指出可以用一小批数据对g、b做数据相关初始化，使各神经元输出初始就零均值单位方差。摘要称它在图像分类、生成建模和深度强化学习中均有效，但整体上仍只有BN的一部分提速。",
+ "limits": [
+  {
+   "text": "效果依赖数据相关初始化，对很深的网络稳定性通常不如BN；它只是调整参数化，并不像BN那样直接约束激活分布。",
+   "solved_by": [
+    "layernorm",
+    "groupnorm"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "batchnorm",
+   "type": "extends",
+   "note": "从BN的归一化思想出发，把归一化从激活挪到权重上，从而摆脱对小批量的依赖"
+  },
+  {
+   "to": "batchnorm",
+   "type": "rivals",
+   "note": "与BN解决同一问题，换用重参数化；在RNN和强化学习中比BN易用，但在大型CNN上通常不如BN"
+  }
+ ],
+ "prereq": [
+  "normalization-layer",
+  "gradient-descent",
+  "vector-matrix",
+  "norm"
+ ],
+ "terms": [],
+ "learn": "先搞清BN的作用，读原文第2节，对照PyTorch的`torch.nn.utils.parametrizations.weight_norm`实现，在小MLP上比较有无权重归一化的收敛曲线。",
+ "check": {
+  "source": "https://arxiv.org/abs/1602.07868",
+  "confirmed": "标题、作者、2016-02-25首次提交；摘要称把权重向量的长度与方向解耦，改善条件数加速SGD，不引入小批量依赖，可用于LSTM、强化学习和生成模型，提速弱于完整BN。"
+ }
+}

@@ -1,0 +1,36 @@
+{
+  "id": "trellis",
+  "who": "Jianfeng Xiang, Zelong Lv, Sicheng Xu, Yu Deng, Ruicheng Wang, Bowen Zhang, Dong Chen, Xin Tong, Jiaolong Yang · 微软亚洲研究院 / 清华大学 / 中国科学技术大学",
+  "venue": "CVPR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2412.01506"},
+    {"label": "代码 microsoft/TRELLIS", "url": "https://github.com/microsoft/TRELLIS"}
+  ],
+  "problem": "3D生成的输出格式五花八门（网格、NeRF、3D高斯），每种格式各自一套模型；前馈重建（如LRM）背面模糊，而基于2D扩散的方法又慢又不一致。",
+  "idea": "设计一种统一的“结构化3D潜变量”：在64³网格中只保留物体表面附近的稀疏体素，每个体素挂一个由多视图DINOv2特征聚合来的局部潜向量；用两段整流流Transformer先生成结构再生成特征，最后可解码成任意格式。",
+  "impact": "开源了参数最高20亿、在约50万个3D资产上训练的原生3D生成模型，文本和图像生成3D的质量明显超过此前方法，并成为后续3D生成和世界生成工作的常用基础。",
+  "background": "[[lrm]]证明了大Transformer可以从单张图片前馈地重建3D，但它是确定性回归：看不见的背面只能取平均，结果模糊。用2D扩散模型做监督的[[dreamfusion]]、[[mvdream]]等方法能生成更丰富的内容，但要逐个优化或做多视图融合，又慢又容易出现不一致。[[clay]]开始直接在3D潜空间里训练扩散模型，但主要生成几何，外观要另外处理。\n\n另一个麻烦是表示：网格适合游戏和工业，NeRF和[[3dgs]]适合渲染，各自的生成模型互不通用。作者想要一种既能表达几何又能表达外观、又能解码成多种格式的统一潜表示，并在其上训练可扩展的生成模型。",
+  "method": "**结构化潜变量（SLat）**：把物体放进64³的体素网格，只保留与物体表面相交的体素（平均约2万个）。对每个物体从150个视角渲染图片，用[[dinov2]]提取图像特征，投影回这些体素并取平均，再用一个稀疏Transformer编码成每个体素的局部潜向量。于是一个3D物体 = 一组（体素位置，局部潜向量）。粗的体素位置描述形状结构，潜向量描述局部的细致几何和外观。训练这个编码器不需要对每个物体先做3D拟合。\n\n**多格式解码**：同一组潜变量可以分别用不同的解码器变成3D高斯、辐射场或网格（网格解码到256³分辨率）。\n\n**两阶段生成**：\n- 第一阶段：用一个整流流Transformer生成稀疏结构，即哪些体素被占据（在压缩后的稠密网格上做）。\n- 第二阶段：在这些体素上，用另一个稀疏的整流流Transformer生成每个体素的潜向量。\n\n两者都用[[rectified-flow]]/[[flow-matching]]的目标训练；文本条件用CLIP特征，图像条件用DINOv2特征。训练数据是来自Objaverse-XL等四个来源、约50万个精选3D资产，并用GPT-4o为它们写描述。模型分为3.42亿、11亿、20亿参数三档，最大一档在64张A100上训练了40万步。",
+  "results": "重建方面，外观PSNR 32.74、几何F分数0.9999，在所列指标上全部优于LN3Diff、3DTopia-XL和CLAY。文本生成3D（Toys4k）上，最大模型的FD_incep为20.48，次好的GaussianCube为27.35。100多名参与者在约130个文本和图像提示上的用户研究中，明显更偏好TRELLIS的结果。由于结构与特征分离，它还能做局部编辑：保持结构、只重新生成某一区域的外观或几何。",
+  "legacy": "TRELLIS的代码和权重以开源形式发布，成为图像到3D工作流中常用的开源基线之一。它与同期的[[hunyuan3d-2]]代表了原生3D生成的两种思路：后者“先生成几何、再生成纹理”，TRELLIS则用一个统一的结构化潜变量同时表示几何与外观，并可输出多种格式。生成范围从单个物体走向完整场景的工作（如[[marble]]）是这条路线的下一步。",
+  "limits": [
+    {"text": "体素分辨率只有64³，非常细小的结构（细线、小孔）容易丢失。", "solved_by": []},
+    {"text": "输出的是带颜色的外观，没有可直接用于渲染引擎的PBR材质（金属度、粗糙度等）。", "solved_by": ["hunyuan3d-2"]},
+    {"text": "只针对单个物体，不能生成完整的场景或可探索的世界。", "solved_by": ["marble"]}
+  ],
+  "relations": [
+    {"to": "lrm", "type": "solves", "note": "LRM是确定性回归，背面纹理模糊；TRELLIS在3D潜空间中做生成建模，能为看不见的部分生成清晰合理的内容。"},
+    {"to": "3dgs", "type": "uses", "note": "3D高斯是SLat的主要解码格式之一，用于高质量渲染。"},
+    {"to": "dinov2", "type": "uses", "note": "用DINOv2对多视图渲染图提取特征，投影聚合成体素的初始特征，同时作为图像条件编码器。"},
+    {"to": "rectified-flow", "type": "uses", "note": "两个生成阶段都用整流流Transformer训练和采样。"},
+    {"to": "clay", "type": "rivals", "note": "CLAY同样是原生3D潜空间扩散，主要生成几何；TRELLIS的统一潜变量同时编码几何与外观，并可解码成多种格式。"},
+    {"to": "dit", "type": "uses", "note": "生成网络是作用在3D潜变量token上的Transformer，延续扩散Transformer的设计。"}
+  ],
+  "prereq": ["3d-representation", "normalizing-flow", "latent-space", "self-supervised", "volume-rendering"],
+  "terms": [
+    {"t": "稀疏体素", "d": "只记录被物体占据的那些立方体格子，而不存储整个三维网格，节省大量内存。"},
+    {"t": "结构化潜变量（SLat）", "d": "本文提出的3D表示：一组带位置的局部潜向量，位置描述结构，向量描述局部细节。"}
+  ],
+  "learn": "先读[[lrm]]、[[3dgs]]和[[rectified-flow]]，补[[c:3d-representation]]。读原文第3节（SLat的构造与两阶段生成）和图2的流程图。动手：用官方代码在一张去背景的物体照片上生成3D，并分别导出高斯和网格两种格式比较。",
+  "check": {"source": "https://arxiv.org/abs/2412.01506", "confirmed": "标题、9位作者与机构；正文（arxiv.org/html）中64³网格与约2万活跃体素、150视角DINOv2特征聚合、两阶段整流流Transformer、三种解码器、342M/1.1B/2B参数、64张A100训练40万步、约50万资产与GPT-4o描述、PSNR 32.74、FD_incep 20.48对27.35、用户研究规模。"}
+}

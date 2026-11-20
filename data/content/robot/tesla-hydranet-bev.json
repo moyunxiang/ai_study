@@ -1,0 +1,102 @@
+{
+  "id": "tesla-hydranet-bev",
+  "who": "Andrej Karpathy 等 · Tesla Autopilot团队（Tesla AI Day 2021）",
+  "links": [
+    {
+      "label": "Tesla AI Day 2021 官方直播回放",
+      "url": "https://www.youtube.com/watch?v=j0z4FweCy4M"
+    },
+    {
+      "label": "TechCrunch：AI Day要点",
+      "url": "https://techcrunch.com/2021/08/19/top-five-highlights-of-elon-musks-tesla-ai-day/"
+    },
+    {
+      "label": "Think Autonomous：HydraNet与纯视觉方案解读",
+      "url": "https://www.thinkautonomous.ai/blog/how-tesla-autopilot-works/"
+    }
+  ],
+  "problem": "Tesla早期的感知在每个相机图像上各自检测，再用手写规则把结果拼成三维世界；跨相机的大卡车、被遮挡的车辆、百米前看到的路牌都处理不好，而且2021年它决定拆掉雷达、只靠8个相机。",
+  "idea": "8路相机共享一个主干网络，再用Transformer把所有相机的特征直接融合到俯视的“向量空间”（BEV）里，加上按时间和空间排队的视频记忆模块，最后由许多任务头（HydraNet）同时输出车道、车辆、红绿灯等。",
+  "impact": "第一次公开展示量产车上的纯视觉多相机BEV感知架构，此后“BEV+Transformer”在业界和学术界迅速流行，也是后来占用网络和端到端FSD的基础。",
+  "background": "[[tesla-autopilot]]最早用Mobileye的视觉方案，2016年后Tesla自研感知网络，并在2019年换上自研的[[tesla-fsd-chip]]。到2020年，它的网络结构大致是：每个相机的图像各自进网络，输出这张图上的检测和分割，然后在图像之外用手写的规则把8个相机的结果“缝”成车辆周围的三维世界。\n\n毛病很明显：横跨多个相机视野的大卡车会被切成几段，很难拼；被暂时遮挡的车辆一消失就忘了；百米外看到的“前方并道”标牌，开到并道处时早已不在视野里。2021年Tesla又宣布新车取消毫米波雷达，测距、测速只能靠相机，这让上述问题更加突出。学术界此时刚出现[[lift-splat]]这类把多相机图像变到俯视图的方法。",
+  "method": "2021年8月19日的AI Day上，Karpathy等人公开了新架构（未发表论文，以下据发布会及媒体、业内解读整理）：\n\n**共享主干+多头（HydraNet）**。8路相机的图像先经过同一个类似[[resnet]]的特征提取网络。“HydraNet”指一个身体、多个头：同一份特征供给车道线、车辆、行人、红绿灯等许多任务头，每个头可以单独微调而不影响别的任务（见[[c:pretrain-finetune]]）。\n\n**多相机融合到向量空间**。不再在每张图上各自出结果，而是用一个类似[[transformer]]的注意力模块，把8个相机的特征直接融合成一张俯视特征图，相当于学出来的“图像→BEV”变换（见[[c:camera-geometry]]）。\n\n**视频模块**。把过去若干帧的BEV特征放进两个队列：按时间排的，和按车辆行驶距离排的；再用一个空间循环网络维护一张随车移动的特征地图。这样被遮挡的车、早先看到的路牌都能被“记住”。\n\n**数据引擎**。发布会称有超过1000人的人工标注团队，并用离线大模型对车队回传的视频片段做自动标注；还用仿真生成难以采到的场景。训练算力由同场发布的[[tesla-dojo]]承接。",
+  "results": "Tesla没有公布在公开基准上的评测数字。可核实的事实是：新架构随FSD Beta推送到用户车辆，雷达自2021年起从新车上取消。D1芯片和Dojo计划也在同一场发布，规划中的Dojo要容纳3000颗D1芯片。",
+  "legacy": "AI Day之后，“多相机BEV+Transformer”迅速成为行业共识，学术界几个月后出现了[[bevformer]]等把同一思路做成公开方法、并在[[nuscenes]]上评测的工作。2022年AI Day上Tesla又把BEV平面扩展成三维的[[tesla-occupancy]]。到[[fsd-v12]]，Tesla进一步把感知之后手写的规划规则也换成了神经网络，形成端到端系统。",
+  "pitfalls": "- 这不是一篇论文，架构细节来自发布会幻灯片和口头介绍，没有可复现的代码和公开评测，具体效果只能看作官方称。\n- “HydraNet”指多任务的共享主干加多个头，BEV融合是2021年架构里新增的部分，两者常被混为一谈。",
+  "limits": [
+    {
+      "text": "BEV是二维俯视平面，对形状不规则、悬空或不在预定类别里的障碍物（翻倒的车、伸出的货物）表达不了。",
+      "solved_by": [
+        "tesla-occupancy"
+      ]
+    },
+    {
+      "text": "感知之后的预测和规划仍以大量手写规则为主，感知输出的信息在规则接口处会丢失。",
+      "solved_by": [
+        "fsd-v12",
+        "uniad"
+      ]
+    },
+    {
+      "text": "依赖千人规模的人工标注加自动标注流水线，成本极高，其他公司难以复制。",
+      "solved_by": []
+    },
+    {
+      "text": "没有论文和公开评测，外界无法核实它相对激光雷达方案的真实性能。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "tesla-autopilot",
+      "type": "extends",
+      "note": "是Autopilot/FSD感知栈的第二代架构，从逐相机检测加规则拼接，改为多相机统一融合到俯视空间。"
+    },
+    {
+      "to": "lift-splat",
+      "type": "rivals",
+      "note": "同样解决“多相机图像→BEV”：Lift-Splat显式预测每个像素的深度再投影，Tesla用注意力让BEV查询直接从各相机特征中取信息。"
+    },
+    {
+      "to": "transformer",
+      "type": "uses",
+      "note": "用Transformer式的注意力完成多相机融合，把图像特征映射到向量空间。"
+    },
+    {
+      "to": "tesla-fsd-chip",
+      "type": "uses",
+      "note": "整套网络在车载的自研FSD芯片上实时运行。"
+    },
+    {
+      "to": "resnet",
+      "type": "uses",
+      "note": "每个相机的特征提取用类ResNet的卷积主干。"
+    }
+  ],
+  "terms": [
+    {
+      "t": "HydraNet",
+      "d": "Tesla对其多任务网络的称呼：一个共享的主干（身体）加许多任务头（像九头蛇），一份计算同时服务几十个感知任务。"
+    },
+    {
+      "t": "向量空间（vector space）",
+      "d": "Tesla对车辆周围三维/俯视坐标系下统一表示的叫法，基本对应学术界说的BEV表示。"
+    },
+    {
+      "t": "自动标注",
+      "d": "用离线运行的大模型（可以看未来帧、可以很慢）给车队采集的视频生成标签，再用这些标签训练车上实时运行的小模型。"
+    }
+  ],
+  "prereq": [
+    "camera-geometry",
+    "conv-layer",
+    "attention-concept",
+    "pretrain-finetune",
+    "vision-tasks"
+  ],
+  "learn": "先读[[lift-splat]]理解“图像→BEV”问题 → 看AI Day 2021回放中Karpathy的视觉部分（约前一小时） → 再读[[bevformer]]，对照发布会的BEV查询和时序队列，理解学术界的公开实现。",
+  "check": {
+    "source": "https://en.wikipedia.org/wiki/Tesla_Dojo ；https://techcrunch.com/2021/08/19/top-five-highlights-of-elon-musks-tesla-ai-day/ ；https://www.thinkautonomous.ai/blog/how-tesla-autopilot-works/",
+    "confirmed": "AI Day日期2021-08-19与Dojo计划3000颗D1芯片（维基百科）；空间循环视频模块、时间和空间队列、千人以上标注团队、自动标注与仿真（TechCrunch）；8相机共享主干、多头HydraNet、Transformer式多相机融合、视频队列、取消雷达（Think Autonomous对Karpathy演讲的解读）。架构细节为发布会口径，无论文。"
+  }
+}

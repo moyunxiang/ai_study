@@ -1,0 +1,35 @@
+{
+  "id": "jukebox",
+  "who": "Prafulla Dhariwal, Heewoo Jun, Christine Payne, Jong Wook Kim, Alec Radford, Ilya Sutskever · OpenAI",
+  "venue": "arXiv 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2005.00341"},
+    {"label": "代码", "url": "https://github.com/openai/jukebox"}
+  ],
+  "problem": "符号音乐模型（如Music Transformer）只能生成乐谱，没有人声和真实音色；直接生成原始音频的WaveNet几秒后就失去连贯性，因为一首4分钟的歌有1000万个采样点。",
+  "idea": "先用三层VQ-VAE把44.1kHz音频分别压缩8、32、128倍变成离散token，再用自回归Transformer在最粗的一层上生成，逐层“上采样”回细节，并以歌手、流派和歌词为条件。",
+  "impact": "第一次从零生成带人声演唱、长达数分钟、风格可控的完整歌曲音频，确立了“音频压缩成离散token + 语言模型生成”的路线，后来的AudioLM、MusicLM、MusicGen都沿用这一思路。",
+  "background": "音乐生成此前有两条路。一条是符号音乐：[[music-transformer]]等模型生成MIDI音符序列，结构好，但只有音符，人声、音色、混音都要另外渲染。另一条是直接生成波形：[[wavenet]]能做出几秒好听的片段，但CD音质每秒44100个采样点，一首4分钟的歌超过1000万个点，远超任何自回归模型的上下文，几秒后风格和乐器就会漂移。另一方面，[[vq-vae]]和[[vq-vae-2]]已经证明可以把图像压缩成离散码再在码上训练先验，[[gpt-2]]则证明大规模Transformer能建模很长的token序列。Jukebox把两者结合用于音频。",
+  "method": "**第一步：多层VQ-VAE压缩**（见[[c:vector-quantization]]、[[c:autoencoder]]）。三个独立的自编码器分别把波形压缩8倍、32倍、128倍，编码器输出的每个向量都替换成码本（2048个向量）中最近的那个，于是音频变成三条不同粗细的离散token序列。编码器和解码器是WaveNet风格的非因果空洞卷积。除了波形重建损失，还加了多分辨率频谱损失，否则高频细节会丢；码本里长期没被用到的向量会被随机重置，防止“码本坍塌”。\n\n**第二步：分层先验**。概率分解为`p(z) = p(z_top)·p(z_mid|z_top)·p(z_bot|z_mid, z_top)`。顶层先验是50亿参数的自回归Sparse Transformer（见[[sparse-transformer]]、[[c:autoregressive]]），上下文8192个token，在顶层约合24秒音频；中层和底层各有一个10亿参数的“上采样器”，以上一层的token为条件补出细节。更长的歌用滑动窗口续写。\n\n**第三步：条件控制**。每首歌的歌手、流派标签和“当前已播放到全曲的百分之几”作为条件输入。歌词条件用编码器-解码器结构：歌词字符先经编码器，音乐解码器通过交叉注意力学会何时唱哪个字；训练时用Spleeter分离出人声、再用自动对齐工具把歌词粗略对到每个片段上。",
+  "results": "训练数据是从网上收集的120万首歌（其中60万首英文），配LyricWiki的歌词和元数据。VQ-VAE在256块V100上训练3天；两个上采样器在128块V100上训练2周；顶层先验在512块V100上训练4周。生成的样例覆盖摇滚、嘻哈、爵士等流派，能模仿指定歌手的嗓音，歌词与旋律能对上。但代价极高：生成1分钟顶层token约需1小时，再上采样到音频约需8小时。作者也指出样本缺少副歌重复这类大尺度结构，细节处常有杂音。",
+  "legacy": "Jukebox的生成速度让它几乎无法实用，但它的框架被继承了下来：先用神经编解码器把音频变成离散token，再用语言模型生成。[[soundstream]]和[[encodec]]提供了更高保真的音频token，[[audiolm]]把语义token与声学token分层，[[musiclm]]和[[musicgen]]把条件换成自由文本描述并大幅提速。Jukebox的中间层表示后来也被用作音乐理解任务的特征。",
+  "limits": [
+    {"text": "生成极慢：1分钟歌曲大约要9小时（顶层1小时、上采样8小时），无法交互使用。", "solved_by": ["musicgen", "stable-audio"]},
+    {"text": "只能用歌手、流派、歌词控制，不能用自然语言描述想要的音乐。", "solved_by": ["musiclm", "musicgen"]},
+    {"text": "局部好听但缺少副歌重复、问答式旋律等整首歌的大结构，细节处常有噪声和沙沙声。", "solved_by": ["suno"]},
+    {"text": "只用英文歌训练，其他语言和曲风覆盖不足。", "solved_by": ["yue"]}
+  ],
+  "relations": [
+    {"to": "vq-vae", "type": "uses", "note": "用VQ-VAE把原始音频压缩成离散码，让Transformer能在可承受的长度上建模。"},
+    {"to": "vq-vae-2", "type": "extends", "note": "借鉴VQ-VAE-2的多层级码本，但改为三个独立训练的自编码器，并加入频谱损失和码本重置。"},
+    {"to": "gpt-2", "type": "extends", "note": "沿用OpenAI用大规模自回归Transformer做生成式预训练的思路，把对象从文本token换成音频token。"},
+    {"to": "sparse-transformer", "type": "uses", "note": "顶层先验和上采样器都是Sparse Transformer，以处理8192个token的长上下文。"},
+    {"to": "music-transformer", "type": "rivals", "note": "Music Transformer生成符号音符，结构强但没有真实音色和人声；Jukebox直接生成音频，音色真实但结构较弱。"},
+    {"to": "wavenet", "type": "solves", "note": "WaveNet直接建模采样点，几秒后就失去连贯；先压缩再建模让连贯性延长到分钟级。"}
+  ],
+  "terms": [
+    {"t": "码本坍塌", "d": "VQ-VAE训练中只有少数码本向量被使用、其余长期闲置，等于压缩容量大幅缩水。Jukebox把闲置向量随机重置到当前编码附近来缓解。"},
+    {"t": "上采样器（upsampler）", "d": "这里指以粗粒度token为条件、生成细粒度token的自回归模型，作用是给粗略的音乐骨架补上音色和细节。"}
+  ],
+  "check": {"source": "https://arxiv.org/abs/2005.00341", "confirmed": "标题、6位作者、arXiv首次提交2020-04-30；正文：8x/32x/128x、码本2048、8192 token约24/6/1.5秒、50亿顶层先验512 V100 4周、10亿上采样器128 V100 2周、VQ-VAE 256 V100 3天、120万首歌（60万英文）、约1小时+8小时生成1分钟、缺少副歌结构、仅英文。"}
+}

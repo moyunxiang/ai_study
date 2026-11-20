@@ -1,0 +1,36 @@
+{
+  "id": "rtx-4090",
+  "who": "NVIDIA",
+  "venue": "2022年9月20日发布，10月12日上市",
+  "links": [
+    {"label": "NVIDIA新闻稿：RTX 40系列", "url": "https://nvidianews.nvidia.com/news/nvidia-delivers-quantum-leap-in-performance-introduces-new-era-of-neural-rendering-with-geforce-rtx-40-series"},
+    {"label": "维基百科：GeForce RTX 40 series", "url": "https://en.wikipedia.org/wiki/GeForce_RTX_40_series"}
+  ],
+  "problem": "大模型和扩散模型开源后，个人和小团队想在自己机器上跑、甚至微调，但数据中心GPU一块上万美元还买不到，消费级显卡显存和算力又不够。",
+  "idea": "Ada架构的旗舰游戏卡：1599美元起，24GB GDDR6X显存、约1TB/s带宽，第四代Tensor Core支持FP8；配合4位量化，单卡就能跑几十亿到三百多亿参数的模型。",
+  "impact": "成为2023–2024年个人AI的事实标准硬件：本地跑Stable Diffusion和量化大模型、用QLoRA微调33B模型都以它为参照；也因此被列入对华出口管制，催生了中国特供的4090 D。",
+  "background": "2020年的[[rtx-3090]]首次给消费卡配了24GB显存，研究者开始用它做小规模实验。2022年下半年情况变了：8月[[stable-diffusion]]开源，任何人都可以在本地生成图片；Meta的OPT等大语言模型权重陆续公开。同时，[[llm-int8]]、[[gptq]]等量化方法证明，大模型的权重从16位压到8位甚至4位，效果损失不大（见[[c:quantization-concept]]）。\n\n这让一个问题变得现实：不租云、不买数据中心卡，能不能在一台台式机上跑大模型？关键约束是显存容量——模型权重必须整个放进显存，否则要在内存和显存之间来回搬，慢几十倍。",
+  "method": "据NVIDIA新闻稿，RTX 4090基于Ada Lovelace架构，台积电4N工艺，763亿个晶体管，16384个CUDA核心，24GB美光GDDR6X显存，整卡功耗450W；第四代Tensor Core支持FP8，官方称Tensor算力最高1.32 PFLOPS（含稀疏的FP8），是上一代的5倍。维基百科列出的显存带宽为1008GB/s。\n\n**为什么对本地大模型重要**。推理生成每个token都要把全部权重读一遍，所以速度上限约等于“显存带宽÷模型字节数”（见[[c:memory-bandwidth]]）。用这个式子估算：\n- 7B参数模型用4位量化约3.5GB，理论上每秒可读近300遍，生成很快；\n- 33B模型4位约16.5GB，放得进24GB，还剩空间给KV缓存；\n- 70B模型4位约35GB，一块4090放不下，只能两块卡拆分或部分放到内存。\n\n（以上为按参数量乘位宽的粗略估算，未计入KV缓存和运行开销。）\n\n**取舍**。与[[rtx-3090]]不同，RTX 40系列去掉了NVLink，多卡之间只能走PCIe，带宽低得多；它也没有数据中心卡的HBM，带宽约为[[h100]]的三分之一。",
+  "results": "官方称4090在全光追游戏中（开DLSS 3）最高是3090 Ti的4倍，在现有游戏中约2倍，功耗同为450W。\n\nAI方面最具代表性的第三方数字来自[[qlora]]论文：用4位量化加LoRA，33B参数的Guanaco可以在24GB消费级GPU上不到12小时完成微调，65B模型则需要一块48GB的专业卡。这类结果让“24GB单卡”成为开源社区衡量模型能否本地使用的门槛。\n\n2023年11月17日起，美国出口管制把4090也列入限制，维基百科记载此前中国出现囤货、市场价上涨约25%；NVIDIA随后在2023年12月28日推出只在中国销售的RTX 4090 D，CUDA核心从16384个削减到14592个。",
+  "legacy": "4090说明了一点：大模型推理的门槛首先是显存容量和带宽，而不是峰值算力。后续的[[rtx-5090]]把显存提到32GB并加入FP4；苹果用统一内存把可用容量做到数百GB（[[m3-ultra]]），NVIDIA也推出了128GB统一内存的桌面机[[dgx-spark]]。开源模型厂商则常把“能在单张消费卡上运行”作为发布小模型的卖点（如[[mistral-7b]]）。",
+  "pitfalls": "- “1.32 PFLOPS”是FP8加稀疏的峰值，常规BF16稠密运算远低于此。与H100相比，4090不只峰值低几倍，显存容量（24GB对80GB）、带宽（约1TB/s对约3TB/s）和多卡互连差距更大。\n- 本地跑大模型时，能否放进显存比算力更重要：一块显存更大但更慢的卡，常常比显存小的快卡更实用。",
+  "limits": [
+    {"text": "24GB显存放不下4位量化的70B模型，更大的模型只能多卡拆分或卸载到内存，速度大幅下降。", "solved_by": ["rtx-5090", "m3-ultra", "dgx-spark"]},
+    {"text": "取消了NVLink，多块4090之间只能通过PCIe通信，不适合做多卡训练。", "solved_by": []},
+    {"text": "整卡450W，在普通台式机里供电和散热都是负担，能效不如专门的推理芯片或统一内存设备。", "solved_by": ["m3-ultra", "dgx-spark"]}
+  ],
+  "relations": [
+    {"to": "rtx-3090", "type": "extends", "note": "保留24GB显存，算力和带宽提高，去掉了NVLink。"},
+    {"to": "turing-rtx", "type": "extends", "note": "延续Turing开始的“消费卡也带Tensor Core”，并在消费级首次支持FP8。"},
+    {"to": "stable-diffusion", "type": "uses", "note": "Stable Diffusion开源后，本地生成图片成为4090最主要的AI用途之一。"},
+    {"to": "gptq", "type": "uses", "note": "GPTQ等4位量化方法让几十亿到三百多亿参数的模型能放进24GB显存，4090才成为本地大模型硬件。"},
+    {"to": "h100", "type": "rivals", "note": "同年发布的数据中心卡：价格高一个数量级，算力、80GB HBM3和NVLink都远胜4090；两者分别占据个人工作站与大规模集群市场。"}
+  ],
+  "prereq": ["memory-bandwidth", "quantization-concept", "params-flops", "cpu-gpu", "training-vs-inference"],
+  "terms": [
+    {"t": "GDDR6X", "d": "游戏显卡用的高速显存，焊在GPU周围的电路板上。比HBM便宜，但带宽和容量都更低。"},
+    {"t": "4位量化", "d": "把每个权重从16位压缩到约4位存储，模型体积缩小约4倍，推理时再还原参与计算，精度略有损失。"}
+  ],
+  "learn": "先补[[c:memory-bandwidth]]和[[c:quantization-concept]]。自己算一算：一个13B模型分别用FP16、8位、4位存储各需要多少显存，按1TB/s带宽每秒最多生成多少个token。然后读[[qlora]]和[[llama-cpp]]的讲解，若有条件，在一块消费级GPU上用llama.cpp或Ollama跑一个4位量化模型，观察显存占用和生成速度。",
+  "check": {"source": "https://nvidianews.nvidia.com/news/nvidia-delivers-quantum-leap-in-performance-introduces-new-era-of-neural-rendering-with-geforce-rtx-40-series", "confirmed": "2022-09-20发布、10月12日上市、1599美元起；76B晶体管、16384 CUDA核、24GB GDDR6X、450W；1.32 Tensor PFLOPS（FP8，5倍）；台积电4N。维基百科：1008GB/s、无NVLink、2023-11-17起受出口限制、价格涨约25%、4090 D于2023-12-28仅在中国发售、14592核。QLoRA论文：33B模型在24GB消费卡上不到12小时、65B需48GB。"}
+}

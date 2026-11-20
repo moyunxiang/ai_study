@@ -1,0 +1,39 @@
+{
+  "id": "i3d",
+  "who": "João Carreira, Andrew Zisserman · DeepMind / University of Oxford",
+  "venue": "CVPR 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1705.07750"},
+    {"label": "官方代码", "url": "https://github.com/google-deepmind/kinetics-i3d"}
+  ],
+  "problem": "视频动作识别的数据集只有一万来段视频，各种网络结构分不出高下；3D卷积网络从零训练又浅又差，用不上ImageNet上练好的图像网络。",
+  "idea": "发布40万段、400类的Kinetics数据集；把ImageNet上训好的二维网络“膨胀”成三维：每个k×k卷积核沿时间复制k份再除以k，直接继承图像权重。",
+  "impact": "“Kinetics预训练 + 膨胀3D卷积”成为2017–2020年视频理解的标准起点，UCF-101上准确率推到98%，此后的视频网络几乎都在Kinetics上报告结果。",
+  "background": "2017年视频动作识别有两条路线。[[two-stream]]用两个二维CNN，一个看单帧RGB，一个看预先算好的光流（相邻帧之间每个像素的运动），最后把两边的预测平均。它能用ImageNet预训练，效果好，但对时间的建模只是“几帧拼在一起”。[[c3d]]直接用三维卷积在“时间×高×宽”上滑动，能真正学到时空特征，但三维网络参数多，只能从零训练，层数也浅。\n\n更根本的问题是数据：常用的[[ucf101]]和HMDB-51规模很小（Kinetics的数据量是它们的约一百倍），各种方法都在这上面得到差不多的分数，无法判断哪种结构更好。视频领域缺一个像[[imagenet]]那样的大数据集。",
+  "method": "**Kinetics数据集**（见[[kinetics]]）。从YouTube收集400类人体动作（单人动作如喝水、人与人交互如握手、人与物交互如修剪草坪），每类至少400段、每段约10秒、各来自不同视频，训练集共约24万段，每类另有100段做测试。规模比UCF-101和HMDB-51大两个数量级。\n\n**膨胀（inflation）**。拿一个在ImageNet上设计好的二维网络（论文用带BatchNorm的Inception-v1），把每个`N×N`的卷积核和池化核加上时间维变成`N×N×N`，网络结构不用重新设计。\n\n**从二维权重初始化**。把一张图片重复T次，就得到一段“无聊视频”。要求三维网络在这段视频上的输出与二维网络在原图上的输出一样，只需把二维卷积核沿时间轴复制`N`份并除以`N`。例如3×3核变成3×3×3，每一片权重是原来的1/3，三片相加正好等于原响应。这样三维网络一开始就具备ImageNet学到的空间特征。\n\n**双流I3D**。RGB和光流各训练一个I3D，预测平均。训练时输入64帧，时间感受野远长于双流网络的10帧。",
+  "results": "在Kinetics上，双流I3D（ImageNet初始化后再训）top-1准确率74.2%、top-5 91.3%，高于论文中复现的双流网络、C3D式3D网络等全部基线。用Kinetics预训练再迁移到小数据集，三个划分平均后UCF-101达到98.0%、HMDB-51达到80.9%，超过此前所有已发表方法。论文还发现，在Kinetics上光流对准确率的贡献比在UCF-101、HMDB-51上小得多，作者认为是Kinetics里镜头运动多。",
+  "legacy": "这之后视频模型的标准流程变成“Kinetics预训练 + 下游微调”。[[non-local]]在I3D上加自注意力式的长程模块；[[slowfast]]用快慢两条三维卷积通路取代了预先计算光流；[[timesformer]]、[[mvit]]把视频Transformer也放在Kinetics上比较；[[videomae]]则用自监督预训练进一步减少对标注的依赖。“把二维模型膨胀成三维并继承权重”的思路后来也常被用来把图像模型改造成视频模型。",
+  "pitfalls": "- I3D的最高分仍依赖光流流（预先用TV-L1等算法计算），光流的计算成本不包含在网络里，实际部署时很重。\n- “膨胀初始化”只给了一个合理的起点，时间方向的特征仍要在视频数据上学；没有Kinetics这样的大数据，膨胀本身帮助有限。",
+  "limits": [
+    {"text": "最好结果依赖预先计算的光流，光流算一段视频的代价往往比网络本身还大。", "solved_by": ["slowfast"]},
+    {"text": "三维卷积只覆盖64帧左右的短片段，长时间的动作结构建模不了，计算量也随帧数线性增长。", "solved_by": ["non-local", "timesformer"]},
+    {"text": "Kinetics里很多动作靠场景和物体就能猜出，测不出模型是否真正理解运动。", "solved_by": []},
+    {"text": "依赖大量人工标注的视频类别，扩展到更多动作代价高。", "solved_by": ["videomae"]}
+  ],
+  "relations": [
+    {"to": "two-stream", "type": "extends", "note": "保留RGB加光流的双流结构，但每一路都从二维网络换成膨胀后的三维网络。"},
+    {"to": "c3d", "type": "solves", "note": "C3D只能从零训练、网络浅；I3D通过膨胀直接继承ImageNet上深网络的结构和权重。"},
+    {"to": "inception-v3", "type": "uses", "note": "骨干取自Inception系列（论文实际用的是带BatchNorm的Inception-v1），把它的卷积和池化核膨胀成三维。"},
+    {"to": "googlenet", "type": "uses", "note": "被膨胀的二维网络就是Inception-v1（GoogLeNet）结构，加上BatchNorm。"},
+    {"to": "kinetics", "type": "uses", "note": "同一篇论文发布的Kinetics-400，是I3D能训练好的前提。"},
+    {"to": "ucf101", "type": "solves", "note": "UCF-101太小、各结构分数相近；论文用Kinetics预训练后在它上面拉开差距并推到98.0%。"}
+  ],
+  "prereq": ["conv-layer", "image-tensor", "pretrain-finetune", "transfer-learning", "top-k-error"],
+  "terms": [
+    {"t": "光流", "d": "相邻两帧之间每个像素的位移向量（水平、竖直两个分量），可当作描述运动的“图像”输入网络。"},
+    {"t": "膨胀（inflation）", "d": "把二维卷积核N×N扩展为三维N×N×N，并把二维权重沿时间复制、除以N，使网络结构和预训练权重都能直接沿用。"},
+    {"t": "Kinetics", "d": "DeepMind从YouTube收集的人体动作视频数据集，首版400类，训练集约24万段、每段约10秒。"}
+  ],
+  "learn": "先理解[[c:conv-layer]]和[[two-stream]]的双流思想。读原文第2.4节（膨胀和“无聊视频”初始化）以及表2–表4。动手：把torchvision里的一个二维ResNet按论文方法膨胀成三维，喂入一段把同一张图复制16次的“视频”，验证输出与原二维网络一致。",
+  "check": {"source": "https://arxiv.org/abs/1705.07750", "confirmed": "标题、作者Carreira与Zisserman、arXiv v1提交于2017-05-22；摘要中的80.9%（HMDB-51）和98.0%（UCF-101）、400类且每类400段以上；正文中约24万训练视频、每段约10秒、每类100段测试、表3中Kinetics上74.2%/91.3%、64帧对10帧。"}
+}

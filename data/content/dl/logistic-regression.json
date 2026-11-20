@@ -1,0 +1,32 @@
+{
+  "id": "logistic-regression",
+  "who": "David R. Cox · Birkbeck College, London",
+  "venue": "Journal of the Royal Statistical Society B 1958",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1111/j.2517-6161.1958.tb00292.x"},
+    {"label": "Wikipedia: Logistic regression", "url": "https://en.wikipedia.org/wiki/Logistic_regression"}
+  ],
+  "problem": "结果只有“是/否”两种（病人是否康复、零件是否失效），普通线性回归会预测出小于0或大于1的“概率”，也没有合理的误差模型。",
+  "idea": "不直接回归概率，而是回归概率的对数几率：`log(p/(1−p)) = β·x`，再用sigmoid函数把线性得分压回(0,1)，用最大似然估计系数。",
+  "impact": "成为二分类的标准统计模型；在机器学习里，它就是“一个sigmoid神经元加交叉熵损失”，今天每个分类网络的最后一层仍是它（多类时为softmax）。",
+  "background": "很多实际问题的结果是二值的：一种药剂量下虫子死没死、一位病人治疗后好没好。研究者想知道各个因素（剂量、年龄、体重）怎样影响“发生”的概率。\n\n直接用线性回归`p = β·x`有两个毛病。一是右边可以取任意实数，预测出的“概率”会跑到0到1之外；二是二值结果的方差随p变化（`p(1−p)`），违背了最小二乘“误差方差恒定”的假设。\n\n当时已有两条线索：19世纪Verhulst为人口增长提出的logistic曲线，以及1944年Berkson提出的“logit”。Cox这篇1958年的论文把对二值序列的回归分析系统化了：怎样设定模型、怎样估计、怎样检验。",
+  "method": "**模型**。对输入`x`，先算线性得分`z = β₀ + β₁x₁ + … + β_dx_d`，再用logistic函数（即sigmoid，见[[c:logistic-regression]]）把它变成概率：\n\n`p(y=1 | x) = σ(z) = 1 / (1 + e^(−z))`\n\n反过来写就是`log(p/(1−p)) = z`：模型假设**对数几率**是输入的线性函数。系数`β_j`的含义很直观——`x_j`增加1，几率`p/(1−p)`乘以`e^(β_j)`。\n\n**估计**。用最大似然（见[[c:mle]]）。对n个样本，对数似然为\n\n`ℓ(β) = Σ [ y_i log p_i + (1 − y_i) log(1 − p_i) ]`\n\n取负号就是今天的二元[[c:cross-entropy]]损失。它对`β`是凹函数，没有坏的局部最优，梯度形式非常简洁：`∂ℓ/∂β = Σ (y_i − p_i)·x_i`——预测与真实之差乘以输入，与[[perceptron]]的更新规则形状几乎一样，只是把0/1的硬判断换成了连续概率。统计学里通常用牛顿法（迭代重加权最小二乘）几步就收敛。\n\n**例子**。若某个模型`z = −4 + 2x`，那么`x = 2`时`z = 0`，概率正好0.5；`x = 3`时`z = 2`，概率约0.88。`x`每加1，几率乘以`e² ≈ 7.4`。",
+  "legacy": "逻辑回归是统计学中广义线性模型的一员，也是机器学习里最常用的基线分类器。多类推广（multinomial logit，即softmax回归）在1960年代出现；在NLP中它以“最大熵模型”的名字被广泛使用（[[maxent-nlp]]），条件随机场（[[crf]]）则把它推广到整条序列的结构化输出。\n\n对神经网络而言，逻辑回归就是**一个用sigmoid激活、用交叉熵训练的神经元**。多层网络（[[backprop]]）可以看作在逻辑回归前面加上若干层可学习的特征变换；今天的图像分类网络和大语言模型，最后一层依然是一个[[c:softmax]]回归——只是它的输入特征不再由人设计，而是由前面的网络学出来。",
+  "pitfalls": "- 名字叫“回归”，用途是**分类**：它回归的是对数几率，再用阈值（通常0.5）做判断。\n- 如果训练数据线性可分，最大似然会让系数趋向无穷大，必须加正则化（见[[ridge]]）。",
+  "limits": [
+    {"text": "决策边界是输入空间中的一个超平面，像XOR这样不能被一条直线分开的问题它学不会，除非人工构造交叉特征。", "solved_by": ["kernel-trick", "svm", "backprop"]},
+    {"text": "效果完全取决于人设计的输入特征；面对图像、语音这样的原始信号，线性模型几乎无能为力。", "solved_by": ["backprop", "lenet", "alexnet"]},
+    {"text": "数据线性可分时最大似然估计不存在（系数发散），特征多、样本少时容易过拟合。", "solved_by": ["ridge", "lasso"]}
+  ],
+  "relations": [
+    {"to": "mcculloch-pitts", "type": "rivals", "note": "同样是“加权求和再过一个S形/阶跃函数”，但M-P单元输出确定的0/1且不学习，逻辑回归输出概率并从数据中估计权重。"},
+    {"to": "perceptron", "type": "rivals", "note": "同一年出现的两种线性分类器：感知机只在分错时修正、追求分对，逻辑回归用似然给出概率；后来神经网络沿用的恰恰是逻辑回归的sigmoid加交叉熵。"}
+  ],
+  "prereq": ["linear-regression", "logistic-regression", "mle", "cross-entropy", "derivative-gradient"],
+  "terms": [
+    {"t": "几率与对数几率", "d": "几率odds是`p/(1−p)`，例如概率0.8对应几率4（发生的可能是不发生的4倍）。对数几率logit是它的自然对数，取值范围是整个实数轴。"},
+    {"t": "广义线性模型", "d": "一类统计模型：输入的线性组合通过一个“连接函数”与输出的期望相联系。线性回归、逻辑回归、泊松回归都是它的特例。"}
+  ],
+  "learn": "先补[[c:mle]]和[[c:cross-entropy]]。然后用numpy从零实现：生成两团二维高斯点，写出交叉熵损失和梯度，用梯度下降训练，画出决策直线；再把数据换成XOR形状，观察它失败，并尝试加入`x₁·x₂`特征后成功。最后对照scikit-learn的LogisticRegression验证结果。",
+  "check": {"source": "https://doi.org/10.1111/j.2517-6161.1958.tb00292.x", "confirmed": "Crossref：D. R. Cox，“The Regression Analysis of Binary Sequences”，JRSS Series B，1958年7月；维基百科Logistic regression条目历史部分核对了Verhulst的logistic曲线、Berkson 1944年提出logit、Cox 1958年的改进与多项logit在1960年代出现。文中数值例子为说明用的假设值。"}
+}

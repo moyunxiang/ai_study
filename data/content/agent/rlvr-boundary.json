@@ -1,0 +1,94 @@
+{
+  "id": "rlvr-boundary",
+  "who": "Yang Yue, Zhiqi Chen, Rui Lu, Andrew Zhao, Zhaokai Wang, Yang Yue, Shiji Song, Gao Huang · 清华大学等",
+  "venue": "NeurIPS 2025（Oral）",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2504.13837"
+    }
+  ],
+  "problem": "DeepSeek-R1之后，大家普遍相信可验证奖励的强化学习（RLVR）能像AlphaGo那样让模型自我进化出基础模型没有的新推理能力，但没有人系统检验过。",
+  "idea": "不只看采样一次答对的比例（pass@1），而是看采样k次至少答对一次的比例（pass@k），把k加大到几百上千，用它衡量模型“能解出哪些题”的边界，并比较RL前后的边界。",
+  "impact": "发现k大时基础模型反而超过RL模型：RLVR主要是把基础模型已会的解法挑出来、提高一次答对的概率，而没有扩展能解的题目范围。这一结论引发了关于“RL能否带来新能力”的持续争论。",
+  "background": "[[deepseek-r1]]和[[tulu-3]]之后，“用规则判对错的奖励做强化学习”（RLVR）成为训练推理模型的标准做法，成绩大幅提升，模型还会出现反思、验证等行为。一个流行的叙事是：这类似于传统强化学习中智能体通过探索发现新策略，模型因此能不断自我提升、获得基础模型没有的推理能力。\n\n另一方面，[[llm-monkeys]]已经发现：只要采样次数足够多，较弱的模型也能覆盖大量题目，pass@k随k按近似幂律上升。这提示一个问题：RL后pass@1的提升，究竟是能力上限提高了，还是只是把已有的正确答案“挑”到了第一位？",
+  "method": "**用pass@k量能力边界**。对每道题采样n次（n≥k），数出其中c个正确，用[[codex]]论文提出的无偏估计：\n\n`pass@k = E[ 1 − C(n−c, k) / C(n, k) ]`\n\n其中`C(·,·)`是组合数。k=1时就是平均正确率；k很大时，它衡量的是“这道题在模型的输出分布里有没有正确解”。如果RL真的带来了新能力，RL模型的pass@k曲线在任何k下都应高于基础模型。\n\n**实验范围**。数学（Qwen2.5-7B/14B/32B基础模型、LLaMA-3.1-8B，用SimpleRL、Oat-Zero、[[dapo]]等框架训练，在GSM8K、MATH500、Minerva、Olympiad、AIME24、AMC23上评测）、代码（LiveCodeBench、HumanEval+）和视觉推理（Qwen2.5-VL-7B）。还在统一框架里比较了PPO、[[grpo]]、Reinforce++、RLOO、ReMax、DAPO六种算法。\n\n**追溯解法的来源**。一是统计RL模型能解的题是否基本包含在基础模型能解的题之中；二是计算RL模型生成的推理过程在基础模型下的[[c:perplexity]]——困惑度低说明这些推理路径本来就在基础模型的输出分布里。",
+  "results": "所有模型、基准上都出现同一个交叉：k小（如k=1）时RL模型明显更好；随着k增大，基础模型的曲线更陡，最终追上并超过RL模型。例如32B模型在Minerva上，k=128时基础模型比RL模型多解出约9%的题。用DAPO训练的模型起初领先基础模型近30%，最后同样被反超。RL模型能解的题几乎是基础模型能解的题的子集，困惑度分析也表明其推理路径已存在于基础模型中。\n\n六种RL算法表现相近，它们的pass@1与基础模型pass@256之间的差距（论文称“采样效率差距”）都很大。相反，从更强模型做[[c:knowledge-distillation]]能引入老师的新推理模式，真正扩大能力边界。",
+  "legacy": "论文直接挑战了“RL让模型自我进化”的叙事，引出一批回应：[[prorl]]报告在更长时间、更多样任务的RL训练后，模型能解出基础模型无论采样多少次都解不出的题；[[spurious-rewards]]发现对某些模型连随机甚至错误的奖励也能提升成绩，进一步说明RL常常只是激活已有能力；[[entropy-rl]]则从熵坍缩角度解释探索不足。作者自己指出，突破边界可能需要持续扩展RL规模和多轮的智能体—环境交互。",
+  "limits": [
+    {
+      "text": "结论来自当时常见的短程RL设置（几百到几千步、单一任务域），更长时间、更大规模的RL能否突破边界没有检验。",
+      "solved_by": [
+        "prorl",
+        "scale-rl"
+      ]
+    },
+    {
+      "text": "pass@k在k很大时可能因“蒙对”而偏高，尤其是答案为整数或选项的题，基础模型的覆盖率可能被高估。",
+      "solved_by": []
+    },
+    {
+      "text": "只研究单轮推理，没有涉及模型能与环境多轮交互、使用工具并从反馈中学习的智能体式强化学习。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "deepseek-r1",
+      "type": "rivals",
+      "note": "R1认为RL激发出了新的推理行为；本文用pass@k曲线论证这些行为和解法本已存在于基础模型中，RL只提高了采样效率。"
+    },
+    {
+      "to": "llm-monkeys",
+      "type": "extends",
+      "note": "借用重复采样下覆盖率随k上升的观察，把pass@k从“推理时扩展”工具变成衡量RL前后能力边界的标尺。"
+    },
+    {
+      "to": "tulu-3",
+      "type": "rivals",
+      "note": "Tülu 3提出RLVR并把它当作提升推理的手段；本文质疑RLVR是否真正扩展了推理能力。"
+    },
+    {
+      "to": "dapo",
+      "type": "uses",
+      "note": "把DAPO训练出的32B模型作为最强RLVR样本之一，发现它同样在k大时被基础模型反超。"
+    },
+    {
+      "to": "codex",
+      "type": "uses",
+      "note": "pass@k的无偏估计公式来自Codex论文。"
+    },
+    {
+      "to": "grpo",
+      "type": "uses",
+      "note": "GRPO是主要被检验的RL算法之一，与PPO、RLOO等五种算法对比后表现相近。"
+    }
+  ],
+  "prereq": [
+    "policy-gradient-concept",
+    "reward-design",
+    "perplexity",
+    "knowledge-distillation",
+    "probability-basics",
+    "benchmark"
+  ],
+  "terms": [
+    {
+      "t": "pass@k",
+      "d": "对一道题采样k次，只要有一次正确就算解出。k=1衡量平时的正确率，k很大衡量模型“有没有可能”解出这道题。"
+    },
+    {
+      "t": "推理能力边界",
+      "d": "本文的说法：一个模型在足够多次采样下能解出的题目集合。"
+    },
+    {
+      "t": "采样效率差距",
+      "d": "RL模型的pass@1与基础模型pass@256之差，表示RL离“把基础模型潜力全部挖出来”还有多远。"
+    }
+  ],
+  "learn": "先弄懂[[c:policy-gradient-concept]]和[[deepseek-r1]]的RLVR做法，再自己推导pass@k无偏估计（从n个样本中不放回抽k个全错的概率）。读论文第3节的曲线图和第4.1节的困惑度分析。动手：拿一个小模型的基础版和RL版，在GSM8K子集上各采样128次，画出两条pass@k曲线，看是否交叉。",
+  "check": {
+    "source": "https://arxiv.org/abs/2504.13837",
+    "confirmed": "标题、作者、v1提交于2025-04-18、Journal reference为NeurIPS 2025 Oral；正文（arxiv.org/html/2504.13837v5）核对pass@k无偏估计式、实验设置表（模型、框架、基准）、六种RL算法、Minerva 32B在k=128时约9%、DAPO模型起初领先近30%、采样效率差距用k=256、蒸馏能扩展边界。"
+  }
+}

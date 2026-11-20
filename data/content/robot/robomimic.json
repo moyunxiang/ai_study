@@ -1,0 +1,37 @@
+{
+  "id": "robomimic",
+  "who": "Ajay Mandlekar, Danfei Xu, Josiah Wong, Soroush Nasiriany, Chen Wang, Rohun Kulkarni, Li Fei-Fei, Silvio Savarese et al. · 斯坦福大学 / UT Austin",
+  "venue": "CoRL 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2108.03298"},
+    {"label": "项目主页（代码、数据集）", "url": "https://arise-initiative.github.io/robomimic-web/"}
+  ],
+  "problem": "从人类示范学操作的论文各用各的数据和代码，结论无法比较；离线强化学习的基准大多用脚本或RL智能体生成的“机器数据”，没人系统地研究真人示范有什么不同。",
+  "idea": "收集一套不同熟练度真人遥操作的示范数据，在5个仿真和3个真机任务上，用统一代码对比6种模仿学习与离线RL算法，并逐项检验观测、网络结构、数据量、模型选择等设计选择的影响。",
+  "impact": "发现带历史的BC-RNN在真人数据上又强又稳、离线RL在真人数据上普遍失灵；开源的数据集和代码成为之后Diffusion Policy等方法的标准测试台。",
+  "background": "到2021年，[[c:imitation-learning]]（尤其是最简单的行为克隆BC：把示范当作“观测→动作”的监督数据来学）和[[c:offline-rl]]（只用固定数据集、不再与环境交互的强化学习，如[[bcq]]、[[cql]]）都发展很快。但机器人操作领域有两个问题。\n\n第一，每篇论文用自己的任务、自己采的数据、自己的实现，结论彼此冲突，没人说得清“到底什么在起作用”。第二，D4RL等离线RL基准的数据大多是脚本策略或RL智能体生成的。真人示范不一样：人会犹豫、会根据过去几秒的情况做决定（不满足[[c:markov-chain]]意义上的马尔可夫性），不同人的熟练程度和习惯差别很大。在机器数据上好用的算法，到真人数据上未必好用。",
+  "method": "**数据**。在基于[[mujoco]]的robosuite仿真里，用RoboTurk遥操作平台采集5个任务：举方块（Lift）、把罐子放进对应格子（Can）、把方形螺母套到柱子上（Square）、双臂传递物品（Transport）和最难的组装支架再挂扳手（Tool Hang）。每个任务有三类数据：一位熟练操作员的200条示范（PH）；6位熟练度不同的操作员各50条、共300条（MH，分“好、中、差”三组）；以及由RL智能体生成的机器数据（MG）。另外有3个真机任务。\n\n**算法**。统一实现6种方法：普通BC；BC-RNN（用[[lstm]]看一段观测历史再输出动作）；分层的HBC和IRIS；离线RL的BCQ和CQL。\n\n**研究的问题**。逐项比较：观测用真实物体位姿还是图像、要不要腕部相机；网络大小；数据质量和数量；以及“训练中挑哪个检查点去部署”。",
+  "results": "在机器数据上离线RL占优，例如Lift（MG）上BCQ成功率91.3%，BC只有65.3%。但换成真人数据就反过来：只用“差”操作员数据的Can任务，BC-RNN 92.0%，BC 56.7%，BCQ 29.3%，CQL仅4.0%；Transport（PH）上BC-RNN 71.3%，CQL为0。用图像代替真实物体位姿时，BC-RNN几乎不掉点。真机Can任务里去掉随机裁剪增强成功率降到26.7%，去掉腕部相机降到43.3%。另一个重要发现：验证损失最低的检查点并不是成功率最高的，验证损失上升时成功率还可能继续上升，必须实际评测。",
+  "legacy": "robomimic的Lift、Can、Square、Transport、Tool Hang成了操作策略论文的常用基准：[[diffusion-policy]]就在这些任务上报告结果，[[mimicgen]]从少量真人示范自动扩增数据，[[libero]]在它的基础上做多任务与终身学习基准。“带历史的策略”“必须用腕部相机”“按真实成功率选检查点”等经验也被后来的真机系统沿用。",
+  "limits": [
+    {"text": "BC-RNN用高斯混合输出动作，对“同一场景多种合理做法”的多峰示范仍建模不佳，最难的Tool Hang成功率只有约30%。", "solved_by": ["diffusion-policy", "aloha-act"]},
+    {"text": "每个任务单独训练，没有覆盖多任务、语言指令或长序列任务。", "solved_by": ["libero"]},
+    {"text": "采集真人示范成本高，每个任务只有几百条，数据规模难以扩大。", "solved_by": ["mimicgen"]},
+    {"text": "离线RL为何在真人数据上失灵、如何在不大量实测的情况下挑选检查点，都只被指出而未解决。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mujoco", "type": "uses", "note": "所有仿真任务都在基于MuJoCo的robosuite框架中搭建。"},
+    {"to": "cql", "type": "rivals", "note": "把CQL放到真人示范上系统测试，发现它在机器数据上可用、在真人数据上几乎学不会，挑战了离线RL基准上的结论。"},
+    {"to": "bcq", "type": "rivals", "note": "BCQ在机器生成数据上最强，但在多人混合质量的真人数据上明显落后于BC-RNN。"},
+    {"to": "lstm", "type": "uses", "note": "表现最好的BC-RNN用LSTM处理观测历史，以应对真人示范的非马尔可夫性。"},
+    {"to": "d4rl", "type": "extends", "note": "D4RL提供离线RL的机器生成数据基准，robomimic补上了真人示范和操作任务这一块。"}
+  ],
+  "terms": [
+    {"t": "行为克隆（BC）", "d": "最简单的模仿学习：把示范拆成一对对“观测→动作”，像图像分类一样做监督学习。"},
+    {"t": "遥操作（teleoperation）", "d": "人通过手机、手柄或主从臂远程控制机器人完成任务，同时记录下数据作为示范。"},
+    {"t": "检查点选择", "d": "训练过程中保存了很多版本的模型，部署时要挑一个；在机器人上，离线指标往往挑不准，需要实际跑任务评测。"}
+  ],
+  "prereq": ["imitation-learning", "offline-rl", "supervised-learning", "recurrent-layer", "teleoperation"],
+  "learn": "先补行为克隆和离线RL的区别 → 读原文第3节（研究设计）和第5节（经验总结L1–L8） → 动手：pip安装robomimic，下载Can（PH）数据，分别训练BC和BC-RNN并比较成功率。",
+  "check": {"source": "https://arxiv.org/abs/2108.03298 ；https://arxiv.org/html/2108.03298", "confirmed": "标题、作者、2021-08-06首次提交；5仿真+3真机任务、6种算法、PH 200条/MH 300条（6人各50条）；Lift(MG) BCQ 91.3对BC 65.3、Can-Worse BC-RNN 92.0/BC 56.7/BCQ 29.3/CQL 4.0、Transport(PH) BC-RNN 71.3/CQL 0、Tool Hang(PH)最高约30；真机Can去随机裁剪26.7%、去腕部相机43.3%；验证损失与成功率不一致。"}
+}

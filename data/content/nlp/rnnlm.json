@@ -1,0 +1,103 @@
+{
+  "id": "rnnlm",
+  "who": "Tomáš Mikolov, Martin Karafiát, Lukáš Burget, Jan Černocký, Sanjeev Khudanpur · 布尔诺理工大学、约翰斯·霍普金斯大学",
+  "venue": "Interspeech 2010",
+  "links": [
+    {
+      "label": "ISCA Archive",
+      "url": "https://www.isca-archive.org/interspeech_2010/mikolov10_interspeech.html"
+    },
+    {
+      "label": "RNNLM Toolkit",
+      "url": "https://www.fit.vutbr.cz/~imikolov/rnnlm/"
+    }
+  ],
+  "problem": "Bengio的神经语言模型只看前面固定几个词，窗口大小要事先定，再往前的信息完全用不上；它训练又极慢，实际系统里几乎没人用，仍是n-gram的天下。",
+  "idea": "把前馈网络换成Elman式的简单循环网络：每读一个词，就把它和上一步的隐状态一起算出新的隐状态，再预测下一个词。隐状态不断循环，理论上能记住任意长的历史。",
+  "impact": "在语音识别上第一次让神经语言模型带来大幅度的实用收益（困惑度降约50%、词错误率降约18%），并配套开源工具，把循环网络语言模型带进主流，直接铺垫了word2vec、seq2seq和此后的LSTM语言模型。",
+  "background": "[[nplm]]证明了词向量加神经网络能胜过n-gram，但它是前馈网络：输入是固定的前n−1个词，窗口大小、投影层大小、隐层大小都要调，窗口之外的信息看不到。更现实的问题是速度：论文提到，Bengio在Brown语料上的基础实现训练要113天，用重要性采样也要26小时。所以到2010年，语音识别和机器翻译里实际用的仍是加[[ngram-smoothing]]平滑的n-gram，神经网络只在少数实验中作为补充。\n\n[[rnn-elman]]早在1990年就提出了带“上下文层”的循环网络，但没有人在大规模语言建模上认真做过。",
+  "method": "**结构**。输入层`x(t)`是当前词的独热向量`w(t)`与上一步隐状态`s(t−1)`拼接而成；隐层（上下文层）和输出层分别为\n\n`s(t) = sigmoid(U·w(t) + W·s(t−1))`\n\n`y(t) = softmax(V·s(t))`\n\n`y(t)`就是下一个词在词表上的概率分布（见[[c:recurrent-layer]]、[[c:softmax]]）。`U`的每一列实际上就是一个词向量，所以不需要单独的投影层；隐层大小通常30到500，唯一需要认真选的超参数是它，并且应随训练数据量增大。\n\n**训练**。用交叉熵损失和随机梯度下降，学习率从0.1开始，验证集上不再明显改善时减半，一般10到20轮收敛。论文主实验用的是只回传一步的截断反向传播（τ = 1），也讨论了更完整的随时间反向传播（BPTT）。出现次数低于阈值的词合并成一个“稀有词”记号，概率在这些词之间均分，以缩小输出层。\n\n**动态模型**。测试时也继续用小学习率在线更新权重，让模型适应当前文档的话题和用词。\n\n**使用方式**。语音识别器先用n-gram产出100个候选（n-best），再用RNN语言模型与5-gram按0.75:0.25线性插值后重新打分。",
+  "results": "华尔街日报（WSJ）语音识别任务，RNN只用640万词训练：修正Kneser-Ney 5-gram困惑度221，三个动态RNN混合后加上5-gram为121，最好结果112，接近减半；词错误率从13.5%降到11.1%，相对降约18%。与用5倍数据（3700万词）训练的回退模型相比，词错误率仍相对降约12%。在更难、基线更强的NIST RT05会议语音任务上也有约5%的相对降低。训练数据从20万词增加到640万词，相对n-gram的优势越来越大。速度方面，Brown语料上训练一个100隐单元的模型约6小时。",
+  "legacy": "Mikolov随后发布RNNLM工具包，循环网络语言模型很快进入语音识别和机器翻译的重打分环节。Mikolov等人随后把RNNLM输入矩阵`U`的列当作词向量，用词语类比题检验它们（[[word2vec]]论文表3中“RNNLM”一行），再去掉隐层、专门为学词向量设计更简单的模型，得到word2vec。\n\n简单RNN的梯度消失问题让它记不住真正长的上下文（论文自己也承认缓存模型仍能提供互补信息），于是[[graves-generating]]、[[lm-limits]]、[[awd-lstm]]改用[[lstm]]；[[seq2seq]]把两个循环网络连成编码器和解码器用于翻译。2017年后[[transformer]]取代循环网络，但“逐词读入、预测下一个词”的训练方式一直延续到今天的大语言模型。",
+  "limits": [
+    {
+      "text": "简单RNN存在梯度消失，实际上记不住很长的上下文，论文中缓存模型仍能提供互补的长程信息。",
+      "solved_by": [
+        "graves-generating",
+        "lm-limits",
+        "awd-lstm"
+      ]
+    },
+    {
+      "text": "训练很慢：输出层要对整个词表算softmax，最复杂的模型在640万词上要训练几周，作者因此没用全部3700万词训练RNN。",
+      "solved_by": [
+        "word2vec",
+        "lm-limits"
+      ]
+    },
+    {
+      "text": "逐词顺序计算，同一句子内部无法并行，难以借助大规模硬件扩大数据和模型。",
+      "solved_by": [
+        "transformer"
+      ]
+    },
+    {
+      "text": "只用于对n-gram产出的候选重打分，不能直接参与语音识别的第一遍搜索。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "nplm",
+      "type": "solves",
+      "note": "前馈神经语言模型只能看固定窗口、超参数多且训练极慢；循环隐状态让上下文长度不受窗口限制，并把Brown上的训练时间降到约6小时。"
+    },
+    {
+      "to": "rnn-elman",
+      "type": "uses",
+      "note": "网络就是Elman的简单循环网络：上一步隐层拷贝回来与当前输入拼接。"
+    },
+    {
+      "to": "ngram-smoothing",
+      "type": "rivals",
+      "note": "基线是修正Kneser-Ney平滑的5-gram；RNN困惑度约降一半，与它插值使用效果最好。"
+    },
+    {
+      "to": "hmm-asr",
+      "type": "uses",
+      "note": "在HMM语音识别系统产出的n-best候选上重打分，词错误率作为最终检验。"
+    },
+    {
+      "to": "backprop",
+      "type": "uses",
+      "note": "用（截断的）反向传播和随机梯度下降训练，并讨论了随时间反向传播。"
+    }
+  ],
+  "prereq": [
+    "language-model",
+    "recurrent-layer",
+    "softmax",
+    "perplexity",
+    "cross-entropy",
+    "word-error-rate"
+  ],
+  "terms": [
+    {
+      "t": "随时间反向传播（BPTT）",
+      "d": "把循环网络按时间展开成很深的前馈网络，再沿时间往回传梯度；截断BPTT只往回传固定的几步。"
+    },
+    {
+      "t": "n-best重打分",
+      "d": "先用便宜的模型产出前n个候选，再用更强但更慢的模型重新给它们打分、挑出最好的一个。"
+    },
+    {
+      "t": "动态模型",
+      "d": "在测试时也继续在线更新参数，使模型适应当前文本的用词和话题。"
+    }
+  ],
+  "learn": "先补[[c:recurrent-layer]]、[[c:perplexity]]，读过[[nplm]]。读原文第2节（公式1–5与训练细节）和表1、表2。动手：用PyTorch实现一个单层sigmoid RNN语言模型，在Penn Treebank上训练，比较隐层50与200的困惑度，并与一个KenLM训练的5-gram做线性插值。",
+  "check": {
+    "source": "https://www.isca-archive.org/interspeech_2010/mikolov10_interspeech.pdf",
+    "confirmed": "标题、5位作者与机构，Interspeech 2010；结构公式、隐层30–500、学习率0.1、10–20轮、τ=1截断；Brown约6小时 vs Bengio 113天/26小时；WSJ表1–3：KN5困惑度221、3xRNN dynamic+KN 121、最好112、WER 13.5→11.1、37M词基线下约12%；摘要中约50%困惑度、约18% WER、RT05约5%；插值权重0.75/0.25。"
+  }
+}

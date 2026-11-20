@@ -1,0 +1,36 @@
+{
+  "id": "och-ney-alignment",
+  "who": "Franz Josef Och, Hermann Ney · USC/ISI、RWTH Aachen",
+  "venue": "Computational Linguistics 29(1), 2003",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/J03-1002/"},
+    {"label": "PDF", "url": "https://aclanthology.org/J03-1002.pdf"}
+  ],
+  "problem": "IBM模型和HMM对齐提出多年，但复杂、难实现、难调，各家多用简单的启发式共现打分来对齐，没人系统比较过哪种做法真正好。",
+  "idea": "用人工标注的对齐做参考、定义对齐错误率AER，在两种语言对、多种语料规模上系统比较IBM 1–5、HMM和Dice启发式，并提出训练顺序、平滑和双向对齐合并等改进，代码以GIZA++公开。",
+  "impact": "确立了“Model 1 → HMM → Model 3 → Model 4”的标准训练流程和双向对齐合并做法，GIZA++成为此后十年几乎所有统计翻译系统的对齐工具。",
+  "background": "统计机器翻译的第一步是**词对齐**（见[[c:word-alignment]]）：在成对的句子里找出哪个词对应哪个词，后面的翻译表都从对齐结果中统计出来。[[ibm-models]]把对齐当作隐变量，用[[em]]迭代估计；[[hmm-alignment]]加入了“相邻词的对齐位置也相邻”的一阶依赖。但这些模型数学复杂，带繁殖率的Model 3–5连求最优对齐都是NP难的，实现和调参门槛很高。于是很多人改用简单的启发式：比如统计两个词在平行句中一起出现的Dice系数，取最大者相连。哪条路更好、各个设计细节有多大影响，一直缺少可靠的定量比较。",
+  "method": "**评价指标**。请人标注参考对齐，分为确定连接S和可能连接P（S⊆P，P用来容纳习语、虚词等不确定的情况）。对一个系统输出的连接集合A，定义\n\n`AER = 1 − (|A∩S| + |A∩P|) / (|A| + |S|)`\n\n它是F值的变体，越低越好。有了这个指标，每个设计决策都能直接量化。\n\n**模型与训练流程**。比较Dice、IBM Model 1–5和HMM，并提出Model 6：把利用源端局部性的HMM和利用目标端局部性的Model 4做对数线性组合。关键发现是**用简单模型给复杂模型做初始化**很重要，标准方案写作`1⁵ H⁵ 3³ 4³ 6³`，即依次跑5轮Model 1、5轮HMM、3轮Model 3、3轮Model 4、3轮Model 6，每个模型都从前一个的参数出发。还研究了繁殖率和对齐概率的平滑、词类、加入双语词典等细节。\n\n**双向合并**。IBM类模型是有方向的：每个目标词只能连一个源词，一对多的现象只能从一边看到。于是正反两个方向各训练一次，再把两个对齐合并：取交集精确率高、取并集召回率高，还提出从交集出发、逐步加入并集中相邻连接的“精化”合并法。",
+  "results": "在德英Verbmobil任务上，3.4万句训练数据时Dice系数的AER为29.0%，Model 1为17.0%，HMM为9.2%，最好的Model 6训练方案为5.7%；在法英Hansards的147万句数据上，Dice为38.9%，Model 6为8.7%。用HMM代替Model 2来引导后续模型，效果明显更好。加入词典并做双向合并后，Verbmobil 3.4万句上精化合并的AER降到4.7%。即使只有500句训练数据，所有统计模型的AER也都在30%以下。",
+  "legacy": "这篇论文的训练流程和公开的GIZA++工具，成了[[phrase-smt]]、[[hiero]]和[[moses]]等系统的标准前处理：先双向跑GIZA++，再用对称化启发式合并，然后抽取短语或规则。AER也成为词对齐研究的通用指标。神经机器翻译出现后，[[bahdanau-attention]]在翻译模型内部学出软对齐，独立的词对齐步骤不再是翻译流水线的必需环节。",
+  "limits": [
+    {"text": "对齐模型是有方向的，一对多、多对一只能靠两次训练再用启发式合并，合并规则没有统一的概率解释。", "solved_by": ["bahdanau-attention"]},
+    {"text": "词对齐和后面的短语抽取、翻译模型是分开优化的，对齐错误会直接传给后续步骤，翻译质量却不一定随AER降低而提高。", "solved_by": ["seq2seq", "bahdanau-attention"]},
+    {"text": "繁殖率模型（Model 3–6）的最优对齐无法精确求解，只能用Viterbi对齐邻域近似，训练慢且实现复杂。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ibm-models", "type": "extends", "note": "系统评估IBM Model 1–5，改进了它们的平滑和初始化，并给出高效的训练算法实现。"},
+    {"to": "hmm-alignment", "type": "extends", "note": "发现用HMM代替Model 2引导繁殖率模型效果更好，并把HMM与Model 4对数线性组合成Model 6。"},
+    {"to": "em", "type": "uses", "note": "所有统计对齐模型都用EM估计参数，繁殖率模型的E步只在Viterbi对齐邻域上近似求和。"},
+    {"to": "log-linear-smt", "type": "uses", "note": "Model 6沿用同一作者在翻译模型里采用的对数线性组合思路，把两个对齐模型的概率加权相乘。"},
+    {"to": "statistical-mt-1990", "type": "extends", "note": "继承噪声信道框架中把对齐作为翻译概率隐变量的建模方式。"}
+  ],
+  "prereq": ["word-alignment", "em-algorithm", "hmm-concept", "latent-variable", "classification-metrics"],
+  "terms": [
+    {"t": "AER（对齐错误率）", "d": "用人工标注的确定连接和可能连接来评价自动对齐的指标，0表示与人工完全一致，数值越低越好。"},
+    {"t": "繁殖率（fertility）", "d": "一个源语言词会被翻译成几个目标语言词，例如英语not常对应法语ne…pas两个词，IBM Model 3以后单独建模这个数。"},
+    {"t": "对齐对称化", "d": "正反两个方向各做一次对齐，再用交集、并集或介于两者之间的启发式合成一个对齐，以弥补单向模型只能一对多的限制。"}
+  ],
+  "learn": "先弄懂[[ibm-models]]的Model 1怎么用EM学翻译概率，以及[[hmm-alignment]]的跳转距离。读原文第2节模型综述、第5节AER定义和第6节表4、表5、表17。动手：用fast_align或GIZA++在几千句平行语料上对齐，分别取交集和并集，比较连线的精确率和召回率。",
+  "check": {"source": "https://aclanthology.org/J03-1002.pdf", "confirmed": "标题、作者及单位（USC/ISI、RWTH Aachen）、Computational Linguistics 29(1) 2003；AER公式(42)；表4（Verbmobil 34K：Dice 29.0、Model 1 17.0、HMM 9.2、Model 6最佳5.7）、表5（Hansards 1.47M：Dice 38.9、Model 6 8.7）、表17精化合并4.7、标准训练方案1⁵H⁵3³4³6³。"}
+}

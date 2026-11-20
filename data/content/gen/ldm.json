@@ -1,0 +1,43 @@
+{
+  "id": "ldm",
+  "who": "Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, Björn Ommer · LMU慕尼黑（CompVis）/ Runway",
+  "venue": "CVPR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2112.10752"},
+    {"label": "代码 CompVis/latent-diffusion", "url": "https://github.com/CompVis/latent-diffusion"},
+    {"label": "The Illustrated Stable Diffusion", "url": "https://jalammar.github.io/illustrated-stable-diffusion/"}
+  ],
+  "problem": "扩散模型直接在像素上加噪去噪，一张256×256图有近20万个数要反复处理，训练要数百GPU天，采样也极慢，普通实验室玩不起。",
+  "idea": "先训一个自编码器把图像压成小得多的潜变量（如32×32×4），扩散只在这个潜空间里做；再用交叉注意力把文本等条件接进U-Net。",
+  "impact": "把高质量扩散生成的算力门槛降了一个量级，直接成为Stable Diffusion的底座，“潜空间扩散”至今是图像和视频生成的标准做法。",
+  "background": "2021年，[[ddpm]]和[[adm]]证明扩散模型（见[[c:diffusion-process]]）的图像质量可以超过GAN，但代价惊人：它们直接在像素空间里工作，每一步去噪都要让U-Net处理整张图的全部像素，而采样要重复几百步。论文引用的数字是，最强的像素扩散模型训练要150到1000个V100 GPU天，用ADM在单张A100上采5万张样本大约要5天。\n\n问题在于像素里大部分信息是人眼几乎察觉不到的高频细节。似然模型会花大量容量去建模这些细节（作者称之为“感知上不重要的细节”），而真正决定画面内容的是语义和构图。\n\n另一条路是[[dall-e]]和[[vqgan]]的两阶段做法：先把图像压成离散token，再用自回归Transformer生成token。这能把序列变短，但为了让Transformer处理得动，压缩率必须很高，重建质量随之下降。这篇论文的问题是：能不能把“压缩”和“生成”分开，压缩只去掉感知上不重要的部分，生成交给扩散模型，在一个温和压缩的空间里做？",
+  "method": "**两阶段训练**。\n\n第一阶段，训练一个自编码器（见[[c:autoencoder]]）：编码器E把图像x压成潜变量`z = E(x)`，解码器D再还原。下采样倍数记为f，256×256×3的图在f=8时变成32×32×4，数据量缩小约48倍。训练损失沿用[[vqgan]]：像素重建加感知损失加一个判别器的对抗损失，这样解码出来的图细节清晰而不是模糊。为防止潜空间数值发散，加一点正则：要么是对标准正态的轻微KL惩罚（KL-reg，类似[[vae]]），要么是向量量化层（VQ-reg）。\n\n第二阶段，冻结自编码器，在潜变量z上训练标准的去噪扩散模型：给z加噪得到z_t，让U-Net预测所加的噪声ε，损失是`L = E‖ε − ε_θ(z_t, t)‖²`。采样时从纯噪声开始在潜空间去噪几十到几百步，最后只调用一次解码器D得到图像。因为潜变量仍保留二维结构，U-Net的卷积归纳偏置照样适用。\n\n**交叉注意力接入条件**。条件y（文本、类别、语义图等）先由一个专门的编码器τ_θ变成一串向量，再在U-Net的中间层做交叉注意力：查询来自图像特征，键和值来自条件，\n\n`Q = W_Q·φ(z_t)，K = W_K·τ_θ(y)，V = W_V·τ_θ(y)，Attention = softmax(Q·Kᵀ/√d)·V`\n\n这样每个图像位置都可以“查”文本里的每个词。同一套接口换个τ_θ就能支持不同条件。\n\n**压缩多少合适**。作者比较了f从1到32：f=1就是像素扩散，训练慢；f=32压得太狠，重建丢细节，质量封顶。f=4和f=8效果最好，这成了后来的默认值。",
+  "results": "ImageNet 256×256类别条件生成，LDM-4在250步DDIM采样下FID为10.56，加上无分类器引导（尺度1.5）降到3.60。文生图模型有14.5亿参数，在LAION-400M上训练，MS-COCO上FID为12.63（加引导）。LSUN卧室数据上，它接近ADM的质量，而参数只有一半、训练资源少到约四分之一。在修复（inpainting）任务上取得当时最好结果，潜空间版本比像素版本至少快2.7倍。f=1与f=8在训练200万步后FID相差38，说明“在哪里做扩散”比模型细节更重要。",
+  "legacy": "2022年8月，Stability AI、Runway与CompVis基于这套框架发布了开源的[[stable-diffusion]]（把文本编码器换成冻结的[[clip]]文本塔），消费级显卡就能跑，随后的[[controlnet]]、[[dreambooth]]、[[sd-lora]]等社区生态都建在它上面。[[sdxl]]把它做大，[[dit]]和[[sd3]]把U-Net换成Transformer，[[video-ldm]]、[[sora]]把同一思路推广到视频的时空潜变量。\n\n今天几乎所有大规模图像、视频生成模型仍是“先压缩再在潜空间生成”的两段式。被替换的部分主要是：U-Net骨干换成Transformer，DDPM目标换成[[flow-matching]]，压缩倍数和通道数不断加大（[[dc-ae]]）。",
+  "pitfalls": "- 潜空间不是“语义空间”。LDM的自编码器只是保留了感知细节的压缩，潜变量本身看起来仍像一张缩小的模糊图，并不具备CLIP那种语义结构；后来的[[rae]]才尝试用语义表征当潜空间。\n- 论文里的文生图模型并没有用CLIP，文本编码器是从头训练的Transformer；用CLIP文本塔是Stable Diffusion的选择。\n- “潜空间扩散更快”主要是每一步更便宜，采样步数并没有减少，仍要几十步。",
+  "limits": [
+    {"text": "采样仍要几十到几百步迭代去噪，生成一张图要数秒以上，无法实时。", "solved_by": ["dpm-solver", "lcm", "add"]},
+    {"text": "骨干是卷积U-Net，参数增大后收益如何、能否像语言模型那样平滑扩展并不清楚。", "solved_by": ["dit", "sd3"]},
+    {"text": "f=8的自编码器重建会丢细节，小字、人脸、手指等精细结构常常画坏；压缩率也难以再提高。", "solved_by": ["sdxl", "dc-ae"]},
+    {"text": "只能用文字或粗粒度条件控制，无法精确指定姿态、边缘、布局。", "solved_by": ["controlnet", "t2i-adapter"]},
+    {"text": "训练好的模型只是论文代码，权重和数据规模都有限，普通用户无法直接使用。", "solved_by": ["stable-diffusion"]}
+  ],
+  "relations": [
+    {"to": "ddpm", "type": "extends", "note": "沿用DDPM的加噪过程和预测噪声的损失，只是把它从像素空间搬到自编码器的潜空间。"},
+    {"to": "vqgan", "type": "uses", "note": "第一阶段的自编码器直接沿用VQGAN的训练方式（感知损失加对抗损失），保证解码出的细节清晰。"},
+    {"to": "clip", "type": "uses", "note": "论文本身的文本编码器是从头训练的；基于它的Stable Diffusion把交叉注意力的条件来源换成冻结的CLIP文本编码器，这一组合才流行开来。"},
+    {"to": "adm", "type": "solves", "note": "ADM在像素空间训练需要数百GPU天；LDM用约四分之一的训练资源达到接近的质量。"},
+    {"to": "dall-e", "type": "rivals", "note": "同为“先压缩再生成”的两阶段方案，DALL·E用离散token加自回归，LDM用连续潜变量加扩散；此后文生图主流转向扩散路线。"},
+    {"to": "glide", "type": "rivals", "note": "同月发布的文本条件扩散模型，GLIDE在像素空间做并级联超分，LDM在潜空间做，算力需求低得多。"},
+    {"to": "unet", "type": "uses", "note": "潜空间里的去噪网络仍是U-Net，只是在中间层插入了交叉注意力。"},
+    {"to": "transformer", "type": "uses", "note": "交叉注意力机制和文本编码器都来自Transformer。"}
+  ],
+  "prereq": ["diffusion-process", "autoencoder", "latent-space", "attention-concept", "conv-layer", "generation-metrics"],
+  "terms": [
+    {"t": "下采样倍数f", "d": "自编码器把图像的长和宽各缩小多少倍。f=8时256×256的图变成32×32的潜变量。"},
+    {"t": "交叉注意力", "d": "查询来自一个序列（图像特征），键和值来自另一个序列（文本）的注意力，用来让图像的每个位置读取条件信息。"},
+    {"t": "感知压缩", "d": "只去掉人眼不敏感的高频细节、保留画面结构的压缩，由感知损失和对抗损失来保证。"}
+  ],
+  "learn": "先补[[c:diffusion-process]]、[[c:autoencoder]]和[[c:attention-concept]]，最好先读[[ddpm]]。然后读原文第3节（方法）和第4.1节（不同f的比较），对照The Illustrated Stable Diffusion看数据在两个阶段之间怎么流动。动手：用diffusers加载一个Stable Diffusion模型，分别打印VAE编码后的潜变量形状和U-Net的输入形状，再手动只用VAE编码解码一张图，看看压缩会丢掉哪些细节。",
+  "check": {"source": "https://arxiv.org/abs/2112.10752", "confirmed": "标题、5位作者、v1提交于2021-12-20、CVPR 2022；正文（ar5iv）中f∈{1…32}的比较、ImageNet FID 10.56/3.60（s=1.5）、1.45B参数与LAION-400M、COCO FID 12.63、150–1000 V100天、2.7倍加速、FID差38。"}
+}

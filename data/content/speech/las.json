@@ -1,0 +1,61 @@
+{
+  "id": "las",
+  "who": "William Chan, Navdeep Jaitly, Quoc V. Le, Oriol Vinyals · Google Brain / CMU",
+  "venue": "ICASSP 2016",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1508.01211"
+    }
+  ],
+  "problem": "CTC类端到端模型假设各输出字符相互独立，需要外部语言模型和词典来补救；传统DNN-HMM又由多个独立训练的模块拼成。",
+  "idea": "用一个「听者」编码器读入语音，再用一个带注意力的「拼写者」解码器逐个输出字符，整个系统联合训练，不依赖独立假设。",
+  "impact": "LAS确立了「编码器-注意力-解码器」作为端到端语音识别的主流结构，Whisper一类的模型仍属于这一族。",
+  "background": "[[ctc]]让网络直接输出字符序列，但每个时间步的输出在给定输入下彼此独立，不能自己学到字符之间的依赖。[[chorowski-attention]]证明注意力能用于音素识别，LAS把它扩展到词级任务。",
+  "method": "Listener是金字塔形的双向[[lstm]]：每升高一层，时间步减半（把相邻两帧的输出拼起来），把几千帧的滤波器组特征压缩成较短的表示，既减轻注意力的负担，又缩短了训练时间。Speller是带注意力的循环解码器（见[[c:attention-concept]]），每一步读入已生成的字符、用注意力在Listener输出里找到要看的位置，并预测下一个字符的概率：`P(y_i | x, y_{<i})`。与[[ctc]]不同，字符概率直接依赖前面的字符，因此没有独立性假设。训练最大化标注字符序列的对数似然，推理用束搜索（见[[c:decoding-sampling]]）。\n\n摘要报告：在Google语音搜索任务的一个子集上，无需词典和语言模型时词错误率为14.1%，用语言模型对前32个候选重打分后为10.3%；作为对照，当时最好的CLDNN-HMM模型为8.0%。",
+  "legacy": "[[chiu-s2s-asr]]通过更大规模与更好的训练技巧，使这一结构在2017年超过传统系统；之后[[speech-transformer]]、[[conformer]]、[[whisper]]在其基础上替换编码器或扩大数据。",
+  "limits": [
+    {
+      "text": "要先看完整段语音才能输出，无法流式识别；注意力对长音频不稳定。",
+      "solved_by": [
+        "streaming-rnnt-mobile"
+      ]
+    },
+    {
+      "text": "论文发表时的词错误率仍落后于最好的混合系统（10.3%对8.0%）。",
+      "solved_by": [
+        "chiu-s2s-asr",
+        "conformer"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "bahdanau-attention",
+      "type": "uses",
+      "note": "解码器的注意力机制来自机器翻译。"
+    },
+    {
+      "to": "ctc",
+      "type": "solves",
+      "note": "去掉CTC输出相互独立的假设，让字符预测依赖已生成的字符。"
+    },
+    {
+      "to": "deepspeech",
+      "type": "rivals",
+      "note": "同期的另一条端到端路线：Deep Speech用CTC加外部语言模型，LAS用注意力解码器。"
+    }
+  ],
+  "prereq": [
+    "encoder-decoder",
+    "attention-concept",
+    "recurrent-layer",
+    "decoding-sampling",
+    "word-error-rate"
+  ],
+  "learn": "先读[[bahdanau-attention]]，再读LAS的金字塔编码器一节；用ESPnet或torchaudio跑一个小LAS。",
+  "check": {
+    "source": "https://arxiv.org/abs/1508.01211",
+    "confirmed": "arXiv页核对：标题、作者Chan/Jaitly/Le/Vinyals、提交日期2015-08-05；摘要中14.1%、10.3%、8.0%三个词错误率。"
+  }
+}

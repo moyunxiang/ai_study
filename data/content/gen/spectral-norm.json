@@ -1,0 +1,91 @@
+{
+ "id": "spectral-norm",
+ "who": "Takeru Miyato, Toshiki Kataoka, Masanori Koyama, Yuichi Yoshida · Preferred Networks / National Institute of Informatics",
+ "venue": "ICLR 2018",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/1802.05957"
+  },
+  {
+   "label": "官方代码（Chainer）",
+   "url": "https://github.com/pfnet-research/sngan_projection"
+  }
+ ],
+ "problem": "控制判别器的Lipschitz常数能稳定GAN训练，但WGAN的权重裁剪太粗暴，WGAN-GP的梯度惩罚每步都要额外做一次反向传播，又慢又只在采样点上约束。",
+ "idea": "把判别器每一层的权重矩阵除以它的最大奇异值（谱范数），使每层都是1-Lipschitz，整个网络的Lipschitz常数也就不超过1；最大奇异值用每步一次的幂迭代廉价估计。",
+ "impact": "几乎零额外开销、一行代码就能加上，成为SAGAN、BigGAN等大型GAN的标准组件，也让单个GAN首次在完整的128×128 ImageNet上稳定训练。",
+ "background": "[[wgan]]和[[wgan-gp]]说明：限制判别器的Lipschitz常数（输出变化不超过输入变化的K倍）能让生成器拿到更平稳的梯度。但两种做法都有缺陷。权重裁剪把每个权重限制在一个小区间里，判别器被迫变得过于简单。梯度惩罚每一步要额外计算判别器对输入的梯度，计算量明显增加；而且只在真假样本连线上的点约束，换个数据分布约束就会变。\n\n作者想要一种直接作用在权重上、与数据无关、几乎不增加计算量的办法。",
+ "method": "**一层的Lipschitz常数**。对线性层`y = Wx`，输入向量长度变化最多被放大W的最大奇异值σ(W)倍（谱范数，见[[c:eigen-svd]]）。ReLU、LeakyReLU等激活函数本身是1-Lipschitz。多层串起来，整个网络的Lipschitz常数不超过各层σ的乘积：\n\n`‖f‖_Lip ≤ Π_l σ(W_l)`\n\n**谱归一化**。每次前向时把权重换成\n\n`W_SN = W / σ(W)`\n\n每层的σ都变成1，整个判别器的Lipschitz常数被限制在1以内。与权重裁剪不同，它只把矩阵整体缩放，不改变矩阵各方向之间的相对比例，判别器的表达力保留得多。\n\n**幂迭代**。精确的SVD很贵。用幂迭代估计最大奇异值：维护一个向量u，反复做`v ← Wᵀu/‖Wᵀu‖`，`u ← Wv/‖Wv‖`，最后`σ ≈ uᵀWv`。因为权重每步只变一点，上一步的u已经很接近，所以每次训练迭代只做**一次**幂迭代就够了。卷积层把卷积核展平成矩阵后同样处理。",
+ "results": "在CIFAR-10标准CNN上，谱归一化GAN的Inception Score为7.42、FID 29.3，优于权重裁剪（6.41/42.6）、WGAN-GP（6.68/40.2）和权重归一化（6.84/34.7）；配合hinge损失进一步到7.58/25.5，换成ResNet结构达到8.22/21.7。在多组激进的学习率与动量设置下，谱归一化保持稳定，而WGAN-GP在高学习率下训练失败。计算时间约为权重归一化的110%到120%，明显快于WGAN-GP。在128×128条件ImageNet上（配合投影判别器），谱归一化GAN的Inception Score为21.1，而不加归一化或用层归一化的GAN在训练早期就坍塌了。",
+ "legacy": "谱归一化很快成为GAN的标配：[[sagan]]把它同时用在生成器和判别器上，[[biggan]]在此基础上把类别条件GAN扩展到更大的模型、批量和分辨率。它也被用于其他需要控制Lipschitz常数的场合，如对抗鲁棒性和强化学习的稳定训练。",
+ "limits": [
+  {
+   "text": "逐层约束的乘积只是整体Lipschitz常数的上界，可能过度约束判别器，限制了它的表达力。",
+   "solved_by": []
+  },
+  {
+   "text": "只约束判别器，在更大的模型和批量下训练后期仍会突然坍塌。",
+   "solved_by": [
+    "biggan"
+   ]
+  },
+  {
+   "text": "幂迭代每步只做一次，权重变化剧烈时谱范数的估计会有偏差。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "wgan-gp",
+   "type": "solves",
+   "note": "用逐层权重缩放代替梯度惩罚，省去额外的反向传播，并且约束与数据分布无关；在激进超参数下比WGAN-GP更稳。"
+  },
+  {
+   "to": "wgan",
+   "type": "solves",
+   "note": "同样限制判别器的Lipschitz常数，但只整体缩放权重矩阵，避免了权重裁剪把判别器变得过于简单的问题。"
+  },
+  {
+   "to": "gan",
+   "type": "extends",
+   "note": "论文用的主要是标准GAN和hinge损失而非Wasserstein损失，说明Lipschitz约束对普通GAN同样有效。"
+  },
+  {
+   "to": "improved-gan",
+   "type": "uses",
+   "note": "以Inception Score作为主要评估指标之一。"
+  },
+  {
+   "to": "fid",
+   "type": "uses",
+   "note": "同时用FID评估生成质量与多样性。"
+  }
+ ],
+ "prereq": [
+  "eigen-svd",
+  "norm",
+  "adversarial-training",
+  "matrix-multiplication",
+  "normalization-layer"
+ ],
+ "terms": [
+  {
+   "t": "谱范数",
+   "d": "矩阵的最大奇异值，即这个线性变换最多能把一个向量的长度放大多少倍。"
+  },
+  {
+   "t": "幂迭代",
+   "d": "反复用矩阵去乘一个向量并归一化，向量会收敛到最大奇异值对应的方向，从而估计出最大奇异值。"
+  },
+  {
+   "t": "hinge损失",
+   "d": "判别器对真样本要求D(x)≥1、对假样本要求D(x)≤−1，超过就不再惩罚。用于GAN时常比原始交叉熵损失更稳。"
+  }
+ ],
+ "learn": "先补[[c:eigen-svd]]，理解为什么最大奇异值等于线性变换的最大放大倍数。原文第2节推导Lipschitz上界，附录A给出幂迭代算法，都很短。PyTorch里`torch.nn.utils.spectral_norm`一行即可启用；动手比较同一个DCGAN判别器加与不加谱归一化时的训练曲线。",
+ "check": {
+  "source": "https://arxiv.org/abs/1802.05957",
+  "confirmed": "标题、4位作者、arXiv v1提交于2018-02-16、comments注明ICLR 2018；正文（ar5iv）中的W/σ(W)、每步一次幂迭代、Lipschitz乘积上界、CIFAR-10上各方法的IS与FID（7.42/29.3、6.41/42.6、6.68/40.2、6.84/34.7、hinge 7.58/25.5、ResNet 8.22/21.7）、计算时间110–120%、ImageNet 128×128 IS 21.1及未归一化GAN早期坍塌。"
+ }
+}

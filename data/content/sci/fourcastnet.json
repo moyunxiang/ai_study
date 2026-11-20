@@ -1,0 +1,91 @@
+{
+  "id": "fourcastnet",
+  "who": "Pathak, Subramanian, Harrington, Raja, Chattopadhyay, Mardani, Kurth, Hall et al. · NVIDIA / Caltech / Lawrence Berkeley National Lab 等",
+  "venue": "arXiv 2022",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2202.11214"
+    }
+  ],
+  "problem": "传统数值天气预报要在超算上解物理方程，一次预报要几小时；而此前的深度学习天气模型分辨率很低，达不到业务使用的0.25度。",
+  "idea": "把傅里叶神经算子与视觉Transformer结合（AFNO），在ERA5再分析数据上直接学习「当前大气状态到6小时后」的映射，并自回归滚动出一周预报。",
+  "impact": "首个在0.25度分辨率上与IFS在部分变量上相当的数据驱动全球模型，一周预报不到2秒，点燃了2022至2023年的AI天气预报竞赛。",
+  "background": "数值天气预报（NWP）把大气当作流体，用时间步进求解物理方程，ECMWF的IFS是最强的业务系统，但需要大型超算和数小时计算。[[weatherbench]]（2020）给数据驱动方法提供了基准，不过当时的深度学习模型分辨率约5.6度到2度，一个格点就是几百公里，无法表示降水、台风这类小尺度现象。问题在于：怎样让神经网络在百万级格点的全球场上既高分辨率又能快速训练。",
+  "method": "输入是ERA5再分析在0.25度网格上的若干变量（风、温度、湿度、位势高度等多个层次，图像大小约720×1440）。模型把这张全球图当作一幅多通道图像：先切成小块（见[[c:image-patch]]），再通过**自适应傅里叶神经算子**（AFNO）混合token。AFNO的思路来自[[fno]]：把空间混合放到频域做，先做二维傅里叶变换，在频域用逐通道的小MLP变换，再逆变换回来，复杂度近似`O(N log N)`，比标准自注意力的`O(N²)`适合这么大的图。外层结构沿用[[vit]]。\n\n模型一次预测下一个6小时的完整大气状态，再把输出当作输入反复滚动（自回归，见[[c:autoregressive]]）得到更长预报。为了降低误差累积，还做了两阶段训练：先学单步，再微调多步滚动。",
+  "results": "按论文报告：在短到中等预报时效上，大尺度变量的精度与IFS相当，而在降水等细尺度结构复杂的变量上优于IFS；一周预报生成时间不到2秒，比IFS快几个数量级，因此可以便宜地生成上千成员的大集合预报。",
+  "legacy": "FourCastNet证明了0.25度的纯数据驱动预报可行。几个月后[[pangu-weather]]在多数变量上全面超过IFS的确定性预报，[[graphcast]]和[[fuxi]]随后跟进，[[gencast]]把它扩展成概率性集合预报。NVIDIA也把它继续做成FourCastNet 3等后续版本（未在此核对）。",
+  "limits": [
+    {
+      "text": "预报在较长时效上会变模糊：均方误差训练使模型倾向输出平滑的平均场，极端值和小尺度结构被抹掉。",
+      "solved_by": [
+        "gencast",
+        "graphcast"
+      ]
+    },
+    {
+      "text": "只给出单条确定性预报，没有可靠的不确定性估计；论文虽能廉价生成大集合，但集合离散度并不经过校准。",
+      "solved_by": [
+        "gencast",
+        "neuralgcm"
+      ]
+    },
+    {
+      "text": "自回归滚动时误差累积，且在整体精度上还未全面超过IFS，尤其是高空变量。",
+      "solved_by": [
+        "pangu-weather",
+        "graphcast"
+      ]
+    },
+    {
+      "text": "模型是黑箱，不保证守恒律等物理约束，也没有长期气候模拟的稳定性。",
+      "solved_by": [
+        "neuralgcm"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "fno",
+      "type": "extends",
+      "note": "把傅里叶神经算子的频域混合改造成适合大图的AFNO，用在全球大气场上。"
+    },
+    {
+      "to": "vit",
+      "type": "uses",
+      "note": "采用图像切块加Transformer的整体结构，用AFNO取代自注意力。"
+    },
+    {
+      "to": "weatherbench",
+      "type": "solves",
+      "note": "WeatherBench时代的数据驱动模型分辨率过低；FourCastNet首次做到0.25度。"
+    },
+    {
+      "to": "pinn",
+      "type": "rivals",
+      "note": "PINN靠把物理方程写进损失函数；FourCastNet完全靠数据，不显式使用方程。"
+    }
+  ],
+  "prereq": [
+    "fourier-transform",
+    "image-patch",
+    "self-attention",
+    "autoregressive",
+    "convolution-op"
+  ],
+  "terms": [
+    {
+      "t": "ERA5",
+      "d": "ECMWF制作的全球大气再分析数据集，把历史观测和模式同化成逐小时的规整网格，是训练数据驱动天气模型的标准数据。"
+    },
+    {
+      "t": "再分析",
+      "d": "用现代预报系统把过去几十年的观测重新同化一遍得到的一致历史大气记录。"
+    }
+  ],
+  "learn": "先理解[[c:fourier-transform]]和[[c:image-patch]]。读原文的AFNO与训练两节；用NVIDIA的earth2studio或原仓库加载预训练权重，对一次台风做预报并和ERA5真值对比。",
+  "check": {
+    "source": "https://arxiv.org/abs/2202.11214",
+    "confirmed": "标题、作者、v1日期2022-02-22；摘要中0.25度分辨率、一周预报不到2秒、与IFS在短时效大尺度变量上相当、降水上更优、可生成数千成员集合。"
+  }
+}

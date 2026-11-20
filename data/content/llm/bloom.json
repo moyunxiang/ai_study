@@ -1,0 +1,40 @@
+{
+  "id": "bloom",
+  "who": "BigScience Workshop（Teven Le Scao, Angela Fan, Christopher Akiki, Ellie Pavlick, Suzana Ilić, Daniel Hesslow et al.，论文作者近400人） · Hugging Face牵头的国际开放协作",
+  "venue": "arXiv 2022（模型于2022-07开放）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2211.05100"},
+    {"label": "Hugging Face发布博客", "url": "https://huggingface.co/blog/bloom"},
+    {"label": "模型权重", "url": "https://huggingface.co/bigscience/bloom"}
+  ],
+  "problem": "千亿级语言模型只掌握在少数大公司手里，权重和训练数据都不公开；训练语料以英语为主，其他语言几乎被忽略。",
+  "idea": "由上千名研究者公开协作，在法国政府的Jean Zay超算上训练一个176B参数、覆盖46种自然语言和13种编程语言的解码器模型，并把权重、代码和数据处理流程全部公开。",
+  "impact": "第一个完全公开权重的千亿级多语言模型，证明学术界能组织起GPT-3规模的训练；但它很快被训练更充分、更小的LLaMA系列取代。",
+  "background": "[[gpt-3]]之后，千亿参数模型成了少数公司的专利：GPT-3只能通过付费API调用，研究者看不到权重，无法研究模型内部，也无法检查训练数据里有什么。同期公开的大模型要么小一个量级（[[gpt-j]]、[[gpt-neox]]），要么像[[opt]]那样只对申请通过的研究者开放、且几乎只训练英语。\n\nBigScience由Hugging Face和法国NLP社区发起，起点是法国GENCI拨给的Jean Zay超算算力。项目很快扩展成国际协作，最终有1200多人登记参与，目标是从数据到模型完全公开地训练一个GPT-3规模的多语言模型。",
+  "method": "**数据**。自建ROOTS语料：498个数据集、1.61TB文本，覆盖46种自然语言和13种编程语言，其中约11%是代码。为了让小语种不被切成过多碎片，分词器用了250,680个词元的大词表（见[[c:tokenization]]）。\n\n**结构**。标准的解码器Transformer（见[[c:autoregressive]]），70层、隐藏维度14336、112个注意力头、上下文2048。两处改动来自前期在小模型上做的消融：位置信息用[[alibi]]——不给输入加位置向量，而是按查询和键的距离线性扣减注意力分数；在词嵌入层后多加一层LayerNorm，因为在104B规模的预实验里，这层能明显减少训练发散。\n\n**训练**。用Megatron-DeepSpeed框架：[[megatron]]提供张量并行和流水线并行，[[zero]]的第一阶段把优化器状态切分到各张卡上（见[[c:distributed-training]]）。在48个节点、384张A100 80GB上训练约3.5个月，用bfloat16混合精度，总共看了366B个token。",
+  "results": "在HELM的5-shot英语评测中，BLOOM大致与初版GPT-3 davinci持平，落后于InstructGPT和[[opt]]。在HumanEval代码题上pass@1为15.52%，远低于Codex-12B的28.81%。训练耗电433MWh，因为法国电网以核电为主，排放约25吨CO2当量，论文引用的GPT-3估算值约为502吨。\n\n在多语言多任务提示数据xP3上继续微调得到BLOOMZ，零样本能力明显提升（沿用[[t0]]的做法）。",
+  "legacy": "BLOOM的价值更多在于过程：ROOTS数据治理、开放许可证、碳排放核算和大规模协作的经验都被详细记录。它本身的使用寿命很短：三个月后[[llama-1]]用更多的数据训练更小的模型，13B就在多数基准上超过GPT-3，开源社区随即转向LLaMA。ALiBi也没有成为主流，后来的大模型大多选择[[rope]]。",
+  "pitfalls": "- “开放”不等于没有限制。BLOOM用的是负责任AI许可证（RAIL），允许使用和修改，但附带用途限制条款。\n- 176B参数与GPT-3相当，但训练token只有366B，按[[chinchilla]]的经验远未训练充分，所以不能把它当作“开源版GPT-3”来期待同等效果。",
+  "limits": [
+    {"text": "176B参数只训练了366B个token，远少于Chinchilla建议的每参数约20个token，英语能力落后于同期规模相近的模型。", "solved_by": ["llama-1"]},
+    {"text": "只是预训练基座模型，没有经过对话和偏好对齐，直接用作助手时回答质量差；BLOOMZ只做了多任务指令微调。", "solved_by": ["vicuna", "llama-2"]},
+    {"text": "模型太大，推理需要多张80GB显卡，普通研究者很难真正部署和微调。", "solved_by": ["llama-1", "qlora", "llama-cpp"]},
+    {"text": "代码能力弱，HumanEval pass@1只有15.5%。", "solved_by": ["starcoder", "code-llama"]}
+  ],
+  "relations": [
+    {"to": "gpt-3", "type": "extends", "note": "以公开协作的方式复现GPT-3规模的解码器语言模型，并把语料扩展到46种语言。"},
+    {"to": "alibi", "type": "uses", "note": "用ALiBi的线性距离偏置代替位置嵌入，论文称它在原始长度上也让训练更平稳、下游效果更好。"},
+    {"to": "megatron", "type": "uses", "note": "训练框架Megatron-DeepSpeed中的张量并行和流水线并行来自Megatron-LM。"},
+    {"to": "zero", "type": "uses", "note": "用ZeRO第一阶段切分优化器状态，以便在384张卡上放下176B模型的训练状态。"},
+    {"to": "opt", "type": "rivals", "note": "同年开放的175B模型；OPT只对申请者开放、以英语为主，BLOOM完全公开且多语言，但两者都很快被LLaMA取代。"},
+    {"to": "t0", "type": "extends", "note": "把T0的多任务提示微调推广到多语言，得到BLOOMZ。"}
+  ],
+  "prereq": ["language-model", "autoregressive", "tokenization", "positional-encoding", "distributed-training", "params-flops", "zero-few-shot"],
+  "terms": [
+    {"t": "ROOTS", "d": "BigScience为BLOOM构建的1.61TB多语言训练语料，由498个数据集组成，并公开了数据来源和处理工具。"},
+    {"t": "bfloat16", "d": "一种16位浮点格式，指数位与32位浮点相同、尾数更短，数值范围大，不容易溢出，因而比float16更适合大模型训练。"},
+    {"t": "负责任AI许可证（RAIL）", "d": "允许自由使用和修改模型、但在条款中禁止某些用途（如违法、伤害他人）的许可证。"}
+  ],
+  "learn": "先了解[[gpt-3]]和[[c:distributed-training]]的三种并行方式。读论文第3.2节（ROOTS）、3.5节（训练基础设施）和表3超参数，再看第4.6节HELM对比，体会“参数多不等于效果好”。可以在Hugging Face上加载BLOOM-560M，用不同语言提问，观察小语种的分词长度。",
+  "check": {"source": "https://arxiv.org/abs/2211.05100", "confirmed": "标题、arXiv v1于2022-11-09；PDF全文：ROOTS 1.61TB/498个数据集、46+13种语言、词表250,680、70层/14336维/112头、ALiBi与嵌入层LayerNorm、384张A100 80GB训练约3.5个月、366B token、Megatron-DeepSpeed与ZeRO stage 1、HumanEval表9（BLOOM 15.52%，Codex-12B 28.81%）、能耗433MWh/25吨与GPT-3 502吨、HELM对比结论。Hugging Face博客：2022-07-12发布、1000多名研究者、70多个国家；论文第2.2节：1200多人登记参与、GENCI算力资助。"}
+}

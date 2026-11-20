@@ -1,0 +1,44 @@
+{
+ "id": "pipedream",
+ "who": "Aaron Harlap, Deepak Narayanan, Amar Phanishayee 等 · CMU · Microsoft Research · Stanford",
+ "venue": "arXiv 2018",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/1806.03377"
+  }
+ ],
+ "problem": "数据并行每步要同步全部梯度，模型越大通信越贵；单纯把模型按层切到不同GPU上，又会让大部分GPU在等别人。",
+ "idea": "把模型按层分到多块GPU，同时让多个小批次依次注入流水线，前向和反向交替进行（1F1B），使每块GPU尽量不空闲。",
+ "impact": "流水线并行的早期代表，其1F1B调度成为后续大模型训练的标配。",
+ "method": "PipeDream把网络分成连续的若干段，每段放一块GPU。一个小批次先逐段前向，再逐段反向。关键是**不等前一批完全结束就注入下一批**：稳态下每块GPU交替做一次前向和一次反向（1F1B），这样各GPU都有活干。\n\n新问题是权重版本：一个批次前向时用的权重，反向时必须是同一版本，否则梯度不对。PipeDream为此保存多份权重版本。它还自动决定如何划分层、各段用多少设备。摘要称它相对数据并行最多可减少95%通信，在两个集群上5个模型达到目标精度最多快5倍。后续的[[gpipe]]走了另一条更简单的同步路线。",
+ "limits": [
+  {
+   "text": "需要保存多个权重版本，显存开销大，且权重更新存在一定的陈旧性。",
+   "solved_by": [
+    "gpipe"
+   ]
+  },
+  {
+   "text": "需要手工或自动划分层，负载不均就会出现流水线气泡。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "parameter-server",
+   "type": "rivals",
+   "note": "参数服务器式数据并行通信随模型增大而变贵，PipeDream改为切模型、传激活，减少95%通信（官方摘要）。"
+  }
+ ],
+ "prereq": [
+  "distributed-training",
+  "backpropagation",
+  "interconnect"
+ ],
+ "learn": "画出4段流水线、8个小批次的时间表，数出空闲格子的数量，再对比1F1B。",
+ "check": {
+  "source": "https://arxiv.org/abs/1806.03377",
+  "confirmed": "标题、7位作者、v1提交2018-06-08；摘要：减少最多95%通信、5个DNN两个集群最多快5倍、保存参数版本、轮流前后向。"
+ }
+}

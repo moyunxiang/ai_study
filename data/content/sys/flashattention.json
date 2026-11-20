@@ -1,0 +1,38 @@
+{
+  "id": "flashattention",
+  "who": "Tri Dao, Daniel Y. Fu, Stefano Ermon, Atri Rudra, Christopher Ré · 斯坦福大学 / 布法罗大学",
+  "venue": "NeurIPS 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2205.14135"},
+    {"label": "代码 flash-attention", "url": "https://github.com/Dao-AILab/flash-attention"}
+  ],
+  "problem": "自注意力要生成N×N的分数矩阵，长序列下显存爆炸、速度慢；各种近似注意力减少了计算量，实际运行时间却常常没变快。",
+  "idea": "问题不在计算而在读写显存：把Q、K、V切成小块放进片上SRAM，用在线softmax逐块算出精确结果，从不把N×N矩阵写回显存。",
+  "impact": "在不改变数学结果的前提下让注意力快数倍、显存从平方降到线性，成为几乎所有大模型训练和推理框架的标配，也是长上下文模型得以训练的前提。",
+  "background": "标准注意力`O = softmax(Q·Kᵀ/√d)·V`的实现分三步：算出`S = Q·Kᵀ`写回显存，读出来做softmax得到`P`再写回去，再读出`P`与`V`相乘。序列长度N=4096时，每个头的`S`就有1600多万个数，这些读写主要发生在GPU的高带宽显存（HBM）上。\n\n论文给出了[[a100]]的存储层次：40–80GB的HBM带宽约1.5–2.0TB/s；108个流式多处理器各有192KB片上SRAM，带宽约19TB/s，快一个数量级但小得多。softmax、mask、dropout这些逐元素操作计算量很小，时间几乎全花在搬数据上（见[[c:memory-bandwidth]]）。\n\n当时的主流思路是近似注意力：[[reformer]]用哈希只算部分配对，[[linear-attention]]、[[performer]]用核函数绕开N×N矩阵。它们降低了FLOPs，但往往不减少实际耗时，还损失精度，所以大模型训练基本没采用。",
+  "method": "核心是**IO感知**：把“读写了多少次HBM”当作主要代价来设计算法。\n\n**分块（tiling）**。把Q按行切成块，K、V也切成块。外层循环每次把一块K、V从HBM读进SRAM，内层循环对每块Q算出这一小块的分数、softmax和与V的乘积，累加到输出上。整个过程融合在一个CUDA内核里，中间的分数块只在SRAM里存在。\n\n**难点是softmax需要整行的信息**：归一化分母要对整行求和，最大值要整行比较。解决办法来自[[online-softmax]]：每处理一块，就维护每行当前的最大值`m`和指数和`ℓ`；新块来了，若最大值变大，就把已有的部分结果乘以`exp(m_旧 − m_新)`修正，再加上新块的贡献。最后得到的结果与一次性算完全一样，不是近似。\n\n**反向传播用重算代替存储**。标准做法要把N×N的`P`存下来供反向使用；FlashAttention只存每行的`m`和`ℓ`，反向时在SRAM里重新算出分数块。多做了一些乘法，但省掉了大量HBM读写，总体更快。\n\n论文证明它的HBM访问量是`O(N²d²/M)`（M为SRAM大小），而标准实现是`Θ(Nd + N²)`；对常见的d=64到128和约100KB的SRAM，前者小很多倍。",
+  "results": "注意力计算本身在GPT-2上比PyTorch实现快至多7.6倍。端到端训练：BERT-large（序列512）比MLPerf 1.1的训练速度纪录快15%，GPT-2（序列1K）快3倍，Long Range Arena（序列1K–4K）快2.4倍。省下的显存让模型能用更长的上下文：GPT-2困惑度降低0.7，长文档分类提高6.4分；它也是第一个在Path-X（序列16K，准确率61.4%）和Path-256（序列64K，63.1%）上超过随机水平的Transformer。",
+  "legacy": "此后它被集成进PyTorch的`scaled_dot_product_attention`和[[hf-transformers]]等主流框架。它也改变了长上下文的研究方向：与其设计近似注意力，不如先把精确注意力的IO做好。后续版本针对每代GPU继续优化：[[flashattention-2]]改进并行划分，[[flashattention-3]]利用H100的异步和FP8，[[flashattention-4]]面向Blackwell。分块加在线softmax的思路被[[ring-attention]]扩展到多卡序列并行，推理系统[[vllm]]等也把它作为注意力后端之一。",
+  "limits": [
+    {"text": "只达到A100理论峰值FLOPs的25%–40%，远不如矩阵乘内核；线程块之间的工作划分不够好，长序列小批量时GPU占用率低。", "solved_by": ["flashattention-2"]},
+    {"text": "计算量仍随序列长度平方增长，只是省了显存读写；百万token级别的上下文单卡依然算不动。", "solved_by": ["ring-attention", "nsa", "moba"]},
+    {"text": "内核针对Ampere架构手写，用不上Hopper的异步张量核心、TMA和FP8，新硬件上要重写。", "solved_by": ["flashattention-3", "flashattention-4"]},
+    {"text": "主要优化训练和预填充；自回归解码时每步只有一个查询，瓶颈变成反复读取和存放KV缓存，需要推理系统另行设计。", "solved_by": ["vllm"]}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "solves", "note": "原始自注意力要物化N×N矩阵，显存与序列长度平方成正比；FlashAttention在数学上不变的前提下把显存降到线性并大幅提速。"},
+    {"to": "online-softmax", "type": "uses", "note": "借用在线softmax“边扫描边修正最大值和分母”的技巧，使softmax可以逐块计算而结果精确。"},
+    {"to": "a100", "type": "uses", "note": "针对A100的HBM与片上SRAM带宽差距设计分块大小，实验主要在A100上完成。"},
+    {"to": "reformer", "type": "rivals", "note": "Reformer等近似注意力靠减少计算量提速，常常牺牲精度又不省时间；FlashAttention证明精确注意力做好IO更快，后者成为主流。"},
+    {"to": "linear-attention", "type": "rivals", "note": "线性注意力改变了数学形式以避开平方复杂度；FlashAttention保留原公式，只改实现方式，在LRA上精度与速度都不输。"},
+    {"to": "grad-checkpointing", "type": "uses", "note": "反向传播时不存注意力矩阵而是重算，与梯度检查点“以计算换显存”的思路相同，只是重算发生在片上SRAM。"}
+  ],
+  "prereq": ["self-attention", "softmax", "memory-bandwidth", "cpu-gpu", "big-o", "backpropagation"],
+  "terms": [
+    {"t": "HBM与SRAM", "d": "HBM是GPU的主显存，容量大（几十GB）但相对慢；SRAM是每个计算单元旁边的片上缓存，容量只有几百KB但快一个数量级。"},
+    {"t": "IO感知", "d": "设计算法时把不同层级存储之间的数据读写次数当作主要代价，而不是只数浮点运算次数。"},
+    {"t": "内核融合", "d": "把多个原本各自读写显存的操作合并到同一个GPU内核里，中间结果留在片上，不写回显存。"}
+  ],
+  "learn": "先弄清[[c:softmax]]的数值稳定写法（减去最大值），再看[[online-softmax]]怎样把它改成单遍扫描。然后读原文第2.1节（GPU存储层次）和第3.1节的算法1，自己用NumPy按块实现一遍前向，与一次性计算的结果对比误差。最后可以读官方Triton教程里的fused attention示例。",
+  "check": {"source": "https://arxiv.org/abs/2205.14135", "confirmed": "标题、5位作者、v1提交于2022-05-27；摘要中的15%、3倍、2.4倍、困惑度0.7、6.4分、Path-X 61.4%与Path-256 63.1%；正文中A100的HBM 1.5–2.0TB/s、192KB×108个SM、约19TB/s，7.6倍加速，HBM访问O(N²d²M⁻¹)。"}
+}

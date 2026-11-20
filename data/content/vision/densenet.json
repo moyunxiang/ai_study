@@ -1,0 +1,37 @@
+{
+  "id": "densenet",
+  "who": "Gao Huang（黄高）, Zhuang Liu（刘壮）, Laurens van der Maaten, Kilian Q. Weinberger · 康奈尔大学 / 清华大学 / Facebook AI Research",
+  "venue": "CVPR 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1608.06993"},
+    {"label": "代码与预训练模型", "url": "https://github.com/liuzhuang13/DenseNet"}
+  ],
+  "problem": "ResNet把很多层做深了，但随机深度等实验表明，深ResNet里很多层可以随机丢掉而几乎不影响结果——层与层之间存在大量冗余，参数利用率不高。",
+  "idea": "在一个稠密块内，每一层都以前面所有层输出的拼接作为输入，自己只新产生少量（k个，如12或32）特征图；L层的块里有L(L+1)/2条直接连接，鼓励特征被反复复用。",
+  "impact": "在CIFAR和SVHN上刷新纪录，在ImageNet上用约一半的参数和计算达到ResNet的精度；“特征复用”和“窄而密”的设计成为与残差并列的另一种连接范式。",
+  "background": "[[resnet]]用`x + F(x)`的恒等捷径训练出上百层网络，此后一年里出现了多个改进：[[preact-resnet]]训出1001层，[[wide-resnet]]发现变宽比变深划算，[[stochastic-depth]]在训练时随机跳过整个残差块，反而让1202层ResNet训练得更好。\n\n随机深度的结果说明了一件事：深ResNet里很多层的贡献很小，删掉它们网络照样工作。原因之一是，相加的方式会把新特征和旧特征混在一起，每一层都要“重新学”一些前面已有的信息才能传下去，造成冗余。另一方面，[[googlenet]]已经用通道拼接合并不同分支的特征。DenseNet的问题是：如果让每一层都能直接拿到前面所有层的原始特征，是否可以用更窄的层、更少的参数达到同样效果？",
+  "method": "**稠密连接。**在一个稠密块里，第ℓ层的输入是前面所有层输出在通道维上的拼接：\n\n`x_ℓ = H_ℓ([x₀, x₁, …, x_{ℓ−1}])`\n\n对比ResNet的`x_ℓ = H_ℓ(x_{ℓ−1}) + x_{ℓ−1}`：ResNet是**相加**，信息被混合；DenseNet是**拼接**，前面每层的特征原封不动地保留，后面任意一层都可以直接读取（见[[c:residual-connection]]）。每个`H_ℓ`是“BN—ReLU—3×3卷积”。\n\n**增长率k。**每层只新产生k个特征图，第ℓ层的输入有`k₀ + k·(ℓ−1)`个通道。k可以很小（12、24、32），因为每层只需补充“集体知识”里缺的那一点，而不必重新传递已有信息。\n\n**过渡层。**拼接要求特征图尺寸相同，所以网络分成若干稠密块，块与块之间用“1×1卷积＋2×2平均池化”的过渡层下采样。\n\n**DenseNet-BC。**两项压缩：B（瓶颈）在每个3×3卷积前加一个输出4k通道的1×1卷积；C（压缩）让过渡层把通道数乘以θ＝0.5。ImageNet上用的是DenseNet-BC、k＝32的121、169、201、264层四种配置。\n\n例子：一个5层稠密块、k＝4、输入16通道，第5层的输入是16＋4×4＝32通道，而块的输出是16＋5×4＝36通道。",
+  "results": "CIFAR（标准增强）：DenseNet-BC（190层、k＝40、2560万参数）在C10+上错误率3.46%、C100+上17.18%，明显低于Wide ResNet。参数效率：100层、k＝12的DenseNet-BC只有80万参数，在C10+上为4.51%，与1000多万参数的1001层预激活ResNet（4.62%）相当，参数少90%。ImageNet：DenseNet-201（约2000万参数）的验证错误率与超过4000万参数的ResNet-101相近；计算量与ResNet-50相同的DenseNet，精度与计算量是其两倍的ResNet-101持平。",
+  "legacy": "DenseNet在医学图像、分割（如DenseNet式的U-Net变体）和小数据场景中被广泛使用；“特征复用”的观点也影响了后来对网络连接方式的研究，[[hyper-connections]]等工作继续探索比单一残差更丰富的层间连接。\n\n但在工业界的主干网络竞争中，DenseNet没有取代ResNet：拼接让特征图越来越宽，显存占用和内存访问量大，在GPU上的实际速度并不像参数量那样占优。之后的高效网络（[[mobilenetv2]]、[[efficientnet]]、[[regnet]]）大多回到残差相加的设计。",
+  "pitfalls": "- DenseNet参数少不等于速度快：拼接后的特征图很宽，朴素实现的显存占用会随层数快速增长，作者另写了技术报告介绍省显存的实现。\n- “每层与所有层相连”只在一个稠密块内部成立，块与块之间靠过渡层串联。",
+  "limits": [
+    {"text": "拼接使每层的输入通道随深度线性增加，中间特征图要全部保存，朴素实现显存占用很大，限制了批大小和网络规模。", "solved_by": []},
+    {"text": "大量窄层和拼接操作的内存访问开销大，参数和FLOPs少并不能换来同等的GPU实际推理速度。", "solved_by": ["mobilenetv2", "regnet"]},
+    {"text": "仍是纯卷积结构，每层只看局部邻域，长距离依赖要靠堆叠很多层间接获得。", "solved_by": ["non-local", "vit"]}
+  ],
+  "relations": [
+    {"to": "resnet", "type": "extends", "note": "把残差的“相加”换成“拼接”，并把捷径从相邻层推广到块内所有层之间，用更少参数达到同等精度。"},
+    {"to": "stochastic-depth", "type": "extends", "note": "随机深度显示深ResNet中很多层是冗余的；DenseNet据此设计窄层加特征复用的结构，减少冗余。"},
+    {"to": "googlenet", "type": "uses", "note": "Inception模块已用通道拼接合并多分支特征；DenseNet把拼接用在层与层之间的连接上。"},
+    {"to": "preact-resnet", "type": "rivals", "note": "同期加深残差网络的方案；100层DenseNet-BC用约十分之一的参数达到1001层预激活ResNet的精度。"},
+    {"to": "wide-resnet", "type": "rivals", "note": "Wide ResNet靠加宽换精度、参数超过3000万；DenseNet靠窄层和特征复用，以更少参数在CIFAR上取得更低错误率。"}
+  ],
+  "prereq": ["conv-layer", "residual-connection", "normalization-layer", "params-flops", "vanishing-exploding"],
+  "terms": [
+    {"t": "稠密块", "d": "一组特征图尺寸相同的层，其中每一层都接收前面所有层输出的拼接，并把自己的输出传给后面所有层。"},
+    {"t": "增长率", "d": "稠密块中每层新产生的特征图数量k，决定了每层为“集体知识”添加多少新信息。"},
+    {"t": "过渡层", "d": "位于两个稠密块之间，用1×1卷积压缩通道、平均池化减半尺寸。"}
+  ],
+  "learn": "先读[[resnet]]并补[[c:residual-connection]]。读原文第3节（稠密连接、增长率、过渡层、BC版本）和图1、图2。动手：用PyTorch写一个k＝12、6层的稠密块，打印每层输入通道数，验证`k₀ + k·(ℓ−1)`；再在CIFAR-10上比较参数量相近的DenseNet与ResNet。",
+  "check": {"source": "https://arxiv.org/abs/1608.06993", "confirmed": "arXiv页确认标题、4位作者、v1提交于2016-08-25、CVPR 2017、L(L+1)/2条连接；正文确认拼接公式、增长率k、过渡层为1×1卷积加2×2平均池化、瓶颈4k、θ＝0.5、ImageNet用k＝32、C10+ 3.46%与C100+ 17.18%（190层k＝40、25.6M参数）、100层k＝12（0.8M）4.51% vs 1001层预激活ResNet 4.62%且参数少90%、DenseNet-201（20M）≈ResNet-101（>40M）、与ResNet-50同计算量的DenseNet≈ResNet-101、提及省显存实现的技术报告、Wide ResNet等超过30M参数。原文首页确认作者单位（康奈尔、清华、FAIR）。"}
+}

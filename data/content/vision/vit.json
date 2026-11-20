@@ -1,0 +1,44 @@
+{
+  "id": "vit",
+  "who": "Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer et al. · Google Research, Brain Team",
+  "venue": "ICLR 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2010.11929"},
+    {"label": "官方代码（big_vision / vision_transformer）", "url": "https://github.com/google-research/vision_transformer"},
+    {"label": "timm中的ViT实现", "url": "https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/vision_transformer.py"}
+  ],
+  "problem": "Transformer已统治自然语言处理，但视觉仍以卷积网络为主；注意力只被当作CNN的附加模块，而对每个像素做自注意力计算量又太大。",
+  "idea": "把图像切成16×16像素的小块，每块线性映射成一个向量，当作一个“词”，整串送进几乎不加修改的标准Transformer编码器做分类。",
+  "impact": "在足够大的数据上预训练后，纯Transformer超过最强的卷积网络且训练算力更少；此后CLIP、MAE、DINO、SAM、DiT和几乎所有多模态大模型的视觉部分都基于ViT。",
+  "background": "从[[alexnet]]到[[resnet]]，卷积网络（见[[c:conv-layer]]）统治视觉近十年。卷积有两个内置假设（[[c:inductive-bias]]）：**局部性**——一个像素只和邻近像素直接相关；**平移等变**——同一个卷积核在图上每个位置共用，猫在左上角和右下角用同样的方式识别。这些假设让CNN在中等规模数据上很省样本。\n\n同期在语言领域，[[transformer]]靠自注意力和大规模预训练（[[bert]]、[[gpt-3]]）一路做大，模型越大越好。视觉界也尝试引入注意力：[[non-local]]在CNN里插入自注意力模块，另一些工作用局部窗口注意力替换卷积，但整体仍是CNN的骨架，而且专用的注意力算子在硬件上跑不快。直接对像素做自注意力也不现实：224×224的图有约5万个像素，自注意力的计算量随序列长度平方增长。同年的[[image-gpt]]在把图像降到很低分辨率后对像素做Transformer，算力代价极高。\n\n此时大规模图像识别的最好成绩仍属于卷积网络：[[bit]]（大规模迁移的ResNet）和[[noisy-student]]（半监督的EfficientNet）。问题是：能不能像NLP一样，用一个几乎不改的标准Transformer直接处理图像？",
+  "method": "**切块变成token**（见[[c:image-patch]]）。一张224×224×3的图切成16×16像素的小块，共`(224/16)² = 196`块。每块展平成`16×16×3 = 768`个数，再乘一个可学习矩阵映射成`D`维向量（ViT-Base中D = 768）。这一步等价于一个核大小和步长都是16的卷积。196个patch向量就是196个“词”。\n\n**位置编码与分类token**。自注意力本身不分先后，所以给每个位置加一个可学习的位置向量（见[[c:positional-encoding]]）；作者试过显式的二维位置编码，没有明显收益，于是用最简单的一维版本。仿照BERT，在序列最前面加一个可学习的`[class]` token，它最终的输出作为整张图的表示，接一个小分类头。\n\n**编码器**。之后就是标准的Transformer编码器（见[[c:transformer-block]]）：每层是`LayerNorm → 多头自注意力 → 残差`，再`LayerNorm → 两层MLP（GELU）→ 残差`。三种规模：\n- ViT-Base：12层、宽768、12头，8600万参数\n- ViT-Large：24层、宽1024、16头，3.07亿参数\n- ViT-Huge：32层、宽1280、16头，6.32亿参数\n\n名字里的“/16”“/14”是块的边长。块越小序列越长，计算越重：ViT-H/14在224分辨率下有256个token。\n\n**训练**。先在大数据集上有监督预训练：ImageNet-1k（130万张）、ImageNet-21k（1400万张、2.1万类）或Google内部的[[jft-300m]]（3.03亿张、1.8万类），用Adam、批大小4096、权重衰减0.1。再在下游任务上微调，微调时常换更高分辨率：块大小不变，序列变长，预训练的位置编码按二维位置插值到新网格上。\n\n与CNN相比，ViT只在“切块”和“微调时插值位置编码”两处用到图像的二维结构，其余空间关系全部从数据中学。",
+  "results": "数据量决定胜负。只在ImageNet-1k上训练、正则化不强时，ViT比同等大小的ResNet低几个百分点；在ImageNet上预训练时ViT-Large甚至不如ViT-Base。换成ImageNet-21k两者相当，到JFT-300M时大模型的优势才完全显现。在JFT的子集上对比：数据为900万张时ViT-B/32远不如ResNet-50，9000万张以上反超。\n\n最好的模型ViT-H/14（JFT预训练）在ImageNet上准确率88.55%，ImageNet-ReaL 90.72%，CIFAR-100 94.55%，19项任务的VTAB 77.63%，均超过BiT-L（ResNet152x4，ImageNet 87.54%）并与Noisy Student（88.4%）相当。预训练算力：ViT-H/14约2.5千TPUv3核·天，而BiT-L为9.9千、Noisy Student为12.3千。用公开的ImageNet-21k预训练的ViT-L/16也表现良好，8核TPUv3约30天可以训完。论文还初步尝试了BERT式的掩码块预测自监督，ViT-B/16达到79.9%，比从头训练高2%，但仍比有监督预训练低4%。",
+  "legacy": "ViT之后视觉研究的骨干迅速转向Transformer。两个月后[[deit]]证明只用ImageNet-1k加强数据增强和蒸馏也能训好ViT；[[swin]]、[[pvt]]把它改造成多尺度、局部窗口的结构，用于检测和分割；[[mae]]、[[beit]]把论文里没做成的掩码预训练做成了，[[dino]]、[[dinov2]]用自蒸馏学到通用特征。[[clip]]的图像编码器用ViT，此后[[llava]]等多模态大模型几乎都以CLIP或SigLIP的ViT作为“眼睛”；[[sam]]的图像编码器是MAE预训练的ViT；图像生成领域[[dit]]把扩散模型的骨干也换成了ViT。\n\n卷积网络也被反向推动：[[convnext]]按ViT的训练配方和设计细节改造ResNet，证明卷积仍有竞争力。今天的视觉Transformer相对原论文的主要变化是：用自监督或图文对比代替有监督预训练、支持可变分辨率（[[navit]]）、加入寄存器token（[[vit-registers]]），主体结构基本未变。",
+  "pitfalls": "- “一张图值16×16个词”并不是说一张图有16×16个词，而是每个词对应一块16×16像素。224分辨率下是14×14 = 196个词。\n- ViT胜过CNN的前提是大规模预训练。论文明确报告：只用ImageNet时它不如ResNet。“Transformer比CNN强”是有数据量条件的。\n- 分块嵌入层本质上就是一个步长等于核大小的卷积，所以ViT并非完全没有卷积，只是不再堆叠卷积。",
+  "limits": [
+    {"text": "需要上亿张带标签图片（JFT-300M）预训练才能超过CNN，只用ImageNet时反而更差，而JFT是Google内部数据，外界无法复现。", "solved_by": ["deit", "how-to-train-vit", "mae"]},
+    {"text": "自注意力随token数平方增长，且全程只有一种分辨率的特征图，难以直接用于需要高分辨率、多尺度特征的检测和分割。", "solved_by": ["swin", "pvt", "vitdet"]},
+    {"text": "依赖人工类别标签做有监督预训练，掩码块预测的自监督尝试比有监督低4%。", "solved_by": ["dino", "beit", "mae", "clip"]},
+    {"text": "输入必须缩放成固定分辨率的正方形，任意长宽比和分辨率的图片处理不自然。", "solved_by": ["navit"]},
+    {"text": "大模型的注意力图中会出现少数高范数的异常token，破坏特征图的局部质量。", "solved_by": ["vit-registers"]}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "extends", "note": "几乎原样使用Transformer编码器，把图像块当成词，证明它在视觉上同样可以扩展。"},
+    {"to": "resnet", "type": "rivals", "note": "与卷积网络正面对比：小数据上ResNet更好，数据到9000万张以上ViT反超，并且预训练算力更少。"},
+    {"to": "bert", "type": "uses", "note": "借用BERT的[class] token汇总整张图，并照搬“大规模预训练 + 微调”的范式；还试了BERT式的掩码块预测。"},
+    {"to": "bit", "type": "rivals", "note": "同一团队的大规模迁移ResNet是主要对手；ViT-L/16在同样JFT数据上全面超过BiT-L且算力更省。"},
+    {"to": "noisy-student", "type": "rivals", "note": "当时ImageNet最高分的EfficientNet半监督方法；ViT-H/14精度相当，预训练算力约为其五分之一。"},
+    {"to": "non-local", "type": "solves", "note": "Non-local等工作只把自注意力当CNN里的插件；ViT去掉了卷积主干，只用标准Transformer。"},
+    {"to": "image-gpt", "type": "rivals", "note": "iGPT对低分辨率像素序列做Transformer，代价高昂；ViT以16×16的块为单位，序列短得多，可以在正常分辨率下训练。"},
+    {"to": "jft-300m", "type": "uses", "note": "最好的结果依赖JFT-300M上的有监督预训练，数据规模是ViT胜出的关键。"}
+  ],
+  "prereq": ["self-attention", "transformer-block", "image-patch", "positional-encoding", "inductive-bias", "pretrain-finetune", "conv-layer"],
+  "terms": [
+    {"t": "patch embedding", "d": "把每个图像块展平后乘以同一个矩阵，得到一个向量，作为Transformer的输入token。"},
+    {"t": "[class] token", "d": "额外加在序列最前面的可学习向量，经过各层注意力汇集全图信息，最终用来做分类。"},
+    {"t": "ViT-B/16", "d": "ViT的命名方式：B/L/H表示Base、Large、Huge三种规模，斜杠后的数字是块的边长（像素）。"},
+    {"t": "TPUv3核·天", "d": "论文衡量训练算力的单位：使用的TPU v3核数乘以训练天数。"}
+  ],
+  "learn": "先确认会[[c:self-attention]]和[[c:transformer-block]]，最好已读懂[[transformer]]。读原文第3.1节（只有一页的模型描述和公式1–4）、第4.4节（数据规模实验，图3、图4）。然后读timm的vision_transformer.py，或照Andrej Karpathy式的极简写法自己写一个ViT：PatchEmbed → 加位置编码和cls token → N个编码器层 → 分类头。在CIFAR-10上从头训练，再加载ImageNet-21k预训练权重微调，对比两者，体会数据规模和预训练的作用。",
+  "check": {"source": "https://arxiv.org/abs/2010.11929", "confirmed": "标题、12位作者、arXiv v1提交于2020-10-22、ICLR版；正文表1三种规模的层数、宽度、参数（86M/307M/632M）；表2中88.55%/90.72%/94.55%/77.63%、BiT-L 87.54%、Noisy Student 88.4%、预训练算力2.5k/9.9k/12.3k TPUv3核·天；ImageNet-21k为14M张21k类、JFT为303M张18k类；9M/90M子集对比；Adam、批4096、权重衰减0.1；掩码块预测79.9%（+2%、比有监督低4%）；8核TPUv3约30天。"}
+}

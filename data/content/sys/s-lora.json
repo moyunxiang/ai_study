@@ -1,0 +1,57 @@
+{
+ "id": "s-lora",
+ "who": "Sheng, Cao, Li, Hooper, Lee, Yang, Chou, Zhu et al. · UC Berkeley, Stanford 等",
+ "venue": "MLSys 2024",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2311.03285"
+  }
+ ],
+ "problem": "[[lora]]让一个基座模型能挂出成百上千个任务适配器，但当时的服务系统（[[vllm]]加朴素LoRA支持、PEFT库）一次只能高效服务很少几个适配器，显存装不下也批不起来。",
+ "idea": "所有适配器存在内存里，只把当前请求用到的取到GPU；用统一分页把不同秩的适配器权重和KV缓存放进同一个显存池，并用自定义内核把用不同适配器的请求混在一个批里算。",
+ "impact": "让一台GPU同时服务数千个微调版本成为可行，是之后多租户微调即服务的系统基础。",
+ "method": "做法分三块。第一，适配器全放主存，只把当前批次要用的适配器按需搬进显存。第二，统一分页（Unified Paging）：适配器权重的大小随秩变化，KV缓存的长度随请求变化，二者共用一个按页管理的显存池，减少碎片，思路来自[[vllm]]的PagedAttention。第三，自定义CUDA内核做异构批处理：同一批里的请求各用各的LoRA，基座权重的矩阵乘共享，低秩部分单独算；多卡时设计了与基座并行方式配套的张量并行策略。\n\n基座模型的计算被所有请求共享，每个适配器只多出两个很小的低秩矩阵（见[[c:low-rank]]），所以批处理收益很大。",
+ "results": "论文称相比HuggingFace PEFT和朴素支持LoRA的vLLM，吞吐最高提升4倍，可服务的适配器数量提升几个数量级。",
+ "legacy": "适配器以分页方式与KV缓存同池管理的做法，被后来的推理引擎吸收；Tinker这类托管微调服务也依赖多个LoRA共享算力。",
+ "limits": [
+  {
+   "text": "适配器必须与同一个基座配套，全参数微调出来的模型无法这样共享。",
+   "solved_by": []
+  },
+  {
+   "text": "适配器的加载取决于主存到显存的带宽，请求分布极不均匀时冷启动延迟仍会上升。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "lora",
+   "type": "uses",
+   "note": "服务的对象是LoRA适配器，低秩增量与基座分开保存才使共享基座成为可能。"
+  },
+  {
+   "to": "vllm",
+   "type": "extends",
+   "note": "沿用分页管理显存的思路，把适配器权重也纳入同一个页池。"
+  }
+ ],
+ "prereq": [
+  "kv-cache",
+  "throughput-latency",
+  "memory-bandwidth",
+  "peft-concept",
+  "low-rank"
+ ],
+ "terms": [
+  {
+   "t": "异构批处理",
+   "d": "同一批里的不同请求使用不同的适配器权重，仍合成一次GPU计算。"
+  }
+ ],
+ "learn": "先读LoRA和vLLM两篇 → 读本文第3节Unified Paging → 在vLLM文档里试用多LoRA服务功能。",
+ "check": {
+  "source": "https://arxiv.org/abs/2311.03285",
+  "confirmed": "标题、作者、日期2023-11-06；摘要中的4倍吞吐、统一分页、自定义CUDA内核。"
+ }
+}

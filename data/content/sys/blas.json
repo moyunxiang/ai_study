@@ -1,0 +1,34 @@
+{
+  "id": "blas",
+  "who": "Charles L. Lawson, Richard J. Hanson, David R. Kincaid, Fred T. Krogh · 美国国家实验室与大学的数值分析学者",
+  "venue": "ACM Transactions on Mathematical Software 1979",
+  "links": [
+    {"label": "ACM TOMS 1979（DOI）", "url": "https://doi.org/10.1145/355841.355847"},
+    {"label": "Level 3 BLAS（Dongarra等，1990）", "url": "https://doi.org/10.1145/77626.79170"},
+    {"label": "Goto & van de Geijn：Anatomy of High-Performance Matrix Multiplication", "url": "https://doi.org/10.1145/1356052.1356053"},
+    {"label": "维基百科：BLAS", "url": "https://en.wikipedia.org/wiki/Basic_Linear_Algebra_Subprograms"}
+  ],
+  "problem": "每个数值程序都在重写点积、向量加法这类底层循环，写法各异、在不同机器上性能差别很大，换一台机器就要重新优化。",
+  "idea": "把最常用的线性代数底层运算定成一组名字和参数都固定的子程序接口；上层程序只调用接口，各家机器厂商为自己的硬件提供优化实现。",
+  "impact": "“接口统一、实现各自优化”的分工延续至今：NumPy、MATLAB、PyTorch的矩阵乘法最终都落到某个BLAS实现（OpenBLAS、MKL、cuBLAS）上。",
+  "background": "1970年代的科学计算主要用Fortran写，解线性方程组、求特征值的程序里，绝大部分时间花在几种很简单的循环上：两个向量求点积、`y ← a·x + y`、求向量范数。每个程序员都自己写这些循环，同一件事有几十种写法；而当时的机器（IBM 360、CDC 6600、Univac 1108，以及稍后的[[cray-1]]向量机）差别很大，用Fortran写的循环在某台机器上可能比手写汇编慢好几倍。结果是：要么牺牲速度换可移植，要么为每台机器重写一遍。",
+  "method": "论文给出38个底层子程序（后称**Level 1 BLAS**），覆盖点积、向量缩放与加法、Givens旋转、向量复制与交换、范数、找绝对值最大元素的下标等，提供可移植的Fortran参考实现和测试程序，并为IBM 360/67、CDC 6600/7600、Univac 1108附上汇编版本。名字里编码了数据类型，例如`SDOT`是单精度点积、`DAXPY`是双精度的`y ← a·x + y`。\n\n关键在后来的两次扩展。Level 1只做向量运算，每读一个数只算一两次，速度被内存带宽卡住（见[[c:memory-bandwidth]]）。1988年的**Level 2**加入矩阵-向量运算；1990年的**Level 3**加入矩阵-矩阵运算，核心是`GEMM`：`C ← α·A·B + β·C`。两个n×n矩阵相乘要做约`2n³`次浮点运算，但只读写约`3n²`个数，每个数可以被重复使用约n次——实现者把矩阵切成能放进缓存的小块反复利用，就能接近处理器的峰值算力（见[[c:matrix-multiplication]]）。",
+  "legacy": "BLAS成为事实标准：1992年的[[lapack]]整个建在Level 3 BLAS之上，[[matlab]]和[[numpy]]的矩阵运算调用它，GotoBLAS（后来的OpenBLAS）、Intel MKL在CPU上把GEMM做到接近峰值。到了GPU时代，NVIDIA提供cuBLAS，深度学习里的全连接层本身就是一次GEMM，卷积也常被改写成GEMM来算（[[caffe]]的做法），后来的[[cudnn]]、[[cutlass]]和[[triton-lang]]本质上都在为GPU写更好的GEMM及其变体。今天“矩阵乘法有多快”仍然决定了训练一个模型要花多少钱。",
+  "pitfalls": "- BLAS首先是一份接口规范，不是某一个库。Netlib上的参考实现只求正确、没有针对硬件优化，性能来自厂商或OpenBLAS这类优化实现；ATLAS等工具还能自动为某台机器生成优化版本。\n- 1979年的原始论文只有向量运算；对深度学习最关键的矩阵乘法GEMM是1990年Level 3才加入的。",
+  "limits": [
+    {"text": "Level 1只有向量运算，计算量与数据量同阶，无法利用缓存复用数据，在有多级存储的机器上跑不到峰值。", "solved_by": ["lapack"]},
+    {"text": "接口按单个稠密矩阵设计，不支持批量小矩阵、稀疏、低精度（FP16/INT8）以及把激活函数等运算融合进矩阵乘法，这些都是深度学习的需求。", "solved_by": ["cudnn", "cutlass", "triton-lang"]},
+    {"text": "只规定了接口，高性能实现仍要专家为每一代硬件手工调优，新硬件出现后往往要等很久。", "solved_by": ["tvm", "triton-lang"]}
+  ],
+  "relations": [
+    {"to": "cray-1", "type": "solves", "note": "向量机让同一段循环在不同机器上性能差异巨大；BLAS把这些向量运算固定成接口，由厂商按各自硬件优化。"},
+    {"to": "von-neumann", "type": "solves", "note": "冯·诺依曼结构下处理器与内存之间的搬运是瓶颈；后来的Level 3 BLAS通过分块让数据在缓存中被反复使用来缓解它。"}
+  ],
+  "prereq": ["vector-matrix", "matrix-multiplication", "big-o", "memory-bandwidth", "floating-point"],
+  "terms": [
+    {"t": "GEMM", "d": "General Matrix Multiply，通用矩阵乘法`C ← α·A·B + β·C`。深度学习里绝大多数计算最终都变成GEMM。"},
+    {"t": "参考实现", "d": "规范附带的、只求正确不求快的标准代码，用来定义行为和做测试；实际使用时换成针对硬件优化的版本。"}
+  ],
+  "learn": "先确认会[[c:matrix-multiplication]]和[[c:big-o]]。用C或NumPy分别写三重循环矩阵乘法和调用`numpy.dot`，在1024×1024上比较耗时；再把三重循环改成分块版本，看缓存复用带来的提升。然后读Goto与van de Geijn的Anatomy of High-Performance Matrix Multiplication前两节。",
+  "check": {"source": "https://doi.org/10.1145/355841.355847", "confirmed": "netlib.org/blas确认三级划分与参考实现/优化实现的分工；标题、4位作者、ACM TOMS 1979年9月；摘要中“38个底层子程序”、涵盖的运算、IBM 360/67、CDC 6600/7600、Univac 1108汇编版本。另核对Level 2 BLAS（1988-03，DOI 10.1145/42288.42291）与Level 3 BLAS（1990-03，DOI 10.1145/77626.79170）。"}
+}

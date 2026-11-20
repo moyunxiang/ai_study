@@ -1,0 +1,38 @@
+{
+  "id": "tf-idf",
+  "who": "Karen Spärck Jones · 剑桥大学计算机实验室",
+  "venue": "Journal of Documentation, Vol. 28, No. 1, pp. 11–21, 1972",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1108/eb026526"},
+    {"label": "原文PDF（2004年重印版，Robertson主页）", "url": "https://www.staff.city.ac.uk/~sbrp622/idfpapers/ksj_orig.pdf"},
+    {"label": "Wikipedia: tf–idf", "url": "https://en.wikipedia.org/wiki/Tf%E2%80%93idf"}
+  ],
+  "problem": "关键词检索按“命中几个词”给文档排序，可是查询里一半是“flow”这种几乎每篇都有的词；删掉它们又会漏掉大量相关文档。",
+  "idea": "把词的“专指性”定义成统计量：出现在越少文档里的词越有区分力。匹配上一个罕见词，加的分要比匹配上一个常见词多，权重约为 `log₂(N/n)+1`。",
+  "impact": "这就是逆文档频率IDF。它与词频相乘成为TF-IDF，此后半个世纪一直是文本检索、关键词提取和文本分类的默认基线，BM25的核心也是它。",
+  "background": "1960年代的自动检索基本是**坐标匹配**：查询和文档共有几个索引词，就排在第几档。[[cranfield]]实验已经建立了用查准率、查全率比较检索方法的规矩，[[luhn-abstracts]]则用词在一篇文档内出现的次数判断这个词对该文档重不重要。\n\n问题出在常用词上。Spärck Jones在三个测试集上发现：Cranfield集合200篇文档里，有一个词出现在144篇中；而用户恰恰爱用常见词提问——Cranfield词表的平均文档频率是9，查询里用到的词平均却是31.6。把高频词从查询里删掉，能达到的最高查全率至少下降30%，Keen集合从75%跌到25%。常见词不能扔，但也不能和罕见词同等对待。",
+  "method": "**把专指性统计化**。传统上“专指性”是语义概念：beverage比tea更宽泛。Spärck Jones改为按用法定义：一个词被用在越多文档上，它就越不专指、越不能区分文档。\n\n**权重公式**。设集合有N篇文档，某词出现在n篇里。令 `f(x) = m`，其中 `2^(m−1) < x ≤ 2^m`（即向上取整的 `log₂ x`），词的权重为\n\n`w = f(N) − f(n) + 1 ≈ log₂(N/n) + 1`\n\n文档的得分是它与查询共有的词的权重之和。\n\n**例子**。Cranfield有200篇文档，`f(200)=8`。出现在90篇里的词，`f(90)=7`，权重 `8−7+1=2`；只出现在3篇里的词，`f(3)=2`，权重7。两篇各命中两个词的文档，一篇命中的词频率是15和43，得分 `5+3=8`；另一篇命中频率3和7的词，得分 `7+6=13`，排在前面。\n\n**与词频的关系**。她特意区分了两种权重：Luhn和Salton用的词频（TF）衡量“这个词多大程度上描述这篇文档”，集合频率衡量“这个词能不能把这篇和别的文档区分开”。两者相乘，就是后来的TF-IDF：在本文档里反复出现、在整个集合里又少见的词，权重最高。",
+  "results": "在Cranfield（200篇）、INSPEC（541篇、1341个词）和Keen（797篇）三个风格迥异的集合上，加权匹配都显著优于不加权的坐标匹配，提升幅度与当时精心构造的叙词表相当，而所需的只是一张词频表。数年后[[vector-space-model]]报告，TF乘IDF比单用TF的平均查准率高约14%。",
+  "legacy": "IDF后来被反复从理论上解释：[[bm25]]所在的概率检索模型推出了它的相关性加权版本，信息论视角把它看成“一个词出现在某文档里”的自信息量。Salton的[[vector-space-model]]把TF-IDF当作向量坐标，配合余弦相似度，成为此后几十年搜索引擎的骨架。今天的稀疏检索（[[splade]]）、[[rag]]系统里的关键词检索通道，以及[[drqa]]这样的问答系统，仍直接用TF-IDF或BM25做第一轮召回。",
+  "pitfalls": "- 这篇论文只提出了IDF，并没有写出TF×IDF的乘积形式；“TF-IDF”是Salton等人后来把它与词频结合的结果。\n- IDF不是停用词表：它不把常见词删掉，而是给它们较低但非零的权重。论文的实验恰恰说明删掉高频词是有害的。",
+  "limits": [
+    {"text": "只看字面是否相同：查询写“汽车”、文档写“轿车”就完全匹配不上（词汇不匹配问题）。", "solved_by": ["lsa", "dssm", "dpr"]},
+    {"text": "权重是经验公式，没有说明为什么是对数、词频该怎么叠加；也没考虑文档长度，长文档天然命中更多词。", "solved_by": ["bm25"]},
+    {"text": "实验集合只有几百篇文档，能否推广到大规模文本库没有验证。", "solved_by": ["trec"]},
+    {"text": "把文档当作词袋，不考虑词序和短语，“狗咬人”与“人咬狗”得分相同。", "solved_by": ["monobert"]}
+  ],
+  "relations": [
+    {"to": "luhn-abstracts", "type": "extends", "note": "Luhn用词在单篇文档内的频率判断重要性；Spärck Jones加上了词在整个集合中的频率，衡量区分力。"},
+    {"to": "cranfield", "type": "uses", "note": "用Cranfield测试集和“固定查全率下的查准率”评测方法证明加权有效。"},
+    {"to": "naive-bayes", "type": "rivals", "note": "Maron用贝叶斯公式做概率索引，需要人工标注类别；IDF只需一张文档频率表，简单得多，两条路线后来在概率检索模型中汇合。"},
+    {"to": "shannon-ngram", "type": "extends", "note": "论文本身没有借用信息论，但IDF的对数形式后来被解释为“罕见事件信息量大”的香农自信息。"}
+  ],
+  "prereq": ["probability-basics", "entropy", "one-hot", "classification-metrics"],
+  "terms": [
+    {"t": "文档频率（document frequency）", "d": "集合里含有某个词的文档篇数，不管它在每篇里出现几次。IDF就是它的对数倒数。"},
+    {"t": "坐标匹配（coordination level matching）", "d": "按查询与文档共有的词的个数给文档分档排序，每个词算1分。"},
+    {"t": "查准率与查全率", "d": "查准率：检索出来的文档中相关的比例；查全率：所有相关文档中被检索出来的比例。"}
+  ],
+  "learn": "先读原文“Weighting by specificity”一节，只有一页，手算一遍Cranfield的例子。动手：在几千篇新闻上分别用“命中词数”和“IDF加权和”检索20个查询，比较前10条结果；再乘上词频得到TF-IDF，用scikit-learn的TfidfVectorizer核对自己的实现。",
+  "check": {"source": "https://www.staff.city.ac.uk/~sbrp622/idfpapers/ksj_orig.pdf", "confirmed": "Crossref确认J. Documentation 1972-01，作者Karen Spärck Jones；原文中三集合（Cranfield 200篇、INSPEC 541篇/1341词、Keen 797篇）、144/200、9与31.6、删除高频词后recall ceiling下降至少30%（Keen 75%→25%）、f(N)−f(n)+1公式及90次→2、3次→7的例子、5+3=8与7+6=13。14%来自Salton等1975（Cornell TR 74-218 OCR）。"}
+}

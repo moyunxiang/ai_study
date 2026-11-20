@@ -1,0 +1,58 @@
+{
+  "id": "lf-mmi",
+  "who": "Daniel Povey, Vijayaditya Peddinti, Daniel Galvez, Pegah Ghahremani, Vimal Manohar, Xingyu Na, Yiming Wang, Sanjeev Khudanpur · JHU / Kaldi",
+  "venue": "Interspeech 2016",
+  "links": [
+    {
+      "label": "DOI",
+      "url": "https://doi.org/10.21437/interspeech.2016-595"
+    }
+  ],
+  "problem": "神经网络声学模型的序列区分训练（如[[mmi-training]]）要先生成词图、再逐轮迭代，流程复杂又慢，通常还得先用交叉熵预训练。",
+  "idea": "把MMI的分母直接定义在一个音素级的语言模型图上，在GPU上对整图做前向后向，不再需要词图，也不需要预训练。",
+  "impact": "这条路线成为Kaldi中最常用的混合模型配方，并在多个开放数据集上取得很强的结果。",
+  "background": "[[cd-dnn-hmm]]通常先用帧级交叉熵训练，再用[[mpe]]一类准则做序列训练。MMI分母要对所有可能的词序列求和，传统做法用词图近似，不能在GPU上批量计算。",
+  "method": "做法有几处关键设计：一是分母图用一个四元音素语言模型建成有限状态机，直接在GPU上做前向后向，计算整图上的MMI目标，分母不再依赖词图；二是网络的输出帧率降低到每3帧一个（把输入帧率降低三倍），使计算量与内存可行；三是HMM拓扑简化，每个音素只有一两个状态；四是从随机初始化直接以该序列准则训练，不预训练。模型常用[[tdnn]]类结构，并加入正则化和泄漏式HMM等技巧防过拟合。工具实现在[[kaldi]]。\n\n在[[human-parity-asr]]里，lattice-free MMI被用作声学模型训练的一部分。",
+  "legacy": "LF-MMI（又称chain模型）成为Kaldi的默认配方，并被[[wenet]]、[[espnet]]等端到端工具对照；而更大规模的Transformer/[[conformer]]端到端模型逐渐取代了混合系统。",
+  "limits": [
+    {
+      "text": "仍是HMM混合系统，依赖发音词典、决策树和音素级语言模型。",
+      "solved_by": [
+        "conformer",
+        "whisper"
+      ]
+    },
+    {
+      "text": "分母图固定，训练时对其他语言模型的适应性有限，需要额外的数据准备流程。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "mmi-training",
+      "type": "solves",
+      "note": "解决MMI分母必须依赖词图和多轮迭代的问题，在GPU上对整个音素语言模型图直接计算。"
+    },
+    {
+      "to": "kaldi",
+      "type": "uses",
+      "note": "在Kaldi工具包中实现。"
+    },
+    {
+      "to": "tdnn",
+      "type": "uses",
+      "note": "声学网络多采用TDNN结构。"
+    }
+  ],
+  "prereq": [
+    "mutual-information",
+    "hmm-concept",
+    "backpropagation",
+    "word-error-rate"
+  ],
+  "learn": "先读[[mmi-training]]，再看Kaldi的`chain`配方脚本如何构建分母图。",
+  "check": {
+    "source": "https://doi.org/10.21437/interspeech.2016-595",
+    "confirmed": "Crossref记录：Purely Sequence-Trained Neural Networks for ASR Based on Lattice-Free MMI，Interspeech 2016，2016年9月；技术细节（四元音素语言模型、降帧率、无预训练）依据对该论文的了解，未逐段打开原文，标注为未核实；不含具体错误率。"
+  }
+}

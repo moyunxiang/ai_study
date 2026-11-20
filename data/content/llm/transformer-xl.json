@@ -1,0 +1,56 @@
+{
+  "id": "transformer-xl",
+  "who": "Zihang Dai, Zhilin Yang, Yiming Yang, Jaime Carbonell, Quoc V. Le, Ruslan Salakhutdinov · 卡内基梅隆大学 / Google Brain",
+  "venue": "ACL 2019",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1901.02860"
+    }
+  ],
+  "problem": "[[transformer]]语言模型把长文本切成固定长度的片段分别处理，片段之间信息完全不通，既看不到片段外的上下文，开头几个词也几乎没有上文。",
+  "idea": "处理新片段时，把上一个片段算出的隐状态缓存下来当作额外的上文，并改用相对位置编码，使缓存的状态可以复用。",
+  "impact": "让Transformer能利用超过训练长度的上文，成为[[xlnet]]、[[compressive-transformer]]的基础，其相对位置思路影响了后续位置编码。",
+  "method": "固定长度片段训练有两个后果：片段边界处的词没有上文（作者称之为上下文碎片化），模型能用的依赖长度也不超过片段长度。\n\nTransformer-XL的做法是**片段级循环**：处理第t个片段时，把第t−1个片段每一层的隐状态缓存起来（不再反向传播梯度），让第t个片段的注意力同时看到自己和缓存。第t+1个片段看到的缓存里又包含了更早的信息，所以有效上文可以随层数一层层延长。\n\n缓存的状态里已经加过绝对位置编码，不同片段的位置会重复冲突，所以作者改用**相对位置编码**：注意力分数里只出现词与词的相对距离，不再出现绝对位置。\n\n官方摘要称：学到的依赖比RNN长80%、比原始Transformer长450%；评估时最多快1800多倍；在enwiki8上达到0.99 bpc，WikiText-103上困惑度18.3。",
+  "limits": [
+    {
+      "text": "缓存只是把上一个片段原样保留，旧片段越多内存越大，更早的信息只能被丢弃。",
+      "solved_by": [
+        "compressive-transformer"
+      ]
+    },
+    {
+      "text": "注意力仍然是对缓存内全部位置计算，长度一大成本依然随长度增长。",
+      "solved_by": [
+        "longformer",
+        "flashattention"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "transformer",
+      "type": "extends",
+      "note": "在Transformer上加入跨片段的状态缓存和相对位置编码，突破固定长度上下文。"
+    }
+  ],
+  "prereq": [
+    "self-attention",
+    "context-window",
+    "positional-encoding",
+    "recurrent-layer",
+    "language-model",
+    "perplexity"
+  ],
+  "terms": [
+    {
+      "t": "上下文碎片化",
+      "d": "把长文本硬切成固定长度片段后，每个片段开头的词看不到前文，边界处的预测变差。"
+    }
+  ],
+  "learn": "先理解[[c:context-window]]和[[c:positional-encoding]]；读原文第3节的片段循环和相对位置公式；对照[[relative-position]]看两者相对位置写法的差异。",
+  "check": {
+    "source": "https://arxiv.org/abs/1901.02860",
+    "confirmed": "标题、6位作者、arXiv首次提交于2019-01-09；摘要中依赖比RNN长80%、比原始Transformer长450%、评估快1800+倍、enwiki8 0.99、WikiText-103 18.3。"
+  }
+}

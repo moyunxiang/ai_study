@@ -1,0 +1,103 @@
+{
+ "id": "wgan-gp",
+ "who": "Ishaan Gulrajani, Faruk Ahmed, Martin Arjovsky, Vincent Dumoulin, Aaron Courville · MILA（Université de Montréal） / NYU",
+ "venue": "NeurIPS 2017",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/1704.00028"
+  },
+  {
+   "label": "官方代码",
+   "url": "https://github.com/igul222/improved_wgan_training"
+  }
+ ],
+ "problem": "WGAN用Wasserstein距离让GAN训练更稳，但它靠“权重裁剪”把判别器限制成1-Lipschitz函数，结果判别器表达力被削弱、梯度容易爆炸或消失，样本质量仍不理想。",
+ "idea": "不裁剪权重，改为在损失里加一项梯度惩罚：在真实样本与生成样本连线上随机取点，要求判别器在这些点上对输入的梯度范数接近1。",
+ "impact": "让各种结构（包括101层ResNet和字符级语言模型）几乎不调参就能稳定训练，梯度惩罚成为此后GAN的常用正则，λ=10一度是默认配置。",
+ "background": "[[wgan]]指出原始[[gan]]的问题：当真实分布与生成分布几乎不重叠时，JS散度是常数，生成器拿不到有用的梯度。WGAN改用Wasserstein距离（把一个分布“搬”成另一个分布的最小代价，见[[c:optimal-transport]]），它总能给出平滑的梯度。但计算它要求判别器（WGAN中称为critic，评论家）是1-Lipschitz函数：输入变化多少，输出最多变化同样多。\n\nWGAN的做法很粗糙：每步更新后把判别器所有权重裁剪到`[−c, c]`。作者发现这会带来两个问题：一是判别器被迫变得过于简单，只能学到数据分布的粗略轮廓，忽略高阶结构；二是c取得稍大梯度爆炸、稍小梯度消失，非常难调。",
+ "method": "**梯度惩罚**。一个可微函数是1-Lipschitz，当且仅当它的梯度范数处处不超过1。在每个点都约束做不到，于是改成软约束，在判别器损失中加一项：\n\n`L = E[D(x̃)] − E[D(x)] + λ·E_x̂[(‖∇_x̂ D(x̂)‖₂ − 1)²]`\n\n前两项是WGAN原本的损失（x̃为生成样本，x为真实样本），第三项是梯度惩罚，λ=10。\n\n**在哪里约束**。x̂取在真实样本与生成样本连线上的随机点：`x̂ = ε·x + (1−ε)·x̃`，ε在0到1之间均匀取值。理由是最优判别器在把生成分布“搬”向真实分布的直线路径上，梯度范数恰好为1，只约束这些位置就够了。\n\n**配套修改**。判别器里不能用批归一化：惩罚是对每个样本单独算梯度，而批归一化让输出依赖整批样本。作者建议改用[[layernorm]]。默认超参数：每更新生成器一次，判别器更新5次；[[adam]]学习率1e-4，β₁=0，β₂=0.9。",
+ "results": "在32×32 ImageNet上随机抽取200种网络结构，用标准GAN和WGAN-GP分别训练，很多结构只有WGAN-GP能训成功。用无批归一化、MLP生成器、101层ResNet等通常难训的结构，WGAN-GP都能得到合理样本。CIFAR-10无条件生成的Inception Score为7.86，是当时最佳；加入类别标签后为8.42。此外还训练了128×128 LSUN卧室图像，以及一个直接输出softmax向量的字符级GAN语言模型——标准GAN目标在这个任务上没能训出可比的结果。",
+ "legacy": "梯度惩罚被大量后续工作采用，[[progan]]的主要实验就采用WGAN-GP损失。[[spectral-norm]]随后提出另一种更便宜的Lipschitz约束方式，不需要额外的反向传播。之后的StyleGAN系列改用只在真实样本上惩罚梯度的R1正则，2025年的[[r3gan]]也以类似的零中心梯度惩罚为核心。[[gans-created-equal]]的大规模对比则提醒：在充足调参下，各种GAN损失之间的差距远小于论文中宣称的。",
+ "limits": [
+  {
+   "text": "每步训练都要额外计算判别器对输入的梯度（二阶反向传播），计算量和显存明显增加。",
+   "solved_by": [
+    "spectral-norm"
+   ]
+  },
+  {
+   "text": "只在连线采样点上软约束梯度，并不能保证判别器处处满足Lipschitz条件。",
+   "solved_by": [
+    "spectral-norm"
+   ]
+  },
+  {
+   "text": "判别器不能使用批归一化，限制了网络结构的选择。",
+   "solved_by": [
+    "spectral-norm"
+   ]
+  },
+  {
+   "text": "训练虽然更稳，但在相同结构下样本质量与标准GAN相近，各种损失之间的真实差距有争议。",
+   "solved_by": [
+    "gans-created-equal"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "wgan",
+   "type": "solves",
+   "note": "用梯度惩罚替换权重裁剪，解决了WGAN判别器表达力不足、梯度爆炸或消失的问题。"
+  },
+  {
+   "to": "gan",
+   "type": "extends",
+   "note": "仍是生成器与判别器对抗训练的框架，只是换了距离度量与约束方式。"
+  },
+  {
+   "to": "improved-gan",
+   "type": "rivals",
+   "note": "后者用一组经验技巧稳定训练，WGAN-GP从损失函数和Lipschitz约束入手，CIFAR-10上的Inception Score也更高。"
+  },
+  {
+   "to": "layernorm",
+   "type": "uses",
+   "note": "批归一化与逐样本梯度惩罚冲突，建议在判别器中改用层归一化。"
+  },
+  {
+   "to": "adam",
+   "type": "uses",
+   "note": "相比WGAN原文推荐的RMSProp，改用β₁=0的Adam，收敛更快。"
+  },
+  {
+   "to": "resnet",
+   "type": "uses",
+   "note": "用残差结构搭建更深的生成器与判别器，甚至能稳定训练101层的GAN。"
+  }
+ ],
+ "prereq": [
+  "adversarial-training",
+  "optimal-transport",
+  "derivative-gradient",
+  "norm",
+  "regularization",
+  "normalization-layer"
+ ],
+ "terms": [
+  {
+   "t": "Lipschitz约束",
+   "d": "要求函数的输出变化不超过输入变化的K倍。K=1时称1-Lipschitz，是WGAN中计算Wasserstein距离对判别器的要求。"
+  },
+  {
+   "t": "critic",
+   "d": "WGAN中的判别器。它不再输出“真/假”的概率，而是输出一个实数评分，两个分布评分差的最大值就是Wasserstein距离。"
+  }
+ ],
+ "learn": "先读[[wgan]]，理解为什么需要Lipschitz约束（[[c:optimal-transport]]）。原文第3节用玩具数据展示了权重裁剪的问题，第4节是方法，篇幅都很短。动手：在八个高斯团块上分别用权重裁剪和梯度惩罚训练WGAN，画出判别器的等高线图，复现论文图1。",
+ "check": {
+  "source": "https://arxiv.org/abs/1704.00028",
+  "confirmed": "标题、5位作者、arXiv v1提交于2017-03-31、comments为NIPS camera-ready；PDF正文中的损失公式、λ=10、n_critic=5、Adam α=1e-4、β₁=0、β₂=0.9、判别器不用批归一化改用层归一化、200种随机结构实验、CIFAR-10 Inception Score 7.86（无监督）与8.42（有标签）、LSUN卧室128×128、字符级语言模型。"
+ }
+}

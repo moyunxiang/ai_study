@@ -1,0 +1,64 @@
+{
+ "id": "audiolm",
+ "who": "Zalán Borsos, Raphaël Marinier, Damien Vincent, Eugene Kharitonov, Olivier Pietquin, Matt Sharifi, Dominik Roblek, Olivier Teboul, David Grangier, Marco Tagliasacchi, Neil Zeghidour · Google Research",
+ "venue": "IEEE/ACM TASLP 2023",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2209.03143"
+  }
+ ],
+ "problem": "把音频当语言建模来做时，只用声学码（如[[soundstream]]）重建质量好但长程结构差，只用语义单元则结构连贯但音质粗糙，二者难以兼得。",
+ "idea": "设计混合分词：用[[w2v-bert]]的离散化中间激活作为“语义token”保长程结构，用SoundStream的码作为“声学token”保音质，再分三阶段用Transformer语言模型依次生成。",
+ "impact": "首次在没有文本标注的情况下生成语法和语义上合理、保持说话人身份和韵律的语音续写，也能续写钢琴曲；这套“语义加声学token”的分层范式成为[[soundstorm]]、[[musiclm]]、[[audiopalm]]、[[vall-e]]的共同基础。",
+ "method": "AudioLM把音频建模成两类离散token的序列。语义token来自预训练好的[[w2v-bert]]，取其某一中间层激活做k-means离散化，每秒50个左右，保留语言内容和旋律结构但丢失细节；声学token来自[[soundstream]]的残差向量量化码，保证音质。\n\n生成分三阶段，每阶段是一个仅解码器的Transformer（见[[gpt-2]]）：先根据提示的语义token自回归生成后续语义token，决定内容和长程结构；再以语义token为条件生成粗粒度声学token（前几层码本），决定说话人和录音环境；最后生成细粒度声学token补足音质。给3秒提示，模型便能延续语音而保持原说话人的声音和韵律，且全程无需转写文本。",
+ "limits": [
+  {
+   "text": "三阶段自回归逐token生成，推理很慢，生成30秒音频需要很长时间。",
+   "solved_by": [
+    "soundstorm"
+   ]
+  },
+  {
+   "text": "没有文本条件，无法按指定内容说话；也无法被用户控制。",
+   "solved_by": [
+    "vall-e",
+    "musiclm"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "soundstream",
+   "type": "uses",
+   "note": "用其残差向量量化码作为声学token。"
+  },
+  {
+   "to": "w2v-bert",
+   "type": "uses",
+   "note": "用其中间层离散化作为语义token。"
+  },
+  {
+   "to": "hubert",
+   "type": "rivals",
+   "note": "语义token的另一种来源，AudioLM论文将不同语义表示做对比；之后很多工作改用HuBERT单元。"
+  },
+  {
+   "to": "gpt-2",
+   "type": "uses",
+   "note": "用GPT式的仅解码器语言模型生成token。"
+  }
+ ],
+ "prereq": [
+  "autoregressive",
+  "tokenization",
+  "vocoder-codec",
+  "self-supervised",
+  "transformer-block"
+ ],
+ "learn": "先读[[soundstream]]和[[w2v-bert]]；读AudioLM第3节的三阶段结构图；读完接着读[[soundstorm]]看它怎样把生成并行化。",
+ "check": {
+  "source": "https://arxiv.org/abs/2209.03143",
+  "confirmed": "核对arXiv页：标题、2022-09-07提交；摘要写明混合分词（预训练遮蔽语言模型的离散激活加神经编解码器码）、无转写生成语义合理的语音续写并保持说话人与韵律、钢琴续写。"
+ }
+}

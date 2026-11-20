@@ -1,0 +1,53 @@
+{
+  "id": "contextual-retrieval",
+  "who": "Anthropic · Anthropic",
+  "venue": "官方博客 2024-09-19",
+  "links": [
+    {
+      "label": "Anthropic公告",
+      "url": "https://www.anthropic.com/news/contextual-retrieval"
+    }
+  ],
+  "problem": "传统RAG把文档切成小块再向量化，每一块脱离了所属文档，常常丢失关键背景，导致检索不到。",
+  "idea": "给每个文本块在编码前先由模型生成一小段说明它在原文档中位置和背景的上下文，再做向量与BM25索引。",
+  "impact": "官方称可把检索失败减少49%，再配合重排序减少67%，成为企业RAG的常用改进。",
+  "method": "标准做法是把知识库切成几百token的块，用嵌入模型转成向量存入向量库，查询时按语义相似度取块（见[[rag]]）。问题是切块之后，一句话如「公司收入比上季度增长3%」就不知道说的是哪家公司、哪个季度。\n\nContextual Retrieval在建索引时，先让Claude读完整文档，为每个块生成一段简短的背景说明（哪家公司、哪个季度的报告），拼到块前面，再做嵌入（Contextual Embeddings）和BM25索引（Contextual BM25，见[[bm25]]）。BM25负责精确匹配，比如错误码；向量负责语义。官方称这能把检索失败减少49%，与重排序结合减少67%（厂商自测）。博文还指出：知识库小于20万token时可以直接放进提示，用[[prompt-caching]]降低成本。",
+  "legacy": "它成为企业RAG的标准技巧之一，也与[[rag-vs-long-context]]的讨论呼应。之后的[[context-engineering]]把「给模型放什么上下文」当作更一般的工程问题。",
+  "limits": [
+    {
+      "text": "建索引时每个块都要调用一次大模型，预处理成本显著增加（靠提示缓存缓解）。",
+      "solved_by": []
+    },
+    {
+      "text": "效果数字来自厂商自选数据集，不同领域的收益未独立验证。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "rag",
+      "type": "extends",
+      "note": "改进[[rag]]中切块丢失上下文的问题。"
+    },
+    {
+      "to": "bm25",
+      "type": "uses",
+      "note": "与词法检索BM25结合，弥补向量检索漏掉精确匹配的缺陷。"
+    },
+    {
+      "to": "prompt-caching",
+      "type": "uses",
+      "note": "用提示缓存降低为每个块反复读入整篇文档的成本。"
+    }
+  ],
+  "prereq": [
+    "retrieval",
+    "embedding",
+    "context-window"
+  ],
+  "learn": "先读[[rag]]与[[bm25]] → 读Anthropic博文的示例和失败率数字 → 对自己的文档集比较有无上下文前缀的召回率。",
+  "check": {
+    "source": "https://www.anthropic.com/news/contextual-retrieval",
+    "confirmed": "发布日期2024-09-19；Contextual Embeddings与Contextual BM25；失败检索减少49%、加重排序67%；20万token内可直接放入提示"
+  }
+}

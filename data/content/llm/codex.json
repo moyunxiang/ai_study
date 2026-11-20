@@ -1,0 +1,37 @@
+{
+  "id": "codex",
+  "who": "Mark Chen, Jerry Tworek, Heewoo Jun, Qiming Yuan, Henrique Ponde de Oliveira Pinto, Jared Kaplan, Harri Edwards, Yuri Burda et al. · OpenAI",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2107.03374"},
+    {"label": "HumanEval代码与评测框架", "url": "https://github.com/openai/human-eval"}
+  ],
+  "problem": "GPT-3能写一点代码，但在“按文档字符串写出能跑通单元测试的函数”这件事上几乎是0分；而且当时评价代码生成用BLEU，和代码对不对关系不大。",
+  "idea": "把GPT模型在159GB的GitHub Python代码上继续训练，得到Codex；同时手写164道带单元测试的题目HumanEval，用“采样k次至少一次通过测试”的pass@k衡量功能正确性。",
+  "impact": "120亿参数的Codex单次采样解出28.8%的题，GPT-3是0%；它的生产版本驱动了GitHub Copilot，HumanEval和pass@k成为此后代码模型的标准评测。",
+  "background": "[[gpt-3]]证明了大模型靠提示就能做很多任务，人们也注意到它偶尔能从注释写出简单的Python。但这种能力很弱，也没有好的衡量办法：代码生成论文大多沿用翻译的BLEU（数和参考答案有多少词重合），而两段代码字面上很像，一段能跑一段报错，BLEU分不出来。另一方面，GitHub上有海量公开代码，正好是语言模型最擅长吃的那种无标注序列。问题是：专门在代码上训练的GPT，能不能真的写出**正确**的程序？",
+  "method": "**数据**。2020年5月从5400万个公开GitHub仓库收集了179GB、单文件小于1MB的Python文件，过滤掉自动生成、行太长、字母数字占比太低的文件，剩下159GB。\n\n**训练**。从GPT-3系列的权重出发继续做下一个词预测（最大120亿参数）。作者发现从预训练权重出发并没有让最终效果更好（可能因为代码数据本身够大），但收敛更快。分词沿用GPT-3的[[bpe]]，额外加了一组表示不同长度连续空格的token，因为缩进是代码里最浪费token的部分，这样同一段代码少用约30%的token。\n\n**评测：HumanEval与pass@k**。手写164道题，每题给出函数签名和文档字符串，平均配7.7个单元测试。模型续写函数体，跑通全部测试才算对。对每题采样n=200次，数出通过的c次，用无偏估计 `pass@k = E[1 − C(n−c, k) / C(n, k)]` 估计“随机挑k个样本至少一个正确”的概率。直接用 `1 − (1 − p̂)^k` 会系统性低估。\n\n**Codex-S**。再从编程竞赛网站和带持续集成的仓库里收集“独立且正确实现”的函数，做一次有监督微调，格式更贴近HumanEval。",
+  "results": "单次采样（温度0.8下的pass@1）：Codex-12B解出28.8%，3亿参数的Codex 13.2%，60亿参数的[[gpt-j]] 11.4%，GPT系列都接近0%；Codex-S达到37.7%。每题采样100次时，只要其中有一个能过测试就算对，Codex-S覆盖77.5%的题；如果不能跑测试、只按平均对数概率挑一个，也有44.5%。作者还造了由“转小写”“删掉每第三个字符”等积木串起来的合成题，每多串一步，通过率下降到原来的约1/2到1/3。",
+  "legacy": "Codex的生产版本是[[copilot]]的底座，也作为API开放。它确立了两件事：代码是大模型最有商业价值的能力之一；“多采样再用测试筛选”是提升代码正确率的有效手段，[[alphacode]]把它推到竞赛级。开源方向随后出现[[codegen]]、[[incoder]]、[[starcoder]]、[[code-llama]]。HumanEval一直用到今天，但因为题少、测试弱、容易被训练数据污染，后来有了[[evalplus]]、[[livecodebench]]，以及面向真实仓库的[[swe-bench]]。",
+  "limits": [
+    {"text": "只评测从文档字符串写一个独立的Python函数，离在真实代码库里读懂上下文、跨文件修改很远。", "solved_by": ["swe-bench", "swe-agent", "claude-code"]},
+    {"text": "只能从左往右续写，不能根据光标前后的代码填补中间的空缺，而编辑器里最常见的正是这种场景。", "solved_by": ["incoder", "fim"]},
+    {"text": "HumanEval只有164题、每题平均7.7个测试，测试不严时错误程序也能通过，题目还可能混进后来模型的训练数据。", "solved_by": ["evalplus", "livecodebench"]},
+    {"text": "模型权重和训练数据都未公开，学界无法复现或研究代码模型。", "solved_by": ["codegen", "starcoder", "code-llama"]}
+  ],
+  "relations": [
+    {"to": "gpt-3", "type": "extends", "note": "从GPT-3系列权重出发，在GitHub Python代码上继续训练，把通用语言模型变成代码模型。"},
+    {"to": "humaneval", "type": "uses", "note": "本文同时发布HumanEval，用164道手写题和单元测试取代BLEU来衡量代码是否真的正确。"},
+    {"to": "gpt-j", "type": "rivals", "note": "在The Pile（含部分GitHub代码）上训练的60亿参数开源模型，HumanEval上11.4%，低于专门训练代码的Codex-12B的28.8%。"},
+    {"to": "apps", "type": "rivals", "note": "同年稍早的APPS也用测试用例判对错，但题目来自竞赛网站；HumanEval题目全部手写，避免与GitHub训练数据重复。"},
+    {"to": "codebert", "type": "rivals", "note": "CodeBERT是双向编码器，擅长代码检索与理解；Codex走自回归生成路线，后来代码生成基本都沿用了后者。"},
+    {"to": "bpe", "type": "uses", "note": "沿用GPT-3的BPE分词，并增加表示连续空格的token，使代码少用约30%的token。"}
+  ],
+  "prereq": ["language-model", "autoregressive", "pretrain-finetune", "decoding-sampling", "tokenization", "benchmark"],
+  "terms": [
+    {"t": "pass@k", "d": "对一道题生成k个程序，只要有一个通过全部单元测试就算解出；对所有题取平均。k越大，越接近“允许多试几次”的场景。"},
+    {"t": "单元测试", "d": "一小段自动检查代码的程序，例如断言 add(2,3)==5。用它判对错比对照参考答案的字面相似度可靠得多。"},
+    {"t": "功能正确性", "d": "只看程序在输入上的行为是否符合要求，不在乎写法是否和参考答案一样。"}
+  ],
+  "learn": "先懂[[c:autoregressive]]和[[c:decoding-sampling]]里的温度采样。读原文第2节（HumanEval与pass@k估计，附录A的推导）和第3节（数据与训练）。动手：克隆human-eval仓库，用任意开源代码模型对20道题各采样10次，自己实现pass@k的无偏估计，并与 `1−(1−p̂)^k` 的结果对比。",
+  "check": {"source": "https://arxiv.org/abs/2107.03374", "confirmed": "标题、作者、v1提交于2021-07-07；摘要中的28.8%、0%、11.4%、100样本70.2%；ar5iv正文中的5400万仓库、179GB→159GB、约30%更少token、164题平均7.7个测试、Codex-S 37.7%、77.5%、44.5%、300M模型13.2%、每多一个组件通过率降2–3倍、n=200的pass@k无偏估计。"}
+}

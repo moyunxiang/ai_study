@@ -1,0 +1,36 @@
+{
+  "id": "search-r1",
+  "who": "Bowen Jin, Hansi Zeng, Zhenrui Yue, Jinsung Yoon, Sercan Arik, Dong Wang, Hamed Zamani, Jiawei Han · UIUC / UMass Amherst / Google Cloud AI Research",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2503.09516"},
+    {"label": "GitHub", "url": "https://github.com/PeterGriffinJin/Search-R1"}
+  ],
+  "problem": "R1式强化学习只训练模型“在脑子里想”，事实性问题仍会编造；而让推理模型调用搜索只靠提示词，模型并不真正会决定何时搜、搜什么、搜几次。",
+  "idea": "把搜索引擎当作强化学习环境的一部分：模型在思考中随时输出<search>查询</search>，系统把检索结果插回上下文，模型继续推理直到给出答案；奖励只看最终答案是否精确匹配，检索回来的文字不参与梯度。",
+  "impact": "提供了一个简单、开源的“用RL训练会搜索的推理模型”配方，成为开源深度研究智能体（如通义DeepResearch）和大量后续搜索智能体工作的起点。",
+  "background": "[[rag]]按问题检索一次，复杂的多跳问题（需要先查A、再根据A查B）常常第一次就搜错方向。[[self-ask]]、[[react]]用提示词让模型多次搜索，[[toolformer]]用自监督教模型插入API调用，但模型并没有针对“搜索后答对”这个目标被优化。2025年1月的[[search-o1]]让推理模型在思考中途调用搜索，仍然只靠提示。同月的[[deepseek-r1]]证明只用“答案对不对”作为奖励的强化学习就能教会模型复杂推理。自然的问题是：同样的方法能否教会模型使用搜索引擎？OpenAI的[[deep-research]]已证明这条路有效，但做法不公开。",
+  "method": "**交错生成**。提示模板规定：每次拿到新信息先在`<think>`里推理；缺知识时输出`<search> 查询 </search>`；系统一看到`</search>`就暂停生成，调用检索器，把前3篇结果包在`<information>…</information>`里接到序列后面，模型继续生成；可以搜任意多次，最后在`<answer>`里作答。论文中的例子：问“女士香水Curious的创作者出生在哪个城市和州”，不搜索的R1直接猜成碧昂丝、答休斯敦；Search-R1先搜“Curious fragrance”，得知是布兰妮·斯皮尔斯的香水，再搜她的出生地，答对密西西比州麦库姆。\n\n**奖励**。只有结果奖励：预测答案与标准答案精确匹配（EM）得1，否则得0，不用过程奖励。\n\n**检索token屏蔽**。一条轨迹里既有模型自己生成的token，也有从搜索引擎拷贝进来的文字。后者不是模型的决策，如果也计算策略梯度，模型会被迫去“学会生成”检索内容，训练不稳定。因此计算损失时把`<information>`里的token全部屏蔽，只优化模型自己写的部分。\n\n**算法**。框架同时支持[[ppo]]和[[grpo]]。实验用Qwen2.5-3B和7B（基础版与指令版），检索器为[[e5]]，知识库是2018年的维基百科，训练集合并NQ和HotpotQA。",
+  "results": "在7个问答数据集（NQ、TriviaQA、PopQA、HotpotQA、2WikiMultiHopQA、Musique、Bamboogle）上，与相同检索器、语料和底座下的多种RAG基线比较，3B模型平均提升20%；7B模型提升更多，但arXiv摘要（41%）与同一版本正文（24%）给出的数值不一致。论文的经验结论还包括：GRPO收敛更快，但训练久了会出现奖励崩溃，PPO更稳定；指令模型起步更快，但RL后基础模型能追平；回答长度呈“先降、后升、再趋稳”的走势；更大的模型更会学习如何搜索。",
+  "legacy": "Search-R1与同期几项类似工作一起，把“智能体式搜索”从提示工程变成可训练的能力。检索token屏蔽成为后续工具调用强化学习（如[[retool]]用代码解释器）的标准做法。工业界的开源深度研究模型[[tongyi-deepresearch]]沿这条路扩展到真实网页搜索和长时程任务；评测也从简单问答转向[[browsecomp]]这类需要几十次搜索的难题。",
+  "limits": [
+    {"text": "只在维基百科本地检索、短答案问答上训练和评测，真实网页的噪声、长报告写作等开放任务没有涉及。", "solved_by": ["tongyi-deepresearch"]},
+    {"text": "精确匹配奖励只适用于答案短而确定的问题，开放式问题无法用规则判分，还会惩罚同义但写法不同的正确答案。", "solved_by": []},
+    {"text": "模型规模只到7B、搜索轮数较少，长时程、多工具的智能体任务上效果未知。", "solved_by": ["tongyi-deepresearch", "kimi-k2"]}
+  ],
+  "relations": [
+    {"to": "deepseek-r1", "type": "extends", "note": "沿用R1的结果奖励强化学习与<think>模板，把单纯的内部推理扩展为推理与搜索交错的多轮过程。"},
+    {"to": "search-o1", "type": "solves", "note": "Search-o1只靠提示让推理模型调用搜索；Search-R1用RL直接优化“何时搜、搜什么”，解决了提示方式下模型不会有效使用搜索的问题。"},
+    {"to": "rag", "type": "solves", "note": "RAG只检索一次且检索与生成分离；Search-R1让模型根据中间推理多次改写查询，在多跳问答上明显超过RAG基线。"},
+    {"to": "react", "type": "extends", "note": "保留ReAct的“思考—搜索—观察”格式，但不再依赖示例提示，而是用强化学习训练这一行为。"},
+    {"to": "grpo", "type": "uses", "note": "与PPO一起作为可选的优化算法，论文比较了两者的稳定性与收敛速度。"},
+    {"to": "e5", "type": "uses", "note": "以E5嵌入模型作为检索器，在2018年维基百科上取前3篇。"}
+  ],
+  "prereq": ["retrieval", "policy-gradient-concept", "reward-design", "agent-loop", "tool-calling"],
+  "terms": [
+    {"t": "检索token屏蔽", "d": "计算强化学习损失时，把从搜索引擎复制进来的文字排除在外，只对模型自己生成的token计算梯度。"},
+    {"t": "多跳问答", "d": "答案需要串联两条以上事实才能得到的问题，例如先查出某作品的作者，再查作者的出生地。"},
+    {"t": "EM（精确匹配）", "d": "预测答案经过规范化（去标点、小写等）后与标准答案完全一致才算对。"}
+  ],
+  "learn": "先读[[rag]]和[[deepseek-r1]]。再读Search-R1论文第3节（交错生成算法、模板、屏蔽、奖励）和表格中的多跳数据集结果。动手：用其开源代码在3B模型上跑一个小规模训练，打印几条轨迹，观察搜索次数随训练步数的变化。",
+  "check": {"source": "https://arxiv.org/abs/2503.09516", "confirmed": "标题、8位作者、v1提交于2025-03-12；摘要中“41% (7B)、20% (3B)”与正文HTML v5摘要段“24% (7B)”不一致；正文核对<search>/<information>/<answer>标签、检索token屏蔽、EM结果奖励、PPO/GRPO、Qwen2.5-3B/7B、E5与2018维基百科、top-3、NQ+HotpotQA训练、7个数据集、Curious香水例子。"}
+}

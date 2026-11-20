@@ -1,0 +1,36 @@
+{
+  "id": "gato",
+  "who": "Scott Reed, Konrad Żołna, Emilio Parisotto, Sergio Gómez Colmenarejo, Alexander Novikov, Gabriel Barth-Maron, Mai Giménez et al., Nando de Freitas · DeepMind",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2205.06175"},
+    {"label": "DeepMind博客", "url": "https://deepmind.google/discover/blog/a-generalist-agent/"},
+    {"label": "ar5iv全文", "url": "https://ar5iv.labs.arxiv.org/html/2205.06175"}
+  ],
+  "problem": "强化学习智能体都是“一个任务一个模型”：玩Atari的不会控制机械臂，更不会说话；而语言模型已经证明一个大序列模型可以靠规模学会很多任务。",
+  "idea": "把文字、图像、按键、关节力矩等一切输入输出都编码成同一套token，拼成一个序列，用一个12亿参数的Transformer像语言模型一样做下一个token预测；靠上下文中的提示（如一段示范）决定当前该做哪件事。",
+  "impact": "同一组权重在604个任务上运行，其中450多个任务达到专家水平的一半以上，涵盖Atari、3D导航、真实机械臂堆积木、看图说话和聊天，是“通用智能体”路线最有名的早期演示。",
+  "background": "[[dqn]]以来，深度RL的范式是每个任务从头训练一个专用智能体。即使[[agent57]]在57个Atari游戏上都超过人类，那也是57个独立训练的模型；[[impala]]尝试一个网络同时学多个游戏，得分明显低于逐个训练。\n\n与此同时，[[gpt-3]]等语言模型表明：把各种任务都写成文本序列，一个足够大的模型就能处理翻译、问答、写代码。[[decision-transformer]]进一步证明，RL轨迹本身也可以写成token序列，用Transformer建模。DeepMind的问题是：能否把这一思路推到极致，让一个模型同时处理多种模态、多种任务、多种“身体”（游戏手柄、仿真机器人、真实机械臂）？",
+  "method": "**统一的token化**。\n\n- 文本：SentencePiece子词，词表3.2万。\n- 图像：像[[vit]]一样切成16×16的小块，每块经一个[[resnet]]残差块变成一个向量。\n- 离散动作（如Atari按键）：直接用整数。\n- 连续值（关节角、力矩等）：先用mu-law压缩到[−1, 1]，再均匀分成1024个桶，变成整数token，接在文本词表之后。\n\n一个时间步写成“观测token + 分隔符 + 动作token”，一条轨迹就是若干时间步依次排开。\n\n**模型与训练**。一个12亿参数的解码器Transformer（见[[c:transformer-block]]），上下文1024个token。训练就是普通的自回归下一个token预测（见[[c:autoregressive]]），但损失只算在文本和动作token上，不预测观测。控制任务的数据来自各领域的专家RL智能体录下的轨迹，因此本质上是大规模多任务行为克隆（见[[c:imitation-learning]]）；视觉和语言数据来自网页文本、图文对等。训练在16×16的TPU v3切片上进行100万步、批大小512，约4天。\n\n**部署**。先把同一任务的一段成功示范放进上下文作为提示，告诉模型现在是哪个任务；然后每步把新观测token化接在后面，自回归采样出动作token，再解码成按键或力矩。",
+  "results": "604个不同任务，同一组权重：在模拟控制任务中，有450多个任务达到训练数据中专家得分的50%以上（每个任务跑50次取平均）。训练数据包含DM Lab 254个任务、Atari 51个游戏、BabyAI 46个任务、DM Control 30个任务等。真实机器人上能完成Sawyer机械臂堆积木任务。论文比较了7900万、3.64亿和11.8亿参数三种规模，在处理相同token数时，模型越大表现越好。但对话和图像描述能力只是演示性质，远不如同期专门的语言模型。",
+  "legacy": "Gato引发了“通用智能体是否只是规模问题”的广泛讨论。同月的[[multi-game-dt]]在Atari上做了类似的多游戏单模型。之后机器人方向的[[robocat]]直接以Gato架构为基础做自我改进，[[rt-2]]则改为在大型视觉语言模型上输出动作token，把网络知识迁移到机器人上；游戏方向的[[sima]]、[[sima-2]]走向以语言指令驱动、跨多个商业3D游戏的通用智能体。",
+  "pitfalls": "- Gato的控制能力几乎全部来自模仿专家RL智能体的轨迹，它本身没有做强化学习，也不会超过数据中的专家。\n- “604个任务”中多数是同一环境的变体（如DM Lab的254个任务），并不是604种完全不同的能力。\n- 为了能实时控制真实机器人，模型被刻意限制在12亿参数，语言能力远弱于大语言模型。",
+  "limits": [
+    {"text": "控制能力靠模仿专家智能体的数据，无法超越数据，也需要先为每个任务训练一个专家RL智能体来产生数据。", "solved_by": ["robocat"]},
+    {"text": "模型只有12亿参数、上下文1024个token，语言和视觉能力很弱，不同模态之间几乎看不到正向迁移。", "solved_by": ["rt-2"]},
+    {"text": "需要放入同任务的示范作为提示才能确定任务，不能像人一样听一句语言指令就去做新任务。", "solved_by": ["sima", "rt-2"]}
+  ],
+  "relations": [
+    {"to": "decision-transformer", "type": "extends", "note": "沿用把RL轨迹写成token序列、用因果Transformer建模的思路，从单任务推广到604个任务和多种模态。"},
+    {"to": "gpt-3", "type": "extends", "note": "直接借用大语言模型“一个模型、一种目标、靠规模和提示处理多任务”的范式，把它延伸到行动。"},
+    {"to": "vit", "type": "uses", "note": "图像按ViT方式切成16×16的块作为token。"},
+    {"to": "impala", "type": "solves", "note": "IMPALA一个网络学57个Atari游戏得分远低于单独训练；Gato用更大的Transformer和模仿专家数据，让单模型多任务的表现大幅改善。"},
+    {"to": "multi-game-dt", "type": "rivals", "note": "同月发布：多游戏DT专注Atari、以回报为条件；Gato覆盖更多模态和身体，但只做模仿。"}
+  ],
+  "prereq": ["autoregressive", "tokenization", "imitation-learning", "transformer-block", "image-patch", "pretrain-finetune"],
+  "terms": [
+    {"t": "多身体（multi-embodiment）", "d": "同一个模型控制不同的“身体”：游戏手柄、仿真机器人、真实机械臂，它们的观测和动作格式各不相同。"},
+    {"t": "mu-law编码", "d": "一种非线性压缩：对接近0的数值分辨率高、对大数值分辨率低，原用于音频，这里用来把连续值变成有限个离散桶。"}
+  ],
+  "learn": "先读[[decision-transformer]]的讲解，补[[c:tokenization]]和[[c:image-patch]]。读原文第2节（token化与训练）和第4节结果。动手：把一个简单的连续控制任务（如Pendulum）的专家轨迹按Gato的方式离散化成token，用一个小GPT做行为克隆，看能否控制住摆。",
+  "check": {"source": "https://ar5iv.labs.arxiv.org/html/2205.06175", "confirmed": "标题、作者（DeepMind）、arXiv 2205编号；604个任务、约12亿参数、SentencePiece 32000词、16×16图像块与ResNet块、mu-law与1024个桶、上下文1024 token、16×16 TPU v3切片1M步批大小512约4天、“over 450 out of 604 tasks at over a 50% expert score threshold”、每任务50次评估；表1中DM Lab 254、Atari 51、BabyAI 46、DM Control 30个任务。"}
+}

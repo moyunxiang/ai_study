@@ -1,0 +1,37 @@
+{
+  "id": "agents-sdk",
+  "who": "OpenAI",
+  "links": [
+    {"label": "官方公告", "url": "https://openai.com/index/new-tools-for-building-agents/"},
+    {"label": "Agents SDK（GitHub）", "url": "https://github.com/openai/openai-agents-python"}
+  ],
+  "problem": "开发者要做智能体，得自己拼：Chat Completions只管单轮生成，Assistants API有工具但笨重且是测试版，搜索、文件检索、电脑操作要分别接，多智能体编排和调试也没有标准工具。",
+  "idea": "推出新的API原语Responses API：一次调用内可连续使用多个内置工具（网页搜索、文件搜索、电脑操作）和多轮模型调用；再开源一个轻量的Agents SDK，用“智能体、交接、护栏、追踪”四个概念编排多智能体流程。",
+  "impact": "Responses API取代Assistants API成为OpenAI构建智能体的主接口（后者计划2026年中下线），Agents SDK成为常用的开源智能体框架之一，OpenAI随后也在其中支持了MCP。",
+  "background": "2023年6月的[[function-calling]]让模型能输出结构化的工具调用，但调用循环、状态管理都要开发者自己写。同年11月[[devday-2023]]推出的Assistants API把线程、检索、代码解释器托管在OpenAI平台上，可它一直是测试版，开发者反馈不够灵活、速度慢。2024年OpenAI还发布过一个实验性的多智能体框架Swarm。与此同时，开源社区的[[langchain]]、[[langgraph]]、[[autogen]]提供了各自的编排方式，Anthropic推出了与厂商无关的[[mcp]]。\n\n2025年1月OpenAI发布了浏览器智能体[[operator]]，其背后的CUA模型只在ChatGPT内可用。官方在公告里说，客户反映把模型能力变成可上线的智能体很难，往往需要大量提示词迭代和自定义编排逻辑，且缺乏可见性。",
+  "method": "2025年3月11日发布的一组构件：\n\n**Responses API**。官方称它结合了Chat Completions的简单和Assistants API的工具能力，是前者的超集；采用统一的“条目（item）”设计，一次调用中模型可以多次调用工具、多轮推理后再返回。\n\n**三个内置工具**：\n- **网页搜索**：与ChatGPT搜索同一模型，回答附带来源链接；\n- **文件搜索**：在开发者上传的文档向量库中检索，支持元数据过滤和重排（即托管版的[[rag]]）；\n- **电脑操作**：与Operator相同的CUA模型，输出鼠标键盘动作，由开发者在自己的环境中执行（与[[computer-use]]类似）。\n\n**Agents SDK**（开源，Python）。在Swarm基础上改进，核心概念只有四个：智能体（配好指令和工具的模型）、交接（handoff，把对话控制权转给另一个智能体）、护栏（对输入输出做安全检查）、追踪（可视化执行过程便于调试）。例如一个“分诊智能体”根据用户问题，把对话交接给“购物助手”（带网页搜索）或“退货客服”（带退款函数）。",
+  "results": "官方称：带搜索的GPT-4o在SimpleQA事实问答上准确率90%，GPT-4o mini为88%。CUA在OSWorld上38.1%（此前最佳22.0%，人类72.4%），WebArena 58.1%，WebVoyager 87%。官方同时承认OSWorld的成绩说明它在操作系统任务上还不可靠，建议人工监督。Assistants API计划在功能对齐后宣布弃用，目标下线时间为2026年中。",
+  "legacy": "发布约两周后，OpenAI宣布在Agents SDK和自家产品中支持[[mcp]]，开放协议与平台API开始合流。Responses API随后成为[[o3-o4-mini]]等推理模型使用工具的主接口，[[codex-cli]]、[[chatgpt-agent]]等产品也建立在同一套能力上；[[apps-sdk]]把MCP服务器进一步扩展为能在ChatGPT里显示界面的应用。Anthropic后来把自家编码智能体的内核开放为[[claude-agent-sdk]]，与之形成对照。",
+  "limits": [
+    {"text": "内置工具和状态存储都在OpenAI平台上，只能配合OpenAI模型使用，智能体被绑定在单一厂商上。", "solved_by": []},
+    {"text": "首发时第三方工具生态只能靠开发者自己写函数接入，没有标准的发现和分发机制。", "solved_by": ["apps-sdk"]},
+    {"text": "电脑操作模型在OSWorld上只有38.1%，离人类72.4%差距大，官方建议人工监督。", "solved_by": []},
+    {"text": "“交接”式编排很简单，多个智能体之间如何分工、共享上下文、避免重复和冲突仍需开发者自己摸索。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "function-calling", "type": "extends", "note": "在函数调用之上增加托管的内置工具和服务器端多轮循环，一次API调用即可完成多步工具使用。"},
+    {"to": "devday-2023", "type": "solves", "note": "Assistants API长期是测试版、笨重且慢；Responses API吸收其工具能力并简化接口，成为其替代品。"},
+    {"to": "operator", "type": "uses", "note": "API中的电脑操作工具就是Operator背后的CUA模型，首次开放给开发者。"},
+    {"to": "mcp", "type": "uses", "note": "发布后不久Agents SDK加入MCP支持，OpenAI由此采用了竞争对手提出的开放协议。"},
+    {"to": "autogen", "type": "rivals", "note": "AutoGen用多智能体对话做编排；Agents SDK选择更少的抽象（智能体、交接、护栏、追踪），并与自家追踪和评测工具深度集成。"},
+    {"to": "computer-use", "type": "rivals", "note": "Anthropic较早以API工具形式开放电脑操作；OpenAI的CUA随后以同样形式进入Responses API，公布的OSWorld成绩更高。"}
+  ],
+  "prereq": ["tool-calling", "agent-loop", "retrieval", "embedding"],
+  "terms": [
+    {"t": "交接（handoff）", "d": "一个智能体把当前对话和控制权转交给另一个更专门的智能体，比如客服分诊后转给退货专员。"},
+    {"t": "护栏（guardrail）", "d": "在智能体处理输入或输出前后运行的检查，例如拦截与业务无关或违规的请求。"},
+    {"t": "CUA", "d": "Computer-Using Agent，OpenAI训练的电脑操作模型，看截图输出鼠标键盘动作，用于Operator和API。"}
+  ],
+  "learn": "先确认会用[[c:tool-calling]]写一个最小的工具调用循环；再读官方公告和Agents SDK的README，跑通其中“分诊—购物—退货”的例子，打开追踪界面看每一步的调用。对比自己手写循环和用SDK的代码量差异。",
+  "check": {"source": "https://openai.com/index/new-tools-for-building-agents/", "confirmed": "发布日期2025-03-11；Responses API定位与条目设计；三个内置工具；SimpleQA 90%/88%；CUA的OSWorld 38.1%（此前22.0%、人类72.4%）、WebArena 58.1%、WebVoyager 87%；Agents SDK四个概念与Swarm的关系；Assistants API目标2026年中下线。OpenAI采用MCP见TechCrunch 2025-03-26报道标题。"}
+}

@@ -1,0 +1,91 @@
+{
+ "id": "deep-rl-matters",
+ "who": "Henderson, Islam, Bachman, Pineau, Precup, Meger · 麦吉尔大学 / Microsoft Maluuba",
+ "venue": "AAAI 2018",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/1709.06560"
+  }
+ ],
+ "problem": "深度RL论文数量激增，但同一算法在不同论文里的数字差别巨大：随机种子、网络结构、奖励缩放、代码库的差异往往没有报告，“超过SOTA”是否真实无从判断。",
+ "idea": "系统地做对照实验，把TRPO、PPO、DDPG、ACKTR的结果拆解到每个“外部因素”上，量化它们对结论的影响，并引入自助法置信区间、显著性检验和功效分析来规范评测与报告。",
+ "impact": "让“多种子、报告置信区间、公开代码与超参数”成为深度RL的基本要求，直接推动了[[rliable]]等更严格的评测方法和[[cleanrl]]式的透明实现。",
+ "background": "2015–2017年，[[trpo]]、[[ddpg]]、[[ppo]]等连续控制算法几乎都在MuJoCo的同一批任务上比较（见[[c:benchmark]]），新论文常声称比基线高出一截。但强化学习的训练过程本身随机性极大：网络初始化、环境随机性、探索噪声都会让同一份代码每次跑出不同的曲线。许多论文只跑3个甚至更少的种子，有时只报告其中最好的几次，基线也常常是作者自己重新实现、未必调好的版本。作者想回答：这些因素到底能让结果相差多少？",
+ "method": "实验主要用OpenAI Baselines（[[openai-baselines]]）中的TRPO、PPO、DDPG、ACKTR，在Hopper和HalfCheetah等MuJoCo任务上，一次只改变一个因素：\n\n- **网络结构与激活函数**：策略和价值网络在(64,64)、(100,50,25)、(400,300)等结构与tanh、ReLU、Leaky ReLU之间组合。\n- **奖励缩放**：把奖励乘以不同系数，看DDPG（加与不加LayerNorm）的表现变化。\n- **随机种子**：同一超参数跑10次，只改种子，随机分成两组各5次，分别取平均。\n- **环境**：同一算法在不同任务上的排名是否一致。\n- **代码库**：比较TRPO的原始代码、rllab版、Baselines版，以及DDPG的三个开源实现。\n\n然后讨论评测指标：只报最大回报、或只报平均回报而不给波动范围，都会误导。论文建议用自助法（bootstrap，有放回地重采样估计置信区间，见[[c:statistical-significance]]）、t检验、KS检验，以及用功效分析估计需要多少次试验。",
+ "results": "结论几乎在每个维度上都是“影响很大”。网络结构和激活函数能让同一算法的最终分数成倍变化，且最佳选择因算法和环境而异。最醒目的是种子实验：同样的代码和超参数跑10次、随机分成两组各5次取平均，在HalfCheetah上两条平均曲线就能显著不同（两样本t检验t=−9.09，p=0.0016），足以“证明”一个并不存在的改进。不同代码库实现的同一算法，在200万样本后的最终表现差异也很大，而这些实现差异在原论文中通常没有写出。算法排名也随环境改变，没有一个算法在所有任务上都最好。",
+ "legacy": "这篇论文之后，报告更多随机种子、置信区间和完整超参数逐渐成为深度RL论文的常规做法。后续工作把它的方法论推进了一步：[[implementation-matters]]细查PPO的代码层面优化，发现它们才是PPO胜过TRPO的主要原因；[[rliable]]针对Atari等基准提出用分层自助法置信区间、四分位均值和表现分布来汇总少量种子的结果；[[cleanrl]]则用单文件实现让每个细节都可见。",
+ "limits": [
+  {
+   "text": "只研究了MuJoCo上的少数几个策略梯度和actor-critic算法，结论能否推广到Atari、值函数方法等更大范围并不清楚。",
+   "solved_by": [
+    "rliable"
+   ]
+  },
+  {
+   "text": "只指出了实现细节和超参数影响巨大，没有找出具体是哪些细节、为什么重要。",
+   "solved_by": [
+    "implementation-matters"
+   ]
+  },
+  {
+   "text": "建议用更多种子和统计检验，但没有给出在计算预算有限（只能跑少量种子）时可靠汇总结果的具体方法。",
+   "solved_by": [
+    "rliable"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "trpo",
+   "type": "extends",
+   "note": "比较了TRPO三个代码库的实现，发现同名算法的表现差距显著。"
+  },
+  {
+   "to": "ddpg",
+   "type": "extends",
+   "note": "DDPG对奖励缩放、网络结构和代码库都极为敏感，是本文受影响最大的算法之一。"
+  },
+  {
+   "to": "ppo",
+   "type": "extends",
+   "note": "把刚发表两个月的PPO纳入研究，展示其结果同样随网络结构与种子大幅波动。"
+  },
+  {
+   "to": "openai-baselines",
+   "type": "uses",
+   "note": "大部分实验基于OpenAI Baselines的实现，并把它与其他开源代码库对比。"
+  },
+  {
+   "to": "mujoco",
+   "type": "uses",
+   "note": "实验在MuJoCo的Hopper、HalfCheetah等连续控制任务上进行。"
+  }
+ ],
+ "prereq": [
+  "statistical-significance",
+  "benchmark",
+  "hyperparameter",
+  "ablation-baseline",
+  "policy-gradient-concept"
+ ],
+ "terms": [
+  {
+   "t": "随机种子",
+   "d": "决定程序里所有“随机”数值序列的初始值。换一个种子，网络初始化、探索噪声、环境随机性都会变。"
+  },
+  {
+   "t": "自助法（bootstrap）",
+   "d": "从已有的少量结果中有放回地反复重采样，估计平均值的置信区间，不需要假设结果服从正态分布。"
+  },
+  {
+   "t": "功效分析",
+   "d": "估计要跑多少次实验，才能以足够大的概率检测出某个大小的真实差异。"
+  }
+ ],
+ "learn": "先补[[c:statistical-significance]]和[[c:ablation-baseline]]。读原文“Random Seeds and Trials”和“Reporting Evaluation Metrics”两节。动手：用同一份PPO代码在HalfCheetah上跑10个种子，随机分成两组各5个画平均曲线，亲手复现“同一算法两组结果显著不同”，再用rliable库计算四分位均值的置信区间。",
+ "check": {
+  "source": "https://arxiv.org/abs/1709.06560",
+  "confirmed": "标题、6位作者、arXiv v1于2017-09-19、AAAI 2018；正文中使用OpenAI Baselines的ACKTR/PPO/DDPG/TRPO、Hopper与HalfCheetah、网络结构与激活函数实验、DDPG奖励缩放与LayerNorm、10次试验分两组各5次及t=−9.0916、p=0.0016、多个TRPO/DDPG代码库比较与200万样本、自助法置信区间与功效分析建议。作者单位含麦吉尔大学与Microsoft Maluuba（论文首页）。"
+ }
+}

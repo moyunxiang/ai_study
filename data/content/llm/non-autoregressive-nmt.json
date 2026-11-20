@@ -1,0 +1,59 @@
+{
+  "id": "non-autoregressive-nmt",
+  "who": "Jiatao Gu, James Bradbury, Caiming Xiong, Victor O. K. Li, Richard Socher · 香港大学 / Salesforce Research",
+  "venue": "ICLR 2018",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1711.02281"
+    }
+  ],
+  "problem": "[[transformer]]翻译时仍要一个词一个词地生成，句子多长就要串行解码多少步，线上延迟下不来。",
+  "idea": "让解码器一次并行吐出所有目标词：先预测每个源词会对应几个目标词（繁殖数），据此定下译文长度，再用知识蒸馏的数据训练。",
+  "impact": "第一个像样的非自回归翻译模型，开启了「用质量换并行速度」的一条研究线。",
+  "method": "自回归翻译每一步都以已生成的词为条件，所以必须串行。这篇工作把这个条件拿掉，让每个位置的词只依赖源句，各位置同时输出。\n\n直接这样做会出现「重复词」的毛病：同一个源词的信息被好几个位置各自翻译一遍。作者用三招补救：一，用自回归的[[transformer]]当老师，把它的译文当训练目标（见[[distillation]]），使目标更「规整」、更容易被并行预测；二，引入「繁殖数」这个隐变量，即每个源词要复制几次作为解码器输入，从而同时决定译文长度和对齐；三，用策略梯度做微调。官方摘要称推理延迟可降低一个数量级，代价最低约2.0个BLEU；在WMT16英语-罗马尼亚语上并行采样繁殖数后达到29.8 BLEU。",
+  "limits": [
+    {
+      "text": "各位置独立预测，相邻词之间缺少协调，译文里仍会有重复或漏译，质量低于同尺寸自回归模型。",
+      "solved_by": [
+        "mask-predict"
+      ]
+    },
+    {
+      "text": "需要一个训练好的自回归老师来生成蒸馏数据，并且训练流程由多个阶段拼成。",
+      "solved_by": [
+        "mask-predict"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "transformer",
+      "type": "extends",
+      "note": "在Transformer解码器上去掉对已生成词的依赖和因果掩码，改为并行输出。"
+    },
+    {
+      "to": "distillation",
+      "type": "uses",
+      "note": "用自回归老师的译文做序列级蒸馏，降低目标分布的多峰性。"
+    }
+  ],
+  "prereq": [
+    "encoder-decoder",
+    "autoregressive",
+    "knowledge-distillation",
+    "throughput-latency",
+    "teacher-forcing"
+  ],
+  "terms": [
+    {
+      "t": "繁殖数（fertility）",
+      "d": "每个源词在译文中对应的目标词个数，用来决定解码器输入的复制份数和译文长度。"
+    }
+  ],
+  "learn": "先理解[[c:autoregressive]]解码为什么只能串行，再读原文第3节的繁殖数部分；动手可以比较同一句话用自回归与并行解码的步数。",
+  "check": {
+    "source": "https://arxiv.org/abs/1711.02281",
+    "confirmed": "标题、5位作者、arXiv首次提交于2017-11-07；摘要中延迟降一个数量级、相差最低2.0 BLEU、WMT16英罗29.8 BLEU。"
+  }
+}

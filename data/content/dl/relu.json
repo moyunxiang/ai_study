@@ -1,0 +1,37 @@
+{
+  "id": "relu",
+  "who": "Vinod Nair, Geoffrey E. Hinton · University of Toronto",
+  "venue": "ICML 2010",
+  "links": [
+    {"label": "PDF", "url": "https://www.cs.toronto.edu/~hinton/absps/reluICML.pdf"},
+    {"label": "Glorot等2011《Deep Sparse Rectifier Neural Networks》", "url": "https://proceedings.mlr.press/v15/glorot11a.html"}
+  ],
+  "problem": "受限玻尔兹曼机的隐单元只能取0或1，表达不了“多强”；而sigmoid、tanh在输入稍大时就饱和，梯度接近0，深层网络很难训。",
+  "idea": "把一个二值单元想象成无数个共享权重、偏置依次减1的副本之和，其总和近似`log(1+eˣ)`，再进一步近似成带噪声的`max(0, x)`：输入为正就原样输出，为负就输出0。",
+  "impact": "`max(0, x)`从此进入主流。两年后AlexNet全面采用它，ReLU成为2012–2018年几乎所有卷积网络的默认激活，后来的GELU、SiLU都是它的平滑版本。",
+  "background": "2006年起，[[dbn]]的做法是用[[contrastive-divergence]]逐层预训练受限玻尔兹曼机（RBM），再整体微调。RBM的隐单元是二值随机单元：按sigmoid给出的概率取1或0。这有两个问题。第一，一个单元只有开、关两种状态，无法表达“这条边有多亮”这类强度信息，图像的整体亮度一变，表示就乱了。第二，sigmoid在输入绝对值较大时导数趋近0（见[[c:neuron-activation]]），堆很多层后梯度一层层变小，这正是[[vanishing-gradient]]指出的老问题。",
+  "method": "作者先构造“阶梯sigmoid单元”：把一个二值单元复制无穷多份，所有副本共享同一组权重和偏置，但第i个副本的偏置额外减去`i − 0.5`。它们开启概率之和有一个几乎精确的闭式近似：\n\n`Σᵢ σ(x − i + 0.5) ≈ log(1 + eˣ)`\n\n这就是softplus。这样做的好处是：学习规则和普通RBM完全一样，参数量也不变，但一个单元能输出0、1、2、3……的整数强度。\n\n为了算得快，再把它近似成**带噪声的整流线性单元**（NReLU）：`max(0, x + N(0, σ(x)))`，去掉噪声就是今天的`ReLU(x) = max(0, x)`。\n\n它的性质很直接：输入为正时导数恒为1，不会饱和；输入为负时输出和导数都是0，于是同一时刻大约只有一部分单元被激活，表示是稀疏的。论文还指出，把输入整体放大k倍，没有偏置时ReLU的输出也正好放大k倍，强度信息能穿过多层保留下来。",
+  "results": "在Jittered-Cluttered NORB三维物体识别上，单隐层4000单元的分类器测试错误率：不预训练时NReLU为17.8%、二值单元为23.0%；预训练后分别为16.5%和18.7%。两层且都预训练时NReLU为15.2%，二值单元为18.8%。作者也承认这仍不如卷积网络。在LFW人脸验证上NReLU略好，但作者写明标准差太大，不能下定论。",
+  "legacy": "第二年Glorot、Bordes和Bengio证明，用ReLU的深层前馈网络不做预训练也能训好。2012年[[alexnet]]全面采用ReLU，训练比tanh快得多，这让逐层预训练很快退出舞台。2015年[[he-init]]给出了专门适配ReLU的初始化并提出可学习负斜率的PReLU。Transformer时代默认激活换成了平滑的[[gelu]]和[[swish]]（以及[[swiglu]]），但ReLU仍广泛用于卷积网络和各类小模型。",
+  "pitfalls": "- 这篇论文的出发点是改进RBM，而不是解决梯度消失；`max(0, x)`本身此前已在Jarrett等2009年的卷积网络中被称为“positive part”试用过。\n- ReLU在负半轴梯度为0，若某个单元对所有输入都输出负值，它就再也学不动（“死亡ReLU”），学习率过大时尤其常见。",
+  "limits": [
+    {"text": "负半轴梯度恒为0，单元一旦落入负区就可能永久“死亡”。", "solved_by": ["he-init", "gelu", "swish"]},
+    {"text": "输出无上界且均值为正，层层叠加后激活尺度会漂移，深层网络仍需要合适的初始化与归一化。", "solved_by": ["he-init", "batchnorm"]},
+    {"text": "在0处不可导、形状生硬，后来在大模型上被平滑激活稳定地超过。", "solved_by": ["gelu", "swiglu"]}
+  ],
+  "relations": [
+    {"to": "dbn", "type": "extends", "note": "直接改进DBN中RBM的隐单元，用整流单元替换二值单元，预训练和微调流程不变。"},
+    {"to": "vanishing-gradient", "type": "solves", "note": "正半轴导数恒为1、不饱和，缓解了sigmoid/tanh逐层乘小导数造成的梯度消失；这一点由后续工作和AlexNet真正证实。"},
+    {"to": "boltzmann-machine", "type": "extends", "note": "在玻尔兹曼机的能量模型框架里推导出整数取值、近似softplus的新单元。"},
+    {"to": "contrastive-divergence", "type": "uses", "note": "新单元的学习规则沿用对比散度，只需把采样换成带噪声的整流。"},
+    {"to": "glorot-init", "type": "rivals", "note": "同年针对深层网络难训的另一条思路：Glorot从初始化尺度入手，本文从激活函数入手，两者后来在He初始化中合流。"}
+  ],
+  "prereq": ["neuron-activation", "vanishing-exploding", "energy-based", "backpropagation", "derivative-gradient"],
+  "terms": [
+    {"t": "受限玻尔兹曼机（RBM）", "d": "两层网络：可见层和隐藏层，层内没有连接。用能量函数定义概率，可以无监督地学特征，曾用于逐层预训练深层网络。"},
+    {"t": "softplus", "d": "`log(1+eˣ)`，形状像平滑过的ReLU：负半轴趋于0，正半轴趋于x。"},
+    {"t": "死亡ReLU", "d": "某个ReLU单元对所有样本的输入都为负，输出和梯度恒为0，参数永远不再更新。"}
+  ],
+  "learn": "先弄清[[c:neuron-activation]]和[[c:vanishing-exploding]]。读原文第2节（从阶梯sigmoid到NReLU的推导，只有两页）和第5节表1、表2。再读Glorot 2011理解ReLU为何让深层网络不需预训练。动手：在MNIST上训一个8层MLP，分别用sigmoid和ReLU，打印每层梯度范数比较。",
+  "check": {"source": "https://www.cs.toronto.edu/~hinton/absps/reluICML.pdf", "confirmed": "标题、作者Nair与Hinton、ICML 2010（第27届，海法）；公式Σσ(x−i+0.5)≈log(1+eˣ)与NReLU定义；表1的17.8%/23.0%、16.5%/18.7%，表2的15.2%/18.8%；LFW部分“标准差太大无法下定论”；对Jarrett等2009“positive part”的引用。"}
+}

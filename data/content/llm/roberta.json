@@ -1,0 +1,35 @@
+{
+  "id": "roberta",
+  "who": "Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer Levy, Mike Lewis et al. · Facebook AI / 华盛顿大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1907.11692"},
+    {"label": "fairseq代码与模型", "url": "https://github.com/facebookresearch/fairseq/tree/main/examples/roberta"}
+  ],
+  "problem": "BERT之后新方法层出不穷，但各家数据量、训练时长、超参数都不同，说不清提升究竟来自新方法还是只是训练得更多。",
+  "idea": "不改模型结构，只认真复现并调整BERT的训练：去掉下一句预测、改为动态掩码、用更大的批次、10倍的数据、更长的训练。",
+  "impact": "原版结构的BERT就追平或超过了此后所有新模型，说明BERT严重训练不足；RoBERTa成为之后几年最常用的编码器基线。",
+  "background": "[[bert]]发表后不到一年，[[xlnet]]等新模型纷纷声称超过它，并把提升归功于新的预训练目标或结构。但比较并不公平：XLNet用的预训练数据是BERT的近10倍，批次和步数也不同。预训练一次成本很高，很少有人做系统的对照实验，社区并不知道BERT本身的潜力在哪里。",
+  "method": "作者用同一套代码逐项改动BERT的训练方式，每次只变一个因素，看下游效果。\n\n**动态掩码**。原版BERT在数据预处理时就决定好遮哪些词，为了多样性把数据复制10份、各遮一次，40轮训练里每种遮法要重复4次。RoBERTa改为每次喂给模型时现场随机选掩码位置，效果相当或略好，也更省事。\n\n**去掉NSP**。对比四种输入构造后发现，直接用一篇或多篇文档里连续的整句填满512个token、不做下一句预测，效果持平或略好。\n\n**大批次**。批大小从256个序列提高到8000个，配合调整后的学习率，在相同计算量下困惑度和下游效果都更好，也更易并行。\n\n**更多数据、更久训练**。在原有的书籍+维基（16GB）之外，新收集了CC-News（2016年9月到2019年2月的6300万篇英文新闻）等，共160GB；训练步数从10万逐步加到50万。\n\n**分词**。改用[[gpt-2]]的字节级[[bpe]]，词表5万，无需任何预处理也不会出现未知词。",
+  "results": "数据从16GB增到160GB、步数从10万到30万再到50万，下游指标持续上升，没有饱和迹象。最终模型在GLUE开发集上与当时同样使用大量数据的XLNet持平或更好，在GLUE公开排行榜上得到88.5分，追平当时榜首；在RACE和SQuAD上也刷新最好结果。训练使用1024块V100，以混合精度训练。",
+  "legacy": "RoBERTa改变了评测文化：之后的新方法都要在同等数据和计算下与它比较。[[xlm-r]]把同一配方扩展到100种语言，[[deberta]]、[[codebert]]、[[longformer]]直接在它的基础上继续改。去掉NSP、动态掩码、大批次这些结论被后来的编码器普遍采纳。",
+  "limits": [
+    {"text": "仍是掩码语言模型，每个序列只从被遮住的15%位置学习，计算利用率低。", "solved_by": ["electra"]},
+    {"text": "靠堆数据和算力取胜，单次预训练需要上千块GPU，小团队难以复现。", "solved_by": ["electra"]},
+    {"text": "只有英文，对其他语言没有直接帮助。", "solved_by": ["xlm-r"]},
+    {"text": "仍是只有编码器的结构，无法直接生成文本。", "solved_by": ["bart", "t5"]}
+  ],
+  "relations": [
+    {"to": "bert", "type": "solves", "note": "证明BERT训练不足：结构不变，只靠更多数据、更长训练、去掉NSP就全面变强。"},
+    {"to": "xlnet", "type": "rivals", "note": "XLNet把提升归于新的排列语言模型目标；RoBERTa在可比数据下用原版MLM追平它，说明数据与训练量是主因。"},
+    {"to": "gpt-2", "type": "uses", "note": "采用GPT-2的字节级BPE词表。"},
+    {"to": "common-crawl", "type": "uses", "note": "新语料CC-News取自Common Crawl的新闻部分。"},
+    {"to": "glue", "type": "uses", "note": "以GLUE、SQuAD、RACE为主要评测，GLUE排行榜88.5分。"}
+  ],
+  "prereq": ["masked-modeling", "pretrain-finetune", "batch-size-epoch", "ablation-baseline", "tokenization"],
+  "terms": [
+    {"t": "动态掩码", "d": "每次把样本送进模型时重新随机选要遮住的位置，而不是在预处理时一次定死。"},
+    {"t": "CC-News", "d": "作者从Common Crawl新闻数据中整理的英文新闻语料，6300万篇。"}
+  ],
+  "learn": "先读懂[[bert]]。读RoBERTa第4节，每个小节就是一个单因素实验，注意表格里控制了哪些变量。动手：用Hugging Face加载roberta-base与bert-base，在同一个分类任务上用相同超参数微调对比。",
+  "check": {"source": "https://arxiv.org/abs/1907.11692", "confirmed": "标题、作者、arXiv首次提交2019-07-26；正文（ar5iv）中静态掩码复制10份/40轮、去NSP结论、批大小8K、160GB与CC-News 6300万篇、10万/30万/50万步、5万字节级BPE、GLUE排行榜88.5、1024块V100。"}
+}

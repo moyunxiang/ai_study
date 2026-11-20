@@ -1,0 +1,37 @@
+{
+  "id": "alphago-zero",
+  "who": "Silver, Schrittwieser, Simonyan, Antonoglou, Huang, Guez, Hubert, Baker et al. · DeepMind",
+  "venue": "Nature 2017",
+  "links": [
+    {"label": "Nature", "url": "https://www.nature.com/articles/nature24270"},
+    {"label": "DeepMind博客", "url": "https://deepmind.google/discover/blog/alphago-zero-starting-from-scratch/"}
+  ],
+  "problem": "[[alphago]]先要用十几万盘人类棋谱做监督学习，还要两张网络、手工特征和快速走子，强度被人类数据的质量和偏好所限制。",
+  "idea": "从随机下法开始只靠自我对弈：一张残差网络同时输出落子概率和胜率，MCTS搜索得到的走子分布当作策略的学习目标，对局胜负当作价值的学习目标。",
+  "impact": "只用规则和自我对弈，3天训练就以100:0战胜曾击败李世石的版本，证明搜索+自我对弈的“策略迭代”可以完全不靠人类知识，直接引出AlphaZero和MuZero。",
+  "background": "[[alphago]]的训练分三步：先用人类高手棋谱监督学习一个策略网络，再用强化学习让它自我对弈提升，最后另训一个价值网络评估局面；对弈时还要配合快速随机走子（rollout）估计胜负。输入里有若干手工设计的围棋特征。\n\n这套流程的问题是：起点依赖人类棋谱，人类的偏好和错误会被一起学进去；两张网络、rollout和手工特征让系统复杂、难以迁移到别的问题。一个自然的问题是：能不能像[[td-gammon]]那样，只给规则，从零开始自己学会？",
+  "method": "**一张网络两个头**。输入只有棋盘上黑白子的位置（加最近几步的历史），主干是[[resnet]]式的残差网络（20或40个残差块），输出两样东西：落子概率向量`p`和当前局面的胜率`v`。\n\n**搜索当老师**（见[[c:tree-search]]）。每走一步，都用当前网络引导[[mcts]]做大量模拟：网络的`p`决定先探索哪些走法，叶子局面直接用`v`估值，不再做rollout。搜索结束后，各走法的访问次数归一化成分布`π`，它通常比网络直接给出的`p`更强。\n\n**自我对弈的策略迭代**。按`π`落子下完一整盘，得到胜负`z∈{+1,−1}`。然后用这批数据训练网络，损失为\n\n`l = (z − v)² − πᵀ·log p + c‖θ‖²`\n\n第一项让价值逼近真实胜负，第二项让策略模仿搜索结果（交叉熵，见[[c:cross-entropy]]），第三项是权重衰减。网络变强→搜索更强→产生更好的`π`和对局→网络再变强，这就是用搜索做“策略改进”、用网络做“策略评估”的循环。",
+  "results": "官方称：自我对弈训练3天后，以100:0击败与李世石对局的AlphaGo Lee版本；约21天达到AlphaGo Master的水平，40天后超过此前所有版本。论文还对比了网络结构：把两张网络合成一张、换用残差网络，各自都带来明显的棋力提升。",
+  "legacy": "同一算法去掉围棋专属设计后就是两个月后的[[alphazero]]，再把规则也换成学出来的模型就是[[muzero]]。开源社区据此复现了Leela Zero和[[katago]]，后者大幅降低了所需算力。“搜索产生更好的目标、网络学习这个目标”的思路后来也出现在[[alphatensor]]、[[alphadev]]等科学发现工作中。",
+  "pitfalls": "- “从零开始”指不用人类棋谱和手工特征，但围棋规则、棋盘对称性等仍是人给的。\n- 训练需要大规模算力生成自我对弈数据，“3天”并不意味着普通设备3天能复现。",
+  "limits": [
+    {"text": "自我对弈产生数据极其耗算力，外界难以复现和研究。", "solved_by": ["katago"]},
+    {"text": "仍然依赖完美的规则模拟器来做搜索，无法用于规则未知或环境不可模拟的问题。", "solved_by": ["muzero"]},
+    {"text": "部分设计仍是围棋专属（如利用棋盘对称性做数据增强、只有胜负两种结局），换到其他棋类不能直接用。", "solved_by": ["alphazero"]},
+    {"text": "超人强度不等于没有漏洞：后来发现可以训练专门的对抗策略击败这类围棋AI。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "alphago", "type": "solves", "note": "去掉人类棋谱、手工特征和rollout，把策略和价值两张网络合成一张，解决了AlphaGo依赖人类数据、系统复杂的问题。"},
+    {"to": "resnet", "type": "uses", "note": "主干换成残差网络，论文实验显示这一项单独就带来明显的棋力提升。"},
+    {"to": "mcts", "type": "uses", "note": "MCTS既是下棋时的决策方法，也是训练时的“策略改进算子”，其访问次数分布就是网络的学习目标。"},
+    {"to": "alphago-lee", "type": "solves", "note": "作为对比对象的AlphaGo Lee正是击败李世石的版本，自我对弈3天即以100:0胜出。"},
+    {"to": "td-gammon", "type": "extends", "note": "延续TD-Gammon从零自我对弈学习的思路，但加入了强力的树搜索作为学习目标。"}
+  ],
+  "prereq": ["tree-search", "self-play", "policy-value", "residual-connection", "cross-entropy", "conv-layer"],
+  "terms": [
+    {"t": "rollout", "d": "从某个局面开始用一个很快的简单策略把棋下完，看谁赢，用来粗略估计这个局面的好坏。AlphaGo Zero不再使用它。"},
+    {"t": "策略迭代", "d": "交替做两件事：评估当前策略有多好，再据此改进策略。这里由网络负责评估，由MCTS负责改进。"}
+  ],
+  "learn": "先补[[c:tree-search]]和[[c:self-play]]。读Nature原文的Methods中“Self-play training pipeline”和损失函数部分。动手：在井字棋或五子棋小棋盘上实现一个迷你版（小网络+几十次模拟的MCTS+自我对弈），观察棋力随迭代上升。",
+  "check": {"source": "https://www.nature.com/articles/nature24270", "confirmed": "Nature页：标题、2017年10月发表、摘要中“winning 100–0 against the previously published, champion-defeating AlphaGo”；DeepMind博客（2017-10-18）：3天、40天超过Master；维基百科AlphaGo Zero条目：21天达到Master水平、20或40个残差块。"}
+}

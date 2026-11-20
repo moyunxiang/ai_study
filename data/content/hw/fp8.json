@@ -1,0 +1,53 @@
+{
+  "id": "fp8",
+  "who": "Micikevicius, Stosic, Burgess et al. · NVIDIA、Arm、Intel",
+  "venue": "arXiv 2022",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2209.05433"
+    }
+  ],
+  "problem": "16位浮点（FP16、bfloat16）已是训练标配，但每个数还占2字节；再压到8位，各家定义不一，整数INT8又常在大模型上掉点。",
+  "idea": "由NVIDIA、Arm、Intel联合提出两种8位浮点编码E4M3和E5M2，并证明在不改超参数的前提下，训练效果可与16位持平。",
+  "impact": "给8位训练一个跨厂商的交换格式，H100一代开始的硬件对它原生支持，推动大模型训练和推理普遍降到8位。",
+  "method": "浮点数由符号位、指数位和尾数位组成：指数位多则数值范围大，尾数位多则精度高。论文给出两种8位编码。E4M3是4位指数加3位尾数，精度高、范围小；E5M2是5位指数加2位尾数，范围大、精度低，遵循IEEE 754对无穷和NaN的表示。为了多挤出一点范围，E4M3不表示无穷，且只保留一种NaN位型。\n\n实际使用时的分工（见[[mixed-precision]]的思路）：前向的权重和激活用精度更高的E4M3，反向的梯度数值跨度大，更适合E5M2；累加和少数敏感运算仍用更高精度。每个张量还需要一个缩放因子把数值调到可表示范围，这是后来[[mx-formats]]改成按小块缩放的起点。\n\n论文覆盖CNN、RNN和Transformer，所有超参数沿用16位基线；训练实验包含最大175B参数的语言模型，并检验了把16位训练出的语言模型做FP8训练后量化，这类模型用整数INT8量化时效果不好。结论是效果与16位训练相当。",
+  "limits": [
+    {
+      "text": "每个张量用一个全局缩放因子，数值分布差异大时仍会溢出或下溢，更低位宽（4位）时问题更严重。",
+      "solved_by": [
+        "mx-formats",
+        "blackwell"
+      ]
+    },
+    {
+      "text": "格式只定义了数的表示，训练稳定性仍依赖框架里对缩放、累加精度的细致处理。",
+      "solved_by": [
+        "blackwell-ultra"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "mixed-precision",
+      "type": "extends",
+      "note": "把混合精度训练从FP16推进到8位浮点。"
+    },
+    {
+      "to": "h100",
+      "type": "uses",
+      "note": "论文由NVIDIA、Arm、Intel的工程师合写，意在让不同厂商硬件使用同一种8位格式。"
+    }
+  ],
+  "prereq": [
+    "floating-point",
+    "quantization-concept",
+    "memory-bandwidth",
+    "params-flops"
+  ],
+  "learn": "先复习浮点数的指数/尾数表示，读论文第2节的两种编码，再看NVIDIA Transformer Engine的文档动手跑一次FP8训练。",
+  "check": {
+    "source": "https://arxiv.org/abs/2209.05433",
+    "confirmed": "标题、2022-09-12提交、作者单位（NVIDIA/Arm/Intel）；E4M3与E5M2定义；实验含最大175B参数语言模型"
+  }
+}

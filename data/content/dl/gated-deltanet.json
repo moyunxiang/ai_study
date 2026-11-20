@@ -1,0 +1,122 @@
+{
+  "id": "gated-deltanet",
+  "who": "Songlin Yang, Jan Kautz, Ali Hatamizadeh · MIT CSAIL / NVIDIA",
+  "venue": "ICLR 2025",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2412.06464"
+    },
+    {
+      "label": "官方代码",
+      "url": "https://github.com/NVlabs/GatedDeltaNet"
+    },
+    {
+      "label": "前作：DeltaNet的并行训练算法",
+      "url": "https://arxiv.org/abs/2406.06484"
+    }
+  ],
+  "problem": "线性注意力和Mamba2把上下文压进固定大小的状态矩阵，记得多了就互相覆盖；Mamba2只能把所有记忆一起按比例遗忘，DeltaNet能精确改写单条记忆却清不掉旧内容。",
+  "idea": "把两种机制合成“门控delta规则”：`S_t = α_t·S_{t−1}(I − β_t k_t k_tᵀ) + β_t v_t k_tᵀ`，α_t负责整体快速清空，delta项负责按键精确替换，并给出可在GPU上分块并行训练的算法。",
+  "impact": "1.3B参数、100B token的同条件对比中，语言建模和检索都超过Mamba2和DeltaNet；后被Qwen3-Next采用，并被Kimi Linear扩展为KDA。",
+  "background": "[[linear-attention]]把注意力改写成RNN：维护一个状态矩阵S（d_v×d_k），每读到一个token就“写入”`S ← S + v kᵀ`，查询时“读出”`o = S q`。生成每个token的代价固定，不像softmax注意力那样随上下文变长（见[[c:efficient-attention]]）。但S能存的近似正交的键值对最多只有约d_k条，序列一长，新旧记忆叠加在一起，检索就不准了。\n\n两种补救各有短板。[[mamba-2]]（以及[[gla]]、[[retnet]]）加入衰减`S ← α_t S + v kᵀ`，α_t∈(0,1)随输入变化，但它让所有记忆按同一比例淡化，想忘掉某一条就得连带忘掉全部。DeltaNet源于[[fast-weights]]一脉，用delta规则精确改写某个键对应的值，合成检索任务很强，但一次只改一条，遇到话题切换清不掉旧内容，在真实数据上表现一般。",
+  "method": "**delta规则是什么**。把状态看作一个线性的“键→值”查找表，希望`S k_t ≈ v_t`。对损失`½‖S k_t − v_t‖²`做一步学习率为β_t的梯度下降，得到\n\n`S_t = S_{t−1} − β_t (S_{t−1} k_t − v_t) k_tᵀ = S_{t−1}(I − β_t k_t k_tᵀ) + β_t v_t k_tᵀ`\n\n这正是[[adaline]]的Widrow–Hoff最小均方规则。例子：若单位长度的键k原来存着v_old，取β=1写入v_new，则`S_t k = v_old − v_old + v_new = v_new`——只替换这一格，与k正交的其他记忆不受影响。普通线性注意力则会得到`v_old + v_new`的混合。\n\n**门控delta规则**：\n\n`S_t = S_{t−1}·α_t(I − β_t k_t k_tᵀ) + β_t v_t k_tᵀ`\n\nα_t→0时整块记忆被清空，α_t→1时退化为纯delta规则。α_t、β_t都由当前输入经线性层算出，α沿用Mamba2的参数化。\n\n**怎么并行训练**。逐步递推无法利用GPU。作者沿用前作的做法：把序列切成长度C的块，块内把一串`(I − β k kᵀ)`的乘积用WY表示压缩成几次矩阵乘法，再乘上块内累积的衰减；块与块之间只传递状态S。计算主要是矩阵乘法，能用上张量核。\n\n**层结构与混合**。q、k经线性投影、短卷积、SiLU和L2归一化；输出再经归一化和门控。混合版H1把它与滑动窗口注意力（SWA，见[[longformer]]）交替，H2再加入Mamba2层。",
+  "results": "所有模型均为1.3B参数，用FineWeb-Edu的100B token在相同设置下训练。WikiText困惑度：Gated DeltaNet 16.42，Mamba2 16.56，DeltaNet 17.71，Transformer++ 18.53；常识推理平均准确率55.32，高于Mamba2的54.89；混合版H1为56.40。大海捞针S-NIAH-1在8K长度上为91.8%，Mamba2只有30.4%；S-NIAH-2在4K上为92.2%，DeltaNet掉到18.6%。截断到2K的真实检索任务平均30.6，仍低于Transformer++的37.0，而H2达到40.1。训练吞吐与DeltaNet基本相同，因转移矩阵更复杂，比Mamba2略慢。",
+  "legacy": "[[qwen3-next]]把Gated DeltaNet与[[gated-attention]]混合，作为线性注意力层进入主流模型系列；作者仓库称后续的[[qwen3.5]]也在使用。[[kimi-linear]]把整头共用的α换成每个特征维度各自的遗忘率（KDA），以3:1与全注意力MLA混合，官方称在相同训练配方下超过纯全注意力，1M上下文时KV缓存最多减少75%、解码吞吐最高提升6倍。",
+  "pitfalls": "- “线性”指计算和状态随序列长度线性（推理时为常数），不是说模型没有非线性；状态更新对S是线性的，非线性来自层间的前馈网络和门控。\n- 纯Gated DeltaNet在真实检索上仍不如Transformer，论文里最好的结果来自与注意力的混合版本。\n- delta规则中键必须先做L2归一化，否则`I − β k kᵀ`可能放大状态导致发散。",
+  "limits": [
+    {
+      "text": "状态大小固定，纯线性模型在需要逐字找回长上下文内容的真实检索任务上仍明显落后全注意力，只能靠混合注意力层弥补。",
+      "solved_by": [
+        "qwen3-next",
+        "kimi-linear"
+      ]
+    },
+    {
+      "text": "遗忘率α_t是每个头一个标量，所有特征维度一起衰减，不能只忘掉部分通道。",
+      "solved_by": [
+        "kimi-linear"
+      ]
+    },
+    {
+      "text": "只在1.3B参数、100B token规模上验证，能否在百亿参数级的生产模型中替代大部分注意力层未知。",
+      "solved_by": [
+        "qwen3-next",
+        "kimi-linear"
+      ]
+    },
+    {
+      "text": "分块并行算法比注意力复杂得多；在2K这样的短上下文上，FlashAttention加持的Transformer训练吞吐仍最高。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "mamba-2",
+      "type": "solves",
+      "note": "Mamba2的标量衰减只能让所有记忆一起淡化；加入delta项后可以按键精确替换，检索和困惑度都超过Mamba2。"
+    },
+    {
+      "to": "linear-attention",
+      "type": "extends",
+      "note": "仍是“状态矩阵写入键值外积、用查询读出”的线性注意力，只是把累加改成带门控的delta更新。"
+    },
+    {
+      "to": "fast-weights",
+      "type": "extends",
+      "note": "DeltaNet把线性注意力看作快速权重编程器并引入delta更新；本文给它加上门控遗忘。"
+    },
+    {
+      "to": "adaline",
+      "type": "uses",
+      "note": "状态更新就是Widrow–Hoff最小均方规则：对键值回归损失做一步梯度下降。"
+    },
+    {
+      "to": "gla",
+      "type": "rivals",
+      "note": "GLA用数据相关的门控衰减改进线性注意力，但没有delta规则的定点改写；两者都采用分块并行训练。"
+    },
+    {
+      "to": "longformer",
+      "type": "uses",
+      "note": "混合版本用滑动窗口注意力补足局部比较和精确检索能力。"
+    },
+    {
+      "to": "ttt",
+      "type": "rivals",
+      "note": "两者都把状态更新理解为在线学习一步；TTT用更复杂的隐状态模型，Gated DeltaNet保持线性状态以便高效并行。"
+    }
+  ],
+  "prereq": [
+    "self-attention",
+    "efficient-attention",
+    "recurrent-layer",
+    "state-space-model",
+    "gating",
+    "gradient-descent",
+    "kv-cache"
+  ],
+  "terms": [
+    {
+      "t": "delta规则",
+      "d": "按“预测值与目标值之差”修正参数的学习规则；用在状态矩阵上，就是把某个键原来对应的值替换成新值。"
+    },
+    {
+      "t": "记忆碰撞",
+      "d": "状态容量有限，存入的键值对太多时彼此叠加，查询时得到几条记忆的混合。"
+    },
+    {
+      "t": "WY表示",
+      "d": "把多个“单位矩阵减秩1矩阵”的连乘写成紧凑的矩阵形式，使原本逐步的计算变成几次矩阵乘法。"
+    },
+    {
+      "t": "滑动窗口注意力（SWA）",
+      "d": "每个token只与前面固定长度窗口内的token做注意力，代价随长度线性增长。"
+    }
+  ],
+  "learn": "先补[[c:self-attention]]和[[c:efficient-attention]]，读懂[[linear-attention]]的“状态矩阵”视角和[[mamba-2]]的衰减。读原文第2节（线性注意力、Mamba2与DeltaNet的对比）、第3.1节公式(10)与表1的在线学习视角、第3.2节S-NIAH案例。动手：用numpy分别实现累加、衰减、delta三种更新，向d_k=16的状态写入32个随机键值对后再查询，比较检索误差；再试用flash-linear-attention库中的实现。",
+  "check": {
+    "source": "https://arxiv.org/html/2412.06464",
+    "confirmed": "arXiv记录：标题、三位作者、v1提交2024-12-09；正文机构MIT CSAIL与NVIDIA、公式(10)、Mamba2统一衰减与DeltaNet清除不足的论述、WY表示分块算法、块结构（短卷积、SiLU、L2归一化）、H1/H2混合设计、1.3B与100B FineWeb-Edu设置、表2 S-NIAH（8K：91.8 vs 30.4；S-NIAH-2 4K：92.2 vs DeltaNet 18.6）、表3（Wiki困惑度16.42/16.56/17.71/18.53，平均55.32/54.89，H1 56.40）、表4（30.6、Transformer++ 37.0、H2 40.1）、吞吐与DeltaNet相同、略慢于Mamba2、2K下Transformer++吞吐最高；官方README：ICLR '25接收、Qwen3-Next与Qwen3.5采用；Kimi Linear摘要（arXiv 2510.26692）：KDA、3B/48B、75% KV缓存、6倍解码吞吐；DeltaNet并行算法摘要（arXiv 2406.06484）。"
+  }
+}

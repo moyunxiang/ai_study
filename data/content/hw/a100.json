@@ -1,0 +1,40 @@
+{
+  "id": "a100",
+  "who": "NVIDIA",
+  "venue": "GTC 2020（2020年5月14日发布）",
+  "links": [
+    {"label": "NVIDIA新闻稿", "url": "https://nvidianews.nvidia.com/news/nvidias-new-ampere-data-center-gpu-in-full-production"},
+    {"label": "A100架构白皮书", "url": "https://images.nvidia.com/aem-dam/en-zz/Solutions/data-center/nvidia-ampere-architecture-whitepaper.pdf"},
+    {"label": "维基百科：Ampere架构", "url": "https://en.wikipedia.org/wiki/Ampere_(microarchitecture)"}
+  ],
+  "problem": "V100的Tensor Core只吃FP16，训练要靠损失缩放防下溢，老的FP32代码不改就用不上；显存和带宽也跟不上GPT-3这一代模型。",
+  "idea": "第三代Tensor Core加入TF32和BF16两种与FP32数值范围相同的格式，FP32代码不改即可走Tensor Core；配40GB HBM2、1555GB/s带宽、600GB/s NVLink，另加2:4结构化稀疏和一卡切7份的MIG。",
+  "impact": "成为2020–2023年大模型训练的标准硬件：LLaMA等都在数千块A100上训练，ChatGPT之前的“千卡集群”基本都是A100。它也是2022年美国对华芯片出口管制的第一批对象。",
+  "background": "[[v100]]把Tensor Core引入GPU，但留下几处摩擦。一是格式：Tensor Core只接受FP16输入，FP16的指数只有5位，小梯度容易下溢成0，必须照[[mixed-precision]]的做法配合损失缩放；而大量科学计算和老训练代码仍是FP32，它们根本用不上Tensor Core。二是规模：2020年的语言模型已经到百亿、千亿参数（[[gpt-3]]就是在V100集群上训的），显存和卡间带宽都成了瓶颈。三是利用率：推理任务常常很小，一整块大GPU只跑一个小模型很浪费。",
+  "method": "据白皮书，A100的GA100芯片用台积电7nm工艺（见[[tsmc-n7]]），542亿个晶体管，面积826mm²，108个流处理器共432个第三代Tensor Core。\n\n**新数值格式**（见[[c:floating-point]]）。TF32：1位符号、8位指数（与FP32相同）、10位尾数（与FP16精度相同），输入输出仍是标准FP32，所以FP32程序不改代码就能自动走Tensor Core。同时支持谷歌的[[bf16]]：同样是8位指数，数值范围与FP32一样宽，基本不再需要损失缩放。\n\n**峰值算力**。FP16/BF16 Tensor Core 312 TFLOPS（V100约为其四成），TF32 Tensor Core 156 TFLOPS；不用Tensor Core的普通FP32只有19.5 TFLOPS——差距说明几乎所有AI算力都在Tensor Core里。\n\n**2:4结构化稀疏**。规定权重矩阵每连续4个数中至多2个非零，硬件只存非零值和位置，跳过零的乘法，官方称数学运算最多再快2倍。做法是先正常训练，再按这个格式剪枝并微调。\n\n**内存与互连**。40GB HBM2，带宽1555GB/s，比V100高73%（见[[hbm]]）；40MB二级缓存；第三代[[nvlink]]总带宽600GB/s，是V100的2倍；8卡机内由NVSwitch全互连。后来又推出80GB版。\n\n**MIG（多实例GPU）**。一块A100可切成最多7个相互隔离的小GPU，各有自己的显存和计算单元，给多个小推理任务同时使用。",
+  "results": "NVIDIA官方称AI训练和推理性能比前代最多高20倍——这个数字是拿TF32加稀疏与V100的普通FP32比，同口径（FP16 Tensor Core对FP16 Tensor Core）大约是2.5倍。同时发布的DGX A100整机装8块A100；用于服务器厂商的八卡HGX A100底板，官方称AI算力10 PFLOPS（含稀疏）。\n\n实际使用上：[[llama-1]]论文写明65B模型在2048块80GB A100上训练，每卡每秒处理约380个token，1.4万亿token约需21天。Meta的[[meta-rsc]]超级集群同样以A100为主。",
+  "legacy": "A100让“BF16训练、FP32累加”成为大模型训练的默认精度。下一代[[h100]]在其基础上加FP8和专为Transformer设计的Transformer Engine，显存带宽再提高；[[grace-hopper]]把CPU和GPU用高速链路连在一起。\n\n2022年10月美国出口管制（[[export-controls]]）以A100的算力和互连带宽为界划线，NVIDIA随后推出降低互连带宽的A800专供中国，这条“降规格特供”路线延续到H800、[[h20-saga]]。",
+  "pitfalls": "- “比V100快20倍”是不同精度、加上稀疏后的峰值对比，不能理解为训练同一个模型快20倍。\n- 2:4稀疏需要专门剪枝和微调，大模型训练中很少用到，日常拿到的通常是不含稀疏的那组数字。\n- TF32的尾数只有10位，比真正的FP32精度低；对精度敏感的科学计算需要显式关闭。",
+  "limits": [
+    {"text": "最低只到16位浮点（另有INT8推理），没有FP8，训练和推理的吞吐受精度格式限制。", "solved_by": ["h100", "fp8"]},
+    {"text": "NVLink高速互连只覆盖一台服务器内8块卡，跨机通信要走InfiniBand，千卡训练时通信开销大。", "solved_by": ["h100", "blackwell"]},
+    {"text": "40/80GB显存装不下百亿参数以上模型的完整训练状态，仍需复杂的模型并行和状态切分。", "solved_by": ["h200", "mi300x"]},
+    {"text": "注意力等非矩阵乘运算受显存带宽限制，Tensor Core常常吃不饱。", "solved_by": ["flashattention", "h100"]}
+  ],
+  "relations": [
+    {"to": "v100", "type": "solves", "note": "用与FP32同范围的TF32和BF16取代只支持FP16的Tensor Core，FP32代码无需修改、训练基本不再依赖损失缩放；FP16 Tensor Core算力提高约2.5倍。"},
+    {"to": "hbm", "type": "uses", "note": "40GB HBM2提供1555GB/s带宽，比V100高73%。"},
+    {"to": "bf16", "type": "uses", "note": "把谷歌在TPU上首创的bfloat16格式加入Tensor Core，使它成为GPU上大模型训练的默认精度。"},
+    {"to": "mixed-precision", "type": "extends", "note": "延续FP32累加的混合精度思路，但用更宽的指数位让损失缩放基本不再必要。"},
+    {"to": "nvlink", "type": "uses", "note": "第三代NVLink总带宽600GB/s，8卡由NVSwitch全互连。"},
+    {"to": "tsmc-n7", "type": "uses", "note": "GA100用台积电7nm工艺制造，542亿晶体管、826mm²。"}
+  ],
+  "prereq": ["floating-point", "cpu-gpu", "memory-bandwidth", "matrix-multiplication", "distributed-training"],
+  "terms": [
+    {"t": "TF32", "d": "NVIDIA为A100定义的Tensor Core内部格式：8位指数、10位尾数。数值范围同FP32、精度同FP16，让FP32代码自动获得Tensor Core加速。"},
+    {"t": "2:4结构化稀疏", "d": "要求每4个连续权重里至少2个为零，硬件可跳过零值乘法。比随机稀疏规则，所以硬件容易实现。"},
+    {"t": "MIG", "d": "多实例GPU：把一块物理GPU切成多个隔离的小GPU，分别分配给不同任务。"}
+  ],
+  "learn": "先补[[c:floating-point]]，画出FP32、FP16、BF16、TF32各自的符号/指数/尾数位数。然后读白皮书中Third-Generation Tensor Core和Structured Sparsity两节。动手：在PyTorch里开关`torch.backends.cuda.matmul.allow_tf32`，比较同一矩阵乘的速度和数值误差。",
+  "check": {"source": "https://images.nvidia.com/aem-dam/en-zz/Solutions/data-center/nvidia-ampere-architecture-whitepaper.pdf", "confirmed": "白皮书：542亿晶体管、826mm²、108 SM/432 Tensor Core、FP16/BF16 312 TFLOPS、TF32 156、FP32 19.5、TF32为8位指数10位尾数、2:4稀疏、40GB HBM2 1555GB/s比V100高73%、NVLink 600GB/s对V100 300GB/s、MIG最多7个实例。新闻稿2020-05-14：最多20倍、7nm、DGX A100八卡、HGX A100 10 PFLOPS。维基百科：台积电N7、另有80GB版。LLaMA论文：2048块A100-80GB、约380 token/s/GPU、约21天。"}
+}

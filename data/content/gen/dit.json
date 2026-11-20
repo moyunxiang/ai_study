@@ -1,0 +1,39 @@
+{
+  "id": "dit",
+  "who": "William Peebles, Saining Xie · UC Berkeley / 纽约大学（工作完成于Meta FAIR实习期间）",
+  "venue": "ICCV 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2212.09748"},
+    {"label": "项目页与代码 facebookresearch/DiT", "url": "https://www.wpeebles.com/DiT"}
+  ],
+  "problem": "扩散模型的骨干一直是卷积U-Net，结构复杂、靠经验调出来，放大规模时收益不清楚，也无法直接借用语言和视觉领域Transformer的扩展经验。",
+  "idea": "把潜空间的噪声图切成小块当token，用标准ViT式Transformer去噪，时间步和类别通过adaLN-Zero注入；发现模型计算量越大，FID越低，规律清晰。",
+  "impact": "ImageNet 256上FID 2.27，超过所有U-Net扩散模型；“扩散Transformer”随后成为SD3、FLUX、Sora等几乎所有大规模图像和视频生成模型的骨干。",
+  "background": "从[[ddpm]]到[[adm]]再到[[ldm]]，扩散模型的去噪网络都是[[unet]]：一个对称的卷积编码器-解码器，中间夹几层注意力，跳连接把高分辨率特征直接传到输出。它好用，但设计里有大量手工选择（每层分辨率、通道数、注意力放在哪层），不同论文各调各的。\n\n与此同时，[[vit]]已经证明图像可以切块后直接交给Transformer，语言模型更是验证了Transformer随规模扩大性能平滑提升（见[[c:scaling-law-concept]]）。问题是：U-Net的卷积归纳偏置对扩散模型是否必需？换成纯Transformer，能否得到可预测的扩展规律？",
+  "method": "**输入**：沿用[[ldm]]的思路，在Stable Diffusion的预训练VAE潜空间里做扩散，256×256的图变成32×32×4的潜变量。把它切成p×p的小块（patchify），每块线性映射成一个token，加上位置编码。p=2时有256个token，p=8时只有16个。\n\n**主体**：N个标准Transformer块（见[[c:transformer-block]]），最后用线性层把每个token还原成p×p×通道的噪声预测（以及方差预测，沿用[[improved-ddpm]]的可学习方差）。\n\n**条件注入**：时间步t和类别y怎么告诉网络？作者比较了几种方式：把它们当额外token拼进去、用交叉注意力、用自适应层归一化（adaLN）。最好的是**adaLN-Zero**：用t和y的嵌入回归出每个块里LayerNorm的缩放、平移参数，以及每个残差分支输出前的缩放系数α；α初始化为0，于是每个块一开始等于恒等映射，训练更稳。\n\n**规模**：四种宽深配置S/B/L/XL（XL为28层、宽1152），每种配三种块大小p=8/4/2。块越小，token越多，计算量（Gflops）约变为4倍，参数量几乎不变。",
+  "results": "在12个配置上，模型Gflops与FID呈强负相关：无论靠加深加宽还是靠减小块大小，只要计算量上去，FID就下降。最大的DiT-XL/2在ImageNet 256×256上配合无分类器引导（尺度1.5）FID 2.27，此前最好的LDM为3.60；不加引导时为9.62，ADM为10.94。512×512上FID 3.04，优于ADM的3.85。DiT-XL/2在256分辨率下每次前向约118.6 Gflops，而像素空间的ADM为1120 Gflops。",
+  "legacy": "DiT的结构几乎原样进入了此后的主力模型：[[pixart-alpha]]把它做成高效文生图，[[sd3]]和[[flux]]改成图文双流的MM-DiT，[[sora]]把它推广到视频的时空块，[[hunyuanvideo]]、[[wan]]、[[mochi]]、[[kling]]等开源和商用视频模型也都是DiT。[[sit]]在同一骨干上换成插值/流匹配目标；[[repa]]发现DiT训练收敛慢，用表征对齐加速；[[rae]]进一步把它搬到语义表征空间。作者Peebles之后加入OpenAI，成为Sora的负责人之一。",
+  "pitfalls": "- DiT没有改变扩散的训练目标和采样过程，换的只是去噪网络。\n- 它的扩展规律是“计算量对FID”，不是参数量：减小块大小几乎不增加参数，但显著提升质量。",
+  "limits": [
+    {"text": "只做了ImageNet类别条件生成，如何接入文本条件没有探索。", "solved_by": ["pixart-alpha", "sd3"]},
+    {"text": "训练收敛慢，需要很长训练才能达到最佳FID。", "solved_by": ["repa", "sit"]},
+    {"text": "自注意力随token数平方增长，高分辨率图像和长视频的计算量很大。", "solved_by": ["sana", "dc-ae"]},
+    {"text": "仍依赖SD的f=8 VAE潜空间，生成上限受这个自编码器限制。", "solved_by": ["rae", "jit"]}
+  ],
+  "relations": [
+    {"to": "ldm", "type": "extends", "note": "沿用LDM的潜空间扩散和SD的VAE，只把U-Net去噪网络换成Transformer，ImageNet FID从3.60降到2.27。"},
+    {"to": "vit", "type": "uses", "note": "切块、线性嵌入和标准Transformer块直接来自ViT。"},
+    {"to": "improved-ddpm", "type": "uses", "note": "训练设置沿用改进DDPM/ADM的做法，包括可学习的方差输出。"},
+    {"to": "unet", "type": "solves", "note": "证明扩散模型不需要U-Net的卷积归纳偏置，纯Transformer骨干扩展性更清晰。"},
+    {"to": "adm", "type": "solves", "note": "ADM在像素空间用U-Net，每次前向约1120 Gflops；DiT-XL/2只用约118.6 Gflops且FID更好。"},
+    {"to": "transformer", "type": "uses", "note": "主体是标准Transformer块，条件注入方式改为adaLN-Zero。"}
+  ],
+  "prereq": ["diffusion-process", "transformer-block", "image-patch", "latent-space", "normalization-layer", "params-flops", "scaling-law-concept"],
+  "terms": [
+    {"t": "adaLN-Zero", "d": "用条件（时间步、类别）回归LayerNorm的缩放平移参数和残差分支的缩放系数，且缩放系数初始为0，使每层起初是恒等映射。"},
+    {"t": "块大小p", "d": "把潜变量切成p×p小块作为一个token。p越小token越多，计算量越大。"},
+    {"t": "Gflops", "d": "一次前向计算的十亿次浮点运算数，用来衡量模型计算量。"}
+  ],
+  "learn": "先读[[vit]]和[[ldm]]，补[[c:image-patch]]与[[c:normalization-layer]]。读原文第3节（设计空间，图3比较四种条件注入方式）和第4节的扩展图。动手：facebookresearch/DiT仓库的models.py不到400行，读懂DiTBlock里adaLN-Zero的实现，在小数据集上训练DiT-S/4并观察换成p=2后的变化。",
+  "check": {"source": "https://arxiv.org/abs/2212.09748", "confirmed": "标题、2位作者与机构；正文（ar5iv）中S/B/L/XL配置、p=8/4/2、adaLN-Zero、ImageNet 256 FID 2.27对LDM 3.60、无引导9.62对ADM 10.94、512分辨率3.04对3.85、118.6对1120 Gflops、Gflops与FID强负相关。"}
+}

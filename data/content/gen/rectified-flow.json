@@ -1,0 +1,36 @@
+{
+  "id": "rectified-flow",
+  "who": "Xingchao Liu, Chengyue Gong, Qiang Liu · 德州大学奥斯汀分校",
+  "venue": "ICLR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2209.03003"},
+    {"label": "代码 gnobitab/RectifiedFlow", "url": "https://github.com/gnobitab/RectifiedFlow"}
+  ],
+  "problem": "扩散模型从噪声到数据的采样轨迹是弯曲的，用大步长走会偏离，所以必须走很多小步；而扩散本身的数学也比较复杂。",
+  "idea": "直接让模型学习“从噪声点沿直线走到数据点”的速度场；再用学好的模型重新配对噪声和数据、再训一次（reflow），轨迹越来越直，最后一步就能走到。",
+  "impact": "给出了比扩散更简单的训练目标（直线插值加速度回归），Stable Diffusion 3、FLUX等大模型的训练目标都采用了这种“整流”形式。",
+  "background": "[[score-sde]]把扩散模型的采样写成一个概率流ODE，[[ddim]]沿着它确定性地走。问题是这条ODE的轨迹通常是弯的：在噪声很大的阶段，一个噪声点可能对应很多张图，平均出来的方向会不断转弯。弯曲的路径用一步欧拉法走（每步按当前方向直走一段）必然偏出去，所以需要几十上百步。\n\n另外，扩散的推导依赖随机微分方程、噪声调度、方差参数化等一整套工具，学习门槛高。作者的问题是：能不能直接要求轨迹是直的？直线只需一步就能精确走完。",
+  "method": "**整流（1-rectified flow）**：设X₀是噪声（高斯分布）里的一个点，X₁是一张真实图像，两者独立随机配对。在它们之间连一条直线，`X_t = t·X₁ + (1−t)·X₀`，t从0到1。沿直线的速度恒为`X₁ − X₀`。训练一个网络v_θ(x, t)，在直线上任意一点预测这个速度：\n\n`min E‖(X₁ − X₀) − v_θ(X_t, t)‖²，t ~ Uniform[0,1]`\n\n这就是一个普通的回归问题。生成时从噪声出发，解ODE `dx/dt = v_θ(x, t)`走到t=1。\n\n为什么学出来的轨迹不是直线？因为很多条直线会在中间交叉：在交叉点上，模型只能预测各个方向的平均值，于是实际轨迹是弯的、不会交叉的曲线。\n\n**Reflow（再整流）**：用训练好的模型从大量噪声点X₀出发跑出对应的图像Z₁，得到新的配对(X₀, Z₁)。这些配对来自同一条确定性的ODE轨迹，彼此不交叉。用这些配对按同样的直线目标再训一次，得到2-rectified flow，轨迹明显更直。作者证明每次reflow都不会增加任何凸的传输代价（见[[c:optimal-transport]]）。反复做几次，轨迹接近直线，一步欧拉法就能走得很准。\n\n最后还可以对“一步生成”再做一次蒸馏，进一步提高质量。",
+  "results": "CIFAR-10上，用自适应RK45求解器完整模拟时，1-rectified flow的FID为2.58（127次调用），优于同框架下的VP ODE（3.93，140次）。只用一步生成时：1-rectified flow的FID为378（完全不可用），2-rectified flow降到12.21，3-rectified flow为8.15；2-rectified flow再加蒸馏达到4.85，作者称是当时一步扩散/流模型中最好的结果。",
+  "legacy": "几乎同时，[[flow-matching]]和[[stochastic-interpolants]]从不同角度得到了等价或相近的目标，三者合起来使“直线插值+速度回归”成为扩散模型之外的主流训练方式。[[sd3]]明确采用整流流作为训练目标并加以改进，之后的[[flux]]、[[hunyuanvideo]]、[[trellis]]等都沿用。reflow思想也启发了一步生成路线，如InstaFlow、[[shortcut-models]]和[[meanflow]]。",
+  "pitfalls": "- 1-rectified flow的轨迹并不直；“直”是reflow之后才有的性质。大模型训练通常只做第一步，所以仍要几十步采样。\n- 线性插值路径本身不是本文独有的，它的特别之处在于reflow这一步以及“轨迹变直”的理论保证。",
+  "limits": [
+    {"text": "reflow要先用模型生成大量配对样本再重新训练，成本高，而且每次reflow都会累积前一个模型的误差，完整模拟时的FID反而变差（2.58→3.36）。", "solved_by": ["consistency-models", "shortcut-models", "meanflow"]},
+    {"text": "一步生成质量仍明显低于多步（FID 4.85对2.58）。", "solved_by": ["scm", "dmd"]},
+    {"text": "只在CIFAR-10等小规模数据上验证，大规模文生图上是否有效没有证明。", "solved_by": ["sd3"]}
+  ],
+  "relations": [
+    {"to": "score-sde", "type": "solves", "note": "Score SDE的概率流ODE轨迹弯曲，需要很多步；整流直接以直线为目标，并用reflow把轨迹拉直。"},
+    {"to": "ddim", "type": "solves", "note": "DDIM少步时质量崩溃；2-rectified flow加蒸馏一步就达到FID 4.85。"},
+    {"to": "stochastic-interpolants", "type": "rivals", "note": "同月提出的随机插值框架，同样在噪声和数据之间插值并回归速度场；整流的独特之处是reflow。"},
+    {"to": "progressive-distillation", "type": "rivals", "note": "渐进蒸馏靠多轮把步数减半来加速，整流靠把轨迹拉直；两者都需要多轮训练。"}
+  ],
+  "prereq": ["ode-sde", "normalizing-flow", "diffusion-process", "optimal-transport", "gaussian"],
+  "terms": [
+    {"t": "速度场", "d": "对空间中每个点、每个时刻给出一个移动方向和速度的函数，沿它积分就得到轨迹。"},
+    {"t": "reflow", "d": "用训练好的流模型生成新的（噪声，样本）配对，再按直线目标重新训练，以拉直轨迹。"},
+    {"t": "欧拉法", "d": "最简单的ODE数值解法：每步按当前位置的速度直线前进一个步长。"}
+  ],
+  "learn": "先补[[c:ode-sde]]和[[c:normalizing-flow]]。读原文第2节（方法和直观图示）和图2的交叉示意。动手：在二维数据（如两个高斯混合到一个月牙形）上实现整流，画出1-rectified和2-rectified的轨迹，比较一步欧拉生成的效果。",
+  "check": {"source": "https://arxiv.org/abs/2209.03003", "confirmed": "标题、3位作者、v1提交于2022-09-07；正文（ar5iv）训练目标公式；表1a中RK45下FID 2.58/3.36/3.96与VP ODE 3.93、一步FID 378/12.21/8.15及蒸馏后6.18/4.85/5.21。"}
+}

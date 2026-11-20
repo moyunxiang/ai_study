@@ -1,0 +1,39 @@
+{
+  "id": "llama-3",
+  "who": "Meta AI（Llama团队）",
+  "venue": "产品发布 2024",
+  "links": [
+    {"label": "官方博客", "url": "https://ai.meta.com/blog/meta-llama-3/"},
+    {"label": "模型卡", "url": "https://github.com/meta-llama/llama3/blob/main/MODEL_CARD.md"}
+  ],
+  "problem": "开源模型落后闭源前沿一大截；按Chinchilla规模定律，8B模型只该训练约2000亿token，再多被认为是浪费算力，但小模型才是开发者真正跑得起的。",
+  "idea": "架构基本不动，把数据从Llama 2的2万亿token加到15万亿以上（远超Chinchilla最优），换用12.8万词表并用Llama 2训练的质量分类器过滤数据，8B也用GQA。",
+  "impact": "8B版本在多项基准上大幅超过Llama 2 70B，70B版本接近当时的闭源中档模型；“小模型严重过训练”成为此后开源模型的通行做法。",
+  "background": "[[llama-2]]（2023年7月）是开源社区的主力底座，但与[[gpt-4]]、[[claude-3]]差距明显。同期的[[mistral-7b]]、[[mixtral]]表明，靠更好的数据，小模型也能打过大模型。\n\n另一个背景是规模定律。[[chinchilla]]给出的结论是：给定训练算力，参数量和训练token数应等比增长，8B模型的“最优”数据量约2000亿token。但这只考虑**训练**成本。模型训好后要服务成千上万次推理，参数越少推理越便宜（见[[beyond-chinchilla]]），所以在部署方看来，把小模型多训很久是划算的——问题只是收益会不会很快饱和。",
+  "method": "**架构**。标准的仅解码器Transformer，与Llama 2基本相同。两处改动：词表从3.2万扩到12.8万（见[[c:tokenization]]），同一段文本的token数最多少15%；8B和70B都使用[[gqa]]（Llama 2只有70B用），减小推理时的[[c:kv-cache]]。训练序列长8192个token，并用掩码保证自注意力不跨越文档边界。\n\n**数据**。超过15万亿token，全部来自公开来源，是Llama 2的7倍，代码量是4倍；5%以上是覆盖30多种语言的非英语数据。过滤流程包括启发式规则、NSFW过滤、语义去重和文本质量分类器——分类器的训练标签由Llama 2生成。团队还用小规模实验预测不同数据配比下的大模型表现。\n\n**训练**。在两个各2.4万张GPU的集群上训练，单任务最多1.6万张GPU同时跑，每卡超过400 TFLOPS，有效训练时间超过95%，整体效率约为Llama 2的3倍（并行方式见[[c:distributed-training]]）。预训练共用770万H100 GPU小时。\n\n**后训练**。监督微调、拒绝采样、[[ppo]]和[[dpo]]的组合。官方称从偏好排序中学习明显提升了推理和代码：模型有时会写出正确的推理过程，却不会选，偏好训练教它挑出正确的那条。",
+  "results": "官方称8B和70B模型训练到15万亿token时仍按对数线性在提升，没有饱和，训练量约是8B的Chinchilla最优值的75倍。模型卡中的预训练基座：MMLU（5-shot）8B为66.6、70B为79.5，而Llama 2 70B为69.7——新的8B已接近上一代70B。指令版差距更大：HumanEval上Llama 3 8B为62.2、Llama 2 70B为25.6；GSM8K（8-shot CoT）70B达到93.0。",
+  "legacy": "三个月后的[[llama-3.1]]发布了论文、405B版本和12.8万上下文；[[llama-3.2-vision]]加入图像。“远超Chinchilla最优地训练小模型”被[[gemma-2]]、[[qwen2.5]]等普遍采用。Llama 3也成为大量开源微调、蒸馏和研究工作的默认底座，例如[[llada]]就以Llama 3 8B为对照。",
+  "pitfalls": "- “超过Chinchilla最优”不是否定Chinchilla：在固定训练算力下，Chinchilla的配比仍然最省；Llama 3是用更多训练算力换更便宜的推理。\n- 同名基准在预训练版和指令版表格里设置不同（例如MMLU一个是基座5-shot，一个是指令版），不能混着比。\n- 15万亿token全部“来自公开来源”不等于数据集公开，具体组成没有披露。",
+  "limits": [
+    {"text": "上下文只有8192个token，长文档和长对话无法处理。", "solved_by": ["llama-3.1"]},
+    {"text": "只支持文本输入，没有图像能力。", "solved_by": ["llama-3.2-vision"]},
+    {"text": "非英语数据只占约5%，官方明确说其他语言达不到英语的水平。", "solved_by": ["llama-3.1"]},
+    {"text": "发布时没有技术论文，最大的400B以上模型仍在训练中，与GPT-4级闭源模型还有差距。", "solved_by": ["llama-3.1"]}
+  ],
+  "relations": [
+    {"to": "llama-2", "type": "extends", "note": "架构基本不变，数据扩大7倍、词表扩大4倍、8B也用GQA，后训练加入DPO和拒绝采样。"},
+    {"to": "chinchilla", "type": "extends", "note": "在Chinchilla最优点之后继续训练约两个数量级的数据，验证小模型性能仍按对数线性提升。"},
+    {"to": "beyond-chinchilla", "type": "uses", "note": "实践了“计入推理成本后应更多训练小模型”的结论：多花训练算力，换来更便宜的部署。"},
+    {"to": "gqa", "type": "uses", "note": "8B和70B都采用分组查询注意力以缩小推理时的KV缓存。"},
+    {"to": "dpo", "type": "uses", "note": "后训练同时使用PPO和DPO，官方称偏好学习对推理和代码提升最大。"},
+    {"to": "mixtral", "type": "rivals", "note": "同为开源前沿的两条路线：Mistral用MoE换取更少的激活参数，Llama 3坚持稠密架构、靠成倍增加数据；官方的人工评测拿70B指令版与Claude Sonnet、Mistral Medium、GPT-3.5对比。"}
+  ],
+  "prereq": ["language-model", "tokenization", "scaling-law-concept", "params-flops", "kv-cache", "rlhf-concept"],
+  "terms": [
+    {"t": "过训练（overtraining）", "d": "训练token数远超规模定律给出的计算最优值。训练成本更高，但得到同等质量下更小、推理更便宜的模型。"},
+    {"t": "文档边界掩码", "d": "把多篇文档拼成一条训练序列时，让注意力不跨越文档边界，避免模型学到不相关文本之间的虚假联系。"},
+    {"t": "拒绝采样微调", "d": "对一个提示采样多个回答，用奖励模型或规则挑出最好的，再拿这些回答做监督微调。"}
+  ],
+  "learn": "先读[[chinchilla]]理解计算最优配比，再读[[beyond-chinchilla]]理解为何部署方愿意过训练。然后读官方博客的“Training data”和“Scaling up pretraining”两节。动手：用Chinchilla的“约20 token每参数”经验值算8B、70B的最优数据量，再与15万亿对比。",
+  "check": {"source": "https://ai.meta.com/blog/meta-llama-3/", "confirmed": "发布日期2024-04-18；128K词表、8B与70B都用GQA、8192序列与文档边界掩码、15T token且为Llama 2的7倍、代码4倍、5%以上非英语覆盖30多种语言、用Llama 2为质量分类器生成训练数据、8B的Chinchilla最优约200B token且15T时仍对数线性提升、两个24K GPU集群/16K GPU并行/400 TFLOPS、有效训练时间95%以上、效率约为Llama 2的3倍、PPO与DPO、token数最多少15%。GitHub模型卡：7.7M H100 GPU小时、基座MMLU 66.6/79.5对Llama 2 70B 69.7、指令版HumanEval 62.2对25.6、GSM8K 70B 93.0。"}
+}

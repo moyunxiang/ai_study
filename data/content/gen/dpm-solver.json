@@ -1,0 +1,35 @@
+{
+  "id": "dpm-solver",
+  "who": "Cheng Lu, Yuhao Zhou, Fan Bao, Jianfei Chen, Chongxuan Li, Jun Zhu · 清华大学 / 中国人民大学",
+  "venue": "NeurIPS 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2206.00927"},
+    {"label": "代码 LuChengTHU/dpm-solver", "url": "https://github.com/LuChengTHU/dpm-solver"}
+  ],
+  "problem": "扩散模型采样要几百到上千步，DDIM能压到几十步，再少质量就崩；通用ODE求解器（如龙格-库塔）在步数很少时误差也很大。",
+  "idea": "发现扩散ODE是“半线性”的：线性部分可以精确积分，只需近似剩下那个带指数权重的积分，据此推出专用的高阶求解器，不用重新训练。",
+  "impact": "CIFAR-10上10次网络调用FID 4.70，比此前最快的免训练采样器快4到16倍；后续的DPM-Solver++成为Stable Diffusion等开源工具的默认采样器之一。",
+  "background": "[[score-sde]]指出，扩散模型的采样可以写成一个确定性的“概率流ODE”，从纯噪声沿着ODE积分回数据。[[ddim]]实际上就在解这个ODE，把[[ddpm]]的1000步压到了几十步。但要再少到10步左右，DDIM的图像就明显变糊；拿通用的龙格-库塔法来解，误差反而更大。原因是通用求解器把整个右端当作黑箱，没利用扩散ODE的特殊结构。",
+  "method": "扩散ODE写成用噪声预测网络ε_θ表示的形式后，右端是“x的线性项 + 神经网络项”，称为半线性ODE。线性项可以用常数变易法精确积分。再做一个变量替换：用对数信噪比的一半`λ = log(α_t/σ_t)`代替时间t（α_t、σ_t分别是信号和噪声的系数），就得到从时刻s到t的精确解\n\n`x_t = (α_t/α_s)·x_s − α_t·∫_{λ_s}^{λ_t} e^{−λ}·ε_θ(x_λ, λ) dλ`\n\n第一项是精确的，唯一需要近似的是那个积分。把ε_θ在λ_s附近做泰勒展开（见[[c:taylor-expansion]]），保留不同阶数就得到不同阶的求解器：\n\n- **一阶**：把ε_θ当常数，得到`x_t = (α_t/α_s)·x_s − σ_t·(e^h − 1)·ε_θ(x_s, s)`，其中`h = λ_t − λ_s`。作者证明它**恰好就是DDIM**，这解释了DDIM为什么比普通欧拉法好：它已经无意中利用了半线性结构。\n- **二阶、三阶**：在一步内部取中间点再算一次（或两次）ε_θ，用差分估计导数项，误差随步长下降得更快。二阶每步调用两次网络。\n\n此外，作者在λ上均匀取时间步，并给出自适应步长版本。整个方法只改采样过程，任何训练好的噪声预测扩散模型都能直接用。",
+  "results": "CIFAR-10上，10次网络调用FID 4.70，20次2.87；ImageNet 128×128上12次调用FID 4.08。与DDIM、PNDM、Analytic-DDIM等免训练采样器相比，达到相同质量快4到16倍；在相同调用次数下也优于通用的龙格-库塔求解器。",
+  "legacy": "同一团队几个月后推出DPM-Solver++，专门处理大引导尺度（见[[cfg]]）下高阶求解器不稳定的问题，它与UniPC等后继方法一起成为[[stable-diffusion]]、[[automatic1111]]、[[comfyui]]里的常用采样器。同月的[[edm]]从另一角度（二阶Heun加新噪声参数化）得到相近结论。免训练求解器大约在10到20步遇到瓶颈，再往下走需要蒸馏，如[[progressive-distillation]]、[[consistency-models]]、[[lcm]]和[[add]]。",
+  "limits": [
+    {"text": "少于约10次调用时质量仍明显下降，做不到一两步生成。", "solved_by": ["consistency-models", "lcm", "add", "dmd"]},
+    {"text": "高阶求解器在大引导尺度下容易不稳定，文生图里直接用效果不佳（后续由DPM-Solver++处理）。", "solved_by": []},
+    {"text": "只加速采样，不改变扩散轨迹本身的弯曲；轨迹越弯，少步误差越大。", "solved_by": ["rectified-flow"]}
+  ],
+  "relations": [
+    {"to": "ddim", "type": "solves", "note": "证明一阶DPM-Solver就是DDIM，并用高阶展开解决DDIM在10步左右质量崩溃的问题。"},
+    {"to": "score-sde", "type": "uses", "note": "以Score SDE提出的概率流ODE为出发点，专门为它设计数值解法。"},
+    {"to": "ddpm", "type": "solves", "note": "DDPM需要约1000步采样；DPM-Solver对同一类模型免训练地降到10到20次调用。"},
+    {"to": "edm", "type": "rivals", "note": "同月发布，都用高阶ODE求解器减少步数；DPM-Solver利用半线性结构解析积分，EDM改噪声参数化并用Heun法。"}
+  ],
+  "prereq": ["diffusion-process", "ode-sde", "taylor-expansion", "noise-schedule", "generation-metrics"],
+  "terms": [
+    {"t": "半线性ODE", "d": "右端由“状态的线性函数”加“一个非线性函数”组成的微分方程，线性部分可以解析求解。"},
+    {"t": "免训练采样器", "d": "只改变采样时的数值方法、不需要重新训练或蒸馏模型的加速方法。"},
+    {"t": "对数信噪比λ", "d": "信号系数与噪声系数之比的对数，用它作时间变量能让积分形式最简单。"}
+  ],
+  "learn": "先读[[ddim]]，补[[c:ode-sde]]和[[c:taylor-expansion]]。读原文第3节（精确解与一阶即DDIM的推导）和第4节的DPM-Solver-2算法。动手：在diffusers里对同一个Stable Diffusion模型分别用DDIM和DPMSolverMultistep调度器，取10步和20步各出一张图对比。",
+  "check": {"source": "https://arxiv.org/abs/2206.00927", "confirmed": "标题、6位作者、v1提交于2022-06-02、NeurIPS 2022；摘要中10 NFE FID 4.70、20 NFE 2.87、4–16倍加速；正文（ar5iv）中精确解公式、一阶等价DDIM、ImageNet-128 12 NFE FID 4.08。"}
+}

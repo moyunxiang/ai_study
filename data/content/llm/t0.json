@@ -1,0 +1,111 @@
+{
+  "id": "t0",
+  "who": "Victor Sanh, Albert Webson, Colin Raffel, Stephen H. Bach, Lintang Sutawika, Zaid Alyafeai, Antoine Chaffin, Arnaud Stiegler et al. · BigScience / Hugging Face / Brown University 等",
+  "venue": "ICLR 2022",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2110.08207"
+    },
+    {
+      "label": "PromptSource与P3提示库",
+      "url": "https://github.com/bigscience-workshop/promptsource"
+    },
+    {
+      "label": "T0模型与代码",
+      "url": "https://github.com/bigscience-workshop/t-zero"
+    }
+  ],
+  "problem": "GPT-3的零样本能力被认为来自预训练中“隐式”见过各种任务，但这需要1750亿参数，而且换一种提示措辞，效果就会大起大落。",
+  "idea": "显式地做多任务训练：把62个有标注的数据集用人写的2000多条自然语言模板改写成“提示→答案”，在110亿参数的T5上微调，然后测试训练中完全没出现过的任务类型。",
+  "impact": "T0在11个未见数据集中的9个上追平或超过体积大约16倍的GPT-3；同时公开了全部模板（P3）和模型，指令微调从此成为开源社区可复现的标准做法。",
+  "background": "[[gpt-3]]展示了零样本、少样本提示的能力，[[gpt-2]]的作者推测原因是：网页文本里本来就混着问答、翻译、摘要的格式，语言模型在预训练中隐式做了多任务学习。但这种能力只在极大的模型上才明显，而且对提示措辞和格式很敏感（见[[calibrate-before-use]]）。\n\n那么能不能把这件事**做成显式的**？把已有的监督数据集改写成自然语言提示，拿来训练，看模型能否泛化到从没训练过的**任务类型**。[[natural-instructions]]做过小规模尝试；几周前Google的[[flan]]用1370亿参数的模型给出了肯定答案。T0要回答：中等规模、公开可复现的模型行不行，多样的措辞有没有用。",
+  "method": "**提示库P3**。作者做了模板工具PromptSource，众包编写模板。每个模板把数据集的一条原始样本（比如前提、假设、标签）填进一段自然语言，例如：「{前提} 问题：{假设} 对、错还是不确定？」→「对」。截至论文写作，P3共有177个数据集的2073条模板，平均每个数据集11.7条。\n\n**按任务类型划分训练和测试**。把数据集按传统NLP任务归类（问答、情感、摘要、释义等），训练时用其中12类、62个数据集；**整类留出**自然语言推理、指代消解、句子补全、词义消歧四类共11个数据集，再加BIG-bench里的14个新任务，全部只用于零样本测试。这样测的是“没见过这种任务”。\n\n**模型**。T5原本只学生成被挖掉的片段，不适合续写提示，所以用按普通语言模型目标多训了1000亿token的版本（T5+LM）再做多任务微调。主模型11B；T0+、T0++逐步加入更多训练数据集。\n\n**报告方式**。每个测试集上报告所有模板结果的中位数和四分位距，不挑最好的模板，从而同时衡量对措辞的稳健性。",
+  "results": "T0（11B）在11个留出数据集中的9个上追平或超过GPT-3各尺寸的结果；两边都没训练过自然语言推理，T0在所有NLI数据集上都超过GPT-3。例外是Winogrande和HellaSwag这类“把句子补完”的任务，GPT-3更好。BIG-bench的14个任务中13个超过官方基线语言模型。每个数据集用的模板越多，留出任务上的中位数越高、波动越小。",
+  "legacy": "T0与[[flan]]几乎同时确立了**指令微调**（见[[c:instruction-tuning]]）这条路，二者后来在[[flan-t5]]里合流，任务数扩到1800多个，并加入思维链和少样本模板。[[super-natural-instructions]]把任务数扩到1600多个。[[instructgpt]]则改用真实用户提示加人类示范和偏好。今天“多样的指令数据+监督微调”仍是对话模型训练的第一步，但数据已多换成更接近真实使用的指令。",
+  "limits": [
+    {
+      "text": "训练数据都是改写的传统NLP数据集，答案多是短标签，模型不擅长开放式写作和多轮对话，离用户实际想要的“听懂指令”有距离。",
+      "solved_by": [
+        "instructgpt",
+        "self-instruct"
+      ]
+    },
+    {
+      "text": "训练中只有零样本格式，没有逐步推理的数据，模型的少样本和多步推理能力没有提升。",
+      "solved_by": [
+        "flan-t5"
+      ]
+    },
+    {
+      "text": "只有62个训练数据集、仅限英语，任务数量和语言多样性能扩到多大、收益怎么变化没有研究。",
+      "solved_by": [
+        "super-natural-instructions",
+        "flan-t5"
+      ]
+    },
+    {
+      "text": "在句子补全类任务（Winogrande、HellaSwag）上反而不如GPT-3，指令格式并不对所有任务都有利。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "t5",
+      "type": "uses",
+      "note": "以T5的LM适配版（多训了1000亿token语言模型目标）为底座，沿用T5“一切任务都写成文本到文本”的格式。"
+    },
+    {
+      "to": "natural-instructions",
+      "type": "extends",
+      "note": "同样用自然语言描述任务做多任务训练，但规模从9个数据集扩到62个，并按整类任务留出测试。"
+    },
+    {
+      "to": "flan",
+      "type": "rivals",
+      "note": "几周前的FLAN用137B的解码器模型做了同样的事；T0只有11B，在多个留出任务上与FLAN相当或更好，并且全部公开。"
+    },
+    {
+      "to": "gpt-3",
+      "type": "solves",
+      "note": "GPT-3的零样本能力要靠1750亿参数“隐式”获得；T0用显式多任务提示训练，在约16倍小的模型上达到可比水平。"
+    },
+    {
+      "to": "calibrate-before-use",
+      "type": "solves",
+      "note": "该文指出模型对提示措辞和格式极其敏感；T0用每个数据集多条模板训练，降低了不同措辞之间的性能波动。"
+    },
+    {
+      "to": "prefix-tuning",
+      "type": "uses",
+      "note": "所用的LM适配版T5来自同期Prompt Tuning工作（Lester等）发布的检查点。"
+    }
+  ],
+  "prereq": [
+    "pretrain-finetune",
+    "zero-few-shot",
+    "in-context-learning",
+    "instruction-tuning",
+    "encoder-decoder",
+    "generalization"
+  ],
+  "terms": [
+    {
+      "t": "提示模板",
+      "d": "把一条数据样本的字段填进固定句式的规则，例如「{文章} 这篇评论是正面还是负面？」，从而把各种数据集统一成“输入一段话、输出一段话”。"
+    },
+    {
+      "t": "留出任务",
+      "d": "训练时整类不出现、只用于测试的任务类型，用来检验模型能否泛化到全新的任务。"
+    },
+    {
+      "t": "四分位距",
+      "d": "把一组结果排序后，第75百分位减第25百分位，用来衡量结果的离散程度；这里反映模型对不同提示措辞的敏感度。"
+    }
+  ],
+  "learn": "先懂[[c:zero-few-shot]]和[[c:pretrain-finetune]]，了解[[t5]]的文本到文本格式。读原文第3节（如何按任务类型划分留出集）、第4节（提示格式）和图4。动手：在Hugging Face上加载promptsource，给同一个情感分类数据集看几条不同模板，再用T0-3B对5种模板分别做零样本测试，比较准确率的离散程度。",
+  "check": {
+    "source": "https://arxiv.org/abs/2110.08207",
+    "confirmed": "标题、作者、v1提交于2021-10-15；摘要中的“16x its size”“6x”；ar5iv正文中的P3 2073条模板/177个数据集/11.7条、62个数据集12类任务、四类11个留出数据集与14个BIG-bench任务、T5+LM多训100B token、11B初始化、9/11追平或超过GPT-3、NLI全面超过、Winogrande/HellaSwag例外、BIG-bench 13/14、Mishra等61个任务9个数据集、FLAN 137B。"
+  }
+}

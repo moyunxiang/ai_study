@@ -1,0 +1,106 @@
+{
+  "id": "chinchilla",
+  "who": "Jordan Hoffmann, Sebastian Borgeaud, Arthur Mensch, Elena Buchatskaya, Trevor Cai, Eliza Rutherford, Diego de Las Casas, Lisa Anne Hendricks et al. · DeepMind",
+  "venue": "NeurIPS 2022",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2203.15556"
+    },
+    {
+      "label": "Chinchilla复现与修正",
+      "url": "https://arxiv.org/abs/2404.10102"
+    }
+  ],
+  "problem": "按照2020年的规模定律，算力增加时应主要加参数、数据只少量增加，于是GPT-3、Gopher、MT-NLG都是一两千亿以上参数却只训练约3000亿token。这种分配是否最优，没人认真检验过。",
+  "idea": "训练400多个从7000万到160亿参数、数据量从50亿到5000亿token的模型，用三种方法估计“给定算力时最优的参数量和数据量”；三种方法都得出：两者应按相同比例增长。",
+  "impact": "按此训练的700亿参数Chinchilla用了与2800亿Gopher相同的算力、4倍的数据，在几乎所有任务上都更好，MMLU达67.5%；“约20个token对应1个参数”成为此后训练大模型的基本参照。",
+  "background": "[[scaling-laws]]（Kaplan等，2020）发现语言模型的损失随参数量N、数据量D按幂律下降（见[[c:scaling-law-concept]]），并据此建议算力增加时主要加参数：最优参数量 `N_opt ∝ C^0.73`，最优数据量 `D_opt ∝ C^0.27`（算力翻10倍，参数约翻5倍，数据不到翻2倍）。业界照此行事：[[gpt-3]]（175B）、[[jurassic-1]]（178B）、[[gopher]]（280B）都只训练了约3000亿token，[[mt-nlg]]（530B）只有2700亿token。\n\n但Kaplan的实验有一个问题：所有模型用同一个固定长度的学习率衰减计划，训练中途的损失并不是“按这么多数据训练到底”时能达到的损失，数据的作用因此被低估；而且大部分模型不到1亿参数。",
+  "method": "训练前先统一一个关键设置：余弦学习率衰减的周期长度与该次训练的token总数匹配。在此基础上用三种互相独立的方法估计最优配比，训练成本按常用近似 `C ≈ 6·N·D` 计算（见[[c:params-flops]]）。\n\n**方法一：训练曲线包络**。固定一组模型尺寸（70M到10B以上），每个按4种不同的训练长度训练，在每个算力点上取所有曲线中最低的损失，再看最低点对应的N和D。\n\n**方法二：等算力曲线（IsoFLOP）**。选9个固定的算力预算，每个预算下训练不同大小的模型（模型越大，能分到的token越少），损失对模型大小呈U形，用抛物线找谷底，得到该预算下的最优N。\n\n**方法三：参数化拟合**。把所有实验的最终损失拟合成\n\n`L(N, D) = E + A / N^α + B / D^β`\n\nE是数据本身的不可约熵，第二项是模型容量不够带来的损失，第三项是数据不够带来的损失。拟合结果约为 `E = 1.69, α = 0.34, β = 0.28`，在 `6ND = C` 的约束下解析求最优点。\n\n三种方法给出 `N_opt ∝ C^a` 中 a 分别为0.50、0.49、0.46，即参数和数据应大致**同比**增长。按方法一的表格：70B模型应训练1.4万亿token，175B模型约3.7万亿，即每个参数约20个token。\n\n**验证**。用Gopher的训练算力训练一个70B模型Chinchilla，在1.4万亿token的MassiveText上（数据与Gopher相同，配比略调），并把优化器换成[[adamw]]。",
+  "results": "Chinchilla（70B）在大量下游任务上全面超过Gopher（280B）、GPT-3（175B）、Jurassic-1（178B）和MT-NLG（530B）。MMLU五样本平均67.5%，比Gopher高7个多百分点。由于参数只有Gopher的四分之一，推理和微调的成本也低得多。按其估计，当时的大模型普遍“参数过多、训练不足”：用Gopher的算力，最优模型应在400亿到700亿参数之间。",
+  "legacy": "这篇论文直接改变了大模型的训练方式。[[llama-1]]进一步把较小的模型训练到远超“20倍”的token数，因为部署时推理成本占大头；[[beyond-chinchilla]]把推理成本写进了规模定律。当高质量数据开始不够用时，[[data-constrained-scaling]]研究了重复训练多轮的收益，[[run-out-of-data]]估计了人类文本何时耗尽。2024年[[chinchilla-replication]]重新拟合发现，原文方法三的参数估计有误，修正后与方法一、二一致。今天“Chinchilla最优”仍是讨论训练预算的基准，但实际模型的训练token数大多远超20倍参数。",
+  "pitfalls": "- “每个参数20个token”是**训练算力最优**，不是**部署最优**：如果模型要被大量调用，训练一个更小的模型、喂更多数据通常更划算。\n- 结论依赖“数据不重复、不超过一轮”的假设，以及特定数据集MassiveText。",
+  "limits": [
+    {
+      "text": "只优化训练算力，没有考虑推理成本；对需要大规模部署的模型，比最优更小、训练更久的模型更合算。",
+      "solved_by": [
+        "llama-1",
+        "beyond-chinchilla"
+      ]
+    },
+    {
+      "text": "假设数据无限、每条只用一次；按此配比，下一代模型需要数万亿乃至更多高质量token，数据很快会成为瓶颈。",
+      "solved_by": [
+        "data-constrained-scaling",
+        "run-out-of-data"
+      ]
+    },
+    {
+      "text": "方法三的参数化拟合与另外两种方法不一致，且原始实验数据没有公开，难以检验。",
+      "solved_by": [
+        "chinchilla-replication"
+      ]
+    },
+    {
+      "text": "只用损失衡量“好坏”，数据的质量差异没有进入公式；同样多的token，质量不同，效果可以差很多。",
+      "solved_by": [
+        "textbooks",
+        "fineweb"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "scaling-laws",
+      "type": "solves",
+      "note": "修正了Kaplan定律“主要加参数”的结论：把最优参数量的指数从0.73改为约0.5，参数与数据应同比增长。"
+    },
+    {
+      "to": "gopher",
+      "type": "solves",
+      "note": "用与Gopher相同的算力，训练4倍小的模型、4倍多的数据，全面超过Gopher，证明后者训练不足。"
+    },
+    {
+      "to": "gpt-3",
+      "type": "solves",
+      "note": "指出GPT-3等175B级模型只训练3000亿token，远少于计算最优所需的约3.7万亿。"
+    },
+    {
+      "to": "mt-nlg",
+      "type": "rivals",
+      "note": "MT-NLG走“继续堆参数”路线到530B；参数少7倍多的Chinchilla在下游任务上更好。"
+    },
+    {
+      "to": "adamw",
+      "type": "uses",
+      "note": "Chinchilla把Gopher用的Adam换成AdamW，并统一让学习率衰减周期与训练长度匹配。"
+    }
+  ],
+  "prereq": [
+    "scaling-law-concept",
+    "params-flops",
+    "learning-rate",
+    "language-model",
+    "generalization",
+    "loss-function"
+  ],
+  "terms": [
+    {
+      "t": "计算最优",
+      "d": "在固定训练算力下，选择让最终损失最低的参数量和数据量组合。"
+    },
+    {
+      "t": "IsoFLOP曲线",
+      "d": "算力固定时，把不同大小模型训练到头的最终损失画成一条曲线；曲线的谷底就是这个预算下的最优模型大小。"
+    },
+    {
+      "t": "6ND",
+      "d": "训练一个N参数模型、看D个token大约需要的浮点运算数：前向每个参数每个token约2次，反向约4次。"
+    }
+  ],
+  "learn": "先懂[[c:scaling-law-concept]]和[[c:params-flops]]，读[[scaling-laws]]了解Kaplan的结论。读原文第3节的三种方法和表2、表3，附录D的推导。动手：用论文的 `L(N,D) = 1.69 + 406.4/N^0.34 + 410.7/D^0.28` 和 `C = 6ND`，写几行代码算出给定算力下的最优N和D，并与表3对照；再看[[chinchilla-replication]]修正后的系数有何不同。",
+  "check": {
+    "source": "https://arxiv.org/abs/2203.15556",
+    "confirmed": "标题、作者、v1提交于2022-03-29；摘要中的400多个模型、70M–16B、5–500B token、70B与4倍数据、MMLU 67.5%；ar5iv正文中的表1（各模型参数与token数）、三种方法的a=0.50/0.49/0.46与Kaplan的0.73/0.27、E=1.69 A=406.4 B=410.7 α=0.34 β=0.28、9个算力预算、6ND近似、表3中175B对应3.7万亿token、最优在40–70B之间、AdamW与MassiveText配比。“算力翻10倍、参数约翻5倍”由0.73/0.27指数推算。"
+  }
+}

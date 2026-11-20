@@ -1,0 +1,124 @@
+{
+ "id": "ppo",
+ "who": "Schulman, Wolski, Dhariwal, Radford, Klimov · OpenAI",
+ "venue": "arXiv 2017",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/1707.06347"
+  },
+  {
+   "label": "Spinning Up：PPO",
+   "url": "https://spinningup.openai.com/en/latest/algorithms/ppo.html"
+  },
+  {
+   "label": "The 37 Implementation Details of PPO",
+   "url": "https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/"
+  }
+ ],
+ "problem": "策略梯度每批数据只能更新一步，步子大了策略会崩；TRPO用KL约束保证稳定，但需要二阶优化和共轭梯度，实现复杂，也不兼容策略与价值共享参数、dropout等常见网络设计。",
+ "idea": "把新旧策略的概率比r限制在[1−ε, 1+ε]之内：目标函数取“原始目标”和“裁剪后目标”中较小的那个，超出范围就不再有好处，于是可以在同一批数据上用普通SGD/Adam放心地训练多轮。",
+ "impact": "只需在普通策略梯度代码上改几行，就有TRPO的稳定性和更好的样本效率，成为最常用的深度RL算法：[[openai-five]]、[[dactyl]]、[[instructgpt]]与ChatGPT的RLHF都用PPO训练。",
+ "background": "策略梯度方法（见[[c:policy-gradient-concept]]）的基本形式是：用当前策略采一批数据，算出每个动作的优势Â（多好于平均，常用[[gae]]估计），然后把好动作的概率调高、坏动作的调低。麻烦在于步长：一步迈太大，新策略和采数据的旧策略差得太远，梯度估计失效，策略可能一下子崩坏、再也采不到好数据。所以[[reinforce]]和[[a3c]]一批数据只敢更新一次，样本效率很低。\n\n[[trpo]]（2015）的解决办法来自[[cpi]]和[[natural-pg]]：最大化一个“替代目标”，同时约束新旧策略的平均KL散度（见[[c:kl-divergence]]）不超过δ。这在理论上保证了近似的单调改进，实践中也很稳定，但每一步要用共轭梯度近似求解带约束的二阶优化，代码复杂；而且当策略和价值函数共享网络、或网络里有dropout等噪声时不好用。有没有只用一阶优化、像普通深度学习那样训练，又能保持TRPO稳定性的方法？",
+ "method": "**替代目标**。设`r_t(θ) = π_θ(a_t|s_t) / π_旧(a_t|s_t)`，即新策略相对采样时旧策略选这个动作的概率比。TRPO优化的替代目标是`E[r_t · Â_t]`：若Â>0就增大r，Â<0就减小r。如果不加约束，SGD会把r推得很远。\n\n**裁剪**。PPO的核心目标是：\n\n`L_CLIP(θ) = E_t[ min( r_t·Â_t , clip(r_t, 1−ε, 1+ε)·Â_t ) ]`，ε常取0.2。\n\n用一个例子读懂它：某动作Â=+1（是好动作），一开始r=1。增大它的概率时目标随r线性上升，但r超过1.2后，裁剪项固定在1.2，min取到这个上限，再增大r就没有任何梯度了。反之，对坏动作（Â<0），r低于0.8后也不再奖励继续压低。取min的作用是：只在“对自己有利”的方向上截断，在“变差”的方向上照样惩罚，所以L_CLIP是未裁剪目标的一个悲观下界。\n\n**算法**。N个并行actor各跑T步收集数据，用GAE计算优势，然后在这N×T条数据上用小批量[[adam]]训练K轮（例如MuJoCo上T=2048、K=10、批大小64），再丢掉数据重新采样。若策略与价值网络共享参数，总损失为`L_CLIP − c₁·L_价值 + c₂·熵奖励`。\n\n论文还给出另一个变体：在目标里减去`β·KL(π_旧‖π_θ)`，并自适应调整β（KL太大就加倍、太小就减半）。实验中它不如裁剪版。",
+ "results": "在7个MuJoCo连续控制任务上（每个100万步，每种设置3个种子），按归一化分数比较目标函数的变体：不裁剪也不加惩罚为−0.39（在HalfCheetah上比随机策略还差），ε=0.2的裁剪最好，为0.82；最好的自适应KL为0.74，最好的固定KL为0.72。与TRPO、交叉熵法、A2C等方法相比，PPO在几乎所有连续控制任务上最好，并在Roboschool中学会了让三维人形机器人奔跑、转向追逐目标、被方块击倒后爬起。在49款Atari游戏上，按整个训练过程的平均回报（衡量学得快），PPO赢30款、ACER赢18款、A2C赢1款；按最后100回合（衡量最终性能），ACER赢28款、PPO赢19款——PPO与更复杂的ACER大致相当，实现却简单得多。",
+ "legacy": "PPO很快成为OpenAI及整个领域的默认算法：[[openai-five]]用它在Dota 2上击败世界冠军，[[dactyl]]用它在仿真中训练机械手，[[hide-and-seek]]、[[juewu]]、[[chip-placement]]也基于它；多智能体的[[mappo]]表明它在合作任务上同样强。最大的影响在语言模型：[[human-preferences]]式的奖励模型加PPO构成了[[instructgpt]]和ChatGPT的RLHF流程（见[[c:rlhf-concept]]）。\n\n它的弱点也引出了后续工作。[[implementation-matters]]发现PPO相对TRPO的优势很大程度来自代码层面的细节（奖励缩放、价值裁剪、学习率退火等）。在大语言模型上，PPO需要一个与策略同规模的价值网络，[[grpo]]去掉价值网络改用组内比较，[[deepseek-r1]]用它训练出推理模型；[[dpo]]则绕过强化学习，直接用偏好数据做监督式优化。",
+ "pitfalls": "- 裁剪并不能严格保证新旧策略的KL小于某个值：多轮训练后r仍可能远远越界，只是越界后不再有梯度推动它。实践中常再加“KL过大就提前停止”的检查。\n- 论文的性能很依赖实现细节：优势归一化、观测与奖励的标准化、正交初始化、学习率退火等。两份“PPO”实现的结果可能差很多。\n- PPO是on-policy算法：每批数据训练K轮后就丢弃，不能像DQN那样长期存放在回放池中重复使用。",
+ "limits": [
+  {
+   "text": "on-policy，每批数据用几轮就丢，样本效率远低于离策略方法，真实机器人上难以直接训练。",
+   "solved_by": [
+    "sac",
+    "mbpo"
+   ]
+  },
+  {
+   "text": "性能高度依赖未写进论文的实现细节和超参数，不同实现结果差异很大，可复现性差。",
+   "solved_by": [
+    "implementation-matters",
+    "cleanrl"
+   ]
+  },
+  {
+   "text": "需要一个与策略同等规模的价值网络来估计优势，在大语言模型上显存和计算开销翻倍，价值估计也不准。",
+   "solved_by": [
+    "grpo"
+   ]
+  },
+  {
+   "text": "探索只靠策略随机性和熵奖励，在稀疏奖励任务（如Montezuma's Revenge）上几乎无效。",
+   "solved_by": [
+    "rnd"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "trpo",
+   "type": "solves",
+   "note": "用裁剪概率比的一阶目标替代TRPO的KL约束与共轭梯度，保留稳定性，实现大为简化，并支持参数共享。"
+  },
+  {
+   "to": "gae",
+   "type": "uses",
+   "note": "优势用截断版GAE估计，论文各组实验都取λ=0.95、γ=0.99。"
+  },
+  {
+   "to": "cpi",
+   "type": "extends",
+   "note": "PPO的未裁剪替代目标r·Â就是保守策略迭代中的L^CPI，裁剪是对它的一种简单“保守化”。"
+  },
+  {
+   "to": "a3c",
+   "type": "extends",
+   "note": "沿用A3C/A2C的多actor并行采样与共享网络结构，但让每批数据训练多轮；Atari上按训练全程平均回报胜A2C 30比1。"
+  },
+  {
+   "to": "reinforce",
+   "type": "extends",
+   "note": "本质仍是似然比策略梯度，只是把单步更新换成可多轮优化的裁剪替代目标。"
+  },
+  {
+   "to": "adam",
+   "type": "uses",
+   "note": "用小批量Adam对替代目标做多轮优化，这正是TRPO做不到的一阶训练方式。"
+  },
+  {
+   "to": "natural-pg",
+   "type": "rivals",
+   "note": "自然梯度与TRPO用二阶信息控制步长；PPO放弃二阶信息，用裁剪近似实现“小步更新”，后者因简单而胜出。"
+  }
+ ],
+ "prereq": [
+  "policy-gradient-concept",
+  "actor-critic",
+  "kl-divergence",
+  "importance-sampling",
+  "on-off-policy",
+  "adaptive-optimizer",
+  "entropy"
+ ],
+ "terms": [
+  {
+   "t": "概率比r",
+   "d": "新策略与采样时旧策略选同一动作的概率之比。r=1表示没变，r=1.5表示这个动作被选中的概率提高了50%。"
+  },
+  {
+   "t": "替代目标",
+   "d": "用旧策略采的数据、通过重要性采样比估计新策略表现的目标函数。只在新旧策略接近时可靠，所以要限制更新幅度。"
+  },
+  {
+   "t": "信赖域",
+   "d": "只在旧参数附近一个“可信”的小范围内优化，因为替代目标只在那里近似准确。TRPO用KL约束显式定义它，PPO用裁剪隐式近似。"
+  },
+  {
+   "t": "熵奖励",
+   "d": "在目标中加上策略的熵，鼓励策略保持一定随机性，防止过早收敛到确定性动作。"
+  }
+ ],
+ "learn": "先补[[c:policy-gradient-concept]]、[[c:actor-critic]]和[[c:importance-sampling]]，并读懂[[gae]]。读原文第3节（裁剪目标与图1、图2）和第5节算法1；对照Spinning Up的PPO页面。然后读“The 37 Implementation Details of PPO”，用CleanRL的ppo.py在CartPole和一款Atari游戏上跑通，逐项关掉实现细节（如优势归一化）观察效果。",
+ "check": {
+  "source": "https://arxiv.org/abs/1707.06347",
+  "confirmed": "标题、5位作者、arXiv v1于2017-07-20；正文中L_CLIP公式与ε=0.2、自适应KL规则（1.5与2倍）、表1（−0.39、0.76/0.82/0.70、自适应KL最高0.74、固定KL最高0.72，7个环境×3个种子、各100万步）、表2（全程平均：A2C 1、ACER 18、PPO 30；最后100回合：A2C 1、ACER 28、PPO 19）、表3（T=2048、Adam 3×10⁻⁴、10轮、批64、γ=0.99、λ=0.95）、Roboschool人形任务、49款Atari。学习资料链接均可访问。"
+ }
+}

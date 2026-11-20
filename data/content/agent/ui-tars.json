@@ -1,0 +1,35 @@
+{
+  "id": "ui-tars",
+  "who": "Yujia Qin, Yining Ye, Junjie Fang, Haoming Wang et al. · 字节跳动 / 清华大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2501.12326"},
+    {"label": "GitHub", "url": "https://github.com/bytedance/UI-TARS"}
+  ],
+  "problem": "当时的GUI智能体多是“框架”：用GPT-4o等商用模型加人工写的提示词和工作流，再外挂专门的定位模型，环节多、难以整体优化，换个应用就要重新调。",
+  "idea": "训练一个端到端的“原生”智能体模型：只看截图，直接输出思考和鼠标键盘动作，把感知、定位、推理、反思都放进同一个视觉语言模型，用约500亿token的GUI数据持续训练。",
+  "impact": "开源的72B模型在OSWorld上以24.6分超过同期Claude computer use的22.0分，证明专门训练的开源模型能在电脑操作上追平闭源前沿模型。",
+  "background": "2024年的GUI智能体大致有两条路。一条是**框架式**：调用GPT-4o这类通用模型，靠精心设计的提示词、网页HTML或无障碍树提供结构信息，再外挂定位模块把“点击搜索框”转换成坐标，如[[seeact]]、[[agent-s]]。另一条是**专用小模型**：[[cogagent]]、[[seeclick]]专门训练模型看懂截图并点准位置（GUI定位），但多只解决单步定位，长任务规划仍要靠外部框架。\n\n2024年10月Anthropic的[[computer-use]]说明前沿大模型可以直接从截图出发操作电脑，但它是闭源的。在[[osworld]]上，当时最好的系统也只有十几到二十几分，而人类超过72分。",
+  "method": "UI-TARS以[[qwen2-vl]]为底座，在约500亿token数据上分三阶段训练，得到2B、7B、72B三个版本。四个要点：\n\n**增强感知**。收集大量截图，训练模型做元素描述、状态变化描述、界面问答等，让它真正“读懂”界面。\n\n**统一动作空间**。把电脑、手机、网页上的操作统一成一套动作，如`click(x, y)`、`type(text)`、`scroll(direction)`、`hotkey(keys)`，再加平台专属动作（如手机的长按、返回）。大量操作轨迹按这套格式标注，模型直接输出像素坐标。\n\n**System-2推理**。每一步先写一段“思考”再给动作（与[[react]]相同的思考—行动格式），并刻意在训练数据里加入任务分解、反思、识别阶段性里程碑等推理模式。\n\n**带反思的在线迭代**。在数百台虚拟机上让模型自己执行任务，自动过滤出好的轨迹，再加入下一轮训练；对出错的步骤，构造“错误动作 vs 纠正后动作”的对，用[[dpo]]让模型提高纠正动作的概率，从而学会在出错后恢复。",
+  "results": "论文称在10多个GUI基准上取得最好成绩。OSWorld：UI-TARS-72B在50步上限下24.6分、15步下22.7分，Claude computer use分别为22.0和14.9。AndroidWorld：46.6分，GPT-4o为34.5。高分辨率专业软件定位基准ScreenSpot-Pro：38.1分，为当时最高。",
+  "legacy": "UI-TARS把“原生GUI智能体”变成开源社区的主流路线：不再拼接多个模型，而是一个模型从截图直接到动作，后续开源GUI模型大多沿用统一动作空间和在线轨迹迭代的做法。同期闭源产品[[operator]]也采用“只看截图”的路线。",
+  "limits": [
+    {"text": "OSWorld上24.6分仍远低于人类的70多分，长任务中途出错后常常无法恢复。", "solved_by": []},
+    {"text": "在线迭代只用了DPO式的偏好纠正，没有在真实环境里做多轮强化学习，模型很难通过试错探索出新策略。", "solved_by": []},
+    {"text": "模型直接在真实或虚拟机界面上执行点击和输入，误操作和网页中的提示注入都可能造成实际损失，论文没有给出安全机制。", "solved_by": ["agent-sandbox"]}
+  ],
+  "relations": [
+    {"to": "seeclick", "type": "extends", "note": "SeeClick证明了只看截图做GUI定位可行；UI-TARS把定位与规划、反思合进一个模型，从单步定位推进到完整任务。"},
+    {"to": "cogagent", "type": "extends", "note": "沿着“专门训练视觉语言模型做GUI智能体”的路线，把数据规模扩大到约500亿token，并跨电脑、手机、网页统一动作。"},
+    {"to": "qwen2-vl", "type": "uses", "note": "以Qwen2-VL 2B/7B/72B为底座持续训练，与Aguvis、OS-Atlas用同一底座便于公平比较。"},
+    {"to": "computer-use", "type": "rivals", "note": "同样只看截图操作电脑；Claude是闭源通用模型，UI-TARS是开源专用模型，在OSWorld上略高于当时的Claude。"},
+    {"to": "agent-s", "type": "rivals", "note": "Agent S代表框架式路线（通用模型加检索、分层规划）；UI-TARS主张端到端原生模型，论文认为后者更好优化。"},
+    {"to": "dpo", "type": "uses", "note": "用DPO在“错误动作/纠正动作”对上做反思微调。"}
+  ],
+  "prereq": ["vla-concept", "agent-loop", "pretrain-finetune", "image-patch", "imitation-learning"],
+  "terms": [
+    {"t": "GUI定位（grounding）", "d": "给出一句指令如“点设置按钮”，模型要在截图上算出那个按钮的像素坐标。坐标落在目标元素的框内就算对。"},
+    {"t": "原生智能体", "d": "论文的说法，指感知、推理、动作全由一个模型端到端完成，不依赖外部提示工程和工作流拼接。"}
+  ],
+  "learn": "先读[[computer-use]]和[[seeclick]]理解截图式GUI操作的基本问题。再读UI-TARS论文第4节（四项设计）和表格中OSWorld、AndroidWorld的对比。动手：下载开源的UI-TARS-7B，在本地虚拟机里给它一个简单任务，观察每步的思考和输出坐标。",
+  "check": {"source": "https://arxiv.org/abs/2501.12326", "confirmed": "标题、作者、v1提交于2025-01-21；摘要中OSWorld 24.6/22.7 vs Claude 22.0/14.9、AndroidWorld 46.6 vs GPT-4o 34.5；正文（arxiv.org/html/2501.12326v1）核对Qwen-2-VL底座、约50B token、2B/7B/72B、DPO反思微调、ScreenSpot-Pro 38.1。"}
+}

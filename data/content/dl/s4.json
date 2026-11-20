@@ -1,0 +1,40 @@
+{
+  "id": "s4",
+  "who": "Albert Gu, Karan Goel, Christopher Ré · Stanford University",
+  "venue": "ICLR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2111.00396"},
+    {"label": "官方代码", "url": "https://github.com/state-spaces/s4"},
+    {"label": "The Annotated S4", "url": "https://srush.github.io/annotated-s4/"}
+  ],
+  "problem": "上万步的长序列上，RNN记不住、Transformer算不动；用HiPPO矩阵构造的线性状态空间模型理论上能记住长历史，但计算和显存开销大到无法实用。",
+  "idea": "把HiPPO矩阵拆成“正规矩阵加低秩矩阵”，在频域里用Woodbury恒等式和Cauchy核计算整段卷积核，使训练接近线性复杂度，推理时又能像RNN一样逐步递推。",
+  "impact": "首次解出长度16384的Path-X任务，在Long Range Arena全部任务上领先；开启了深度状态空间模型这一路线，直接引出Hyena、Mamba。",
+  "background": "长程依赖是序列建模的老难题。[[lstm]]等RNN要把信息一步步传下去，几千步之后基本丢失；[[transformer]]的注意力代价随长度平方增长，[[reformer]]、[[performer]]等高效变体在Long Range Arena（LRA，长度1K到16K的六项任务）上表现仍差，其中Path-X（判断128×128图片展平成16384个像素后两点是否连通）所有模型都只有50%的瞎猜水平。\n\n另一条路来自控制论的状态空间模型（SSM，见[[c:state-space-model]]，[[kalman-filter]]是其经典形式）。[[hippo]]推导出一类特殊的状态矩阵A，让隐状态在线压缩全部历史；同组的LSSL把它做成深度网络层，在序列MNIST上把精度从随机A的60%提到98%。但LSSL要为状态维度N、长度L付出`O(N²L)`计算和`O(NL)`显存，N=256时比同等RNN多用几个数量级的显存；已有的快速算法又在数值上不稳定。",
+  "method": "**SSM的两种算法**。连续形式`x'(t) = Ax(t) + Bu(t)，y(t) = Cx(t)`。用步长Δ离散化（双线性法）：`Ā = (I − Δ/2·A)⁻¹(I + Δ/2·A)`，`B̄ = (I − Δ/2·A)⁻¹ΔB`，得到递推`x_k = Ā x_{k−1} + B̄ u_k，y_k = C x_k`——这就是一个线性RNN，推理时每步代价固定。把递推展开，输出等于输入与卷积核`K̄ = (CB̄, CĀB̄, CĀ²B̄, …, CĀ^{L−1}B̄)`的卷积，训练时可以用FFT一次性并行算完（见[[c:convolution-op]]、[[c:fourier-transform]]）。\n\n**卡点**。算K̄需要A的L次幂。若A是对角阵就很容易，但论文证明HiPPO矩阵的对角化矩阵元素大到约`2^{4N/3}`，直接对角化在数值上不可行。\n\n**S4的解法**。HiPPO矩阵虽不是正规矩阵，却能写成“正规矩阵减一个秩1矩阵”：`A = VΛV* − PQ*`。正规部分可以用酉矩阵稳定地对角化。再不直接算L个幂，而是在L个单位根上计算K̄的生成函数：低秩部分用Woodbury恒等式化掉，剩下的对角部分恰好是数值分析里研究透的Cauchy核`1/(ω_j − ζ_k)`；最后做一次逆FFT得到K̄。总代价约为`Õ(N+L)`计算、`O(N+L)`显存。\n\n**消融**。用随机初始化的同结构矩阵效果很差，说明效果主要来自HiPPO初始化，结构化参数化负责让它算得动。",
+  "results": "相比LSSL快到30倍、显存省到1/400。LRA上首版平均80.48%，所有基线都低于60%；首次解出Path-X，精度88%（修订版表格更新为96.35%）。不做数据增强的序列CIFAR-10达到91%。WikiText-103语言建模困惑度21.28，与同配置Transformer的20.51只差0.8，并比此前无注意力模型好2以上；生成时比普通Transformer快约60倍。语音指令分类直接处理长16000的原始波形，测试时只改步长Δ，在采样率减半的数据上不重训仍有96.3%。",
+  "legacy": "S4证明了“线性递推加特殊初始化”可以和注意力竞争，随后出现了更简单的对角版本DSS、S4D，以及用隐式长卷积的[[hyena]]。它的主要缺点——参数与输入无关——被[[mamba]]用选择性机制解决，[[mamba-2]]又把SSM与[[linear-attention]]统一起来。今天大模型里的线性层多来自这条线，常与注意力混合使用，如[[jamba]]。",
+  "pitfalls": "- S4是线性时不变系统：A、B、C、Δ对所有输入都一样，非线性来自层与层之间的激活和前馈层。\n- “卷积模式训练、递推模式推理”只对时不变模型成立；参数随输入变化后就不能用FFT卷积了。\n- 论文的Path-X和LRA数字在不同版本中有更新，引用时注明版本。",
+  "limits": [
+    {"text": "参数不随输入变化，无法按内容决定记住或忽略哪个token，在需要选择性复制、上下文检索的任务上吃亏。", "solved_by": ["mamba"]},
+    {"text": "语言建模仍落后同规模Transformer，实验最大只到约2.5亿参数，能否扩展到大语言模型未知。", "solved_by": ["mamba", "jamba"]},
+    {"text": "正规加低秩分解与Cauchy核需要专门的复数运算和自定义内核，实现复杂，难以被一般开发者修改。", "solved_by": ["mamba-2"]}
+  ],
+  "relations": [
+    {"to": "hippo", "type": "solves", "note": "HiPPO矩阵给出长记忆，但直接用于深度网络计算和显存开销过大；S4用正规加低秩分解让它可高效训练。"},
+    {"to": "kalman-filter", "type": "extends", "note": "沿用控制论中线性状态空间模型的形式，把它变成可堆叠、可学习的深度网络层。"},
+    {"to": "transformer", "type": "rivals", "note": "同为通用序列模型，S4在长序列基准上大幅领先，但在语言建模上仍略逊；后来两者走向混合。"},
+    {"to": "performer", "type": "rivals", "note": "高效注意力变体在LRA上平均不到60%、Path-X只有瞎猜水平，S4用完全不同的递推路线超过它们。"},
+    {"to": "linear-attention", "type": "rivals", "note": "两者都能在推理时变成常数代价的递推；S4的递推矩阵有长记忆初始化，生成速度同样快而质量更高。"},
+    {"to": "lstm", "type": "solves", "note": "RNN在上万步序列上学不会，S4同样以递推方式推理，却能在长16000的原始语音上直接训练。"}
+  ],
+  "prereq": ["state-space-model", "recurrent-layer", "convolution-op", "fourier-transform", "eigen-svd", "low-rank", "ode-sde"],
+  "terms": [
+    {"t": "Long Range Arena（LRA）", "d": "2020年提出的长序列基准，含文本、检索、图像、路径等6项任务，长度从1千到1万6千。"},
+    {"t": "离散化", "d": "把连续时间的微分方程按步长Δ换成逐步递推的公式；改变Δ相当于改变采样率。"},
+    {"t": "正规矩阵", "d": "能被酉矩阵（复数版的正交矩阵）对角化的矩阵，对角化过程数值稳定。"},
+    {"t": "Cauchy核", "d": "形如1/(ω_j − ζ_k)的矩阵运算，数值分析中有稳定的近线性算法。"}
+  ],
+  "learn": "先补[[c:state-space-model]]、[[c:recurrent-layer]]和[[c:convolution-op]]，读懂[[hippo]]要解决什么。读原文第2节（SSM的三种视角）和第3节的算法1，数学细节可先跳过附录。最好的入门材料是The Annotated S4，用JAX逐行实现。动手：先实现对角A的简化SSM层，在序列MNIST上训练，对比随机初始化与HiPPO初始化的差距。",
+  "check": {"source": "https://arxiv.org/html/2111.00396", "confirmed": "arXiv记录：标题、三位作者、v1提交2021-10-31；正文中LSSL的O(N²L)计算、N=256、双线性离散化公式、HiPPO对角化矩阵元素约2^{4N/3}、NPLR与Woodbury/Cauchy核、Õ(N+L)、比LSSL快30倍省400倍显存、LRA平均80.48%与表2（修订版86.09、Path-X 96.35）、Path-X 88%、sCIFAR 91%、WikiText-103 Transformer 20.51 vs S4 21.28（附录说明后来重训得20.95）、生成快约60倍、采样率减半96.3%、随机NPLR消融；LSSL摘要（arXiv 2110.13985）；官方代码README的ICLR 2022引用。"}
+}

@@ -1,0 +1,8 @@
+{
+  "key": "gumbel-softmax",
+  "short": "离散采样（选第几个类别、取哪个码本向量）没有梯度；直通估计和Gumbel-Softmax是两种让梯度“穿过”离散选择、从而能端到端训练的近似办法。",
+  "body": "[[c:backpropagation]]要求每一步都可导。但很多模型中间有离散选择：[[vq-vae]]要从码本里选最近的向量，离散隐变量模型要采样一个类别，硬注意力要选一个位置。argmax或采样操作的输出是阶梯状的，几乎处处导数为0，梯度传不回去。[[c:reparameterization]]对连续高斯有效，对离散分布不直接适用。\n\n**直通估计**（Straight-Through Estimator，STE）：前向传播照常做离散操作，反向传播时假装这一步是恒等函数，把输出的梯度原样传给输入。它是有偏的近似，但简单、常常够用。VQ-VAE就是这样把梯度从解码器直接拷贝给编码器输出；[[bnn]]等低比特量化训练也依赖STE（见[[c:quantization-concept]]）。\n\n**Gumbel-Max技巧**：要从概率π₁…π_K里采样，可以给每个log π_i加一个独立的Gumbel噪声`g_i = −log(−log u_i)`，u_i在(0,1)均匀分布，然后取argmax。结果恰好服从类别分布π。这把“随机性”和“参数”分开了，正是重参数化的思路。\n\n**Gumbel-Softmax**（2016年两组人同时提出，另一个名字叫Concrete分布）：把不可导的argmax换成带温度τ的[[c:softmax]]：\n\n`y_i = softmax((log π_i + g_i) / τ)`\n\nτ → 0时y趋近独热向量，τ大时更平滑。训练时常从较大τ逐步退火。也可以前向用硬的独热、反向用软的y的梯度，叫Straight-Through Gumbel-Softmax。\n\n**在AI里**：[[dall-e]]第一阶段训练离散VAE时用Gumbel-Softmax松弛；离散token化的图像、语音模型（见[[c:vector-quantization]]）广泛使用直通估计；神经架构搜索中选择操作类型也用过Gumbel-Softmax。",
+  "example": "三类概率π = [0.5, 0.3, 0.2]，log π ≈ [−0.69, −1.20, −1.61]。抽到u = [0.6, 0.2, 0.9]，Gumbel噪声g ≈ [0.67, −0.48, 2.25]，相加得[−0.02, −1.68, 0.64]。\n\n- argmax：选第3类（Gumbel-Max的采样结果）。\n- τ = 1：softmax得[0.32, 0.06, 0.62]，平滑但偏向第3类。\n- τ = 0.1：[0.00, 0.00, 1.00]，几乎就是独热。\n- τ = 5：[0.35, 0.25, 0.40]，接近均匀。",
+  "pitfalls": "- 两种方法给出的都是有偏梯度，模型优化的不完全是你写下的目标。\n- τ太小时梯度方差很大、训练不稳；τ太大时训练和测试（测试用硬选择）的行为差距大。\n- 另一类无偏方法是REINFORCE式的得分函数估计（见[[c:policy-gradient-concept]]），无偏但方差大，适用场景不同。",
+  "needs": ["backpropagation", "softmax", "reparameterization"]
+}

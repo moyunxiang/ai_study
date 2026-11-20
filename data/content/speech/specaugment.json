@@ -1,0 +1,33 @@
+{
+  "id": "specaugment",
+  "who": "Daniel S. Park, William Chan, Yu Zhang, Chung-Cheng Chiu, Barret Zoph, Ekin D. Cubuk, Quoc V. Le · Google Brain",
+  "venue": "Interspeech 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1904.08779"},
+    {"label": "Google AI博客", "url": "https://research.google/blog/specaugment-a-new-data-augmentation-method-for-automatic-speech-recognition/"}
+  ],
+  "problem": "端到端识别模型在几百小时的公开数据上严重过拟合，打不过精调的混合系统；而传统的语音数据增强（加噪、变速）要额外处理音频，成本高、收益有限。",
+  "idea": "不碰音频，直接在输入的对数梅尔频谱上做三件事：沿时间轴轻微扭曲、随机抹掉几条连续的频带、随机抹掉几段连续的时间帧。",
+  "impact": "只靠这种增强，LAS模型在LibriSpeech和Switchboard上不用语言模型就超过了当时最好的混合系统；SpecAugment此后几乎成为所有语音识别训练的默认配置。",
+  "background": "到2019年，[[las]]这类注意力端到端模型结构简单，但在LibriSpeech 960小时、Switchboard 300小时这种规模的公开数据上，仍明显落后于用[[kaldi]]精调的混合DNN-HMM系统。一个重要原因是端到端模型参数多、容易过拟合（见[[c:generalization]]）。视觉里数据增强是常规手段，语音也有做法：[[deepspeech]]把噪声叠加到波形上，还有变速、模拟房间混响等，但这些都要在波形层面处理，代价高，而且需要额外的噪声数据。",
+  "method": "SpecAugment把输入的对数梅尔频谱当成一张图（横轴时间、纵轴频率），训练时对每个样本随机施加三种变换（见[[c:data-augmentation]]）：\n\n- **时间扭曲**：在时间轴中间随机取一点，把它向左或右平移一个不超过W帧的距离，图像随之平滑变形，相当于局部加快或放慢语速。\n- **频率掩码**：随机选连续的f个梅尔频带置零，f在0到F之间均匀抽取（LibriSpeech设置F=27，频谱共80个频带）。模型因此不能依赖某几个固定频段，类似于部分频率信息丢失。\n- **时间掩码**：随机选连续的t帧置零，并限制它不超过整句长度的一定比例，类似于短暂的丢音。\n\n频谱已归一化到均值0，所以置零就等于填上平均值。可以叠加多个掩码，论文手工设计了几种策略，如LibriSpeech基础版（每种掩码各1个）和加倍版（各2个）。整个过程在训练时实时计算，不需要额外数据。\n\n增强之后模型由“过拟合”变成“欠拟合”，于是作者把LAS网络做得更大、训练更久（最大模型训练约24天），并配合标签平滑和学习率调度；解码时可选地用浅融合加入外部语言模型。",
+  "results": "LibriSpeech 960小时：不用语言模型，test-clean/test-other词错误率2.8%/6.8%；加语言模型浅融合后2.5%/5.8%，此前最好的混合系统在test-other上为7.5%。Switchboard 300小时：不用语言模型时Switchboard/CallHome为7.2%/14.6%，加语言模型6.8%/14.1%，此前最好的混合系统为8.3%/17.3%。消融显示三种变换里时间扭曲贡献最小、计算最贵，两种掩码是主要来源。",
+  "legacy": "SpecAugment成本几乎为零，很快成为[[conformer]]、[[espnet]]、[[wenet]]等几乎所有识别模型的标配。随机掩盖一部分输入、让模型从上下文推断的思路，与[[wav2vec-2]]在潜在表示上做掩码的自监督训练思路相通。",
+  "limits": [
+    {"text": "掩码大小和数量是手工为每个数据集调的，没有自动选择的方法。", "solved_by": []},
+    {"text": "增强后模型欠拟合，需要更大的网络和极长的训练（最大模型约24天）才能兑现收益。", "solved_by": ["conformer"]},
+    {"text": "仍是纯监督训练，960小时的标注数据依然不可少，无法利用海量无标注语音。", "solved_by": ["wav2vec-2"]}
+  ],
+  "relations": [
+    {"to": "las", "type": "uses", "note": "所有实验都用LAS模型，SpecAugment让这种端到端模型在公开数据集上第一次超过混合系统。"},
+    {"to": "cutout", "type": "extends", "note": "把视觉里随机抹掉图像块的做法搬到频谱上，按时间和频率两个方向分别抹除连续区域。"},
+    {"to": "deepspeech", "type": "rivals", "note": "Deep Speech在波形上叠加噪声做增强，需要噪声数据和音频处理；SpecAugment直接在特征上做，零成本，此后成为主流。"},
+    {"to": "librispeech", "type": "uses", "note": "主要基准之一，在test-other上把当时最好的结果相对降低约22%。"},
+    {"to": "switchboard", "type": "uses", "note": "另一主要基准，300小时训练集上超过混合系统。"}
+  ],
+  "terms": [
+    {"t": "浅融合（shallow fusion）", "d": "解码时把识别模型的对数概率与外部语言模型的对数概率按权重相加来给候选句打分：`y* = argmax(log P(y|x) + λ·log P_LM(y))`。"},
+    {"t": "标签平滑", "d": "训练时不让正确类别的目标概率等于1，而是如0.9，剩下的分给其他类别，防止模型过度自信。"}
+  ],
+  "check": {"source": "https://arxiv.org/abs/1904.08779", "confirmed": "标题、7位作者、arXiv首次提交2019-04-18；摘要与正文：LibriSpeech 2.8/6.8（无LM）、2.5/5.8（有LM）、混合系统7.5；Switchboard 7.2/14.6、6.8/14.1、混合8.3/17.3；表1 F=27、W=80；最大模型训练约24天；时间扭曲贡献最小；test-other相对改进22%。"}
+}

@@ -1,0 +1,35 @@
+{
+  "id": "glove",
+  "who": "Jeffrey Pennington, Richard Socher, Christopher D. Manning · 斯坦福大学",
+  "venue": "EMNLP 2014",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/D14-1162/"},
+    {"label": "项目主页与预训练向量", "url": "https://nlp.stanford.edu/projects/glove/"}
+  ],
+  "problem": "词向量有两派：LSA一类对全局共现矩阵做分解，统计用得充分但类比任务很差；word2vec一类在局部窗口上滑动预测，类比好却没直接利用全局统计，也说不清规律从哪来。",
+  "idea": "先数出整个语料的词-词共现次数，再直接拟合“两个词向量的内积≈共现次数的对数”，并用一个加权函数压低罕见和极高频词对的影响。",
+  "impact": "给出了“词义藏在共现概率之比里”的清晰解释，公开的预训练向量（最大来自8400亿词网页语料）与word2vec一起成为2014–2018年几乎所有神经NLP模型的输入层。",
+  "background": "按照[[c:distributional-hypothesis]]，意思相近的词出现在相近的上下文里。2014年学词向量有两条路。\n\n一条是**全局矩阵分解**，代表是[[lsa]]：统计整个语料的共现矩阵，再做奇异值分解。它充分利用了全局统计，但在“king − man + woman ≈ queen”这类类比测试上很差，因为“the”“and”这类高频词在原始计数里占绝对主导。\n\n另一条是**局部窗口预测**，代表是[[word2vec]]和[[skip-gram-ns]]：在语料上滑动窗口，用一个词预测周围的词。它在类比上表现很好，但每次只看一个窗口，没有直接利用“这两个词在全语料共同出现了多少次”这一统计量，而且为什么向量相减能表达语义关系也不清楚。",
+  "method": "**出发点：看概率之比**。设`X_ij`是词j出现在词i上下文中的次数，`P(j|i) = X_ij / X_i`。论文用60亿词语料举例：`P(solid|ice) / P(solid|steam) = 8.9`，`P(gas|ice) / P(gas|steam) = 0.085`，而与两者都相关或都无关的water、fashion，比值分别为1.36和0.96，接近1。也就是说，区分ice和steam的信息在**比值**里，无关的噪声在比值里互相抵消。\n\n**目标函数**。希望向量能表达这种比值，推导后得到一个对数双线性回归：\n\n`J = Σ_ij f(X_ij) · (w_iᵀ·w̃_j + b_i + b̃_j − log X_ij)²`\n\n`w`是词向量，`w̃`是上下文向量，`b`是偏置。只在`X_ij > 0`的格子上求和，所以计算量取决于非零共现对的数量，而不是语料长度。\n\n**加权函数**。`f(x) = (x / x_max)^α`（当`x < x_max`），否则为1；取`x_max = 100`、`α = 3/4`。这样只共现一两次的词对（多半是噪声）权重很小，“of the”这种极高频词对也不会无限放大。\n\n训练完把`w + w̃`作为最终词向量。",
+  "results": "在word2vec的类比测试集上，300维、用60亿词（维基百科+Gigaword）训练的GloVe总准确率71.7%，同语料同维度下作者自己用word2vec工具训练的skip-gram为69.1%、CBOW为65.7%，对共现矩阵直接做SVD只有7.3%；用420亿词网页语料训练达到75.0%。在词相似度测试和[[conll-2003]]命名实体识别上也优于对比方法。作者还用8400亿词的Common Crawl训练了一版更大的向量。",
+  "legacy": "GloVe向量成为默认输入：[[chen-manning-parser]]之后的大量句法分析、[[bidaf]]、[[drqa]]等阅读理解模型、[[cove]]都直接加载300维GloVe。不久后[[levy-goldberg-pmi]]证明skip-gram负采样本身也在隐式分解一个移位的PMI矩阵，两派在理论上合流。[[fasttext]]用子词向量解决了未登录词问题。2018年起[[elmo]]和[[bert]]给出随上下文变化的词表示，静态词向量退居轻量场景。",
+  "limits": [
+    {"text": "每个词只有一个固定向量，“bank”是银行还是河岸无法区分，上下文信息完全丢失。", "solved_by": ["cove", "elmo", "bert"]},
+    {"text": "以整词为单位，词表外的词和形态变化（如复数、派生词）没有向量。", "solved_by": ["fasttext", "bpe"]},
+    {"text": "向量忠实复制语料中的统计相关性，包括职业与性别等社会偏见，下游模型会继承这些偏见。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "word2vec", "type": "rivals", "note": "同为学习词向量：word2vec在局部窗口上做预测，GloVe直接拟合全局共现计数；同等条件下类比准确率略高，两者此后长期并用。"},
+    {"to": "lsa", "type": "solves", "note": "同样基于全局共现矩阵，但用对数计数和加权最小二乘替代原始计数上的SVD，解决了LSA在类比任务上极差的问题。"},
+    {"to": "skip-gram-ns", "type": "rivals", "note": "论文与skip-gram负采样做了同语料、同维度的直接比较，并从理论上把两类模型的目标函数联系起来。"},
+    {"to": "log-bilinear-lm", "type": "extends", "note": "模型形式是对数双线性：两个向量内积直接对应对数计数，与Mnih和Hinton的对数双线性语言模型一脉相承。"},
+    {"to": "conll-2003", "type": "uses", "note": "用CoNLL-2003命名实体识别检验词向量作为特征的效果。"}
+  ],
+  "prereq": ["embedding", "distributional-hypothesis", "dot-product", "eigen-svd", "loss-function", "conditional-bayes"],
+  "terms": [
+    {"t": "共现矩阵", "d": "一个词表×词表的计数表，第i行第j列记录词j在词i附近（比如左右10个词内）出现了多少次。"},
+    {"t": "词类比测试", "d": "给出a:b = c:?，用向量b − a + c找最近的词，看是否等于正确答案，如“雅典:希腊 = 柏林:德国”。"}
+  ],
+  "learn": "先补[[c:embedding]]和[[c:dot-product]]，读过[[word2vec]]。读原文第3节（从概率比推导目标函数的过程）和表1、表2。动手：下载项目主页上的glove.6B.300d向量，做几组类比和最近邻查询；再在一个小语料上自己数共现矩阵，用上面的J做梯度下降训练一版。",
+  "check": {"source": "https://aclanthology.org/D14-1162.pdf", "confirmed": "标题、3位作者、EMNLP 2014（Semantic Scholar日期2014-10、DOI 10.3115/v1/D14-1162）；正文表1的ice/steam比值8.9、0.085、1.36、0.96，目标函数与f(x)的x_max=100、α=3/4，表2中300维6B语料GloVe 71.7、SG† 69.1、CBOW† 65.7、SVD 7.3、42B语料75.0，以及8400亿词Common Crawl语料。"}
+}

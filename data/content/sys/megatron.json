@@ -1,0 +1,57 @@
+{
+ "id": "megatron",
+ "who": "Mohammad Shoeybi, Mostofa Patwary, Raul Puri 等 · NVIDIA",
+ "venue": "arXiv 2019",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/1909.08053"
+  }
+ ],
+ "problem": "单块GPU放不下数十亿参数的Transformer，已有的模型并行方案需要重写模型或专门编译器。",
+ "idea": "把每层的矩阵乘按列或按行切到多块GPU上，每个Transformer层只需前向和反向各两次allreduce，几行PyTorch代码即可实现。",
+ "impact": "层内张量并行成为之后所有大模型训练的标准组件之一。",
+ "method": "每个Transformer层有两大块：多头自注意力和前馈网络（MLP）。Megatron把MLP第一个矩阵按**列**切到几块GPU，各自独立算出激活，第二个矩阵按**行**切，这样中间不用通信，只在两个矩阵乘之后做一次allreduce求和。注意力则按头分到各GPU，每个头独立计算，再用同样方式处理输出投影。\n\n因此每层前向只有两次通信，反向两次。论文称无需新编译器或重写框架，只需在原生[[pytorch]]里插入几个通信操作。训练的8.3B参数GPT-2式模型用到512块GPU，持续15.1 PetaFLOPs，相对单卡基线（39 TeraFLOPs）扩展效率76%；在WikiText103上困惑度10.8（此前最优15.8），LAMBADA准确率66.5%（此前63.2%）；3.9B的BERT式模型在RACE上90.9%（此前89.4%）。",
+ "limits": [
+  {
+   "text": "只切层内，模型更大时通信跨机很贵，需要与流水线、数据并行组合。",
+   "solved_by": [
+    "megatron-3d"
+   ]
+  },
+  {
+   "text": "每张卡仍要存全部优化器状态，显存冗余。",
+   "solved_by": [
+    "zero"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "gpt-2",
+   "type": "uses",
+   "note": "用GPT-2结构训练8.3B参数的大模型，并在多项基准上验证。"
+  },
+  {
+   "to": "pytorch",
+   "type": "uses",
+   "note": "在原生PyTorch中实现，不依赖新编译器。"
+  },
+  {
+   "to": "mesh-tensorflow",
+   "type": "rivals",
+   "note": "同样做张量切分，Mesh-TensorFlow用声明式语言和TPU网格，Megatron用手写的GPU与PyTorch方案，后者在GPU社区被广泛采用。"
+  }
+ ],
+ "prereq": [
+  "distributed-training",
+  "matrix-multiplication",
+  "transformer-block",
+  "interconnect"
+ ],
+ "learn": "在纸上把一个两层MLP按列、行切成2份，验证拼起来与原结果一致且只需一次求和。",
+ "check": {
+  "source": "https://arxiv.org/abs/1909.08053",
+  "confirmed": "标题、6位作者、v1提交2019-09-17；摘要：8.3B参数、512 GPU、15.1 PetaFLOPs、76%效率、WikiText103 10.8对15.8、LAMBADA 66.5%对63.2%、RACE 90.9%对89.4%。列切、行切的细节为论文方法，按常识描述，未逐字核对。"
+ }
+}

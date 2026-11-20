@@ -1,0 +1,36 @@
+{
+  "id": "large-batch-sgd",
+  "who": "Priya Goyal, Piotr Dollár, Ross Girshick, Pieter Noordhuis, Lukasz Wesolowski, Aapo Kyrola, Andrew Tulloch, Yangqing Jia, Kaiming He · Facebook AI Research",
+  "venue": "技术报告 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1706.02677"}
+  ],
+  "problem": "想用更多GPU加速训练，就得把批量做大；但当时普遍观察到批量一大，模型精度就下降，ResNet-50在8块GPU上要训练29小时。",
+  "idea": "两条简单规则：批量放大k倍，学习率也放大k倍（线性缩放）；训练开头5个轮次让学习率从小到大逐渐升上去（渐进式warmup）。",
+  "impact": "批量8192、256块GPU、1小时训完ResNet-50且精度不降。线性缩放加warmup成为大规模分布式训练的默认配方，warmup后来也成了训练Transformer的标准步骤。",
+  "background": "数据并行训练（见[[c:distributed-training]]）的做法是：每块GPU算一部分样本的梯度，再求平均更新参数。GPU越多，每步的总批量就越大（见[[c:batch-size-epoch]]）。若每块GPU分到的样本太少，算力就被通信浪费，所以加速必然意味着大批量。\n\n问题是，大批量训练的精度经常变差。同期的[[sharp-minima]]认为这是泛化问题：大批量SGD噪声小，容易落进“尖锐”的极小值，测试集表现差。如果真是这样，大批量训练就有天花板。这篇报告要回答：精度下降到底是泛化问题，还是优化问题？",
+  "method": "**线性缩放规则**。批量乘以k，学习率也乘以k，其他超参数（权重衰减等）不变。直觉：小批量连续走k步，每步用一个大小为n的批量；大批量一步用kn个样本。如果这k步里梯度变化不大，那么大批量一步要走出同样的距离，步长就得是k倍。具体设置为`η = 0.1 × 总批量/256`，批量8192时学习率为3.2。\n\n**渐进式warmup**。训练刚开始时参数变化剧烈，上面那个“梯度变化不大”的假设不成立，直接用3.2的学习率会让训练发散或卡住。作者先试了“前5个轮次用小学习率，然后突然跳到大学习率”，结果跳变时训练误差飙升。改为从0.1开始，每次迭代加一个常数，5个轮次后线性升到3.2，再进入原来的分步衰减计划。\n\n**实现细节**。BatchNorm的统计量仍在每块GPU的32张图上计算，不跨卡同步，这样批量增大时[[batchnorm]]的行为不变；权重衰减项要和梯度一起按批量正确缩放；动量（见[[momentum]]）更新公式在学习率变化时需做相应修正。通信用分层的allreduce与反向传播重叠进行。",
+  "results": "ImageNet上ResNet-50（见[[resnet]]），批量256的基线top-1错误率23.60%（5次平均，±0.12）。批量8192时：不用warmup为24.84%，用“恒定小学习率”warmup为25.88%，用渐进式warmup为23.74%（±0.09），与基线几乎相同，训练曲线也基本重合。256块P100 GPU一小时训完，从8块到256块的扩展效率约90%。批量从8k增到16k时错误率明显上升。",
+  "legacy": "它表明大批量的精度下降主要是优化问题，可以靠调学习率解决，而不是不可逾越的泛化缺陷。随后[[lars]]用逐层自适应学习率把ResNet-50批量推到3.2万，[[lamb]]又把这一思路用到BERT。warmup则成了几乎所有大模型训练的标配；[[pre-ln]]后来解释了Transformer为何离不开它，并给出减少对它依赖的改法。",
+  "limits": [
+    {"text": "批量超过约8k后精度开始明显下降，线性缩放规则失效，单靠全局学习率无法继续扩大批量。", "solved_by": ["lars", "lamb"]},
+    {"text": "只在带BatchNorm的卷积网络和SGD动量上验证；对Adam类优化器和注意力模型，简单的线性缩放并不可靠。", "solved_by": ["lamb"]},
+    {"text": "warmup是经验技巧，为什么需要、需要多长没有理论解释，只能靠试。", "solved_by": ["pre-ln"]},
+    {"text": "依赖256块GPU和高速网络，梯度同步的通信开销随规模上升，需要专门的通信与显存优化。", "solved_by": ["horovod", "zero"]}
+  ],
+  "relations": [
+    {"to": "resnet", "type": "uses", "note": "以ResNet-50在ImageNet上的标准训练为基准，原始配置是8块GPU、批量256。"},
+    {"to": "momentum", "type": "uses", "note": "优化器是带动量的SGD，并给出了学习率变化时动量更新的修正方式。"},
+    {"to": "sharp-minima", "type": "solves", "note": "同期研究把大批量精度下降归因于落入尖锐极小值的泛化问题；本文证明处理好早期优化困难后精度可以不降。"},
+    {"to": "batchnorm", "type": "uses", "note": "保持每块GPU上32张图计算BN统计量，使批量放大时BN行为不变，这是规则成立的前提之一。"},
+    {"to": "sgdr", "type": "rivals", "note": "同一时期对学习率调度的另一种探索；SGDR关注训练后期的余弦退火与重启，本文关注训练初期的warmup，两者后来常被合用为“warmup加余弦衰减”。"}
+  ],
+  "prereq": ["sgd-minibatch", "learning-rate", "batch-size-epoch", "momentum", "distributed-training", "normalization-layer"],
+  "terms": [
+    {"t": "线性缩放规则", "d": "批量放大k倍时把学习率也放大k倍，使大批量的一步大致等于小批量的k步。"},
+    {"t": "warmup（预热）", "d": "训练初期把学习率从较小的值逐步升到目标值，避免一开始步子太大导致发散。"},
+    {"t": "扩展效率", "d": "实际加速比与理想加速比之比。从8卡到256卡理想快32倍，效率90%即实际快约29倍。"}
+  ],
+  "learn": "先补[[c:sgd-minibatch]]、[[c:learning-rate]]和[[c:distributed-training]]。读原文第2节（线性缩放与warmup的推理）和表1。动手：在CIFAR-10上用小ResNet，分别以批量128和2048训练，对比“不调学习率”“线性放大学习率”“线性放大加warmup”三种设置的曲线。",
+  "check": {"source": "https://arxiv.org/abs/1706.02677", "confirmed": "标题、九位作者、arXiv首次提交2017-06-08；正文（arxiv.org/html版）中的线性缩放规则、η=0.1·kn/256、5轮渐进warmup、表1的23.60/24.84/25.88/23.74、8块P100训29小时、256 GPU一小时、约90%扩展效率、8k到16k错误率上升。"}
+}

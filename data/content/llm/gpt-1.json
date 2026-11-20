@@ -1,0 +1,41 @@
+{
+  "id": "gpt-1",
+  "who": "Alec Radford, Karthik Narasimhan, Tim Salimans, Ilya Sutskever · OpenAI",
+  "venue": "OpenAI技术报告 2018",
+  "links": [
+    {"label": "论文PDF", "url": "https://cdn.openai.com/research-covers/language-unsupervised/language_understanding_paper.pdf"},
+    {"label": "OpenAI博客", "url": "https://openai.com/index/language-unsupervised/"},
+    {"label": "The Illustrated GPT-2（含GPT结构图解）", "url": "https://jalammar.github.io/illustrated-gpt2/"}
+  ],
+  "problem": "NLP任务的标注数据很少，每个任务都要设计专门的模型；预训练的词向量或LSTM特征只能迁移一小部分知识。",
+  "idea": "先在大量书籍上训练一个只有解码器的Transformer语言模型，再在每个任务上整体微调；把句对、选择题等输入改写成一串token，同一个模型几乎不改结构就能做所有任务。",
+  "impact": "12个任务里9个刷新纪录，确立了“生成式预训练+判别式微调”的范式，也是后来GPT系列的起点。",
+  "background": "2018年上半年，迁移学习刚在NLP里起步。[[elmo]]把预训练双向LSTM的隐状态当作特征，但每个任务仍需自己设计网络；[[ulmfit]]做到了整体微调语言模型，可只用LSTM、只验证了文本分类。蕴含判断、问答、相似度这些涉及两段以上文本的任务，大家仍各自设计复杂的结构。\n\n另一条线索来自OpenAI自己。[[sentiment-neuron]]发现：只用来预测下一个字符的语言模型，内部会自发出现一个对应情感的神经元。这说明无监督的语言建模能学到有用的判别特征，只要数据和模型足够大。\n\n与此同时，[[transformer]]刚证明自注意力比RNN更能捕捉长距离依赖、也更易并行。这篇工作把这几条线拼在了一起。",
+  "method": "**第一阶段：生成式预训练**。在无标注文本U上最大化标准语言模型似然（见[[c:language-model]]、[[c:autoregressive]]）：\n\n`L1(U) = Σ_i log P(u_i | u_(i−k), …, u_(i−1))`\n\n模型是12层、只有解码器的Transformer：带掩码的自注意力保证每个位置只看到左边，隐藏维度768、12个注意力头、前馈层3072维，激活函数用[[gelu]]，词表是4万次合并的[[bpe]]，上下文长度512。语料是[[bookscorpus]]，7000多本未出版的书，长段连续文字让模型学会长距离依赖。训练100轮，批大小64。\n\n**第二阶段：判别式微调**。对带标签的任务数据C，取最后一层最后一个token的表示，接一个新的线性层预测标签y，得到监督损失L2。同时保留语言模型损失作为辅助项：`L3 = L2 + λ·L1`，λ=0.5。大多数任务只需训练3轮。\n\n**输入改写**。这是让一个模型通吃多种任务的关键。所有输入都加上开始和结束标记，然后：\n- 蕴含：前提 + 分隔符$ + 假设，拼成一串；\n- 相似度：两句没有先后之分，所以两种顺序各算一次，再把两个表示相加；\n- 问答和常识选择：文档 + 问题 + $ + 候选答案k，每个候选单独算一个分数，最后对所有候选做softmax。\n\n这样新增的参数只有分隔符嵌入和最后的线性层。",
+  "results": "12个数据集中9个超过当时最好结果。常识推理Story Cloze绝对提高8.9个百分点，阅读理解RACE提高5.7，MultiNLI提高1.5，[[glue]]总分72.8，此前最好为68.9。\n\n消融实验很说明问题：去掉预训练、直接在任务上训练同样的Transformer，平均下降14.8%；把Transformer换成单层2048单元的LSTM，平均分降5.6。迁移的层数越多越好，全部迁移时MultiNLI上最多多出9个点。论文还观察到，随着预训练进行，用启发式方法直接拿语言模型做任务（不微调）的效果稳步上升——这是后来零样本路线的萌芽。",
+  "legacy": "四个月后，[[bert]]保留“Transformer预训练+整体微调”的框架，但把单向语言模型换成双向的掩码语言模型，在GLUE上大幅超过它，且BERT-base特意与它同尺寸以便比较。OpenAI则沿着生成式这条线继续：[[gpt-2]]把模型和数据放大十倍，开始不微调直接做任务；[[gpt-3]]再放大百倍，靠上下文示例完成任务。今天的大语言模型都是只有解码器的自回归Transformer，正是这篇工作选定的结构。",
+  "pitfalls": "- “GPT”这个名字是后来才固定的，原论文标题里并没有出现GPT。\n- 它不是第一个“预训练语言模型再微调”的工作，[[semi-supervised-seq]]和[[ulmfit]]更早；它的贡献是换成Transformer、并用输入改写把方法推广到几乎所有任务。\n- 微调时仍然需要每个任务的标注数据，零样本只是附带的观察。",
+  "limits": [
+    {"text": "语言模型只看左边的上下文，对需要同时利用前后文的理解任务（如问答中的定位）不利。", "solved_by": ["bert"]},
+    {"text": "每个任务仍要收集标注数据并微调出一个独立模型，不微调直接做任务的能力还很弱。", "solved_by": ["gpt-2", "gpt-3"]},
+    {"text": "预训练语料只有约7000本书，模型也只有12层，规模远未到头。", "solved_by": ["gpt-2", "scaling-laws"]},
+    {"text": "每类任务都要人工设计输入改写规则和分隔方式，换一种任务格式就得重新设计。", "solved_by": ["t5", "gpt-3"]}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "uses", "note": "只取Transformer的解码器部分（带掩码自注意力），去掉编码器和交叉注意力。"},
+    {"to": "ulmfit", "type": "extends", "note": "沿用“预训练语言模型后整体微调”，把LSTM换成Transformer，并从文本分类推广到句对和多选任务。"},
+    {"to": "sentiment-neuron", "type": "extends", "note": "OpenAI此前发现无监督语言模型能学出判别特征，这里把这一观察做成通用的迁移方法。"},
+    {"to": "semi-supervised-seq", "type": "extends", "note": "Dai与Le最早用LSTM语言模型预训练再微调做文本分类，GPT-1把同一思路放到更大模型和更多任务上。"},
+    {"to": "elmo", "type": "rivals", "note": "ELMo把双向LSTM状态当冻结特征、各任务另配模型；GPT-1整体微调一个单向Transformer，任务改动更小，在多数任务上更好。"},
+    {"to": "bookscorpus", "type": "uses", "note": "预训练语料，长篇连续文字利于学习长距离依赖。"},
+    {"to": "glue", "type": "uses", "note": "主要评测基准之一，GLUE总分从68.9提高到72.8。"}
+  ],
+  "prereq": ["language-model", "autoregressive", "transformer-block", "self-attention", "pretrain-finetune", "tokenization", "softmax"],
+  "terms": [
+    {"t": "只有解码器的Transformer", "d": "去掉编码器和交叉注意力，只保留带掩码自注意力的那一半，每个位置只能看到它之前的token，适合做从左到右的语言模型。"},
+    {"t": "输入改写", "d": "把句对、文档+问题+答案等结构化输入用分隔符拼成一条序列，让为连续文本训练的模型可以直接读取。"},
+    {"t": "辅助语言模型损失", "d": "微调时在任务损失之外再加上语言模型损失，让模型不要偏离预训练学到的语言知识。"}
+  ],
+  "learn": "先确认会[[c:language-model]]、[[c:self-attention]]和[[c:pretrain-finetune]]。读原文第3节（框架与公式1–5）和图1右侧的输入改写示意，再看第5节的消融。动手：用[[nanogpt]]在一小份文本上预训练一个小模型，然后加一个线性层在情感分类数据上微调，比较有无预训练、有无辅助损失的差别。",
+  "check": {"source": "https://cdn.openai.com/research-covers/language-unsupervised/language_understanding_paper.pdf", "confirmed": "标题与4位作者；OpenAI博客发布日期2018-06-11；正文中12层/768维/12头/3072维前馈、4万次BPE合并、7000多本书、λ=0.5、3轮微调、9/12任务、8.9/5.7/1.5、GLUE 72.8 vs 68.9、消融14.8%与5.6。"}
+}

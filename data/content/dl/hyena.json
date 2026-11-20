@@ -1,0 +1,23 @@
+{
+  "id": "hyena",
+  "who": "Michael Poli, Stefano Massaroli, Eric Nguyen, Daniel Y. Fu, Tri Dao, Stephen Baccus, Yoshua Bengio, Stefano Ermon, Christopher Ré 等 · Stanford、Mila等",
+  "venue": "ICML 2023",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2302.10866"}],
+  "problem": "注意力的计算量随序列长度平方增长，限制了上下文长度；已有的低秩、稀疏近似必须和稠密注意力层混用才能追上Transformer。",
+  "idea": "用隐式参数化的长卷积加上由输入控制的逐元素门控交替堆叠，得到一个亚平方复杂度、可直接替换注意力的算子。",
+  "impact": "第一批不含稠密注意力就在语言建模上接近Transformer质量的架构之一，并催生了面向DNA长序列的[[evo]]。",
+  "method": "Hyena的核心是两个部件的交替。其一是长卷积：卷积核和序列一样长，但核不是直接存成一大串参数，而是由一个小网络根据位置生成（隐式参数化），这点沿用了[[s4]]一脉的思路；卷积用FFT计算，复杂度约为`O(L log L)`而不是`O(L²)`。其二是数据控制的门控：把输入先投影成若干份，其中几份与卷积输出做逐元素相乘，使算子的权重像注意力一样依赖于输入内容，这是纯线性时不变的状态空间模型缺少的能力。\n\n一个Hyena算子就是「投影 → 长卷积 → 门控相乘」重复若干次（论文称为阶数），整体可以看成一个由输入决定的、带结构的矩阵乘法，直接替换[[transformer]]里的自注意力层。",
+  "results": "按摘要：在序列长度达数千到数十万的回忆与推理任务上，比依赖状态空间等隐式或显式方法的算子准确率高出50个点以上，与基于注意力的模型持平；在WikiText103和The Pile上刷新了不含稠密注意力架构的最优成绩，序列长度2K时达到Transformer质量所需训练算力减少20%；序列长度8K时比高度优化的注意力快2倍，64K时快100倍。",
+  "limits": [
+    {"text": "门控只依赖当前位置的投影，对需要按内容检索的任务仍弱于注意力；论文的对比规模不大，在更大规模上是否持平未被证明。", "solved_by": ["mamba"]},
+    {"text": "FFT长卷积不能像RNN那样以常数内存逐词生成，自回归推理效率不占优。", "solved_by": ["mamba", "mamba-2"]}
+  ],
+  "relations": [
+    {"to": "s4", "type": "extends", "note": "继承隐式参数化长卷积的思路，并加入数据控制的门控以弥补S4不随输入变化的缺陷。"},
+    {"to": "transformer", "type": "rivals", "note": "目标是做可直接替换自注意力的算子，复杂度从平方降到近线性。"}
+  ],
+  "prereq": ["convolution-op", "state-space-model", "efficient-attention", "self-attention"],
+  "terms": [{"t": "隐式参数化", "d": "不直接存卷积核的每个数值，而用一个小网络按位置输出核的值，参数量与序列长度无关。"}],
+  "learn": "先补[[c:convolution-op]]与FFT加速卷积的原理，再读[[c:state-space-model]]概念页。读原文第3节的算子定义，用PyTorch的torch.fft写一个单阶Hyena层，并在合成的回忆任务上和注意力对比。",
+  "check": {"source": "https://arxiv.org/abs/2302.10866", "confirmed": "标题、九位作者、2023-02-21首次提交；摘要中的50个点、20%训练算力、8K快2倍、64K快100倍。"}
+}

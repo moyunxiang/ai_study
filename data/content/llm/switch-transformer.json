@@ -1,0 +1,64 @@
+{
+  "id": "switch-transformer",
+  "who": "William Fedus, Barret Zoph, Noam Shazeer · Google",
+  "venue": "JMLR 2022",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2101.03961"
+    }
+  ],
+  "problem": "[[sparse-moe]]等MoE模型让参数量很大而计算量不变，但路由复杂、通信开销大、训练不稳定，很少有人用。",
+  "idea": "简化路由：每个词只送给一个专家（top-1），并配合稳定训练的技巧，使稀疏模型可用低精度bfloat16训练。",
+  "impact": "证明万亿参数规模的稀疏模型可以训出来，并比同等算力的稠密模型快得多，为后来Mixtral等MoE大模型铺路。",
+  "method": "以前的MoE通常把每个词发给2个以上的专家。Switch Transformer把路由简化为**只选一个专家**：把T5的部分前馈层换成多个专家，路由器根据词的表示给每个专家打分，选分最高的那个。这样计算更少、通信更省、实现更简单。训练稳定性靠几项做法：加入负载均衡的辅助损失防止所有词挤向少数专家，限制每个专家的容量，并用一些初始化和精度处理使bfloat16训练成为可能。\n\n官方摘要称，基于T5-Base和T5-Large设计的模型，在相同算力下预训练速度最多提升7倍；在101种语言上全面超过mT5-Base；并预训练了最多万亿参数的模型，相比T5-XXL有4倍的加速。",
+  "limits": [
+    {
+      "text": "负载不均衡和训练不稳定的问题只是被缓解，微调时容易过拟合。",
+      "solved_by": [
+        "st-moe"
+      ]
+    },
+    {
+      "text": "所有专家的参数都要放进显存，推理时的内存成本和通信仍很高。",
+      "solved_by": [
+        "mixtral",
+        "deepseek-v2"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "sparse-moe",
+      "type": "extends",
+      "note": "在稀疏门控MoE层的基础上简化为单专家路由，并放大到万亿参数。"
+    },
+    {
+      "to": "gshard",
+      "type": "extends",
+      "note": "沿着GShard的MoE翻译模型，改用更简单的路由并应用到语言模型预训练。"
+    },
+    {
+      "to": "t5",
+      "type": "uses",
+      "note": "在T5的前馈层上插入专家层，并以T5-XXL为对比基线。"
+    },
+    {
+      "to": "moe-1991",
+      "type": "uses",
+      "note": "继承混合专家按输入选专家的原始思想。"
+    }
+  ],
+  "prereq": [
+    "mixture-of-experts",
+    "distributed-training",
+    "params-flops",
+    "floating-point",
+    "initialization"
+  ],
+  "learn": "先读[[c:mixture-of-experts]]；读原文第2节的路由与负载均衡损失；动手写一个4个专家、top-1路由的小MoE前馈层。",
+  "check": {
+    "source": "https://arxiv.org/abs/2101.03961",
+    "confirmed": "标题、3位作者、arXiv首次提交于2021-01-11；摘要中top-1路由、bfloat16训练、T5-Base/Large预训练最多快7倍、101种语言超过mT5-Base、万亿参数比T5-XXL快4倍。"
+  }
+}

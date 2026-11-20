@@ -1,0 +1,53 @@
+{
+  "id": "reformer",
+  "who": "Nikita Kitaev, Łukasz Kaiser, Anselm Levskaya · 加州大学伯克利分校 / Google Research",
+  "venue": "ICLR 2020",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2001.04451"
+    }
+  ],
+  "problem": "[[transformer]]的注意力需要计算n×n的相似度矩阵，且每一层的激活都要存到反向传播，长序列时显存立刻爆掉。",
+  "idea": "用局部敏感哈希（LSH）让每个位置只与哈希到同一桶里的位置做注意力；并用可逆残差层，反向时重新算出激活而不存储。",
+  "impact": "同时降低了长序列的时间和显存开销，提供了一条有代表性的「近似稀疏注意力」路线，虽然实际使用不及后来的精确注意力内核。",
+  "method": "**LSH注意力**：注意力里softmax主要由相似度最大的少数键决定，所以不必比较所有位置。Reformer先对查询和键做哈希，使相似的向量落入同一个桶，每个位置只在自己所在的桶内（及相邻块）做注意力，复杂度从 `O(L²)` 降到 `O(L log L)`（L为序列长度）。\n\n**可逆残差层**：借用可逆网络的思想，把一层的输入分成两路，使得由本层输出可以精确算回输入。这样反向传播时无需保存每一层的激活，再算一遍即可，摘要称存储激活的份数从N（层数）降到1。\n\n官方摘要称，Reformer在效果上与Transformer相当，但在长序列上内存效率高得多、速度也更快。",
+  "limits": [
+    {
+      "text": "哈希是近似的，相关的键有概率落入不同的桶，质量和速度需要折中。",
+      "solved_by": [
+        "flashattention"
+      ]
+    },
+    {
+      "text": "复杂度的常数项较大，序列不够长时反而不比普通注意力快。",
+      "solved_by": [
+        "flashattention"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "transformer",
+      "type": "extends",
+      "note": "把Transformer全连接注意力换成LSH近似，并用可逆层省显存。"
+    },
+    {
+      "to": "sparse-transformer",
+      "type": "rivals",
+      "note": "同样为降低注意力成本：Sparse Transformer用固定模式，Reformer用基于内容的哈希分桶。"
+    }
+  ],
+  "prereq": [
+    "self-attention",
+    "big-o",
+    "residual-connection",
+    "efficient-attention",
+    "memory-bandwidth"
+  ],
+  "learn": "先读[[c:efficient-attention]]；原文第2–3节讲LSH注意力和可逆层；理解哈希桶的做法即可，不必实现全部细节。",
+  "check": {
+    "source": "https://arxiv.org/abs/2001.04451",
+    "confirmed": "标题、3位作者、arXiv首次提交于2020-01-13；摘要中LSH复杂度O(L²)降至O(L log L)、可逆残差层、激活存一份而非N份。"
+  }
+}

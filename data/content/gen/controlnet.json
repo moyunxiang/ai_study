@@ -1,0 +1,63 @@
+{
+  "id": "controlnet",
+  "who": "Zhang, Rao, Agrawala · Stanford University",
+  "venue": "ICCV 2023",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2302.05543"
+    },
+    {
+      "label": "代码",
+      "url": "https://github.com/lllyasviel/ControlNet"
+    }
+  ],
+  "problem": "文字很难指定精确的构图、姿态和轮廓；为每种空间条件微调大模型既贵又会破坏原有能力。",
+  "idea": "冻结预训练模型，复制其编码器作为可训练副本，用零初始化的卷积层连接到原网络，学习边缘、深度、姿态等条件。",
+  "impact": "让用户能以草图、边缘、骨架精确控制文生图构图，成为社区和商业工具里最常用的控制手段。",
+  "method": "做法：保持[[stable-diffusion]]的U-Net权重不动（锁定副本），另复制一份编码器块作为**可训练副本**，把条件图（如Canny边缘、深度图、人体姿态、分割图）输入它。可训练副本的输出通过**零卷积**（权重和偏置初始化为零的1×1卷积）加回到锁定网络的各层。\n\n零初始化使得训练开始时副本的贡献为零，不会给已有能力带来噪声，之后网络逐渐增长出控制能力。这样既利用了在数十亿图像上预训练的编码层作为强大骨干，又让新的条件学习稳定。论文显示：在小数据集（5万以下）和大数据集（百万以上）上训练都稳健，可单条件或多条件、带或不带提示词使用。",
+  "limits": [
+    {
+      "text": "每种条件需要一份与编码器同等大小的可训练副本，参数与显存开销可观，且仅适用于对应的基础模型。",
+      "solved_by": [
+        "ip-adapter"
+      ]
+    },
+    {
+      "text": "只给出空间结构控制，不能表达风格或身份参考。",
+      "solved_by": [
+        "ip-adapter"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "stable-diffusion",
+      "type": "extends",
+      "note": "锁定Stable Diffusion权重，复制编码器作为可训练控制分支。"
+    },
+    {
+      "to": "ldm",
+      "type": "uses",
+      "note": "整个控制发生在潜扩散模型的U-Net上。"
+    },
+    {
+      "to": "sdedit",
+      "type": "rivals",
+      "note": "同样想保留输入图结构：SDEdit靠加噪程度折中且无法精确控制，ControlNet通过条件分支精确保持边缘与姿态。"
+    }
+  ],
+  "prereq": [
+    "diffusion-process",
+    "conv-layer",
+    "initialization",
+    "transfer-learning",
+    "latent-space",
+    "peft-concept"
+  ],
+  "learn": "读原文第3节“零卷积”，然后用diffusers的ControlNet管线配合Canny边缘跑通。",
+  "check": {
+    "source": "https://arxiv.org/abs/2302.05543",
+    "confirmed": "标题、作者、2023-02-10提交；摘要中锁定模型、复用编码层、零卷积、边缘/深度/分割/姿态、小数据集（<50k）与大数据集（>1m）训练稳健。"
+  }
+}

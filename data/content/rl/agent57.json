@@ -1,0 +1,39 @@
+{
+  "id": "agent57",
+  "who": "Adrià Puigdomènech Badia, Bilal Piot, Steven Kapturowski, Pablo Sprechmann, Alex Vitvitskyi, Daniel Guo, Charles Blundell · DeepMind",
+  "venue": "ICML 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2003.13350"},
+    {"label": "DeepMind博客", "url": "https://deepmind.google/discover/blog/agent57-outperforming-the-human-atari-benchmark/"},
+    {"label": "ar5iv全文", "url": "https://ar5iv.labs.arxiv.org/html/2003.13350"}
+  ],
+  "problem": "Atari 57个游戏推出七年，没有任何一个算法能用同一套超参数在全部57个游戏上超过人类：擅长多数游戏的方法在Montezuma、Pitfall这类难探索游戏上很差，擅长探索的方法又在Skiing这类长时延信用分配游戏上失败。",
+  "idea": "在Never Give Up（NGU）上做三处改进：把外在奖励和内在奖励分成两个网络分别学；训练一族从“极度探索”到“纯利用”、折扣因子各不相同的策略；用一个多臂老虎机在训练中自动选择该用哪一个。",
+  "impact": "第一个在全部57个Atari游戏上超过人类基线的深度RL智能体，最弱的5%游戏也达到人类的1.17倍，标志着“Atari 57全部过人类线”这一目标被达成，此后Atari研究转向样本效率。",
+  "background": "[[ale]]的57个游戏是深度RL最常用的基准。[[r2d2]]、[[muzero]]把平均和中位数人类标准化得分推到人类的20多倍，但平均数掩盖了尾部：MuZero在Venture上得分与随机策略相当。另一边，[[ngu]]在R2D2上加了[[rnd]]式的跨回合新奇度和回合内记忆，难探索游戏大幅进步，但在需要长期[[c:credit-assignment]]的Skiing、Solaris上仍低于人类，整体也不如R2D2稳定。\n\n根本矛盾是：不同游戏需要不同的探索强度和时间视野。一套固定的超参数总有一部分游戏不合适。",
+  "method": "**NGU的底子**。NGU同时训练N个策略，第j个策略的奖励是`r_外 + β_j · r_内`，折扣因子为`γ_j`：β越大越爱探索，γ越大越看重远期。所有策略共享一个循环网络（带LSTM的分布式回放，见[[r2d2]]），策略编号作为输入。\n\n**改进一：拆开两种价值**。把`Q(x, a, j)`拆成`Q_外 + β_j · Q_内`两个结构相同的网络，分别用外在、内在奖励训练。内在奖励的尺度和方差与游戏分数完全不同，混在一起会让训练不稳定；拆开后对β的取值大范围内都稳定。\n\n**改进二：元控制器**。NGU让每个actor均匀随机地选策略编号j，很多数据浪费在不合适的探索强度上。Agent57给每个actor配一个**滑动窗口UCB老虎机**（见[[ucb1]]），把每个j当作一只“手臂”，回报就是该回合的游戏得分，训练中自动把更多回合分给当前最有用的(β, γ)组合，并能随训练阶段变化（滑动窗口应对非平稳性）。\n\n**改进三：更长的时间视野**。允许使用更接近1的折扣因子，并把R2D2的反向传播时间窗口加倍，以应对Skiing这种奖励要到很久以后才出现的游戏。",
+  "results": "57个游戏全部超过人类基线（NGU为51个，R2D2为52个，MuZero为51个）；封顶的平均人类标准化得分为100%（满分）。最差5%分位上Agent57为117%，R2D2为50%，MuZero只有0.03%。不封顶的平均和中位数（4766%、1933%）反而低于MuZero（5662%、2382%）——Agent57追求的是没有短板而非平均分最高。论文指出它在大多数游戏上很快超过人类，难探索游戏需要更多数据，Skiing最晚，数据效率是明确的遗留问题。",
+  "legacy": "Atari 57“全部超越人类”之后，研究重心转向少数据设置（Atari 100k）：[[efficientzero]]、[[bbf]]用10万步交互达到人类水平。“用老虎机在线选择超参数”的做法也被后续智能体沿用；2025年元学习发现RL算法的[[disco-rl]]同样以Atari 57作为主要元训练环境。",
+  "pitfalls": "- “超过人类基线”指超过ALE论文记录的普通人类测试者分数，不是人类世界纪录。\n- Agent57的平均分并不是当时最高的；它的贡献在于消灭了所有短板。",
+  "limits": [
+    {"text": "样本效率极低，需要大规模分布式训练和海量游戏帧，难探索游戏和Skiing要训练到很后期才过人类线。", "solved_by": ["efficientzero", "bbf"]},
+    {"text": "每个游戏单独训练一个智能体，不能用一个模型玩所有游戏。", "solved_by": ["multi-game-dt", "gato"]},
+    {"text": "架构由多个人工设计的部件（内在奖励、记忆、老虎机、多组超参数）拼接而成，复杂且难以复现。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ngu", "type": "extends", "note": "直接在NGU上改进：拆分内外价值网络、加入自适应元控制器、拉长时间视野，从51个过人类提高到57个。"},
+    {"to": "r2d2", "type": "uses", "note": "以R2D2的循环网络+分布式优先回放为底座，并加倍其反向传播时间窗口。"},
+    {"to": "muzero", "type": "rivals", "note": "MuZero平均分和中位数更高，但在Venture等游戏上近乎随机；Agent57牺牲平均分换来全部57个游戏都超过人类。"},
+    {"to": "ucb1", "type": "uses", "note": "元控制器是一个滑动窗口版本的UCB多臂老虎机，在线选择探索强度和折扣因子。"},
+    {"to": "rnd", "type": "uses", "note": "经由NGU继承RND作为跨回合的新奇度信号。"},
+    {"to": "go-explore", "type": "rivals", "note": "两者都攻克难探索游戏：Go-Explore依赖可恢复的确定性模拟器，Agent57在标准设置下纯靠学习完成。"}
+  ],
+  "prereq": ["exploration-exploitation", "reward-return", "td-error", "on-off-policy", "recurrent-layer"],
+  "terms": [
+    {"t": "人类标准化得分（HNS）", "d": "`(智能体得分 − 随机得分)/(人类得分 − 随机得分)`；100%即达到人类测试者水平。封顶版本把超过100%的部分截掉，用来看有没有短板。"},
+    {"t": "元控制器", "d": "在训练过程中决定“下一回合用哪一种探索强度和折扣因子”的机制，这里是一个多臂老虎机。"},
+    {"t": "滑动窗口UCB", "d": "只用最近一段时间的回报来计算置信上界的老虎机算法，适合各手臂好坏会随时间变化的情况。"}
+  ],
+  "learn": "先读[[r2d2]]、[[ngu]]的讲解，补[[c:exploration-exploitation]]。读原文第3节的三处改进和第4节的消融（R2D2(bandit)、R2D2(Retrace)等对照）。动手：写一个滑动窗口UCB，在一个“各手臂收益随时间漂移”的模拟老虎机上与普通UCB比较。",
+  "check": {"source": "https://ar5iv.labs.arxiv.org/html/2003.13350", "confirmed": "标题、7位作者（DeepMind）、arXiv 2003编号；摘要“first deep RL agent that outperforms the standard human benchmark on all 57 Atari games”；表1：过人类游戏数57/54/51/52/52/51，封顶平均100.00，平均4766.25、中位数1933.49，MuZero 5661.84、2381.51，5%分位116.67对R2D2 50.27、MuZero 0.03；正文中滑动窗口老虎机、反向传播窗口加倍、MuZero在Venture接近随机。"}
+}

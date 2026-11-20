@@ -1,0 +1,39 @@
+{
+  "id": "bm25",
+  "who": "Stephen E. Robertson, Steve Walker · 伦敦城市大学（Okapi项目）",
+  "venue": "SIGIR 1994，pp. 232–241",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1007/978-1-4471-2099-5_24"},
+    {"label": "Robertson & Zaragoza 2009：The Probabilistic Relevance Framework: BM25 and Beyond", "url": "https://www.staff.city.ac.uk/~sbrp622/papers/foundations_bm25_review.pdf"},
+    {"label": "Wikipedia: Okapi BM25", "url": "https://en.wikipedia.org/wiki/Okapi_BM25"}
+  ],
+  "problem": "TF-IDF是经验公式：词出现20次的得分是出现1次的20倍，长文档天然占便宜。概率检索模型有理论，但在大规模TREC评测上用不好词频和文档长度。",
+  "idea": "从“词频由文档是否真正讲这个主题决定”的双泊松模型出发，不去估计它那些估不出来的参数，而是模仿它的形状：词频的贡献先快后慢、趋于饱和，并按文档长度相对平均长度做软归一化。",
+  "impact": "得到一个只有两个参数（k₁和b）的打分公式，三十年来一直是关键词检索的默认算法和最难打败的基线；今天RAG系统里的关键词召回通道大多还是它。",
+  "background": "检索打分有两条路线。[[vector-space-model]]用TF-IDF向量的余弦，效果好但没有理论解释。概率路线从[[naive-bayes]]（Maron与Kuhns的概率索引）发展到Robertson与Spärck Jones 1976年的相关性权重：给定一个词在相关文档和不相关文档中出现的概率，就能推出它该加多少分；在没有任何相关性信息时，这个权重退化成与[[tf-idf]]几乎相同的 `log((N−n+0.5)/(n+0.5))`。但它只看词“有没有出现”，不用词频。\n\n1992年起的[[trec]]提供了上百万篇、长短悬殊的新闻和政府文档，词频和文档长度的影响一下子变得很大。Harter提出过一个能解释词频的**双泊松模型**，可它的参数（两个泊松均值和混合比例）在实际中无从估计。",
+  "method": "**精英度（eliteness）**。设想每篇文档对每个词有一个看不见的二值属性：这篇文档是否真正“讲”这个词代表的主题。讲这个主题的文档里，词频服从均值较大的泊松分布；不讲的，服从均值较小的泊松分布——两个泊松混合，故称双泊松。相关性只通过精英度影响词频。\n\n**看形状，不算参数**。把这个模型代入相关性权重，得到的公式很复杂，但它的性质很清楚：词频为0时贡献为0；随词频单调上升；但有上限，上限就是“已经确定这篇是精英文档”时的权重。于是用一个最简单的同形状函数代替：\n\n`tf / (k₁ + tf)`\n\nk₁控制饱和快慢。例如k₁=1.2时，词频1、2、10对应的值约为0.45、0.63、0.89——出现第二次还有明显加分，出现第十次就几乎不加了。\n\n**文档长度**。长文档词频高，可能是作者啰嗦（应按长度打折），也可能是内容多（不该打折）。折中的做法是软归一化：`B = (1−b) + b·dl/avdl`，dl是文档长度，avdl是平均长度，b=1完全按长度归一化，b=0不归一化。\n\n**完整公式**。对查询中每个词求和：\n\n`score = Σ IDF(t) · tf·(k₁+1) / (tf + k₁·B)`\n\n分子的 `(k₁+1)` 不影响排序，只是让词频为1时得分与原权重一致。IDF部分在没有相关性信息时用 `log((N−n+0.5)/(n+0.5))`。“BM”是best matching（最佳匹配）的缩写，Okapi是最早使用它的检索系统的名字。",
+  "results": "原始论文的SIGIR版本本次未能打开，具体TREC数字未核对。根据Robertson与Zaragoza 2009年的综述：模型本身不告诉你k₁和b该取多少，大量实验表明 `1.2 < k₁ < 2`、`0.5 < b < 0.8` 在多数情况下效果不错，但最优值依赖文档和查询类型；查询内词频的饱和项和额外的整篇长度修正后来被证明不重要而被去掉。",
+  "legacy": "BM25很快成为检索系统的标准打分函数，Lemur、Terrier、Xapian等开源引擎都实现了它，后来又扩展出处理标题、正文等多个字段的BM25F。在机器学习时代，它通常作为一个特征被[[ranknet]]等排序学习模型使用；[[ibm-watson]]的候选段落检索、[[drqa]]的文档检索也以它或TF-IDF为基础。\n\n神经检索兴起后，BM25反而成了必须报告的基线：[[dpr]]需要证明自己比它好，[[beir]]却显示在跨领域零样本检索上，很多稠密检索模型不如BM25。[[splade]]把它的“稀疏词权重”交给BERT来学；[[contextual-retrieval]]等RAG实践则把BM25和向量检索的结果合并。",
+  "pitfalls": "- BM25不是从双泊松模型严格推导出来的，而是用一个形状相似的简单函数去近似，作者自己称之为“简单有效的近似”。\n- 公式有很多变体（是否带k₁+1、IDF是否加1防负数、是否保留k₃查询词频项），不同工具包的得分不能直接比较。\n- 它和TF-IDF一样是词袋模型：词序、短语、同义词一概不管。",
+  "limits": [
+    {"text": "仍然只认字面相同的词，查询与文档用词不同（同义词、改写）就检索不到。", "solved_by": ["dpr", "splade", "contriever"]},
+    {"text": "k₁和b没有理论给出的取值，需要在有标注的查询上调参，换领域可能要重调。", "solved_by": ["ranknet"]},
+    {"text": "不考虑词序和查询词之间的距离，无法判断几个词是否在同一句话里共同出现。", "solved_by": ["monobert", "colbert"]},
+    {"text": "只能用于文本本身，链接、点击等文档以外的信号无法融入公式。", "solved_by": ["pagerank", "ranknet"]}
+  ],
+  "relations": [
+    {"to": "tf-idf", "type": "solves", "note": "TF-IDF的词频线性增长、不处理文档长度；BM25用饱和函数和软长度归一化解决了这两点，并保留IDF作为词的权重。"},
+    {"to": "vector-space-model", "type": "rivals", "note": "同样给文档打分排序：向量空间模型靠几何直觉，BM25从相关概率出发，在TREC上逐渐成为更强的方案。"},
+    {"to": "naive-bayes", "type": "extends", "note": "继承Maron与Kuhns开创的概率检索路线，从“文档与查询相关的概率”推导词权重。"},
+    {"to": "trec", "type": "uses", "note": "在TREC的大规模、长度差异巨大的文档集上开发和调参，正是这些数据暴露了词频与长度的问题。"},
+    {"to": "cranfield", "type": "uses", "note": "沿用Cranfield以来的“测试集 + 相关性判断 + 查准查全”评测范式来选择公式变体。"}
+  ],
+  "prereq": ["probability-basics", "conditional-bayes", "latent-variable", "retrieval", "classification-metrics"],
+  "terms": [
+    {"t": "双泊松模型（2-Poisson）", "d": "假设词频来自两个泊松分布的混合：讲这个主题的文档里词出现得多，不讲的文档里只是偶然出现。"},
+    {"t": "词频饱和", "d": "同一个词多次出现带来的加分递减并趋于上限。避免一篇文档靠重复关键词刷高得分。"},
+    {"t": "软长度归一化", "d": "按文档长度相对平均长度的比例对词频打折，打折力度由b在0到1之间调节。"}
+  ],
+  "learn": "先读Robertson与Zaragoza 2009年综述的第3.4–3.5节（精英度、饱和、长度归一化和参数取值），比读原文更清楚。动手：用Python实现BM25，在一个小型问答语料上与TF-IDF余弦比较前10条结果；再画出k₁=0.5、1.2、3时 `tf/(k₁+tf)` 的曲线，体会饱和的含义；最后用rank_bm25或Pyserini跑一个MS MARCO子集。",
+  "check": {"source": "https://www.staff.city.ac.uk/~sbrp622/papers/foundations_bm25_review.pdf", "confirmed": "Crossref确认Robertson & Walker，SIGIR ’94，pp. 232–241，DOI 10.1007/978-1-4471-2099-5_24。综述（Foundations and Trends in IR 3(4), 2009）中：将该文作为“the original BM25”、精英度与双泊松、饱和性质、B=(1−b)+b·dl/avdl与BM25公式、参数范围0.5<b<0.8与1.2<k₁<2、k₃与整篇长度修正后被弃用、开源实现列表、Maron与Kuhns 1960。SIGIR原文本身未能打开。饱和函数数值为按公式计算。"}
+}

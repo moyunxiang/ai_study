@@ -1,0 +1,101 @@
+{
+  "id": "flan-t5",
+  "who": "Hyung Won Chung, Le Hou, Shayne Longpre, Barret Zoph, Yi Tay, William Fedus, Yunxuan Li, Xuezhi Wang et al.（含Jason Wei、Quoc V. Le） · Google",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2210.11416"
+    },
+    {
+      "label": "Flan-T5模型（Hugging Face文档）",
+      "url": "https://huggingface.co/docs/transformers/model_doc/flan-t5"
+    }
+  ],
+  "problem": "FLAN、T0证明了指令微调有效，但只用了几十个数据集；任务数再多、模型再大还有没有收益？而且这些早期指令微调会让模型的逐步推理能力变差。",
+  "idea": "把FLAN、T0、Super-NaturalInstructions和9个带人工推理过程的数据集合成1836个任务，混合零样本、少样本、有无思维链多种格式，在T5和PaLM的多个尺寸上做指令微调。",
+  "impact": "Flan-PaLM 540B比原版PaLM平均高9.4个百分点，MMLU达75.2%；公开的Flan-T5让30亿参数的模型在MMLU上超过1750亿的GPT-3，被广泛用作开源指令模型。",
+  "background": "[[flan]]（137B，62个任务）和[[t0]]（11B，62个数据集）在2021年确立了指令微调（见[[c:instruction-tuning]]）：把监督数据改写成自然语言指令训练，模型就能零样本完成没见过的任务。但还有几件事不清楚：任务数和模型规模继续放大，收益怎么变？指令微调能否同时提升少样本和推理？\n\n后一个问题尤其尖锐。[[cot]]发现让大模型写出中间推理步骤能大幅提升数学和推理；而早期的指令数据全是“输入→短答案”，用它微调过的模型，再用思维链提示时效果反而下降。",
+  "method": "**数据：四个混合，共1836个任务**（473个数据集、146个任务类别）：\n\n- Muffin（80个任务）：FLAN的62个任务加26个新任务，包括对话和程序合成；\n- T0-SF（193个）：T0中不与FLAN重复的任务；\n- NIV2（1554个）：来自Super-NaturalInstructions，去掉了与MMLU相关的44个；\n- CoT（9个数据集）：算术推理（如[[gsm8k]]）、多跳推理、自然语言推理等，训练样本带有人工写的推理过程，每个数据集手写约10种指令模板。\n\n**格式**。同一份数据随机呈现为四种格式：零样本或少样本、直接回答或先写推理过程再回答。这样微调后的模型在各种提示方式下都能用。\n\n**模型**。T5（8000万到110亿参数，编码器-解码器）、PaLM（8B、62B、540B，只有解码器）、继续预训练过的cont-PaLM和U-PaLM。微调很便宜：Flan-PaLM 540B只用了预训练算力的0.2%（约512块TPU v4跑37小时）。\n\n**评测**全部是微调中没出现过的任务：MMLU（57科）、BBH（BIG-bench中23个难题）、TyDiQA（多语言问答）、MGSM（多语言数学）。",
+  "results": "**规模化**。在8B、62B、540B三个尺寸上，指令微调都带来明显提升；任务数从9增加到282时收益显著，再增到1836时收益变小。模型规模每扩大约一个数量级，微调前后的模型都大幅提升。\n\n**思维链**。不含CoT数据的指令微调会损害思维链推理；只要混入9个CoT数据集，所有评测都变好。微调后，只需加一句“let’s think step-by-step”，Flan-PaLM就能在BBH上零样本地写出推理过程并提分，原版PaLM做不到。\n\n**关键数字**。Flan-PaLM 540B平均比PaLM 540B高9.4个百分点；MMLU五样本加思维链和自洽性采样达75.2%（PaLM为69.3%）；单样本TyDiQA提高14.9个百分点。Flan-T5-XL（3B）MMLU 52.4%，超过GPT-3 175B的43.9%；Flan-T5-XXL（11B）在部分BIG-bench难题上超过PaLM 62B。人工评测中Flan-PaLM的开放式生成也明显优于PaLM。",
+  "legacy": "Flan-T5的公开检查点常被用作研究基线，也被[[instructblip]]等多模态模型用作语言部分。“把思维链数据放进指令微调”的做法被后续几乎所有对话模型继承，[[orca]]等进一步用更强模型的详细解释来蒸馏小模型。另一方面，[[lima]]发现千条精选样本就能达到不错的对齐效果，说明任务数量并非越多越好；而面向真实用户的对话体验，最终靠[[chatgpt]]式的人类反馈训练拉开差距。",
+  "limits": [
+    {
+      "text": "指令数据大多改写自学术NLP数据集，回答偏短，开放式对话和真实用户需求覆盖不足。",
+      "solved_by": [
+        "chatgpt",
+        "self-instruct"
+      ]
+    },
+    {
+      "text": "任务数超过约282个后收益明显变小，单纯堆任务数量很快遇到瓶颈。",
+      "solved_by": [
+        "lima"
+      ]
+    },
+    {
+      "text": "效果最好的Flan-PaLM没有公开，开源的Flan-T5最大只有110亿参数。",
+      "solved_by": [
+        "llama-2"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "flan",
+      "type": "extends",
+      "note": "沿用FLAN的指令微调，任务从62个扩到1836个，模型扩到540B，并加入思维链和少样本格式。"
+    },
+    {
+      "to": "t0",
+      "type": "uses",
+      "note": "T0的提示数据（去掉与FLAN重复的部分）作为T0-SF混合并入训练集。"
+    },
+    {
+      "to": "super-natural-instructions",
+      "type": "uses",
+      "note": "其1554个任务构成训练集中最大的一部分（NIV2）。"
+    },
+    {
+      "to": "palm",
+      "type": "uses",
+      "note": "以PaLM的8B、62B、540B为底座得到Flan-PaLM，研究模型规模与指令微调的关系。"
+    },
+    {
+      "to": "t5",
+      "type": "uses",
+      "note": "以T5的5个尺寸为底座得到公开发布的Flan-T5。"
+    },
+    {
+      "to": "cot",
+      "type": "solves",
+      "note": "早期指令微调会削弱思维链推理；本文在微调中混入9个带推理过程的数据集，使微调后的模型思维链更强。"
+    }
+  ],
+  "prereq": [
+    "instruction-tuning",
+    "pretrain-finetune",
+    "zero-few-shot",
+    "in-context-learning",
+    "encoder-decoder",
+    "scaling-law-concept"
+  ],
+  "terms": [
+    {
+      "t": "思维链（CoT）数据",
+      "d": "训练样本里不仅有答案，还有一步步推导出答案的过程，例如应用题的计算步骤。"
+    },
+    {
+      "t": "自洽性采样",
+      "d": "对同一道题用思维链采样多次，取出现最多的最终答案，通常比只采一次准确。"
+    },
+    {
+      "t": "BBH",
+      "d": "BIG-Bench Hard：从BIG-bench中挑出的23个此前模型普遍不如人类平均水平的难题。"
+    }
+  ],
+  "learn": "先读[[flan]]和[[t0]]理解指令微调，读[[cot]]理解思维链。读原文第2节（数据混合与格式，图2、图3）、第3节（规模化，图4）和第4节（思维链微调，表5和图6）。动手：用Hugging Face加载flan-t5-large，分别用直接提问和加“Let's think step by step”的方式做几道GSM8K题，再与未微调的t5-large对比。",
+  "check": {
+    "source": "https://arxiv.org/abs/2210.11416",
+    "confirmed": "标题、作者、v1提交于2022-10-20；摘要中的1.8K任务、+9.4%、MMLU 75.2%、Flan-T5对比PaLM 62B；ar5iv正文中的473个数据集/146类/1836个任务、Muffin 80（62+26）/T0-SF 193/NIV2 1554（去掉44个MMLU相关）/CoT 9个数据集、约10种模板、0.2%算力（512块TPU v4、37小时）与14亿token、9→282→1836任务的收益、无CoT微调损害推理、“let’s think step-by-step”在BBH 23个任务上的零样本效果、PaLM 69.3%→75.2%、TyDiQA +14.9、Flan-T5-XL 52.4%超过GPT-3 43.9%、毒性下降。"
+  }
+}

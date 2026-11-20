@@ -1,0 +1,47 @@
+{
+  "id": "mqa",
+  "who": "Noam Shazeer · Google",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1911.02150"
+    }
+  ],
+  "problem": "训练时注意力可以并行，但逐词生成时每一步都要把巨大的键、值张量从显存里整个读一遍，推理被带宽拖慢。",
+  "idea": "让所有注意力头共享同一组键和值，只保留各自独立的查询，键值张量缩小到原来的1/头数。",
+  "impact": "成为大模型推理提速的基础技巧，被[[palm]]采用，并推广为[[gqa]]。",
+  "method": "普通多头注意力里，每个头都有自己的一套Q、K、V投影。生成第t个词时，要读取前t−1个词的所有头的K和V（即[[c:kv-cache]]），在生成时每步计算量很小，主要时间花在从显存搬这些张量上，即受[[c:memory-bandwidth]]限制。\n\n**多查询注意力**（MQA）只保留一组K和V，所有头共用；各头仍有各自的Q。这样KV缓存的体积缩小到原来的1/h（h为头数），每步要读的数据大幅减少。\n\n官方摘要称，使用MQA的模型解码可以快很多，质量只有轻微下降；论文中的具体数字是在翻译模型上测得，这里不展开。",
+  "limits": [
+    {
+      "text": "所有头共用键值会让质量略有下降，训练有时更不稳定。",
+      "solved_by": [
+        "gqa"
+      ]
+    },
+    {
+      "text": "共享程度是全有或全无，没有中间选项来换取质量。",
+      "solved_by": [
+        "gqa"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "transformer",
+      "type": "extends",
+      "note": "在Transformer多头注意力里把键值头共享，以降低解码时的内存带宽成本。"
+    }
+  ],
+  "prereq": [
+    "self-attention",
+    "kv-cache",
+    "memory-bandwidth",
+    "throughput-latency",
+    "params-flops"
+  ],
+  "learn": "先读[[c:kv-cache]]与[[c:memory-bandwidth]]；原文只有几页，重点看对增量解码内存访问的分析；然后对照[[gqa]]。",
+  "check": {
+    "source": "https://arxiv.org/abs/1911.02150",
+    "confirmed": "标题、单作者Noam Shazeer、arXiv首次提交于2019-11-06；摘要中键值在所有头之间共享、降低带宽、解码更快、质量轻微下降。"
+  }
+}

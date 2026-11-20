@@ -1,0 +1,100 @@
+{
+  "id": "swiglu",
+  "who": "Noam Shazeer · Google",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2002.05202"
+    },
+    {
+      "label": "GLU原始论文（门控卷积语言模型）",
+      "url": "https://arxiv.org/abs/1612.08083"
+    },
+    {
+      "label": "PaLM论文（大规模采用SwiGLU）",
+      "url": "https://arxiv.org/abs/2204.02311"
+    }
+  ],
+  "problem": "Transformer每层的前馈网络一直是“线性—ReLU—线性”，有人把ReLU换成GELU或Swish，但收益很小，没人系统试过把门控结构放进前馈层。",
+  "idea": "把第一层线性变换换成两路投影相乘：一路过激活函数当“门”，另一路保持线性，`FFN = (Swish(xW) ⊗ xV)·W₂`，并把隐藏维度缩到2/3以保持参数量不变。",
+  "impact": "同参数、同计算量下，T5预训练的困惑度和GLUE等下游分数都更好；PaLM、LLaMA随后采用，SwiGLU成为大语言模型前馈层的默认写法。",
+  "background": "[[transformer]]的每一层由注意力和逐位置前馈网络（FFN）组成（见[[c:transformer-block]]）。FFN把每个位置的向量先放大到4倍宽，过一个激活函数，再投影回来：`FFN(x) = max(0, xW₁)·W₂`。FFN占了模型大约三分之二的参数，但它的激活函数几年里基本没变，[[gelu]]和[[swish]]只带来很小的改进。\n\n另一条线索来自[[gated-cnn-lm]]：Dauphin等人2016年提出门控线性单元GLU，`GLU(x) = σ(xW) ⊗ xV`，即两个线性投影逐元素相乘，其中一个先过sigmoid（见[[c:gating]]）。它在卷积语言模型里效果很好，但还没有人把它放进Transformer的FFN。",
+  "method": "**一族门控前馈层**。论文把GLU里的sigmoid换成别的函数，定义了一组变体（均不加偏置）：\n\n`FFN_GLU = (σ(xW) ⊗ xV)·W₂`\n`FFN_ReGLU = (max(0, xW) ⊗ xV)·W₂`\n`FFN_GEGLU = (GELU(xW) ⊗ xV)·W₂`\n`FFN_SwiGLU = (Swish(xW) ⊗ xV)·W₂`，其中`Swish(z) = z·σ(z)`\n`FFN_Bilinear = (xW ⊗ xV)·W₂`（干脆不用激活）\n\n直观理解：xV是“内容”，激活后的xW是逐元素的“开关”，决定内容的每一维放行多少。与ReLU只能按自身正负截断不同，这里的开关由输入的另一个投影决定。\n\n**公平对比**。门控版有W、V、W₂三个矩阵，原版只有两个。为了参数量和计算量相同，隐藏宽度d_ff乘以2/3：T5-base里原版d_ff=3072，门控版改为2048。",
+  "results": "在T5-base设置（编码器、解码器各12层，d_model=768）上，用C4做片段填空预训练524,288步，留出集对数困惑度：ReLU 1.677，GELU 1.679，Swish 1.683，GLU 1.663，GEGLU 1.633，SwiGLU 1.636。微调到GLUE开发集后平均分ReLU为83.80，SwiGLU为84.36，ReGLU为84.67。作者说明微调结果噪声较大，只各跑了一次。",
+  "legacy": "[[palm]]原文写明FFN采用SwiGLU，理由正是这篇论文显示它“显著提升质量”，代价是三次矩阵乘法；[[llama-1]]也把ReLU换成SwiGLU，隐藏维度用`(2/3)·4d`。此后大部分开放大模型沿用这一结构，[[mixtral]]等MoE模型的每个专家也是一个这样的门控前馈网络。[[gated-attention]]则把门控思路搬到注意力输出上。",
+  "pitfalls": "- SwiGLU是一种前馈层结构，不是单个激活函数；它比原版多一个权重矩阵，比较时必须把隐藏宽度缩小才公平。\n- 作者在结论里明说“不解释为什么有效”，把成功归于“神的眷顾”；后来的流行主要来自大模型上的实践，而非理论。\n- 各变体之间差距很小，GEGLU在困惑度上与SwiGLU几乎相同。",
+  "limits": [
+    {
+      "text": "论文没有给出任何解释，门控为什么比普通激活更好至今主要是经验结论。",
+      "solved_by": []
+    },
+    {
+      "text": "只在约T5-base规模上验证，下游微调各只跑一次、噪声大，能否在百亿参数以上保持优势当时未知。",
+      "solved_by": [
+        "palm",
+        "llama-1"
+      ]
+    },
+    {
+      "text": "前馈层仍是稠密的：每个token都要经过全部三个矩阵，想扩大参数就得同比增加计算。",
+      "solved_by": [
+        "switch-transformer",
+        "mixtral",
+        "deepseekmoe"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "gated-cnn-lm",
+      "type": "extends",
+      "note": "把为卷积语言模型提出的门控线性单元GLU搬进Transformer的前馈层，并把sigmoid换成其他激活。"
+    },
+    {
+      "to": "transformer",
+      "type": "extends",
+      "note": "修改的是Transformer每层的逐位置前馈网络，其余结构不变。"
+    },
+    {
+      "to": "swish",
+      "type": "uses",
+      "note": "SwiGLU的“门”就是Swish函数`z·σ(z)`，单独用Swish作激活时反而不比ReLU好。"
+    },
+    {
+      "to": "gelu",
+      "type": "uses",
+      "note": "GEGLU变体用GELU作门；同时把单独的GELU激活作为对照基线。"
+    },
+    {
+      "to": "t5",
+      "type": "uses",
+      "note": "完全沿用T5-base的代码、架构和C4片段填空任务做对比实验。"
+    }
+  ],
+  "prereq": [
+    "transformer-block",
+    "gating",
+    "neuron-activation",
+    "matrix-multiplication",
+    "params-flops"
+  ],
+  "terms": [
+    {
+      "t": "前馈层（FFN）",
+      "d": "Transformer每层里对每个位置单独做的两层全连接网络，先升维再降维。"
+    },
+    {
+      "t": "门控线性单元（GLU）",
+      "d": "两个线性投影逐元素相乘，其中一个先经过sigmoid等函数，起到按维度开关信息的作用。"
+    },
+    {
+      "t": "逐元素乘积（⊗）",
+      "d": "两个同样长度的向量对应位置相乘，结果仍是同样长度的向量。"
+    }
+  ],
+  "learn": "先补[[c:transformer-block]]和[[c:gating]]，看懂原版FFN。原文只有4页，读第2节的公式(4)–(6)和表1。动手：在nanoGPT里把MLP改成SwiGLU（三个无偏置线性层，隐藏宽度取原来的2/3），在小数据上对比验证损失。",
+  "check": {
+    "source": "https://arxiv.org/html/2002.05202",
+    "confirmed": "arXiv记录：标题、作者Noam Shazeer、v1提交2020-02-12；正文公式(4)–(6)、d_ff乘2/3（3072→2048）、T5-base配置、524,288步、表1困惑度（ReLU 1.677、GELU 1.679、Swish 1.683、GLU 1.663、GEGLU 1.633、SwiGLU 1.636）、表2 GLUE平均（ReLU 83.80、SwiGLU 84.36、ReGLU 84.67）、结论中的“divine benevolence”；PaLM论文（arXiv 2204.02311）采用SwiGLU的原文；LLaMA论文（arXiv 2302.13971）SwiGLU与2/3·4d。；Mixtral论文（arXiv 2401.04088）专家函数用SwiGLU、每token路由到两个。"
+  }
+}

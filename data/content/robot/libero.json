@@ -1,0 +1,37 @@
+{
+  "id": "libero",
+  "who": "Bo Liu, Yifeng Zhu, Chongkai Gao, Yihao Feng, Qiang Liu, Yuke Zhu, Peter Stone · UT Austin等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2306.03310"},
+    {"label": "项目主页与数据下载", "url": "https://libero-project.github.io"}
+  ],
+  "problem": "终身学习（不断学新任务又不忘旧任务）的研究几乎都在图像分类上做，机器人要迁移的是“怎么做”的动作知识，没有一个能把这件事拆开测量的标准基准。",
+  "idea": "在仿真里按模板程序化生成130个带语言指令的操作任务，分成只变空间关系、只变物体、只变目标、三者混合四组，并配好人类示范和统一的评测指标。",
+  "impact": "原本为终身学习设计，后来成了VLA模型最常报的仿真成绩之一：OpenVLA、π0等都在LIBERO四个子集上报告平均成功率。",
+  "background": "2023年的机器人学习基准，如[[robomimic]]、[[meta-world]]、[[calvin]]，大多是“给一组固定任务，训练完测一次”。而真实机器人会被不断教新东西，理想情况是学新任务时能借用旧经验（前向迁移），学完又不把旧任务忘掉（避免[[catastrophic-forgetting]]）。\n\n研究这个问题的[[c:continual-learning]]方法，如[[ewc]]，几乎都在图像、文本上测试，迁移的是“这是什么”的陈述性知识。机器人操作还要迁移“怎么做”的过程性知识：一个任务失败了，很难分清是没认出物体、没记住位置，还是动作本身没学会。缺少一个能把这几类知识拆开的基准。",
+  "method": "LIBERO建在robosuite仿真器上，任务按三步程序化生成：从[[ego4d]]的日常活动描述里提炼语言模板（如“打开……”），生成“打开柜子抽屉”这样的指令；用PDDL（一种规划语言）写出场景里的物体及初始位置；再把目标写成谓词的合取，如`On(碗, 盘子) ∧ Open(抽屉)`，所有谓词为真时任务成功。\n\n据此做了四组任务：**LIBERO-Spatial**（10个任务，两只一模一样的碗只差位置，考空间关系）、**LIBERO-Object**（10个，每次抓不同物体，考物体知识）、**LIBERO-Goal**（10个，物体和布局不变，只换目标，考动作知识），以及**LIBERO-100**（100个任务三者混杂，拆成90个短任务LIBERO-90和10个长任务LIBERO-Long）。每个任务都配有人类遥操作示范。\n\n基准还实现了顺序微调SeqL（下界）、多任务联合训练MTL（上界）、经验回放ER、EWC、PackNet五种算法，和ResNet-RNN、ResNet-T、ViT-T三种策略网络（计算量统一为13.5G FLOPs），用前向迁移FWT、遗忘程度NBT和总体AUC三个指标打分，每个任务跑20次评测、3个随机种子。",
+  "results": "几条结论与直觉相反：什么都不做的顺序微调SeqL前向迁移反而最好，说明所测的终身学习算法都在伤害对新任务的学习；EWC整体不如SeqL；PackNet在10任务组上最好，但在长任务组上明显输给ER；在LIBERO-90上做朴素的监督预训练，再去学LIBERO-Long，有时比从头学还差；没有哪种视觉骨干在所有知识类型上都最好。",
+  "legacy": "LIBERO后来更多被当成**多任务模仿学习和VLA的仿真基准**：[[openvla]]、[[openvla-oft]]、[[pi0]]系列、[[smolvla]]都把Spatial、Object、Goal、Long四组的平均成功率当作标准成绩。随着这些模型把分数刷到接近满分，它的区分度下降，社区转向更难的仿真集（如[[robocasa]]）和真机评测（如[[roboarena]]）。",
+  "pitfalls": "- 今天论文里说的“LIBERO成绩”通常是对四个子集分别多任务微调后的平均成功率，并不是原论文定义的终身学习指标FWT/NBT。\n- 仿真里接近满分不代表真机好用，物理和渲染都与真实世界有差距。",
+  "limits": [
+    {"text": "全部在robosuite仿真中，物理接触和渲染与真实世界有差距，仿真成功率与真机表现的对应关系不清楚。", "solved_by": ["simpler", "roboarena"]},
+    {"text": "只有单一机械臂、少量厨房和桌面场景，任务较短；成为VLA基准后很快被刷到接近满分，难以再区分强模型。", "solved_by": ["robocasa", "roboarena"]},
+    {"text": "揭示的核心问题——现有终身学习算法损害前向迁移、朴素预训练可能有害——论文本身没有给出解决办法。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "robomimic", "type": "extends", "note": "同一研究圈的离线示范基准；LIBERO沿用robosuite和类似BC-RNN的策略结构，把单次多任务评测扩展成任务流上的终身学习评测。"},
+    {"to": "ewc", "type": "uses", "note": "把EWC作为正则化类终身学习方法的代表纳入对比，并发现它在机器人任务上不如简单的顺序微调。"},
+    {"to": "experience-replay", "type": "uses", "note": "ER（存一部分旧任务数据与新数据混合训练）是回放类方法的代表，在长任务组上表现最好。"},
+    {"to": "catastrophic-forgetting", "type": "extends", "note": "把灾难性遗忘的研究从分类问题搬到需要过程性知识的机器人决策问题上，并用NBT指标量化。"},
+    {"to": "ego4d", "type": "uses", "note": "从Ego4D的日常活动语言标注中提炼任务模板，让生成的任务贴近人类真实活动。"},
+    {"to": "calvin", "type": "rivals", "note": "同为语言条件的仿真操作基准；CALVIN侧重长序列任务泛化，LIBERO侧重按知识类型拆分的终身迁移。"}
+  ],
+  "prereq": ["imitation-learning", "continual-learning", "transfer-learning", "benchmark", "teleoperation", "distribution-shift"],
+  "terms": [
+    {"t": "前向迁移 / 后向迁移", "d": "前向迁移指学过旧任务后学新任务更快更好；后向迁移指学新任务后旧任务也变好。反过来旧任务变差就是遗忘。"},
+    {"t": "过程性知识", "d": "关于“怎么做”的知识，比如怎样把抽屉拉开；与之相对的陈述性知识是“这是什么”，比如认出这是碗。"},
+    {"t": "PackNet", "d": "一种终身学习方法：每学完一个任务就剪掉不重要的权重、冻结重要的，留给后面任务的可用参数越来越少，因此不会遗忘但容量受限。"}
+  ],
+  "learn": "先了解[[c:imitation-learning]]和[[c:continual-learning]]。读原文第4节（任务生成和四个任务组）和第5.2节的结论列表。然后按项目主页装好LIBERO，下载LIBERO-Spatial数据，跑一个行为克隆基线，看看20次评测的成功率波动有多大。",
+  "check": {"source": "https://arxiv.org/abs/2306.03310", "confirmed": "标题、7位作者、arXiv首次提交2023-06-05；HTML正文第4节的四个任务组（10/10/10/100，LIBERO-100拆为90+10）、五种算法、三种架构、13.5G FLOPs、每任务20次评测3个种子，以及第5.2节SeqL前向迁移最好、EWC不如SeqL、PackNet在LIBERO-Long较差等结论。"}
+}

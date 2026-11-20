@@ -1,0 +1,52 @@
+{
+ "id": "attention-residuals",
+ "who": "Kimi Team（Guangyu Chen, Yu Zhang, Jianlin Su 等，共37位） · 月之暗面",
+ "venue": "arXiv 2026",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2603.15031"
+  }
+ ],
+ "problem": "残差连接加PreNorm把各层输出以固定权重1累加，隐状态随深度不受控地增长，每层的贡献被逐渐稀释。",
+ "idea": "用softmax注意力代替固定累加：每层对前面各层的输出做带输入依赖的加权汇聚；并提出分块版Block AttnRes降低开销。",
+ "impact": "在各规模上持续提升，已用于Kimi Linear并被Kimi K3采用。",
+ "method": "现代大模型普遍用残差连接加PreNorm：第l层的输出等于前面所有层输出的简单相加，每项权重固定为1。论文指出这会让隐状态的幅度随深度增长，早期层的贡献被越来越多的后续层“稀释”。\n\nAttention Residuals（AttnRes）把这一累加替换成“沿深度方向的注意力”：对前面所有层的输出做[[c:self-attention]]式的softmax，权重由当前输入决定，于是每层可以有选择地聚合更早的表示。为了避免对所有前层做注意力带来的显存和通信开销，作者提出Block AttnRes：把层分成若干块，只对块级表示做注意力，保留大部分收益；再配合基于缓存的流水线通信和两阶段计算，使它成为几乎无额外开销的标准残差替代品。\n\n摘要称缩放律实验显示各规模一致提升；把它放进[[kimi-linear]]架构（总48B/激活3B）并在1.4T token上预训练后，输出幅度和梯度在各深度更均匀，所有评测任务都有提升。",
+ "limits": [
+  {
+   "text": "主要在Kimi自家架构上验证，其他模型族上的收益还需要独立复现。",
+   "solved_by": []
+  },
+  {
+   "text": "即使是分块版本，也增加了流水线并行训练的通信和实现复杂度。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "hyper-connections",
+   "type": "rivals",
+   "note": "同样想改造残差路径：Hyper-Connections拓宽残差流的宽度，AttnRes则让各层按内容选择聚合哪些前层输出。"
+  },
+  {
+   "to": "mhc",
+   "type": "rivals",
+   "note": "与mHC一样是对标准残差累加的改进，但走的是沿深度做注意力的路线。"
+  }
+ ],
+ "prereq": [
+  "residual-connection",
+  "normalization-layer",
+  "self-attention"
+ ],
+ "terms": [
+  {
+   "t": "PreNorm稀释",
+   "d": "归一化放在子层之前的残差网络中，各层输出不断累加，深层的隐状态很大，使每个新层的贡献在相对意义上变小。"
+  }
+ ],
+ "check": {
+  "source": "https://arxiv.org/abs/2603.15031",
+  "confirmed": "标题、Kimi Team 37位作者、v1提交于2026-03-16；摘要中PreNorm稀释、AttnRes、Block AttnRes、Kimi Linear 48B/3B、1.4T token。"
+ }
+}

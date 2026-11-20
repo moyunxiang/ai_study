@@ -1,0 +1,39 @@
+{
+  "id": "icl-gradient-descent",
+  "who": "Johannes von Oswald, Eyvind Niklasson, Ettore Randazzo, João Sacramento, Alexander Mordvintsev, Andrey Zhmoginov, Max Vladymyrov · Google Research / ETH Zürich",
+  "venue": "ICML 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2212.07677"},
+    {"label": "后续质疑：Do pretrained Transformers Learn In-Context by Gradient Descent?", "url": "https://arxiv.org/abs/2310.08540"},
+    {"label": "代码", "url": "https://github.com/google-research/self-organising-systems/tree/master/transformers_learn_icl_by_gd"}
+  ],
+  "problem": "大模型看几个例子就能做新任务（上下文学习），但权重没有更新，它到底在前向计算里做了什么，没有机制层面的解释。",
+  "idea": "构造证明：一层线性自注意力恰好能实现“在上下文例子上对线性回归做一步梯度下降”；再实验表明，在回归任务上训练出来的Transformer，权重确实收敛到这个构造。",
+  "impact": "给“上下文学习是一种在前向计算中运行的学习算法”提供了可检验的机制模型，成为上下文学习理论研究的常用出发点；但它能多大程度解释真实大模型，至今有争议。",
+  "background": "[[gpt-3]]展示了[[c:in-context-learning]]：提示里放几个输入输出例子，模型不更新参数也能照着做。这像是一种学习，但学习发生在哪里？\n\n2022年有两条线索。[[icl-function-classes]]发现，专门在“给若干(x, y)对、预测新x的y”上训练的Transformer，做线性回归的误差能接近最小二乘法，但没说它内部怎么算。[[induction-heads]]在真实语言模型里找到了“复制前文模式”的注意力头，却解释不了回归这类需要计算的任务。另一方面，[[linear-attention]]早已指出：去掉softmax的注意力等价于一个随输入不断累加的“快速权重”矩阵。这篇论文把这几件事连了起来。",
+  "method": "**梯度下降可以写成“改数据”**。设线性模型`y = W·x`，损失`L = (1/2N)·Σ‖W·xᵢ − yᵢ‖²`。从`W₀ = 0`出发走一步梯度下降，权重变化为\n\n`ΔW = −η·∇L = (η/N)·Σ yᵢ·xᵢᵀ`\n\n于是对测试点的预测是`ŷ = ΔW·x_test = (η/N)·Σ yᵢ·(xᵢᵀ·x_test)`。\n\n**这正是线性注意力**。把每个例子拼成一个token `eᵢ = (xᵢ, yᵢ)`，测试点是`(x_test, 0)`。如果让键和查询取出x部分、值取出y部分，去掉softmax的注意力输出就是`Σ vᵢ·(kᵢᵀ·q) = Σ yᵢ·(xᵢᵀ·x_test)`，与上式只差一个系数η/N。论文的命题1给出了具体的`W_K, W_Q, W_V, P`矩阵，使一层线性自注意力对所有token的更新，与“对数据做一步梯度下降后的变化”完全一致；学习率η被吸收进权重里，相当于跨任务元学习出来的（见[[c:meta-learning]]）。\n\n**多层**。把K层堆起来，就对应K步梯度下降。",
+  "results": "在随机生成的线性回归任务上训练单层线性自注意力模型，它的损失与调好学习率的一步梯度下降几乎重合，两者给出的预测和隐含的权重的余弦相似度接近1，换成训练时没见过的输入尺度也一致（5个随机种子）。多层模型比同样步数的普通梯度下降更好，但与作者提出的变体GD++吻合：每步先把输入变换为`(I − γ·X·Xᵀ)·x`，相当于做了一次曲率校正。在非线性回归上，带MLP的Transformer先学出特征，再在特征上做梯度下降。",
+  "legacy": "同期的[[icl-learning-algorithm]]和[[icl-meta-optimizer]]从不同角度提出了相近的主张，三篇合在一起，使“上下文学习＝隐式优化”成为一个主流的理论视角，也让[[mesa-optimization]]这个原本偏思辨的安全概念有了具体实例。2023年10月Shen等人在LLaMA-7B上直接比较上下文学习与真正的梯度微调，发现两者在不同数据集、模型和示例数量下表现并不一致，结论是二者等价仍只是一个开放假设。这个对应关系目前主要在受控的回归任务里成立。",
+  "pitfalls": "- 结论是在“线性注意力＋把x和y拼进同一个token”的人造设定下得到的。真实大模型用softmax注意力，例子以普通文本分散在很多token中，不能直接推出“GPT在做梯度下降”。\n- “等价”指输出相同，构造并不唯一：只要`P·W_V`和`W_K·W_Q`的乘积对上即可，所以比较训练出的权重时要先消除缩放差异。",
+  "limits": [
+    {"text": "只在线性自注意力、人造线性回归任务上严格成立；带softmax、在自然语言上训练的大模型是否仍按梯度下降做上下文学习，没有直接证据。", "solved_by": []},
+    {"text": "需要把输入和标签拼进同一个token这种特殊排布；真实提示中x和y分处不同位置，模型还得先用类似归纳头的机制把它们配对。", "solved_by": []},
+    {"text": "无法解释大模型上下文学习的许多现象，例如对示例顺序和格式的敏感、以及能否违背先验去学习反转的标签。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "icl-function-classes", "type": "solves", "note": "Garg等人只观察到Transformer能在上下文中做好线性回归，这篇给出了它在内部如何做到的权重构造并验证训练会找到它。"},
+    {"to": "linear-attention", "type": "uses", "note": "核心构造依赖去掉softmax的线性注意力：它等价于把值和键的外积累加成权重矩阵，与梯度下降的更新同形。"},
+    {"to": "induction-heads", "type": "extends", "note": "论文讨论了两层模型中的归纳头，认为它可以看作“先拷贝配对、再做梯度下降”这一机制的特例。"},
+    {"to": "icl-learning-algorithm", "type": "rivals", "note": "Akyürek等人同期用包含MLP的多层构造实现一步梯度下降；本文的构造只需一层线性注意力，并直接比对了训练出的权重。"},
+    {"to": "icl-meta-optimizer", "type": "rivals", "note": "Dai等人同月从注意力的“对偶形式”论证GPT在隐式微调，偏重真实模型的类比；本文偏重可严格验证的小模型。"},
+    {"to": "mesa-optimization", "type": "extends", "note": "给出了“训练出的模型内部运行一个优化器”的具体可验证例子。"}
+  ],
+  "prereq": ["in-context-learning", "gradient-descent", "linear-regression", "self-attention", "efficient-attention", "meta-learning"],
+  "terms": [
+    {"t": "线性自注意力（LSA）", "d": "去掉softmax、直接用键和查询的内积作为权重的注意力。它的输出可以写成一个由历史(键, 值)外积累加而成的矩阵乘以查询。"},
+    {"t": "mesa优化器", "d": "被训练出来的模型自身在前向计算中又执行了一个优化过程。外层训练是“基础优化”，模型内部的这个过程叫mesa优化。"},
+    {"t": "GD++", "d": "本文提出的梯度下降变体：每步先用`(I − γXXᵀ)`变换输入数据再做梯度步，相当于近似的曲率（二阶）校正，多层Transformer的行为与它吻合。"}
+  ],
+  "learn": "先确认会[[c:linear-regression]]的梯度推导和[[c:self-attention]]的矩阵写法。读论文第2节，自己在纸上验证：W₀=0时一步梯度下降的预测等于`Σ yᵢ(xᵢᵀx_test)`，再把它对上线性注意力的公式。然后跑官方代码里的单层实验，看训练出的权重与构造的对比图。",
+  "check": {"source": "https://arxiv.org/abs/2212.07677", "confirmed": "标题、7位作者、arXiv v1于2022-12-15、ICML 2023（PDF页眉）；PDF第2节式(2)(3)与命题1、图2（5个种子，余弦相似度与损失对齐）、多层与GD++（H(X)=I−γXXᵀ）、与Akyürek等人同期工作的比较、对归纳头的讨论；作者单位ETH Zürich与Google Research。后续质疑见arXiv 2310.08540（Shen, Mishra, Khashabi，2023-10-12）摘要：在LLaMA-7B上ICL与GD表现不一致。"}
+}

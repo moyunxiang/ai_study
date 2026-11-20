@@ -1,0 +1,37 @@
+{
+  "id": "biaffine-parser",
+  "who": "Timothy Dozat, Christopher D. Manning · 斯坦福大学",
+  "venue": "ICLR 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1611.01734"},
+    {"label": "CoNLL 2017评测系统论文", "url": "https://aclanthology.org/K17-3002/"}
+  ],
+  "problem": "神经依存分析里，转移式分析器（逐步移进-归约）效果最好但结构复杂；图式分析器直接给每条“中心词→依存词”的弧打分，结构简单，却比最好的转移式系统差一截。",
+  "idea": "用三层双向LSTM读句子，每个词经两个小MLP分别得到“作为依存词”和“作为中心词”的向量，再用一个双仿射变换一次性算出所有词对的弧分数矩阵，配合大量dropout和调过参的Adam。",
+  "impact": "简单的图式分析器第一次追平最好的转移式系统（英语PTB UAS 95.74），双仿射打分随后成为依存分析、语义依存分析乃至片段抽取任务的常用打分层。",
+  "background": "依存分析要为句子中每个词找到它的中心词（head）并标出关系类型，例如“Casey hugged Kim”里，Casey和Kim都依附于hugged，关系分别是主语和宾语。\n\n两大流派：**转移式**像[[nivre-parser]]和[[chen-manning-parser]]，从左到右用栈和缓冲区一步步做移进、归约动作，神经网络只负责预测下一步动作；**图式**像[[mstparser]]，给所有可能的弧打分，再用最大生成树算法挑出得分最高的树。2016年Kiperwasser和Goldberg提出用BiLSTM加MLP给弧打分的简单图式分析器，但它在英语上仍比当时最好的转移式系统（Kuncoro等人，UAS 95.8）低约2个百分点。",
+  "method": "**编码**。每个词的输入是词向量（预训练向量与训练集上学的向量相加）拼接词性向量，经过三层双向[[lstm]]（每个方向400维）得到`r_i`。\n\n**先降维再打分**。`r_i`里装着太多信息（要找自己的中心词、找所有依存词、预测标签……），直接拿来打分容易过拟合。所以先用两个独立的单层MLP得到`h_i^dep = MLP_dep(r_i)`和`h_j^head = MLP_head(r_j)`（500维）。\n\n**双仿射打分**。词j作为词i的中心词的分数为\n\n`s(i→j) = h_jᵀ·U·h_i + h_jᵀ·u`\n\n第一项是双线性项，衡量“j和i是否适合配对”；第二项只依赖j，衡量“j本身是否常当中心词”，相当于一个先验。整句写成矩阵乘法`H_head·U·H_depᵀ + H_head·u`，一次得到n×n的分数矩阵，对每一行做[[c:softmax]]就是词i选每个中心词的概率。和[[luong-attention]]里的“general”双线性注意力是同一类打分，只是多了偏置项。关系标签用类似的双仿射分类器预测。\n\n**训练与解码**。训练时每个词独立选中心词（交叉熵）；测试时用最大生成树算法保证输出是一棵合法的树。\n\n**强正则**。词和词性各以33%概率随机丢弃，LSTM与MLP层都加33%的dropout；用[[adam]]但把β₂从0.999改为0.9，作者认为这让优化器更快适应最近的梯度。",
+  "results": "英语PTB（Stanford依存3.3.0）测试集：UAS 95.74、LAS 94.08，比Kiperwasser和Goldberg的图式分析器（93.9 / 91.9）高1.8和2.2个百分点，与最好的转移式系统Kuncoro等人（95.8 / 94.6）接近，好于谷歌的[[syntaxnet]]（94.61 / 92.79）。中文CTB 5.1上UAS 89.30、LAS 88.23，超过此前所有报告结果。在CoNLL 2009的多种语言上也达到或接近最好水平。消融显示：三四层LSTM明显好于两层，隐层从200维加到300或400维也有显著提升。",
+  "legacy": "斯坦福团队在它的基础上加入字符LSTM词表示，参加2017年CoNLL多语言依存分析评测（[[universal-dependencies]]数据），在UPOS、XPOS、UAS、LAS等五项指标上全部排名第一。双仿射打分被推广到语义依存图分析、命名实体与嵌套实体识别、关系抽取等“给片段对打分”的任务。[[elmo]]、[[bert]]出现后，人们把BiLSTM编码器换成预训练模型、保留双仿射打分层，进一步提高了精度。",
+  "limits": [
+    {"text": "每条弧独立打分（一阶分解），兄弟节点、祖孙节点之间的结构约束只能靠编码器隐式学习。", "solved_by": []},
+    {"text": "仍然依赖词性标注作为输入，词性标注出错会传递给依存分析，且需要单独训练一个标注器。", "solved_by": ["bert"]},
+    {"text": "编码器从零开始在一个树库上训练，只用静态预训练词向量，低资源语言的树库很小，精度明显下降。", "solved_by": ["elmo", "bert", "xlm-r"]}
+  ],
+  "relations": [
+    {"to": "chen-manning-parser", "type": "rivals", "note": "Chen和Manning开启了神经转移式分析；本文属于图式路线，并证明简单的图式模型也能追平最好的转移式系统。"},
+    {"to": "mstparser", "type": "extends", "note": "沿用“给每条弧打分、用最大生成树解码”的图式框架，把手工特征加线性打分换成BiLSTM加双仿射打分。"},
+    {"to": "luong-attention", "type": "extends", "note": "双仿射打分是Luong“general”双线性注意力的推广：把“中心词选择依存词”看作一种注意力，并加入只依赖中心词的先验项。"},
+    {"to": "syntaxnet", "type": "solves", "note": "SyntaxNet用全局归一化的转移式模型达到PTB UAS 94.61；本文用更简单的图式结构做到95.74。"},
+    {"to": "adam", "type": "uses", "note": "用Adam优化，但把β₂改为0.9，作者认为默认的0.999在此任务上适应太慢。"},
+    {"to": "penn-treebank", "type": "uses", "note": "主要在由宾州树库转换的英语依存数据上评测。"}
+  ],
+  "prereq": ["recurrent-layer", "attention-concept", "mlp", "softmax", "graph-basics", "dropout-concept"],
+  "terms": [
+    {"t": "依存分析", "d": "为句中每个词指定一个中心词和关系类型，结果是一棵以谓语动词为根的树。"},
+    {"t": "UAS / LAS", "d": "依存分析的准确率指标。UAS是中心词找对的词所占比例；LAS还要求关系标签也对。"},
+    {"t": "双仿射（biaffine）", "d": "形如`xᵀ·U·y + xᵀ·u`的打分函数：一个双线性项衡量两个向量是否匹配，再加一个只依赖其中一个向量的线性项。"}
+  ],
+  "learn": "先补[[c:graph-basics]]里的树与生成树、[[c:attention-concept]]，读过[[chen-manning-parser]]了解转移式分析。读原文第3.1节的三个公式和表4。动手：用PyTorch实现BiLSTM加双仿射打分，在Universal Dependencies的一个小树库上训练，先用每行argmax解码，再换成最大生成树解码，比较UAS。",
+  "check": {"source": "https://arxiv.org/html/1611.01734", "confirmed": "标题、2位作者、arXiv首次提交2016-11-06；正文双仿射公式（含先验项）、表1超参数（3层400维LSTM、弧MLP 500维、33% dropout、β₂=.9）、表4英语PTB-SD 3.3.0 UAS/LAS 95.74/94.08、Kiperwasser 93.9/91.9、Kuncoro 95.8/94.6、Andor 94.61/92.79、CTB 89.30/88.23；层数与维度的消融结论。另核对ACL Anthology K17-3002摘要：CoNLL 2017评测五项指标均排名第一。"}
+}

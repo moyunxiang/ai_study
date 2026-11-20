@@ -1,0 +1,54 @@
+{
+ "id": "monobert",
+ "who": "Rodrigo Nogueira, Kyunghyun Cho · NYU",
+ "venue": "arXiv 2019",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/1901.04085"
+  }
+ ],
+ "problem": "传统检索先用BM25取候选，排序仍靠词的匹配次数，看不懂语义，排在前面的不一定真正回答了问题。",
+ "idea": "把查询和候选段落拼成一条输入喂给BERT，让它输出这段话是否相关，用分数重新排序候选。",
+ "impact": "证明预训练语言模型能直接做相关性判断，开启了「BM25召回加神经网络重排」的两阶段检索范式。",
+ "method": "做法很简单：先用[[bm25]]为每个查询取回约一批候选段落；再把「[CLS] 查询 [SEP] 段落」送入[[bert]]，取[CLS]位置的输出接一个分类层，预测相关概率，按概率重排。训练时用有相关性标注的查询段落对做二分类微调。\n\n摘要称该系统在TREC-CAR上达到当时最佳，并登上MS MARCO段落检索榜首，MRR@10相对此前最好结果提高27%。因为BERT要把每个查询与每个候选一起过一遍网络，开销大，所以只用于重排少量候选，不能直接扫全库。",
+ "legacy": "之后的重排模型（如T5重排、交叉编码器）和RAG中的reranker都沿用这一结构；为了摆脱对BM25召回的依赖，才有了[[dpr]]这类稠密召回。",
+ "limits": [
+  {
+   "text": "交叉编码器对每个候选都要完整前向一次，推理成本高，只能重排几十到几百条，召回阶段仍受BM25限制。",
+   "solved_by": [
+    "dpr",
+    "colbert"
+   ]
+  },
+  {
+   "text": "需要大量相关性标注（如MS MARCO）微调，换领域效果不稳。",
+   "solved_by": [
+    "contriever"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "bert",
+   "type": "uses",
+   "note": "直接用BERT的句对输入形式，做相关/不相关二分类。"
+  },
+  {
+   "to": "bm25",
+   "type": "extends",
+   "note": "保留BM25负责取候选，只在其上增加神经重排，补上词匹配不懂语义的缺口。"
+  }
+ ],
+ "prereq": [
+  "pretrain-finetune",
+  "retrieval",
+  "classification-metrics",
+  "self-attention"
+ ],
+ "learn": "先看BERT的句对分类用法，再读原文方法部分，用HuggingFace上的交叉编码器对BM25结果重排，比较MRR前后差异。",
+ "check": {
+  "source": "https://arxiv.org/abs/1901.04085",
+  "confirmed": "标题、作者、v1提交2019-01-13；摘要称MS MARCO榜首、MRR@10相对提升27%。"
+ }
+}

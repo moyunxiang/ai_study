@@ -1,0 +1,64 @@
+{
+ "id": "flashattention-3",
+ "who": "Shah, Bikshandi, Zhang, Thakkar, Ramani, Dao · Colfax, Meta, NVIDIA, Princeton, Together AI",
+ "venue": "NeurIPS 2024",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2407.08608"
+  }
+ ],
+ "problem": "[[flashattention-2]]在H100上只用到约35%的利用率，没有利用Hopper架构新增的异步张量核心和TMA、FP8等能力。",
+ "idea": "用warp专门化让数据搬运和计算重叠，交错分块矩阵乘与softmax，并用块量化和非相干处理支持FP8注意力。",
+ "impact": "在H100上把注意力推到接近75%利用率，成为Hopper时代的标准注意力内核。",
+ "method": "FlashAttention-3针对[[h100]]的三项改造。第一，利用张量核心和TMA（张量内存加速器）的异步性，用warp专门化：一部分warp专门负责搬运数据，另一部分负责计算，让两者重叠。第二，把一个块的矩阵乘与前一个块的softmax交错执行，因为softmax用的特殊函数单元吞吐远低于张量核心，错开可以隐藏其延迟。第三，支持[[fp8]]：用块量化和非相干处理（对输入做随机正交变换以打散离群值），减小低精度误差。",
+ "results": "论文称在H100上比FlashAttention-2快1.5到2.0倍，FP16最高740 TFLOPs/s（75%利用率），FP8接近1.2 PFLOPs/s，且FP8数值误差比基线FP8注意力低2.6倍。",
+ "legacy": "紧接着Blackwell带来新的瓶颈，见[[flashattention-4]]。",
+ "limits": [
+  {
+   "text": "内核深度绑定Hopper特性，到了Blackwell需要重写。",
+   "solved_by": [
+    "flashattention-4"
+   ]
+  },
+  {
+   "text": "FP8路径在长上下文和极端离群值下的精度仍需谨慎评估。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "flashattention-2",
+   "type": "solves",
+   "note": "FA2在H100上利用率仅约35%，FA3通过异步和低精度把它提到约75%。"
+  },
+  {
+   "to": "h100",
+   "type": "uses",
+   "note": "利用Hopper的TMA和异步张量核心。"
+  },
+  {
+   "to": "fp8",
+   "type": "uses",
+   "note": "用FP8注意力进一步提速。"
+  }
+ ],
+ "prereq": [
+  "self-attention",
+  "memory-bandwidth",
+  "floating-point",
+  "quantization-concept",
+  "cpu-gpu"
+ ],
+ "terms": [
+  {
+   "t": "warp专门化",
+   "d": "同一个线程块内，不同的warp分工，一部分搬运数据，一部分做计算。"
+  }
+ ],
+ "learn": "先读FlashAttention与FA2 → 读FA3第3节的异步与流水线 → 看Tri Dao的博客或GPU Mode讲座。",
+ "check": {
+  "source": "https://arxiv.org/abs/2407.08608",
+  "confirmed": "标题、作者、2024-07-11；摘要的FA2仅35%利用率、1.5到2.0倍、740 TFLOPs/s（75%）、FP8近1.2 PFLOPs/s、误差低2.6倍。"
+ }
+}

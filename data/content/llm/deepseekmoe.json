@@ -1,0 +1,39 @@
+{
+  "id": "deepseekmoe",
+  "who": "Damai Dai, Chengqi Deng, Chenggang Zhao, R. X. Xu, Huazuo Gao, Deli Chen, Jiashi Li, Wangding Zeng et al. · 深度求索DeepSeek-AI / 北京大学等",
+  "venue": "ACL 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2401.06066"},
+    {"label": "论文HTML全文", "url": "https://arxiv.org/html/2401.06066v1"},
+    {"label": "代码与权重", "url": "https://github.com/deepseek-ai/DeepSeek-MoE"}
+  ],
+  "problem": "GShard式MoE只有8–16个大专家、每次选1–2个，一个专家要装下很杂的知识，不同专家又各自重复存储常识，专家并没有真正分工。",
+  "idea": "把每个专家切成m个小专家、同时多激活m倍个数，让组合方式暴增；再固定留出几个所有token都经过的共享专家，专门存放通用知识。",
+  "impact": "2B规模用一半多的计算追平GShard 2.9B，16B模型以约40%的计算追平7B稠密模型；细粒度加共享专家成为DeepSeek-V2/V3及之后大量开源MoE的标准结构。",
+  "background": "[[c:mixture-of-experts]]让参数量与每个token的计算量脱钩。[[gshard]]用top-2路由、[[switch-transformer]]用top-1，专家数通常为8或16，每个专家与普通前馈网络一样大。同月发布的[[mixtral]]也是8选2。\n\n论文指出这种设计有两个问题。**知识混杂**：专家太少，分到同一个专家的token涵盖各种内容，一个专家的参数里要塞进完全不相干的知识，很难各司其职。**知识冗余**：几乎所有token都需要某些通用知识（如基本语法），于是多个专家各自学一份，参数被浪费。Mixtral的路由分析恰好显示专家没有按学科分工，印证了这一点。",
+  "method": "**细粒度切分**。把N个专家各切成m份，每份的中间维度是原来的1/m，于是有mN个小专家；每个token从选K个改为选mK个，计算量不变。好处是组合数：16个专家选2个只有 `C(16,2) = 120` 种组合；每个切成4份后64选8，有 `C(64,8) ≈ 44亿` 种，每个token能拼出更贴合自己的专家组合。\n\n**共享专家隔离**。从中拿出K_s个专家，所有token都必经过它们，不参与路由。通用知识集中到共享专家里，路由专家就可以专注于差异化的知识。一层的输出是：\n\n`h = x + Σ(共享专家输出) + Σ_{被选中的路由专家} g_i · FFN_i(x)`\n\n**负载均衡**。专家变多后更容易出现路由坍缩（总选那几个专家）。论文用一个较小权重的专家级均衡损失，外加一个设备级均衡损失，后者只要求各GPU负载均衡，不要求每个专家都一样忙。\n\n16B版本每个MoE层有2个共享专家和64个路由专家（每个是标准FFN的1/4大小），每个token选6个路由专家；第一层仍用稠密FFN，因为它的负载均衡收敛特别慢。",
+  "results": "在同样语料和超参下，2B总参数的DeepSeekMoE（1个共享专家+63个路由专家选7个）与专家参数和计算都是它1.5倍的GShard 2.9B相当，并接近同总参数稠密模型这一MoE上限。把排名靠前的路由专家屏蔽掉时，它的损失上升得比GShard更快，说明专家之间冗余更少。16B模型在2T token上训练，总参数是LLaMA2 7B的245%，计算只需39.6%，整体表现相当；与同语料训练的DeepSeek 7B相比也只用约40%的计算。初步扩展到145B时，以28.5%的计算达到DeepSeek 67B的水平。",
+  "legacy": "四个月后的[[deepseek-v2]]把这套结构放大到236B，[[deepseek-v3]]进一步放大到671B（每层1个共享专家、256个路由专家选8个），并用[[aux-loss-free]]替换了均衡损失。细粒度专家与共享专家随后被[[qwen3]]、[[kimi-k2]]等大量开源MoE采用，“专家越多越细”成为2024–2025年MoE设计的主线。",
+  "pitfalls": "- 细粒度切分**不增加**总参数和计算量，变的只是专家的大小和个数；它的收益来自组合灵活性。\n- 专家多了以后，每个token要被发送到更多专家，分布式训练时的通信量会增加——这正是V2要专门处理的问题。",
+  "limits": [
+    {"text": "仍靠辅助均衡损失防止路由坍缩，损失权重调大会伤害模型效果，调小又可能负载不均。", "solved_by": ["aux-loss-free", "deepseek-v3"]},
+    {"text": "专家切得越细，每个token要分发到的专家越多，跨设备的all-to-all通信成为瓶颈。", "solved_by": ["deepseek-v2", "deepseek-v3"]},
+    {"text": "只改了前馈层，注意力仍是标准多头注意力，长上下文推理时KV缓存很大。", "solved_by": ["deepseek-v2"]},
+    {"text": "145B版本只是初步实验，训练量有限，最大规模下的收益尚未充分验证。", "solved_by": ["deepseek-v2"]}
+  ],
+  "relations": [
+    {"to": "gshard", "type": "solves", "note": "针对GShard式粗粒度top-2专家的知识混杂与冗余问题，用细粒度切分和共享专家让专家真正分工；同等计算下明显更好。"},
+    {"to": "switch-transformer", "type": "extends", "note": "沿用稀疏MoE替换前馈层与辅助均衡损失的框架，但方向相反：不是每个token只选一个大专家，而是选很多个小专家。"},
+    {"to": "mixtral", "type": "rivals", "note": "同一周发布的开源MoE；Mixtral用8个大专家选2个，DeepSeekMoE用几十个小专家加共享专家，后者成为后来开源MoE的主流设计。"},
+    {"to": "deepseek-llm", "type": "uses", "note": "16B模型与DeepSeek 7B稠密模型使用同一份2T语料训练，用作公平对照。"},
+    {"to": "llama-2", "type": "rivals", "note": "以39.6%的计算量追平LLaMA2 7B。"}
+  ],
+  "prereq": ["mixture-of-experts", "transformer-block", "params-flops", "distributed-training"],
+  "terms": [
+    {"t": "共享专家", "d": "每个token都必经过、不参与路由选择的专家，用来存放所有token都需要的通用知识。"},
+    {"t": "路由坍缩", "d": "路由器总是把token送给少数几个专家，其余专家得不到训练，越来越没用，最后MoE退化成小模型。"},
+    {"t": "细粒度专家", "d": "把一个标准大小的专家沿中间维度切成多个小专家，个数变多、单个变小，总参数不变。"}
+  ],
+  "learn": "先确认理解[[switch-transformer]]的路由和负载均衡损失。读原文第3节（图2很直观地画出了三种结构的区别）和第4.5节专家专门化分析。动手：用组合数算一算不同切分粒度下的专家组合数，再在小模型上对比8选2与32选8（专家缩小为1/4）的验证损失。",
+  "check": {"source": "https://arxiv.org/html/2401.06066v1", "confirmed": "标题、作者、arXiv v1提交于2024-01-11，ACL Anthology 2024.acl-long.70确认发表于ACL 2024；正文中的知识混杂/冗余、C(16,2)=120与C(64,8)=4,426,165,368的例子、专家级与设备级均衡损失、2B模型1共享+63路由选7、16B模型2共享+64路由选6且每个专家为标准FFN的0.25倍、首层稠密、2T token、245%参数39.6%计算、145B以28.5%计算对标DeepSeek 67B。"}
+}

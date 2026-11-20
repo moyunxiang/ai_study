@@ -1,0 +1,45 @@
+{
+ "id": "smoothquant",
+ "who": "Guangxuan Xiao, Ji Lin, Mickael Seznec, Hao Wu, Julien Demouth, Song Han · MIT / NVIDIA",
+ "venue": "ICML 2023",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2211.10438"
+  }
+ ],
+ "problem": "[[llm-int8]]指出大模型激活里有离群值，激活量化很难；把离群通道单独用16位算又拖慢速度。",
+ "idea": "把激活里的量化难度用数学等价变换“转移”给权重：激活逐通道除以一个缩放，权重相应乘上，让两者都容易量化到8位。",
+ "impact": "让权重和激活都用INT8（W8A8）成为可行方案，直接使用硬件的整数矩阵乘。",
+ "method": "离群值集中在少数激活通道。设`Y = X·W`，对每个通道j取缩放`s_j`，改写成`Y = (X·diag(s)⁻¹)·(diag(s)·W)`，数学上等价。选`s_j = max|X_j|^α / max|W_j|^(1−α)`，使激活和权重的动态范围相近。缩放可以离线融入前一层的LayerNorm，推理时无额外开销。摘要称该方法训练无关，能做到W8A8，最多约1.56倍推理加速、2倍显存减少，并可让5300亿参数的模型在单个节点内服务。",
+ "limits": [
+  {
+   "text": "只做到8位，更低比特（4位）时离群值问题重现。",
+   "solved_by": [
+    "awq"
+   ]
+  },
+  {
+   "text": "缩放系数依赖校准数据，通用性受限。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "llm-int8",
+   "type": "solves",
+   "note": "LLM.int8()用混合精度处理离群通道较慢，SmoothQuant用等价缩放让整体都能整数计算。"
+  }
+ ],
+ "prereq": [
+  "quantization-concept",
+  "normalization-layer",
+  "memory-bandwidth"
+ ],
+ "learn": "读论文平滑变换一节，在一个小Transformer里手工实现通道缩放，验证输出不变。",
+ "check": {
+  "source": "https://arxiv.org/abs/2211.10438",
+  "confirmed": "标题、6位作者、v1于2022-11-18；摘要：W8A8、最多1.56倍加速、2倍显存减少、530B单节点。"
+ },
+ "legacy": "之后常与[[gptq]]、[[awq]]一起被推理框架当作可选的量化方案。它解决的是W8A8整数计算，4位权重量化则由后两者承担。"
+}

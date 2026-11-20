@@ -1,0 +1,40 @@
+{
+  "id": "gemini-1",
+  "who": "Gemini Team（Rohan Anil, Sebastian Borgeaud, Jean-Baptiste Alayrac, Jiahui Yu et al.） · Google DeepMind / Google",
+  "venue": "技术报告 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2312.11805"},
+    {"label": "官方博客", "url": "https://blog.google/technology/ai/google-gemini-ai/"},
+    {"label": "论文HTML全文", "url": "https://arxiv.org/html/2312.11805v5"}
+  ],
+  "problem": "GPT-4领先近一年，谷歌的PaLM 2只懂文本；多模态模型多是“语言模型外挂一个视觉编码器”，图像、音频、视频各走各的管线。",
+  "idea": "从预训练第一天起就把文本、图像、音频、视频交错放进同一个Transformer解码器的序列里训练，并按Ultra、Pro、Nano三档尺寸覆盖从数据中心到手机。",
+  "impact": "Ultra在32项基准中的30项刷新纪录、MMLU首次超过人类专家线；“原生多模态”成为此后Gemini、GPT-4o等旗舰模型的默认设计。",
+  "background": "2023年3月[[gpt-4]]发布后，谷歌手里最强的是纯文本的[[palm-2]]。当时的多模态做法以[[flamingo]]为代表：拿一个训练好的语言模型，冻结它，再接一个视觉编码器，用交叉注意力把图像特征“喂”进去。这样能看图说话，但模态是后接的，语言模型本身从没在预训练里见过图像；音频通常还要先转成文字（如[[whisper]]）再交给模型，语气、口音等信息在转写时就丢了。2023年4月谷歌合并Brain与DeepMind，Gemini是新团队的第一个模型。",
+  "method": "**架构**。主体是Transformer解码器（见[[c:transformer-block]]），上下文32K，使用多查询注意力（[[mqa]]）以加速推理。报告没有公开参数量和层数。\n\n**原生多模态**。文本、图片、音频、视频帧被编码成token后交错排成一条序列（见[[c:image-patch]]），视频就是上下文里的一串帧，音频直接输入[[usm]]提取的16kHz特征而不先转文字。报告称视觉编码受Flamingo、CoCa、PaLI启发，区别在于从一开始就多模态训练，并且可以用离散图像token直接**输出**图像。\n\n**三档尺寸与训练**。Ultra在多个数据中心的TPUv4集群上训练，Pro在几周内训完，Nano-1（18亿参数）和Nano-2（32.5亿参数）从大模型蒸馏而来（见[[c:knowledge-distillation]]）并做4比特量化，跑在手机上。后训练沿用SFT→奖励模型→[[c:rlhf-concept]]的流程。为了在超大规模下少丢算力，团队改用内存中的模型副本快速恢复，把最大训练任务的有效计算时间占比（goodput）从85%提到97%。",
+  "results": "Ultra在32项基准中的30项超过此前最佳。MMLU达到90.04%（用32条思维链采样加不确定性路由），高于报告中人类专家的89.8%，同法测GPT-4为87.29%。多模态的MMMU为59.4%，高于GPT-4V的56.8%；语音识别上Pro优于Whisper和USM。基于Gemini Pro的AlphaCode 2在Codeforces的77道题中解出43%，估计排在参赛者第85百分位（初代[[alphacode]]约为50%）。",
+  "legacy": "两个月后的[[gemini-1.5]]换成MoE架构并把上下文推到百万token；原生多模态路线延续到[[gemini-2.5]]、[[gemini-3]]，OpenAI的[[gpt-4o]]和Meta的[[chameleon]]也转向把所有模态放进同一个模型。Nano版本落地为[[gemini-nano]]端侧模型。发布同时出现的争议是宣传视频经过剪辑：画面中看似实时的语音对话，实际是用静态图片加文字提示完成的，谷歌事后承认。",
+  "pitfalls": "- MMLU 90.04%用的是CoT@32加不确定性路由，而GPT-4常被引用的86.4%是5-shot；同为5-shot时两者差距很小，“首次超过人类专家”依赖于评测方式。\n- “原生多模态”指训练方式；能读图、听音频不等于能实时对话，实时语音交互是后来[[gpt-4o]]和[[project-astra]]才做到的。",
+  "limits": [
+    {"text": "上下文只有32K token，一部长视频或一个代码仓库放不进去。", "solved_by": ["gemini-1.5"]},
+    {"text": "Ultra是稠密大模型，推理成本高，发布时只开放了Pro，Ultra要两个月后才上线。", "solved_by": ["gemini-1.5"]},
+    {"text": "多模态输入能处理，但不能实时听说：语音仍是一问一答，没有低延迟的连续对话。", "solved_by": ["gpt-4o", "project-astra"]},
+    {"text": "参数量、数据配比、架构细节都没有公开，外界无法复现或核验，宣传视频也被指夸大实时能力。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "gpt-4", "type": "rivals", "note": "直接对标GPT-4和GPT-4V；报告在几乎每张表里都与之比较，Ultra在文本上小幅领先、多模态上领先较多。"},
+    {"to": "flamingo", "type": "extends", "note": "视觉编码借鉴Flamingo，但不再冻结语言模型后接视觉，而是从预训练起就让所有模态共同训练。"},
+    {"to": "palm-2", "type": "extends", "note": "接替PaLM 2成为谷歌旗舰，训练规模明显更大，并新加了图像、音频、视频输入。"},
+    {"to": "mqa", "type": "uses", "note": "用多查询注意力减小推理时的KV缓存，支撑32K上下文。"},
+    {"to": "usm", "type": "uses", "note": "音频不先转文字，而是直接输入USM提取的声学特征，保留语气和口音信息。"},
+    {"to": "alphacode", "type": "extends", "note": "AlphaCode 2把底座换成Gemini Pro，竞赛编程表现从约第50百分位提到约第85百分位。"}
+  ],
+  "prereq": ["transformer-block", "image-patch", "tokenization", "knowledge-distillation", "rlhf-concept", "benchmark"],
+  "terms": [
+    {"t": "原生多模态", "d": "不是把视觉、语音模块事后接到语言模型上，而是从预训练开始就让一个模型同时学习各种模态交错在一起的数据。"},
+    {"t": "CoT@32", "d": "对同一道题采样32条思维链答案再汇总；Gemini的版本在答案一致性高时取多数票，否则退回贪心解码的答案（不确定性路由）。"},
+    {"t": "goodput", "d": "训练任务中真正用来推进有效训练步的时间占总耗时的比例，扣除了故障恢复、重算等浪费。"}
+  ],
+  "learn": "先补[[c:transformer-block]]和[[c:image-patch]]，再看[[flamingo]]理解“后接视觉”的做法，对比本文第2节的模型架构和图2的交错输入示意。读第5.1节文本评测时注意每个数字的评测设置（5-shot还是CoT@32）。",
+  "check": {"source": "https://arxiv.org/html/2312.11805v5", "confirmed": "标题、Gemini Team、arXiv v1提交于2023-12-19（官方博客发布于2023-12-06）；正文中的32K上下文与多查询注意力、Nano-1/2为1.8B/3.25B并4比特量化、USM 16kHz音频特征、TPUv4训练、goodput 85%→97%、MMLU 90.04%（CoT@32）对人类专家89.8%与GPT-4 87.29%、MMMU 59.4%对GPT-4V 56.8%、30/32基准、AlphaCode 2解出43%与第85百分位；宣传视频剪辑争议见CNBC、Engadget 2023-12-08报道。"}
+}

@@ -1,0 +1,54 @@
+{
+ "id": "gated-attention",
+ "who": "Qiu, Wang, Zheng, Huang, Wen, Yang, Men, Yu, Huang, Liu, Zhou 等 · Qwen团队（阿里巴巴）等",
+ "venue": "arXiv 2025",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2505.06708"
+  }
+ ],
+ "problem": "标准softmax注意力的输出是低秩线性映射，且常把大量注意力分到第一个token上（attention sink），影响稳定性和长文本外推。",
+ "idea": "在缩放点积注意力（SDPA）的输出后，给每个注意力头加一个由当前token算出的sigmoid门，逐元素乘上去。",
+ "impact": "一处几乎零成本的改动，同时带来更好的效果、更稳的训练和更少的attention sink，被后续Qwen3-Next采用。",
+ "method": "论文系统比较了30种带门控的注意力变体，在15B参数的混合专家模型（MoE）和1.7B稠密模型上训练3.5万亿token。结论很集中：效果最好的是在SDPA输出之后、输出投影之前，对每个头单独加一个sigmoid门。\n\n具体做法：用当前位置的隐状态经一个线性层得到门值`g = σ(W_g·x)`，再与注意力输出逐元素相乘。作者给出两个解释：一是在原本只是低秩线性映射的“值→输出”路径中插入了非线性；二是门值依赖于查询，且大多接近0，相当于稀疏地调节每个头的输出。这种稀疏性抑制了attention sink，也提高了长上下文外推表现。\n\n摘要还称，该改动能提升训练稳定性、容忍更大的学习率、改善规模扩展性。代码和模型已开源。",
+ "limits": [
+  {
+   "text": "机理解释主要来自消融实验，为什么稀疏门能消除attention sink缺少严格理论。",
+   "solved_by": []
+  },
+  {
+   "text": "门只修补了softmax注意力，平方复杂度的长文本成本没有变化。",
+   "solved_by": [
+    "qwen3-next"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "transformer",
+   "type": "extends",
+   "note": "在原始自注意力的输出端增加门控，修补其低秩线性输出和attention sink。"
+  },
+  {
+   "to": "swiglu",
+   "type": "uses",
+   "note": "借用门控线性单元的思想，把‘门乘以内容’这一模式搬进注意力层。"
+  }
+ ],
+ "prereq": [
+  "self-attention",
+  "gating",
+  "softmax"
+ ],
+ "terms": [
+  {
+   "t": "attention sink",
+   "d": "大量注意力权重集中在序列开头的第一个token上，它自身没有语义，却吸走了很多权重。"
+  }
+ ],
+ "check": {
+  "source": "https://arxiv.org/abs/2505.06708",
+  "confirmed": "标题、作者、v1提交于2025-05-10；摘要中30种变体、15B MoE与1.7B稠密模型、3.5T token、头专属sigmoid门位于SDPA之后。"
+ }
+}

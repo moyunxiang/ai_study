@@ -1,0 +1,37 @@
+{
+  "id": "mar",
+  "who": "Tianhong Li, Yonglong Tian, He Li, Mingyang Deng, Kaiming He · MIT / Google DeepMind / 清华大学",
+  "venue": "NeurIPS 2024 (Spotlight)",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2406.11838"},
+    {"label": "代码 LTH14/mar", "url": "https://github.com/LTH14/mar"}
+  ],
+  "problem": "自回归图像生成一直被认为必须先把图像量化成离散token（才能用softmax交叉熵），而向量量化会丢失细节、训练也不稳定。",
+  "idea": "让自回归Transformer对每个位置只输出一个条件向量z，再用一个小型扩散MLP根据z去生成该位置的连续token；损失换成扩散的去噪损失，彻底不需要码本。",
+  "impact": "ImageNet 256上FID 1.55，自回归模型首次在连续token上达到与最好扩散模型相当的质量，“自回归+扩散头”成为统一多模态模型生成图像的一种常用设计。",
+  "background": "语言模型的成功让人想用同一套“预测下一个token”的方法生成图像。[[dall-e]]、[[vqgan]]、[[maskgit]]、[[llamagen]]都这么做，前提是先用向量量化（见[[c:vector-quantization]]）把图像变成有限码本里的离散编号，这样每个位置的输出就是一个分类问题，可以用[[c:softmax]]加交叉熵训练。\n\n但向量量化是图像质量的瓶颈：码本大小有限，重建总有损失；训练时常有大量码字从不被使用（码本坍塌），需要各种技巧维持。而扩散模型使用连续潜变量（如[[ldm]]的KL自编码器），没有这个问题。作者追问：自回归真的需要离散token吗？“自回归”的本质是按顺序建模条件分布，至于每个位置的分布用什么表示，是可以换的。",
+  "method": "**扩散损失（Diffusion Loss）**：对每个要生成的位置，自回归网络根据已生成的内容输出一个向量z。真正的连续token x（来自LDM的KL-16自编码器，每个位置一个小向量）由一个小型去噪MLP建模：给x加噪得到x_t，让MLP在z的条件下预测噪声，\n\n`L(z, x) = E_{ε,t}‖ε − ε_θ(x_t | t, z)‖²`\n\n梯度同时传回MLP和自回归网络。生成时，MLP用约100步去噪从z采样出该位置的token。默认的MLP只有3个残差块、约2100万参数，相当于给大模型加了一个“连续值的输出层”，取代了softmax。\n\n**掩码自回归（MAR）**：作者还把自回归推广了。传统做法是光栅顺序加因果注意力；MAR借鉴[[maskgit]]，每步以随机顺序同时预测一批位置，网络使用双向注意力，看到所有已知位置。生成一张256×256图默认用64步，每步决定一组token。这仍是自回归（每一步依赖之前生成的结果），但效率高得多。",
+  "results": "ImageNet 256×256类别条件生成，MAR-H（9.43亿参数）加无分类器引导FID 1.55，MAR-L（4.79亿）1.78，MAR-B（2.08亿）2.31。对照实验中，同一MAR模型用离散VQ-16加交叉熵FID为3.69，换成连续KL-16加扩散损失降到1.98。从光栅顺序因果自回归（FID 19.23）到随机顺序因果（13.07）再到随机顺序双向（3.43），每一步都显著提升。生成速度低于0.3秒每张。",
+  "legacy": "扩散头的想法很快进入统一多模态模型：[[transfusion]]在同一个Transformer里结合语言建模和扩散损失，之后的不少理解生成一体化模型（如[[bagel]]、[[blip3-o]]）也采用“语言模型输出条件、扩散模块画图”的结构。同团队后续把MAR扩展到文生图（Fluid），并继续探索不依赖量化的自回归。它与[[var]]、[[llamagen]]一起，构成了2024年“自回归能否追上扩散”的讨论核心。",
+  "limits": [
+    {"text": "每个位置都要跑约100步的小扩散去噪，生成过程仍是迭代式的，采样步数并未真正消除。", "solved_by": []},
+    {"text": "只做了ImageNet类别条件生成，文本条件和与语言模型统一训练尚未验证。", "solved_by": ["transfusion", "bagel"]},
+    {"text": "仍依赖一个预训练的KL自编码器，生成质量受其重建能力和潜空间结构限制。", "solved_by": ["rae"]}
+  ],
+  "relations": [
+    {"to": "maskgit", "type": "extends", "note": "沿用随机顺序、双向注意力的掩码并行生成，并把它解释为广义自回归；输出从离散码本换成连续token。"},
+    {"to": "ddpm", "type": "uses", "note": "每个位置的输出分布用DDPM式的去噪损失建模，取代softmax交叉熵。"},
+    {"to": "vqgan", "type": "solves", "note": "VQ量化是自回归图像模型的质量瓶颈；MAR证明完全不需要码本，FID从3.69降到1.98。"},
+    {"to": "ldm", "type": "uses", "note": "连续token来自LDM代码库的KL-16自编码器。"},
+    {"to": "var", "type": "rivals", "note": "同年的另一种自回归改造，VAR保留离散token、改为由粗到细逐尺度预测；MAR保留逐位置预测、去掉离散化。"},
+    {"to": "llamagen", "type": "rivals", "note": "同月的LlamaGen坚持标准的离散token加光栅顺序自回归，质量落后于MAR。"}
+  ],
+  "prereq": ["autoregressive", "diffusion-process", "vector-quantization", "masked-modeling", "latent-space", "generation-metrics"],
+  "terms": [
+    {"t": "扩散损失（Diffusion Loss）", "d": "用一个小去噪网络建模单个连续token的条件分布，以去噪误差作为训练损失，相当于连续值版本的softmax输出层。"},
+    {"t": "连续token", "d": "不经量化、直接取自自编码器潜变量的实数向量。"},
+    {"t": "广义自回归", "d": "只要每一步的生成依赖之前已生成的内容就算自回归，顺序可以随机，每步也可以生成多个token。"}
+  ],
+  "learn": "先读[[maskgit]]和[[ddpm]]，补[[c:vector-quantization]]和[[c:autoregressive]]。读原文第3节（扩散损失）和第4节（从AR到MAR的推广），以及表1的消融。动手：在MNIST上把一个小的自回归模型的softmax输出层换成扩散MLP头，比较离散和连续两种做法。",
+  "check": {"source": "https://arxiv.org/abs/2406.11838", "confirmed": "标题、5位作者、v1提交于2024-06-17、NeurIPS 2024 Spotlight；正文（arxiv.org/html）中扩散损失公式、MLP 3块约21M、KL-16、MAR-B/L/H参数与FID 2.31/1.78/1.55、VQ交叉熵3.69对扩散损失1.98、19.23/13.07/3.43、64步、100步去噪、0.3秒以内。"}
+}

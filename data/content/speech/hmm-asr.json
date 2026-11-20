@@ -1,0 +1,41 @@
+{
+  "id": "hmm-asr",
+  "who": "Frederick Jelinek · IBM T. J. Watson研究中心（连续语音识别组）",
+  "venue": "Proceedings of the IEEE 64(4), 1976",
+  "links": [
+    {"label": "论文（IEEE）", "url": "https://doi.org/10.1109/PROC.1976.10159"},
+    {"label": "Rabiner：HMM教程（1989）", "url": "https://doi.org/10.1109/5.18626"},
+    {"label": "Juang & Rabiner：语音识别简史（PDF）", "url": "https://web.archive.org/web/20140817193243/http://www.ece.ucsb.edu/Faculty/Rabiner/ece259/Reprints/354_LALI-ASRHistory-final-10-8.pdf"}
+  ],
+  "problem": "ARPA计划里的系统靠人写规则和模板，换人、换任务就得重写；发音的随机变化、词与词的连读，没有一个能从数据中学习的统一框架来处理。",
+  "idea": "把识别看作通信中的解码：找使`P(W)·P(A|W)`最大的词序列W。`P(W)`由统计语言模型给出，`P(A|W)`由一串隐马尔可夫模型给出，两者的参数都从数据中估计，再用搜索算法找最优解。",
+  "impact": "确立了“声学模型+语言模型+解码搜索”的统计语音识别框架，此后三十多年几乎所有识别系统都按这个分工搭建，深度学习最初也只是替换了其中的声学模型。",
+  "background": "1970年代初，语音识别主要有两条路。一条是[[arpa-sur]]资助的知识工程路线：Hearsay、HWIM等系统让语音学、词汇、句法、语义规则互相协作，[[harpy]]则把规则编译成网络再搜索。规则都由人写，系统无法从更多录音中自动变好。\n\nJelinek原是康奈尔大学的信息论学者，1972年进入IBM领导连续语音识别组。当时自[[alpac]]报告和乔姆斯基形式语言学兴起以来，统计方法在语言研究中已经很不流行。他的组把语音识别当成一个有噪信道问题：说话人心里想的是词序列W，经过发音器官和声学处理，机器收到的是一串声学观测A，任务是从A反推W。同一时期，CMU的Baker在[[dragon-1975]]中独立走了类似的路。",
+  "method": "**基本公式**。按[[c:conditional-bayes]]：\n\n`Ŵ = argmax_W P(W|A) = argmax_W P(W) · P(A|W)`\n\n`P(A)`与W无关，可以略去。于是问题拆成三块，论文对应地讨论了“说话人的模型”“声学处理器的模型”“参数的统计估计”和“语言解码中的假设搜索与似然计算”。\n\n**语言模型 P(W)**。描述什么样的词序列更常见。按[[shannon-ngram]]的马尔可夫思路，把句子的概率分解成每个词在前几个词条件下的概率连乘，例如三元模型`P(wᵢ | wᵢ₋₂, wᵢ₋₁)`，用文本计数估计（见[[c:n-gram]]）。\n\n**声学模型 P(A|W)**。每个词按发音拆成音素，每个音素用一个从左到右的小[[c:hmm-concept]]表示：状态之间的跳转概率刻画发音的长短快慢，每个状态的输出分布刻画这一段的声学特征。把词序列对应的音素HMM首尾相接，就得到整句的模型，其概率可以用前向算法算出。所有参数用[[baum-welch]]从录音加文字转写中自动训练，不需要人工标出每个音素的边界。\n\n**解码**。在所有可能的W中搜索最优解。词序列的组合数随长度指数增长，需要用[[viterbi]]式动态规划或启发式的栈搜索，只展开有希望的假设。\n\n语言模型的作用可以用一个英语老例子说明：“recognize speech”和“wreck a nice beach”发音几乎相同，声学模型分不出来，但前者在文本中常见得多，`P(W)`会让它胜出。",
+  "results": "论文给出的实验结果表明了这些方法的有效性（摘要语）。按Wikipedia记载，IBM沿这条路线在1980年代中期做出了Tangora语音打字机，词表达到2万词，但需要针对每位用户训练。Juang & Rabiner的综述指出，HMM在1980年代取代了[[dtw]]模板匹配，成为语音识别的主导方法。",
+  "legacy": "这套框架在之后三十多年里只有部件在换：输出分布从离散分布变成高斯混合，单音素变成上下文相关并做[[tied-state]]，语言模型加入[[katz-backoff]]平滑，训练目标加入[[mmi-training]]等区分性准则，解码器用[[wfst]]统一编译，工具链由[[htk]]和[[kaldi]]提供。[[cd-dnn-hmm]]和[[dnn-hmm]]用深度网络替换了高斯混合，但HMM、语言模型和解码器都保留了下来。直到[[ctc]]、[[rnn-t]]和注意力模型出现，端到端模型才开始把三块合成一个网络。\n\n“声学模型×语言模型”的有噪信道思路还被IBM原样搬到了机器翻译，催生了[[ibm-models]]。",
+  "pitfalls": "- HMM并不认为语音真的是马尔可夫过程，它只是一个计算上可行、能从数据学习的近似。语言学家当时就批评它太简单，它的胜出靠的是能用数据训练和评测。\n- HMM用于语音识别并非IBM独创：CMU的Baker夫妇几乎同时独立提出，背后的数学来自IDA的Baum等人。",
+  "limits": [
+    {"text": "参数按最大似然训练，只追求训练数据似然最高，并不直接最小化识别错误。", "solved_by": ["mmi-training", "mpe", "lf-mmi"]},
+    {"text": "上下文无关的音素模型忽略了协同发音，而细分到三音子后大多数单元训练数据不足。", "solved_by": ["tied-state", "sphinx"]},
+    {"text": "系统依赖特定说话人训练，换人效果大幅下降。", "solved_by": ["sphinx", "mllr"]},
+    {"text": "假设每帧观测在给定状态时彼此独立，输出分布也表达力有限，难以利用相邻多帧的信息。", "solved_by": ["hybrid-nn-hmm", "cd-dnn-hmm"]},
+    {"text": "n-gram计数在大词表下极其稀疏，大量合理的词组合在训练文本中从未出现。", "solved_by": ["katz-backoff", "rnnlm"]}
+  ],
+  "relations": [
+    {"to": "shannon-ngram", "type": "uses", "note": "语言模型直接用香农的马尔可夫/n-gram思路，有噪信道的整体框架也来自信息论。"},
+    {"to": "baum-welch", "type": "uses", "note": "用前向-后向重估从未切分的录音中自动训练所有HMM参数。"},
+    {"to": "viterbi", "type": "uses", "note": "解码时在状态-时间网格上做动态规划找最可能的路径。"},
+    {"to": "dragon-1975", "type": "rivals", "note": "CMU的Baker几乎同时独立地把HMM用于连续语音识别；两条线最终汇合成同一个统计框架。"},
+    {"to": "harpy", "type": "rivals", "note": "同年的Harpy把人工语法编译成无概率网络；统计路线可以从数据中学习，1980年代后完全胜出。"},
+    {"to": "arpa-sur", "type": "solves", "note": "解决了ARPA计划中知识工程系统规则靠人写、无法从数据中改进的问题。"}
+  ],
+  "prereq": ["conditional-bayes", "hmm-concept", "markov-chain", "n-gram", "phoneme-acoustic", "mle", "dynamic-programming"],
+  "terms": [
+    {"t": "有噪信道模型", "d": "把观测到的信号看成原始消息经过一个会出错的信道的输出，识别就是根据信道特性和消息的先验概率，反推最可能的原始消息。"},
+    {"t": "声学模型", "d": "给定词序列时，产生这段声学观测的概率模型，即P(A|W)。"},
+    {"t": "语言模型", "d": "给任意词序列打一个先验概率P(W)，表示它作为一句话有多常见。"}
+  ],
+  "learn": "先补[[c:conditional-bayes]]、[[c:markov-chain]]和[[c:hmm-concept]]，再读[[hmm-tutorial]]第I–III节和第VI节（连接词识别）。有了这些，再看[[c:phoneme-acoustic]]理解三块的分工。动手：用hmmlearn给几个孤立词各训练一个HMM，用MFCC做观测，再加一个简单的二元语言模型，体验P(W)如何纠正声学上的混淆。",
+  "check": {"source": "https://api.openalex.org/works/doi:10.1109/PROC.1976.10159", "confirmed": "OpenAlex与Crossref：标题Continuous speech recognition by statistical methods，单作者F. Jelinek，Proceedings of the IEEE 64卷4期532–556页，1976；摘要列出的四部分内容（说话人模型、声学处理器模型、参数估计、假设搜索与似然计算）。Jelinek 1972年进入IBM并领导连续语音识别组见Wikipedia Frederick Jelinek条目；Tangora 2万词、HMM取代DTW见Wikipedia Speech recognition条目与Juang & Rabiner简史。正文中未引用论文内的具体实验数字。"}
+}

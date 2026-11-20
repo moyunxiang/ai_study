@@ -1,0 +1,39 @@
+{
+  "id": "lsa",
+  "who": "Scott Deerwester, Susan T. Dumais, George W. Furnas, Thomas K. Landauer, Richard Harshman · 芝加哥大学 / Bellcore / 西安大略大学",
+  "venue": "Journal of the American Society for Information Science, Vol. 41, No. 6, pp. 391–407, 1990-09",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1002/(SICI)1097-4571(199009)41:6%3C391::AID-ASI1%3E3.0.CO;2-9"},
+    {"label": "预印本PDF（科罗拉多大学LSA组）", "url": "http://wordvec.colorado.edu/papers/Deerwester_1990.pdf"},
+    {"label": "Wikipedia: Latent semantic analysis", "url": "https://en.wikipedia.org/wiki/Latent_semantic_analysis"}
+  ],
+  "problem": "关键词检索只认字面：查“human computer interaction”，写着“user interface”的相关文档一个词都对不上，就找不到。人工叙词表成本高，还会把多义词带偏。",
+  "idea": "把“词×文档”计数矩阵做奇异值分解，只保留最大的约100个维度。经常出现在相同文档里的词会落到相近的方向，于是没有共同词的查询和文档也能变得相似。",
+  "impact": "第一次从原始文本中自动学出稠密的词向量和文档向量，把“分布相似即语义相近”变成一行线性代数；它是主题模型、GloVe和稠密检索的直接前身。",
+  "background": "[[vector-space-model]]把文档表示成以词为坐标的向量，按余弦相似度检索。但每个词是一个独立、互相正交的维度，造成两个问题：\n\n- **同义**：同一个东西有很多说法，论文引用的研究显示，不同的人为同一常见物体选同一个关键词的概率不到20%。查询和文档用词不同，就检索不到，查全率低。\n- **多义**：一个词有多个意思，字面相同不代表主题相同，查准率低。\n\n已有的补救办法是人工或自动构造叙词表扩展查询，但扩展词又会引入新的歧义。[[harris-distributional]]早就指出词义与它出现的环境相关，问题是怎样从语料中自动、大规模地把这种关联算出来。",
+  "method": "**构造矩阵**。X是t×d的矩阵，第i行第j列是词i在文档j中出现的次数（实验中也可加权）。\n\n**奇异值分解**（见[[c:eigen-svd]]）。任何矩阵都可写成 `X = T₀ S₀ D₀ᵀ`，T₀、D₀的列是正交单位向量，S₀是从大到小排列的奇异值。只保留最大的k个奇异值及对应的列，得到 `X̂ = T S Dᵀ`，它是所有秩为k的矩阵里最接近X的一个（见[[c:low-rank]]）。T的每一行就是一个词的k维向量，D的每一行是一个文档的k维向量。k取50到100左右：太小丢信息，太大又退回到逐词匹配。\n\n**为什么能解决同义**。压缩维度时，模型必须用少数几个方向去解释全部共现。“user”“interface”“system”常和“computer”一起出现在人机交互文档里，就会被挤到同一个方向上；于是即便两个文档没有共同词，只要它们的词各自与同一批词共现，在k维空间里也会靠近。\n\n**查询**。把查询当作一篇“伪文档”：取其词的计数向量，用 `X_qᵀ T S⁻¹` 投影到k维空间，再与每个文档向量算余弦，超过阈值的返回。\n\n**例子**。论文用9个技术备忘录标题：5篇关于人机交互，4篇关于图论。查询“human computer interaction”，字面匹配只能找到c1、c2、c4；在二维LSA空间中，与查询余弦大于0.9的恰好是全部5篇人机交互文档，其中c3、c5与查询没有任何共同词。",
+  "results": "**MED**（1033篇医学摘要、30个查询、5823个词）：100维LSA的平均查准率0.51，直接词匹配0.45，提升13%；从很少的维数增加到100维左右，平均查准率从0.25升到0.52，翻了一倍多。**CISI**（1460篇、35个查询）：所有方法都很差，LSA与词匹配同为0.11，反而不如做了词干化的SMART。作者坦言LSA主要改善同义问题（查全率），对多义问题（查准率）帮助有限。",
+  "legacy": "LSA很快被用到认知科学（Landauer用它模拟词汇习得）和作文自动评分上。它缺少概率解释，[[plsa]]和[[lda]]把同样的“文档-主题-词”分解改写成概率生成模型。神经词向量出现后，[[glove]]明确把自己定位为“LSA式全局矩阵分解”与[[word2vec]]式局部窗口预测的结合；[[levy-goldberg-pmi]]证明word2vec本质上也在分解一个共现矩阵。检索方面，[[dssm]]用神经网络取代SVD学习查询与文档的低维表示，[[dpr]]把“稠密向量检索”变成了今天的主流。",
+  "pitfalls": "- “潜在语义”只是低秩分解的维度，不对应可以命名的概念，论文作者明确说不尝试解释或旋转这些维度。\n- LSA对多义词基本无能为力：每个词只有一个向量，bank的两个意思被平均在一起。\n- 维度k没有理论最优值，论文的100维是按实验效果挑的。",
+  "limits": [
+    {"text": "每个词只有一个固定向量，多义词的不同含义被混在一起，对查准率帮助很小。", "solved_by": ["elmo", "bert"]},
+    {"text": "线性代数分解没有概率含义，向量有负值、难以解释，也无法自然地给出“文档属于哪些主题”。", "solved_by": ["plsa", "lda"]},
+    {"text": "对巨大的词×文档矩阵做SVD代价高，新文档只能近似“折叠”进来，语料一变就要重算。", "solved_by": ["word2vec", "glove"]},
+    {"text": "只利用“是否在同一文档中出现”，忽略词序和局部窗口信息，在难的集合（CISI）上不比关键词匹配好。", "solved_by": ["word2vec", "dssm"]}
+  ],
+  "relations": [
+    {"to": "vector-space-model", "type": "solves", "note": "向量空间模型里每个词是独立正交的维度、同义词完全不相关；LSA把词和文档投影到共享的低维空间，让无共同词的相关文档也能被检索到。"},
+    {"to": "harris-distributional", "type": "extends", "note": "第一次把“意义差异与分布差异相关”变成可在上千篇文档上自动计算的向量表示。"},
+    {"to": "pca", "type": "uses", "note": "核心工具是与PCA同源的奇异值分解：保留最大的若干个奇异值，就是最优的低秩近似。"},
+    {"to": "tf-idf", "type": "rivals", "note": "TF-IDF通过调整权重改善逐词匹配，LSA则直接换掉了“逐词匹配”本身；但在CISI上二者效果相同，后来的系统常把两者结合。"},
+    {"to": "k-means", "type": "rivals", "note": "同期解决同义问题的另一条路是文档聚类，只能给出离散的类别；LSA给出连续的多维表示，词和文档也在同一空间里。"}
+  ],
+  "prereq": ["eigen-svd", "low-rank", "dimensionality-reduction", "dot-product", "vector-matrix", "distributional-hypothesis"],
+  "terms": [
+    {"t": "词-文档矩阵", "d": "行是词、列是文档、元素是词在文档中出现次数（或其加权值）的大矩阵，通常非常稀疏。"},
+    {"t": "伪文档（pseudo-document）", "d": "把查询当成一篇很短的文档，用同样的方式投影到低维空间，以便和真文档直接比较。"},
+    {"t": "同义与多义（synonymy / polysemy）", "d": "前者是多个词表达同一意思，导致漏检；后者是一个词有多个意思，导致误检。"}
+  ],
+  "learn": "先补[[c:eigen-svd]]和[[c:low-rank]]。读原文第4.1节的9篇标题例子和第4.2节的公式。动手：用numpy把论文表2的12×9矩阵做SVD，取k=2画出词和文档的位置，验证c3、c5靠近查询；再用scikit-learn的TruncatedSVD在20 Newsgroups上做LSA，比较k=10、100、500时近义词检索的效果。",
+  "check": {"source": "http://wordvec.colorado.edu/papers/Deerwester_1990.pdf", "confirmed": "Crossref确认JASIS 41(6):391–407，1990-09，五位作者；预印本中“ca 100 orthogonal factors”、同一物体选同一关键词少于20%、9篇技术备忘录例子及余弦0.9、X=T₀S₀D₀′；MED 1033篇/30查询/5823词、.51 vs .45即13%提升、.25到.52；CISI 1460篇/35查询、均为.11、SMART更好；LSI主要解决同义而非多义。"}
+}

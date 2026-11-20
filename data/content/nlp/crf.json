@@ -1,0 +1,40 @@
+{
+  "id": "crf",
+  "who": "John Lafferty, Andrew McCallum, Fernando Pereira · 卡内基梅隆大学 / WhizBang! Labs / 宾夕法尼亚大学",
+  "venue": "ICML 2001",
+  "links": [
+    {"label": "论文PDF（哥伦比亚大学课程镜像）", "url": "https://www.cs.columbia.edu/~jebara/6772/papers/crf.pdf"},
+    {"label": "Sutton & McCallum：An Introduction to Conditional Random Fields", "url": "https://arxiv.org/abs/1011.4088"},
+    {"label": "Wikipedia: Conditional random field", "url": "https://en.wikipedia.org/wiki/Conditional_random_field"}
+  ],
+  "problem": "序列标注里，HMM是生成式模型，很难加入“首字母大写”“以-ing结尾”这类重叠特征；MEMM能加特征，但每一步在局部归一化，会出现“标签偏置”：后继选择少的状态几乎无视观测。",
+  "idea": "不再为每一步单独归一化，而是为整个标签序列定义一个对数线性分数，只在全体可能序列上归一化一次：`p(y|x) = exp(Σ 特征权重) / Z(x)`，用前向-后向算法高效计算Z(x)和梯度。",
+  "impact": "成为2000年代序列标注（分词、词性、命名实体、信息抽取）的标准模型；神经网络时代又作为BiLSTM等编码器上面的输出层继续使用。",
+  "background": "序列标注要给一串观测（词）配一串标签（词性、实体类型）。[[church-tagger]]那样的HMM对“词和标签”的联合概率建模，必须假设每个词只依赖当前标签，所以很难同时使用大小写、后缀、前后词这类相互重叠的特征。\n\n[[maxent-nlp]]的对数线性模型可以随意加特征。[[memm]]把它串成序列：每个状态用一个最大熵分类器给出“下一个状态”的条件分布。但正因为每个状态的出边概率要归一化到1，从某个状态流出的概率总量是固定的，观测只能决定“怎么分”，不能决定“分多少”。只有一条出边的状态会把全部概率传下去，不管观测是什么——这就是**标签偏置**。",
+  "method": "**标签偏置的例子**。一个识别rib和rob的有限状态机：开头看到r，两条路径各分一半；接下来不论看到i还是o，每条路径上的状态都只有一条出边，只能把概率原样传下去。结果哪个词在训练集里稍多一点，就永远赢，观测被忽略。\n\n**线性链CRF**。对输入x和整个标签序列y定义\n\n`p(y | x) = (1/Z(x)) · exp( Σ_t Σ_k λ_k f_k(y_{t−1}, y_t, x, t) )`\n\n特征f可以是“当前标签是名词且当前词以-tion结尾”“前一个标签是限定词且当前标签是名词”等任意函数，且可以看整句的任何位置。关键在Z(x)：它是对**所有可能标签序列**的指数分数求和，而不是每一步各自归一化。于是一个位置的强证据可以压过其他位置，标签偏置随之消失。\n\n**计算**。标签序列的数量随长度指数增长，但分数可以按相邻标签分解，所以Z(x)和每个位置的边缘概率可以用前向-后向（[[c:dynamic-programming]]）在 `O(长度 × 标签数²)` 内算出；预测时用Viterbi找最优序列。\n\n**训练**。最大化条件对数似然，它是参数的凹函数，有唯一全局最优。论文给出两种迭代尺度算法，每一轮都需对每个训练句做一次前向-后向。",
+  "results": "合成数据上，按rib/rob结构生成的带噪数据，CRF错误率4.6%，MEMM为42%。在Penn Treebank 45类词性标注上（110万词语料一半训练一半测试），只用词-标签和标签-标签特征时：HMM 5.69%，MEMM 6.37%，CRF 5.55%；加入大小写、连字符、后缀等拼写特征后，MEMM降到4.81%，CRF降到4.27%，未登录词错误率从HMM的45.99%降到23.76%。训练很慢：从零初始化2000轮仍未收敛，用MEMM参数初始化后需1000轮。",
+  "legacy": "CRF迅速成为信息抽取和序列标注的主力：[[conll-2003]]命名实体评测、[[chinese-segmentation-tagging]]中的中文分词都大量使用它。[[structured-perceptron]]提出了更简单、更快的训练方式，在同类任务上效果相当。\n\n神经网络出现后，人们保留了CRF的“整句归一化 + 标签转移”部分，用网络自动学出的特征替代手写特征：[[collobert-weston]]的句子级训练、[[bilstm-crf]]和[[lample-ner]]都是“神经编码器 + CRF输出层”。预训练模型（[[bert]]）普及后，逐位置softmax往往已足够，CRF层的增益变小，但在需要严格标签约束的场景仍在使用。",
+  "pitfalls": "- 标签偏置不是“所有判别模型”的问题，而是**逐状态局部归一化**带来的问题；CRF也是判别模型，但做全局归一化。\n- 论文实验里HMM在不加特征时反而比MEMM好，CRF的优势主要体现在能和MEMM一样加特征、又没有标签偏置。\n- CRF的训练和推断都要前向-后向或Viterbi，标签数多（如几百类）时计算量是标签数的平方。",
+  "limits": [
+    {"text": "训练要对每个句子反复做前向-后向，迭代尺度法收敛很慢，论文中需上千轮迭代。", "solved_by": ["structured-perceptron"]},
+    {"text": "特征仍需人工设计（后缀、大小写、词典等），换任务、换语言就要重新做特征工程。", "solved_by": ["collobert-weston", "bilstm-crf", "lample-ner"]},
+    {"text": "线性链只建模相邻标签之间的依赖，更远的标签约束要用高阶CRF，计算量随阶数指数增长。", "solved_by": ["bilstm-crf", "bert"]},
+    {"text": "需要大量逐词完整标注的训练序列。", "solved_by": ["bert"]}
+  ],
+  "relations": [
+    {"to": "memm", "type": "solves", "note": "MEMM逐状态归一化导致标签偏置；CRF改为在整个标签序列上归一化，合成数据上错误率从42%降到4.6%。"},
+    {"to": "church-tagger", "type": "solves", "note": "HMM式生成模型难以加入重叠特征；CRF作为条件模型可使用任意观测特征，词性标注未登录词错误率大幅下降。"},
+    {"to": "maxent-nlp", "type": "extends", "note": "把最大熵/对数线性模型从单个决策推广到整个序列，特征与权重的形式完全相同。"},
+    {"to": "penn-treebank", "type": "uses", "note": "在Penn Treebank的45类词性标注上与HMM、MEMM对比。"},
+    {"to": "bayes-net", "type": "rivals", "note": "HMM、MEMM是有向图模型；CRF是无向图（马尔可夫随机场）模型，只对条件分布建模，从而避开了有向模型的局部归一化。"},
+    {"to": "viterbi", "type": "uses", "note": "预测时沿用Viterbi动态规划寻找得分最高的标签序列，训练用同类的前向-后向算法。"}
+  ],
+  "prereq": ["graphical-model", "logistic-regression", "dynamic-programming", "hmm-concept", "mle", "discriminative-generative", "convexity"],
+  "terms": [
+    {"t": "标签偏置（label bias）", "d": "局部归一化的序列模型中，后继状态少的状态会把概率几乎原样传下去，导致观测对路径选择几乎不起作用。"},
+    {"t": "全局归一化", "d": "只在“所有可能的完整标签序列”上做一次归一化，而不是每一步分别归一化，使各位置的证据可以互相权衡。"},
+    {"t": "前向-后向算法", "d": "利用分数可按相邻位置分解的性质，用动态规划求所有路径分数之和以及每个位置取各标签的边缘概率。"}
+  ],
+  "learn": "先补[[c:hmm-concept]]、[[c:logistic-regression]]和[[c:graphical-model]]。读原文第2节（rib/rob的标签偏置例子）和第3节（CRF定义），再读Sutton与McCallum的教程第2–4章看前向-后向的推导。动手：用sklearn-crfsuite在CoNLL-2003上做命名实体识别，先只用词本身作特征，再加入大小写、后缀、前后词，观察F1的变化。",
+  "check": {"source": "https://www.cs.columbia.edu/~jebara/6772/papers/crf.pdf", "confirmed": "原文PDF：标题、三位作者与单位；标签偏置rib/rob例子；全局归一化的定义；合成数据CRF 4.6% vs MEMM 42%；Penn Treebank 45类、110万词50/50划分；HMM 5.69%/45.99%、MEMM 6.37%/54.61%、CRF 5.55%/48.05%、MEMM+ 4.81%/26.99%、CRF+ 4.27%/23.76%；拼写特征使错误率降约25%、OOV降约50%；MEMM+约100轮、CRF+ 1000轮、均匀初始化2000轮未收敛。发表于ICML 2001为通行信息，PDF本身未印会议名。"}
+}

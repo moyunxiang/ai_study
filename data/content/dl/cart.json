@@ -1,0 +1,38 @@
+{
+  "id": "cart",
+  "who": "Leo Breiman, Jerome Friedman, Richard Olshen, Charles Stone · 加州大学伯克利分校 / 斯坦福大学",
+  "venue": "Wadsworth 1984（专著）",
+  "links": [
+    {"label": "专著（Routledge再版DOI）", "url": "https://doi.org/10.1201/9781315139470"},
+    {"label": "scikit-learn：决策树（CART实现与剪枝）", "url": "https://scikit-learn.org/stable/modules/tree.html"},
+    {"label": "Wikipedia: Decision tree learning", "url": "https://en.wikipedia.org/wiki/Decision_tree_learning"}
+  ],
+  "problem": "线性模型假设特征与结果是简单的加权关系，碰到交互、阈值和混合类型的变量就失灵；而一棵树长得越深越会把训练数据背下来。",
+  "idea": "反复挑一个特征和阈值把数据一分为二，让每一边尽量“纯”；先长一棵大树，再用代价-复杂度剪枝和交叉验证剪回合适的大小。分类和回归用同一套框架。",
+  "impact": "给出了至今仍在用的决策树标准算法；它是随机森林、梯度提升和XGBoost的基本部件，表格数据上的树模型从这里开始。",
+  "background": "1970年代的统计建模以[[logistic-regression]]和线性回归为主：要求分析者事先决定用哪些变量、怎样组合，交互作用要手动加。非参数方法如[[knn]]不需要这些假设，但给不出可解释的规则，变量一多就失效。另一边，[[expert-systems]]用人写的if-then规则做决策，规则要靠专家一条条口述。\n\n决策树的想法——用一连串是非问题把样本分组——在1960–70年代已有若干版本，但普遍有两个毛病：什么时候停止分裂全凭经验阈值，停早了欠拟合，停晚了过拟合；而且大多只做分类。",
+  "method": "**二叉分裂**。在每个节点，枚举每个特征和每个可能的阈值（如“年龄 ≤ 62.5？”），把样本分成左右两组，选让子节点“不纯度”下降最多的那一个。\n\n**分类用Gini不纯度**。若某节点里各类的比例为`p_k`，则`Gini = 1 − Σ_k p_k²`。全是一类时为0；两类各半时为0.5。例如一个节点有8个正例2个反例，`Gini = 1 − 0.8² − 0.2² = 0.32`；若某个分裂得到纯净的左右两边，不纯度就降到0。\n\n**回归用方差下降**。叶子的预测值是其中样本的平均数，分裂标准是让子节点内的平方误差之和最小。\n\n**先长大，再剪枝**。不靠“不纯度降不动就停”这种早停规则，而是先长一棵很大的树，再定义代价-复杂度`R_α(T) = R(T) + α·|T̃|`：`R(T)`是训练误差，`|T̃|`是叶子数，α是每多一片叶子的罚款。α从0增大时，依次剪掉“最弱的一环”，得到一串越来越小的子树；再用[[cross-validation]]从中挑测试误差最小的那棵。\n\n**实用细节**。数值与类别特征都能处理，不需要标准化；用“替代分裂”处理缺失值；每个叶子对应一条可读的if-then规则。",
+  "results": "这是一本专著而非单篇论文。书中用多个真实数据集（包括质谱分类等）展示了方法，并系统讨论了分裂准则、剪枝和误差估计。它的剪枝思路成为标准做法：今天scikit-learn的决策树就是优化版CART，参数`ccp_alpha`即上式中的α。同期Quinlan的ID3（1986）走信息增益、多叉分裂的路线，后来演变成C4.5。",
+  "legacy": "单棵树的最大问题是不稳定，Breiman本人后来给出的解法是“种很多棵”：[[bagging]]（1996）在自助采样上训练多棵树取平均，[[random-forest]]（2001）再加上随机选特征；Friedman则走另一条路，[[gradient-boosting]]让每棵新树去拟合前面的残差，后来的[[xgboost]]把它工程化。直到今天，在中小规模的表格数据上，基于CART的树集成仍常常胜过神经网络。[[esl-book]]把这些方法整理成教材，[[two-cultures]]则是Breiman对“算法建模”路线的总结。",
+  "pitfalls": "- 决策树的“可解释”只对浅树成立；一棵几百片叶子的树和黑箱差不多。\n- 树的特征重要性（按不纯度下降累计）偏向取值多的特征，不能直接当因果解释。\n- 找全局最优的树是NP完全问题，CART的逐层贪心不保证最优。",
+  "limits": [
+    {"text": "方差大：训练数据稍有变化，树的结构就可能完全不同，单棵树的预测不稳定。", "solved_by": ["bagging", "random-forest"]},
+    {"text": "逐层贪心、只按单个特征做与坐标轴平行的切分，单棵树的精度明显低于后来的集成方法。", "solved_by": ["gradient-boosting", "xgboost"]},
+    {"text": "预测是分段常数，没有平滑性，也不能外推到训练数据范围之外。", "solved_by": []},
+    {"text": "只能在人给定的特征上切分，无法从像素、声音、文字这类原始高维输入中自己学特征。", "solved_by": ["alexnet"]}
+  ],
+  "relations": [
+    {"to": "cross-validation", "type": "uses", "note": "剪枝得到一串子树后，用交叉验证估计每棵的测试误差来选择最终的树。"},
+    {"to": "logistic-regression", "type": "rivals", "note": "逻辑回归是参数化的线性模型，需要人工设定交互项；CART自动发现阈值和交互，但预测不平滑、方差大。"},
+    {"to": "knn", "type": "rivals", "note": "同为非参数方法，k近邻只记住样本、不给规则；CART把空间切成长方块并给出可读规则，对无关特征也更稳健。"},
+    {"to": "expert-systems", "type": "rivals", "note": "专家系统的if-then规则由人写；CART从数据里自动归纳出同样形式的规则。"}
+  ],
+  "prereq": ["decision-tree", "supervised-learning", "generalization", "train-val-test", "entropy"],
+  "terms": [
+    {"t": "不纯度", "d": "衡量一个节点里样本类别有多混杂的指标。全是同一类时为0，越混越大；Gini和熵是两种常用度量。"},
+    {"t": "代价-复杂度剪枝", "d": "在训练误差上加一项“叶子数 × α”的惩罚，α越大树越小；配合交叉验证选α，是CART控制过拟合的核心。"},
+    {"t": "替代分裂", "d": "为每个分裂找几个效果相近的备用特征，主特征缺失时就按备用特征走，从而处理缺失值。"}
+  ],
+  "learn": "先补[[c:decision-tree]]和[[c:generalization]]。读[[esl-book]]第9.2节，再读scikit-learn文档中决策树与最小代价-复杂度剪枝两节。动手：在一个小表格数据集上用`DecisionTreeClassifier`画出`ccp_alpha`与训练、验证准确率的曲线，然后用不同随机种子重采样训练集，观察树结构变化有多大——这会让你理解为什么要有随机森林。",
+  "check": {"source": "https://scikit-learn.org/stable/modules/tree.html", "confirmed": "CART原始文献为Breiman, Friedman, Olshen, Stone, Classification and Regression Trees, Wadsworth, Belmont, CA, 1984；代价-复杂度公式R_α(T)=R(T)+α|T̃|与sklearn采用优化版CART、ID3为1986年。Gini公式、方差下降、贪心NP完全与不稳定性核对自 https://en.wikipedia.org/wiki/Decision_tree_learning ；Crossref确认Routledge再版及“Mass Spectra Classification”章节。"}
+}

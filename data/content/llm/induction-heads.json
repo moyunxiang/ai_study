@@ -1,0 +1,108 @@
+{
+  "id": "induction-heads",
+  "who": "Catherine Olsson, Nelson Elhage, Neel Nanda, Nicholas Joseph, Nova DasSarma, Tom Henighan, Ben Mann, Amanda Askell et al.（通讯作者Chris Olah） · Anthropic",
+  "venue": "Transformer Circuits Thread 2022",
+  "links": [
+    {
+      "label": "Transformer Circuits原文",
+      "url": "https://transformer-circuits.pub/2022/in-context-learning-and-induction-heads/index.html"
+    },
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2209.11895"
+    }
+  ],
+  "problem": "大模型能在上下文里“现学现用”，但没人知道网络内部是哪种计算在做这件事；行为实验只能描述现象，不能指出机制。",
+  "idea": "找到一种由两层注意力头组合成的简单电路——归纳头，它实现“前面出现过[A][B]，现在又看到[A]，就预测[B]”；再用六类证据论证它是上下文学习的主要来源。",
+  "impact": "训练早期有一个短暂窗口，归纳头和上下文学习能力同时突然出现，损失曲线上可见一个小鼓包；这是机制可解释性第一次把一个具体电路和大模型的一项通用能力联系起来。",
+  "background": "[[gpt-3]]让“上下文学习”（见[[c:in-context-learning]]）广为人知，但它为什么存在一直是个谜。同期[[icl-demonstrations]]等从行为上研究它；Anthropic的团队则沿用[[circuits]]的思路，把网络拆成可理解的电路。几个月前的[[transformer-circuits]]在只有注意力层、两层的小模型里发现了一种特殊的头组合，命名为归纳头。本文要回答：这种小模型里的电路，与大模型的上下文学习有什么关系？\n\n这里的上下文学习定义更宽：模型越往后读、预测越准，就算。",
+  "method": "**归纳头怎么工作**。设文本里出现过「…Mr Dursley…」，现在又读到「Mr」。归纳头要预测下一个词是「Dursley」，需要两个头配合：\n\n- 前一层的**前缀头**把“我前面那个词是什么”的信息写进每个位置的表示里，于是「Dursley」所在位置记着“我前面是Mr”；\n- 后一层的**归纳头**用当前词「Mr」作查询，去找“前面是Mr”的位置（前缀匹配），注意到「Dursley」并把它复制到输出（复制）。\n\n“看哪里”取决于另一个位置的前一个词，单个头做不到，必须跨层组合（K-composition），所以一层模型里没有归纳头。\n\n**度量**。上下文学习分数 = 第500个token的损失减去第50个token的损失，在数据上取平均；归纳头用“在随机重复序列上的前缀匹配分数”识别。\n\n**六类证据**：\n\n- 同时出现：训练过程中两者在同一窗口突然形成；\n- 同时移动：改动结构让归纳头更早形成，上下文学习的跃升也精确地提前；\n- 直接消融：在小模型测试时删掉归纳头，上下文学习大幅下降；\n- 泛化实例：大模型里同一批头也做更抽象的“找相似、按类比补全”，即 `[A*][B*]…[A] → [B]`；\n- 机制上说得通：小模型中能完整解释其计算；\n- 从小到大连续：从两层模型到130亿参数模型，相关现象平滑一致。",
+  "results": "在多种尺寸的模型中，上下文学习都在训练早期约25亿到50亿token之间的窄窗口里突然形成：之前不到0.15 nats，之后约0.4 nats，并在此后的训练中、在各种模型尺寸上大致保持不变；只有一层的模型始终没有形成。同一窗口里，归纳头出现，训练损失曲线上出现一个肉眼可见的鼓包。对小型纯注意力模型，作者给出了因果证据；对带MLP的大模型，证据是相关性的。",
+  "legacy": "归纳头成为机制可解释性的标准例子。随后的研究从另一个角度解释上下文学习：[[icl-gradient-descent]]认为注意力层能在前向计算中执行类似梯度下降的更新。为了看懂大模型中混在一起的MLP特征，Anthropic转向[[superposition]]和[[monosemanticity]]，最终在生产级模型上做出电路追踪（[[circuit-tracing]]）。",
+  "pitfalls": "- 本文对大模型的结论是相关性证据，作者明确称之为“初步、间接”的；并没有证明大模型里的全部上下文学习都来自归纳头。\n- 这里的“上下文学习”是“越往后预测越准”，比少样本提示的含义宽。",
+  "limits": [
+    {
+      "text": "对带MLP的大模型只有相关性证据，可能存在同时导致两者的共同原因，无法排除其他机制。",
+      "solved_by": [
+        "circuit-tracing"
+      ]
+    },
+    {
+      "text": "主要解释了复制和类比补全式的上下文学习，模型如何从示例中学到一个新的输入-输出映射没有覆盖。",
+      "solved_by": [
+        "icl-function-classes",
+        "icl-gradient-descent"
+      ]
+    },
+    {
+      "text": "分析集中在注意力头，MLP层里的特征彼此叠加、难以逐个解释，大模型的完整电路仍看不清。",
+      "solved_by": [
+        "superposition",
+        "monosemanticity"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "transformer-circuits",
+      "type": "extends",
+      "note": "前作在两层纯注意力模型里发现了归纳头；本文把它与大模型的上下文学习联系起来，并定义了可在任意模型上测量的分数。"
+    },
+    {
+      "to": "gpt-3",
+      "type": "uses",
+      "note": "以GPT-3带火的上下文学习现象为解释对象。"
+    },
+    {
+      "to": "circuits",
+      "type": "extends",
+      "note": "沿用“把网络逆向工程成可理解电路”的研究纲领，从视觉模型搬到Transformer语言模型。"
+    },
+    {
+      "to": "icl-demonstrations",
+      "type": "rivals",
+      "note": "同期从行为上解释上下文学习（示例提供格式和分布）；本文从内部机制解释，两者互补。"
+    },
+    {
+      "to": "icl-bayesian",
+      "type": "rivals",
+      "note": "该文把上下文学习解释为推断隐含概念的贝叶斯过程；本文给出的是具体的注意力电路，层次不同。"
+    },
+    {
+      "to": "transformer",
+      "type": "uses",
+      "note": "归纳头完全由Transformer中两层注意力头的组合实现：前缀匹配靠查询-键匹配，复制靠值-输出通路。"
+    }
+  ],
+  "prereq": [
+    "self-attention",
+    "transformer-block",
+    "residual-connection",
+    "in-context-learning",
+    "loss-function",
+    "ablation-baseline"
+  ],
+  "terms": [
+    {
+      "t": "归纳头",
+      "d": "一种注意力头：在前文中找到“前一个词与当前词相同”的位置，注意它并把它后面的词复制为预测，实现 [A][B]…[A]→[B]。"
+    },
+    {
+      "t": "相变",
+      "d": "训练中某种能力在很短的步数内突然形成，而不是平滑增长；在这里体现为损失曲线上的一个鼓包。"
+    },
+    {
+      "t": "nats",
+      "d": "用自然对数计量的信息量单位，语言模型的交叉熵损失通常以nats为单位。"
+    },
+    {
+      "t": "消融",
+      "d": "把模型的某个部件关掉（例如把某个头的输出置零），观察效果变化，以判断它的作用。"
+    }
+  ],
+  "learn": "先读[[transformer-circuits]]，弄懂残差流和“头的组合”。读本文的Key Concepts部分和Argument 1、3，看损失鼓包与归纳头形成的对照图。动手：训练一个两层纯注意力的小Transformer，在随机token重复序列上计算每个头的前缀匹配分数，观察归纳头在训练中何时出现；再对比一层模型。TransformerLens库提供了现成的工具。",
+  "check": {
+    "source": "https://transformer-circuits.pub/2022/in-context-learning-and-induction-heads/index.html",
+    "confirmed": "标题、作者、Anthropic、发布于2022-03-08（arXiv版2022-09-24）；上下文学习分数的500/50 token定义、2.5–5B token窗口、0.15与0.4 nats、一层模型不形成、六类论证的内容、13B模型、小模型因果/大模型相关的证据强度、Harry Potter中Dursley的例子。"
+  }
+}

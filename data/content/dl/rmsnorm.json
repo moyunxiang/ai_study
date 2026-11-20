@@ -1,0 +1,39 @@
+{
+  "id": "rmsnorm",
+  "who": "Biao Zhang, Rico Sennrich · University of Edinburgh / University of Zurich",
+  "venue": "NeurIPS 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1910.07467"},
+    {"label": "官方代码", "url": "https://github.com/bzhangGo/rmsnorm"},
+    {"label": "LLaMA论文第2.2节（采用RMSNorm）", "url": "https://arxiv.org/abs/2302.13971"}
+  ],
+  "problem": "LayerNorm能稳定训练，但每一层都要先算均值、再算方差，在RNN里每个时间步都要做，额外开销抵消了它带来的收敛加速。",
+  "idea": "猜测LayerNorm起作用的是“缩放不变性”而不是“减均值”，于是去掉减均值，只用均方根RMS来缩放：`ā = a / RMS(a) · g`。",
+  "impact": "效果与LayerNorm相当，在不同模型上把运行时间缩短7%到64%；后来Gopher、LLaMA等大语言模型都用它替代LayerNorm。",
+  "background": "[[layernorm]]对一层的输入向量a先减去均值μ、再除以标准差σ，最后乘可学习的增益g、加偏置b：`ā_i = (a_i − μ)/σ · g_i + b_i`（见[[c:normalization-layer]]）。它不依赖批次统计，所以比[[batchnorm]]更适合变长序列和RNN，也成了[[transformer]]每个子层必备的部件。\n\n问题是代价。作者在GRU版RNNSearch翻译模型上观察到：按训练步数算，加了LayerNorm的模型收敛快得多；但按实际耗时算，优势大幅缩水，因为每一步都要多算两遍统计量，而RNN要在每个时间步都做一次。论文想知道LayerNorm的两个性质——对输入整体平移不敏感（re-centering）和对输入整体缩放不敏感（re-scaling）——到底哪个是必需的。",
+  "method": "**只保留缩放**。RMSNorm把均值和方差两个统计量换成一个均方根：\n\n`RMS(a) = √( (1/n) Σ a_i² )，  ā_i = a_i / RMS(a) · g_i`\n\n没有减均值，通常也不加偏置。当输入均值恰好为0时，它与LayerNorm完全相同。\n\n**为什么够用**。RMS是线性的：`RMS(αa) = α·RMS(a)`，所以把输入或权重矩阵整体放大α倍，输出不变。论文进一步推导：梯度对输入的缩放不敏感，而与权重的缩放成反比——权重变大时更新自动变小，相当于隐式的学习率自适应。它丢掉的只是对整体平移的不变性。\n\n**例子**。a = (3, 4)：RMS = √((9+16)/2) ≈ 3.54，输出约为(0.85, 1.13)·g；LayerNorm则先减掉均值3.5得到(−0.5, 0.5)，输出(−1, 1)。\n\n**部分RMSNorm（pRMSNorm）**。假设同层神经元同分布，只用前p%个元素估计RMS，实验中p取6.25%仍能正常收敛。",
+  "results": "实验覆盖WMT14英德翻译（RNNSearch和Transformer）、CNN/Daily Mail阅读理解、COCO图文检索和CIFAR-10分类。TensorFlow版RNNSearch上，LayerNorm每1000步耗时665秒，RMSNorm为501秒，快24.7%，BLEU（newstest2014/2017）分别为22.6/23.6和22.4/23.7。Transformer-base上快6.9%，BLEU为26.8/27.7对26.6/27.7；不加归一化的Transformer则训练失败。总体加速7%到64%，取决于框架、硬件和模型。CIFAR-10上LayerNorm和RMSNorm都不如BatchNorm。",
+  "legacy": "[[pre-ln]]确定了把归一化放在子层输入处之后，RMSNorm成了这个位置的常用选择：[[gopher]]用它代替LayerNorm，[[llama-1]]原文写明在每个子层输入做RMSNorm预归一化，此后大多数开放权重大模型沿用这一组合。[[t5]]原文写的“只缩放、不加偏置的简化版层归一化”在形式上也是同一回事。后来[[dyt]]进一步尝试用逐元素的tanh函数完全去掉归一化统计量。",
+  "pitfalls": "- RMSNorm不是“没有归一化”：它仍按每个token自己的向量做缩放，只是不减均值。\n- 7%到64%是整个模型的运行时间缩短，不是归一化层本身；在注意力和矩阵乘法占主导的大Transformer里，收益接近下限。\n- pRMSNorm理论上更省，但作者自己没有观察到稳定的实际加速。",
+  "limits": [
+    {"text": "“减均值可有可无”只是假设并经验验证，论文没有从理论上说明什么情况下丢掉平移不变性会有害。", "solved_by": []},
+    {"text": "只回答了怎么归一化，没回答放在哪里：放在残差之后的Post-LN结构在深层Transformer上仍依赖学习率预热、容易发散。", "solved_by": ["pre-ln"]},
+    {"text": "每层仍要对每个token做一次求和归约，算子受内存带宽限制；部分RMSNorm的理论加速在实测中没有兑现。", "solved_by": ["dyt"]},
+    {"text": "在卷积网络的图像分类上不如BatchNorm，作为通用归一化并不占优。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "layernorm", "type": "solves", "note": "去掉LayerNorm的减均值和偏置，只按均方根缩放，在精度相当的前提下减少每步计算开销。"},
+    {"to": "batchnorm", "type": "rivals", "note": "BatchNorm依赖批内统计，不适合RNN和变长序列；RMSNorm按单个样本归一化，但在CNN图像分类上仍是BatchNorm更好。"},
+    {"to": "weight-norm", "type": "rivals", "note": "论文把权重归一化作为对照，比较各方法对输入、权重缩放与平移的不变性。"},
+    {"to": "groupnorm", "type": "uses", "note": "部分RMSNorm只用一部分神经元估计统计量，作者说这一想法部分受组归一化启发。"},
+    {"to": "transformer", "type": "uses", "note": "在Transformer-base翻译模型上验证可直接替换LayerNorm，BLEU持平、训练快6.9%。"}
+  ],
+  "prereq": ["normalization-layer", "expectation-variance", "norm", "recurrent-layer", "transformer-block", "learning-rate"],
+  "terms": [
+    {"t": "均方根（RMS）", "d": "把向量各元素平方、取平均、再开根号，衡量向量的整体大小；不减均值。"},
+    {"t": "缩放不变性", "d": "把输入或权重整体乘上一个常数，归一化后的输出不变；RMSNorm保留了这一性质。"},
+    {"t": "平移不变性", "d": "给输入每个元素都加上同一个数，输出不变；LayerNorm靠减均值获得，RMSNorm放弃了它。"}
+  ],
+  "learn": "先补[[c:normalization-layer]]，把[[layernorm]]的公式写熟。读原文第3–4节（不变性分析与表1）和表2、表4的耗时对比。动手：用PyTorch写一个10行的RMSNorm模块，替换nanoGPT里的LayerNorm，比较验证损失和每步耗时；再对同一个向量分别算LayerNorm和RMSNorm的输出，体会减均值的差别。",
+  "check": {"source": "https://arxiv.org/html/1910.07467", "confirmed": "arXiv记录：标题、两位作者、v1提交2019-10-16，摘要中7%~64%；正文公式、不变性与隐式学习率分析、pRMSNorm取6.25%及“未观察到稳定加速”、表2（RNNSearch：LayerNorm 665s/22.6/23.6，RMSNorm 501s/22.4/23.7，24.7%）、表4（Transformer 6.9%，无归一化训练失败）、CIFAR-10不如BatchNorm、受GroupNorm启发；官方代码README（数据目录名neurips19_rmsnorm）；LLaMA论文（arXiv 2302.13971）第2.2节Pre-normalization用RMSNorm、SwiGLU用2/3·4d。"}
+}

@@ -1,0 +1,42 @@
+{
+  "id": "dnn-hmm",
+  "who": "Hinton, Deng, Yu, Dahl, Mohamed, Jaitly, Senior, Vanhoucke et al. · 多伦多大学 / Microsoft Research / Google / IBM Research",
+  "venue": "IEEE Signal Processing Magazine 2012",
+  "links": [
+    {"label": "IEEE", "url": "https://doi.org/10.1109/MSP.2012.2205597"},
+    {"label": "PDF（作者预印本）", "url": "https://www.cs.toronto.edu/~hinton/absps/DNN-2012-proof.pdf"}
+  ],
+  "problem": "三十年来语音识别的声学模型一直是GMM-HMM：高斯混合模型只能吃少量去相关的特征，用不好相邻帧的上下文，进步几乎停滞。",
+  "idea": "保留HMM管时间，把GMM换成一个多隐层的前馈网络：输入十几帧的滤波器组特征，直接输出几千个绑定三音素状态的后验概率。",
+  "impact": "四家机构在五个大词汇量任务上一致证明DNN比GMM错误率相对降低约7%–33%，两年内各大公司的语音产品全部换成了神经网络声学模型。",
+  "background": "从[[hmm-asr]]开始，语音识别的骨架就是HMM：一个词拆成音素，每个音素是三个状态，HMM负责“哪一帧属于哪个状态”的时间对齐，另有一个模型负责回答“这一帧声音像不像状态s”（见[[c:phoneme-acoustic]]、[[c:hmm-concept]]）。后一个问题几十年来都交给**高斯混合模型（GMM）**：每个状态配几十个高斯分布，用[[c:em-algorithm]]训练，再加[[mmi-training]]之类的区分性训练打磨。\n\nGMM有几处根本的别扭。为了省参数，高斯通常只用对角协方差，所以输入特征必须先去相关——这正是[[mfcc]]要做离散余弦变换的原因，原始滤波器组信息因此被丢掉一部分。对角GMM也吃不下太多相邻帧，上下文只能靠差分特征勉强补。每个高斯只负责一小块数据，参数利用率低。\n\n用神经网络替代GMM的想法并不新，1990年代的[[hybrid-nn-hmm]]就做过，但当时网络只有一个隐层、只预测几十个单音素，硬件也不够，始终没有赢过精调的GMM。转机出现在2009年：[[mohamed-dbn-phone]]用[[dbn]]逐层预训练的深层网络在TIMIT音素识别上超过了GMM；2011年微软的[[cd-dnn-hmm]]把输出换成上千个上下文相关状态，在大词汇量任务上也赢了。这篇2012年的综述由多伦多、微软、谷歌、IBM四个组联合署名，把这些结果放在一起，回答一个问题：DNN替换GMM是不是在所有任务上都成立？",
+  "method": "**整体结构**。HMM、发音词典、语言模型、解码器全部保留，只换掉“打分”这一环。DNN的输入是以当前帧为中心的一个窗口，例如11帧×40维对数梅尔滤波器组（见[[c:waveform-spectrogram]]）；中间是4–7个隐层，每层约2000个单元；输出层是[[c:softmax]]，类别是GMM系统里用决策树绑定好的三音素状态（[[tied-state]]），在Switchboard上有9304个，在谷歌语音输入上有7969个。\n\n**训练标签从哪来**。先用现成的GMM-HMM系统做强制对齐，给每一帧标上它属于哪个状态，然后把DNN当作普通的逐帧分类器，用[[c:cross-entropy]]训练。\n\n**后验变似然**。HMM解码需要的是`p(x|s)`，DNN给的是`p(s|x)`。按贝叶斯公式（见[[c:conditional-bayes]]）`p(x|s) = p(s|x)·p(x) / p(s)`，`p(x)`对所有状态相同，可以丢掉，所以只要把DNN输出除以各状态在训练对齐中出现的频率`p(s)`，就得到一个“按比例缩放的似然”，直接塞进原来的Viterbi解码器。\n\n**预训练**。先把网络当成一叠受限玻尔兹曼机逐层无监督预训练（即[[dbn]]），再整体用反向传播微调。文章同时指出：在数据充足时预训练带来的绝对收益不到1个百分点，层数达到五层以上收益更小。\n\n**为什么DNN比GMM强**。文章归纳了几点：DNN不要求输入去相关，所以可以直接吃滤波器组，在TIMIT上比用MFCC的错误率低1.7个百分点；它能利用多帧输入；它的隐单元是分布式表示，一帧里多个同时发生的声学事件可以由不同单元分别刻画，而GMM假设每帧只来自一个高斯分量。最后还可以在帧级训练之后再用MMI等序列级准则微调。",
+  "results": "TIMIT音素错误率：六层单音素DBN-DNN为22.4%，改用滤波器组输入的八层网络为20.7%，此前最好的区分性训练三音素GMM-HMM是21.7%。\n\n大词汇量任务上（文中表3）：Switchboard用309小时训练，词错误率（见[[c:word-error-rate]]）从GMM的27.4%降到18.5%，相对降低33%，与用2000小时数据、多遍自适应解码的GMM系统（18.6%）持平；Bing语音搜索句错误率从36.2%降到30.4%；谷歌语音输入用5870小时训练，从16.0%降到12.3%；YouTube从52.3%降到47.6%；IBM英语广播新闻从18.8%降到17.5%。识别速度方面，8位量化加SIMD可把处理1秒语音的时间从1.6秒降到210毫秒，用GPU可降到66毫秒。",
+  "legacy": "这篇文章之后，混合DNN-HMM成为工业界的标准做法，开源工具[[kaldi]]很快内置了相应流程。后续改进几乎都在这个框架里替换零件：前馈网络换成[[lstm-am]]和[[graves-deep-rnn]]那样的循环网络，帧级交叉熵换成整句的序列训练（[[lf-mmi]]），RBM预训练被更好的初始化和[[relu]]取代、基本不再使用。\n\n另一条路线则想拆掉HMM本身：[[ctc]]、[[deepspeech]]、[[las]]、[[rnn-t]]直接从声学特征输出字符，不再需要GMM对齐、决策树和发音词典。到2010年代末，端到端模型（如[[conformer]]）在大多数任务上追平并取代了混合系统，但“神经网络打分、外部结构管对齐”这一思路在许多资源受限的场景里仍在使用。",
+  "pitfalls": "- 这不是一篇新方法论文，而是四家机构的联合综述；DNN-HMM的具体系统分别来自[[mohamed-dbn-phone]]、[[cd-dnn-hmm]]等原始论文。\n- DNN并没有取代HMM，只取代了GMM。时间对齐、发音词典、语言模型和解码图都还在。\n- “深度学习靠预训练才成功”的说法不准确：文中Switchboard实验已显示预训练只带来不到1个百分点的收益，大数据下随机初始化同样可行。",
+  "limits": [
+    {"text": "训练标签依赖一个现成的GMM-HMM系统做强制对齐和决策树状态绑定，还要人工发音词典，流程长、步骤多，GMM系统的错误会传给DNN。", "solved_by": ["deepspeech", "las", "chiu-s2s-asr"]},
+    {"text": "前馈网络只看一个固定的十几帧窗口，更长的上下文（音节、语速、说话人特征）完全看不到。", "solved_by": ["graves-deep-rnn", "lstm-am", "conformer"]},
+    {"text": "帧级交叉熵训练与最终的词错误率不一致，需要额外的序列级区分性训练，而这一步要先生成词图，计算昂贵。", "solved_by": ["lf-mmi"]},
+    {"text": "每个任务都要几百到几千小时的人工转写数据，低资源语言难以复制这套做法。", "solved_by": ["wav2vec-2", "whisper"]}
+  ],
+  "relations": [
+    {"to": "hmm-asr", "type": "extends", "note": "完整保留HMM统计识别框架，只把其中的状态打分模型从GMM换成深层网络。"},
+    {"to": "dbn", "type": "uses", "note": "用DBN的逐层RBM预训练初始化声学网络，再用反向传播微调。"},
+    {"to": "mohamed-dbn-phone", "type": "extends", "note": "把在TIMIT小任务上验证过的DBN音素识别推广到五个大词汇量任务，并汇总了它的实验。"},
+    {"to": "cd-dnn-hmm", "type": "extends", "note": "综述中Switchboard 27.4%到18.5%的结果就来自微软的CD-DNN-HMM，以上下文相关状态为输出是成功的关键。"},
+    {"to": "hybrid-nn-hmm", "type": "solves", "note": "1990年代混合系统网络浅、输出只是单音素，赢不了GMM；加深网络并改用几千个绑定三音素状态后稳定胜出。"},
+    {"to": "tied-state", "type": "uses", "note": "DNN的输出类别直接沿用GMM系统里决策树绑定出的三音素状态。"},
+    {"to": "mfcc", "type": "solves", "note": "MFCC的去相关是为对角GMM服务的；DNN不需要这一步，直接用滤波器组特征错误率反而更低。"},
+    {"to": "mmi-training", "type": "uses", "note": "在帧级训练之后，借用GMM时代的MMI等序列级区分性准则继续微调网络。"}
+  ],
+  "prereq": ["hmm-concept", "phoneme-acoustic", "mlp", "softmax", "conditional-bayes", "cross-entropy", "waveform-spectrogram", "word-error-rate"],
+  "terms": [
+    {"t": "GMM（高斯混合模型）", "d": "用若干个高斯分布加权相加来拟合一个复杂分布。在语音识别里，每个HMM状态配一个GMM，用来算一帧特征属于这个状态的概率密度。"},
+    {"t": "三音素与状态绑定", "d": "同一个音素在不同前后邻音下发音不同，所以按“左邻-中心-右邻”区分建模，叫三音素。三音素组合太多，就用决策树把相似的状态合并共享参数，最后留下几千个绑定状态。"},
+    {"t": "强制对齐", "d": "已知一句话的文字，让现有模型找出每一帧对应哪个HMM状态的最佳路径，相当于自动给每一帧打标签。"},
+    {"t": "混合系统（hybrid）", "d": "神经网络只负责逐帧给出状态概率，时间对齐和解码仍由HMM完成的识别系统。"}
+  ],
+  "learn": "先补[[c:hmm-concept]]和[[c:phoneme-acoustic]]，弄清楚HMM状态、发射概率、Viterbi解码分别是什么。然后读原文“Interfacing a DNN with an HMM”一节和表2、表3。动手：用Kaldi的TIMIT或mini_librispeech示例，先跑GMM-HMM配方，再跑nnet3的DNN配方，对比两者的错误率和训练流程。",
+  "check": {"source": "https://www.cs.toronto.edu/~hinton/absps/DNN-2012-proof.pdf", "confirmed": "标题、作者、IEEE Signal Processing Magazine 2012年11月（OpenAlex记录在线日期2012-10-19）；表1 TIMIT 22.4%/20.7%/21.7%，表2/表3中Switchboard 27.4→18.5、18.6（2000小时）、Bing 36.2→30.4、谷歌语音输入5870小时16.0→12.3、YouTube 52.3→47.6、广播新闻18.8→17.5；9304/7969个状态；1.6秒→210毫秒→66毫秒；预训练收益不到1%。"}
+}

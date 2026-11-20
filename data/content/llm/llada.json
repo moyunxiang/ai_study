@@ -1,0 +1,40 @@
+{
+  "id": "llada",
+  "who": "Shen Nie, Fengqi Zhu, Zebin You, Xiaolu Zhang, Jingyang Ou, Jun Hu, Jun Zhou, Yankai Lin et al. · 中国人民大学高瓴人工智能学院 / 蚂蚁集团",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2502.09992"},
+    {"label": "论文HTML全文", "url": "https://arxiv.org/html/2502.09992v3"},
+    {"label": "项目主页与代码", "url": "https://ml-gsai.github.io/LLaDA-demo/"}
+  ],
+  "problem": "所有大语言模型都是从左到右逐词生成的自回归模型，人们默认上下文学习、指令遵循等能力离不开这种方式；离散扩散语言模型此前只做到十亿参数级别，无法与之正面比较。",
+  "idea": "按标准大模型流程从头训练一个8B的掩码扩散模型：随机遮住比例为t的token，让双向Transformer同时猜出所有被遮住的词；生成时从全遮住开始，分多步逐渐揭开。",
+  "impact": "LLaDA 8B在2.3T token上训练后与同等数据量级的LLaMA3 8B基座大致相当，并在反向诗句补全上超过GPT-4o，第一次在大模型规模上说明核心能力并不依赖自回归。",
+  "background": "[[c:autoregressive]]模型把句子的概率拆成 `p(x) = Π p(x_i | x_<i)`，每次只生成下一个词。这有两个固有问题：生成必须一个token接一个token，无法并行；模型只学过“由前推后”，例如训练数据里有“A是B”，它常常答不出“B是什么”，即[[reversal-curse]]。\n\n[[c:diffusion-process]]在图像上很成功，搬到离散的文本上，较成功的一类是“掩码扩散”：加噪就是把token换成特殊的[MASK]，去噪就是把[MASK]猜回来。[[sedd]]和[[mdlm]]给出了这类模型的训练目标，并证明它是似然的上界，但实验规模停留在GPT-2大小，与真正的大模型差了一个数量级以上。",
+  "method": "**前向过程**。给定一句话x₀，从0到1之间均匀抽一个比例t，每个token独立地以概率t被换成[MASK]，得到x_t。t=1时全部遮住。\n\n**训练目标**。一个不带因果掩码的Transformer（能看到整句的所有位置）读入x_t，同时预测所有被遮住的token，只在被遮住的位置上算[[c:cross-entropy]]：\n\n`L = −E[ (1/t) · Σ_i 1[x_t^i = MASK] · log p(x₀^i | x_t) ]`\n\n这个损失是负对数似然的上界，所以训练它就是在做近似的[[c:mle]]。与[[bert]]固定遮15%不同，这里遮住的比例在0到1之间随机变化；与[[maskgit]]相比多了 `1/t` 这一项，正是它把目标和最大似然联系起来。\n\n**规模与流程**。8B参数，按常规大模型的数据流程在2.3万亿token上预训练（序列长4096），共0.13M H800 GPU小时，与同规模自回归模型相当；之后在450万对指令数据上做SFT，只遮住回答部分。\n\n**采样**。给定提示，回答部分先全部设为[MASK]，长度由用户指定。每一步模型预测所有被遮住的位置，然后把其中一部分重新遮回去，进入下一步；默认重新遮住**置信度最低**的那些（低置信度重遮）。步数越多质量越好、越慢。也可以分块从左到右生成，块内并行（半自回归）。",
+  "results": "基座模型MMLU 65.9、GSM8K 70.3、MATH 31.4，同一评测流程下LLaMA3 8B基座分别为65.4、48.7、16.0，但BBH、PIQA等明显落后。论文在相同数据上训练了不同规模的自回归基线，LLaDA的扩展趋势与之相当，MMLU和GSM8K上更强。只做了SFT、没有RL的指令版整体略逊于LLaMA3 8B Instruct。反向诗句补全（给下一句写上一句）上，LLaDA 8B Instruct正向51.8、反向45.6，GPT-4o为82.7和34.3——它的正反两个方向更均衡。",
+  "legacy": "LLaDA之后，“扩散大语言模型”成为一条活跃路线：[[block-diffusion]]把块间自回归和块内扩散结合起来，可以复用KV缓存；[[dream-7b]]改为从自回归模型初始化；[[llada-moe]]扩展到MoE。工业界也推出了以速度为卖点的商用扩散模型[[mercury]]、[[gemini-diffusion]]和[[seed-diffusion]]。",
+  "pitfalls": "- 与LLaMA3 8B“相当”是在训练数据少得多（2.3T对15T）的情况下，但这也意味着它并未在同等数据下全面胜出；BBH、PIQA等推理和常识任务仍明显落后。\n- 扩散模型理论上能并行生成多个token，但LLaDA本身每步都要对整段序列重新计算、没有KV缓存，实际推理并不比自回归快。\n- 回答长度要事先指定，模型不能像自回归那样自然地决定何时停止。",
+  "limits": [
+    {"text": "没有KV缓存等系统优化，每个采样步都要对整段序列做一次完整前向，推理很慢（作者自述）。", "solved_by": ["block-diffusion", "seed-diffusion", "mercury"]},
+    {"text": "生成长度是用户指定的超参数，不能自适应地决定写多长（作者自述）。", "solved_by": ["block-diffusion"]},
+    {"text": "只做了SFT，没有强化学习对齐，指令版落后于经过RL的同规模自回归模型（作者自述）。", "solved_by": []},
+    {"text": "已有研究指出掩码扩散要达到同样似然需要约16倍于自回归的计算，训练效率仍是劣势。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mdlm", "type": "extends", "note": "采用MDLM式的掩码扩散训练目标，把规模从GPT-2级别推进到8B、2.3T token，并加入SFT。"},
+    {"to": "sedd", "type": "extends", "note": "SEDD证明了离散扩散在GPT-2规模可与自回归竞争；LLaDA把这一结论推进到现代大模型规模。"},
+    {"to": "reversal-curse", "type": "solves", "note": "双向建模、不偏向从左到右，在反向诗句补全上明显缓解了反转诅咒，反向成绩超过GPT-4o。"},
+    {"to": "bert", "type": "extends", "note": "同样是用双向Transformer预测被遮住的token，但遮住比例从固定15%变为0到1随机，从而成为一个能生成的概率模型。"},
+    {"to": "maskgit", "type": "extends", "note": "沿用逐步揭开、重遮低置信度token的采样思路，但训练目标加入1/t权重，与最大似然有理论联系。"},
+    {"to": "llama-3", "type": "rivals", "note": "主要对照对象；自回归的LLaMA3 8B用15T token，LLaDA 8B用2.3T token达到大致相当的基座水平。"}
+  ],
+  "prereq": ["autoregressive", "masked-modeling", "diffusion-process", "cross-entropy", "mle", "decoding-sampling"],
+  "terms": [
+    {"t": "掩码扩散模型", "d": "离散扩散的一种：加噪过程把token逐渐换成[MASK]，生成时从全是[MASK]出发，一步步把它们预测回真实的词。"},
+    {"t": "低置信度重遮", "d": "每一步预测完所有被遮位置后，把模型最没把握的那些位置重新遮住，留到后面的步骤再猜，先确定容易的词。"},
+    {"t": "半自回归采样", "d": "把回答切成若干块，块与块之间从左到右，块内用扩散并行生成。"}
+  ],
+  "learn": "先补[[c:masked-modeling]]和[[c:diffusion-process]]，读[[mdlm]]理解为什么带1/t权重的掩码损失是似然上界。原文读第2节（公式1–5）和第3.3节反转实验。动手：在一个小字符级数据集上训练一个掩码扩散模型，分别用随机重遮和低置信度重遮采样，比较生成质量随步数的变化。",
+  "check": {"source": "https://arxiv.org/html/2502.09992v3", "confirmed": "标题、作者、arXiv v1提交于2025-02-14；正文中的t~U[0,1]前向过程、损失公式与似然上界、与MaskGIT缺1/t的区别、2.3T token、序列长4096、0.13M H800 GPU小时、4.5M SFT对、低置信度重遮与半自回归采样、表1中LLaDA 8B MMLU 65.9/GSM8K 70.3/MATH 31.4与LLaMA3 8B 65.4/48.7/16.0及训练token 2.3T对15T、反转诗句表中51.8/45.6对GPT-4o 82.7/34.3、只做SFT未做RL、未用KV缓存、生成长度需指定、引用的约16倍计算的结论。机构据论文署名（中国人民大学高瓴人工智能学院、蚂蚁集团）。"}
+}

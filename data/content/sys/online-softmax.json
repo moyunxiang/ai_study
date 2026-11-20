@@ -1,0 +1,40 @@
+{
+ "id": "online-softmax",
+ "who": "Maxim Milakov, Natalia Gimelshein · NVIDIA",
+ "venue": "arXiv 2018",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/1805.02867"
+  }
+ ],
+ "problem": "数值稳定的softmax需要先扫一遍求最大值、再扫一遍求指数和、再扫一遍输出，共三次读取内存，在GPU上受带宽限制。",
+ "idea": "用一个递推公式在一次扫描里同时维护当前最大值和归一化因子，把对内存的访问从三次降到两次。",
+ "impact": "这一在线归一化技巧是FlashAttention分块计算注意力的数学基础。",
+ "method": "[[c:softmax]]的稳定写法是先减去最大值`m`再取指数，避免溢出：`softmax(x_i) = e^(x_i−m) / Σ e^(x_j−m)`。直接实现要先求`m`，再求和`d`，再输出，需要多遍数据。\n\n论文给出递推：扫描到第j个元素时，维护`m_j = max(m_{j−1}, x_j)`和`d_j = d_{j−1}·e^(m_{j−1}−m_j) + e^(x_j−m_j)`。当最大值更新时，之前累积的和乘以一个修正因子就变成相对新最大值的和。扫描结束即得到正确的`m`与`d`，随后再扫一遍输出。这样内存访问更少。摘要称标准Softmax最多快1.3倍，与TopK融合后最多快5倍。\n\n关键意义是该递推可以对分块独立计算再合并，它被[[flashattention]]用来分块计算注意力，无需存下完整的注意力矩阵。",
+ "limits": [
+  {
+   "text": "论文本身只优化了softmax这一个算子，注意力整体仍要读写大矩阵。",
+   "solved_by": [
+    "flashattention"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "transformer",
+   "type": "extends",
+   "note": "Transformer里的softmax是注意力的核心开销，该工作减少其访存。"
+  }
+ ],
+ "prereq": [
+  "softmax",
+  "memory-bandwidth",
+  "floating-point"
+ ],
+ "learn": "手写在线softmax并与标准实现对比，再用分块+合并验证结果一致。",
+ "check": {
+  "source": "https://arxiv.org/abs/1805.02867",
+  "confirmed": "标题、2位作者、v1提交2018-05-08；摘要：Softmax最多快1.3倍，Softmax+TopK最多快5倍。递推公式为论文主要内容，由本人按常识写出，未逐行对照正文。"
+ }
+}

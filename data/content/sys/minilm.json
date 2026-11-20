@@ -1,0 +1,46 @@
+{
+ "id": "minilm",
+ "who": "Wenhui Wang, Furu Wei, Li Dong, Hangbo Bao, Nan Yang, Ming Zhou · Microsoft Research",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2002.10957"
+  }
+ ],
+ "problem": "[[tinybert]]、[[distilbert]]要求学生与教师层数、隐层维度对齐或逐层映射，换一种学生结构就要重新设计蒸馏方案。",
+ "idea": "只蒸馏教师最后一层的自注意力分布和值向量之间的关系，不要求学生层数或隐层维度与教师一致。",
+ "impact": "把任务无关的小模型蒸馏变成一个简单配方，后来成为小型编码器模型的常用来源。",
+ "method": "此前的BERT压缩工作（[[distilbert]]、[[tinybert]]）要么只蒸馏输出，要么逐层对齐中间表示，学生结构被教师绑死。MiniLM只拿教师**最后一个Transformer层**的信号来教学生：一是自注意力分布（每个词对其他词的注意力权重，即`softmax(Q·Kᵀ/√d)`），二是值向量之间的关系矩阵（`V·Vᵀ`再softmax）。学生用KL散度去拟合这两项（见[[c:self-attention]]）。因为比较的是词与词之间的关系矩阵，其大小只取决于序列长度，与隐层维度无关，所以学生可以更窄、更浅。\n\n另一个做法是在教师和学生之间加一个小的中间“助教”模型缓解容量差距。蒸馏是任务无关的：先通用预训练式蒸馏，再对下游任务微调。论文称学生在SQuAD 2.0和多个GLUE任务上保留了教师99%以上的精度，而参数量和计算量只有教师Transformer部分的50%。",
+ "limits": [
+  {
+   "text": "只用最后一层做监督，信号较粗；学生与教师相差很悬殊时（例如缩到几分之一层数）仍会掉点。",
+   "solved_by": []
+  },
+  {
+   "text": "面向的是BERT类编码器，没有处理自回归大模型的蒸馏。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "distilbert",
+   "type": "extends",
+   "note": "同样做任务无关的BERT蒸馏，但去掉了对隐层维度和层数的硬对齐要求。"
+  },
+  {
+   "to": "tinybert",
+   "type": "rivals",
+   "note": "TinyBERT逐层对齐多种中间表示；MiniLM只蒸馏最后一层的注意力关系，更简单也更灵活。"
+  }
+ ],
+ "prereq": [
+  "self-attention",
+  "attention-concept",
+  "transformer-block"
+ ],
+ "learn": "先读[[distillation]]理解软标签，再读MiniLM原文的方法一节；动手：用Hugging Face加载一个公开的MiniLM权重在GLUE小任务上微调。",
+ "check": {
+  "source": "https://arxiv.org/abs/2002.10957",
+  "confirmed": "标题、6位作者、v1提交于2020-02-25；摘要中保留99%以上精度、教师Transformer参数与计算量的50%。"
+ }
+}

@@ -1,0 +1,71 @@
+{
+ "id": "dust3r",
+ "who": "Shuzhe Wang, Vincent Leroy, Yohann Cabon, Boris Chidlovskii, Jerome Revaud · NAVER LABS Europe / 阿尔托大学",
+ "venue": "CVPR 2024",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2312.14132"
+  }
+ ],
+ "problem": "传统多视图重建要先标定相机、估计位姿，再三角化匹配点，由[[sift]]匹配加[[colmap]]光束法平差等多阶段流水线组成，复杂且对无标定图片脆弱。",
+ "idea": "把两张图片的重建当作回归问题：网络直接为每张图输出每个像素的3D点（点图），两图的点图落在同一坐标系里，不需要相机参数。",
+ "impact": "开创了「用一个Transformer端到端输出点图」的路线，后来的MASt3R、VGGT都建立在它之上。",
+ "method": "DUSt3R的输入是任意两张图像，没有内参也没有位姿。网络是一个标准的[[vit]]编码器加两路解码器：两张图各经编码器，再通过交叉注意力互相交换信息，输出各自的点图——每个像素对应的3D坐标，并且两个点图都在第一张图的坐标系下。\n\n这个表示把单目和双目重建统一在一起；从点图可直接读出深度，还能反推像素匹配、相对和绝对相机位姿。图像多于两张时，先成对预测，再用一个简单的全局对齐把所有点图配准到同一坐标系。网络用[[croco]]预训练权重初始化，因此能利用大规模预训练的模型。\n\n摘要称它在单目和多视图深度、相对位姿估计等任务上都取得新的最好成绩。",
+ "limits": [
+  {
+   "text": "成对预测加全局对齐，图像一多就要算大量图像对，速度慢，对齐优化也耗时。",
+   "solved_by": [
+    "vggt",
+    "cut3r"
+   ]
+  },
+  {
+   "text": "点图回归的匹配精度有限，不如专门的匹配方法精细。",
+   "solved_by": [
+    "mast3r"
+   ]
+  },
+  {
+   "text": "训练数据以静态场景为主，对运动物体处理不好。",
+   "solved_by": [
+    "monst3r"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "croco",
+   "type": "uses",
+   "note": "用CroCo的跨视图补全预训练权重初始化网络。"
+  },
+  {
+   "to": "vit",
+   "type": "uses",
+   "note": "编码器和解码器都是标准的ViT式Transformer。"
+  },
+  {
+   "to": "colmap",
+   "type": "solves",
+   "note": "绕开了COLMAP式的标定、匹配、三角化多阶段流水线，直接回归3D。"
+  },
+  {
+   "to": "sift",
+   "type": "solves",
+   "note": "不再依赖SIFT这类手工局部特征加几何验证来建立对应。"
+  }
+ ],
+ "prereq": [
+  "camera-geometry",
+  "3d-representation",
+  "attention-concept",
+  "encoder-decoder",
+  "end-to-end",
+  "pretrain-finetune"
+ ],
+ "learn": "先读CroCo和ViT；再读DUSt3R的点图和全局对齐两节；官方代码可对自己拍的几张图直接出点云。",
+ "check": {
+  "source": "https://arxiv.org/abs/2312.14132",
+  "confirmed": "arXiv页面确认标题、v1日期2023-12-21，摘要写明无需相机标定和位姿、点图回归、统一单目与双目、全局对齐、基于标准Transformer编码器解码器。"
+ }
+}

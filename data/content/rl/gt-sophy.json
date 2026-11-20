@@ -1,0 +1,36 @@
+{
+  "id": "gt-sophy",
+  "who": "Peter R. Wurman, Samuel Barrett, Kenta Kawamoto, James MacGlashan, Kaushik Subramanian, Thomas J. Walsh et al., Peter Stone, Hiroaki Kitano · Sony AI / Polyphony Digital",
+  "venue": "Nature 2022",
+  "links": [
+    {"label": "Nature", "url": "https://www.nature.com/articles/s41586-021-04357-7"},
+    {"label": "技术介绍", "url": "https://www.gran-turismo.com/us/gran-turismo-sophy/technology/"},
+    {"label": "Sony AI博客", "url": "https://ai.sony/blog/blog-016/"}
+  ],
+  "problem": "赛车同时要求在轮胎抓地极限上做毫秒级连续控制、与对手斗智（超车、防守），还要遵守没法写成精确公式的“赛车礼仪”；此前的AI在《GT赛车》里只能单独跑出快圈，不能和顶尖人类正面对抗。",
+  "idea": "在1000多台PS4上大规模运行模拟，用改进的分位数回归SAC（QR-SAC）学习连续控制；精心设计混合训练场景（各种超车、并排、拥堵情形）和包含碰撞惩罚的奖励，让一个策略同时学会速度、战术和礼仪。",
+  "impact": "在《GT Sport》中击败四位世界顶尖电竞车手，计时赛中100圈全部快于1.2万多名玩家的最好成绩；后来作为对手AI进入商业游戏《GT赛车7》。",
+  "background": "此前深度RL的标志性成就多在回合制或离散动作的游戏（[[dqn]]的Atari、[[alphago]]）或大型即时战略游戏（[[openai-five]]、[[alphastar]]）。赛车不同：动作是连续的油门、刹车、转向，车辆以接近物理极限的速度行驶，一个微小失误就会冲出赛道。《GT赛车》高度还原了真实赛车的非线性动力学，被视作真实赛车的良好模拟。\n\n更难的是“与人同场”：要会超车和防守，又不能撞人、挤人，否则人类车手和裁判都不接受。而什么算“公平”，规则写得很模糊。早先的工作（Fuchs、Dürr等人2021年的研究）已经能在单车计时赛中超过人类，但没有解决多车对抗。",
+  "method": "**算法**。以[[sac]]为基础，把critic换成分位数回归的分布式价值估计（类似[[qr-dqn]]），称为QR-SAC。它估计的不只是回报的平均值，而是回报的整个分布，从而能更好地推理高速动作可能带来的不同后果（例如过弯时有一定概率失控）。\n\n**训练场景**。RL靠自己收集数据，但像“借尾流弹射超车”这类技能需要对手恰好处在特定位置，自由比赛中太少出现。于是训练中混入人工设计的、在每条赛道上可能起决定作用的比赛片段（如拥挤的起步、尾流超车、防守），并配上专门的“陪练”对手，让这些关键局面得到足够练习。对手来自一个包含不同风格策略的对手池，并调节其构成，避免智能体变得过于激进或过于胆怯。\n\n**奖励**（见[[c:reward-design]]）。进度奖励（沿赛道前进）是主体，再加上多项惩罚：冲出赛道、撞墙、与其他车发生接触等。这是把成文和不成文的“赛车礼仪”编码为智能体能理解的信号；最终候选策略还要经人工评审委员会根据团队得分和碰撞指标挑选，并请测试车手试驾。\n\n**规模**。Sony AI搭建了名为DART的分布式平台，可调用1000多台PS4游戏机收集数据，智能体在云端GPU上训练。",
+  "results": "计时赛：在Seaside和Sarthe两条赛道上，GT Sophy的100圈全部快于各自1.2万多名和近9000名人类玩家中的最好单圈；在较长的Sarthe赛道上需训练约48小时才达到人类99分位水平。对抗赛：在2021年7月2日和10月21日两场“Race Together”活动中与顶尖电竞车手对抗，论文称最终在正面对抗中击败了四位世界最佳的《GT赛车》车手。媒体报道的展示赛中，四台GT Sophy与2020年Nations Cup世界冠军宫園拓真等四位车手同场，GT Sophy从杆位领跑到终点。",
+  "legacy": "GT Sophy于2023年以更新形式进入《GT赛车7》，是深度RL智能体少有的面向大众玩家的商业部署。它表明在高保真模拟器里，基于SAC类方法和大规模数据，可以学到接近物理极限、同时考虑他人的连续控制策略——这与无人机竞速等模拟到现实的工作一起，推动了把“仿真中超越人类”的RL推向真实控制问题的讨论。",
+  "pitfalls": "- 它的“礼仪”来自奖励中的惩罚项和人工评审挑选的策略，并不是理解了规则。",
+  "limits": [
+    {"text": "只在模拟器中运行，没有验证能否迁移到真实赛车，模拟与现实的差距未涉及。", "solved_by": []},
+    {"text": "奖励中的礼仪惩罚和训练场景比例都靠人工反复调整，最终策略还要由人工评审委员会挑选，难以推广到别的任务。", "solved_by": []},
+    {"text": "需要上千台游戏机的大规模模拟数据，样本效率低。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "sac", "type": "extends", "note": "核心算法QR-SAC是在SAC上把critic改为分位数回归的分布式价值估计。"},
+    {"to": "qr-dqn", "type": "uses", "note": "借用QR-DQN的分位数回归来表示回报分布，用于连续控制的actor-critic。"},
+    {"to": "openai-five", "type": "extends", "note": "同样依靠大规模分布式模拟训练多智能体对抗，但面对的是连续控制和需与人类公平竞争的约束。"},
+    {"to": "alphastar", "type": "rivals", "note": "同为在复杂电子游戏中击败顶尖人类：AlphaStar从人类数据和联赛自我对弈出发，GT Sophy完全由RL从零学习并显式设计礼仪奖励。"}
+  ],
+  "prereq": ["actor-critic", "policy-gradient-concept", "reward-design", "control-loop", "sim2real"],
+  "terms": [
+    {"t": "分布式价值估计", "d": "不只估计回报的期望，而是估计回报可能取值的分布（例如若干个分位数），能表达“有一定概率出事”的风险。"},
+    {"t": "QR-SAC", "d": "分位数回归软演员-评论家：用分位数回归训练critic的SAC变体，Sony AI为GT Sophy提出。"}
+  ],
+  "learn": "先读[[sac]]和[[qr-dqn]]的讲解，补[[c:reward-design]]。读Nature论文的方法部分（训练场景与奖励项）和Sony的技术介绍页。动手：在开源赛车模拟器（如TORCS或CarRacing）里用SAC训练，再加入与对手接触的惩罚，观察超车行为如何变化。",
+  "check": {"source": "https://www.nature.com/articles/s41586-021-04357-7", "confirmed": "Nature页：标题、作者（Wurman等，Sony AI）、Nature 602卷223–228页、摘要中击败四位最佳车手与礼仪奖励、Race Together活动日期2021-07-02与10-21、计时赛100圈全部快于最佳人类单圈、1.2万多名与近9000名玩家、Sarthe约48小时；GT官方技术页：QR-SAC、DART平台、1000多台PS4；Polygon报道：展示赛选手名单与GT Sophy将进入GT7。"}
+}

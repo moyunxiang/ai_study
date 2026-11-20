@@ -1,0 +1,38 @@
+{
+  "id": "cd-dnn-hmm",
+  "who": "Frank Seide, Gang Li, Dong Yu · 微软亚洲研究院 / 微软研究院",
+  "venue": "Interspeech 2011",
+  "links": [
+    {"label": "论文（ISCA Archive）", "url": "https://www.isca-archive.org/interspeech_2011/seide11_interspeech.pdf"},
+    {"label": "Dahl, Yu, Deng, Acero：Context-Dependent Pre-Trained DNNs（IEEE TASLP 2012）", "url": "https://doi.org/10.1109/tasl.2011.2134090"}
+  ],
+  "problem": "深度网络已在TIMIT音素识别上胜过GMM，但TIMIT很小；在几百小时数据、上万词的真实电话对话上，能否打败调了二十年、经过区分性训练的GMM-HMM系统，仍是未知数。",
+  "idea": "沿用混合NN/HMM框架，但让深层网络直接输出9304个决策树绑定的三音子状态（senone），输入11帧上下文，7层×2048单元，用DBN预训练后在309小时Switchboard数据上用GPU训练。",
+  "impact": "在电话对话转写基准上把词错误率从27.4%降到18.5%，相对降低33%。这是深度学习在大词表语音识别上第一次大幅胜出，一两年内各大公司的产品识别器都换成了DNN声学模型。",
+  "background": "[[mohamed-dbn-phone]]在TIMIT上证明了深层网络加HMM的威力，但那里只有183个单音素状态、几小时语音。微软的Dahl、Yu、Deng、Acero随后把输出换成绑定的三音子状态，在几十小时的语音搜索数据上相对降低了约16%的错误。\n\n真正的考验是[[switchboard]]：电话里两个人的自由对话，口语化、语速快、信道差，是当时最难也最受重视的基准。GMM-HMM在这上面积累了[[tied-state]]三音子、区分性训练（如BMMI，见[[mmi-training]]）、说话人自适应等一整套技术。批评者认为深层网络只是在小数据上占便宜，换到几百小时数据和数千个状态，要么训不动，要么优势消失。",
+  "method": "**整体结构**。仍是[[hybrid-nn-hmm]]：HMM负责时间结构和解码，网络负责给每一帧打分。网络输出状态后验`P(s | x)`，除以状态先验`P(s)`后作为HMM的发射概率。\n\n**关键改动一：输出是绑定三音子状态**。原有GMM系统用决策树把所有三音子的状态绑定成9304个共享状态（senone）。CD-DNN-HMM让网络的[[c:softmax]]层直接有9304个输出，也就是让网络区分“哪个上下文中的哪个音素状态”，而不只是“哪个音素”。训练标签来自GMM系统的强制对齐。\n\n**关键改动二：深而且有上下文**。输入是当前帧加前后各5帧，共11帧特征；隐层7层、每层2048个单元，约4500万参数。网络先用[[dbn]]逐层预训练，再用[[c:backpropagation]]和小批量[[c:sgd-minibatch]]微调。\n\n**工程**。309小时数据、上亿帧，训练依赖多块NVIDIA Tesla GPU，把运算写成大矩阵乘法；数据在约48小时语音的滚动窗口内打乱。论文还尝试把约三分之二的权重置零（稀疏化），模型变小而错误率还略有下降。",
+  "results": "训练数据为309小时Switchboard，测试为单遍、说话人无关解码。主测试集RT03S的Fisher部分：ML训练GMM 30.2%，BMMI区分性训练GMM 27.4%，CD-DNN-HMM 18.5%。Hub5'00 Switchboard部分：BMMI GMM 23.6%，CD-DNN-HMM 16.1%。在另外四个不太匹配的转写任务上相对降低22%–28%。\n\n消融显示深度本身是关键：参数量相同的单隐层网络（4634个单元）错误率26.0%，比GMM还差；加上前后各5帧的上下文降到22.4%；把同样的参数排成7层再降到17.1%。单隐层宽到16000个单元也只有22.1%（据论文表1–3）。",
+  "legacy": "这篇论文让工业界相信了深度学习：2012年多伦多、微软、谷歌、IBM四组联合发表综述[[dnn-hmm]]，DNN声学模型迅速进入微软、谷歌等公司的产品。之后的改进沿着它暴露的问题展开：前馈网络只看11帧，[[lstm-am]]和[[graves-deep-rnn]]换成循环网络；逐帧交叉熵训练之后加序列区分性训练，最终演变为[[lf-mmi]]；Switchboard上的错误率一路降到[[human-parity-asr]]。DBN预训练则很快被证明在大数据上可以省略——论文自己的表2已显示纯反向传播的7层网络只比预训练版本差0.3个百分点。\n\n“深层网络+HMM+WFST解码”的混合架构在[[kaldi]]中成为标准配方，直到2018年前后才被端到端模型逐步取代。",
+  "pitfalls": "- CD-DNN-HMM并不是端到端模型：发音词典、决策树、GMM对齐、HMM解码一样都没少，换掉的只是给每帧打分的那一部分。\n- 33%的相对降幅里，深度、三音子状态输出和多帧上下文都有贡献；只加深而输出单音素，或只用单隐层，都得不到这样的结果。",
+  "limits": [
+    {"text": "训练依赖GMM系统提供的状态对齐和决策树，整个流程要先完整训练一个GMM-HMM。", "solved_by": ["lf-mmi", "deepspeech", "las"]},
+    {"text": "前馈网络只看固定的11帧窗口，更长的上下文无法利用。", "solved_by": ["graves-deep-rnn", "lstm-am"]},
+    {"text": "论文作者自己指出两大挑战：训练效率难以扩展到数千小时数据，以及缺少有效的DNN说话人自适应方法。", "solved_by": ["distbelief"]},
+    {"text": "按逐帧交叉熵训练，目标与词错误率不一致。", "solved_by": ["lf-mmi"]}
+  ],
+  "relations": [
+    {"to": "mohamed-dbn-phone", "type": "extends", "note": "把TIMIT上183个单音素状态的DBN声学模型，扩展到9304个三音子状态、309小时对话语音。"},
+    {"to": "tied-state", "type": "uses", "note": "网络的输出类别就是GMM系统用决策树绑定得到的9304个三音子状态。"},
+    {"to": "hybrid-nn-hmm", "type": "solves", "note": "1990年代的混合系统网络浅、输出少，始终没能胜过精调的GMM；加深并改用三音子状态输出后，在最难的对话基准上大幅胜出。"},
+    {"to": "dbn", "type": "uses", "note": "用深度信念网络的逐层预训练初始化7个隐层。"},
+    {"to": "switchboard", "type": "uses", "note": "在309小时Switchboard上训练，在RT03S和Hub5'00电话对话测试集上评测。"},
+    {"to": "mmi-training", "type": "rivals", "note": "对照的最强基线是BMMI区分性训练的GMM-HMM；DNN的相对优势远大于区分性训练带来的提升。"}
+  ],
+  "prereq": ["mlp", "softmax", "backpropagation", "hmm-concept", "phoneme-acoustic", "word-error-rate"],
+  "terms": [
+    {"t": "senone（绑定三音子状态）", "d": "用决策树把所有三音子的HMM状态聚类后得到的共享状态，每个对应一个输出类别。这里有9304个。"},
+    {"t": "单遍说话人无关解码", "d": "不针对测试者做任何自适应、也不做第二遍重打分，直接一次解码得到结果，最能反映声学模型本身的能力。"}
+  ],
+  "learn": "先读[[mohamed-dbn-phone]]和[[hybrid-nn-hmm]]，弄清后验除以先验的接口。然后读本文第2节与第4节的三张表，重点看表3的逐步消融。动手：在Kaldi的Switchboard或较小的WSJ配方中对比GMM（tri3/tri4）与nnet DNN两个阶段的词错误率，并试着把DNN改成单隐层同参数量，复现“深度比宽度重要”的结论。",
+  "check": {"source": "https://www.isca-archive.org/interspeech_2011/seide11_interspeech.pdf", "confirmed": "论文PDF：Seide、Li、Yu，Interspeech 2011；309小时SWB训练、9304个CART绑定状态、前后各5帧、7层×2048；表1中RT03S FSH 30.2/27.4/18.5%、Hub5'00 23.6/16.1%；四个不匹配任务相对降低22–28%；表2中7×2k DBN 17.1/BP 17.4、1×16k 22.1；表3中单层4634单元26.0%、加上下文22.4%、7层17.1%、稀疏化66%后16.1%；48小时滚动窗口、多块Tesla GPU；结论中的两项挑战。此前约16%相对降低见摘要。"}
+}

@@ -1,0 +1,35 @@
+{
+  "id": "alphazero",
+  "who": "Silver, Hubert, Schrittwieser, Antonoglou, Lai, Guez, Lanctot, Sifre et al. · DeepMind",
+  "venue": "arXiv 2017；Science 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1712.01815"},
+    {"label": "Science版", "url": "https://www.science.org/doi/10.1126/science.aar6404"}
+  ],
+  "problem": "国际象棋、将棋最强的程序靠几十年积累的手工评估函数和大量领域专用技巧；AlphaGo Zero的方法又带着围棋专属的假设，不确定能否推广。",
+  "idea": "把AlphaGo Zero中围棋专属的部分全部去掉，同一套算法和超参数，只换规则，分别从零自我对弈学会国际象棋、将棋和围棋。",
+  "impact": "训练不到一天即在三种棋上击败各自的世界冠军程序，证明“神经网络+MCTS+自我对弈”是通用的棋类学习方法，而不是围棋特例。",
+  "background": "1997年[[deep-blue]]之后，国际象棋程序一直沿着同一条路发展：[[alpha-beta]]剪枝搜索，配上人类专家手写、再精细调参的局面评估函数，以及开局库、残局库和大量搜索技巧。2016年的世界冠军程序Stockfish每秒能搜索数千万个局面。将棋更难（吃掉的子可以打回棋盘），最强程序Elmo也是同一架构。\n\n[[alphago-zero]]已经证明围棋可以从零自学，但围棋有几个特别“友好”的性质：规则对旋转、镜像不变，可以用来扩充数据；动作只是“在哪落子”；结局只有输赢。国际象棋和将棋都不满足——兵的走法与位置有关、有和棋、动作是“哪个子走到哪”。问题是：去掉这些便利，方法还成立吗？",
+  "method": "核心算法与[[alphago-zero]]相同：一张网络输出走法概率`p`和局面价值`v`，[[mcts]]用它们引导搜索，搜索访问分布`π`作为策略目标、对局结果`z`作为价值目标，损失`(z − v)² − πᵀ·log p + c‖θ‖²`（见[[c:self-play]]、[[c:tree-search]]）。改动是去掉围棋专属的东西：\n\n- **结局**：`z`取−1、0、+1，价值预测的是期望得分而不是胜率，以容纳和棋。\n- **不利用对称性**：不做旋转镜像的数据增强，因为国际象棋和将棋不对称。\n- **动作编码**：国际象棋用8×8×73个平面表示“从哪个格子、朝什么方向、走几格”，将棋类似，加上“打入”。\n- **不再选拔**：AlphaGo Zero每次要新网络打赢旧网络55%才替换；AlphaZero始终用最新网络自我对弈，持续更新。\n- 超参数在三种棋上完全相同，不针对单个游戏调参。\n\n每种棋单独训练70万步（批大小4096），用5000块第一代TPU生成自我对弈对局，64块第二代TPU训练网络。",
+  "results": "在每步1分钟的100盘对局中：国际象棋对Stockfish 28胜72和0负；将棋对Elmo 90胜2和8负；围棋对训练3天的AlphaGo Zero 60胜40负。训练过程中，国际象棋4小时、将棋不到2小时、围棋8小时就分别超过Stockfish、Elmo和AlphaGo Lee。比赛时AlphaZero每秒只搜索约8万个局面（国际象棋），Stockfish约7000万——它靠网络把搜索集中在少数有希望的走法上。",
+  "legacy": "开源的Leela Chess Zero复现了这套方法；Stockfish后来也引入了神经网络评估。[[muzero]]进一步去掉“已知规则”这个前提，[[efficientzero]]把它推向少样本，[[katago]]在围棋上大幅降低算力。去掉领域知识、只靠通用算法和算力，也是Silver等人后来在[[reward-is-enough]]中的论点来源之一。",
+  "pitfalls": "- 预印本对Stockfish的设置（固定每步1分钟、64线程配1GB哈希表等）被国际象棋界批评为削弱了对手；2018年的Science正式版改用更接近比赛的条件重新做了评测。\n- “24小时”是在数千块TPU上，单机复现需要多得多的时间。",
+  "limits": [
+    {"text": "仍然需要一个完美的规则模拟器来展开搜索树，无法用于Atari等规则未知的环境。", "solved_by": ["muzero"]},
+    {"text": "训练动用数千块TPU，样本效率极低，外界难以复现。", "solved_by": ["katago", "efficientzero"]},
+    {"text": "只适用于两人、完美信息、确定性的回合制博弈；扑克、陆军棋这类隐藏信息博弈无法直接套用。", "solved_by": ["student-of-games", "deepnash"]}
+  ],
+  "relations": [
+    {"to": "alphago-zero", "type": "extends", "note": "同一算法去掉围棋专属设计（对称性增强、二值结局、新旧网络选拔），推广到国际象棋和将棋。"},
+    {"to": "mcts", "type": "uses", "note": "用神经网络引导的MCTS取代国际象棋程序传统的alpha-beta搜索。"},
+    {"to": "alpha-beta", "type": "rivals", "note": "Stockfish、Elmo代表的alpha-beta+手工评估路线；AlphaZero每秒搜索的局面少近千倍仍胜出。"},
+    {"to": "deep-blue", "type": "rivals", "note": "Deep Blue开创的“专用搜索+专家评估函数”国际象棋路线，被不用人类知识的自学方法超越。"},
+    {"to": "tpu", "type": "uses", "note": "自我对弈用5000块第一代TPU，训练用64块第二代TPU。"}
+  ],
+  "prereq": ["self-play", "tree-search", "policy-value", "residual-connection", "cross-entropy"],
+  "terms": [
+    {"t": "Stockfish / Elmo", "d": "当时国际象棋和将棋最强的传统程序，基于alpha-beta搜索和人工设计的局面评估。"}
+  ],
+  "learn": "先读[[alphago-zero]]的讲解，补[[c:tree-search]]中MCTS的PUCT公式。然后读arXiv原文第2节（与AlphaGo Zero的差异）和Methods中的动作表示。动手：用开源的alpha-zero-general框架在黑白棋或四子棋上训练，体验“同一算法换规则即可”。",
+  "check": {"source": "https://ar5iv.labs.arxiv.org/html/1712.01815", "confirmed": "标题、作者、arXiv 1712编号；正文中70万步、批大小4096、5000块一代TPU与64块二代TPU；Stockfish 4小时、Elmo不到2小时、AlphaGo Lee 8小时；表1的对局结果（象棋25+3胜、25+47和；将棋43+47胜、2和、5+3负；围棋31+29胜）；每秒8万对7000万局面。"}
+}

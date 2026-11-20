@@ -1,0 +1,64 @@
+{
+ "id": "owl-vit",
+ "who": "Matthias Minderer, Alexey Gritsenko, Austin Stone, Maxim Neumann, Dirk Weissenborn, Alexey Dosovitskiy, Aravindh Mahendran, Anurag Arnab, Mostafa Dehghani, Zhuoran Shen et al. · Google Research",
+ "venue": "ECCV 2022",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2205.06230"
+  },
+  {
+   "label": "官方代码",
+   "url": "https://github.com/google-research/scenic/tree/main/scenic/projects/owl_vit"
+  }
+ ],
+ "problem": "检测模型只能认训练集里标注过的固定类别；带框标注的数据很少，长尾类别更是几乎没有，而图文对比模型虽然认得万物，却不会画框。",
+ "idea": "取标准ViT，先做CLIP式图文对比预训练，再去掉最后的池化，让每个图像token直接输出一个框和一个类别嵌入；类别名过文本编码器，与框的嵌入比相似度，从而检测任意文字描述的物体。",
+ "impact": "给出一套把图文模型迁移成开放词表检测器的简单配方，并显示检测效果随图像级预训练和模型规模稳定提升，是后来YOLO-World等开放词表检测的参照。",
+ "method": "做法分两步。第一步，用[[clip]]的方式在海量图文对上预训练一个标准的[[vit]]和一个文本编码器。第二步，把ViT最后的token池化去掉，每个输出token额外接一个小网络预测一个框（中心、宽、高），再接一个线性层把token映射成「类别嵌入」；训练检测时用二分图匹配把预测框和标注框一一配对，这一点沿用了[[detr]]。\n\n分类头不再是固定的N个类别的权重，而是把类别名（如“一只猫”）送入文本编码器得到的向量：框的类别嵌入与每个文本向量做相似度，就得到该框属于各类别的分数。这样训练时只见过的类别，推理时换成任何新词也能用。同一结构也支持单样本图像条件检测：用一张示例图的嵌入代替文本去找相似物体。\n\n论文还分析了缩放性质：增大图像级预训练规模和模型尺寸都能带来下游检测的持续提升，并给出微调时所需的适配策略与正则化。",
+ "limits": [
+  {
+   "text": "检测阶段的框标注数据规模仍远小于图文对，罕见类别上的定位精度明显落后于常见类别。",
+   "solved_by": [
+    "yolo-world"
+   ]
+  },
+  {
+   "text": "每次检测都要跑完整的大ViT，速度不适合实时场景。",
+   "solved_by": [
+    "yolo-world",
+    "rt-detr"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "clip",
+   "type": "extends",
+   "note": "沿用CLIP的图文对比预训练，把图像级对齐迁移到框级别。"
+  },
+  {
+   "to": "vit",
+   "type": "uses",
+   "note": "用几乎不改动的标准ViT作为检测骨干，每个输出token对应一个框。"
+  },
+  {
+   "to": "detr",
+   "type": "uses",
+   "note": "借用DETR的集合预测和二分图匹配损失，免去锚框与NMS设计。"
+  }
+ ],
+ "prereq": [
+  "self-supervised",
+  "contrastive-learning",
+  "zero-few-shot",
+  "vision-tasks",
+  "iou-map",
+  "embedding"
+ ],
+ "learn": "先读CLIP和DETR两篇的核心机制，再读OWL-ViT的方法部分；动手可用官方发布的代码和模型，对自己的图片试不同文字查询。",
+ "check": {
+  "source": "https://arxiv.org/abs/2205.06230",
+  "confirmed": "arXiv页面确认标题、v1日期2022-05-12、作者含Minderer、Dosovitskiy，摘要写明标准ViT、对比图文预训练加端到端检测微调、支持文本条件和单样本图像条件检测。"
+ }
+}

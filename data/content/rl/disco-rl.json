@@ -1,0 +1,104 @@
+{
+  "id": "disco-rl",
+  "who": "Junhyuk Oh, Gregory Farquhar, Iurii Kemaev, Dan A. Calian, Matteo Hessel, Luisa Zintgraf, Satinder Singh, Hado van Hasselt et al., David Silver · Google DeepMind",
+  "venue": "Nature 2025",
+  "links": [
+    {
+      "label": "Nature",
+      "url": "https://www.nature.com/articles/s41586-025-09761-x"
+    },
+    {
+      "label": "DOI",
+      "url": "https://doi.org/10.1038/s41586-025-09761-x"
+    }
+  ],
+  "problem": "TD学习、Q学习、PPO等RL更新规则都是人手工设计的；此前自动发现RL算法的尝试，要么只调几个超参数，要么只在网格世界里有效，从没在难基准上胜过人类设计的算法。",
+  "idea": "用一个元网络来表示“RL规则”：它看智能体的输出轨迹和奖励，给出策略和预测应当靠近的目标；让一大群智能体在57到103个复杂环境里按这条规则学习，再用元梯度改进规则本身。",
+  "impact": "发现的规则Disco57在Atari上IQM得分13.86，超过所有已有规则（包括MuZero），并在从没见过的ProcGen上超过所有已发表方法，首次让机器发现的RL算法在主流基准上胜过人类设计。",
+  "background": "所有RL算法本质上都在做同一件事：让网络的某些预测（价值、Q值、策略）朝某个“目标”更新，而目标由未来奖励和未来预测拼成（见[[c:td-error]]、[[c:bellman-equation]]）。目标怎么拼、预测代表什么，过去几十年全靠研究者的直觉，例如[[agent57]]集成了大量手工组件，只用一个元控制器在若干预设的探索参数间挑选。\n\n此前的自动发现要么只元学习少数超参数，离不开手工算法；要么像[[rl2]]那样把学习过程整个交给黑箱RNN，容易对见过的任务过拟合。而且大多只在网格世界里做，没和最强算法正面比较过。",
+  "method": "**智能体**除了策略`π`，还输出两个“没有规定含义”的预测向量：只依赖观测的`y(s)`和依赖动作的`z(s, a)`——这对应RL里状态价值`v(s)`与动作价值`q(s, a)`的区分；另外保留一个普通的动作价值`q`和一个辅助策略预测`p`。\n\n**元网络**（一个沿时间倒着展开的[[lstm]]）读入一段长为n的轨迹上智能体的输出、奖励和终止标志，为`π`、`y`、`z`各输出一个目标。它不看画面只看预测、对动作维度共享权重，因此适用于任意观测和任意数量的离散动作。智能体的损失是各输出与目标之间的[[c:kl-divergence]]之和，`q`的目标则来自[[retrace]]。输出“目标”而不是“损失值”，使Q学习这类半梯度方法也在搜索空间里。\n\n**元优化**。并行训练一群智能体（Disco57用128个，轮流分配到57个Atari游戏），目标是它们的累计回报之和。元梯度按链式法则分两段（见[[c:meta-learning]]）：一段对智能体的更新过程反向传播（滑动窗口内20次更新），另一段用[[c:actor-critic]]估计。智能体定期重置参数，迫使规则在有限“寿命”内学得快。",
+  "results": "Disco57在Atari 57个游戏上IQM 13.86，超过MuZero、Dreamer、MEME、STACX等所有已有规则，墙钟效率明显高于MuZero。在发现时没见过的ProcGen 16个游戏上超过所有已发表方法；在NetHack NeurIPS 2021挑战赛排行榜上排第三（40多支队伍），且不用任何领域知识，同设置下的IMPALA弱得多。用Atari、ProcGen、DMLab-30共103个环境发现的Disco103，在Crafter上达到人类水平、在Sokoban上接近MuZero。反过来，在57个网格世界上发现的规则在Atari上明显更差。发现计算量：Disco57用1024个TPUv3核心64小时，Disco103用2048个核心60小时。",
+  "legacy": "分析显示，学到的`y`、`z`会在大奖励或策略熵变化之前提前“尖峰”，并利用未来预测构造当前目标——元网络自己重新发现了自举（bootstrapping）这种TD思想。它与[[alphadev]]、[[alphaevolve]]一起，代表DeepMind“让机器设计算法”的路线，并呼应Silver在[[era-of-experience]]中的主张：连学习规则本身也可以从经验中来。",
+  "pitfalls": "- 发现的规则是一个神经网络，不是一行公式；它能被复用，但人读不懂它的完整逻辑。\n- 胜过的是“规则”：Disco57和MuZero比的是同等网络规模下的更新规则，不是它自带了搜索或世界模型。",
+  "limits": [
+    {
+      "text": "元网络按离散动作维度共享权重，只适用于离散动作；连续控制和机器人任务没有验证。",
+      "solved_by": []
+    },
+    {
+      "text": "发现过程本身极贵：一次需要上千个TPUv3核心运行两三天，普通实验室无法复现发现过程，只能使用发布的规则。",
+      "solved_by": []
+    },
+    {
+      "text": "规则是黑箱LSTM，只能事后通过可视化和信息分析部分解释，没有收敛性或稳定性保证。",
+      "solved_by": []
+    },
+    {
+      "text": "发现和评测都在游戏类基准上；对语言模型后训练这类回合极长、奖励稀少的RL是否同样有效未知。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "rl2",
+      "type": "rivals",
+      "note": "RL²把整个学习过程交给黑箱RNN，易对见过的任务过拟合；DiscoRL保留“预测朝目标更新”的结构，只元学习目标，因而能泛化到没见过的基准。"
+    },
+    {
+      "to": "muzero",
+      "type": "solves",
+      "note": "MuZero是Atari上最强的人类设计方法之一；Disco57以更高的墙钟效率在Atari IQM上超过它。"
+    },
+    {
+      "to": "agent57",
+      "type": "solves",
+      "note": "Agent57靠大量手工组件加一个只在预设参数间选择的元控制器；DiscoRL把整个更新规则交给元学习，在Atari上超过所有已有规则。"
+    },
+    {
+      "to": "impala",
+      "type": "rivals",
+      "note": "在NetHack上用相同设置训练IMPALA作为对照，表现远弱于Disco57，说明收益来自发现的规则本身。"
+    },
+    {
+      "to": "retrace",
+      "type": "uses",
+      "note": "预设含义的动作价值q的目标用Retrace计算，帮助元学习把精力集中在发现新的预测y、z上。"
+    },
+    {
+      "to": "dreamerv3",
+      "type": "rivals",
+      "note": "Dreamer是Atari上的人类设计基线之一，Disco57的IQM超过它。"
+    }
+  ],
+  "prereq": [
+    "meta-learning",
+    "td-error",
+    "bellman-equation",
+    "actor-critic",
+    "kl-divergence",
+    "recurrent-layer"
+  ],
+  "terms": [
+    {
+      "t": "RL规则",
+      "d": "决定智能体如何根据经验更新参数的那部分算法，例如TD学习“价值朝r+γV(s′)更新”。"
+    },
+    {
+      "t": "元梯度",
+      "d": "对“学习过程本身”求梯度：调整规则的参数，看按新规则学出来的智能体回报是否更高。"
+    },
+    {
+      "t": "IQM",
+      "d": "四分位距均值：把多个游戏的归一化得分排序后，去掉最高和最低各25%再取平均，比均值稳健、比中位数用的数据多。"
+    },
+    {
+      "t": "自举",
+      "d": "用自己对未来的预测来构造当前的学习目标，TD学习的核心思想。"
+    }
+  ],
+  "learn": "先补[[c:meta-learning]]、[[c:td-error]]，并读[[rl2]]了解“学会学习”的黑箱做法。再读Nature原文的“Discovery method”一节和图1（智能体输出、元网络、元优化三块），然后看图4的分析。动手：在一个小网格世界里实现简化版——让一个小MLP输出价值的更新目标，用元梯度训练它，对比它学出的规则与TD(0)的差别。",
+  "check": {
+    "source": "https://www.nature.com/articles/s41586-025-09761-x",
+    "confirmed": "标题、作者（Oh、Farquhar、Kemaev、Calian、Hessel、Zintgraf、Singh、van Hasselt、Silver）、Nature在线发表2025-10-22（收稿2024-12-11）；智能体输出π、y、z、q、p，元网络为LSTM、KL距离、q目标来自Retrace、20次更新滑动窗口；Disco57用128个智能体、Atari IQM 13.86超过所有已有规则；ProcGen超过所有已发表方法；NetHack 2021挑战赛第三（40多支队伍）；Disco103用103个环境、Crafter达人类水平、Sokoban接近MuZero；网格世界发现的规则更差；1024个TPUv3核心64小时、2048个核心60小时。"
+  }
+}

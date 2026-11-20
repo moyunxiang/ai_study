@@ -1,0 +1,129 @@
+{
+  "id": "react",
+  "who": "Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik Narasimhan, Yuan Cao · Princeton University / Google Research, Brain Team",
+  "venue": "ICLR 2023",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2210.03629"
+    },
+    {
+      "label": "项目主页与代码",
+      "url": "https://react-lm.github.io"
+    }
+  ],
+  "problem": "思维链只在模型脑内推理，事实记错就一路编下去；让模型直接输出动作（搜索、点击）又缺少规划，拿到结果也不会总结。推理和行动是两条分开研究的线。",
+  "idea": "让模型交替输出“思考→行动→观察”：先用自然语言想下一步要干什么，再输出一个动作（如Search[实体]），把环境返回的结果追加进上下文，再接着想，直到给出答案。只需一两个示例提示。",
+  "impact": "把大模型从“回答者”变成能用工具、与环境交互的智能体。“思考-行动-观察”循环成为几乎所有LLM智能体框架（LangChain、AutoGPT及后来的编码智能体）的默认骨架。",
+  "background": "2022年，大模型的两种能力被分开研究。一边是**推理**：[[cot]]让模型先写推理再答题，但推理完全依赖参数里的知识，在多跳问答上常出现事实幻觉，并且错误会沿推理链传播。另一边是**行动**：[[saycan]]让语言模型给机器人挑选下一步动作，[[webgpt]]用人类示范和强化学习训练GPT-3浏览网页，但这些系统要么没有显式推理，要么需要大量专门的训练数据。\n\n人做事时两者是交织的：做饭时会想“盐用完了，先用酱油代替”，再去拿酱油，看到结果再调整。问题是：能否用同一个模型、只靠提示，让推理指导行动，又用行动得到的信息修正推理？",
+  "method": "**扩展动作空间**。原来智能体的动作只有环境动作（如Search、点击）。ReAct再加一种“思考”动作：输出一段自然语言，它不改变环境，只写进上下文，用来分解目标、记录进度、从观察中提炼信息、处理异常。见[[c:agent-loop]]。\n\n**轨迹格式**。在HotpotQA和FEVER上，作者给模型一个只有三个动作的维基百科接口：`Search[实体]`返回该词条的前几句，`Lookup[字符串]`在当前页面中找下一处包含该字符串的句子，`Finish[答案]`结束。提示里放几条人工写的完整轨迹，模型照样续写，例如：\n\n思考1：我需要搜索Colorado orogeny，找到它东段延伸到哪里。\n行动1：Search[Colorado orogeny]\n观察1：Colorado orogeny是科罗拉多及周边地区的一次造山运动……\n思考2：页面没提东段，我查一下“eastern sector”。\n行动2：Lookup[eastern sector]\n观察2：东段延伸到High Plains……\n\n每当模型输出一个行动，程序就截断生成、真正调用接口，把结果作为“观察”拼回提示，再让模型继续。\n\n**与思维链结合**。ReAct遇到搜索失败时可能走不下去，思维链则可能编造事实。作者设计了两种切换策略：ReAct若干步内没得出答案就改用思维链多次采样投票（[[self-consistency]]）；或反过来，投票结果不够一致时改用ReAct。\n\n在ALFWorld（文本版家务模拟环境）和[[webshop]]（模拟网购）上，思考只在需要时稀疏出现，比如“我要找一个杯子，可能在柜子或桌子上”。",
+  "results": "主要用冻结的PaLM-540B加少样本提示。\n\nHotpotQA（精确匹配）：只推理的思维链29.4，只行动的Act 25.7，ReAct本身27.4，略低于思维链；但“ReAct→自洽性”组合35.1，“自洽性→ReAct”组合34.2，都超过只用自洽性的33.4。FEVER上ReAct 60.9，好于思维链的56.3，组合方法达到64.6。人工分析错误：思维链的失败中56%是幻觉，ReAct的失败中幻觉为0%，但47%是推理错误（包括陷入重复动作），23%是搜索结果无用。\n\n决策任务提升更大：ALFWorld上ReAct最好一次成功率71%，只行动的版本45%，需要大量训练的模仿学习方法BUTLER 37%；WebShop成功率40.0%，比模仿学习加强化学习的28.7%高约10个点。每个任务只用了1到2个示例。",
+  "legacy": "ReAct几乎定义了之后两年智能体的形态。[[langchain]]把它做成默认的agent实现；[[autogpt]]在它上面加入长期目标和自我循环；[[reflexion]]让智能体失败后写反思再重试；[[lats]]在多条ReAct轨迹上做树搜索。行动的格式也从提示里的`Search[...]`文本，演变为模型训练出来的[[toolformer]]、API层面的[[function-calling]]，再到跨应用的[[mcp]]。[[swe-agent]]、[[claude-code]]等编码智能体本质上仍是“想—调用工具—看结果”的循环。\n\n它也带来了新风险：观察内容直接进入上下文，网页里埋的指令可以劫持智能体（[[indirect-prompt-injection]]）。",
+  "pitfalls": "- ReAct在HotpotQA上单独使用并不比思维链好（27.4对29.4），它的优势是事实可靠、可解释，以及与思维链组合后的提升。\n- 原文是纯提示方法，模型没有为工具使用做过训练；今天的模型原生支持工具调用，但“思考-行动-观察”这一结构是从这里来的。\n- “思考”只是写进上下文的文本，不保证真实反映模型的决策过程。",
+  "limits": [
+    {
+      "text": "完全靠少样本提示，轨迹越长越占上下文；小模型照着格式做效果很差，需要另外微调。",
+      "solved_by": [
+        "toolformer",
+        "function-calling",
+        "toolllm"
+      ]
+    },
+    {
+      "text": "容易陷入重复同一个动作或思考的循环，失败后也不会总结教训重试。",
+      "solved_by": [
+        "reflexion",
+        "lats"
+      ]
+    },
+    {
+      "text": "动作是提示里约定的文本格式，靠字符串解析，换一个工具就要重写示例，格式出错就中断。",
+      "solved_by": [
+        "function-calling",
+        "mcp"
+      ]
+    },
+    {
+      "text": "每步只贪心地走一条轨迹，不评估、不比较其他可能的行动序列。",
+      "solved_by": [
+        "lats",
+        "tot"
+      ]
+    },
+    {
+      "text": "环境返回的内容原样进入上下文，恶意网页或文档中的指令可以操纵智能体。",
+      "solved_by": [
+        "camel-defense"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "cot",
+      "type": "solves",
+      "note": "思维链只能用参数里的知识，在HotpotQA上失败多由幻觉造成；ReAct在推理中插入搜索，把幻觉类失败从56%降到0%。"
+    },
+    {
+      "to": "saycan",
+      "type": "extends",
+      "note": "SayCan让语言模型挑选机器人动作但没有自由形式的推理；ReAct在动作之间加入自然语言思考来规划和跟踪进度。"
+    },
+    {
+      "to": "webgpt",
+      "type": "rivals",
+      "note": "WebGPT用人类示范和强化学习专门训练浏览能力；ReAct只用一两个提示示例，不训练任何参数。"
+    },
+    {
+      "to": "palm",
+      "type": "uses",
+      "note": "主要实验模型是冻结的PaLM-540B，另在附录给出GPT-3的结果。"
+    },
+    {
+      "to": "self-consistency",
+      "type": "uses",
+      "note": "在问答任务上与思维链多次采样投票互相切换，组合后HotpotQA达35.1、FEVER达64.6。"
+    },
+    {
+      "to": "star",
+      "type": "uses",
+      "note": "借鉴STaR的自举思路，用3000条答对的ReAct轨迹微调PaLM-8B/62B。"
+    },
+    {
+      "to": "rag",
+      "type": "rivals",
+      "note": "RAG在生成前检索一次；ReAct由模型在推理中途多次决定查什么，更适合多跳问题。"
+    },
+    {
+      "to": "hotpotqa",
+      "type": "uses",
+      "note": "以HotpotQA多跳问答作为知识密集推理的主要评测。"
+    }
+  ],
+  "prereq": [
+    "language-model",
+    "in-context-learning",
+    "agent-loop",
+    "tool-calling",
+    "hallucination",
+    "state-action-observation"
+  ],
+  "terms": [
+    {
+      "t": "轨迹（trajectory）",
+      "d": "智能体完成一个任务时产生的“思考、行动、观察”序列，既可作为提示示例，也可作为训练数据。"
+    },
+    {
+      "t": "ALFWorld",
+      "d": "把家务任务（拿杯子、加热食物等）做成纯文本交互的模拟环境，智能体通过“去柜子1”“拿起杯子”等文字命令行动。"
+    },
+    {
+      "t": "多跳问答",
+      "d": "答案需要串联两篇以上文档中的信息才能得到的问题，比如先查到某人的出生地，再查那个城市的人口。"
+    }
+  ],
+  "learn": "先读[[cot]]，并了解[[c:agent-loop]]与[[c:tool-calling]]。读原文第2节（图1的四种对比最直观）、第3.3节表1与表2的错误分析、第4节ALFWorld部分。动手：用任意聊天模型写一个50行左右的Python循环——提示中给出Search/Lookup/Finish三个动作和一条示例轨迹，遇到“行动”就调用维基百科API，把结果追加回提示，在10道HotpotQA题上跑一遍。",
+  "check": {
+    "source": "https://arxiv.org/abs/2210.03629",
+    "confirmed": "标题、7位作者、arXiv v1于2022-10-06提交；摘要ALFWorld/WebShop绝对提升34%/10%；正文（ar5iv）表1 PaLM-540B HotpotQA CoT 29.4、CoT-SC 33.4、Act 25.7、ReAct 27.4、组合35.1/34.2，FEVER 56.3/60.9/64.6；表2错误分析56%幻觉 vs 0%、47%推理错误、23%搜索错误；表3 ALFWorld 71/45/37；表4 WebShop 40.0 vs 28.7；3000条轨迹微调。"
+  }
+}

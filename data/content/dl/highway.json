@@ -1,0 +1,35 @@
+{
+  "id": "highway",
+  "who": "Rupesh Kumar Srivastava, Klaus Greff, Jürgen Schmidhuber · IDSIA",
+  "venue": "ICML 2015 Deep Learning Workshop；完整版NIPS 2015",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1505.00387"},
+    {"label": "完整版 Training Very Deep Networks", "url": "https://arxiv.org/abs/1507.06228"}
+  ],
+  "problem": "网络越深越难训：即便用了方差保持的初始化，几十层的普通网络用SGD也训不下去，只能靠分阶段训练或在中间层加辅助损失。",
+  "idea": "借用LSTM的门：每层输出 = 变换后的结果×门T + 原输入×(1−T)。门关上时这一层就是恒等映射，信息和梯度可以沿“高速公路”无衰减地穿过很多层。",
+  "impact": "第一次用普通SGD直接训练上百层的前馈网络。半年后ResNet把门去掉、只留恒等捷径，成为深度网络的标准结构。",
+  "background": "到2015年，ImageNet上的进步大多来自更深的网络（[[vgg]]、[[googlenet]]），理论上深网络也能比浅网络更高效地表示某些函数。但多加几层并不简单：普通网络超过一二十层后，训练误差本身就降不下去。当时的对策都很曲折——专门的初始化（[[glorot-init]]、[[he-init]]），先训浅网络再加深，或者像GoogLeNet那样在中间层挂辅助分类器、像FitNets那样用老师网络的中间输出做提示。作者注意到，循环网络里同样的问题早已由[[lstm]]的门控解决：门控让信息沿时间几乎无衰减地传很远（见[[vanishing-gradient]]）。",
+  "method": "普通层是`y = H(x)`。Highway层多一个“变换门”`T(x) = σ(W_T·x + b_T)`：\n\n`y = H(x)·T(x) + x·(1 − T(x))`\n\n逐元素相乘。T接近0时`y ≈ x`，这一层直接把输入搬运过去，雅可比矩阵接近单位矩阵，梯度原样回传；T接近1时就是普通层。网络可以按样本、按单元自己决定每层“改多少、留多少”。论文一般形式里还有单独的携带门C，为简单起见取`C = 1 − T`。\n\n**关键的初始化**：把门的偏置`b_T`设成负数（如−1、−3），让网络在开始时偏向“搬运”，深层网络一开始就近似浅网络，梯度通畅；这一招直接借自LSTM遗忘门的偏置初始化。好处是它与H用什么激活、权重怎么初始化无关。\n\n输入输出维度必须相同，需要改变维度时插入一个普通层。卷积版的H和T都是卷积。",
+  "results": "MNIST上比较10、20、50、100层：普通网络（用He初始化、各自随机搜索40组超参数）层数一多训练误差明显变差；Highway网络几乎不受深度影响，100层的最终训练误差比10层的好约一个数量级，作者还开始训练一个900层的网络且未见优化困难。CIFAR-10上，19层、约230万参数的Highway网络直接反向传播训练就达到92.24%，好于需要老师网络两阶段训练的FitNet（91.61%）。",
+  "legacy": "2015年12月的[[resnet]]相当于把门固定为“恒等+残差相加”：`y = x + F(x)`，没有额外参数，在ImageNet上训到152层并夺冠，此后残差连接取代了Highway成为默认做法，[[transformer]]的每个子层也包着残差。Highway的门控思想则留在了LSTM、GRU以及后来的门控线性单元中。2024年的[[hyper-connections]]重新回到“可学习地混合捷径与变换”的思路。",
+  "limits": [
+    {"text": "门T需要和H一样多的参数与计算，每层成本约翻倍。", "solved_by": ["resnet"]},
+    {"text": "门可能学会关闭捷径，信息通路并非始终畅通；在ImageNet这样的大规模任务上没有验证几百层网络的效果。", "solved_by": ["resnet"]},
+    {"text": "深度带来的表示收益并不清楚：很多层可能学成近似恒等，存在冗余。", "solved_by": ["stochastic-depth"]}
+  ],
+  "relations": [
+    {"to": "lstm", "type": "extends", "note": "把LSTM沿时间传递信息的门控和遗忘门负偏置初始化，搬到前馈网络的深度方向上。"},
+    {"to": "vanishing-gradient", "type": "solves", "note": "门关闭时层的雅可比接近单位矩阵，梯度可跨越上百层不衰减，解决了深层前馈网络的梯度消失。"},
+    {"to": "he-init", "type": "solves", "note": "实验表明即便用He初始化，普通网络到50、100层仍难以优化，而Highway网络不受深度影响。"},
+    {"to": "googlenet", "type": "rivals", "note": "GoogLeNet靠中间层的辅助损失帮助梯度传递；Highway用结构上的捷径直接解决，不需要额外损失。"},
+    {"to": "glorot-init", "type": "rivals", "note": "初始化方案依赖激活函数的具体形式；Highway的负偏置初始化与H的形式无关。"}
+  ],
+  "prereq": ["mlp", "gating", "vanishing-exploding", "residual-connection", "initialization"],
+  "terms": [
+    {"t": "变换门 / 携带门", "d": "变换门T决定输出中有多少来自本层的变换H(x)，携带门C决定有多少直接来自输入x；本文取C=1−T。"},
+    {"t": "FitNets", "d": "2014年的一种训练细深网络的方法：先训一个浅而宽的老师网络，再用老师中间层的输出作为“提示”训练学生网络。"}
+  ],
+  "learn": "先弄懂[[lstm]]的遗忘门和[[c:gating]]，再读原文第2节（式3–5和2.2节的偏置初始化，只有两页）。然后读[[resnet]]，比较`y = H·T + x·(1−T)`与`y = x + F(x)`的差别。动手：在MNIST上搭50层的普通MLP和Highway MLP，记录训练损失曲线和各层梯度范数。",
+  "check": {"source": "https://arxiv.org/abs/1505.00387", "confirmed": "标题、作者Srivastava/Greff/Schmidhuber、arXiv首次提交于2015-05-03；ar5iv全文中核对了式(3)、负偏置−1/−3初始化及其借鉴Gers 1999、MNIST上9/19/49/99层与每种40次随机搜索、100层比10层好约一个数量级、900层实验，以及CIFAR-10表1中的92.24%与FitNet 4的91.61%。"}
+}

@@ -1,0 +1,35 @@
+{
+  "id": "gelu",
+  "who": "Dan Hendrycks, Kevin Gimpel · Toyota Technological Institute at Chicago (TTIC)",
+  "venue": "arXiv预印本（2016）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1606.08415"},
+    {"label": "PyTorch文档 torch.nn.GELU", "url": "https://pytorch.org/docs/stable/generated/torch.nn.GELU.html"}
+  ],
+  "problem": "ReLU在0处有个硬拐角，负半轴梯度恒为0；激活函数与dropout等随机正则化是两套互不相干的设计，各管各的。",
+  "idea": "把“以概率Φ(x)保留输入、否则置零”的随机掩码取期望，得到确定性的激活`GELU(x) = x·Φ(x)`：输入越大越可能被原样放行，越小越接近被关掉，曲线处处光滑。",
+  "impact": "被GPT、BERT、ViT等Transformer模型采用，成为2018–2022年大模型的默认激活；后来的SwiGLU也是在它这一族平滑门控激活上发展出来的。",
+  "background": "[[relu]]让深层网络好训了，但它是分段线性的：`x>0`时原样输出，否则输出0，在0处不可导，输入一旦长期为负，梯度就一直是0。ELU（指数线性单元）在负半轴改用平滑的指数曲线，好了一些。另一方面，[[dropout]]以固定概率随机把神经元置零来防过拟合，Adaptive Dropout等工作让置零概率依赖输入。作者注意到：ReLU可以看成“按输入的符号决定乘1还是乘0”，dropout是“随机决定乘1还是乘0”——能不能把两者统一成一个按输入大小、带概率的乘法？",
+  "method": "设想一个随机正则化：给输入x乘上掩码`m ~ Bernoulli(Φ(x))`，其中Φ是标准正态分布的累积分布函数（见[[c:gaussian]]），`Φ(x) = P(X ≤ x)`、`X ~ N(0,1)`。x越大，Φ(x)越接近1，越可能被保留；x越小越可能被置零。由于经过[[batchnorm]]的输入大致服从标准正态，Φ(x)可以理解为“这个输入比其他输入大的概率”。\n\n推理时需要确定的输出，于是取这个随机变换的期望：\n\n`GELU(x) = Φ(x)·x + (1−Φ(x))·0 = x·Φ(x) = x·½[1 + erf(x/√2)]`\n\n具体数值：`GELU(2) ≈ 2×0.977 = 1.95`，`GELU(−2) ≈ −2×0.023 = −0.05`，`GELU(−0.75) ≈ −0.17`。它与ReLU的区别是：负输入不是一刀切成0，而是有一小段可以略微为负、梯度不为0的光滑区域；整条曲线不单调，在约`x = −0.75`处有极小值。\n\nerf计算较慢，论文给出两个近似：`0.5x(1 + tanh[√(2/π)(x + 0.044715x³)])`，以及`x·σ(1.702x)`。论文还指出，把Φ换成logistic函数σ就得到`x·σ(x)`，命名为SiLU——它就是一年后[[swish]]搜索出来的函数。",
+  "results": "论文在MNIST分类和自编码、推特词性标注、TIMIT语音帧分类、CIFAR-10/100上与ReLU、ELU比较，GELU在所有任务上都最好，但优势多为零点几到一个百分点。CIFAR-10上9层卷积网络三次运行的中位错误率：GELU 7.89%，ReLU 8.16%，ELU 8.41%。CIFAR-100上40层、宽度因子4的宽残差网络：GELU 20.74%，ReLU 21.77%，ELU 22.98%。",
+  "legacy": "论文在2016年并未引起太多注意，真正推广它的是Transformer：[[gpt-1]]、[[bert]]、[[gpt-2]]的前馈层都用GELU，[[vit]]也沿用，于是它成了这一代大模型的默认激活。2017年的[[swish]]通过自动搜索得到几乎同样的曲线，`x·σ(x)`（SiLU/Swish）后来在视觉模型里很常用。2020年的[[swiglu]]把这类平滑激活与门控线性单元结合，被[[llama-1]]等新一代大模型采用，逐步取代了单纯的GELU前馈层。",
+  "limits": [
+    {"text": "精确形式要计算erf，比ReLU慢；实际实现普遍用tanh近似，不同框架的近似版本并不完全一致。", "solved_by": []},
+    {"text": "提升幅度不大（多在1个百分点以内），且只在小规模图像、语音、标注任务上验证，没说明在大模型上是否仍然更好。", "solved_by": ["bert", "swiglu"]},
+    {"text": "“随机正则化取期望”的推导只是动机，并不能解释为什么这条曲线比别的平滑曲线好，激活函数的选择仍靠经验。", "solved_by": ["swish"]}
+  ],
+  "relations": [
+    {"to": "relu", "type": "solves", "note": "保留ReLU在正半轴近似线性的好处，把0处的硬拐角换成光滑过渡，负半轴梯度不再恒为0。"},
+    {"to": "dropout", "type": "extends", "note": "把dropout的随机置零改成依赖输入大小的置零概率Φ(x)，再取期望变成确定性激活。"},
+    {"to": "batchnorm", "type": "uses", "note": "用“经批归一化的输入近似标准正态”来解释为何选正态分布的Φ。"},
+    {"to": "he-init", "type": "rivals", "note": "He初始化论文提出可学习负斜率的PReLU，同样针对ReLU负半轴梯度为0的问题；GELU改用光滑的概率门控，后者在Transformer中胜出。"}
+  ],
+  "prereq": ["neuron-activation", "gaussian", "dropout-concept", "expectation-variance", "normalization-layer"],
+  "terms": [
+    {"t": "Φ(x)（标准正态累积分布函数）", "d": "标准正态随机变量取值不超过x的概率，Φ(0)=0.5，Φ(2)≈0.977，Φ(−2)≈0.023。"},
+    {"t": "ELU", "d": "指数线性单元：x>0时输出x，x≤0时输出α(eˣ−1)，负半轴平滑地趋于−α。"},
+    {"t": "SiLU", "d": "Sigmoid线性单元x·σ(x)，本文作为GELU的变体提出，2017年又以Swish之名被重新发现。"}
+  ],
+  "learn": "先复习[[c:neuron-activation]]和[[c:gaussian]]，用Python画出ReLU、ELU、GELU、x·σ(x)四条曲线及其导数。然后读原文第2节（一页，讲推导）和第4节讨论。动手：在一个小Transformer或CIFAR-10上只换激活函数，跑三个种子比较结果，体会这类改动的收益和噪声大小。",
+  "check": {"source": "https://arxiv.org/abs/1606.08415", "confirmed": "标题、作者Hendrycks/Gimpel、arXiv v1提交于2016-06-27；ar5iv全文核对了GELU(x)=xΦ(x)的推导、两个近似式中的0.044715与1.702、SiLU的命名、实验任务列表、CIFAR-10中位错误率7.89/8.16/8.41%、CIFAR-100 WRN 40-4的20.74/21.77/22.98%，以及实验使用Loshchilov & Hutter的学习率调度。"}
+}

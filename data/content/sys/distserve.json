@@ -1,0 +1,60 @@
+{
+ "id": "distserve",
+ "who": "Zhong, Liu, Chen, Hu, Zhu, Liu, Jin, Zhang et al. · 北京大学, UC San Diego",
+ "venue": "OSDI 2024",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2401.09670"
+  }
+ ],
+ "problem": "预填充（读入提示词）和解码（逐词生成）被放在同一批GPU上混合调度，两者互相干扰，系统要么牺牲首词延迟，要么牺牲每词延迟，或者靠堆更多GPU硬撑。",
+ "idea": "把预填充和解码拆到不同的GPU上，各自按需要选择并行方案和资源数，并按集群带宽摆放以压低两者之间传输KV缓存的开销。",
+ "impact": "确立了「预填充-解码分离」的部署范式，后来被Mooncake、NVIDIA Dynamo等生产系统采用。",
+ "method": "预填充是计算密集的，一次处理整段提示；解码是访存密集的，每步只生成一个词。在[[orca-serving]]、[[vllm]]的连续批处理里，新请求的预填充会插进正在解码的批次，让正在生成的请求卡顿；服务质量又同时看首词延迟TTFT和之后每词延迟TPOT。\n\nDistServe的做法：预填充用一组GPU，解码用另一组，预填充完成后把KV缓存（见[[c:kv-cache]]）传给解码GPU。两个阶段可以独立选择张量并行或流水线并行的度数，再由搜索算法在给定TTFT和TPOT目标下，寻找每张GPU上单位时间内能满足延迟目标的最大请求率（作者称之为goodput）。",
+ "results": "论文称在多种模型和应用上，相比现有系统，同等条件下可服务7.4倍的请求量，或满足12.6倍更紧的延迟目标。",
+ "legacy": "此后KV缓存的跨机传输成为独立的研究方向，见[[mooncake]]；[[nvidia-dynamo]]把分离式服务做成通用框架。",
+ "limits": [
+  {
+   "text": "KV缓存要在两组GPU间传输，需要高带宽互联，网络较慢的集群收益会缩小。",
+   "solved_by": [
+    "mooncake"
+   ]
+  },
+  {
+   "text": "预填充和解码的GPU比例要随负载变化，静态划分在负载波动时利用率下降。",
+   "solved_by": [
+    "nvidia-dynamo"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "vllm",
+   "type": "solves",
+   "note": "vLLM把两阶段混批，互相干扰；DistServe通过物理分离消除这种干扰。"
+  },
+  {
+   "to": "orca-serving",
+   "type": "solves",
+   "note": "Orca的迭代级调度仍将预填充与解码混合，DistServe让两者各自独立扩缩。"
+  }
+ ],
+ "prereq": [
+  "kv-cache",
+  "throughput-latency",
+  "distributed-training",
+  "training-vs-inference"
+ ],
+ "terms": [
+  {
+   "t": "TTFT/TPOT",
+   "d": "首词延迟和之后每个词的间隔，分别对应预填充和解码阶段。"
+  }
+ ],
+ "learn": "先读vLLM和Orca，理解连续批处理 → 读本文第2节对干扰的分析和第4节放置算法 → 看开源实现或Dynamo文档。",
+ "check": {
+  "source": "https://arxiv.org/abs/2401.09670",
+  "confirmed": "标题、作者、2024-01-18；摘要的7.4倍请求量与12.6倍延迟目标；摘要原文：7.4x more requests or 12.6x tighter SLO，且超过90%的请求满足延迟约束。"
+ }
+}

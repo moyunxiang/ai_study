@@ -1,0 +1,109 @@
+{
+  "id": "detr",
+  "who": "Nicolas Carion, Francisco Massa, Gabriel Synnaeve, Nicolas Usunier, Alexander Kirillov, Sergey Zagoruyko · Facebook AI",
+  "venue": "ECCV 2020",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2005.12872"
+    },
+    {
+      "label": "官方代码",
+      "url": "https://github.com/facebookresearch/detr"
+    }
+  ],
+  "problem": "主流检测器靠大量手工部件：预先铺设成千上万个锚框、按IoU规则分配正负样本、最后用非极大值抑制删除重复框，流程复杂且每个部件都要调参。",
+  "idea": "把检测直接看成“预测一个集合”：Transformer解码器用100个可学习的查询向量并行输出100个预测，训练时用匈牙利算法把预测和真实物体一一配对，重复预测自然受罚，不再需要锚框和NMS。",
+  "impact": "第一个端到端、没有锚框和NMS的检测器，精度与精调的Faster R-CNN持平；“对象查询 + 二分图匹配”成为之后检测、分割、开放词表检测乃至SAM 3的基础框架。",
+  "background": "到2020年，[[faster-rcnn]]、[[retinanet]]这类检测器（见[[c:vision-tasks]]）已经很准，但它们并不直接输出“图里有哪些物体”。它们先在图上铺满锚框（见[[c:anchor-nms]]），对每个锚框判断是否有物体、需要怎样微调；训练时用IoU阈值规定哪些锚框算正样本；推理时同一个物体会被许多相邻锚框重复检出，只能事后用非极大值抑制（NMS）按分数删掉重叠框。\n\n这些部件编码了大量人工先验，锚框尺寸、IoU阈值、NMS阈值都要按数据集调；NMS还不可微，模型无法在训练中学会“别重复”。论文的问题是：能不能像机器翻译直接输出一句话那样，让网络直接输出一个物体集合？",
+  "method": "**结构**。[[resnet]]-50骨干把图像变成1/32分辨率的特征图，压成2048→256维后展平成一串“图像token”，加上二维正弦位置编码，送进6层[[transformer]]编码器做全局自注意力。解码器有`N = 100`个可学习的向量，称为**对象查询**；它们通过自注意力互相交流（避免重复），通过交叉注意力从图像特征里取信息，6层后每个查询经一个小前馈网络输出一个类别（含“无物体”类∅）和一个框（中心、宽、高的归一化坐标）。100个预测是并行产生的，不是逐个生成。\n\n**集合损失**。一张图可能只有5个物体，却有100个预测。先在所有“预测—真值”配对中找总代价最小的一一对应：\n\n`σ̂ = argmin_σ Σᵢ L_match(yᵢ, ŷ_σ(i))`\n\n代价由类别概率和框的差距（L1距离加广义IoU）组成，用匈牙利算法在多项式时间内求解。配上的预测按真值计算分类和框回归损失，没配上的95个预测都被要求输出“无物体”。由于每个真值只认一个预测，两个查询抢同一个物体时总有一个受罚，模型自己学会不重复，NMS因此多余。每层解码器后都加辅助损失。",
+  "results": "COCO验证集上，ResNet-50版DETR（约4100万参数）AP 42.0，与同样参数量、加强训练的Faster R-CNN-FPN（42.0）持平，速度也相近（28对26帧每秒）。分大小看差异明显：大物体AP 61.1，比Faster R-CNN高7.8；小物体AP 20.5，低5.5。去掉编码器，AP下降3.9，大物体下降6.0，说明全局自注意力对分开大物体很重要。加一个掩码头后可直接做[[panoptic-segmentation]]。代价是训练很慢：基线在16块V100上训练300轮要3天，最终结果训了500轮，而Faster R-CNN通常只需几十轮。",
+  "legacy": "DETR的两个明显缺陷——收敛慢、小物体差——半年后被[[deformable-detr]]用稀疏的可变形注意力和多尺度特征解决，[[dino-detr]]进一步加入去噪训练把COCO精度推到新高，[[rt-detr]]做到实时。“查询 + 二分图匹配”被推广到分割（[[maskformer]]、[[mask2former]]）、图文检测（[[mdetr]]、[[owl-vit]]、[[grounding-dino]]）、自动驾驶感知（[[bevformer]]），[[sam-3]]的检测器也基于DETR。[[yolov10]]借用一对一匹配的思路去掉了YOLO的NMS。",
+  "pitfalls": "- DETR并没有在所有指标上超过Faster R-CNN：它强在大物体，弱在小物体，总AP打平。\n- “端到端”不代表训练简单：匈牙利匹配在训练初期很不稳定，同一个查询在相邻两轮可能被分配给不同物体，这是收敛慢的主要原因之一。",
+  "limits": [
+    {
+      "text": "收敛极慢，需要500轮训练，是Faster R-CNN的十倍以上。",
+      "solved_by": [
+        "deformable-detr",
+        "dino-detr"
+      ]
+    },
+    {
+      "text": "只用1/32分辨率的单层特征，小物体AP比Faster R-CNN低5.5。",
+      "solved_by": [
+        "deformable-detr"
+      ]
+    },
+    {
+      "text": "编码器的全局自注意力随像素数平方增长，无法直接用于高分辨率多尺度特征。",
+      "solved_by": [
+        "deformable-detr"
+      ]
+    },
+    {
+      "text": "推理速度和部署友好度不如YOLO系列，难以用在实时场景。",
+      "solved_by": [
+        "rt-detr"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "transformer",
+      "type": "uses",
+      "note": "直接使用编码器—解码器Transformer，只是把自回归逐词解码改成100个查询并行解码。"
+    },
+    {
+      "to": "faster-rcnn",
+      "type": "solves",
+      "note": "去掉了Faster R-CNN的锚框、按IoU规则分配正负样本和NMS后处理，以端到端方式达到同等AP。"
+    },
+    {
+      "to": "retinanet",
+      "type": "rivals",
+      "note": "同为一次性密集预测，但RetinaNet仍靠锚框和NMS，DETR改用一对一匹配；DETR路线后来在精度上胜出，单阶段锚框检测仍在实时场景中常用。"
+    },
+    {
+      "to": "fpn",
+      "type": "rivals",
+      "note": "DETR只用单尺度特征，小物体明显落后于FPN类检测器；作者明确期待类似FPN的改进，后由Deformable DETR补上多尺度。"
+    },
+    {
+      "to": "resnet",
+      "type": "uses",
+      "note": "以ResNet-50/101作为骨干提取图像特征。"
+    },
+    {
+      "to": "panoptic-segmentation",
+      "type": "extends",
+      "note": "加一个掩码头即可统一处理物体和背景区域的全景分割，在COCO测试集上达到46 PQ。"
+    }
+  ],
+  "prereq": [
+    "self-attention",
+    "encoder-decoder",
+    "vision-tasks",
+    "anchor-nms",
+    "iou-map",
+    "positional-encoding"
+  ],
+  "terms": [
+    {
+      "t": "对象查询（object query）",
+      "d": "解码器的N个可学习输入向量，每个最终输出一个预测（某个物体或“无物体”），相当于N个检测“槽位”。"
+    },
+    {
+      "t": "二分图匹配 / 匈牙利算法",
+      "d": "在预测集合与真值集合之间找总代价最小的一对一配对的经典算法，复杂度为多项式级。"
+    },
+    {
+      "t": "广义IoU（GIoU）",
+      "d": "IoU的推广，两框不相交时仍能根据距离给出有意义的梯度，常用作框回归损失。"
+    }
+  ],
+  "learn": "先懂[[c:self-attention]]、[[c:encoder-decoder]]和[[c:anchor-nms]]。读原文第3.1节（集合损失）和附录里约50行的PyTorch推理代码。动手：用scipy.optimize.linear_sum_assignment写一个匈牙利匹配损失，再加载官方预训练DETR，可视化100个查询的预测框分布。",
+  "check": {
+    "source": "https://arxiv.org/abs/2005.12872",
+    "confirmed": "标题、6位作者、arXiv v1（2020-05）；正文表1中DETR 42.0 AP、AP_S 20.5、AP_L 61.1、41M参数、28 FPS，Faster RCNN-FPN+ 42.0、26 FPS；AP_L +7.8、AP_S −5.5；去编码器−3.9/−6.0 AP；N=100；16块V100训练300轮3天、长训练500轮。"
+  }
+}
