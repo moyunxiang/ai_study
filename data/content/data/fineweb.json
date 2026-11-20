@@ -1,0 +1,110 @@
+{
+  "id": "fineweb",
+  "who": "Guilherme Penedo, Hynek Kydlíček, Loubna Ben allal, Anton Lozhkov, Margaret Mitchell, Colin Raffel, Leandro Von Werra, Thomas Wolf · Hugging Face",
+  "venue": "NeurIPS 2024 Datasets and Benchmarks",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2406.17557"
+    },
+    {
+      "label": "FineWeb数据集",
+      "url": "https://huggingface.co/datasets/HuggingFaceFW/fineweb"
+    },
+    {
+      "label": "FineWeb-Edu数据集",
+      "url": "https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu"
+    }
+  ],
+  "problem": "Llama 3、Mixtral等开源权重模型都不公开预训练数据和清洗方法；公开的网页语料要么规模不够，要么训出来的模型明显更差，社区不知道哪些处理步骤真正有用。",
+  "idea": "在96个Common Crawl快照上逐步做消融、搭出清洗流水线，得到15万亿token的FineWeb；再用Llama-3-70B给网页打“教育价值”分并训练分类器，筛出1.3万亿token的FineWeb-Edu。",
+  "impact": "成为公开网页语料的新基线，训出的模型优于此前所有公开网页数据集；FineWeb-Edu展示了“用大模型标注、训练小分类器筛数据”的威力，这种做法迅速成为预训练数据处理的标准步骤。",
+  "background": "从[[c4]]开始，网页语料的处理大体是“抽文本—语言识别—启发式规则过滤—去重”。[[gopher]]的MassiveText加入了更多质量规则，[[refinedweb]]证明只用精心处理的网页数据也能训出好模型，但只公开了其中一部分；[[dolma]]、RedPajama等开放了更多数据，效果却普遍不如闭源配方。\n\n到2024年，[[llama-3]]用了超过15万亿token预训练，Meta只在博客里透露用Llama 2生成训练数据、训练了文本质量分类器，数据本身和细节都没有公开。开放社区面对的问题是：数十个快照的Common Crawl该怎么抽取、怎么去重、哪些过滤规则真的提升模型，而不是凭直觉堆规则。",
+  "method": "**消融驱动**。每个设计选择都用同样的方式检验：用候选数据训练一个约17亿参数的小模型（通常280亿token），在一组对早期训练敏感的基准上比较。\n\n**流水线**。\n\n- 文本抽取：不用Common Crawl自带的WET纯文本（残留大量菜单和样板），而是从原始WARC网页用trafilatura重新抽取，效果明显更好。\n- 基础过滤：URL黑名单、fastText语言识别只留英语、MassiveText的质量与重复规则，此时约有36万亿token。\n- 去重：用MinHash做模糊去重。一个反直觉的发现是：跨所有快照做全局去重反而让模型变差，因为老快照里被保留下来的往往是各快照都没出现过的低质量内容；改为每个快照内部单独去重效果更好。\n- 再过滤：测试了C4的各条规则，保留除“句末标点”外的全部（这条删得太多）；又统计好坏数据集的差异，新增了几条自定义规则；最后匿名化邮箱和IP地址。\n\n**FineWeb-Edu**。用Llama-3-70B-Instruct给46万个随机网页按0–5分打“教育价值”分，用其中41万条合成标注，在Snowflake-arctic-embed-m嵌入模型上训练一个线性回归打分器，阈值取3分时验证集F1为82%。把它跑遍15万亿token用了约6000个H100 GPU小时，保留下来的1.3万亿token就是FineWeb-Edu。",
+  "results": "用17亿参数模型训练3500亿token对比：FineWeb整体优于RefinedWeb、C4、Dolma、The Pile、SlimPajama、RedPajama2等公开网页数据集。FineWeb-Edu在知识与推理基准上进一步大幅领先：MMLU从33%提到37%，ARC从46%提到57%；在MMLU上，它只需约十分之一的token就能达到Matrix语料训练到最后的水平。",
+  "legacy": "FineWeb和FineWeb-Edu很快成为开源小模型和数据研究的常用预训练语料，团队后续还推出了多语种的[[fineweb2]]。同月发布的[[dclm]]也用模型分类器筛选数据并得到相近结论，两者共同确立了“用大模型标注质量、训练轻量分类器大规模筛选”的范式；[[nemotron-cc]]则进一步讨论如何在高质量与保留足够token之间取舍。另一面，教育分类器按单一标准打分，可能系统性地偏向某类文体和主题，被筛掉的不一定都是低质量内容，过滤强度与数据多样性之间的权衡仍在讨论中。",
+  "pitfalls": "- FineWeb-Edu只有FineWeb的不到十分之一，对知识型基准很好，但在常识类任务（如HellaSwag）上优势不明显，阈值越高越偏科。\n- 消融都用17亿参数的小模型做，某些结论放到大模型上未必完全成立。",
+  "limits": [
+    {
+      "text": "只有英语，其他语言的清洗流程和质量判断需要重新研究。",
+      "solved_by": [
+        "fineweb2"
+      ]
+    },
+    {
+      "text": "质量判断依赖Llama-3-70B眼中的“教育价值”，会把偏好写进数据，可能误删有价值的非教科书式内容。",
+      "solved_by": []
+    },
+    {
+      "text": "严格的分类器过滤丢掉了九成以上的数据，对需要训练数十万亿token的大模型来说高质量数据不够用。",
+      "solved_by": [
+        "nemotron-cc"
+      ]
+    },
+    {
+      "text": "仍然来自网页爬取，版权、授权与网站拒绝爬虫等问题没有解决。",
+      "solved_by": [
+        "common-pile",
+        "consent-in-crisis"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "refinedweb",
+      "type": "extends",
+      "note": "沿用RefinedWeb“只用网页数据、精心清洗”的思路，把公开规模扩到15万亿token，并完整公开每一步的消融。"
+    },
+    {
+      "to": "common-crawl",
+      "type": "uses",
+      "note": "原料是96个Common Crawl快照的原始WARC网页。"
+    },
+    {
+      "to": "llama-3",
+      "type": "uses",
+      "note": "用Llama-3-70B-Instruct为46万个网页打教育价值分，作为训练质量分类器的合成标注。"
+    },
+    {
+      "to": "llama-3",
+      "type": "solves",
+      "note": "Llama 3等模型不公开数据配方，FineWeb把同量级（15万亿token）的数据和完整流程公开出来。"
+    },
+    {
+      "to": "c4",
+      "type": "uses",
+      "note": "逐条测试C4的启发式过滤规则，保留了除句末标点规则外的全部。"
+    },
+    {
+      "to": "textbooks",
+      "type": "extends",
+      "note": "phi-1提出“教科书式”数据更有效；FineWeb-Edu把这个想法用分类器推广到万亿token规模的网页数据上。"
+    }
+  ],
+  "prereq": [
+    "pretrain-finetune",
+    "language-model",
+    "tokenization",
+    "ablation-baseline",
+    "classification-metrics"
+  ],
+  "terms": [
+    {
+      "t": "WARC / WET",
+      "d": "Common Crawl的两种文件：WARC保存原始网页HTML，WET是官方抽好的纯文本。WET速度快但混着大量导航菜单。"
+    },
+    {
+      "t": "MinHash去重",
+      "d": "把每篇文档切成短语片段，用多组哈希函数压缩成签名，签名相似的文档被视为近似重复，可在数十亿文档上高效运行。"
+    },
+    {
+      "t": "合成标注",
+      "d": "让大模型代替人给数据打标签，再用这些标签训练一个便宜的小模型，去处理人或大模型都无法逐条看完的海量数据。"
+    }
+  ],
+  "learn": "先读[[c4]]了解最早的网页清洗规则。读原文第3节（每一步的消融，尤其是3.4节去重）和第4节（FineWeb-Edu）。动手：从FineWeb-Edu和FineWeb各抽1000篇文档，用Hugging Face公开的教育分类器打分并对比分布，再自己读几篇3分以下被筛掉的文档，判断分类器的取舍是否合理。",
+  "check": {
+    "source": "https://arxiv.org/abs/2406.17557",
+    "confirmed": "标题、8位作者、arXiv v1提交于2024-06-25、NeurIPS 2024 Datasets and Benchmarks；摘要中的96个快照、15万亿token、1.3万亿token的FineWeb-Edu；PDF中trafilatura与WARC、约36万亿token、按快照去重优于全局去重、C4规则除句末标点外全部保留、PII匿名化、Llama-3-70B-Instruct标注46万网页0–5分、阈值3与F1 82%、约6000 H100 GPU小时、1.71B模型3500亿token对比、MMLU 33%→37%与ARC 46%→57%、约十分之一token追平Matrix；Llama 3博客（ai.meta.com/blog/meta-llama-3）中15T token与用Llama 2生成质量分类器训练数据。"
+  }
+}

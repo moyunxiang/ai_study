@@ -1,0 +1,28 @@
+{
+  "id": "speecht5",
+  "who": "Junyi Ao, Rui Wang, Long Zhou, Chengyi Wang, Shuo Ren, Yu Wu, Shujie Liu et al. · 微软亚洲研究院等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2110.07205"},
+    {"label": "代码与模型", "url": "https://github.com/microsoft/SpeechT5"}
+  ],
+  "problem": "语音预训练模型（wav2vec 2.0、HuBERT）只有编码器，只擅长识别类任务；生成语音、语音翻译还得另训模型，文本数据也用不上。",
+  "idea": "仿照T5做一个语音与文本共用的编码器-解码器，外面接六个分模态的前后处理网络，并用跨模态向量量化把两种模态对齐到同一语义空间。",
+  "impact": "第一次用一个预训练模型同时覆盖语音识别、合成、翻译、转换、增强和说话人识别，为后来的统一语音语言模型提供了范式。",
+  "method": "此前的语音自监督模型（[[wav2vec-2]]、[[hubert]]）只预训练编码器，识别时再接一个输出层；做语音合成这类需要「生成」的任务，解码器仍要从零训练。NLP这边的[[t5]]则把所有任务都写成「文本进、文本出」，用同一个[[c:encoder-decoder]]。SpeechT5把这个思路搬到语音上。\n\n结构上，中间是一个共享的Transformer编码器-解码器；语音和文本各有输入用的预处理网络（pre-net）和输出用的后处理网络（post-net），共六个。语音输入先变成声学特征，文本输入变成词向量，经共享主体后，再由对应的post-net生成文本或语音频谱。于是同一个主体既能做语音到文本（识别），也能做文本到语音（合成），还能做语音到语音（转换、增强）。\n\n预训练用两类无标注数据：未标注语音上做[[c:masked-modeling]]式的去噪重建，未标注文本上做类似的文本去噪。为让两种模态在同一空间里对齐，论文提出跨模态向量量化（见[[c:vector-quantization]]）：用一组共享的离散隐变量单元作为编码器与解码器之间的接口，训练时随机把一部分语音或文本状态替换成这些单元，迫使模型把两种模态映射到共同的语义表示。",
+  "results": "论文在语音识别、合成、翻译、转换、增强和说话人识别六类任务上做了微调评测，摘要称各项任务上都显示出该框架的优势。具体分数本次未逐项核对，故不列出。",
+  "limits": [
+    {"text": "预训练仍以较小规模的有限语音语料为主，且各任务需要分别微调，没有做到不微调、一个模型通吃。", "solved_by": ["whisper"]},
+    {"text": "模型输出的是连续频谱，合成语音的音质和零样本说话人克隆能力有限；后来的路线改用离散编码器token并用语言模型生成。", "solved_by": ["vall-e", "audiolm"]}
+  ],
+  "relations": [
+    {"to": "t5", "type": "extends", "note": "沿用T5的统一编码器-解码器思路，从纯文本推广到语音与文本两种模态。"},
+    {"to": "hubert", "type": "extends", "note": "在只预训练编码器的语音自监督基础上，补上预训练的解码器，使生成类任务也能受益。"},
+    {"to": "wav2vec-2", "type": "extends", "note": "继承其用无标注语音做自监督预训练的做法，但同时加入文本数据并面向多种任务。"}
+  ],
+  "prereq": ["self-supervised", "pretrain-finetune", "encoder-decoder", "masked-modeling", "vector-quantization"],
+  "terms": [
+    {"t": "pre-net / post-net", "d": "放在共享主体前后的小网络，负责把语音或文本转成主体能处理的向量，并把主体输出转回对应模态。"}
+  ],
+  "learn": "先补[[c:self-supervised]]与[[c:encoder-decoder]]，再读[[t5]]了解统一文本到文本的思路；读SpeechT5原文的模型结构与跨模态向量量化两节；动手可用Hugging Face中发布的SpeechT5模型试做合成或识别。",
+  "check": {"source": "https://arxiv.org/abs/2110.07205", "confirmed": "通过lookup.py核对标题、10位以上作者、arXiv v1日期2021-10-14，以及摘要中的共享编码器-解码器、六个分模态pre/post-net、跨模态向量量化和六类任务。"}
+}

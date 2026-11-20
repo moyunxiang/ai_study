@@ -1,0 +1,43 @@
+{
+  "id": "kneser-ney",
+  "who": "Reinhard Kneser, Hermann Ney · Philips Research Laboratories Aachen / RWTH Aachen",
+  "venue": "ICASSP 1995",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1109/icassp.1995.479394"},
+    {"label": "Goodman: A Bit of Progress in Language Modeling", "url": "https://arxiv.org/abs/cs/0108005"},
+    {"label": "Jurafsky & Martin《Speech and Language Processing》", "url": "https://web.stanford.edu/~jurafsky/slp3/"}
+  ],
+  "problem": "Katz回退在高阶计数为0时退到普通词频：Francisco总次数多，却几乎只跟在San后面，回退时它被高估，而能接在许多词后面的词被低估。",
+  "idea": "专门为回退设计低阶分布：一个词的低阶概率正比于它前面出现过多少种不同的词（接续计数），高阶部分则统一减去一个固定折扣D。",
+  "impact": "经Chen和Goodman改成插值、三折扣的修正版后，成为n-gram语言模型十几年的标准基线，也是早期神经语言模型对比的对象。",
+  "background": "[[katz-backoff]]（1987）是当时语音识别里最常用的n-gram平滑（见[[c:n-gram]]）：先用Good-Turing公式给见过的n-gram打折，空出的概率在高阶计数为0时按低一阶的模型分配。问题出在这个低阶模型本身——它就是普通词频。\n\n典型例子是「San Francisco」。Francisco在语料里出现很多次，但几乎只跟在San后面。模型遇到没见过的「on Francisco」而回退到一元模型时，Francisco因为总次数高拿到不小的概率；而Tuesday能接在on、by、last等许多词后面，在新上下文里其实更可能出现。回退分布只在高阶计数为0时才用，却按所有情况统计，问的不是同一个问题。",
+  "method": "Kneser和Ney的做法是**专门为回退优化低阶分布**：低阶概率不正比于一个词出现了多少次，而正比于它作为「新接续」出现过多少次，也就是它前面出现过多少种不同的词。二元情形下：\n\n`P_cont(w) = |{v : c(v w) > 0}| / |{(v, w′) : c(v w′) > 0}|`\n\n分子是w前面出现过的不同词的个数，分母是语料中不同二元组的总数。Francisco只跟过San，分子是1；Tuesday跟过几十种词，分子就大。\n\n高阶部分用**绝对折扣**代替Good-Turing：每个见过的n-gram计数都减去同一个常数D（0到1之间，在留出数据上调）。原论文是回退形式：\n\n`P(w|h) = (c(h,w) − D) / c(h)`，若`c(h,w) > 0`\n`P(w|h) = α(h)·P_cont(w)`，若`c(h,w) = 0`\n\n`α(h)`保证概率总和为1。减常数的依据：Church和Gale在2200万词AP新闻上统计，训练中出现4次的二元组在另一份同样大的语料里平均只出现3.23次，出现2到9次的大致都少0.75左右。推广到三元时，二元和一元两层回退分布都换成接续计数。理论上，它来自「平滑后应保持已知的低阶边缘分布」这一要求。",
+  "results": "[[ngram-smoothing]]的Chen和Goodman在多种语料、数据量和阶数上比较，发现插值、多折扣的Kneser-Ney始终最好；Goodman（2001）称没见过胜过它的平滑方法。阶数越高优势越大：Katz平滑在三元附近最好、再往上反而变差，插值Kneser-Ney直到20-gram都基本单调改进，在2.8亿词训练数据上6-gram仍比5-gram好0.02比特。",
+  "legacy": "Chen和Goodman在1998年的技术报告里做了两处改动：改成插值形式（高阶计数非零时也混入低阶分布，因为一两次的计数本身不可靠），并给出现1次、2次、3次及以上的n-gram各用一个折扣，称为修正Kneser-Ney。它成为此后n-gram的标准做法，KenLM（2013）就是专为大规模估计修正KN而写的工具。神经语言模型也拿它当对照：[[nplm]]、[[rnnlm]]都与Kneser-Ney 5-gram比较困惑度；[[lm1b]]基准里未剪枝KN 5-gram困惑度为67.6，组合以RNN为主的多种模型后再降35%。在网页规模语料上，[[large-lm-mt]]发现简单的Stupid Backoff能接近它。2006年Teh给出了插值Kneser-Ney的贝叶斯解释（层次Pitman-Yor过程）。",
+  "pitfalls": "- 绝对折扣本身来自Ney、Essen、Kneser 1994年的论文，这篇1995年论文的贡献是专为回退设计的接续分布，因此也有人称Kneser-Essen-Ney平滑。\n- 今天教材里讲的Kneser-Ney通常是Chen和Goodman的插值版或修正版，不是原论文的回退版。\n- 接续计数只用于低阶各层；最高阶仍用普通计数减折扣。",
+  "limits": [
+    {"text": "原始形式只在高阶计数为0时才用低阶分布，而且所有计数共用一个折扣D，对只出现一两次的n-gram估计偏差大。", "solved_by": ["ngram-smoothing"]},
+    {"text": "仍是按词形计数：「狗」和「猫」的统计互不相通，没见过的组合只能靠低阶分布兜底，无法利用词之间的相似性。", "solved_by": ["nplm", "rnnlm"]},
+    {"text": "上下文最多是前几个词，阶数一高需要存储的n-gram数量急剧膨胀，实际系统往往只能用到5-gram并要剪枝。", "solved_by": ["rnnlm", "lm-limits"]},
+    {"text": "接续计数要在全语料上统计并多遍处理，到万亿词规模时估计和存储都很昂贵。", "solved_by": ["large-lm-mt"]}
+  ],
+  "relations": [
+    {"to": "katz-backoff", "type": "solves", "note": "保留回退结构，但把Katz按词频估计的回退分布换成按接续计数估计，并用绝对折扣代替Good-Turing折扣。"},
+    {"to": "shannon-ngram", "type": "extends", "note": "仍是香农式的n-gram模型，改进的是数据稀疏时如何估计条件概率。"},
+    {"to": "hmm-asr", "type": "uses", "note": "为统计语音识别中的语言模型部分P(W)提供更好的估计，原论文发表在语音会议ICASSP上。"},
+    {"to": "perplexity-metric", "type": "uses", "note": "平滑方法的好坏用留出数据上的困惑度（交叉熵）衡量。"},
+    {"to": "brown-clustering", "type": "rivals", "note": "类别n-gram让相似词共享统计来对抗稀疏，Kneser-Ney则留在词级、改进回退分布；Chen和Goodman后来发现在好的平滑之上加类别模型只带来小幅改进。"}
+  ],
+  "prereq": ["language-model", "n-gram", "conditional-bayes", "mle", "perplexity", "cross-entropy"],
+  "terms": [
+    {"t": "绝对折扣", "d": "平滑时把每个见过的n-gram的计数都减去同一个小常数D（如0.75），把减下来的概率留给没见过的组合。"},
+    {"t": "接续概率", "d": "一个词作为「新搭配」出现的可能性，用它前面出现过多少种不同的词来估计，而不是它总共出现了多少次。"},
+    {"t": "回退与插值", "d": "回退只在高阶没见过时才用低阶估计；插值则总是把高阶和低阶按权重混合。"},
+    {"t": "修正Kneser-Ney", "d": "Chen和Goodman的改进版：插值形式，并对出现1次、2次、3次及以上的n-gram分别使用三个折扣。"}
+  ],
+  "learn": "先复习[[katz-backoff]]的回退公式与[[c:perplexity]] → 读Jurafsky & Martin《Speech and Language Processing》第3版n-gram一章的Kneser-Ney小节（Hong Kong与glasses的例子）→ 读Goodman《A Bit of Progress in Language Modeling》第2节和附录A → 动手：在几万词的语料上实现插值Kneser-Ney二元模型，与加一平滑、Katz回退比较留出集困惑度。",
+  "check": {
+    "source": "https://api.crossref.org/works/10.1109/icassp.1995.479394",
+    "confirmed": "Crossref：标题、作者R. Kneser与H. Ney、ICASSP-95（Detroit）第1卷181–184页；Semantic Scholar记录publicationDate 1995-05-09；OpenAlex机构为Philips GmbH Aachen研究实验室与RWTH Aachen Lehrstuhl für Informatik VI。原文摘要与实验数字因IEEE页面无法访问未核对，正文未引用原文数字。接续概率公式、Church-Gale的22M词/3.23/0.75、修正KN三折扣核对自Jurafsky & Martin SLP3（2023-01版）第3.7节；回退与插值KN公式、Katz在三元后变差而KN到20-gram单调、2.8亿词6-gram好0.02比特、保持边缘分布的论证核对自Goodman arXiv cs/0108005；LM1B的67.6与35%核对自arXiv 1312.3005摘要；1994年Ney-Essen-Kneser论文与Teh 2006技术报告见Wikipedia Kneser–Ney smoothing条目。"
+  }
+}
