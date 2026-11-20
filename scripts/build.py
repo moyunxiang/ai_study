@@ -307,6 +307,134 @@ def build_edges(nodes, order, content):
     return list(edges.values())
 
 
+def load_tree(nodes, order, track_keys):
+    """大方向、分支之间的分叉、每条分支下的主题线。给每个节点写入 n['th']，返回 (tree, threads)。"""
+    tree = {"groups": [], "forks": {}, "joins": []}
+    tp = DATA / "tree.json"
+    if not tp.exists():
+        warn("data/tree.json", "不存在，跳过树结构")
+    else:
+        tree = json.loads(tp.read_text(encoding="utf-8"))
+        seen = [k for g in tree.get("groups", []) for k in g.get("tracks", [])]
+        for k in track_keys:
+            if seen.count(k) != 1:
+                err("data/tree.json", f"分支 {k} 应恰好属于一个大方向，实际出现 {seen.count(k)} 次")
+            if k not in tree.get("forks", {}):
+                err("data/tree.json", f"forks 缺少分支 {k}")
+        for k in seen:
+            if k not in track_keys:
+                err("data/tree.json", f"groups 里的 {k!r} 不是分支")
+        for k, f in tree.get("forks", {}).items():
+            if k not in track_keys:
+                err("data/tree.json", f"forks 里的 {k!r} 不是分支")
+            if f.get("from") and (f["from"] not in track_keys or f["from"] == k):
+                err("data/tree.json", f"forks.{k}.from {f['from']!r} 无效")
+            if f.get("at") and f["at"] not in nodes:
+                err("data/tree.json", f"forks.{k}.at {f['at']!r} 不是已登记的节点")
+        for j in tree.get("joins", []):
+            for side in ("from", "to"):
+                if j.get(side) not in nodes:
+                    err("data/tree.json", f"joins 里的 {j.get(side)!r} 不是已登记的节点")
+
+    by_track = defaultdict(list)
+    for nid in order:
+        by_track[nodes[nid]["track"]].append(nid)
+    threads = {}
+    for k in track_keys:
+        p = DATA / "threads" / f"{k}.json"
+        where = f"data/threads/{k}.json"
+        ths, assign = [], {}
+        if not p.exists():
+            warn(where, "还没有主题线文件，整条分支暂时归入一条线")
+        else:
+            try:
+                d = json.loads(p.read_text(encoding="utf-8"))
+                ths, assign = d.get("threads") or [], d.get("assign") or {}
+            except Exception as e:  # noqa: BLE001
+                err(where, f"JSON解析失败：{e}")
+        good = []
+        for t in ths:
+            key = t.get("key") if isinstance(t, dict) else None
+            if not key or not ID_RE.match(key):
+                err(where, f"主题线 key {key!r} 只能用小写字母、数字、连字符")
+            elif key in [g["key"] for g in good]:
+                err(where, f"主题线 key {key!r} 重复")
+            elif not (t.get("name") or "").strip():
+                err(where, f"主题线 {key} 缺少 name")
+            else:
+                good.append({"key": key, "name": t["name"].strip(), "blurb": (t.get("blurb") or "").strip(),
+                             "from": t.get("from") or None, "via": t.get("via") or None})
+        if not good:
+            good, assign = [{"key": "all", "name": "全部", "blurb": "", "from": None, "via": None}], {}
+        elif not 5 <= len(good) <= 13:
+            warn(where, f"主题线 {len(good)} 条，规范要求6–12条")
+        tk = {t["key"]: t for t in good}
+        for t in good:
+            if len(t["name"]) > 12:
+                warn(where, f"主题线 {t['key']} 的名称过长：{t['name']}")
+            if len(t["blurb"]) > 48:
+                warn(where, f"主题线 {t['key']} 的 blurb 过长（{len(t['blurb'])} 字，限40字左右）")
+            if t["from"] and t["from"] not in tk:
+                err(where, f"主题线 {t['key']} 的 from {t['from']!r} 不存在")
+                t["from"] = None
+            if t["via"] and t["via"] not in nodes:
+                err(where, f"主题线 {t['key']} 的 via {t['via']!r} 不是已登记的节点")
+                t["via"] = None
+        for t in good:      # from 不能成环
+            seen, cur = set(), t
+            while cur and cur["from"]:
+                if cur["key"] in seen:
+                    err(where, f"主题线 {t['key']} 的 from 链成环")
+                    t["from"] = None
+                    break
+                seen.add(cur["key"])
+                cur = tk.get(cur["from"])
+        for nid, th in assign.items():
+            if nid not in nodes:
+                err(where, f"assign 里的 {nid!r} 不是已登记的节点")
+            elif nodes[nid]["track"] != k:
+                err(where, f"assign 里的 {nid} 属于分支 {nodes[nid]['track']}，不应出现在这里")
+            elif th not in tk:
+                err(where, f"{nid} 指向不存在的主题线 {th!r}")
+            else:
+                nodes[nid]["th"] = th
+        missing = [nid for nid in by_track[k] if "th" not in nodes[nid]]
+        for nid in sorted(missing, key=lambda i: date_key(nodes[i]["date"])):   # 以后新增的节点不至于让构建失败
+            par = next((q for q in nodes[nid]["parents"] if nodes[q]["track"] == k and "th" in nodes[q]), None)
+            nodes[nid]["th"] = nodes[par]["th"] if par else good[0]["key"]
+        if p.exists() and missing and len(good) > 1:
+            warn(where, f"{len(missing)} 个节点没有归入主题线，已按parent自动归入：{', '.join(missing[:8])}{'…' if len(missing) > 8 else ''}")
+        members = defaultdict(list)
+        for nid in by_track[k]:
+            members[nodes[nid]["th"]].append(nid)
+        for t in good:
+            ms = sorted(members[t["key"]], key=lambda i: date_key(nodes[i]["date"]))
+            if not ms:
+                err(where, f"主题线 {t['key']} 没有任何节点")
+                continue
+            if len(ms) < 3 and len(good) > 1:
+                warn(where, f"主题线 {t['key']} 只有 {len(ms)} 个节点")
+            t["n"], t["first"], t["last"] = len(ms), nodes[ms[0]]["date"], nodes[ms[-1]]["date"]
+            if t["via"] and date_key(nodes[t["via"]]["date"])[:4] > date_key(t["first"])[:4]:
+                warn(where, f"主题线 {t['key']} 的 via {t['via']} ({nodes[t['via']]['date']}) 晚于它的第一个节点 ({t['first']})")
+        good = [t for t in good if "n" in t]
+        ordered = []        # 分叉出来的线紧跟在母线后面
+
+        by_start = sorted(good, key=lambda t: date_key(t["first"]))     # 按起始时间排，分叉出来的线紧跟母线
+
+        def put(t):
+            ordered.append(t)
+            for c in by_start:
+                if c["from"] == t["key"]:
+                    put(c)
+        for t in by_start:
+            if not t["from"] or t["from"] not in {g["key"] for g in good}:
+                t["from"] = None
+                put(t)
+        threads[k] = ordered
+    return tree, threads
+
+
 def main():
     check_only = "--check" in sys.argv
     tracks = json.loads((DATA / "tracks.json").read_text(encoding="utf-8"))
@@ -315,6 +443,7 @@ def main():
     eras = json.loads(eras_path.read_text(encoding="utf-8")) if eras_path.exists() else []
 
     nodes, order = load_skeleton(set(track_keys))
+    tree, threads = load_tree(nodes, order, track_keys)
     content = load_content(nodes)
     concepts = load_concepts()
     check_links(nodes, content, concepts)
@@ -332,7 +461,7 @@ def main():
           f"，已有讲解 {len(content)}，边 {len(edges)}，概念 {sum(c['has'] for c in concepts.values())}/{len(concepts)}，错误 {len(errors)}，警告 {len(warnings)}")
     if "--stats" in sys.argv or not check_only:
         for k in track_keys:
-            print(f"  {k:8s} {by_track[k][1]:4d} / {by_track[k][0]:4d}")
+            print(f"  {k:8s} {by_track[k][1]:4d} / {by_track[k][0]:4d}   主题线 {len(threads[k]):2d}：" + "、".join(f"{t['name']}{t['n']}" for t in threads[k]))
     if check_only:
         sys.exit(1 if errors else 0)
     if errors and "--force" not in sys.argv:
@@ -344,7 +473,7 @@ def main():
     for nid in sorted(order, key=lambda i: (date_key(nodes[i]["date"]), track_keys.index(nodes[i]["track"]))):
         n = nodes[nid]
         c = content.get(nid, {})
-        g = {k: n[k] for k in ("id", "date", "tier", "kind", "title", "full", "track")}
+        g = {k: n[k] for k in ("id", "date", "tier", "kind", "title", "full", "track", "th")}
         g["who"] = c.get("who", "")
         for k in SHORT:
             g[k] = c.get(k, "")
@@ -359,7 +488,8 @@ def main():
                     slot["d"] = t["d"]
                 slot["nodes"].append(nid)
     dump = lambda p, o: p.write_text(json.dumps(o, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    dump(OUT / "graph.json", {"tracks": tracks, "eras": eras, "nodes": g_nodes, "edges": edges})
+    dump(OUT / "graph.json", {"tracks": tracks, "eras": eras, "groups": tree.get("groups", []), "forks": tree.get("forks", {}),
+                              "joins": tree.get("joins", []), "threads": threads, "nodes": g_nodes, "edges": edges})
     # 开放问题：没有 solved_by 的遗留问题
     dump(OUT / "open.json", [{"id": nid, "t": lim["text"]} for nid in order for lim in (content.get(nid, {}).get("limits") or [])
                              if isinstance(lim, dict) and lim.get("text") and not lim.get("solved_by")])
