@@ -625,20 +625,33 @@ function viewMe() {
 const LANE_W = 150, GUT = 58, ROW = 24, PADY = 10;
 let mapState = Object.assign({tier: 2, edges: 'trunk', off: [], zoom: 1}, store.get('map', {}));
 function lineage(id, depth) {
-  const set = new Set([id]);
-  const walk = (adj, key) => { let fr = [id]; for (let d = 0; d < depth && fr.length; d++) { const nx = []; for (const x of fr) for (const e of adj[x]) if (!set.has(e[key])) { set.add(e[key]); nx.push(e[key]); } fr = nx; } };
+  // 往前（它建立在什么之上）和往后（谁接着做）各走 depth 层；tree 只保留把每一层连到下一层的边，避免枢纽节点糊成一团
+  const set = new Set([id]), tree = new Set();
+  const walk = (adj, key) => {
+    const lvl = {[id]: 0}; let fr = [id];
+    for (let d = 0; d < depth && fr.length; d++) {
+      const nx = [];
+      for (const x of fr) for (const e of adj[x]) {
+        const y = e[key];
+        if (lvl[y] === undefined && !set.has(y)) { lvl[y] = d + 1; set.add(y); nx.push(y); }
+        if (lvl[y] === d + 1) tree.add(e);
+      }
+      fr = nx;
+    }
+  };
   walk(inn, 'from'); walk(out, 'to');
-  return set;
+  return {set, tree};
 }
 function viewMap(_, q) {
-  const focus = byId[q.focus] ? q.focus : null, depth = +(q.depth || 2);
+  const focus = byId[q.focus] ? q.focus : null; let depth = +(q.depth || 0), tree = null;
   const era = G.eras.find(e => e.id === q.era);
   const st = mapState;
   if (q.tier) st.tier = +q.tier;
   const only = trackBy[q.only] ? q.only : null;
   let nodes, lanes;
   if (focus) {
-    const set = lineage(focus, depth);
+    if (!depth) depth = lineage(focus, 2).set.size > 160 ? 1 : 2;      // 没指定层数时：连接太多的枢纽节点默认只看一层
+    const lin = lineage(focus, depth), set = lin.set; tree = lin.tree;
     nodes = G.nodes.filter(n => set.has(n.id));
     lanes = G.tracks.filter(t => nodes.some(n => n.track === t.key));
   } else {
@@ -674,7 +687,7 @@ function viewMap(_, q) {
 
   // 边：较早 → 较晚
   const vis = new Set(nodes.map(n => n.id));
-  let edges = G.edges.filter(e => vis.has(e.from) && vis.has(e.to));
+  let edges = G.edges.filter(e => vis.has(e.from) && vis.has(e.to) && (!tree || tree.has(e)));
   if (!focus && st.edges === 'trunk') edges = edges.filter(e => byId[e.from].tier === 1 && byId[e.to].tier === 1);
   if (!focus && st.edges === 'none') edges = [];
   const NW = LANE_W - 14;
