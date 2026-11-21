@@ -15,6 +15,7 @@
 - 搜索：认名字、英文原题、缩写和别名（DLM、OPSD）、作者、机构，也认概念和研究思路；中英文常见叫法互通；结果页把命中的东西画成树
 - 概念与思路（`#/concepts`）：基础概念和“研究思路”（一串论文共同在做的事，如在策略自蒸馏），每一条都画出它长在树上的哪些节点
 - 学习进度、收藏、笔记、自测卡片（只存在浏览器本地，可导出导入）
+- 设计说明（<https://moyunxiang.com/ai_study/design.html>）：不运行脚本就能读的静态页，讲清定位、信息结构、数据格式、每个页面的布局、树的画法、搜索规则、视觉规范和已知问题，附截图；给人或AI助手评审用
 
 ## 目录
 
@@ -30,6 +31,7 @@ data/aliases/<track>.json       已有节点的别名和缩写（搜索用）
 guide/                          内容规范（census 普查、content 讲解、threads 主题线、hot 补录当下热点与思路）
 scripts/build.py                校验并生成 docs/data/
 docs/                           静态站点（GitHub Pages从这里发布，无构建步骤）
+docs/design.html, docs/design/  设计说明页和它的截图；页里 <b data-stat="…"> 的数字由 build.py 每次构建重写
 ```
 
 ## 本地运行

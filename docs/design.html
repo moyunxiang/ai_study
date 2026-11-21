@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>设计说明 · AI脉络</title>
+<meta name="description" content="AI脉络（moyunxiang.com/ai_study）的完整设计说明：定位、信息结构、数据格式、每个页面的布局、演化树的画法、搜索规则、视觉规范、已知问题。纯静态页面，不需要运行脚本就能读。">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.dz{max-width:900px;margin:0 auto}
+.dz h2{font-size:26px;margin:46px 0 10px;padding-top:14px;border-top:1.5px solid var(--ink)}
+.dz h3{font-size:18.5px;margin:26px 0 6px}
+.dz p,.dz li{font-size:15.5px;line-height:1.75}
+.dz p{margin:.6em 0}
+.dz ul,.dz ol{padding-left:1.4em;margin:.5em 0}
+.dz a{text-decoration:underline;text-underline-offset:2px}
+.dz code{font:13px var(--mono);background:var(--paper-2);padding:1px 5px;border-radius:4px;word-break:break-word}
+.dz pre{font:12.5px/1.6 var(--mono);background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:12px 14px;overflow:auto;white-space:pre}
+.dz pre code{background:none;padding:0;font:inherit}
+.dz .tw{overflow-x:auto;margin:10px 0}
+.dz table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.6}
+.dz th,.dz td{border-bottom:1px solid var(--rule);padding:7px 10px 7px 0;text-align:left;vertical-align:top}
+.dz th{font:700 12px var(--sans);letter-spacing:.06em;color:var(--muted);white-space:nowrap}
+.dz td:first-child{white-space:nowrap}
+.dz td.w{white-space:normal}
+.dz b[data-stat]{font-weight:inherit}
+.dz figure{margin:18px 0}
+.dz figure img{display:block;max-width:100%;height:auto;border:1px solid var(--rule);border-radius:10px}
+.dz figure.m img{max-width:300px}
+.dz figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+.dz .toc{columns:2;column-gap:28px;font-size:14.5px;padding-left:1.4em}
+.dz .toc li{font-size:14.5px;line-height:1.9}
+.dz .box{border:1px solid var(--rule);border-radius:12px;background:var(--card);padding:12px 16px;margin:14px 0}
+.dz .box p{margin:.3em 0}
+@media (max-width:620px){.dz .toc{columns:1}}
+</style>
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme'));if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./">AI脉络</a>
+  <nav class="nav"><a href="./">← 回到网站</a><a class="on" href="design.html">设计说明</a><a href="https://github.com/moyunxiang/ai_study">源码</a></nav>
+</header>
+<main class="page"><div class="dz">
+
+<div class="mast">
+  <div class="eyebrow">设计说明 · 数据版本 <b data-stat="stamp">202611211953</b></div>
+  <h1>这个网站是怎么设计的</h1>
+  <p class="lead">网站本体（<a href="./">moyunxiang.com/ai_study</a>）的所有页面都由脚本在浏览器里渲染，而且全部挂在同一个地址的<code>#</code>后面，所以不运行脚本的读者——包括大多数只抓网页文字的AI助手——只能看到一个空壳。这一页是纯静态的，把定位、信息结构、数据格式、每个页面的布局、演化树的画法、搜索规则、视觉规范和已知问题一次讲完，供人或AI助手评审并提出改进建议。页面里的数字每次构建时自动更新。</p>
+</div>
+
+<div class="box">
+  <p><b>给评审者（包括AI助手）的说明。</b>读完这一页就能了解整个设计。需要看原始实现时，第12节列出了每个源文件的直接地址；需要看实际界面时，第13节有截图。最想听的意见在第11节。评审时请区分三类问题：结构与信息架构、交互与视觉、内容的准确性与覆盖面。</p>
+</div>
+
+<ol class="toc">
+  <li><a href="#goal">目标、读者与非目标</a></li>
+  <li><a href="#ia">信息结构：四层树、边、概念、思路</a></li>
+  <li><a href="#data">数据文件与构建</a></li>
+  <li><a href="#content">内容规范：一个节点写什么</a></li>
+  <li><a href="#pages">页面与路由</a></li>
+  <li><a href="#tree">演化树的画法</a></li>
+  <li><a href="#search">搜索</a></li>
+  <li><a href="#visual">视觉规范</a></li>
+  <li><a href="#tech">技术实现与部署</a></li>
+  <li><a href="#issues">已知问题与做过的取舍</a></li>
+  <li><a href="#ask">最想听到的建议</a></li>
+  <li><a href="#src">源文件地址</a></li>
+  <li><a href="#shots">截图</a></li>
+</ol>
+
+<h2 id="goal">1　目标、读者与非目标</h2>
+<p><b>一句话：</b>把AI从1943年到今天的发展画成一棵按时间生长的树。只有基本编程和大一数学基础的人，靠它按时间顺序读下来，就能入门AI研究的各个方向。</p>
+<p><b>读者：</b>中文读者；会一点编程、学过微积分和线性代数的入门内容；没有读过论文。界面和讲解全部是中文，专有名词保留英文原文。</p>
+<h3>成功标准</h3>
+<ul>
+  <li><b>全。</b>每条分支里真正有贡献的工作（论文、模型、系统、硬件、数据集、事件）都是树上的一个节点。</li>
+  <li><b>每个节点都有讲解。</b>当时卡在哪、它怎么解决、关键结果、留下什么问题、后来谁解决了这些问题。读者不看原文也能懂。</li>
+  <li><b>连接带含义。</b>节点之间的边有类型（解决、延续、使用、竞争）和一句说明，能回答“谁解决了谁的什么问题”。</li>
+  <li><b>零基础可入门。</b>讲解里遇到的概念都有词条可以点过去。</li>
+  <li><b>结构看得懂。</b>默认一屏总览，点开才展开细节。</li>
+  <li><b>能查。</b>现在大家在讨论的任何一篇论文、一个思路、一个概念，都能直接搜到（名字、英文原题、缩写、别名、中英文叫法都认），并且看到它长在树上的哪里。</li>
+  <li><b>能跟着学。</b>按时代、分支或主干路线阅读，记录学习进度。</li>
+  <li><b>事实可追溯。</b>每个节点记录写作时核对过的出处。</li>
+</ul>
+<h3>非目标</h3>
+<ul>
+  <li>不做后端、账号、评论。进度只存在浏览器本地，提供导出和导入。</li>
+  <li>不追求收录每一篇顶会论文，标准是“有贡献”或“读者现在很可能听到这个名字并来搜它”。</li>
+  <li>不做英文版。</li>
+</ul>
+
+<h2 id="ia">2　信息结构</h2>
+<h3>2.1　四层树</h3>
+<p>整个领域按“大方向 › 分支 › 主题线 › 节点”四层组织：6个大方向、<b data-stat="tracks">16</b>条分支、<b data-stat="threads">190</b>条主题线、<b data-stat="nodes">3309</b>个节点。大方向用一棵树来比喻：</p>
+<div class="tw"><table>
+  <tr><th>大方向</th><th>在树上的角色</th><th>包含的分支（括号里是代码里的key）</th></tr>
+  <tr><td>环境 · 社会</td><td class="w">气候：钱和人往哪边流、公众怎么看、谁来管</td><td class="w">思潮、机构与产业事件（biz）；安全、对齐与可解释性（safety）</td></tr>
+  <tr><td>语言与推理</td><td class="w">今天的主枝</td><td class="w">语言与NLP（nlp）→ Transformer与大语言模型（llm）→ 推理、检索与智能体（agent）</td></tr>
+  <tr><td>树干 · 学习方法</td><td class="w">所有分支共用的方法，画得最粗</td><td class="w">机器学习与深度学习基础（dl）</td></tr>
+  <tr><td>感知与生成</td><td class="w">大枝</td><td class="w">计算机视觉（vision）、语音与音频（speech）、生成模型（gen）、多模态理解（mm）</td></tr>
+  <tr><td>决策与真实世界</td><td class="w">大枝</td><td class="w">强化学习与博弈（rl）、具身智能与世界模型（robot）、AI for Science（sci）</td></tr>
+  <tr><td>土壤 · 数据、系统与算力</td><td class="w">树靠什么长</td><td class="w">数据集与评测（data）、系统、框架与效率（sys）、硬件与算力（hw）</td></tr>
+</table></div>
+<ul>
+  <li><b>分支之间有分叉关系。</b>每条分支记录它从哪条分支、在哪个节点处长出来，以及一句原因。例如大语言模型在2017年的Transformer处从NLP分叉，智能体在检索增强生成处从大语言模型分叉，系统在Theano处从硬件分叉。有7条分支是“独立的根”（没有母分支）。</li>
+  <li><b>一条分支只画一个母分支</b>，这是为了可读性做的简化。其余来源用14条手工挑选的“跨分支汇流”表示，例如“Transformer进入视觉（ViT）”“视觉语言模型直接输出动作（RT-2）”。</li>
+  <li><b>主题线</b>是分支下面的一层：沿着同一个问题接力的一串工作，规范允许每条分支6–12条，实际每条分支是11或12条，例如大语言模型下的“架构与组件”“长上下文与高效注意力”“非自回归与扩散”。每个节点只属于一条主题线；主题线之间也有“从哪条线分出来”的关系。</li>
+</ul>
+<h3>2.2　节点</h3>
+<ul>
+  <li><b>重要程度分三档：</b>主干必读（tier 1，<b data-stat="tier1">69</b>个，缺了就讲不通）、重要（tier 2，<b data-stat="tier2">702</b>个）、延伸（tier 3，<b data-stat="tier3">2538</b>个）。几乎所有列表和树都能按这三档过滤。</li>
+  <li><b>类型七种：</b>论文<b data-stat="kind_paper">2183</b>、事件<b data-stat="kind_event">279</b>、系统<b data-stat="kind_system">239</b>、数据集<b data-stat="kind_dataset">239</b>、模型<b data-stat="kind_model">129</b>、硬件<b data-stat="kind_hardware">121</b>、思想<b data-stat="kind_concept">119</b>。</li>
+  <li><b>时间</b>精确到年或月。另有9个<b>时代</b>（1943–1968起源、1969–1985寒冬与专家系统、1986–2005统计学习、2006–2011蓄力、2012–2016深度学习爆发、2017–2019 Transformer与预训练、2020–2022规模化与基础模型、2023–2024生成式AI浪潮、2025–2026推理、智能体与物理AI），时代和分支是两个正交的切法。</li>
+</ul>
+<h3>2.3　边</h3>
+<p>共<b data-stat="edges">12963</b>条，方向统一为“较早 → 较晚”，四种类型：解决（<b data-stat="rel_solves">5586</b>）、使用（<b data-stat="rel_uses">3328</b>）、延续（<b data-stat="rel_extends">2504</b>）、竞争（<b data-stat="rel_rivals">1545</b>）。每条边带一句说明。边有三个来源：登记表里的<code>parents</code>（默认算“延续”）、讲解里的<code>relations</code>（作者写明类型和说明）、讲解里“留下的问题”的<code>solved_by</code>（生成“解决”边，说明就是那个问题本身）。</p>
+<h3>2.4　基础概念与研究思路</h3>
+<ul>
+  <li><b>基础概念</b>（<b data-stat="concepts">206</b>个）：读讲解前要先会的知识，如梯度下降、注意力、KL散度。分13个领域、3个难度（预备、入门、进阶），有“先要会”的依赖关系。每个概念记录出处节点（例如“自回归生成”从香农1948年的工作开始）和所有用到它的节点。</li>
+  <li><b>研究思路</b>（<b data-stat="ideas">264</b>个）：大家讨论时挂在嘴边的做法和话题，例如“在策略自蒸馏”“扩散语言模型”“智能体群”“测试时训练”。它不是某一篇论文，而是一串论文共同在做的事。每个思路有中英文名、一组别名、一句话定义、两三段正文、出处节点和属于它的节点列表（至少2个）。</li>
+  <li><b>别名</b>：节点、主题线、概念、思路都可以带别名（缩写、中文译名、产品代号），只用于搜索和“也叫”一行。</li>
+</ul>
+<p>设计上的要求是：任何一篇论文、一个思路、一个概念，都必须落在树上——思路和概念通过“属于它的节点”落到树上，页面上直接画出来。</p>
+
+<h2 id="data">3　数据文件与构建</h2>
+<p>所有内容是仓库里的纯文本文件，由<code>scripts/build.py</code>校验并生成站点读取的JSON。没有数据库。</p>
+<div class="tw"><table>
+  <tr><th>文件</th><th>内容</th></tr>
+  <tr><td><code>data/tracks.json</code></td><td class="w">16条分支：key、名称、简称、色相、核心问题、简介、阶段划分</td></tr>
+  <tr><td><code>data/eras.json</code></td><td class="w">9个时代：起止年、一句话概括、当时的条件、各分支在攻克什么、热点、退潮、留给下一个时代什么、怎么读</td></tr>
+  <tr><td><code>data/tree.json</code></td><td class="w">6个大方向（<code>groups</code>）、分支的分叉（<code>forks</code>：<code>from</code>/<code>at</code>/<code>why</code>）、跨分支汇流（<code>joins</code>）。手写</td></tr>
+  <tr><td><code>data/skeleton/*.txt</code></td><td class="w">节点登记表，一行一个：<code>id | date | tier | kind | title | full | parents</code></td></tr>
+  <tr><td><code>data/threads/&lt;分支&gt;.json</code></td><td class="w">这条分支的主题线（<code>key,name,blurb,from,via,aka</code>）和每个节点归哪条线（<code>assign</code>）</td></tr>
+  <tr><td><code>data/content/&lt;分支&gt;/&lt;id&gt;.json</code></td><td class="w">一个节点的讲解，字段见第4节</td></tr>
+  <tr><td><code>data/concepts.txt</code>、<code>data/concepts/&lt;key&gt;.json</code></td><td class="w">基础概念的登记和正文；<code>data/concepts.aka.json</code>是它们的别名和出处节点</td></tr>
+  <tr><td><code>data/ideas/&lt;分支&gt;.json</code></td><td class="w">研究思路：<code>key,name,en,aka,blurb,body,origin,nodes</code></td></tr>
+  <tr><td><code>data/aliases/&lt;分支&gt;.json</code></td><td class="w">已有节点的别名：<code>{节点id: [别名…]}</code></td></tr>
+</table></div>
+<p>登记表的一行和一个思路的例子：</p>
+<pre><code>opsd | 2026-01 | 2 | paper | 在策略自蒸馏OPSD | Self-Distilled Reasoner: On-Policy Self-Distillation for Large Language Models | gkd, grpo, deepseek-r1
+
+{
+  "key": "on-policy-self-distillation",
+  "name": "在策略自蒸馏",
+  "en": "On-Policy Self-Distillation",
+  "aka": ["OPSD", "自蒸馏推理", "self-distillation"],
+  "blurb": "同一个模型既当老师又当学生：老师多看到参考答案，学生在自己生成的轨迹上向老师的输出分布靠拢。",
+  "body": "两三段话，可以用 [[节点id]] 和 [[c:概念key]] 链接。",
+  "origin": "opsd",
+  "nodes": ["gkd", "opsd", "dopsd"]
+}</code></pre>
+<h3>构建做的校验</h3>
+<ul>
+  <li>登记表：id唯一、日期格式、档位和类型合法、<code>parents</code>都已登记且不晚于自己、官方标题重复时警告。</li>
+  <li>讲解：只允许规定的字段，短字段有长度上限，<code>relations</code>必须指向更早的节点并写明类型和说明，正文里的<code>[[…]]</code>链接必须能解析。</li>
+  <li>树：6个大方向不重不漏地覆盖16条分支；分叉和汇流里的节点都存在；主题线的母线不能成环；每个节点都有主题线（漏写时按同分支的第一个parent自动归入并警告）。</li>
+  <li>思路：key不和概念冲突，至少2个已登记的节点，链接可解析。</li>
+</ul>
+<p>有任何错误就不生成输出。当前状态：0错误，4条有意保留的警告。</p>
+<h3>生成的文件</h3>
+<div class="tw"><table>
+  <tr><th>文件</th><th>大小（未压缩）</th><th>什么时候加载</th></tr>
+  <tr><td><code>docs/data/graph.json</code></td><td>约4.9MB</td><td class="w">打开任何页面时。分支、时代、大方向、主题线、全部节点（含三个短字段和别名）、全部边（含说明）</td></tr>
+  <tr><td><code>docs/data/concepts.json</code></td><td>约1.6MB</td><td class="w">打开任何页面时。概念、思路（含正文）和术语表</td></tr>
+  <tr><td><code>docs/data/content/&lt;分支&gt;.json</code></td><td>16个，共约7.8MB</td><td class="w">打开某个节点页时加载它所在分支的那一个；全文搜索时加载全部</td></tr>
+  <tr><td><code>docs/data/open.json</code></td><td>约0.3MB</td><td class="w">打开“开放问题”页时</td></tr>
+</table></div>
+<p>传输时服务器会压缩，前两个文件压缩后合计约2.5MB。</p>
+
+<h2 id="content">4　内容规范：一个节点写什么</h2>
+<p>每个节点一个JSON文件。短字段显示在卡片、列表和树的侧栏里，长字段是讲解页的正文。</p>
+<pre><code>{
+  "id": "与文件名一致",
+  "who": "主要作者 · 机构",
+  "venue": "NeurIPS 2017",
+  "links": [{"label": "arXiv", "url": "https://…"}],
+
+  "problem": "当时卡在哪里",        // 三个短字段，每个一两句话，约80字以内
+  "idea":    "它怎么解决的",
+  "impact":  "它改变了什么",
+
+  "background": "背景：当时的主流做法是什么，具体卡在哪",
+  "method":     "方法：核心机制，讲到读者能向别人复述，该有公式就给公式",
+  "results":    "结果：关键实验和数字",
+  "legacy":     "后续：它直接催生了什么，今天还在用吗",
+  "pitfalls":   "常见误解",
+
+  "limits":    [{"text": "它留下的一个具体问题", "solved_by": ["后来解决它的节点id"]}],
+  "relations": [{"to": "更早的节点id", "type": "solves | extends | uses | rivals", "note": "一句话"}],
+
+  "prereq": ["读懂这篇要先会的概念key，3–8个"],
+  "terms":  [{"t": "本篇新出现的术语", "d": "一两句大白话"}],
+  "learn":  "怎么学：先补什么 → 读原文哪几节 → 动手做什么",
+  "check":  {"source": "写作时实际打开核对的地址", "confirmed": "核对了什么"},
+  "aka":    ["别名", "缩写"]
+}</code></pre>
+<ul>
+  <li><b>写法：</b>面向没读过论文的人；先讲问题再讲解法；数字、作者、机构、日期只写打开原始出处确认过的；正文用空行分段，支持列表、粗体、行内代码和<code>[[链接]]</code>。</li>
+  <li><b>三档的要求不同：</b>主干节点要写满所有字段并讲透方法；延伸节点可以短，但三个短字段、留下的问题和关系必须有。</li>
+  <li><b>谁写的：</b>全部讲解、概念词条、思路、主题线划分和别名都由AI模型按<code>guide/</code>目录里的规范撰写，要求联网对照原文。站长只抽查了少量节点，没有逐条人工复核。站点页脚写明“仍可能有错，请以原文为准”。</li>
+  <li><b>规范文件：</b><code>guide/census.md</code>（收什么、怎么登记）、<code>guide/content.md</code>（讲解和概念词条怎么写）、<code>guide/threads.md</code>（主题线怎么划）、<code>guide/hot.md</code>（补录当下在讨论的工作、写思路、补别名）。</li>
+</ul>
+
+<h2 id="pages">5　页面与路由</h2>
+<p>单页应用，路由全部在<code>#</code>后面。顶栏固定：站名、8个导航（指南、路线、时代、分支、全景树、概念、开放问题、我的）、搜索框、主题切换。</p>
+<div class="tw"><table>
+  <tr><th>地址</th><th>页面</th><th>内容</th></tr>
+  <tr><td><code>#/</code></td><td>首页</td><td class="w">一句话介绍和5个数字；“从这里开始”三步；一张可点击的迷你总览树和6个大方向的卡片；8个“只想搞懂一样东西”的目标；9个时代；6个工具入口</td></tr>
+  <tr><td><code>#/guide</code></td><td>使用指南</td><td class="w">三种读法、怎么看树、节点页怎么读、图例、每个页面是干什么的</td></tr>
+  <tr><td><code>#/path</code></td><td>学习路线</td><td class="w">预备概念 → 按9个时代排好的主干节点；18个“按目标学”的入口；进度条；导出导入</td></tr>
+  <tr><td><code>#/eras</code>、<code>#/era/&lt;id&gt;</code></td><td>时代</td><td class="w">当时的条件、各分支在攻克什么、热点与退潮、留给下一个时代什么、这个时代的全部节点</td></tr>
+  <tr><td><code>#/tracks</code></td><td>分支总览</td><td class="w">大方向 › 分支 › 主题线的层级列表；每条分支有核心问题、分叉说明、每年工作量的小图、主题线标签；14条跨分支汇流</td></tr>
+  <tr><td><code>#/track/&lt;key&gt;</code></td><td>分支页</td><td class="w">这条分支自己的树（一行一条主题线）、主题线卡片、阶段划分、节点列表（按主题线或按阶段排）；<code>?th=</code>只看一条主题线</td></tr>
+  <tr><td><code>#/map</code></td><td>全景树</td><td class="w">见第6节。参数：<code>open=</code>展开哪些分支、<code>at=</code>定位到某节点、<code>focus=</code>只看某节点的来龙去脉（<code>depth=</code>层数）、<code>q=</code>只画某个搜索词的节点、<code>c=</code>只画某个概念或思路的节点、<code>era=</code>、<code>only=</code>、<code>dir=h|v</code>、<code>tier=</code></td></tr>
+  <tr><td><code>#/n/&lt;id&gt;</code></td><td>节点讲解</td><td class="w">见下面5.1</td></tr>
+  <tr><td><code>#/concepts</code></td><td>概念与思路</td><td class="w">思路按分支分组，概念按13个领域分组，最后是从各篇讲解汇总的术语表</td></tr>
+  <tr><td><code>#/c/&lt;key&gt;</code></td><td>概念页、思路页</td><td class="w">名称、英文名、“也叫”、一句话定义、它长在树上的哪里（出处节点被圈出）、正文、例子、常见误解、属于它或用到它的节点</td></tr>
+  <tr><td><code>#/search?q=</code></td><td>搜索结果</td><td class="w">见第7节</td></tr>
+  <tr><td><code>#/chain/&lt;id&gt;</code></td><td>学习链</td><td class="w">从零读懂某个节点要先读哪些：沿“建立在什么之上”往回找到源头，按时间排好。精简版和完整版</td></tr>
+  <tr><td><code>#/link/&lt;a&gt;/&lt;b&gt;</code></td><td>演进路径</td><td class="w">任选两个节点，找出图上连接它们的最短路径，每一步写明是什么关系</td></tr>
+  <tr><td><code>#/open</code></td><td>开放问题</td><td class="w">各节点“留下的问题”里还没有后续节点解决的，可按年份和分支筛</td></tr>
+  <tr><td><code>#/quiz</code></td><td>自测卡片</td><td class="w">先回忆再翻面；没答上的下次优先；四个范围（读过的、主干、没答上的、概念）</td></tr>
+  <tr><td><code>#/me</code></td><td>我的</td><td class="w">进度、在读、收藏、笔记，导出导入</td></tr>
+  <tr><td><code>#/year/&lt;年&gt;</code>、<code>#/stats</code>、<code>#/orgs</code></td><td>年度、统计、机构</td><td class="w">某一年各分支在做什么；每年节点数的堆叠柱状图和连接最多的节点；按机构统计</td></tr>
+</table></div>
+<h3>5.1　节点讲解页的结构（从上到下）</h3>
+<ol>
+  <li><b>页头：</b>面包屑（大方向 › 分支 › 主题线 · 时代）、标题、英文原题、日期、类型、档位、发表处、作者和机构；一排操作（学习状态、在全景树上的位置、只看来龙去脉、学习链、和另一个工作的联系、收藏、原文链接）。</li>
+  <li><b>三格摘要：</b>当时卡在哪、它怎么解决、改变了什么。不想读全文的人看到这里就够了。</li>
+  <li><b>它长在树上的哪里：</b>一棵小树，画出它所在的主题线、它直接建立其上的工作和直接接着它做的工作，只画和它相连的边；旁边列出它所属的思路。</li>
+  <li><b>正文：</b>先要会的概念 → 背景 → 方法 → 结果 → 后续 → 常见误解 → 本篇术语 → 它留下的问题（每条标出后来的解决者，或标“可能仍是开放问题”）→ 它建立在什么之上 → 后来谁接着做 → 怎么学 → 同一年别的分支在做什么 → 我的笔记。</li>
+  <li><b>页尾：</b>核对出处；本分支上一个、下一个节点；主干下一站。左右方向键翻页。</li>
+</ol>
+<p>正文栏宽812px，嵌入的小树用页面全宽（1180px）。</p>
+<h3>5.2　学习进度</h3>
+<p>每个节点和概念右侧有一个圆点，点一下在“未读 → 在读 → 已读”之间切换。已读的节点在树上加删除线。进度、收藏、笔记、自测的薄弱卡片、全景树的设置、主题选择都存在浏览器的localStorage里（键名以<code>aimap.</code>开头），可以导出成一个JSON文件再导入。</p>
+
+<h2 id="tree">6　演化树的画法</h2>
+<p>这是整个站点的核心可视化，由两个函数完成：<code>treeLayout</code>在抽象坐标里算位置（t是时间方向，c是横断方向），<code>treeDraw</code>把它映射成像素。横向（时间从左到右）和竖向（根在下、往上长）共用同一套布局，只在最后映射时不同。宽屏默认横向，窄于760px默认竖向，用户可以切换，选择会被记住。</p>
+<h3>6.1　行</h3>
+<ul>
+  <li>一行是一条分支，按大方向分组。树干（学习方法）在正中；排在树干前面的大方向里，分支倒序排，让更早的分支贴着树干。</li>
+  <li><b>收起的分支</b>只标“地标节点”：它的主干节点，不足3个时用连接最多的重要节点补足。行上画一条密度带，粗细随这一年这条分支的节点数起伏（高度与节点数的平方根成正比）。</li>
+  <li><b>展开一条分支</b>（点左边的分支名）：这一行变成一个标题行加若干主题线行，每条主题线一行，从它的母线分叉出来。可以同时展开多条，有“全部展开”和“全部收起”。展开后显示哪些节点由“主干 / + 重要 / 全部”三档控制。</li>
+  <li>仍然活跃的线（最后一个节点在最近两年内）末端画箭头并延伸到最右；已经停止的线画一个终止符并标“止于某年”。</li>
+</ul>
+<h3>6.2　时间轴</h3>
+<ul>
+  <li><b>非线性。</b>一年占多长，取决于这一年要画多少个节点：没有节点的年份压得很短，拥挤的年份拉长（横向时长度约为“节点数的0.7次方”的线性函数，上限200px）。1943年以前压成一小段，标“更早”。</li>
+  <li>缩放三档：适应屏幕、1×、2×。“适应”会把整棵树压进一屏宽，下限是原长的20%。</li>
+  <li>时代作为背景的交替色带，顶部固定一行时代名和年份刻度（可点进时代页和年度页）；左侧固定一列行名。</li>
+</ul>
+<h3>6.3　节点和标签</h3>
+<ul>
+  <li>节点是一个带圆点的文字标签（绝对定位的链接），不是纯圆点，所以不用悬停就能读出名字。主干节点24px高、加粗、带分支色的边框和底色；重要节点20px高、白底细边；延伸节点没有边框。标签最宽190px，超出截断。</li>
+  <li><b>不重叠：</b>每个标签沿时间方向占一段区间，同一行里放不下就换到下一子行（贪心装箱，先放主干节点），行高随子行数增长。竖向时每列固定宽126px，节点按时间往上叠。</li>
+</ul>
+<h3>6.4　线</h3>
+<ul>
+  <li><b>默认不画节点之间的边</b>，结构由行和分叉表达，否则一万多条边会糊成一团。</li>
+  <li>分支和主题线各有一条轨道（分支2.6px，树干5px，主题线1.6px），用分支的颜色；分叉用圆角折线从母线接到子线，接点在分叉节点的年份。没有母分支的几条根在最左边用一条竖线连起来。</li>
+  <li>跨分支汇流是灰色虚线，只在两端的分支都收起时画，可以整体关掉；鼠标停在线上显示说明。</li>
+  <li><b>悬停或点一个节点时</b>，才画出它的所有连接，其余节点变淡。四种边的画法：解决是红色实线，延续是灰色实线，使用是灰色虚线，竞争是绿色点线。</li>
+  <li>点节点后右侧滑出一个360px的讲解面板（窄屏时从底部升起，最高占62%）：三格摘要、它建立在什么之上、后来谁接着做、“读完整讲解”和“只看来龙去脉”。</li>
+</ul>
+<h3>6.5　同一套画法的几种用法</h3>
+<div class="tw"><table>
+  <tr><th>用法</th><th>在哪</th><th>画什么</th></tr>
+  <tr><td>总览</td><td class="w"><code>#/map</code>默认</td><td class="w">16行，一屏看完</td></tr>
+  <tr><td>迷你树</td><td class="w">首页、分支总览页</td><td class="w">不带标签的SVG：轨道、密度带、分叉、主干节点的圆点</td></tr>
+  <tr><td>分支的树</td><td class="w">分支页顶部</td><td class="w">只画一条分支，展开成主题线，背景分段换成这条分支自己的阶段</td></tr>
+  <tr><td>来龙去脉</td><td class="w"><code>#/map?focus=id</code></td><td class="w">只留这个节点往前往后各1、2、3层或全部的相关节点，边常显。连接太多的枢纽节点默认只看1层</td></tr>
+  <tr><td>话题树</td><td class="w"><code>#/map?q=</code>、<code>#/map?c=</code>，以及搜索页、概念页、思路页里嵌入的小树</td><td class="w">只画某个搜索词或某个概念、思路对应的节点，一行一条主题线；节点不超过90个（全景树里是220个）时画出它们之间的边</td></tr>
+  <tr><td>节点的位置</td><td class="w">节点页里嵌入的小树</td><td class="w">它的主题线加直接的前驱和后继，只画和它相连的边</td></tr>
+</table></div>
+<p>重画时（展开、切档、缩放）会保持视口中心对应的年份和被点那一行在屏幕上的位置，避免跳动。</p>
+
+<h2 id="search">7　搜索</h2>
+<p>完全在浏览器里做，没有服务端。顶栏输入时下拉显示前几条，回车进入结果页；按<code>/</code>聚焦搜索框。</p>
+<h3>7.1　索引里有什么</h3>
+<ul>
+  <li>节点：标题、英文原题、别名、作者机构、三个短字段、所在分支名；另有“英文原题首字母缩写”。</li>
+  <li>主题线：名称、简介、别名。</li>
+  <li>概念和思路：中文名、英文名、别名、一句话定义。</li>
+  <li>术语表里的术语。</li>
+  <li>可选的全文：16个分支的讲解正文，第一次用到时才下载。</li>
+</ul>
+<h3>7.2　打分</h3>
+<div class="tw"><table>
+  <tr><th>命中方式</th><th>分数</th></tr>
+  <tr><td>和标题完全相同</td><td>100</td></tr>
+  <tr><td>和某个别名完全相同</td><td>80</td></tr>
+  <tr><td>是标题或别名里的一个完整英文单词</td><td>70</td></tr>
+  <tr><td>是标题或别名的开头</td><td>60</td></tr>
+  <tr><td>出现在标题或别名中间</td><td>40</td></tr>
+  <tr><td>出现在其他主要字段里</td><td>20</td></tr>
+  <tr><td>是英文原题的首字母缩写</td><td>14</td></tr>
+  <tr><td>出现在次要字段里</td><td>6</td></tr>
+</table></div>
+<ul>
+  <li><b>同义词：</b>手写了约100组中英文同义叫法（如rl = 强化学习 = reinforcement learning，kd = 蒸馏），通过同义词命中的分数打八折。</li>
+  <li><b>短英文词</b>（4个字母以内）只在单词开头处匹配，避免“marl”命中人名里的片段。</li>
+  <li><b>多个词：</b>默认要求每个词都命中。整个查询正好等于某个标题或别名时直接算满分。完全命中的结果少于8条时，补上“只匹配了部分关键词”的结果，但必须包含最稀有的那个词，并按词的稀有程度加权。</li>
+  <li><b>中文长串</b>（4个字以上、没有空格、没有任何命中）自动切成两个词再搜。</li>
+  <li><b>自动全文：</b>标题和别名里命中的节点少于6个时，自动把讲解正文也搜一遍。</li>
+</ul>
+<h3>7.3　结果页（从上到下）</h3>
+<ol>
+  <li>“主题线、概念、思路与术语”：命中的非节点结果，用卡片显示。</li>
+  <li>“它在树上的位置”：一棵嵌入的小树。画哪些节点：最多3个强命中的主题线、概念或思路的全部成员，加上命中分数高的节点；都没有时取前30个节点。可以一键在全景树里打开。</li>
+  <li>“节点”：按分数排的列表，可改为按时间排。</li>
+  <li>“讲解正文里提到”：只在全文里命中的节点。</li>
+  <li>“只匹配了部分关键词”。</li>
+</ol>
+
+<h2 id="visual">8　视觉规范</h2>
+<p>风格是“暖纸色手帐”：衬线标题、米色纸张底、细线分隔、几乎不用阴影。和站长的其他子站是同一套。</p>
+<div class="tw"><table>
+  <tr><th>用途</th><th>浅色</th><th>深色</th></tr>
+  <tr><td>页面底色</td><td><code>#f3efe6</code></td><td><code>#171614</code></td></tr>
+  <tr><td>次级底色</td><td><code>#ebe5d8</code></td><td><code>#1f1d1a</code></td></tr>
+  <tr><td>卡片底色</td><td><code>#fbf9f4</code></td><td><code>#211f1b</code></td></tr>
+  <tr><td>正文</td><td><code>#1c1a16</code></td><td><code>#eeeae1</code></td></tr>
+  <tr><td>次级文字</td><td><code>#4a463e</code></td><td><code>#c9c3b6</code></td></tr>
+  <tr><td>弱化文字</td><td><code>#8a8478</code></td><td><code>#8e877a</code></td></tr>
+  <tr><td>分隔线</td><td><code>#d8d1c2</code> / <code>#e6e0d3</code></td><td><code>#37332d</code> / <code>#2c2925</code></td></tr>
+  <tr><td>红（“解决”边、悬停）</td><td><code>#b8321f</code></td><td><code>#ff8a73</code></td></tr>
+  <tr><td>绿（“竞争”边、已读）</td><td><code>#3f7a4a</code></td><td><code>#8fcf9b</code></td></tr>
+</table></div>
+<ul>
+  <li><b>分支色：</b>每条分支只定义一个色相，颜色由公式生成。主色是<code>hsl(色相 48% 40%)</code>，浅底是<code>hsl(色相 45% 88%)</code>；深色模式下分别是<code>62% 72%</code>和<code>28% 24%</code>。16个色相大致每隔24度取一个：大语言模型0、NLP 24、基础48、硬件72、具身96、强化学习120、科学144、语音168、系统192、视觉216、多模态240、数据264、生成288、安全312、智能体336；产业事件用低饱和的30。</li>
+  <li><b>字体：</b>标题用衬线（宋体系：Songti SC、Noto Serif CJK SC等），正文用系统无衬线（苹方等），数字等宽对齐。正文15px、行高1.6；讲解正文更大。不加载任何网络字体。</li>
+  <li><b>组件：</b>圆角12px的卡片；胶囊形按钮（32px高，小号26px）；带分支色小圆点的胶囊标签表示节点，方点灰底的表示概念；顶栏52px高，底部一条1.5px的黑线。</li>
+  <li><b>版心：</b>普通页面最宽1180px，讲解正文812px；全景树占满视口。</li>
+  <li><b>断点：</b>760px以下顶栏换成两行（导航横向滚动），全景树默认竖向；820px以下讲解面板从底部升起；720px以下三格摘要竖排。</li>
+  <li><b>主题：</b>跟随系统，也可以手动切到浅色或深色，三态循环。</li>
+  <li><b>打印：</b>隐藏顶栏、按钮和页脚，白底。</li>
+</ul>
+
+<h2 id="tech">9　技术实现与部署</h2>
+<ul>
+  <li><b>无依赖、无构建工具。</b>一个<code>index.html</code>、一个<code>app.js</code>（约125KB，未压缩未混淆）、一个<code>style.css</code>（约28KB）。页面用模板字符串拼HTML后整体替换；树用绝对定位的链接加两层SVG。</li>
+  <li><b>哈希路由。</b>所有页面是<code>index.html#/…</code>。好处是纯静态托管、子路径零配置；代价见第10节。</li>
+  <li><b>数据：</b>启动时并行取<code>graph.json</code>和<code>concepts.json</code>，在内存里建好索引（按id、按分支、入边、出边、主题线成员、每年节点数）；讲解正文按分支懒加载并缓存。</li>
+  <li><b>缓存：</b>每次构建生成一个版本戳，写进<code>index.html</code>，所有脚本、样式和数据请求都带上它。</li>
+  <li><b>部署：</b>GitHub Pages从<code>main</code>分支的<code>/docs</code>目录发布，推送后约一分钟生效。本地预览是<code>python3 -m http.server -d docs</code>。</li>
+  <li><b>内容生产：</b>分支定义、时代划分、规范、校验和前端由站长和一个AI助手设计；节点普查、逐节点讲解、概念、主题线、思路和别名由多个后台AI代理按规范并行完成，每个代理只负责一条分支。</li>
+</ul>
+
+<h2 id="issues">10　已知问题与做过的取舍</h2>
+<h3>内容</h3>
+<ul>
+  <li><b>全部讲解由AI撰写，没有逐条人工复核。</b>规范要求打开原文核对并记录出处，但有一部分延伸节点是在查询工具被限流时凭模型记忆写的；2025–2026年的产品和行业事件有些只有二手来源。</li>
+  <li><b>覆盖面不均。</b>每条分支每轮补录有名额上限，另有约120个“该收但没排上”的近期工作和约380个更早的候选没收。</li>
+  <li><b>思路之间有重叠。</b>思路按分支各写一份，同一个话题可能出现两条（例如“测试时训练”和“测试时适应”、强化学习分支的“群体智能”和基础分支的“群体优化”）。</li>
+  <li><b>主题线的划分由模型完成</b>，多条分支都用满了12条的上限，个别线是为了凑上限合并的。</li>
+</ul>
+<h3>结构</h3>
+<ul>
+  <li><b>一条分支只有一个母分支</b>，多模态这类同时来自两边的分支只能画一边，另一边靠汇流虚线。</li>
+  <li><b>一个节点只属于一条分支、一条主题线</b>，跨领域的工作（例如同时属于强化学习和大语言模型的）只能选一边，靠思路层和边来补。</li>
+</ul>
+<h3>性能</h3>
+<ul>
+  <li><b>首屏数据大：</b>打开任何页面都要先取约6.5MB（压缩后约2.5MB）的两个文件，哪怕只看一个节点。</li>
+  <li><b>全文搜索第一次要下载全部16个讲解文件</b>（约7.8MB）。耗时没有测过。</li>
+  <li>全部展开且显示全部节点时，页面上有三千多个绝对定位的元素，页面很长很宽。这是预期内的极端情况，没有做虚拟滚动。</li>
+</ul>
+<h3>可达性与可见性</h3>
+<ul>
+  <li><b>搜索引擎和AI助手读不到内容：</b>哈希路由加脚本渲染，没有任何一个节点有独立的、不运行脚本就能读的地址。这一页是目前唯一的补救。</li>
+  <li><b>无障碍：</b>树是视觉化的，没有为读屏软件提供等价的结构；节点标签可以用Tab聚焦，但没有方向键导航；颜色对比度没有系统检查过。</li>
+  <li><b>没有分享卡片：</b>所有页面共用同一个标题和描述，分享到社交平台时看不出是哪个节点。</li>
+</ul>
+<h3>没有验证过的</h3>
+<ul>
+  <li>只在桌面Chrome上看过。没有在真机手机、Safari、Firefox上测试。</li>
+  <li>手机宽度下只有截图（见第13节的16–20），没有实际用手操作过。截图里能看到的问题：嵌入在搜索页、概念页、节点页里的小树，左侧的行名列固定168px，占了近一半宽度，树本身只剩约190px，必须横向滑动；节点页页头里很长的原文链接按钮会折成两行。</li>
+  <li>搜索只用约十几个查询词人工检查过第一屏，没有系统的评测集。</li>
+</ul>
+<h3>其他取舍</h3>
+<ul>
+  <li>进度只存本地，换设备会丢；没有同步。</li>
+  <li>同义词表是手写的，遇到搜不到的叫法只能靠补别名或补同义词。</li>
+  <li>树上默认不画边，读者可能意识不到点节点能看到连接；指南页里写了，但界面上的提示很弱。</li>
+</ul>
+
+<h2 id="ask">11　最想听到的建议</h2>
+<ol>
+  <li><b>信息架构：</b>“大方向 › 分支 › 主题线 › 节点”加上正交的“时代”“概念”“思路”，对一个入门者来说是不是层次太多？首页应该先把人带到哪里？</li>
+  <li><b>树的可读性：</b>一屏总览 → 点开分支 → 点节点看连接，这个三步模型是否直观？默认不画边、节点用文字标签、非线性时间轴，这三个决定有没有更好的替代？</li>
+  <li><b>“每个思路和概念都长在树上”</b>现在的做法是在页面里嵌一棵过滤后的小树。有没有更清楚的表达方式？</li>
+  <li><b>节点讲解页</b>的顺序和长度是否合适？三格摘要之后紧跟小树、再跟正文，会不会打断阅读？</li>
+  <li><b>搜索：</b>打分规则和结果页的五个区块是否合理？在不加后端的前提下，怎样系统地发现“搜不到”的词？</li>
+  <li><b>首屏性能：</b>怎样拆分<code>graph.json</code>最合算（例如把边的说明、别名、短字段拆成按需加载）？</li>
+  <li><b>可见性：</b>要不要在构建时为每个节点生成一个静态页面，让搜索引擎和AI助手能直接读？对纯静态托管来说代价多大？</li>
+  <li><b>内容质量：</b>在没有人力逐条复核的前提下，怎样排优先级去核对三千多篇AI写的讲解？怎样向读者标明每一篇的可信程度？</li>
+  <li><b>学习功能：</b>路线、学习链、自测卡片、进度，这些对真正想入门的人够用吗？缺什么？</li>
+  <li><b>手机上的体验：</b>竖向的树、底部升起的面板、横向滚动的导航，是否可用？</li>
+</ol>
+
+<h2 id="src">12　源文件地址</h2>
+<p>仓库：<a href="https://github.com/moyunxiang/ai_study">https://github.com/moyunxiang/ai_study</a>（公开）。下面是可以直接读取的原始文件地址：</p>
+<div class="tw"><table>
+  <tr><th>内容</th><th>地址</th></tr>
+  <tr><td>总览</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/README.md">https://raw.githubusercontent.com/moyunxiang/ai_study/main/README.md</a></td></tr>
+  <tr><td>前端逻辑</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/docs/assets/app.js">https://raw.githubusercontent.com/moyunxiang/ai_study/main/docs/assets/app.js</a></td></tr>
+  <tr><td>样式</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/docs/assets/style.css">https://raw.githubusercontent.com/moyunxiang/ai_study/main/docs/assets/style.css</a></td></tr>
+  <tr><td>构建与校验</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/scripts/build.py">https://raw.githubusercontent.com/moyunxiang/ai_study/main/scripts/build.py</a></td></tr>
+  <tr><td>收录规范</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/guide/census.md">https://raw.githubusercontent.com/moyunxiang/ai_study/main/guide/census.md</a></td></tr>
+  <tr><td>讲解规范</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/guide/content.md">https://raw.githubusercontent.com/moyunxiang/ai_study/main/guide/content.md</a></td></tr>
+  <tr><td>主题线规范</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/guide/threads.md">https://raw.githubusercontent.com/moyunxiang/ai_study/main/guide/threads.md</a></td></tr>
+  <tr><td>补录与思路规范</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/guide/hot.md">https://raw.githubusercontent.com/moyunxiang/ai_study/main/guide/hot.md</a></td></tr>
+  <tr><td>分支定义</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/tracks.json">https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/tracks.json</a></td></tr>
+  <tr><td>时代定义</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/eras.json">https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/eras.json</a></td></tr>
+  <tr><td>大方向、分叉、汇流</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/tree.json">https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/tree.json</a></td></tr>
+  <tr><td>一条分支的主题线（例）</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/threads/llm.json">https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/threads/llm.json</a></td></tr>
+  <tr><td>一条分支的思路（例）</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/ideas/llm.json">https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/ideas/llm.json</a></td></tr>
+  <tr><td>一个主干节点的讲解（例）</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/content/llm/transformer.json">https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/content/llm/transformer.json</a></td></tr>
+  <tr><td>一个近期节点的讲解（例）</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/content/agent/opsd.json">https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/content/agent/opsd.json</a></td></tr>
+  <tr><td>一张登记表（例）</td><td class="w"><a href="https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/skeleton/llm.txt">https://raw.githubusercontent.com/moyunxiang/ai_study/main/data/skeleton/llm.txt</a></td></tr>
+</table></div>
+
+<h2 id="shots">13　截图</h2>
+<p>桌面截图的窗口宽1440px、高900px（个别加高，图注里写明），手机截图宽390px，都来自无头Chrome，不是真机。编号02空缺。图片地址是<code>https://moyunxiang.com/ai_study/design/&lt;文件名&gt;</code>。</p>
+
+<figure><img src="design/01-home.jpg" alt="首页：标题AI脉络、一句话介绍、五个数字、开始学习按钮、从这里开始三步；下面是迷你总览树（16条彩色轨道按时间从左到右）和六个大方向的卡片" loading="lazy"><figcaption>01　首页（<code>#/</code>），窗口加高到1900px：页头、“从这里开始”三步、迷你总览树和六个大方向</figcaption></figure>
+<figure><img src="design/03-tree.jpg" alt="全景树总览：左侧是按大方向分组的16条分支名，右侧每条分支一行，带密度带、分叉曲线、地标节点和灰色的汇流虚线" loading="lazy"><figcaption>03　全景树总览（<code>#/map</code>）</figcaption></figure>
+<figure><img src="design/04-tree-open.jpg" alt="全景树里展开了大语言模型分支：一个标题行下面是多条主题线，每条一行，节点是带圆点的文字标签" loading="lazy"><figcaption>04　展开“大语言模型”分支（<code>#/map?open=llm</code>）</figcaption></figure>
+<figure><img src="design/05-tree-select.jpg" alt="在全景树上选中Transformer：它的连接被画出来，其余节点变淡，右侧是讲解面板" loading="lazy"><figcaption>05　选中一个节点：连线和右侧讲解面板（<code>#/map?at=transformer</code>）</figcaption></figure>
+<figure><img src="design/06-tree-focus.jpg" alt="来龙去脉模式：只保留Transformer前后一层的相关节点，边常显" loading="lazy"><figcaption>06　来龙去脉（<code>#/map?focus=transformer&amp;depth=1</code>）</figcaption></figure>
+<figure><img src="design/07-tree-topic.jpg" alt="话题树：只画搜索词dlm对应的节点，一行一条主题线" loading="lazy"><figcaption>07　话题树（<code>#/map?q=dlm</code>）</figcaption></figure>
+<figure><img src="design/08-tracks.jpg" alt="分支总览页：按大方向分段，每条分支有核心问题、分叉说明、每年工作量小图和主题线标签" loading="lazy"><figcaption>08　分支总览（<code>#/tracks</code>），窗口加高到1500px</figcaption></figure>
+<figure><img src="design/09-track.jpg" alt="大语言模型分支页：顶部是这条分支自己的树，一行一条主题线" loading="lazy"><figcaption>09　分支页（<code>#/track/llm</code>），窗口加高到1300px</figcaption></figure>
+<figure><img src="design/10-node.jpg" alt="节点讲解页：页头、三格摘要、它长在树上的哪里的小树、正文开头" loading="lazy"><figcaption>10　节点讲解页（<code>#/n/opsd</code>），窗口加高到2000px</figcaption></figure>
+<figure><img src="design/11-search.jpg" alt="搜索swarm rl的结果页：主题线概念思路卡片、它在树上的位置的小树、节点列表" loading="lazy"><figcaption>11　搜索结果（<code>#/search?q=swarm rl</code>），窗口加高到1600px</figcaption></figure>
+<figure><img src="design/12-idea.jpg" alt="思路页在策略自蒸馏：名称、也叫、一句话定义、它长在树上的哪里、正文" loading="lazy"><figcaption>12　思路页（<code>#/c/on-policy-self-distillation</code>），窗口加高到1600px</figcaption></figure>
+<figure><img src="design/13-concepts.jpg" alt="概念与思路列表页：思路按分支分组成网格" loading="lazy"><figcaption>13　概念与思路（<code>#/concepts</code>）</figcaption></figure>
+<figure><img src="design/14-path.jpg" alt="学习路线页：进度条、按目标学的卡片、预备概念" loading="lazy"><figcaption>14　学习路线（<code>#/path</code>），窗口加高到1200px</figcaption></figure>
+<figure><img src="design/15-tree-dark.jpg" alt="深色模式下的全景树，展开了视觉分支" loading="lazy"><figcaption>15　深色模式（<code>#/map?open=vision</code>）</figcaption></figure>
+<figure class="m"><img src="design/16-m-home.jpg" alt="手机宽度的首页" loading="lazy"><figcaption>16　手机：首页</figcaption></figure>
+<figure class="m"><img src="design/17-m-tree.jpg" alt="手机宽度的全景树，竖向，根在下" loading="lazy"><figcaption>17　手机：全景树（竖向）</figcaption></figure>
+<figure class="m"><img src="design/18-m-node.jpg" alt="手机宽度的节点讲解页" loading="lazy"><figcaption>18　手机：节点讲解页</figcaption></figure>
+<figure class="m"><img src="design/19-m-search.jpg" alt="手机宽度的搜索结果页" loading="lazy"><figcaption>19　手机：搜索结果</figcaption></figure>
+<figure class="m"><img src="design/20-m-idea.jpg" alt="手机宽度的思路页" loading="lazy"><figcaption>20　手机：思路页</figcaption></figure>
+
+<footer class="foot"><span>AI脉络 · 设计说明</span><span><a href="./">回到网站</a> · <a href="https://github.com/moyunxiang/ai_study">源码</a></span></footer>
+</div></main>
+</body>
+</html>

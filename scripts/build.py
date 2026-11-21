@@ -640,6 +640,17 @@ def main():
     html = re.sub(r"\?v=\d+", f"?v={stamp}", html)
     html = re.sub(r'window\.AIMAP_V="\d+"', f'window.AIMAP_V="{stamp}"', html)
     idx.write_text(html, encoding="utf-8")
+    # 设计说明页（docs/design.html，不依赖脚本的静态页）里的数字：<b data-stat="nodes">…</b> 每次构建按当前数据重写
+    dsg = ROOT / "docs" / "design.html"
+    if dsg.exists():
+        vals = {"nodes": len(nodes), "edges": len(edges), "concepts": len(concepts) - n_ideas, "ideas": n_ideas,
+                "threads": sum(len(v) for v in threads.values()), "tracks": len(track_keys), "stamp": stamp,
+                **{f"tier{i}": sum(1 for n in nodes.values() if n["tier"] == i) for i in (1, 2, 3)},
+                **{f"rel_{k}": sum(1 for e in edges if e["type"] == k) for k in REL_TYPES},
+                **{f"kind_{k}": sum(1 for n in nodes.values() if n["kind"] == k) for k in KINDS}}
+        d = dsg.read_text(encoding="utf-8")
+        d = re.sub(r'(<b data-stat="(\w+)">)[^<]*(</b>)', lambda m: m.group(1) + str(vals.get(m.group(2), "?")) + m.group(3), d)
+        dsg.write_text(d, encoding="utf-8")
     print(f"\n已生成 {OUT.relative_to(ROOT)}/（版本 {stamp}）")
 
 

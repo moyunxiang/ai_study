@@ -121,7 +121,7 @@ function row(n, opt = {}) {
       <div class="f">${esc(n.full || '')}${n.who ? `${n.full ? ' · ' : ''}${esc(n.who.split('·')[0].trim())}` : ''}</div>${body}</div>
     ${stBtn(n.id)}</li>`;
 }
-const foot = () => `<footer class="foot"><span>© ${new Date().getFullYear()} Yunxiang (Kevin) Mo</span><span>${G.nodes.length} 个节点 · ${G.edges.length} 条连接 · 讲解由AI模型整理并对照原文核对，仍可能有错，请以原文为准</span></footer>`;
+const foot = () => `<footer class="foot"><span>© ${new Date().getFullYear()} Yunxiang (Kevin) Mo</span><span>${G.nodes.length} 个节点 · ${G.edges.length} 条连接 · 讲解由AI模型整理并对照原文核对，仍可能有错，请以原文为准 · <a href="design.html" style="text-decoration:underline;text-underline-offset:2px">设计说明</a></span></footer>`;
 const tierBar = (cur, base) => `<label>显示</label>${[[1, '只看主干'], [2, '主干 + 重要'], [3, '全部']].map(([v, l]) => `<a class="btn sm ${cur === v ? 'on' : ''}" href="${base}${base.includes('?') ? '&' : '?'}tier=${v}">${l}</a>`).join('')}`;
 function doneStat(ids) { const d = ids.filter(i => status(i) === 2).length; return {d, n: ids.length, pct: ids.length ? Math.round(d / ids.length * 100) : 0}; }
 
