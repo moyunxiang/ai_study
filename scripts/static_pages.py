@@ -52,6 +52,8 @@ class Site:
             self.inn[e["to"]].append(e)
         self.rev = lambda nid: {"source": 1, "human": 2}.get((self.reviews.get(nid) or {}).get("status"), 0)
         self.fig_by = {f["key"]: f for f in self.figures}
+        import hashlib      # 样式表用内容哈希做版本号：只有样式真的变了，静态页才会跟着变
+        self.cssv = hashlib.md5((self.docs / "assets" / "style.css").read_bytes()).hexdigest()[:8]
         self.written = []
 
     # ——— 正文标记，与前端 app.js 的 inline / rich 保持一致 ———
@@ -123,7 +125,7 @@ class Site:
 <meta property="og:image" content="{SITE}assets/og.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="{rel}assets/style.css?v={self.stamp}">
+<link rel="stylesheet" href="{rel}assets/style.css?v={self.cssv}">
 <script>try{{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}}catch(e){{}}</script>
 </head>
 <body class="static">

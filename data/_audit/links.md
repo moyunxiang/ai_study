@@ -1,0 +1,164 @@
+# 出处链接检查
+
+2026-11-22 检查了主干、重要节点和专题里的节点的 1811 个链接：1656 个正常，24 个确定打不开（404/410/域名不存在），131 个没能判断（网站拒绝脚本访问、超时等）。
+
+## 确定打不开
+
+- http://www.comp.hkbu.edu.hk/~markus/teaching/comp7650/tnn-94-gradient.pdf　`URLError`　vanishing-gradient、vanishing-gradient
+- http://www.cs.utexas.edu/~shmat/shmat_oak08netflix.pdf　`404`　netflix-prize
+- https://ai.sony/blog/blog-016/　`404`　gt-sophy
+- https://bitbucket.org/deeplab/deeplab-public　`404`　deeplab
+- https://developer.nvidia.com/blog/inside-the-nvidia-vera-rubin-platform-six-new-chips-one-ai-supercomputer/　`404`　vera-rubin
+- https://doi.org/10.1145/1143844.1143891　`URLError`　ctc
+- https://en.wikipedia.org/wiki/Hierarchical_reinforcement_learning　`404`　options
+- https://en.wikipedia.org/wiki/Reward_shaping　`404`　reward-shaping
+- https://github.com/tatsu-lab/test-set-contamination　`404`　contamination
+- https://gluebenchmark.com　`URLError`　glue
+- https://nlp.stanford.edu/projects/glove/　`URLError`　glove
+- https://nlp.stanford.edu/projects/snli/　`URLError`　snli
+- https://nlp.stanford.edu/sentiment/　`URLError`　rntn
+- https://pubmed.ncbi.nlm.nih.gov/22106262/　`URLError`　coevolution-contacts、coevolution-contacts
+- https://pubmed.ncbi.nlm.nih.gov/27898976/　`URLError`　gulshan-dr、gulshan-dr
+- https://pubmed.ncbi.nlm.nih.gov/32084340/　`URLError`　halicin、halicin
+- https://pubmed.ncbi.nlm.nih.gov/34282049/　`URLError`　rosettafold、rosettafold
+- https://trec.nist.gov/　`URLError`　trec
+- https://trec.nist.gov/pubs/trec1/papers/01.txt　`URLError`　trec
+- https://www.aisi.gov.uk/blog/our-evaluation-of-claude-mythos-previews-cyber-capabilities　`URLError`　claude-mythos
+- https://www.congress.gov/bill/117th-congress/house-bill/4346　`URLError`　chips-act
+- https://www.economist.com/business/2024/06/13/a-price-war-breaks-out-among-chinas-ai-model-builders　`URLError`　api-price-war
+- https://www.image-net.org/challenges/LSVRC/　`URLError`　ilsvrc
+- https://www.image-net.org/static_files/papers/imagenet_cvpr09.pdf　`URLError`　imagenet、imagenet
+
+## 没能判断
+
+- http://ai.eecs.umich.edu/people/conway/Impact/Impact.html　`TimeoutError`　mead-conway
+- http://hts.sp.nitech.ac.jp/　`403`　hts
+- http://lavalle.pl/rrt/about.html ; https://en.wikipedia.org/wiki/Rapidly_exploring_random_tree　`InvalidURL`　rrt
+- http://publications.eng.cam.ac.uk/331214/　`403`　htk
+- http://robots.stanford.edu/papers/thrun.stanley05.pdf ; https://en.wikipedia.org/wiki/DARPA_Grand_Challenge_(2005)　`InvalidURL`　darpa-grand-challenge
+- http://www.chilton-computing.org.uk/inf/literature/reports/lighthill_report/p001.htm　`403`　first-ai-winter
+- http://www.eecs.ucf.edu/~lboloni/Teaching/EEL5708_2006/slides/wulf94.pdf　`403`　memory-wall、memory-wall
+- http://www.gov.cn/zhengce/content/2017-07/20/content_5211996.htm　`403`　china-aidp
+- http://www.nytimes.com/2010/10/10/science/10google.html　`403`　google-self-driving
+- https://arcprize.org/blog/oai-o3-pub-breakthrough ; https://arcprize.org/blog/analyzing-o3-with-arc-agi ; https://arxiv.org/abs/2412.04604 ; https://arcprize.org/arc-agi/1/　`InvalidURL`　o3-arc
+- https://arxiv.org/abs/1806.10293 ；https://arxiv.org/html/1806.10293　`InvalidURL`　qt-opt
+- https://arxiv.org/abs/1808.00177 ；https://arxiv.org/html/1808.00177　`InvalidURL`　dactyl
+- https://arxiv.org/abs/1901.08652 ；https://arxiv.org/html/1901.08652　`InvalidURL`　legged-rl
+- https://arxiv.org/abs/1912.01603 ；https://arxiv.org/html/1912.01603　`InvalidURL`　dreamer
+- https://arxiv.org/abs/2008.05711 ；https://arxiv.org/html/2008.05711　`InvalidURL`　lift-splat
+- https://arxiv.org/abs/2010.11251 ；https://arxiv.org/html/2010.11251　`InvalidURL`　anymal-terrain
+- https://arxiv.org/abs/2010.14406 ；https://arxiv.org/html/2010.14406　`InvalidURL`　transporter
+- https://arxiv.org/abs/2107.04034 ；https://arxiv.org/html/2107.04034　`InvalidURL`　rma
+- https://arxiv.org/abs/2108.03298 ；https://arxiv.org/html/2108.03298　`InvalidURL`　robomimic
+- https://arxiv.org/abs/2109.11978 ；https://arxiv.org/html/2109.11978　`InvalidURL`　walk-in-minutes
+- https://arxiv.org/abs/2109.12098 ；https://arxiv.org/html/2109.12098　`InvalidURL`　cliport
+- https://arxiv.org/abs/2203.12601 ；https://arxiv.org/html/2203.12601　`InvalidURL`　r3m
+- https://arxiv.org/abs/2203.17270 ；https://arxiv.org/html/2203.17270　`InvalidURL`　bevformer
+- https://arxiv.org/abs/2204.01691 ；https://arxiv.org/html/2204.01691　`InvalidURL`　saycan
+- https://arxiv.org/abs/2209.07753 ；https://arxiv.org/html/2209.07753　`InvalidURL`　code-as-policies
+- https://arxiv.org/abs/2212.06817 ；https://arxiv.org/html/2212.06817　`InvalidURL`　rt-1
+- https://arxiv.org/abs/2212.12794 与 https://arxiv.org/html/2212.12794　`InvalidURL`　graphcast
+- https://arxiv.org/abs/2301.04104 ；https://arxiv.org/html/2301.04104 ；Google News中Nature 2025-04-02条目　`InvalidURL`　dreamerv3
+- https://arxiv.org/abs/2303.03378 ；https://arxiv.org/html/2303.03378　`InvalidURL`　palm-e
+- https://arxiv.org/abs/2303.04137 ；https://arxiv.org/html/2303.04137　`InvalidURL`　diffusion-policy
+- https://arxiv.org/abs/2303.08774 ；https://web.archive.org/web/20230315000000/https://openai.com/research/gpt-4　`InvalidURL`　gpt-4
+- https://arxiv.org/abs/2304.13705 ；https://arxiv.org/html/2304.13705　`InvalidURL`　aloha-act
+- https://arxiv.org/abs/2503.14499 ; https://arxiv.org/html/2503.14499v1 ; https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/ ; https://metr.org/time-horizons/　`InvalidURL`　metr-horizon
+- https://arxiv.org/abs/2504.20879 ; https://arxiv.org/html/2504.20879v1 ; https://techcrunch.com/2025/04/30/study-accuses-lm-arena-of-helping-top-ai-labs-game-its-benchmark/　`InvalidURL`　leaderboard-illusion
+- https://arxiv.org/abs/2505.11831 ; https://arxiv.org/html/2505.11831v1 ; https://arcprize.org/arc-agi/2/ ; https://arcprize.org/blog/announcing-arc-agi-2-and-arc-prize-2025 ; https://arcprize.org/blog/arc-prize-2025-results-analysis　`InvalidURL`　arc-agi-2
+- https://arxiv.org/abs/2603.24621 ; https://arxiv.org/html/2603.24621v1 ; https://arcprize.org/arc-agi/3/　`InvalidURL`　arc-agi-3
+- https://arxiv.org/html/2306.02572 ；HN条目指向 https://openreview.net/forum?id=BZ5a1r-kVsf（2022-06-27）　`InvalidURL`　jepa
+- https://cacm.acm.org/magazines/2019/2/234352-a-new-golden-age-for-computer-architecture/fulltext　`403`　golden-age、golden-age
+- https://dl.acm.org/citation.cfm?id=914540　`403`　sphinx
+- https://doi.org/10.1002/(SICI)1097-4571(199009)41:6%3C391::AID-ASI1%3E3.0.CO;2-9　`403`　lsa
+- https://doi.org/10.1037/h0042519　`403`　perceptron、perceptron
+- https://doi.org/10.1073/pnas.79.8.2554　`403`　hopfield、hopfield
+- https://doi.org/10.1080/00437956.1954.11659520　`403`　harris-distributional
+- https://doi.org/10.1080/14786440109462720　`403`　pca、pca
+- https://doi.org/10.1093/mind/LIX.236.433　`403`　turing-test
+- https://doi.org/10.1101/2024.11.19.624167　`429`　boltz-1
+- https://doi.org/10.1108/eb026526　`403`　tf-idf
+- https://doi.org/10.1111/j.2517-6161.1958.tb00292.x　`403`　logistic-regression、logistic-regression
+- https://doi.org/10.1111/j.2517-6161.1977.tb01600.x　`403`　em、em
+- https://doi.org/10.1112/plms/s2-42.1.230　`403`　turing-1936、turing-1936
+- https://doi.org/10.1115/1.3662552　`403`　kalman-filter
+- https://doi.org/10.1121/1.1906946　`403`　audrey
+- https://doi.org/10.1121/1.1912679　`403`　lpc
+- https://doi.org/10.1121/1.2003013　`403`　harpy
+- https://doi.org/10.1121/1.2003089　`403`　harpy
+- https://doi.org/10.1121/1.2016299　`403`　perplexity-metric、perplexity-metric
+- https://doi.org/10.1121/1.381666　`403`　arpa-sur、harpy
+- https://doi.org/10.1126/science.abj8754　`403`　rosettafold
+- https://doi.org/10.1137/1116025　`403`　vc-dimension、vc-dimension
+- https://doi.org/10.1145/1356052.1356053　`403`　blas
+- https://doi.org/10.1145/1365490.1365500　`403`　cuda
+- https://doi.org/10.1145/1376616.1376746　`403`　freebase
+- https://doi.org/10.1145/1498765.1498785　`403`　roofline
+- https://doi.org/10.1145/1553374.1553486　`403`　gpu-dl-2009
+- https://doi.org/10.1145/1772690.1772758　`403`　linucb
+- https://doi.org/10.1145/1968.1972　`403`　pac-learning、pac-learning
+- https://doi.org/10.1145/216585.216588　`403`　memory-wall
+- https://doi.org/10.1145/2541940.2541967　`403`　diannao
+- https://doi.org/10.1145/3197517.3201311　`403`　deepmimic
+- https://doi.org/10.1145/3315508.3329973　`403`　triton-lang、triton-lang
+- https://doi.org/10.1145/355841.355847　`403`　blas、blas
+- https://doi.org/10.1145/360018.360022　`403`　pssh
+- https://doi.org/10.1145/361219.361220　`403`　vector-space-model
+- https://doi.org/10.1145/3620665.3640366　`403`　pytorch-2、pytorch-2
+- https://doi.org/10.1145/365153.365168　`403`　eliza
+- https://doi.org/10.1145/367177.367199　`403`　lisp
+- https://doi.org/10.1145/77626.79170　`403`　blas
+- https://doi.org/10.1162/089976600300015015　`403`　lstm-forget-gate
+- https://doi.org/10.1162/NECO_a_00142　`403`　denoising-score-matching
+- https://doi.org/10.1162/neco.1989.1.4.541　`403`　lecun-1989
+- https://doi.org/10.1162/neco.1992.4.1.1　`403`　bias-variance
+- https://doi.org/10.1162/neco.1997.9.8.1735　`403`　lstm
+- https://doi.org/10.1162/neco.2006.18.7.1527　`403`　dbn
+- https://doi.org/10.1177/027836498600500404　`403`　slam-probabilistic
+- https://doi.org/10.1177/027836498600500404 ; https://api.openalex.org/works/doi:10.1177/027836498600500404 ; https://people.eecs.berkeley.edu/~pabbeel/cs287-fa09/readings/Durrant-Whyte_Bailey_SLAM-tutorial-I.pdf　`InvalidURL`　slam-probabilistic
+- https://doi.org/10.1207/s15516709cog1402_1　`403`　rnn-elman
+- https://doi.org/10.7249/p868　`403`　logic-theorist
+- https://en.wikipedia.org/wiki/ASIMO ; https://en.wikipedia.org/wiki/Honda_P_series ; https://en.wikipedia.org/wiki/Zero_moment_point　`InvalidURL`　asimo
+- https://en.wikipedia.org/wiki/DARPA_Grand_Challenge_(2007) ; https://www.ri.cmu.edu/pub_files/pub4/urmson_christopher_2008_1/urmson_christopher_2008_1.pdf ; https://doi.org/10.1109/TCST.2008.2012116　`InvalidURL`　darpa-urban-challenge
+- https://en.wikipedia.org/wiki/Tesla_Dojo ；https://techcrunch.com/2021/08/19/top-five-highlights-of-elon-musks-tesla-ai-day/ ；https://www.thinkautonomous.ai/blog/how-tesla-autopilot-works/　`InvalidURL`　tesla-hydranet-bev
+- https://en.wikipedia.org/wiki/Waymo ; https://news.ycombinator.com/ (HN条目：NYT 2010-10-09 Google Cars Drive Themselves, in Traffic)　`InvalidURL`　google-self-driving
+- https://europepmc.org/article/MED/29249696　`403`　libratus、libratus
+- https://htk.eng.cam.ac.uk/docs/history.shtml　`503`　htk
+- https://mitpress.mit.edu/9780262035613/deep-learning/　`403`　goodfellow-book
+- https://mitpress.mit.edu/9780262201629/probabilistic-robotics/　`403`　probabilistic-robotics、probabilistic-robotics
+- https://mitpress.mit.edu/9780262514620/vision/　`403`　marr-vision、marr-vision
+- https://mitpress.mit.edu/9780262537841/cybernetics-or-control-and-communication-in-the-animal-and-the-machine/　`403`　cybernetics
+- https://mitpress.mit.edu/9780262631112/perceptrons/　`403`　perceptrons-book
+- https://physicalintelligence.company/blog/pi0　`429`　pi0
+- https://pi.website/blog/pistar06　`429`　pi-star-0.6
+- https://pi.website/pi07　`429`　pi0.7
+- https://sakana.ai/ai-scientist-nature/ 与 https://www.nature.com/articles/s41586-026-10265-5　`InvalidURL`　ai-scientist-nature
+- https://sites.engineering.ucsb.edu/~jbraw/mpc/MPC-book-2nd-edition-1st-printing.pdf ; https://en.wikipedia.org/wiki/Model_predictive_control ; https://en.wikipedia.org/wiki/Charles_R._Cutler　`InvalidURL`　mpc
+- https://techcrunch.com/2026/01/14/ai-models-are-starting-to-crack-high-level-math-problems/ ，https://github.com/teorth/erdosproblems/wiki/AI-contributions-to-Erd%C5%91s-problems ，https://www.erdosproblems.com/728　`InvalidURL`　erdos-ai
+- https://web.archive.org/web/2016/http://www.willowgarage.com/sites/default/files/icraoss09-ROS.pdf ; https://en.wikipedia.org/wiki/Robot_Operating_System　`InvalidURL`　ros
+- https://web.archive.org/web/20221201000000/https://openai.com/blog/chatgpt/ ；https://en.wikipedia.org/wiki/ChatGPT　`InvalidURL`　chatgpt
+- https://web.archive.org/web/2025id_/https://openai.com/index/gdpval/ ; https://arxiv.org/abs/2510.04374 ; https://arxiv.org/html/2510.04374v1 ; https://web.archive.org/web/2026id_/https://openai.com/index/introducing-gpt-5-2/　`InvalidURL`　gdpval
+- https://web.archive.org/web/2025id_/https://openai.com/index/introducing-swe-bench-verified/ ; https://web.archive.org/web/2026id_/https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/ ; https://www.swebench.com/verified.html　`InvalidURL`　swe-bench-verified
+- https://www.anthropic.com/institute/measuring-pace-of-ai-development ，https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/　`InvalidURL`　research-acceleration
+- https://www.biorxiv.org/content/10.1101/2022.06.03.494563　`429`　proteinmpnn
+- https://www.biorxiv.org/content/10.1101/2024.07.01.600583　`429`　esm3、esm3
+- https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI:10.1101/2024.11.19.624167&resultType=core&format=json　`503`　boltz-1
+- https://www.europarl.europa.eu/news/en/press-room/20240308IPR19015/artificial-intelligence-act-meps-adopt-landmark-law　`403`　eu-ai-act
+- https://www.intel.com/content/www/us/en/history/virtual-vault/articles/the-intel-4004.html　`403`　intel-4004
+- https://www.nobelprize.org/prizes/physics/2024/press-release/ 与 https://www.nobelprize.org/prizes/chemistry/2024/press-release/　`InvalidURL`　nobel-2024
+- https://www.pi.website/blog/pi05　`429`　pi0.5
+- https://www.rand.org/pubs/papers/P3244.html　`403`　dreyfus
+- https://www.science.org/doi/10.1126/science.275.5306.1593　`403`　dopamine-td
+- https://www.science.org/doi/10.1126/science.aam6960　`403`　deepstack
+- https://www.science.org/doi/10.1126/science.aao1733　`403`　libratus
+- https://www.science.org/doi/10.1126/science.aar6404　`403`　alphazero
+- https://www.science.org/doi/10.1126/science.aay2400　`403`　pluribus
+- https://www.science.org/doi/10.1126/science.add2187　`403`　proteinmpnn
+- https://www.science.org/doi/10.1126/science.ade2574　`403`　esmfold
+- https://www.science.org/doi/10.1126/scirobotics.aau5872　`403`　legged-rl
+- https://www.science.org/doi/10.1126/scirobotics.abc5986　`403`　anymal-terrain
+- https://www.sciencedirect.com/science/article/pii/S0004370221000862　`403`　reward-is-enough
+- https://www.tbench.ai/news/announcement ; https://arxiv.org/abs/2601.11868 ; https://www.anthropic.com/news/claude-4　`InvalidURL`　terminal-bench
+- https://www.unitedthc.com/DSP/Kalman1960.pdf ; https://en.wikipedia.org/wiki/Kalman_filter ; https://en.wikipedia.org/wiki/Rudolf_E._K%C3%A1lm%C3%A1n　`InvalidURL`　kalman-filter
+- https://www.whitecase.com/insight-alert/two-california-district-judges-rule-using-books-train-ai-fair-use　`403`　fair-use-rulings、fair-use-rulings
+- https://zh.wikipedia.org/wiki/深度求索　`UnicodeEncodeError`　api-price-war
