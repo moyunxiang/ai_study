@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>注意力残差AttnRes（2026） · AI脉络</title>
+<meta name="description" content="残差连接加PreNorm把各层输出以固定权重1累加，隐状态随深度不受控地增长，每层的贡献被逐渐稀释。 用softmax注意力代替固定累加：每层对前面各层的输出做带输入依赖的加权汇聚；并提出分块版Block AttnRes降低开销。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/attention-residuals.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="注意力残差AttnRes（2026）">
+<meta property="og:description" content="残差连接加PreNorm把各层输出以固定权重1累加，隐状态随深度不受控地增长，每层的贡献被逐渐稀释。 用softmax注意力代替固定累加：每层对前面各层的输出做带输入依赖的加权汇聚；并提出分块版Block AttnRes降低开销。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/attention-residuals.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/attention-residuals">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 架构与组件</div>
+<h1>注意力残差AttnRes</h1>
+<div class="full">Attention Residuals</div>
+<div class="meta"><span>2026.03</span><span>论文</span><span>延伸</span><span>arXiv 2026</span><span>Kimi Team（Guangyu Chen, Yu Zhang, Jianlin Su 等，共37位） · 月之暗面</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2603.15031" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/attention-residuals">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>残差连接加PreNorm把各层输出以固定权重1累加，隐状态随深度不受控地增长，每层的贡献被逐渐稀释。</p></div><div><h4>方法</h4><p>用softmax注意力代替固定累加：每层对前面各层的输出做带输入依赖的加权汇聚；并提出分块版Block AttnRes降低开销。</p></div><div><h4>影响</h4><p>在各规模上持续提升，已用于Kimi Linear并被Kimi K3采用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>现代大模型普遍用残差连接加PreNorm：第l层的输出等于前面所有层输出的简单相加，每项权重固定为1。论文指出这会让隐状态的幅度随深度增长，早期层的贡献被越来越多的后续层“稀释”。</p><p>Attention Residuals（AttnRes）把这一累加替换成“沿深度方向的注意力”：对前面所有层的输出做<a class="lc" href="../c/self-attention.html">自注意力与多头注意力</a>式的softmax，权重由当前输入决定，于是每层可以有选择地聚合更早的表示。为了避免对所有前层做注意力带来的显存和通信开销，作者提出Block AttnRes：把层分成若干块，只对块级表示做注意力，保留大部分收益；再配合基于缓存的流水线通信和两阶段计算，使它成为几乎无额外开销的标准残差替代品。</p><p>摘要称缩放律实验显示各规模一致提升；把它放进<a class="ln" href="../n/kimi-linear.html">Kimi Linear</a>架构（总48B/激活3B）并在1.4T token上预训练后，输出幅度和梯度在各深度更均匀，所有评测任务都有提升。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>主要在Kimi自家架构上验证，其他模型族上的收益还需要独立复现。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>即使是分块版本，也增加了流水线并行训练的通信和实现复杂度。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/hyper-connections.html">超连接</a><span class="yr">2024.09 · 基础</span><div class=nt>同样想改造残差路径：Hyper-Connections拓宽残差流的宽度，AttnRes则让各层按内容选择聚合哪些前层输出。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/mhc.html">mHC流形约束超连接</a><span class="yr">2025.12 · 基础</span><div class=nt>与mHC一样是对标准残差累加的改进，但走的是沿深度做注意力的路线。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/kimi-k3.html">Kimi K3</a><span class="yr">2026.07 · LLM</span><div class=nt>使用注意力残差改善信息在网络深度上的流动。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/residual-connection.html">残差连接</a> <a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a></p>
+<h2>本篇术语</h2><ul><li><b>PreNorm稀释</b>　归一化放在子层之前的残差网络中，各层输出不断累加，深层的隐状态很大，使每个新层的贡献在相对意义上变小。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2603.15031" rel="noopener">https://arxiv.org/abs/2603.15031</a>（标题、Kimi Team 37位作者、v1提交于2026-03-16；摘要中PreNorm稀释、AttnRes、Block AttnRes、Kimi Linear 48B/3B、1.4T token。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%B3%A8%E6%84%8F%E5%8A%9B%E6%AE%8B%E5%B7%AEAttnRes%EF%BC%88attention-residuals%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aattention-residuals%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/attention-residuals.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mercury-2.html"><small>本分支上一个 · 2026.02</small><b>Mercury 2推理扩散模型</b></a><a class="r" href="gpt-5.4.html"><small>本分支下一个 · 2026.03</small><b>GPT-5.4</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

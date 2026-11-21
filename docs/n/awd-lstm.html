@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AWD-LSTM（2017） · AI脉络</title>
+<meta name="description" content="小数据上的LSTM语言模型严重过拟合，而现有的循环层正则化方法要改LSTM内部计算，用不了cuDNN这类高速实现；同时大家在设计越来越复杂的新循环单元，普通LSTM是否真的不够用并不清楚。 不改LSTM本身，而是对隐藏到隐藏的权重矩阵做DropConnect（随机置零部分权重），再叠加嵌入drop…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/awd-lstm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="AWD-LSTM（2017）">
+<meta property="og:description" content="小数据上的LSTM语言模型严重过拟合，而现有的循环层正则化方法要改LSTM内部计算，用不了cuDNN这类高速实现；同时大家在设计越来越复杂的新循环单元，普通LSTM是否真的不够用并不清楚。 不改LSTM本身，而是对隐藏到隐藏的权重矩阵做DropConnect（随机置零部分权重），再叠加嵌入drop…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/awd-lstm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/awd-lstm">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 语言模型</div>
+<h1>AWD-LSTM</h1>
+<div class="full">Regularizing and Optimizing LSTM Language Models</div>
+<div class="meta"><span>2017.08</span><span>论文</span><span>重要</span><span>ICLR 2018</span><span>Stephen Merity, Nitish Shirish Keskar, Richard Socher · Salesforce Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1708.02182" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/salesforce/awd-lstm-lm" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/awd-lstm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>小数据上的LSTM语言模型严重过拟合，而现有的循环层正则化方法要改LSTM内部计算，用不了cuDNN这类高速实现；同时大家在设计越来越复杂的新循环单元，普通LSTM是否真的不够用并不清楚。</p></div><div><h4>方法</h4><p>不改LSTM本身，而是对隐藏到隐藏的权重矩阵做DropConnect（随机置零部分权重），再叠加嵌入dropout、权重共享、激活正则、随机截断长度等一整套正则化，并用一个自动决定何时开始平均的平均SGD（NT-ASGD）训练。</p></div><div><h4>影响</h4><p>普通三层LSTM在Penn Treebank上困惑度57.3、WikiText-2上65.8，超过神经架构搜索出来的复杂单元；它成为2017–2018年语言模型的标准强基线，并被ULMFiT直接用作预训练骨干。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/lm-limits.html">探索语言模型的极限</a>说明在10亿词这样的大语料上，主要矛盾是模型容量；而在<a class="ln" href="../n/penn-treebank.html">Penn Treebank</a>（约100万词、1万词表）和<a class="ln" href="../n/wikitext.html">WikiText</a>-2（约为PTB的两倍）这类小数据上，主要矛盾是过拟合。</p><p>给循环网络加<a class="ln" href="../n/dropout.html">Dropout</a>并不简单：每个时间步都对隐状态随机丢弃，会破坏长期记忆。Gal和Ghahramani提出在所有时间步共用同一个丢弃掩码（变分dropout），但这需要改写LSTM的内部循环，就不能用NVIDIA cuDNN这类黑盒实现，而后者通常快很多倍。另一方面，循环高速网络、<a class="ln" href="../n/nas.html">神经架构搜索NAS</a>搜出的循环单元等新结构不断刷新纪录，让人以为普通<a class="ln" href="../n/lstm.html">LSTM</a>已经落伍。</p><h2>方法</h2><p><b>权重丢弃的LSTM（weight-dropped LSTM）</b>。在每个批次开始前，对LSTM的隐藏到隐藏权重矩阵<code>[U_i, U_f, U_o, U_c]</code>做一次DropConnect（随机把50%的权重置零），整个前向和反向过程都用这一份被丢弃过的权重。效果类似于“所有时间步共用同一掩码”，但不改LSTM的计算公式，可以直接调用cuDNN。</p><p><b>NT-ASGD</b>。语言模型训练中，普通SGD往往比Adam更好。平均SGD（ASGD）在某个时刻T之后输出各步权重的平均值，理论性质好，但T难以手动设定。作者的规则是：每个epoch检查一次验证集损失，如果比5次之前的最好值还差（非单调条件），就从这一刻开始平均。</p><p><b>其他正则化</b>：</p><ul><li><b>随机截断长度</b>：反向传播长度按<code>N(70, 5)</code>抽样（5%概率取<code>N(35, 5)</code>），并按长度缩放学习率，让每个词都有机会处于窗口的不同位置；</li><li><b>嵌入dropout</b>：以10%概率丢弃整个词的向量，这个词在本次前向传播中所有出现都消失；</li><li><b>权重共享</b>（<a class="ln" href="../n/weight-tying.html">输入输出嵌入共享</a>）：输入嵌入矩阵与输出softmax矩阵共享，并把嵌入降到400维；</li><li><b>激活正则AR与时间激活正则TAR</b>：分别对最后一层输出的L2范数<code>α‖h_t‖²</code>和相邻时刻差值<code>β‖h_t − h_(t+1)‖²</code>加惩罚（见<a class="lc" href="../c/regularization.html">正则化与权重衰减</a>）。</li></ul><p>模型是三层LSTM，隐层1150维，训练750个epoch，梯度裁剪0.25，学习率30。</p><h2>结果</h2><p>单模型测试困惑度（见<a class="lc" href="../c/perplexity.html">困惑度</a>）：Penn Treebank上24M参数的AWD-LSTM为57.3，对比NAS单元（54M参数）62.4、Melis等人调参后的4层LSTM 58.3、变分LSTM大模型（66M）75.2；WikiText-2上33M参数为65.8。在训练好的模型上加一个无需训练的神经缓存（记住最近出现的词），进一步降到52.8和52.0，说明模型本身仍记不住近期出现的词。消融（PTB测试集）：去掉权重丢弃升到68.9，去掉NT-ASGD升到63.7，嵌入恢复全尺寸升到65.6。</p><h2>后来的发展</h2><p>AWD-LSTM成为当时语言建模和文本分类的默认骨干：<a class="ln" href="../n/ulmfit.html">ULMFiT</a>直接把它当作预训练语言模型，加上分层微调策略在文本分类上大幅领先；它和同期Melis等人的工作一起说明“调好正则化和优化的普通LSTM并不输给复杂新结构”，提醒研究者重视基线。随后<a class="ln" href="../n/transformer-xl.html">Transformer-XL</a>和<a class="ln" href="../n/gpt-2.html">GPT-2</a>等Transformer语言模型在这些数据集上全面超过LSTM。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>正则化组合与超参数针对百万词级的小数据反复试出，在大数据上意义不大，换数据集往往要重新调。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a></div></li><li>加一个不需训练的缓存就能降低6–11个困惑度，说明LSTM记不住几百个词之前出现过的内容，长程依赖仍弱。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/transformer-xl.html">Transformer-XL</a></div></li><li>LSTM逐词计算无法在序列内并行，在PTB上要训练750个epoch，难以扩展到大模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/transformer-xl.html">Transformer-XL</a> <a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/lstm.html">LSTM</a><span class="yr">1997 · 基础</span><div class=nt>不改LSTM结构，只用正则化和优化技巧，就让普通LSTM超过了更复杂的新循环单元。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/rnnlm.html">RNN语言模型</a><span class="yr">2010.09 · NLP</span><div class=nt>简单RNN存在梯度消失，实际上记不住很长的上下文，论文中缓存模型仍能提供互补的长程信息。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/dropout.html">Dropout</a><span class="yr">2012.07 · 基础</span><div class=nt>把dropout推广到循环权重（DropConnect作用于隐藏到隐藏矩阵）和整个词嵌入，解决了循环网络里dropout会破坏记忆、又要改内部实现的问题。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/lm-limits.html">探索语言模型的极限</a><span class="yr">2016.02 · NLP</span><div class=nt>后者认为大语料上的瓶颈是容量；本文针对小语料，问题是过拟合，两者共同说明了语言模型的两种局面。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/nas.html">神经架构搜索NAS</a><span class="yr">2016.11 · 基础</span><div class=nt>NAS用强化学习搜出专门的循环单元（PTB 62.4）；本文证明调好正则化的普通LSTM（57.3）更好。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/weight-tying.html">输入输出嵌入共享</a><span class="yr">2016.08 · 基础</span><div class=nt>输入嵌入与softmax权重共享，并把嵌入降到400维；恢复全尺寸嵌入会让PTB困惑度升高约8。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/wikitext.html">WikiText</a><span class="yr">2016.09 · 数据·评测</span><div class=nt>在WikiText-2和Penn Treebank上评测。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a><span class="yr">2019.02 · LLM</span><div class=nt>正则化组合与超参数针对百万词级的小数据反复试出，在大数据上意义不大，换数据集往往要重新调。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/ulmfit.html">ULMFiT</a><span class="yr">2018.01 · LLM</span><div class=nt>预训练模型直接采用AWD-LSTM的结构与正则化方案。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/transformer-xl.html">Transformer-XL</a><span class="yr">2019.01 · LLM</span><div class=nt>加一个不需训练的缓存就能降低6–11个困惑度，说明LSTM记不住几百个词之前出现过的内容，长程依赖仍弱。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/perplexity.html">困惑度</a> <a class="chip c" href="../c/dropout-concept.html">Dropout</a> <a class="chip c" href="../c/regularization.html">正则化与权重衰减</a> <a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a></p>
+<h2>本篇术语</h2><ul><li><b>DropConnect</b>　dropout的变体：不是随机丢弃神经元的输出，而是随机把权重矩阵中的一部分元素置零。</li><li><b>平均SGD（ASGD）</b>　训练后期不取最后一步的权重，而取从某一步开始所有权重的平均值，能抵消SGD在最优点附近的来回震荡。</li><li><b>神经缓存</b>　把最近若干个时刻的隐状态和对应的词存起来，预测时如果当前状态与某个缓存状态相似，就提高那个词的概率；不需要训练，只调三个超参数。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/dropout-concept.html">Dropout</a>、<a class="lc" href="../c/regularization.html">正则化与权重衰减</a>和<a class="lc" href="../c/perplexity.html">困惑度</a>，读过<a class="ln" href="../n/lstm.html">LSTM</a>。读原文第2–4节，每一节就是一种技巧；再看表4的消融，判断哪些技巧最重要。动手：官方仓库代码不长，在PTB上先只开权重丢弃训练，再逐项加入其他技巧，记录验证困惑度的变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/html/1708.02182" rel="noopener">https://arxiv.org/html/1708.02182</a>（标题、3位作者、arXiv首次提交2017-08-07；摘要57.3/65.8/52.8/52.0；正文DropConnect作用于U矩阵、NT-ASGD规则n=5、BPTT长度N(70,5)与N(35,5)、各dropout值、AR/TAR公式、3层1150维、400维嵌入、750 epoch、裁剪0.25、学习率30；表1 PTB对比（NAS 62.4、Melis 58.3、变分LSTM 75.2）；表2 WT2 33M参数；表4消融68.9、63.7、65.6、62.7；缓存降6与11个点。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20AWD-LSTM%EF%BC%88awd-lstm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aawd-lstm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/awd-lstm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="cove.html"><small>本分支上一个 · 2017.08</small><b>CoVe上下文词向量</b></a><a class="r" href="deepl.html"><small>本分支下一个 · 2017.08</small><b>DeepL翻译上线</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

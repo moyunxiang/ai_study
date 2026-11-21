@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MoGe单目几何（2024） · AI脉络</title>
+<meta name="description" content="单目深度模型只给深度图，不知道相机视场角就无法还原真实三维形状；直接监督三维点又会被尺度和平移的歧义搅乱。 让网络直接从一张图预测仿射不变的三维点图（只差一个全局尺度和平移），并配上最优对齐求解器和多尺度局部几何损失来监督。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/moge.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MoGe单目几何（2024）">
+<meta property="og:description" content="单目深度模型只给深度图，不知道相机视场角就无法还原真实三维形状；直接监督三维点又会被尺度和平移的歧义搅乱。 让网络直接从一张图预测仿射不变的三维点图（只差一个全局尺度和平移），并配上最优对齐求解器和多尺度局部几何损失来监督。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/moge.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/moge">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 单目深度估计</div>
+<h1>MoGe单目几何</h1>
+<div class="full">MoGe: Unlocking Accurate Monocular Geometry Estimation for Open-Domain Images with Optimal Training Supervision</div>
+<div class="meta"><span>2024.10</span><span>论文</span><span>延伸</span><span>Ruicheng Wang, Sicheng Xu, Cassie Dai, Jianfeng Xiang, Yu Deng, Xin Tong, Jiaolong Yang · 微软亚洲研究院 / 中国科大 / 清华大学 / 哈佛大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2410.19115" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/moge">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>单目深度模型只给深度图，不知道相机视场角就无法还原真实三维形状；直接监督三维点又会被尺度和平移的歧义搅乱。</p></div><div><h4>方法</h4><p>让网络直接从一张图预测仿射不变的三维点图（只差一个全局尺度和平移），并配上最优对齐求解器和多尺度局部几何损失来监督。</p></div><div><h4>影响</h4><p>一次前馈同时给出点云、深度和视场角，成为单图三维几何的常用基础模型，后续MoGe-2加入了度量尺度。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>常见的单目深度（如<a class="ln" href="../n/midas.html">MiDaS混合数据集深度</a>）只预测相对深度，要还原成点云还得知道相机焦距。MoGe改为直接预测点图：每个像素对应一个三维点坐标（借鉴<a class="ln" href="../n/dust3r.html">DUSt3R</a>的点图表示），而且是仿射不变的，即允许与真值差一个全局尺度和平移。这样训练时不会因为“这张照片到底拍得多远”这种无法从图像确定的量而得到互相矛盾的监督。</p><p>监督分两部分：全局上用作者提出的鲁棒、最优且高效的对齐求解器（ROE），先求出让预测与真值最贴合的尺度和平移（对离群点做截断），再算误差；局部上用多尺度的局部几何损失约束细节形状。焦距和深度都能从点图反推出来。网络是<a class="ln" href="../n/dinov2.html">DINOv2</a>预训练的ViT编码器加轻量卷积上采样解码器，训练数据来自21个公开数据集约900万帧。摘要称在多个未见数据集上，点图、深度和视场角估计都明显超过此前方法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>输出缺少绝对尺度，无法直接给出以米为单位的距离。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/depth-pro.html">Depth Pro度量深度</a> <a class="chip hue" style="--h:216" href="../n/depth-anything-3.html">Depth Anything 3</a></div></li><li>逐帧独立预测，用在视频上会出现帧间闪烁和不一致。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/video-depth-anything.html">视频深度VDA</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/dinov2.html">DINOv2</a><span class="yr">2023.04 · 视觉</span><div class=nt>编码器是DINOv2预训练的ViT。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/midas.html">MiDaS混合数据集深度</a><span class="yr">2019.07 · 视觉</span><div class=nt>继承MiDaS用尺度/平移不变损失混合多数据集训练的思路，从深度推广到三维点。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/dust3r.html">DUSt3R</a><span class="yr">2023.12 · 视觉</span><div class=nt>借用逐像素三维点图的表示，把它用在单张图上并去掉尺度歧义。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/depth-anything-v2.html">Depth Anything V2</a><span class="yr">2024.06 · 视觉</span><div class=nt>Depth Anything V2只输出相对深度，MoGe直接给出几何与视场角。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/depth-pro.html">Depth Pro度量深度</a><span class="yr">2024.10 · 视觉</span><div class=nt>输出缺少绝对尺度，无法直接给出以米为单位的距离。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/video-depth-anything.html">视频深度VDA</a><span class="yr">2025.01 · 视觉</span><div class=nt>逐帧独立预测，用在视频上会出现帧间闪烁和不一致。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/depth-anything-3.html">Depth Anything 3</a><span class="yr">2025.11 · 视觉</span><div class=nt>输出缺少绝对尺度，无法直接给出以米为单位的距离。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a></p>
+<h2>本篇术语</h2><ul><li><b>点图（point map）</b>　与图像同尺寸的数组，每个像素存一个三维坐标(x, y, z)，等价于一张逐像素对齐的点云。</li><li><b>仿射不变</b>　预测结果只在整体缩放和平移意义下正确，评估或监督前要先把这两个量对齐。</li></ul>
+<h2>怎么学</h2><p>先补相机针孔模型和MiDaS的尺度不变损失，再读MoGe第3节的ROE求解器；用官方模型把一张照片转成点云在Open3D里查看。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2410.19115" rel="noopener">https://arxiv.org/abs/2410.19115</a>（核对了arXiv记录：标题、七位作者、v1提交于2024-10-24、摘要中的仿射不变点图与ROE求解器；HTML正文确认DINOv2 ViT编码器、21个数据集约900万帧、作者单位。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MoGe%E5%8D%95%E7%9B%AE%E5%87%A0%E4%BD%95%EF%BC%88moge%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amoge%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/moge.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="d-fine.html"><small>本分支上一个 · 2024.10</small><b>D-FINE</b></a><a class="r" href="mast3r-slam.html"><small>本分支下一个 · 2024.12</small><b>MASt3R-SLAM</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>D4RT动态4D重建（2025） · AI脉络</title>
+<meta name="description" content="从视频重建动态场景需要深度、点跟踪、相机位姿等多个模型拼接，要么靠昂贵的测试时优化，要么用多个专用解码器，且大多无法给运动物体建立对应关系。 用一个全局自注意力编码器把整段视频编码成场景表示，再用轻量解码器按需查询：给定某帧的一个2D点和目标时间、目标相机坐标系，直接输出它的3D位置。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/d4rt.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="D4RT动态4D重建（2025）">
+<meta property="og:description" content="从视频重建动态场景需要深度、点跟踪、相机位姿等多个模型拼接，要么靠昂贵的测试时优化，要么用多个专用解码器，且大多无法给运动物体建立对应关系。 用一个全局自注意力编码器把整段视频编码成场景表示，再用轻量解码器按需查询：给定某帧的一个2D点和目标时间、目标相机坐标系，直接输出它的3D位置。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/d4rt.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/d4rt">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 多视图几何与重建</div>
+<h1>D4RT动态4D重建</h1>
+<div class="full">Efficiently Reconstructing Dynamic Scenes One D4RT at a Time</div>
+<div class="meta"><span>2025.12</span><span>论文</span><span>延伸</span><span>arXiv 2025</span><span>Chuhan Zhang, Guillaume Le Moing, Skanda Koppula, Ignacio Rocco, Raia Hadsell, Zoubin Ghahramani, Andrew Zisserman, Mehdi S. M. Sajjadi et al. · Google DeepMind / UCL / Oxford</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2512.08924" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://d4rt-paper.github.io/" rel="noopener">项目主页 ↗</a><a class="btn sm" href="../index.html#/n/d4rt">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>从视频重建动态场景需要深度、点跟踪、相机位姿等多个模型拼接，要么靠昂贵的测试时优化，要么用多个专用解码器，且大多无法给运动物体建立对应关系。</p></div><div><h4>方法</h4><p>用一个全局自注意力编码器把整段视频编码成场景表示，再用轻量解码器按需查询：给定某帧的一个2D点和目标时间、目标相机坐标系，直接输出它的3D位置。</p></div><div><h4>影响</h4><p>深度、点轨迹、点云、相机参数都变成同一个查询接口的不同用法，不必逐帧稠密解码，训练和推理都更省；论文称在多种4D重建任务上达到当时最优。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>此前的做法是分工合作：MegaSaM之类的流水线要分别估计单目深度、度量深度和运动分割，再靠测试时优化让几何互相一致；<a class="ln" href="../n/vggt.html">VGGT</a>这类前馈模型为不同输出配不同的专用解码器，但无法为动态部分建立对应。D4RT想用一个模型、一个接口解决全部。</p><p>结构分两块。第一块是全局自注意力编码器（见<a class="lc" href="../c/self-attention.html">自注意力与多头注意力</a>），读入整段视频，输出一个潜在的全局场景表示。第二块是轻量解码器，可以被独立查询：一个查询包含源帧时刻、源帧中的2D坐标（u, v）、想知道它在哪个目标时刻、并以哪个相机坐标系表示，另外还带上以该点为中心的局部图像块的嵌入，提供局部细节。解码器输出的就是这个点在目标时刻、目标相机坐标系下的3D位置。</p><p>这个设计的好处是各种任务只是查询的不同组合：源时刻与目标时刻相同、对整帧像素逐点查询，得到深度和点云；固定一个点、让目标时刻遍历整段视频，得到点轨迹（和<a class="ln" href="../n/tapir.html">TAPIR任意点跟踪</a>这类跟踪方法的目标一致，但直接给出3D）；相机参数同样由查询得到。因为只需解码被问到的点，不用像稠密解码那样对每一帧每个像素都算一遍，这是它宣称高效的来源。论文把该模型定位为<a class="ln" href="../n/monst3r.html">MonST3R动态几何</a>、<a class="ln" href="../n/vggt.html">VGGT</a>一脉在动态场景上的统一与简化。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍然是离线处理整段视频的前馈模型，需要先读完整段视频才能查询，不适合边拍边重建的流式场景。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只给出点的3D位置，不显式表示场景的外观与可渲染形态，无法直接做新视角合成。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/vggt.html">VGGT</a><span class="yr">2025.03 · 视觉</span> <span class="vk ok">已核对</span><div class=nt>沿用前馈式几何Transformer，但把多个专用解码器换成统一的查询解码，并能处理动态部分的对应。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/tapir.html">TAPIR任意点跟踪</a><span class="yr">2023.06 · 视觉</span><div class=nt>点跟踪从2D轨迹推广为任意时刻、任意相机坐标系下的3D位置查询。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/monst3r.html">MonST3R动态几何</a><span class="yr">2024.10 · 视觉</span><div class=nt>MonST3R只估动态场景的逐帧几何，D4RT把深度、跨时间对应和相机参数统一在同一个模型里。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/cotracker3.html">CoTracker3</a><span class="yr">2024.10 · 视觉</span><div class=nt>输出的是二维像素轨迹，不直接给出点的三维运动与相机运动，需要与深度或重建模型组合。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/megasam.html">MegaSaM动态SfM</a><span class="yr">2024.12 · 视觉</span><div class=nt>仍是逐视频的优化流程，比一次前馈的网络慢，不适合实时或超长视频。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a></p>
+<h2>本篇术语</h2><ul><li><b>4D重建</b>　在三维空间之上再加一维时间：恢复随时间变化的场景几何与运动。</li><li><b>点跟踪</b>　给定视频里某一帧的一个点，找出它在其他每一帧的位置。</li></ul>
+<h2>怎么学</h2><p>先补相机模型与多视图几何，再读<a class="ln" href="../n/vggt.html">VGGT</a>了解前馈几何模型；读D4RT原文第3节的查询设计和图2，对照项目主页的动画结果。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2512.08924" rel="noopener">https://arxiv.org/abs/2512.08924</a>、<a href="https://arxiv.org/html/2512.08924" rel="noopener">https://arxiv.org/html/2512.08924</a>（标题、作者、v1日期2025-12-09、摘要，以及图2和引言中关于编码器、查询解码器和对MegaSaM、VGGT、SpatialTrackerV2的描述；未引用任何实验数字）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20D4RT%E5%8A%A8%E6%80%814D%E9%87%8D%E5%BB%BA%EF%BC%88d4rt%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ad4rt%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/d4rt.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="depth-anything-3.html"><small>本分支上一个 · 2025.11</small><b>Depth Anything 3</b></a><span></span></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MCMC与朗之万动力学（MCMC and Langevin Dynamics） · AI脉络</title>
+<meta name="description" content="当只能计算一个分布的（未归一化）密度或其梯度、却无法直接采样时，构造一条随机游走的马尔可夫链，让它长期停留的分布恰好是目标分布。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/langevin-mcmc.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MCMC与朗之万动力学（MCMC and Langevin Dynamics）">
+<meta property="og:description" content="当只能计算一个分布的（未归一化）密度或其梯度、却无法直接采样时，构造一条随机游走的马尔可夫链，让它长期停留的分布恰好是目标分布。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/langevin-mcmc.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/langevin-mcmc">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 概率统计与信息论 · 进阶</div>
+<h1>MCMC与朗之万动力学</h1><div class="full">MCMC and Langevin Dynamics</div>
+<p class="muted" style="font-size:13px">也叫：马尔可夫链蒙特卡洛　朗之万采样　Metropolis-Hastings　Gibbs采样　SGLD</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/langevin-mcmc">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>当只能计算一个分布的（未归一化）密度或其梯度、却无法直接采样时，构造一条随机游走的马尔可夫链，让它长期停留的分布恰好是目标分布。</b></p>
+<p class="tags">先要会：<a class="chip c" href="markov-chain.html">马尔可夫性与马尔可夫链</a> <a class="chip c" href="monte-carlo.html">蒙特卡洛采样</a> <a class="chip c" href="derivative-gradient.html">导数、偏导与梯度</a></p>
+<p><a class="lc" href="../c/monte-carlo.html">蒙特卡洛采样</a>方法需要从分布p(x)里抽样本，但很多分布只能写出一个不知道归一化常数的形式<code>p(x) ∝ exp(−E(x))</code>（见<a class="lc" href="../c/energy-based.html">能量模型与玻尔兹曼分布</a>），比如贝叶斯后验、玻尔兹曼分布。归一化常数要对所有x积分，高维时算不出来，也就没法直接采样。</p><p><b>MCMC的思路</b>：不直接采样，而是设计一条<a class="lc" href="../c/markov-chain.html">马尔可夫性与马尔可夫链</a>，使它的平稳分布等于p。从任意起点出发跑足够多步，链上的点就近似是p的样本。1953年的<a class="ln" href="../n/mcmc.html">Metropolis采样与MCMC</a>（Metropolis算法）给出了最早的构造：从当前点x随机提议一个新点x′，以概率<code>min(1, p(x′)/p(x))</code>接受，否则留在原地。注意只用到密度之比，归一化常数被约掉了。</p><p><b>朗之万动力学</b>利用梯度，让提议往高概率区域走：</p><p class="formula"><code>x ← x + (ε/2)·∇log p(x) + √ε · z，z ~ N(0, I)</code></p><p>第一项是沿对数密度的梯度上坡（类似<a class="lc" href="../c/gradient-descent.html">梯度下降</a>），第二项注入噪声防止所有点都挤到峰顶。步长ε → 0、步数足够多时，样本分布趋于p；有限步长会带来少量偏差，可用Metropolis校正。</p><p><b>在AI里</b>：<code>∇log p(x)</code>正是<a class="lc" href="../c/score-function.html">分数函数与分数匹配</a>。<a class="ln" href="../n/score-matching.html">分数匹配生成模型</a>（2019）先用神经网络学出分数，再用退火朗之万动力学从纯噪声出发逐步采样——这是扩散模型的前身之一；<a class="ln" href="../n/ddpm.html">DDPM</a>的反向去噪过程也可以看成一种离散的朗之万采样（见<a class="lc" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a>）。早期的能量模型、受限玻尔兹曼机，以及贝叶斯神经网络的随机梯度朗之万方法，都靠这类采样。</p>
+<div class="example"><h4>例子</h4><p>目标分布是标准正态N(0, 1)，∇log p(x) = −x。取ε = 0.1，更新为x ← 0.95x + 0.316z。</p><ul><li>从x = 5出发，忽略噪声时均值每步乘0.95，50步后约为0.38，链已经“忘记”起点。</li><li>长期方差v满足v = 0.95²·v + 0.1，解得v ≈ 1.026，接近目标的1；多出的2.6%就是有限步长带来的偏差，ε越小偏差越小。</li></ul></div>
+<h2>容易误解的地方</h2><ul><li>MCMC的样本彼此相关，1000个链上的点远不等于1000个独立样本。</li><li>前面若干步（burn-in）还没收敛，要丢掉。多峰分布中链可能长时间困在一个峰里，看起来“收敛”了其实没有。</li><li>朗之万更新和带噪声的梯度下降形式几乎一样，区别在于噪声的大小是按步长精确设定的，目的是采样而不是找最大值。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:288" href="../n/score-matching.html">分数匹配生成模型</a> <a class="chip hue" style="--h:288" href="../n/score-sde.html">Score SDE统一框架</a> <a class="chip hue" style="--h:288" href="../n/ebm-implicit.html">隐式能量模型生成</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

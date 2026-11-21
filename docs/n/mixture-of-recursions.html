@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>递归混合MoR（2025） · AI脉络</title>
+<meta name="description" content="省参数的办法（层间共享权重）和省计算的办法（按token自适应计算）一直分开研究，没有一个架构同时做到两者。 把一叠共享权重的层反复循环使用，再用轻量路由器给每个token决定循环几次；只有还在“算”的token参与注意力和KV缓存。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/mixture-of-recursions.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="递归混合MoR（2025）">
+<meta property="og:description" content="省参数的办法（层间共享权重）和省计算的办法（按token自适应计算）一直分开研究，没有一个架构同时做到两者。 把一叠共享权重的层反复循环使用，再用轻量路由器给每个token决定循环几次；只有还在“算”的token参与注意力和KV缓存。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/mixture-of-recursions.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/mixture-of-recursions">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 架构与组件</div>
+<h1>递归混合MoR</h1>
+<div class="full">Mixture-of-Recursions: Learning Dynamic Recursive Depths for Adaptive Token-Level Computation</div>
+<div class="meta"><span>2025.07</span><span>论文</span><span>延伸</span><span>NeurIPS 2025</span><span>Sangmin Bae, Yujin Kim, Reza Bayat, Sungnyun Kim, Jiyoun Ha, Tal Schuster, Adam Fisch, Hrayr Harutyunyan et al. · KAIST / Google DeepMind / Mila等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2507.10524" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/mixture-of-recursions">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>省参数的办法（层间共享权重）和省计算的办法（按token自适应计算）一直分开研究，没有一个架构同时做到两者。</p></div><div><h4>方法</h4><p>把一叠共享权重的层反复循环使用，再用轻量路由器给每个token决定循环几次；只有还在“算”的token参与注意力和KV缓存。</p></div><div><h4>影响</h4><p>在135M–1.7B规模上用更少参数和同等训练FLOPs取得更低困惑度和更高吞吐，被视为“循环/递归Transformer”复兴的代表作之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/albert.html">ALBERT参数共享</a>和<a class="ln" href="../n/universal-transformer.html">Universal Transformer</a>让多层共享同一组权重，节省参数；<a class="ln" href="../n/mixture-of-depths.html">深度混合MoD</a>让不同token走不同深度，节省计算。MoR把两者合进一个<b>递归Transformer</b>：模型只有一小叠层，前向时把这叠层重复调用多次（每次叫一次递归），参数量因此很小。</p><p>每次递归前，一个轻量路由器为每个token决定是否继续下一次递归，于是简单token早早“下车”，难的token多算几轮。在第r次递归时，只有仍然活跃的token之间做二次方的注意力，KV缓存也只为它们保存，这同时省了计算和显存访问。论文还提出一种KV共享变体，后续递归直接复用第一次递归的键值，进一步减少显存。</p><p>摘要报告：在135M到1.7B参数的范围内，相同训练FLOPs下MoR以更小的模型显著降低验证困惑度、提高少样本准确率，吞吐也高于普通Transformer和已有的递归基线。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只在1.7B以下验证，递归架构放大到前沿规模后的训练稳定性和收益未知。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/ouro.html">Ouro循环语言模型</a></div></li><li>按token提前退出导致批内各序列计算深度不一，在实际推理框架中实现高效批处理较难。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/albert.html">ALBERT参数共享</a><span class="yr">2019.09 · LLM</span><div class=nt>借用层间参数共享来节省参数。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/universal-transformer.html">Universal Transformer</a><span class="yr">2018.07 · LLM</span><div class=nt>继承循环共享层的结构，并加入按token的递归深度路由。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/mixture-of-depths.html">深度混合MoD</a><span class="yr">2024.04 · LLM</span><div class=nt>把MoD的按token跳层推广为按token决定递归次数，并据此只缓存活跃token的KV。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/ouro.html">Ouro循环语言模型</a><span class="yr">2025.10 · LLM</span><div class=nt>同为自适应循环深度，Ouro用熵正则目标学习深度分配，并把它做进万亿token级的预训练。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a> <a class="chip c" href="../c/perplexity.html">困惑度</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2507.10524" rel="noopener">https://arxiv.org/abs/2507.10524</a>（标题、作者、v1提交于2025-07-14；摘要中递归Transformer共享层、轻量路由器分配递归深度、只对活跃token做注意力并缓存KV、KV共享变体、135M–1.7B、同等训练FLOPs下更低困惑度和更高吞吐；NeurIPS收录依据OpenAlex记录。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E9%80%92%E5%BD%92%E6%B7%B7%E5%90%88MoR%EF%BC%88mixture-of-recursions%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amixture-of-recursions%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/mixture-of-recursions.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="diffusion-beats-ar.html"><small>本分支上一个 · 2025.07</small><b>数据受限时扩散胜自回归</b></a><a class="r" href="qwen3-coder.html"><small>本分支下一个 · 2025.07</small><b>Qwen3-Coder</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

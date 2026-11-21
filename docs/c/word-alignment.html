@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>噪声信道与词对齐（Noisy Channel and Word Alignment） · AI脉络</title>
+<meta name="description" content="统计机器翻译的两块基石：噪声信道模型把翻译拆成“语言模型 × 翻译模型”；词对齐则从只有句子对应的平行语料中，用EM算法自动推断出哪个词译成了哪个词。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/word-alignment.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="噪声信道与词对齐（Noisy Channel and Word Alignment）">
+<meta property="og:description" content="统计机器翻译的两块基石：噪声信道模型把翻译拆成“语言模型 × 翻译模型”；词对齐则从只有句子对应的平行语料中，用EM算法自动推断出哪个词译成了哪个词。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/word-alignment.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/word-alignment">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>噪声信道与词对齐</h1><div class="full">Noisy Channel and Word Alignment</div>
+<p class="muted" style="font-size:13px">也叫：噪声信道模型　IBM模型　统计机器翻译　SMT　对齐模型</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/word-alignment">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>统计机器翻译的两块基石：噪声信道模型把翻译拆成“语言模型 × 翻译模型”；词对齐则从只有句子对应的平行语料中，用EM算法自动推断出哪个词译成了哪个词。</b></p>
+<p class="tags">先要会：<a class="chip c" href="conditional-bayes.html">条件概率与贝叶斯公式</a> <a class="chip c" href="language-model.html">语言模型</a> <a class="chip c" href="latent-variable.html">隐变量模型</a> <a class="chip c" href="em-algorithm.html">EM算法</a></p>
+<p>1990年前后，IBM的研究者想用统计方法做翻译。他们手里有加拿大议会的英法双语记录，句子一一对应，但<b>没有人标出词与词的对应</b>。要从这样的数据里学会翻译，需要两个想法。</p><p><b>噪声信道模型</b>。设想一句英文e在传输中被“噪声”扭曲成了法文f，翻译就是从f还原出最可能的e。由贝叶斯公式（见<a class="lc" href="../c/conditional-bayes.html">条件概率与贝叶斯公式</a>）：</p><p class="formula"><code>ê = argmax_e P(e | f) = argmax_e P(e) · P(f | e)</code></p><p>（P(f)与e无关，可以去掉。）这样就把一个难题拆成两个容易些的部分：</p><ul><li><b>P(e)</b>：<a class="lc" href="../c/language-model.html">语言模型</a>，只需要英文单语语料，负责译文通顺。</li><li><b>P(f | e)</b>：翻译模型，只需负责词义对得上，不必管英文是否通顺。</li></ul><p>同样的分解也是语音识别的经典框架：<code>argmax_W P(W) · P(声音 | W)</code>。<a class="ln" href="../n/statistical-mt-1990.html">噪声信道翻译模型</a>提出了这个框架。</p><p><b>词对齐</b>。为了估计P(f | e)，引入一个看不见的<b>对齐</b>a：对法文的每个位置j，a_j指出它是由英文的第几个词翻译来的（也可以对应一个特殊的NULL词，表示凭空多出来的词）。对齐是一个<a class="lc" href="../c/latent-variable.html">隐变量模型</a>。<a class="ln" href="../n/ibm-models.html">IBM统计翻译模型</a>提出了一系列由简到繁的模型，最简单的IBM Model 1假设所有对齐方式先验等可能，只有一张词翻译概率表t(f | e)：</p><p class="formula"><code>P(f | e) ∝ Π_j Σ_i t(f_j | e_i)</code></p><p><b>用EM学习</b>（见<a class="lc" href="../c/em-algorithm.html">EM算法</a>）。不知道对齐就无法数“哪个词译成哪个”；不知道t表就无法推断对齐。EM交替进行：</p><ul><li><b>E步</b>：用当前的t表，计算每个法文词对齐到每个英文词的概率（按t值归一化）。</li><li><b>M步</b>：把这些概率当作“软计数”累加，重新估计t表。</li></ul><p>反复迭代，在多个句子里反复共现的词对会逐渐拿到大部分概率。</p><p><b>它在哪里出现</b>。<a class="ln" href="../n/hmm-alignment.html">HMM词对齐</a>加入了“相邻词的对齐位置也相邻”的约束；<a class="ln" href="../n/och-ney-alignment.html">GIZA++与对齐模型比较</a>的GIZA++工具成为标准；对齐结果是<a class="ln" href="../n/phrase-smt.html">短语统计机器翻译</a>抽取短语表的基础。神经机器翻译中，<a class="ln" href="../n/bahdanau-attention.html">注意力机制</a>的注意力权重可以看作一种由网络自己学出来的<b>软对齐</b>（见<a class="lc" href="../c/attention-concept.html">注意力机制</a>），不再需要单独的对齐步骤。</p>
+<div class="example"><h4>例子</h4><p><b>IBM Model 1的EM，三对句子</b>（为简单起见不加NULL）：das Haus ↔ the house，das Buch ↔ the book，ein Buch ↔ a book。德文共4个词，t(德文词 | 英文词)初始都设为1/4。</p><p><b>第1轮</b>。在第一对里，das对齐到the和house的概率各为0.5；Haus也一样。把所有句对的软计数汇总再归一化，得到t(das | the) = 0.5，t(Haus | the) = 0.25，t(Buch | the) = 0.25——因为das与the在两个句对中都共现，而Haus和Buch各只有一次。同理t(Buch | book) = 0.5。</p><p><b>继续迭代</b>。第2轮后t(das | the) = 0.636，t(Buch | book) = 0.636；第5轮后两者都升到0.896，t(Haus | house)升到0.782，t(ein | a)也是0.782。</p><p>没有任何人告诉模型das对应the，它是从“das和the总一起出现，而Haus只和house一起出现”这一统计规律中推出来的。</p></div>
+<h2>容易误解的地方</h2><ul><li>“噪声信道”的方向容易搞反：要把法文f译成英文e，翻译模型是P(f | e)，即从目标语言“生成”源语言。</li><li>IBM Model 1完全不考虑词序，“the house”与“house the”得分相同；词序要靠语言模型和更高阶的IBM模型来管。</li><li>注意力权重只是近似的软对齐，并不总与人工标注的词对齐一致，用它直接做对齐效果通常不如专门的对齐方法。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:24" href="../n/ibm-models.html">IBM统计翻译模型</a> <a class="chip hue" style="--h:24" href="../n/weaver-memo.html">Weaver翻译备忘录</a> <a class="chip hue" style="--h:24" href="../n/statistical-mt-1990.html">噪声信道翻译模型</a> <a class="chip hue" style="--h:24" href="../n/och-ney-alignment.html">GIZA++与对齐模型比较</a> <a class="chip hue" style="--h:24" href="../n/phrase-smt.html">短语统计机器翻译</a> <a class="chip hue" style="--h:24" href="../n/hiero.html">层次短语翻译Hiero</a> <a class="chip hue" style="--h:24" href="../n/moses.html">Moses</a> <a class="chip hue" style="--h:24" href="../n/cho-encdec.html">RNN编码器-解码器与GRU</a> <a class="chip hue" style="--h:24" href="../n/candide.html">IBM Candide翻译系统</a> <a class="chip hue" style="--h:24" href="../n/hmm-alignment.html">HMM词对齐</a> <a class="chip hue" style="--h:24" href="../n/log-linear-smt.html">对数线性翻译模型</a> <a class="chip hue" style="--h:24" href="../n/google-translate.html">Google翻译上线（统计MT）</a> <a class="chip hue" style="--h:24" href="../n/coverage-nmt.html">覆盖机制</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

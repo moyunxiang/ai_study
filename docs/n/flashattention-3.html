@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FlashAttention-3（2024） · AI脉络</title>
+<meta name="description" content="在H100上只用到约35%的利用率，没有利用Hopper架构新增的异步张量核心和TMA、FP8等能力。 用warp专门化让数据搬运和计算重叠，交错分块矩阵乘与softmax，并用块量化和非相干处理支持FP8注意力。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/flashattention-3.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="FlashAttention-3（2024）">
+<meta property="og:description" content="在H100上只用到约35%的利用率，没有利用Hopper架构新增的异步张量核心和TMA、FP8等能力。 用warp专门化让数据搬运和计算重叠，交错分块矩阵乘与softmax，并用块量化和非相干处理支持FP8注意力。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/flashattention-3.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/flashattention-3">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 编译器与高性能算子</div>
+<h1>FlashAttention-3</h1>
+<div class="full">FlashAttention-3: Fast and Accurate Attention with Asynchrony and Low-precision</div>
+<div class="meta"><span>2024.07</span><span>论文</span><span>延伸</span><span>NeurIPS 2024</span><span>Shah, Bikshandi, Zhang, Thakkar, Ramani, Dao · Colfax, Meta, NVIDIA, Princeton, Together AI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2407.08608" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/flashattention-3">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/flashattention-2.html">FlashAttention-2</a>在H100上只用到约35%的利用率，没有利用Hopper架构新增的异步张量核心和TMA、FP8等能力。</p></div><div><h4>方法</h4><p>用warp专门化让数据搬运和计算重叠，交错分块矩阵乘与softmax，并用块量化和非相干处理支持FP8注意力。</p></div><div><h4>影响</h4><p>在H100上把注意力推到接近75%利用率，成为Hopper时代的标准注意力内核。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>FlashAttention-3针对<a class="ln" href="../n/h100.html">H100</a>的三项改造。第一，利用张量核心和TMA（张量内存加速器）的异步性，用warp专门化：一部分warp专门负责搬运数据，另一部分负责计算，让两者重叠。第二，把一个块的矩阵乘与前一个块的softmax交错执行，因为softmax用的特殊函数单元吞吐远低于张量核心，错开可以隐藏其延迟。第三，支持<a class="ln" href="../n/fp8.html">FP8训练格式</a>：用块量化和非相干处理（对输入做随机正交变换以打散离群值），减小低精度误差。</p><h2>结果</h2><p>论文称在H100上比FlashAttention-2快1.5到2.0倍，FP16最高740 TFLOPs/s（75%利用率），FP8接近1.2 PFLOPs/s，且FP8数值误差比基线FP8注意力低2.6倍。</p><h2>后来的发展</h2><p>紧接着Blackwell带来新的瓶颈，见<a class="ln" href="../n/flashattention-4.html">FlashAttention-4</a>。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>内核深度绑定Hopper特性，到了Blackwell需要重写。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/flashattention-4.html">FlashAttention-4</a></div></li><li>FP8路径在长上下文和极端离群值下的精度仍需谨慎评估。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:72" href="../n/h100.html">H100</a><span class="yr">2022.03 · 硬件</span><div class=nt>利用Hopper的TMA和异步张量核心。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a><span class="yr">2022.05 · 系统·效率</span><div class=nt>内核针对Ampere架构手写，用不上Hopper的异步张量核心、TMA和FP8，新硬件上要重写。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/flashattention-2.html">FlashAttention-2</a><span class="yr">2023.07 · 系统·效率</span><div class=nt>FA2在H100上利用率仅约35%，FA3通过异步和低精度把它提到约75%。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:72" href="../n/fp8.html">FP8训练格式</a><span class="yr">2022.09 · 硬件</span><div class=nt>用FP8注意力进一步提速。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/deepseek-infra-week.html">DeepSeek开源周</a><span class="yr">2025.02 · 系统·效率</span><div class=nt>FlashMLA沿着FlashAttention系列在Hopper上利用异步与分块的路线，专门针对MLA的压缩KV缓存做解码优化。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/flashattention-4.html">FlashAttention-4</a><span class="yr">2026.03 · 系统·效率</span><div class=nt>沿用异步与流水线思路，针对Blackwell的新瓶颈重新设计。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/floating-point.html">浮点精度：FP32、FP16、BF16、INT8</a> <a class="chip c" href="../c/quantization-concept.html">量化</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a></p>
+<h2>本篇术语</h2><ul><li><b>warp专门化</b>　同一个线程块内，不同的warp分工，一部分搬运数据，一部分做计算。</li></ul>
+<h2>怎么学</h2><p>先读FlashAttention与FA2 → 读FA3第3节的异步与流水线 → 看Tri Dao的博客或GPU Mode讲座。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2407.08608" rel="noopener">https://arxiv.org/abs/2407.08608</a>（标题、作者、2024-07-11；摘要的FA2仅35%利用率、1.5到2.0倍、740 TFLOPs/s（75%）、FP8近1.2 PFLOPs/s、误差低2.6倍。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20FlashAttention-3%EF%BC%88flashattention-3%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aflashattention-3%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/flashattention-3.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="modded-nanogpt.html"><small>本分支上一个 · 2024.06</small><b>modded-nanogpt速通</b></a><a class="r" href="minitron.html"><small>本分支下一个 · 2024.07</small><b>Minitron剪枝加蒸馏</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

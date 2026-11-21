@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>标签平滑（2015） · AI脉络</title>
+<meta name="description" content="用one-hot标签和交叉熵训练时，模型会把正确类别的logit推向无穷大，产生过度自信，容易过拟合并削弱泛化。 把硬标签换成软标签：正确类别拿到 1−ε ，剩下的概率均匀分给其他类别，使网络不再追求无限大的logit。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/label-smoothing.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="标签平滑（2015）">
+<meta property="og:description" content="用one-hot标签和交叉熵训练时，模型会把正确类别的logit推向无穷大，产生过度自信，容易过拟合并削弱泛化。 把硬标签换成软标签：正确类别拿到 1−ε ，剩下的概率均匀分给其他类别，使网络不再追求无限大的logit。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/label-smoothing.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/label-smoothing">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 深层训练配方</div>
+<h1>标签平滑</h1>
+<div class="full">Rethinking the Inception Architecture for Computer Vision</div>
+<div class="meta"><span>2015.12</span><span>论文</span><span>延伸</span><span>CVPR 2016</span><span>Szegedy, Vanhoucke, Ioffe, Shlens, Wojna · Google</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1512.00567" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/label-smoothing">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>用one-hot标签和交叉熵训练时，模型会把正确类别的logit推向无穷大，产生过度自信，容易过拟合并削弱泛化。</p></div><div><h4>方法</h4><p>把硬标签换成软标签：正确类别拿到<code>1−ε</code>，剩下的概率均匀分给其他类别，使网络不再追求无限大的logit。</p></div><div><h4>影响</h4><p>这个只有一行的正则化技巧成了分类、翻译、语音等任务的通用配置，Transformer等模型也沿用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>这篇论文的主体是改进<a class="ln" href="../n/googlenet.html">GoogLeNet / Inception</a>的Inception结构，即<a class="ln" href="../n/inception-v3.html">Inception v3</a>：把大卷积分解成小卷积、不对称卷积，并在辅助分类器上做正则。其中一节提出标签平滑正则（LSR）。</p><p>设类别数为K，真实类别为y，原来的目标分布是one-hot，<code>q(k)=1 if k=y else 0</code>。平滑后改写为<code>q′(k) = (1−ε)·q(k) + ε/K</code>，即把一小部分概率ε均匀分给所有类别，再对它计算<a class="lc" href="../c/cross-entropy.html">交叉熵</a>。这样让最优logit差变成有限值，限制了模型的过度自信，也让输出分布更接近“较宽的”分布。</p><p>论文称，把它与分解卷积等手段结合，单模型单帧评估在ILSVRC 2012验证集上达到21.2% top-1和5.6% top-5错误，计算量约50亿次乘加、参数不到2500万；四模型集成加多裁剪评估达到3.5% top-5验证错误。这些数字来自整个Inception-v3方案，并不全部来自标签平滑。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>平滑强度ε和“均匀分给所有类”的做法是手工设定的，没有区分哪些类别更相近，同时会让输出概率偏小，对依赖精确置信度的任务可能有副作用。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/googlenet.html">GoogLeNet / Inception</a><span class="yr">2014.09 · 视觉</span><div class=nt>在Inception架构基础上加入卷积分解与标签平滑，成为后续的Inception-v3</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/inception-v3.html">Inception v3</a><span class="yr">2015.12 · 视觉</span><div class=nt>标签平滑是Inception-v3训练配方的一部分，同一篇论文</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/cross-entropy.html">交叉熵</a> <a class="chip c" href="../c/regularization.html">正则化与权重衰减</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/generalization.html">泛化与过拟合</a></p>
+
+<h2>怎么学</h2><p>先看交叉熵与softmax的关系，读原文第7节（Model Regularization via Label Smoothing），在PyTorch中用<code>label_smoothing=0.1</code>重训一个小分类器并比较置信度直方图。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1512.00567" rel="noopener">https://arxiv.org/abs/1512.00567</a>（标题、作者、2015-12-02首次提交；摘要称Inception方案在ILSVRC 2012验证集上单模型21.2% top-1/5.6% top-5，约50亿乘加、不到2500万参数；4模型集成3.5% top-5。标签平滑的公式为我对原文第7节的转述，未单独核对正文。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%A0%87%E7%AD%BE%E5%B9%B3%E6%BB%91%EF%BC%88label-smoothing%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Alabel-smoothing%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/label-smoothing.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mc-dropout.html"><small>本分支上一个 · 2015.06</small><b>MC Dropout不确定性</b></a><a class="r" href="weight-norm.html"><small>本分支下一个 · 2016.02</small><b>权重归一化</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

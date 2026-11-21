@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DeltaNet并行训练（2024） · AI脉络</title>
+<meta name="description" content="用delta规则的线性Transformer在联想回忆上更强，但现有训练算法无法沿序列长度并行，在现代硬件上效率很低。 利用Householder矩阵乘积的节省内存的表示，设计出沿序列长度并行、硬件友好的训练算法。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/deltanet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DeltaNet并行训练（2024）">
+<meta property="og:description" content="用delta规则的线性Transformer在联想回忆上更强，但现有训练算法无法沿序列长度并行，在现代硬件上效率很低。 利用Householder矩阵乘积的节省内存的表示，设计出沿序列长度并行、硬件友好的训练算法。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/deltanet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/deltanet">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 线性循环与状态空间</div>
+<h1>DeltaNet并行训练</h1>
+<div class="full">Parallelizing Linear Transformers with the Delta Rule over Sequence Length</div>
+<div class="meta"><span>2024.06</span><span>论文</span><span>延伸</span><span>NeurIPS 2024</span><span>Songlin Yang, Bailin Wang, Yu Zhang, Yikang Shen, Yoon Kim · MIT / MIT-IBM Watson AI Lab 等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2406.06484" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/deltanet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>用delta规则的线性Transformer在联想回忆上更强，但现有训练算法无法沿序列长度并行，在现代硬件上效率很低。</p></div><div><h4>方法</h4><p>利用Householder矩阵乘积的节省内存的表示，设计出沿序列长度并行、硬件友好的训练算法。</p></div><div><h4>影响</h4><p>让delta规则线性注意力能规模化训练，成为<a class="ln" href="../n/gated-deltanet.html">Gated DeltaNet</a>等后续模型的基础。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>线性Transformer和状态空间模型被视为softmax注意力的线性时间替代，但在需要从上下文中检索信息的任务上往往逊色。把简单累加改成delta规则（DeltaNet）能提升联想回忆，原理见<a class="ln" href="../n/fast-weight-programmers.html">线性注意力即快速权重</a>。问题是它的递推每一步都依赖上一步的状态，以前只能逐步计算。</p><p>这篇工作观察到，delta规则的每步更新可以写成一个Householder型矩阵的乘积，并利用一种省内存的表示来计算这类乘积，从而把序列切成块，在块内用矩阵乘法并行、块间传递状态。这样训练时可以充分利用GPU的并行。</p><p>作者借此训练了13亿参数、1000亿token的DeltaNet，摘要称在困惑度和零样本任务上优于Mamba和GLA等近期线性时间基线，并展示了与滑动窗口注意力或全局注意力混合的模型表现更好。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>纯线性递归的状态大小固定，需要精确回溯全文的任务上仍不如完整注意力，需要混合层。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/gated-deltanet.html">Gated DeltaNet</a></div></li><li>只有写入而没有遗忘机制，状态满了以后旧信息难以清除。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/gated-deltanet.html">Gated DeltaNet</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/linear-attention.html">线性注意力</a><span class="yr">2020.06 · 基础</span><div class=nt>在线性注意力上用delta规则替代纯累加，并解决其训练效率问题。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/fast-weight-programmers.html">线性注意力即快速权重</a><span class="yr">2021.02 · 基础</span><div class=nt>把其中提出的delta规则式快速权重做成可大规模并行训练的算法。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/gla.html">门控线性注意力GLA</a><span class="yr">2023.12 · LLM</span><div class=nt>同期的硬件高效线性注意力，GLA用数据相关门控，DeltaNet用delta规则。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/gated-deltanet.html">Gated DeltaNet</a><span class="yr">2024.12 · 基础</span><div class=nt>纯线性递归的状态大小固定，需要精确回溯全文的任务上仍不如完整注意力，需要混合层。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/vector-matrix.html">向量、矩阵与张量</a> <a class="chip c" href="../c/matrix-multiplication.html">矩阵乘法与线性变换</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/state-space-model.html">状态空间模型与线性RNN</a></p>
+
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/fast-weight-programmers.html">线性注意力即快速权重</a>，再读本文关于分块并行的算法一节；可以对照<a class="ln" href="../n/gla.html">门控线性注意力GLA</a>的分块训练，思考为什么delta规则更难并行。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2406.06484" rel="noopener">https://arxiv.org/abs/2406.06484</a>（标题、5位作者、arXiv v1提交于2024-06-10；摘要中Householder矩阵乘积、沿序列长度并行、1.3B模型训练100B token后优于Mamba与GLA、两种混合模型优于强Transformer基线。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DeltaNet%E5%B9%B6%E8%A1%8C%E8%AE%AD%E7%BB%83%EF%BC%88deltanet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adeltanet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/deltanet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="platonic-representation.html"><small>本分支上一个 · 2024.05</small><b>柏拉图表示假说</b></a><a class="r" href="ttt.html"><small>本分支下一个 · 2024.07</small><b>测试时训练层TTT</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

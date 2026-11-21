@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DFlash块扩散草稿（2026） · AI脉络</title>
+<meta name="description" content="推测解码的草稿器本身也是逐词自回归生成，草稿越长越慢；扩散语言模型能并行出词，但单独使用时质量不如自回归模型。 只让扩散模型当草稿器：一个小型块扩散模型一次前向就猜出整块16个词，并读取目标模型的中间特征来提高命中率，最后仍由目标模型逐一验证。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dflash.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DFlash块扩散草稿（2026）">
+<meta property="og:description" content="推测解码的草稿器本身也是逐词自回归生成，草稿越长越慢；扩散语言模型能并行出词，但单独使用时质量不如自回归模型。 只让扩散模型当草稿器：一个小型块扩散模型一次前向就猜出整块16个词，并读取目标模型的中间特征来提高命中率，最后仍由目标模型逐一验证。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dflash.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dflash">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 解码与生成控制</div>
+<h1>DFlash块扩散草稿</h1>
+<div class="full">DFlash: Block Diffusion for Flash Speculative Decoding</div>
+<div class="meta"><span>2026.02</span><span>论文</span><span>延伸</span><span>ICML 2026</span><span>Jian Chen, Yesheng Liang, Zhijian Liu · 加州大学圣地亚哥分校</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2602.06036" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/z-lab/dflash" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/dflash">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>推测解码的草稿器本身也是逐词自回归生成，草稿越长越慢；扩散语言模型能并行出词，但单独使用时质量不如自回归模型。</p></div><div><h4>方法</h4><p>只让扩散模型当草稿器：一个小型块扩散模型一次前向就猜出整块16个词，并读取目标模型的中间特征来提高命中率，最后仍由目标模型逐一验证。</p></div><div><h4>影响</h4><p>官方称在多种模型和任务上无损加速超过6倍，比EAGLE-3高最多2.5倍；是把扩散语言模型用来加速自回归模型的代表做法之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/speculative-decoding.html">推测解码</a>的验证保证输出与目标模型完全一致，所以草稿器可以用任何方法生成，只要猜得准、猜得快。DFlash的草稿器是一个<a class="ln" href="../n/block-diffusion.html">块扩散BD3-LM</a>式的小模型（Qwen3上只有5层）：给定已确认的前文，它把接下来一整块位置都设为掩码，一次前向同时填出这一块的所有词，而不是像<a class="ln" href="../n/eagle-3.html">EAGLE-3推测解码</a>那样一个一个猜。</p><p>为了让小模型猜得准，DFlash从目标模型均匀选取5层的隐藏特征，拼接压缩后注入草稿器每一层的Key和Value里，相当于草稿器直接“看到”目标模型对上下文的理解。草稿器与目标模型共用词嵌入和输出头（冻结），只训练中间几层。</p><h2>结果</h2><p>论文表1：Qwen3-8B、关闭思考、温度0时，DFlash平均加速4.86倍、每轮平均接受6.49个词；EAGLE-3（草稿16）为1.76倍、2.96个词。在SGLang中单张B200、并发1时，Qwen3-8B在Math500上吞吐从230升到1175 token/s（5.1倍），并发32时降到2.8倍。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>并发升高后加速比明显下降（并发1为5.1倍，并发32为2.8倍），高负载服务中优势收窄。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>每个目标模型要单独训练草稿器，训练依赖目标模型自己生成的约80万条回答。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/speculative-decoding.html">推测解码</a><span class="yr">2022.11 · 系统·效率</span><div class=nt>沿用推测解码的验证流程，因此输出与目标模型逐词解码一致。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/eagle.html">EAGLE特征级推测解码</a><span class="yr">2024.01 · 系统·效率</span><div class=nt>继承EAGLE系列读取目标模型特征的思路，但注入到草稿器每层的KV中而不只是输入。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/eagle-3.html">EAGLE-3推测解码</a><span class="yr">2025.03 · 系统·效率</span><div class=nt>EAGLE-3草稿器仍逐词自回归，DFlash用块扩散一次前向出整块草稿，并作为主要对比基线。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/block-diffusion.html">块扩散BD3-LM</a><span class="yr">2025.03 · LLM</span><div class=nt>草稿器采用块扩散的生成方式：块内并行去掩码，块间按顺序推进。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/speculative-decoding.html">推测解码</a>、<a class="ln" href="../n/eagle-3.html">EAGLE-3推测解码</a>和<a class="ln" href="../n/block-diffusion.html">块扩散BD3-LM</a> → 读论文第3节草稿器结构与训练 → 用官方仓库的SGLang示例测不同并发下的加速比。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2602.06036" rel="noopener">https://arxiv.org/abs/2602.06036</a>（标题、作者、v1日期2026-02-05；摘要中6倍、比EAGLE-3高2.5倍；arXiv HTML v2：UCSD、5层草稿器、块大小16、5层目标特征注入每层KV、共用冻结的嵌入与输出头、约80万训练样本；表1的4.86倍/6.49与1.76倍/2.96；SGLang表3的230→1175 token/s与并发32时2.8倍。ICML 2026来自ICML 2026海报页与PMLR v306。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DFlash%E5%9D%97%E6%89%A9%E6%95%A3%E8%8D%89%E7%A8%BF%EF%BC%88dflash%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adflash%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dflash.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ggml-hf.html"><small>本分支上一个 · 2026.02</small><b>ggml.ai加入Hugging Face</b></a><a class="r" href="flashattention-4.html"><small>本分支下一个 · 2026.03</small><b>FlashAttention-4</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

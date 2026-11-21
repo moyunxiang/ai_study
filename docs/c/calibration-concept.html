@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>模型校准（Calibration） · AI脉络</title>
+<meta name="description" content="模型说“我有80%把握”时，在所有这类预测里它确实应该对约80%；满足这一点就叫校准良好。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/calibration-concept.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="模型校准（Calibration）">
+<meta property="og:description" content="模型说“我有80%把握”时，在所有这类预测里它确实应该对约80%；满足这一点就叫校准良好。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/calibration-concept.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/calibration-concept">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 机器学习基础 · 进阶</div>
+<h1>模型校准</h1><div class="full">Calibration</div>
+<p class="muted" style="font-size:13px">也叫：置信度校准　温度缩放　temperature scaling　ECE　期望校准误差　过度自信　overconfidence</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/calibration-concept">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>模型说“我有80%把握”时，在所有这类预测里它确实应该对约80%；满足这一点就叫校准良好。</b></p>
+<p class="tags">先要会：<a class="chip c" href="softmax.html">Softmax与logits</a> <a class="chip c" href="probability-basics.html">随机变量与概率分布</a></p>
+<p>分类模型通过<a class="lc" href="../c/softmax.html">Softmax与logits</a>输出一个概率，但这个数字值得信吗？医疗诊断、自动驾驶、要决定“是否把问题转给人”的系统，不仅需要答案，还需要可靠的置信度。<b>校准</b>衡量的就是置信度与实际正确率是否一致。</p><p><b>定义</b>：模型完美校准，当且仅当对任意p，<code>P(预测正确 | 置信度 = p) = p</code>。实际检验时把预测按置信度分成若干箱，每箱比较平均置信度与实际准确率。画成图叫<b>可靠性图</b>；把每箱的差距按样本数加权平均，得到<b>期望校准误差</b><code>ECE = Σ_b (n_b/n) · |acc_b − conf_b|</code>。</p><p><b>现代网络过度自信</b>。<a class="ln" href="../n/calibration.html">神经网络校准</a>（2017）发现，与十年前的浅层网络相比，现代深层网络准确率更高，校准却更差：普遍高估自己的把握。深度、宽度、BatchNorm、较弱的权重衰减都会加重这一点。他们给出的修正方法极其简单——<b>温度缩放</b>：在验证集上学一个标量T，把logits除以T再做softmax。T &gt; 1会让分布变平、降低过高的置信度，而且不改变哪个类最大，所以准确率不变。</p><p><b>其他方法</b>：<a class="ln" href="../n/mc-dropout.html">MC Dropout不确定性</a>在测试时多次随机dropout取平均；<a class="ln" href="../n/deep-ensembles.html">深度集成</a>训练多个独立模型取平均，通常校准更好；<a class="ln" href="../n/label-smoothing.html">标签平滑</a>也会影响校准。</p><p><b>在大模型里</b>：<a class="ln" href="../n/gpt-4.html">GPT-4</a>技术报告显示，预训练模型在选择题上的置信度相当校准，经过RLHF后训练校准明显变差。校准也与<a class="lc" href="../c/hallucination.html">幻觉</a>有关：模型如果知道自己不知道，就有机会选择不答。</p>
+<div class="example"><h4>例子</h4><p>某模型的验证集预测分两箱：60%的样本置信度约0.90，实际准确率0.75；40%的样本置信度约0.60，实际准确率0.55。ECE = 0.6×|0.75 − 0.90| + 0.4×|0.55 − 0.60| = 0.09 + 0.02 = 0.11。</p><p>温度缩放：logits为[3, 1, 0]时softmax最大概率0.84；取T = 2，变成[0.63, 0.23, 0.14]，仍然预测第一类，但不再那么自信。</p></div>
+<h2>容易误解的地方</h2><ul><li>校准好不等于准确率高：一个永远输出各类先验比例的模型可以完美校准，却毫无用处。</li><li>在一个数据集上校准好，遇到<a class="lc" href="../c/distribution-shift.html">分布偏移</a>后往往又会过度自信。</li><li>ECE依赖分箱方式，箱数不同数值会变，不同论文的ECE不宜直接比较。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:264" href="../n/mmlu.html">MMLU</a> <a class="chip hue" style="--h:144" href="../n/alphafold-db.html">AlphaFold蛋白结构数据库</a> <a class="chip hue" style="--h:264" href="../n/big-bench.html">BIG-bench</a> <a class="chip hue" style="--h:48" href="../n/conformal-prediction.html">保形预测</a> <a class="chip hue" style="--h:312" href="../n/fairness-impossibility.html">公平性不可兼得</a> <a class="chip hue" style="--h:48" href="../n/deep-ensembles.html">深度集成</a> <a class="chip hue" style="--h:48" href="../n/calibration.html">神经网络校准</a> <a class="chip hue" style="--h:264" href="../n/squad-2.html">SQuAD 2.0</a> <a class="chip hue" style="--h:0" href="../n/lm-know-what-they-know.html">模型知道自己知道什么</a> <a class="chip hue" style="--h:264" href="../n/helm.html">HELM</a> <a class="chip hue" style="--h:144" href="../n/gpt4-medical.html">GPT-4医学挑战题评测</a> <a class="chip hue" style="--h:0" href="../n/rlaif.html">RLAIF</a> <a class="chip hue" style="--h:144" href="../n/med-gemini.html">Med-Gemini</a> <a class="chip hue" style="--h:264" href="../n/arena-hard.html">Arena-Hard</a> <a class="chip hue" style="--h:264" href="../n/simpleqa.html">SimpleQA事实性</a> <a class="chip hue" style="--h:264" href="../n/hle.html">Humanity&#x27;s Last Exam</a> <a class="chip hue" style="--h:264" href="../n/lmarena.html">LMArena公司化</a> <a class="chip hue" style="--h:144" href="../n/mai-dxo.html">MAI-DxO序贯诊断</a> <a class="chip hue" style="--h:336" href="../n/deepconf.html">DeepConf置信度筛选推理</a> <a class="chip hue" style="--h:0" href="../n/why-hallucinate.html">幻觉的统计根源</a> <a class="chip hue" style="--h:264" href="../n/eci.html">Epoch能力指数ECI</a> <a class="chip hue" style="--h:264" href="../n/metr-th1.1.html">METR时间跨度1.1</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

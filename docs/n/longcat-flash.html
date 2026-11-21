@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>美团LongCat-Flash（2025） · AI脉络</title>
+<meta name="description" content="MoE模型每个token激活的专家数固定，简单token和困难token花一样多的算力；大规模专家并行时通信又经常卡住计算。 加入什么都不算、原样输出的“零计算专家”，让路由器给每个token动态分配算力；再用跨层捷径让通信和计算重叠。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/longcat-flash.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="美团LongCat-Flash（2025）">
+<meta property="og:description" content="MoE模型每个token激活的专家数固定，简单token和困难token花一样多的算力；大规模专家并行时通信又经常卡住计算。 加入什么都不算、原样输出的“零计算专家”，让路由器给每个token动态分配算力；再用跨层捷径让通信和计算重叠。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/longcat-flash.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/longcat-flash">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 中文大模型</div>
+<h1>美团LongCat-Flash</h1>
+<div class="full">LongCat-Flash Technical Report</div>
+<div class="meta"><span>2025.09</span><span>论文</span><span>延伸</span><span>Meituan LongCat Team · 美团</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2509.01322" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/longcat-flash">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>MoE模型每个token激活的专家数固定，简单token和困难token花一样多的算力；大规模专家并行时通信又经常卡住计算。</p></div><div><h4>方法</h4><p>加入什么都不算、原样输出的“零计算专家”，让路由器给每个token动态分配算力；再用跨层捷径让通信和计算重叠。</p></div><div><h4>影响</h4><p>美团开源的560B总参MoE模型、按token动态激活18.6B–31.3B，以“零计算专家”在MoE设计上提出了新做法。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/deepseekmoe.html">DeepSeekMoE细粒度专家</a>和<a class="ln" href="../n/deepseek-v3.html">DeepSeek-V3</a>确立了细粒度专家加共享专家的MoE配方，但每个token激活的专家数是固定的。LongCat-Flash在每层的512个普通FFN专家之外加了256个<b>零计算专家</b>：选中它就等于把输入原样传过去，不消耗计算。每个token从两类专家里共选12个，选中的零计算专家越多，实际算力越少，于是激活参数在18.6B到31.3B之间浮动，平均约27B。为了让分配稳定在目标比例，路由偏置用PID控制器按专家近期负载调节，思路接近<a class="ln" href="../n/aux-loss-free.html">无辅助损失负载均衡</a>。</p><p>第二个设计是<b>捷径连接MoE（ScMoE）</b>：从第一个注意力输出直接连一条跨层捷径到MoE块，使前面的稠密FFN能和MoE的分发/汇总通信并行执行，扩大了通信计算重叠的窗口。注意力用MLA，共28层。</p><p>技术报告称模型在30天内训完20T以上token，推理在H800上超过每秒100 token、每百万输出token约0.7美元；后训练面向智能体，TerminalBench 39.51、τ²-Bench 67.7、SWE-bench Verified 60.4。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>零计算专家让每个token计算量不一，批处理和推理框架中的负载预测更复杂，需要专门的工程适配。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>技术报告的对比多为厂商自测，动态算力分配相对固定激活到底带来多少质量收益缺少独立消融。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/deepseekmoe.html">DeepSeekMoE细粒度专家</a><span class="yr">2024.01 · LLM</span><div class=nt>在细粒度专家MoE的基础上加入零计算专家，让激活量随token变化。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/deepseek-v3.html">DeepSeek-V3</a><span class="yr">2024.12 · LLM</span><div class=nt>沿用MLA注意力和MTP等DeepSeek-V3的架构组件。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/mixture-of-depths.html">深度混合MoD</a><span class="yr">2024.04 · LLM</span><div class=nt>与MoD让token跳层的思路相通，LongCat把“可以不算”做成MoE里的一类专家。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/aux-loss-free.html">无辅助损失负载均衡</a><span class="yr">2024.08 · LLM</span><div class=nt>用PID控制器调节路由偏置，延续无辅助损失的负载均衡思路。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:240" href="../n/longcat-flash-omni.html">LongCat-Flash-Omni</a><span class="yr">2025.10 · 多模态</span><div class=nt>以美团LongCat-Flash混合专家语言模型为底座，加入音视频感知与语音重建模块。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/mixture-of-experts.html">混合专家</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a> <a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a> <a class="chip c" href="../c/residual-connection.html">残差连接</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2509.01322" rel="noopener">https://arxiv.org/abs/2509.01322</a>（标题、v1提交于2025-09-01；摘要中560B、零计算专家、18.6B–31.3B（平均27B）、ScMoE、20T token 30天、100 TPS、0.7美元；正文中512+256专家各选12、PID调节偏置、MLA、28层、TerminalBench 39.51、τ²-Bench 67.7、SWE-bench Verified 60.4。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E7%BE%8E%E5%9B%A2LongCat-Flash%EF%BC%88longcat-flash%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Alongcat-flash%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/longcat-flash.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="llada-moe.html"><small>本分支上一个 · 2025.09</small><b>LLaDA-MoE</b></a><a class="r" href="kimi-linear.html"><small>本分支下一个 · 2025.10</small><b>Kimi Linear</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GSLM无文本语言模型（2021） · AI脉络</title>
+<meta name="description" content="语言模型都建立在文字上，可世界上很多语言几乎没有文字资源，婴儿也是只听声音就学会说话。能不能完全不用文字和标注，直接从原始语音学一个会“说话”的语言模型？ 把系统拆成三段：自监督编码器加k-means把语音变成离散“伪文本”单元，在单元序列上训练Transformer语言模型，再用一个从单元合成语…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/gslm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="GSLM无文本语言模型（2021）">
+<meta property="og:description" content="语言模型都建立在文字上，可世界上很多语言几乎没有文字资源，婴儿也是只听声音就学会说话。能不能完全不用文字和标注，直接从原始语音学一个会“说话”的语言模型？ 把系统拆成三段：自监督编码器加k-means把语音变成离散“伪文本”单元，在单元序列上训练Transformer语言模型，再用一个从单元合成语…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/gslm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/gslm">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:168"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/speech.html">语音与音频</a> › 语音助手与对话模型</div>
+<h1>GSLM无文本语言模型</h1>
+<div class="full">On Generative Spoken Language Modeling from Raw Audio</div>
+<div class="meta"><span>2021.02</span><span>论文</span><span>重要</span><span>TACL 2021</span><span>Kushal Lakhotia, Eugene Kharitonov, Wei-Ning Hsu, Yossi Adi, Adam Polyak, Benjamin Bolte, Tu-Anh Nguyen, Jade Copet et al.（含Dupoux） · Facebook AI Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2102.01192" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/facebookresearch/fairseq/tree/main/examples/textless_nlp/gslm" rel="noopener">代码（fairseq textless） ↗</a><a class="btn sm" href="../index.html#/n/gslm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>语言模型都建立在文字上，可世界上很多语言几乎没有文字资源，婴儿也是只听声音就学会说话。能不能完全不用文字和标注，直接从原始语音学一个会“说话”的语言模型？</p></div><div><h4>方法</h4><p>把系统拆成三段：自监督编码器加k-means把语音变成离散“伪文本”单元，在单元序列上训练Transformer语言模型，再用一个从单元合成语音的模型把生成的单元念出来；同时提出一套自动评测指标。</p></div><div><h4>影响</h4><p>第一次给“无文本语音语言模型”定义了任务、基线和评测方法，证明从6000小时无标注语音学出的模型能续写出可懂的语音；它的离散单元+语言模型框架直接影响了AudioLM、dGSLM、SpiRit-LM以及后来的语音大模型。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/gpt-2.html">GPT-2</a>之类的语言模型说明，只要有大量文本就能学到词汇和语法。但这条路有两个缺口：许多语言缺乏书面文本；文字丢掉了语音里的语调、停顿、情绪等信息。另一方面，<a class="ln" href="../n/cpc.html">对比预测编码CPC</a>、<a class="ln" href="../n/wav2vec-2.html">wav2vec 2.0</a>等自监督模型已能从无标注语音中学到与音素相关的表示，<a class="ln" href="../n/vq-vae.html">VQ-VAE</a>等方法也能把连续信号变成离散码。把两者接起来似乎顺理成章，真正的障碍是评测：没有文字，就没法用困惑度比较用不同单元训练的模型，生成的“话”好不好也缺乏客观标准。</p><h2>方法</h2><p><b>语音到单元（S2u）</b>。用一个预训练好的自监督编码器（CPC、wav2vec 2.0或HuBERT三选一）抽取每20毫秒左右一帧的连续表示，取某一中间层（如HuBERT第6层、wav2vec 2.0第14层），再用k-means（见<a class="lc" href="../c/clustering.html">聚类</a>）聚成50、100或200个簇，每帧替换成簇编号。一句话就变成类似“71 12 12 57 …”的伪文本（见<a class="lc" href="../c/vector-quantization.html">向量量化与离散token</a>）。</p><p><b>单元语言模型（uLM）</b>。在单元序列上训练一个12层的标准Transformer语言模型（见<a class="lc" href="../c/language-model.html">语言模型</a>、<a class="lc" href="../c/autoregressive.html">自回归生成</a>），训练数据是Libri-Light中约6000小时“干净”有声书语音。生成时给一段语音提示或什么都不给，按温度采样续写单元。</p><p><b>单元到语音（u2S）</b>。把<a class="ln" href="../n/tacotron-2.html">Tacotron 2</a>的输入从字符换成单元，在单人数据集LJSpeech上训练，输出梅尔谱，再用<a class="ln" href="../n/waveglow.html">WaveGlow</a>转成波形。</p><p><b>评测</b>。对编码：ABX测试（三段语音里判断哪两段属于同一音素）；对语言模型：零样本的“找出真词”（spot-the-word）和语法可接受性判断（sBLIMP），随机水平都是50%错误率；对生成：用现成的语音识别把生成语音转写成文字，再算困惑度和重复度，并和人工打分（MOS和意义性MMOS）对照，二者相关性很高。</p><h2>结果</h2><p>在重合成任务上，最好的无监督组合与“文字+TTS”“ASR+TTS”两个有文字参照的上限系统相比，音素错误率差距在3个百分点以内。零样本探针上，声学层面很好（最好模型的跨说话人ABX错误率6.5%），词汇层面一般（找出真词错误率31.3%），语法层面接近随机（sBLIMP错误率42%）。单元数量的影响因任务而异：重合成总是200个最好，语言建模则不一定。三种编码器中CPC的单元ABX最好，HuBERT的语言模型得分最好。</p><h2>后来的发展</h2><p>GSLM开启了Meta的“无文本NLP”系列：之后的工作加入韵律（pGSLM）、做双人对话（<a class="ln" href="../n/dgslm.html">dGSLM双通道对话</a>）、做语音到语音翻译。谷歌的<a class="ln" href="../n/audiolm.html">AudioLM</a>沿用“语义token语言模型”的思路，再叠加<a class="ln" href="../n/soundstream.html">神经音频编解码器</a>的声学token以保留音色。<a class="ln" href="../n/spirit-lm.html">SpiRit-LM交错语音文本</a>把语音单元和文本token交错训练，弥补纯语音模型语法弱的问题；<a class="ln" href="../n/moshi.html">Moshi全双工语音对话</a>等全双工对话模型同样建立在“语音离散化后交给语言模型”的框架上。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>离散单元主要保留音素内容，说话人音色、语调和情绪基本丢失，合成端还固定成LJSpeech那一个人的声音。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/audiolm.html">AudioLM</a> <a class="chip hue" style="--h:168" href="../n/spirit-lm.html">SpiRit-LM交错语音文本</a></div></li><li>只用6000小时语音学语言，词汇知识薄弱、语法判断接近随机，远不如同等规模的文本模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/spirit-lm.html">SpiRit-LM交错语音文本</a></div></li><li>只能单人独白式续写，无法处理两人对话中的轮流、打断和重叠。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/dgslm.html">dGSLM双通道对话</a> <a class="chip hue" style="--h:168" href="../n/moshi.html">Moshi全双工语音对话</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a><span class="yr">2019.02 · LLM</span><div class=nt>沿用“在大量序列上训练自回归Transformer语言模型”的做法，只是token从文字换成了语音单元。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/vq-vae.html">VQ-VAE</a><span class="yr">2017.11 · 生成</span><div class=nt>同样把语音离散成码本单元再建模，但改为在自监督表示上离线k-means，并把重点放在单元之上的语言模型和评测。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:168" href="../n/tacotron-2.html">Tacotron 2</a><span class="yr">2017.12 · 语音</span><div class=nt>把Tacotron 2的输入从字符改为离散单元，作为从单元合成语音的解码器。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:168" href="../n/wav2vec-2.html">wav2vec 2.0</a><span class="yr">2020.06 · 语音</span><div class=nt>取wav2vec 2.0第14层表示做k-means得到离散单元，作为另一种编码器参与比较。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/cpc.html">对比预测编码CPC</a><span class="yr">2018.07 · 视觉</span><div class=nt>CPC是三种语音编码器之一，其单元在ABX音素区分上表现最好。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:168" href="../n/waveglow.html">WaveGlow</a><span class="yr">2018.10 · 语音</span><div class=nt>用预训练的WaveGlow把单元合成出的梅尔谱转为波形。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:168" href="../n/dgslm.html">dGSLM双通道对话</a><span class="yr">2022.03 · 语音</span><div class=nt>把单声道无文本续写扩展到双声道对话建模。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/audiolm.html">AudioLM</a><span class="yr">2022.09 · 语音</span><div class=nt>离散单元主要保留音素内容，说话人音色、语调和情绪基本丢失，合成端还固定成LJSpeech那一个人的声音。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/spirit-lm.html">SpiRit-LM交错语音文本</a><span class="yr">2024.02 · 语音</span><div class=nt>在无文本语音语言建模的基础上加入文本，用LLM做基座。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/moshi.html">Moshi全双工语音对话</a><span class="yr">2024.09 · 语音</span><div class=nt>只能单人独白式续写，无法处理两人对话中的轮流、打断和重叠。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+
+<h2>本篇术语</h2><ul><li><b>伪文本单元</b>　通过聚类得到的语音离散符号，每个大致对应几十毫秒的一类声音，像一种机器自己发明的“音标”，但没有人为定义。</li><li><b>ABX测试</b>　给出A、B、X三段语音，A和B属于不同音素，X与其中一个相同，看表示能否让X更接近同类那一个。错误率越低，表示越能区分音素。</li><li><b>无文本NLP（textless NLP）</b>　不经过任何文字转写，直接在语音信号上做语言建模、生成和翻译等任务的研究方向。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2102.01192" rel="noopener">https://arxiv.org/abs/2102.01192</a>（arXiv标题“Generative Spoken Language Modeling from Raw Audio”、11位作者、首次提交2021-02-01，TACL正式标题加“On”；正文：三种编码器、50/100/200单元、12层Transformer LM、6000小时Libri-Light、Tacotron 2在LJ上训练加WaveGlow、与上限差距3%以内、ABX 6.5%、spot-the-word 31.3%、sBLIMP 42%、重合成200单元最好。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20GSLM%E6%97%A0%E6%96%87%E6%9C%AC%E8%AF%AD%E8%A8%80%E6%A8%A1%E5%9E%8B%EF%BC%88gslm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Agslm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/gslm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="hifi-gan.html"><small>本分支上一个 · 2020.10</small><b>HiFi-GAN</b></a><a class="r" href="wenet.html"><small>本分支下一个 · 2021.02</small><b>WeNet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

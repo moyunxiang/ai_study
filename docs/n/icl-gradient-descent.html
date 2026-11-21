@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ICL即梯度下降（2022） · AI脉络</title>
+<meta name="description" content="大模型看几个例子就能做新任务（上下文学习），但权重没有更新，它到底在前向计算里做了什么，没有机制层面的解释。 构造证明：一层线性自注意力恰好能实现“在上下文例子上对线性回归做一步梯度下降”；再实验表明，在回归任务上训练出来的Transformer，权重确实收敛到这个构造。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/icl-gradient-descent.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ICL即梯度下降（2022）">
+<meta property="og:description" content="大模型看几个例子就能做新任务（上下文学习），但权重没有更新，它到底在前向计算里做了什么，没有机制层面的解释。 构造证明：一层线性自注意力恰好能实现“在上下文例子上对线性回归做一步梯度下降”；再实验表明，在回归任务上训练出来的Transformer，权重确实收敛到这个构造。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/icl-gradient-descent.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/icl-gradient-descent">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 能力的机理</div>
+<h1>ICL即梯度下降</h1>
+<div class="full">Transformers learn in-context by gradient descent</div>
+<div class="meta"><span>2022.12</span><span>论文</span><span>重要</span><span>ICML 2023</span><span>Johannes von Oswald, Eyvind Niklasson, Ettore Randazzo, João Sacramento, Alexander Mordvintsev, Andrey Zhmoginov, Max Vladymyrov · Google Research / ETH Zürich</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2212.07677" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://arxiv.org/abs/2310.08540" rel="noopener">后续质疑：Do pretrained Transformers Learn In-Context by Gradient Descent? ↗</a><a class="btn sm" href="https://github.com/google-research/self-organising-systems/tree/master/transformers_learn_icl_by_gd" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/icl-gradient-descent">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>大模型看几个例子就能做新任务（上下文学习），但权重没有更新，它到底在前向计算里做了什么，没有机制层面的解释。</p></div><div><h4>方法</h4><p>构造证明：一层线性自注意力恰好能实现“在上下文例子上对线性回归做一步梯度下降”；再实验表明，在回归任务上训练出来的Transformer，权重确实收敛到这个构造。</p></div><div><h4>影响</h4><p>给“上下文学习是一种在前向计算中运行的学习算法”提供了可检验的机制模型，成为上下文学习理论研究的常用出发点；但它能多大程度解释真实大模型，至今有争议。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/gpt-3.html">GPT-3</a>展示了<a class="lc" href="../c/in-context-learning.html">上下文学习与提示</a>：提示里放几个输入输出例子，模型不更新参数也能照着做。这像是一种学习，但学习发生在哪里？</p><p>2022年有两条线索。<a class="ln" href="../n/icl-function-classes.html">上下文学习函数类</a>发现，专门在“给若干(x, y)对、预测新x的y”上训练的Transformer，做线性回归的误差能接近最小二乘法，但没说它内部怎么算。<a class="ln" href="../n/induction-heads.html">归纳头与ICL</a>在真实语言模型里找到了“复制前文模式”的注意力头，却解释不了回归这类需要计算的任务。另一方面，<a class="ln" href="../n/linear-attention.html">线性注意力</a>早已指出：去掉softmax的注意力等价于一个随输入不断累加的“快速权重”矩阵。这篇论文把这几件事连了起来。</p><h2>方法</h2><p><b>梯度下降可以写成“改数据”</b>。设线性模型<code>y = W·x</code>，损失<code>L = (1/2N)·Σ‖W·xᵢ − yᵢ‖²</code>。从<code>W₀ = 0</code>出发走一步梯度下降，权重变化为</p><p class="formula"><code>ΔW = −η·∇L = (η/N)·Σ yᵢ·xᵢᵀ</code></p><p>于是对测试点的预测是<code>ŷ = ΔW·x_test = (η/N)·Σ yᵢ·(xᵢᵀ·x_test)</code>。</p><p><b>这正是线性注意力</b>。把每个例子拼成一个token <code>eᵢ = (xᵢ, yᵢ)</code>，测试点是<code>(x_test, 0)</code>。如果让键和查询取出x部分、值取出y部分，去掉softmax的注意力输出就是<code>Σ vᵢ·(kᵢᵀ·q) = Σ yᵢ·(xᵢᵀ·x_test)</code>，与上式只差一个系数η/N。论文的命题1给出了具体的<code>W_K, W_Q, W_V, P</code>矩阵，使一层线性自注意力对所有token的更新，与“对数据做一步梯度下降后的变化”完全一致；学习率η被吸收进权重里，相当于跨任务元学习出来的（见<a class="lc" href="../c/meta-learning.html">元学习</a>）。</p><p><b>多层</b>。把K层堆起来，就对应K步梯度下降。</p><h2>结果</h2><p>在随机生成的线性回归任务上训练单层线性自注意力模型，它的损失与调好学习率的一步梯度下降几乎重合，两者给出的预测和隐含的权重的余弦相似度接近1，换成训练时没见过的输入尺度也一致（5个随机种子）。多层模型比同样步数的普通梯度下降更好，但与作者提出的变体GD++吻合：每步先把输入变换为<code>(I − γ·X·Xᵀ)·x</code>，相当于做了一次曲率校正。在非线性回归上，带MLP的Transformer先学出特征，再在特征上做梯度下降。</p><h2>后来的发展</h2><p>同期的<a class="ln" href="../n/icl-learning-algorithm.html">ICL学的是什么算法</a>和<a class="ln" href="../n/icl-meta-optimizer.html">ICL即隐式元优化</a>从不同角度提出了相近的主张，三篇合在一起，使“上下文学习＝隐式优化”成为一个主流的理论视角，也让<a class="ln" href="../n/mesa-optimization.html">学到的优化器与内对齐</a>这个原本偏思辨的安全概念有了具体实例。2023年10月Shen等人在LLaMA-7B上直接比较上下文学习与真正的梯度微调，发现两者在不同数据集、模型和示例数量下表现并不一致，结论是二者等价仍只是一个开放假设。这个对应关系目前主要在受控的回归任务里成立。</p><h2>容易误解的地方</h2><ul><li>结论是在“线性注意力＋把x和y拼进同一个token”的人造设定下得到的。真实大模型用softmax注意力，例子以普通文本分散在很多token中，不能直接推出“GPT在做梯度下降”。</li><li>“等价”指输出相同，构造并不唯一：只要<code>P·W_V</code>和<code>W_K·W_Q</code>的乘积对上即可，所以比较训练出的权重时要先消除缩放差异。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只在线性自注意力、人造线性回归任务上严格成立；带softmax、在自然语言上训练的大模型是否仍按梯度下降做上下文学习，没有直接证据。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>需要把输入和标签拼进同一个token这种特殊排布；真实提示中x和y分处不同位置，模型还得先用类似归纳头的机制把它们配对。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>无法解释大模型上下文学习的许多现象，例如对示例顺序和格式的敏感、以及能否违背先验去学习反转的标签。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:312" href="../n/mesa-optimization.html">学到的优化器与内对齐</a><span class="yr">2019.06 · 安全·可解释</span><div class=nt>给出了“训练出的模型内部运行一个优化器”的具体可验证例子。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/icl-demonstrations.html">示例标签不重要？</a><span class="yr">2022.02 · LLM</span><div class=nt>只给出行为层面的现象，没有说明模型内部用什么机制利用示例的格式和分布。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/induction-heads.html">归纳头与ICL</a><span class="yr">2022.03 · LLM</span><div class=nt>论文讨论了两层模型中的归纳头，认为它可以看作“先拷贝配对、再做梯度下降”这一机制的特例。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/linear-attention.html">线性注意力</a><span class="yr">2020.06 · 基础</span><div class=nt>核心构造依赖去掉softmax的线性注意力：它等价于把值和键的外积累加成权重矩阵，与梯度下降的更新同形。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/icl-bayesian.html">ICL即隐式贝叶斯推断</a><span class="yr">2021.11 · LLM</span><div class=nt>理论建立在隐马尔可夫混合的简化假设上，与真实网络文本和多层Transformer的距离不明。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/icl-function-classes.html">上下文学习函数类</a><span class="yr">2022.08 · LLM</span><div class=nt>Garg等人只观察到Transformer能在上下文中做好线性回归，这篇给出了它在内部如何做到的权重构造并验证训练会找到它。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/icl-learning-algorithm.html">ICL学的是什么算法</a><span class="yr">2022.11 · LLM</span><div class=nt>Akyürek等人同期用包含MLP的多层构造实现一步梯度下降；本文的构造只需一层线性注意力，并直接比对了训练出的权重。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/icl-meta-optimizer.html">ICL即隐式元优化</a><span class="yr">2022.12 · LLM</span><div class=nt>Dai等人同月从注意力的“对偶形式”论证GPT在隐式微调，偏重真实模型的类比；本文偏重可严格验证的小模型。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/in-context-learning.html">上下文学习与提示</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/linear-regression.html">线性回归</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/efficient-attention.html">稀疏注意力与高效注意力</a> <a class="chip c" href="../c/meta-learning.html">元学习</a></p>
+<h2>本篇术语</h2><ul><li><b>线性自注意力（LSA）</b>　去掉softmax、直接用键和查询的内积作为权重的注意力。它的输出可以写成一个由历史(键, 值)外积累加而成的矩阵乘以查询。</li><li><b>mesa优化器</b>　被训练出来的模型自身在前向计算中又执行了一个优化过程。外层训练是“基础优化”，模型内部的这个过程叫mesa优化。</li><li><b>GD++</b>　本文提出的梯度下降变体：每步先用<code>(I − γXXᵀ)</code>变换输入数据再做梯度步，相当于近似的曲率（二阶）校正，多层Transformer的行为与它吻合。</li></ul>
+<h2>怎么学</h2><p>先确认会<a class="lc" href="../c/linear-regression.html">线性回归</a>的梯度推导和<a class="lc" href="../c/self-attention.html">自注意力与多头注意力</a>的矩阵写法。读论文第2节，自己在纸上验证：W₀=0时一步梯度下降的预测等于<code>Σ yᵢ(xᵢᵀx_test)</code>，再把它对上线性注意力的公式。然后跑官方代码里的单层实验，看训练出的权重与构造的对比图。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2212.07677" rel="noopener">https://arxiv.org/abs/2212.07677</a>（标题、7位作者、arXiv v1于2022-12-15、ICML 2023（PDF页眉）；PDF第2节式(2)(3)与命题1、图2（5个种子，余弦相似度与损失对齐）、多层与GD++（H(X)=I−γXXᵀ）、与Akyürek等人同期工作的比较、对归纳头的讨论；作者单位ETH Zürich与Google Research。后续质疑见arXiv 2310.08540（Shen, Mishra, Khashabi，2023-10-12）摘要：在LLaMA-7B上ICL与GD表现不一致。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ICL%E5%8D%B3%E6%A2%AF%E5%BA%A6%E4%B8%8B%E9%99%8D%EF%BC%88icl-gradient-descent%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aicl-gradient-descent%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/icl-gradient-descent.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="e5.html"><small>本分支上一个 · 2022.12</small><b>E5文本嵌入</b></a><a class="r" href="icl-meta-optimizer.html"><small>本分支下一个 · 2022.12</small><b>ICL即隐式元优化</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

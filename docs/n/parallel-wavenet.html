@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Parallel WaveNet（2017） · AI脉络</title>
+<meta name="description" content="WaveNet音质最好，但一次只能生成一个采样点，很难放到大规模并行硬件上，无法在线服务。 提出概率密度蒸馏：用训练好的WaveNet当老师，教一个并行的前馈网络学生一次性生成整段波形。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/parallel-wavenet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Parallel WaveNet（2017）">
+<meta property="og:description" content="WaveNet音质最好，但一次只能生成一个采样点，很难放到大规模并行硬件上，无法在线服务。 提出概率密度蒸馏：用训练好的WaveNet当老师，教一个并行的前馈网络学生一次性生成整段波形。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/parallel-wavenet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/parallel-wavenet">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:168"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/speech.html">语音与音频</a> › 神经声码器与编解码</div>
+<h1>Parallel WaveNet</h1>
+<div class="full">Parallel WaveNet: Fast High-Fidelity Speech Synthesis</div>
+<div class="meta"><span>2017.11</span><span>论文</span><span>延伸</span><span>ICML 2018</span><span>van den Oord, Li, Babuschkin, Simonyan, Vinyals, Kavukcuoglu et al. · DeepMind / Google</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1711.10433" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/parallel-wavenet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>WaveNet音质最好，但一次只能生成一个采样点，很难放到大规模并行硬件上，无法在线服务。</p></div><div><h4>方法</h4><p>提出概率密度蒸馏：用训练好的WaveNet当老师，教一个并行的前馈网络学生一次性生成整段波形。</p></div><div><h4>影响</h4><p>让WaveNet音质的语音合成第一次能在线部署，并成为Google Assistant中使用的声音。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/wavenet.html">WaveNet</a>的自回归生成要对每个采样点（一秒语音有上万个）依次做一次前向计算，GPU并行用不上。直接训练一个并行模型又很难达到同样音质。</p><p>论文的办法是<b>概率密度蒸馏</b>（见<a class="ln" href="../n/distillation.html">知识蒸馏</a>）。学生网络是一个<b>逆自回归流</b>（<a class="ln" href="../n/iaf.html">逆自回归流IAF</a>）：输入一串白噪声，各位置并行地变换成波形。因为流模型可以精确算出自己生成的每个样本的概率，就能让学生生成一批样本，再让<b>已训练好的WaveNet老师</b>给这些样本打分，目标是最小化学生分布与老师分布之间的KL散度（见<a class="lc" href="../c/kl-divergence.html">KL散度</a>），并辅以几项额外损失（如感知损失）保证音质。老师在训练时只需要『评分』，评分可以并行完成，所以训练是高效的。</p><p>摘要称，该方法在音质上与原WaveNet无显著差异，生成速度比实时快20倍以上，已被Google Assistant上线使用，覆盖多个英语和日语声音。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>训练流程复杂：需要先训好一个完整的WaveNet老师，再做蒸馏，还要多项辅助损失调参。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/waveglow.html">WaveGlow</a> <a class="chip hue" style="--h:168" href="../n/melgan.html">MelGAN</a> <a class="chip hue" style="--h:168" href="../n/hifi-gan.html">HiFi-GAN</a></div></li><li>逆自回归流学生模型很大，推理仍需要可观算力。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/hifi-gan.html">HiFi-GAN</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/wavenet.html">WaveNet</a><span class="yr">2016.09 · 语音</span> <span class="vk ok">已核对</span><div class=nt>解决WaveNet逐采样点生成太慢的问题，把它蒸馏成并行前馈网络，速度提升20倍以上。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/distillation.html">知识蒸馏</a><span class="yr">2015.03 · 系统·效率</span><div class=nt>以老师WaveNet的概率评分为目标训练学生，是分布层面的蒸馏。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/tacotron-2.html">Tacotron 2</a><span class="yr">2017.12 · 语音</span><div class=nt>WaveNet声码器逐采样点生成，推理极慢，需要额外蒸馏或换声码器才能上线。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/realnvp.html">标准化流RealNVP</a><span class="yr">2016.05 · 生成</span><div class=nt>学生网络使用流（逆自回归流）结构，可精确计算样本概率。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/deep-voice.html">Deep Voice</a><span class="yr">2017.02 · 语音</span><div class=nt>合成端的WaveNet逐采样点自回归，实时性靠大量工程优化勉强达到，质量与速度难兼顾。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/nsynth.html">NSynth</a><span class="yr">2017.04 · 语音</span><div class=nt>WaveNet解码器逐采样点生成，合成极慢，无法实时演奏。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/hifi-gan.html">HiFi-GAN</a><span class="yr">2020.10 · 语音</span><div class=nt>训练流程复杂：需要先训好一个完整的WaveNet老师，再做蒸馏，还要多项辅助损失调参。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:168" href="../n/wavernn.html">WaveRNN</a><span class="yr">2018.02 · 语音</span><div class=nt>同期解决WaveNet慢的另一条路线：Parallel WaveNet用蒸馏换并行，WaveRNN保持自回归但压缩。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/waveglow.html">WaveGlow</a><span class="yr">2018.10 · 语音</span><div class=nt>训练流程复杂：需要先训好一个完整的WaveNet老师，再做蒸馏，还要多项辅助损失调参。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/melgan.html">MelGAN</a><span class="yr">2019.10 · 语音</span><div class=nt>训练流程复杂：需要先训好一个完整的WaveNet老师，再做蒸馏，还要多项辅助损失调参。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/knowledge-distillation.html">知识蒸馏</a> <a class="chip c" href="../c/normalizing-flow.html">可逆流与流匹配</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/vocoder-codec.html">声码器与音频编解码</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1711.10433" rel="noopener">https://arxiv.org/abs/1711.10433</a>（核对标题、作者、2017-11-28提交；摘要写明Probability Density Distillation、20倍以上快于实时、Google Assistant已上线、多个英语日语声音。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Parallel%20WaveNet%EF%BC%88parallel-wavenet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aparallel-wavenet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/parallel-wavenet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="rnnoise.html"><small>本分支上一个 · 2017.09</small><b>RNNoise实时降噪</b></a><a class="r" href="chiu-s2s-asr.html"><small>本分支下一个 · 2017.12</small><b>序列到序列识别超越传统</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>梯度检查点（2016） · AI脉络</title>
+<meta name="description" content="训练一个n层的网络，反向传播需要保存每层的中间激活，显存与层数成正比，很多先进模型已经顶到了GPU显存上限。 只保存少数几层的激活，其余的在反向传播需要时重新前向计算一次，用算力换显存。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/grad-checkpointing.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="梯度检查点（2016）">
+<meta property="og:description" content="训练一个n层的网络，反向传播需要保存每层的中间激活，显存与层数成正比，很多先进模型已经顶到了GPU显存上限。 只保存少数几层的激活，其余的在反向传播需要时重新前向计算一次，用算力换显存。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/grad-checkpointing.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/grad-checkpointing">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 大模型并行训练</div>
+<h1>梯度检查点</h1>
+<div class="full">Training Deep Nets with Sublinear Memory Cost</div>
+<div class="meta"><span>2016.04</span><span>论文</span><span>延伸</span><span>Tianqi Chen, Bing Xu, Chiyuan Zhang, Carlos Guestrin</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1604.06174" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/grad-checkpointing">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>训练一个n层的网络，反向传播需要保存每层的中间激活，显存与层数成正比，很多先进模型已经顶到了GPU显存上限。</p></div><div><h4>方法</h4><p>只保存少数几层的激活，其余的在反向传播需要时重新前向计算一次，用算力换显存。</p></div><div><h4>影响</h4><p>成为训练大模型的标准手段，PyTorch、DeepSpeed、Megatron等都提供激活重计算。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>摘要的核心结果：训练n层网络只需 O(√n) 的内存，代价是每个小批量多做一次前向计算。做法是把网络切成约 √n 段，前向时只保留每段边界处的激活；反向传播到某一段时，从该段开头的检查点重新前向算出段内激活，用完即丢。内存从保存全部 n 层降到约 2√n 层，额外计算相当于多做一遍前向。</p><p>论文还基于计算图分析实现了自动的就地计算和内存共享，并在<a class="ln" href="../n/mxnet.html">MXNet</a>里实现，使在显存有限时能训练更深的网络（如深层<a class="ln" href="../n/resnet.html">ResNet</a>）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>额外约一遍前向的计算开销，对计算受限的训练是实实在在的减速。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a></div></li><li>只减少激活内存，参数、梯度与优化器状态的内存仍需另外处理。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/zero.html">ZeRO与DeepSpeed</a> <a class="chip hue" style="--h:192" href="../n/fsdp.html">PyTorch FSDP</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/backprop.html">反向传播</a><span class="yr">1986 · 基础</span><div class=nt>在反向传播需要保存全部中间值的基础上，用重计算换内存。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/ad-reverse-mode.html">反向模式自动微分</a><span class="yr">1970 · 系统·效率</span><div class=nt>反向遍需要正向遍的全部中间值，存储量随计算步数线性增长，深而长的计算会被内存卡住。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/speelpenning.html">Speelpenning梯度代码生成</a><span class="yr">1980 · 系统·效率</span><div class=nt>需要保存整个前向计算过程的中间值，内存与计算步数成正比。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/mxnet.html">MXNet</a><span class="yr">2015.12 · 系统·效率</span><div class=nt>在MXNet的计算图内存优化基础上实现。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/gpipe.html">GPipe流水线并行</a><span class="yr">2018.11 · 系统·效率</span><div class=nt>每段只保存边界激活、反向时重算本段前向，用梯度检查点式的重计算大幅降低激活显存。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a><span class="yr">2022.05 · 系统·效率</span><div class=nt>反向传播时不存注意力矩阵而是重算，与梯度检查点“以计算换显存”的思路相同，只是重算发生在片上SRAM。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/zero.html">ZeRO与DeepSpeed</a><span class="yr">2019.10 · 系统·效率</span><div class=nt>只减少激活内存，参数、梯度与优化器状态的内存仍需另外处理。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/fsdp.html">PyTorch FSDP</a><span class="yr">2023.04 · 系统·效率</span><div class=nt>只减少激活内存，参数、梯度与优化器状态的内存仍需另外处理。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/backpropagation.html">反向传播</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a> <a class="chip c" href="../c/autodiff.html">自动微分与计算图</a></p>
+
+<h2>怎么学</h2><p>读摘要和第3节；在PyTorch里用 <code>torch.utils.checkpoint</code> 包住几层，对比显存和耗时。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1604.06174" rel="noopener">https://arxiv.org/abs/1604.06174</a>（arXiv abs页：Training Deep Nets with Sublinear Memory Cost，Chen、Xu、Zhang、Guestrin，日期2016/04/21；摘要中的O(√n)内存、每个小批量多一次前向、计算图分析的就地操作与内存共享。√n分段细节为对摘要思路的展开。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%A2%AF%E5%BA%A6%E6%A3%80%E6%9F%A5%E7%82%B9%EF%BC%88grad-checkpointing%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Agrad-checkpointing%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/grad-checkpointing.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="xnor-net.html"><small>本分支上一个 · 2016.03</small><b>XNOR-Net</b></a><a class="r" href="paddlepaddle.html"><small>本分支下一个 · 2016.08</small><b>百度飞桨PaddlePaddle</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

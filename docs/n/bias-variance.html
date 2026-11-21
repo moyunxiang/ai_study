@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>偏差-方差权衡（1992） · AI脉络</title>
+<meta name="description" content="反向传播流行后，大家相信网络够大、数据够多就能学会任何东西；但网络为什么有时在新数据上表现很差、该用多大的网络，没有清楚的解释。 把神经网络看成非参数回归，把预测误差拆成噪声、偏差²、方差三项：模型太死板则偏差大，太自由则方差大，只能在两者之间权衡，而降低方差的根本办法是引入正确的先验结构。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/bias-variance.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="偏差-方差权衡（1992）">
+<meta property="og:description" content="反向传播流行后，大家相信网络够大、数据够多就能学会任何东西；但网络为什么有时在新数据上表现很差、该用多大的网络，没有清楚的解释。 把神经网络看成非参数回归，把预测误差拆成噪声、偏差²、方差三项：模型太死板则偏差大，太自由则方差大，只能在两者之间权衡，而降低方差的根本办法是引入正确的先验结构。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/bias-variance.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/bias-variance">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 泛化与学习理论</div>
+<h1>偏差-方差权衡</h1>
+<div class="full">Neural Networks and the Bias/Variance Dilemma</div>
+<div class="meta"><span>1992</span><span>论文</span><span>重要</span><span>Neural Computation 1992</span><span>Stuart Geman, Elie Bienenstock, René Doursat · 布朗大学 / ESPCI巴黎</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1162/neco.1992.4.1.1" rel="noopener">Neural Computation（DOI） ↗</a><a class="btn sm" href="http://web.mit.edu/6.435/www/Geman92.pdf" rel="noopener">原文扫描PDF（MIT 6.435课程页） ↗</a><a class="btn sm" href="../index.html#/n/bias-variance">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>反向传播流行后，大家相信网络够大、数据够多就能学会任何东西；但网络为什么有时在新数据上表现很差、该用多大的网络，没有清楚的解释。</p></div><div><h4>方法</h4><p>把神经网络看成非参数回归，把预测误差拆成噪声、偏差²、方差三项：模型太死板则偏差大，太自由则方差大，只能在两者之间权衡，而降低方差的根本办法是引入正确的先验结构。</p></div><div><h4>影响</h4><p>让“偏差-方差权衡”成为机器学习的标准语言，用来解释过拟合、早停和正则化；同时提出“难点在表示而非学习本身”，这一判断后来被深度学习的发展所印证与修正。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/backprop.html">反向传播</a>之后，多层网络被大量用于识别任务，<a class="ln" href="../n/universal-approx.html">万能近似定理</a>又证明了足够多隐藏单元的网络能逼近任意连续函数。一个流行的乐观看法是：网络是“白板”式的通用学习器，只要更多数据、更快的并行硬件，问题自然解决。</p><p>统计学家对这类“不假设模型形式”的方法早有研究，称为非参数估计，例如<a class="ln" href="../n/knn.html">k近邻</a>和核平滑。Geman等人的问题是：把神经网络放进这个框架里看，它能学什么、需要多少样本？</p><h2>方法</h2><p><b>分解</b>。设真实关系是<code>y = g(x) + 噪声</code>，用训练集D学到的预测函数为<code>f(x; D)</code>。对所有可能抽到的训练集取期望<code>E_D</code>，在某个输入x处的均方误差可以拆成三项：</p><p class="formula"><code>E[(y − f(x;D))²] = 噪声方差 + (E_D[f(x;D)] − E[y|x])² + E_D[(f(x;D) − E_D[f(x;D)])²]</code></p><p>第一项是数据本身的随机性，谁也消除不了；第二项是<b>偏差²</b>：换无数个训练集取平均，预测仍然系统性地偏离真值多少；第三项是<b>方差</b>：换一个训练集，预测会抖动多少（见<a class="lc" href="../c/bias-variance.html">偏差-方差权衡</a>）。</p><p><b>两个极端</b>。以k近邻为例：k = N时预测就是全体样本的平均，几乎不随训练集变化，方差小但偏差极大；k = 1时贴着每个样本走，偏差小但对训练集里的偶然噪声极其敏感，方差大。中间某个k最好。神经网络的隐藏单元数、训练步数都扮演同样的“平滑参数”角色：单元多、训练久，偏差降而方差升。</p><p><b>怎么测</b>。这个分解的好处是可以实际算出来：反复抽取多个独立训练集，各训练一个模型，在同一批测试点上看平均预测离真值多远（偏差）、各模型彼此差多远（方差）。</p><h2>结果</h2><p>手写数字实验：共1200个数字，留出600个（每类60个，加了20%像素翻转噪声）作测试；每个训练集只取200个（每类20个），对k近邻和Parzen核方法各抽100个训练集、对反向传播网络抽50个。三种方法都呈现清楚的U形总误差曲线。一个只有4个隐藏单元的网络，总误差在约100轮迭代时最低，此后训练误差继续下降但测试误差上升——即使这么小的网络也会过拟合，这为<b>早停</b>提供了直接的解释。作者据此认为当时的前馈网络对困难的感知问题“基本不够用”，根本挑战在于找到合适的表示和先验结构。</p><h2>后来的发展</h2><p>偏差-方差分解从此成为讲过拟合、正则化（<a class="ln" href="../n/weight-decay.html">权重衰减</a>）、集成方法（<a class="ln" href="../n/bagging.html">Bagging</a>靠平均降方差）时的标准框架。文中“需要把正确的偏置内建进模型”的主张，与卷积网络的权值共享（<a class="ln" href="../n/lenet.html">LeNet与卷积网络</a>）等思路一致。</p><p>但深度学习时代出现了它解释不了的现象：参数远多于样本、能把训练集完全背下来的网络照样泛化得很好（<a class="ln" href="../n/rethinking-generalization.html">重新思考泛化</a>）；继续增大模型越过“插值点”后测试误差反而再次下降，即<a class="ln" href="../n/interpolation-regime.html">插值区与双下降曲线</a>与<a class="ln" href="../n/double-descent.html">双下降</a>。经典的U形曲线只描述了故事的前半段。</p><h2>容易误解的地方</h2><ul><li>偏差和方差是对“所有可能的训练集”取期望得到的，单次训练无法直接测出，需要重复抽样。</li><li>平方误差下的分解最干净；对0-1分类误差，偏差和方差不能简单相加。</li><li>“模型越大方差越大”在经典区间成立，但在过参数化的深度网络里常常不成立。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>按经典U形曲线，参数远多于样本的网络应该严重过拟合，但这与后来深度网络的实际表现矛盾。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/rethinking-generalization.html">重新思考泛化</a> <a class="chip hue" style="--h:48" href="../n/interpolation-regime.html">插值区与双下降曲线</a> <a class="chip hue" style="--h:48" href="../n/double-descent.html">双下降</a></div></li><li>只指出“需要正确的先验结构”，没有给出如何为视觉、语言等问题设计这种结构。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/lenet.html">LeNet与卷积网络</a> <a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a></div></li><li>实验规模很小（每个训练集200个样本、最多24个隐藏单元），大数据下方差问题有多严重没有检验。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/alexnet.html">AlexNet</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/backprop.html">反向传播</a><span class="yr">1986 · 基础</span><div class=nt>把反向传播训练的前馈网络放进非参数回归框架，分析它的偏差、方差和样本需求。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/vc-dimension.html">VC维与一致收敛</a><span class="yr">1971 · 基础</span><div class=nt>两种解释泛化的视角：VC理论用假设空间的容量给出最坏情况的界，偏差-方差分解则在给定分布下把误差拆成可测量的两项。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/universal-approx.html">万能近似定理</a><span class="yr">1989 · 基础</span><div class=nt>万能近似只保证偏差能降到任意小；这篇指出代价是方差，以及随之而来的巨大样本需求。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/knn.html">k近邻</a><span class="yr">1967 · 基础</span><div class=nt>用k近邻作为基准，以k从1到N的变化最直观地展示偏差与方差此消彼长。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/cross-validation.html">交叉验证</a><span class="yr">1974 · 基础</span><div class=nt>把交叉验证列为自动选择平滑参数、在偏差和方差之间折中的标准做法。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/lenet.html">LeNet与卷积网络</a><span class="yr">1998 · 视觉</span><div class=nt>只指出“需要正确的先验结构”，没有给出如何为视觉、语言等问题设计这种结构。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/alexnet.html">AlexNet</a><span class="yr">2012.09 · 视觉</span><div class=nt>实验规模很小（每个训练集200个样本、最多24个隐藏单元），大数据下方差问题有多严重没有检验。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>只指出“需要正确的先验结构”，没有给出如何为视觉、语言等问题设计这种结构。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/rethinking-generalization.html">重新思考泛化</a><span class="yr">2016.11 · 基础</span><div class=nt>挑战“模型越复杂越过拟合、必须靠正则化约束”的经典图景：参数远多于样本、不加正则的网络仍能泛化。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/interpolation-regime.html">插值区与双下降曲线</a><span class="yr">2018.12 · 基础</span><div class=nt>指出经典U形曲线只描述了容量较小的区间，补上了插值之后误差再次下降的部分。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/double-descent.html">双下降</a><span class="yr">2019.12 · 基础</span><div class=nt>按经典U形曲线，参数远多于样本的网络应该严重过拟合，但这与后来深度网络的实际表现矛盾。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/expectation-variance.html">期望与方差</a> <a class="chip c" href="../c/generalization.html">泛化与过拟合</a> <a class="chip c" href="../c/bias-variance.html">偏差-方差权衡</a> <a class="chip c" href="../c/k-nearest-neighbors.html">k近邻</a> <a class="chip c" href="../c/mlp.html">多层感知机</a> <a class="chip c" href="../c/train-val-test.html">训练集、验证集与测试集</a></p>
+<h2>本篇术语</h2><ul><li><b>非参数估计</b>　不预先假设函数形式（如线性），而让数据决定函数形状的估计方法。参数数量可以随数据量增长。</li><li><b>早停</b>　在验证误差开始上升时停止训练，即使训练误差还在下降。从偏差-方差角度看，是用训练步数控制方差。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/expectation-variance.html">期望与方差</a>和<a class="lc" href="../c/generalization.html">泛化与过拟合</a>，然后看<a class="lc" href="../c/bias-variance.html">偏差-方差权衡</a>。读原文第1节和第3.1–3.5节（分解与实验），图15、16最值得看。动手：用多项式拟合带噪声的正弦曲线，对每个阶数重复抽100次训练集，算出偏差²和方差并画成曲线；再把阶数推到远超样本数并加一点岭正则，看看能不能复现双下降。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="http://web.mit.edu/6.435/www/Geman92.pdf" rel="noopener">http://web.mit.edu/6.435/www/Geman92.pdf</a>（OCR阅读原文：标题、三位作者与单位、Neural Computation 4, 1–58 (1992)；摘要中“基本不够用”与“挑战在于表示而非学习”；第3.1节分解式；第3.5节手写数字实验的1200/600/200个样本、每类60/20个、20%翻转噪声、M=100与M=50；4隐藏单元网络约100次迭代时总误差最低；图16最多24个隐藏单元。Crossref确认发表于1992年1月。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%81%8F%E5%B7%AE-%E6%96%B9%E5%B7%AE%E6%9D%83%E8%A1%A1%EF%BC%88bias-variance%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Abias-variance%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/bias-variance.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="weight-decay.html"><small>本分支上一个 · 1991</small><b>权重衰减</b></a><a class="r" href="kernel-trick.html"><small>本分支下一个 · 1992</small><b>核技巧与最优间隔分类器</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

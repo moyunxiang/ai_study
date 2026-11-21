@@ -8,24 +8,24 @@
   ],
   "problem": "ViT要在3亿张带标签的内部数据上预训练才能超过CNN，只用ImageNet时只有77.9%，外界几乎无法复现和使用。",
   "idea": "只用ImageNet-1k，靠一整套强数据增强和正则化（RandAugment、Mixup、CutMix、随机擦除、随机深度、重复增强）训练300轮；再加一个专门的“蒸馏token”，让ViT向卷积网络老师学习。",
-  "impact": "单台8卡机器两三天就能把ViT-B训到83.1%，蒸馏后最高85.2%，让ViT成为任何实验室都能训练的骨干；它的训练配方被Swin、DINO等后续工作直接沿用。",
+  "impact": "单台8卡机器两三天就能把ViT-B训到83.1%（384分辨率微调后），蒸馏并延长训练后最高85.2%，普通实验室也能训练ViT；Swin等后续工作沿用了它的大部分增强和正则化设置。",
   "background": "[[vit]]证明了纯Transformer可以做图像分类，但有一个前提：先在Google内部的[[jft-300m]]上预训练。论文自己报告，ViT-B/16只在ImageNet-1k（约130万张）上训练时准确率77.9%，不如同等规模的ResNet。原因被归结为ViT缺少卷积的[[c:inductive-bias]]，需要更多数据才能学会“相邻像素相关”这类常识。\n\n于是出现一个疑问：ViT到底是真的需要海量数据，还是只是没训好？如果只能靠私有数据，绝大多数研究者都用不上它。",
-  "method": "**数据高效的训练配方**。架构与ViT-B完全相同（另给出小模型DeiT-S和DeiT-Ti，分别约2200万和500万参数）。改的只是训练：[[adamw]]优化器，300轮，配合[[randaugment]]、[[mixup]]、[[cutmix]]、随机擦除、[[stochastic-depth]]、重复增强（同一张图在一个批次里出现多份不同增强）。消融表显示这些组件大多缺一不可，例如把AdamW换成SGD会明显变差。\n\n**蒸馏token**（见[[c:knowledge-distillation]]）。普通蒸馏让学生的输出去拟合老师输出的软概率。DeiT在输入序列里除了`[class]` token，再加一个`[distill]` token，二者都通过自注意力与图像块交流。`[class]`的输出用真实标签监督，`[distill]`的输出用老师的预测监督。作者发现用老师预测的**硬标签**（概率最大的那个类）比软概率更好：\n\n`L = ½·CE(ψ(Z_cls), y) + ½·CE(ψ(Z_dist), y_t)`，`y_t = argmax Z_teacher`\n\n老师是同样数据训练的卷积网络[[regnet]]-16GF。推理时把两个token的预测相加。训练后两个token的余弦相似度只有0.06，说明它们学到了不同的东西。",
+  "method": "**数据高效的训练配方**。架构与ViT-B完全相同（另给出小模型DeiT-S和DeiT-Ti，分别约2200万和500万参数）。改的只是训练：[[adamw]]优化器，300轮，配合[[randaugment]]、[[mixup]]、[[cutmix]]、随机擦除、[[stochastic-depth]]、重复增强（同一张图在一个批次里出现多份不同增强）。消融表显示去掉其中多项都会明显掉点：例如把AdamW换成SGD，224分辨率准确率从81.8%降到74.5%；去掉重复增强降到76.5%；去掉随机深度则基本训练不起来。\n\n**蒸馏token**（见[[c:knowledge-distillation]]）。普通蒸馏让学生的输出去拟合老师输出的软概率。DeiT在输入序列里除了`[class]` token，再加一个`[distill]` token，二者都通过自注意力与图像块交流。`[class]`的输出用真实标签监督，`[distill]`的输出用老师的预测监督。作者发现用老师预测的**硬标签**（概率最大的那个类）比软概率更好：\n\n`L = ½·CE(ψ(Z_cls), y) + ½·CE(ψ(Z_dist), y_t)`，`y_t = argmax Z_teacher`\n\n老师是同样数据训练的卷积网络[[regnet]]-16GF。推理时把两个token的预测相加。训练后两个token的输入向量余弦相似度只有0.06；经过各层后逐渐变得相似，到最后一层为0.93，但仍不等于1，说明二者没有学成同一个东西。",
   "results": "不蒸馏时，DeiT-B在224分辨率下ImageNet准确率81.8%，在384分辨率微调后83.1%，比原版ViT-B仅用ImageNet时的77.9%高出5个多点。加入蒸馏token后DeiT-B为83.4%（224）和84.5%（384），延长训练后最高85.2%。DeiT-Ti、DeiT-S分别为72.2%和79.8%，蒸馏后74.5%和81.2%。卷积网络当老师比Transformer当老师效果更好，作者推测是学生通过蒸馏继承了卷积的归纳偏置。DeiT-B在单个8卡节点上预训练约53小时。",
-  "legacy": "DeiT让ViT从“Google专属”变成开源社区的常用骨干。它的训练配方几乎原样被[[swin]]、[[pvt]]等后续视觉Transformer采用；[[dino]]的主要实验用DeiT-S大小的ViT；[[how-to-train-vit]]进一步系统研究了数据增强、正则化和数据规模之间的取舍。蒸馏token本身影响较小，但“用卷积老师给ViT补归纳偏置”的思路启发了后续的混合架构，而[[mae]]、[[dinov2]]等自监督方法后来让ViT在不依赖标签和老师的情况下也训得很好。",
-  "pitfalls": "- DeiT没有改变ViT的结构，只改了训练方法。它说明原版ViT在ImageNet上表现差，很大程度上是训练配方的问题，而不只是归纳偏置的问题。\n- 最好的结果仍借助了一个强卷积网络老师，所以“纯Transformer”的成绩里有卷积的贡献。",
+  "legacy": "DeiT公开了代码和模型，只用ImageNet就能复现ViT的训练。[[swin]]论文写明沿用了它的大部分增强和正则化策略（只去掉了重复增强和EMA）；[[dino]]的主要实验用DeiT-S大小的ViT；[[how-to-train-vit]]进一步系统研究了数据增强、正则化和数据规模之间的取舍。“学生通过蒸馏继承了卷积老师的归纳偏置”是作者的推测；之后[[mae]]、[[dinov2]]等自监督方法让ViT在不依赖类别标签和老师的情况下也训得很好。",
+  "pitfalls": "- DeiT没有改变ViT的结构，只改了训练方法。它显示原版ViT在ImageNet上表现差，有相当一部分来自训练配方，而不只是缺少归纳偏置。\n- 最好的结果仍借助了一个强卷积网络老师，所以“纯Transformer”的成绩里有卷积的贡献。",
   "limits": [
     {"text": "仍依赖ImageNet的类别标签和一个预先训练好的卷积老师。", "solved_by": ["dino", "mae"]},
     {"text": "沿用ViT单一尺度、全局注意力的结构，计算随分辨率平方增长，不便直接用于检测和分割。", "solved_by": ["swin", "pvt"]},
     {"text": "训练效果高度依赖一长串增强和正则化超参数，换数据或模型规模需重新调。", "solved_by": ["how-to-train-vit"]}
   ],
   "relations": [
-    {"to": "vit", "type": "solves", "note": "ViT只用ImageNet时只有77.9%；DeiT不改结构、只改训练配方，同一模型达到81.8%–83.1%，去掉了对JFT-300M的依赖。"},
+    {"to": "vit", "type": "solves", "note": "ViT只用ImageNet时只有77.9%；DeiT不改结构、只改训练配方，同一模型达到81.8%–83.1%，在ImageNet-1k上不再需要JFT-300M预训练。"},
     {"to": "distillation", "type": "extends", "note": "在知识蒸馏基础上，为Transformer设计了单独的蒸馏token，并发现硬标签蒸馏优于软标签。"},
-    {"to": "randaugment", "type": "uses", "note": "数据增强的核心组件之一，消融后选择RandAugment而非AutoAugment。"},
+    {"to": "randaugment", "type": "uses", "note": "默认训练配置里的数据增强组件之一；消融表中同时去掉RandAugment和AutoAugment时，准确率从81.8%降到79.6%。"},
     {"to": "cutmix", "type": "uses", "note": "与Mixup一起作为混合样本增强，是训好ViT的重要正则化。"},
     {"to": "regnet", "type": "uses", "note": "默认老师是RegNetY-16GF，卷积老师比Transformer老师更有效。"},
-    {"to": "efficientnet", "type": "rivals", "note": "以“精度—吞吐量”权衡与EfficientNet等卷积网络比较，蒸馏后的DeiT与之相当。"}
+    {"to": "efficientnet", "type": "rivals", "note": "以“精度—吞吐量”权衡与EfficientNet等卷积网络比较：论文称不蒸馏时略低于EfficientNet，用RegNetY老师蒸馏后超过EfficientNet。"}
   ],
   "prereq": ["knowledge-distillation", "data-augmentation", "image-patch", "self-attention", "regularization", "inductive-bias"],
   "terms": [

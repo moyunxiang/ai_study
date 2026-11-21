@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>控制回路与控制频率（Control Loops and Control Frequency） · AI脉络</title>
+<meta name="description" content="机器人以固定频率反复执行“读传感器→算指令→发给电机”的循环；循环每秒跑多少次叫控制频率，它决定机器人能多快地对变化做出反应。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/control-loop.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="控制回路与控制频率（Control Loops and Control Frequency）">
+<meta property="og:description" content="机器人以固定频率反复执行“读传感器→算指令→发给电机”的循环；循环每秒跑多少次叫控制频率，它决定机器人能多快地对变化做出反应。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/control-loop.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/control-loop">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 具身与控制 · 入门</div>
+<h1>控制回路与控制频率</h1><div class="full">Control Loops and Control Frequency</div>
+<p class="muted" style="font-size:13px">也叫：闭环控制　closed-loop　反馈控制　PID　Hz</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/control-loop">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>机器人以固定频率反复执行“读传感器→算指令→发给电机”的循环；循环每秒跑多少次叫控制频率，它决定机器人能多快地对变化做出反应。</b></p>
+<p class="tags">先要会：<a class="chip c" href="state-action-observation.html">状态、观测与动作</a></p>
+<p>语言模型慢一秒回答，用户只是多等一秒；机器人慢一秒，杯子已经掉在地上了。物理世界不会等模型算完，所以机器人软件的基本结构是一个按时钟运行的<b>闭环</b>：每隔固定时间读一次观测（见<a class="lc" href="../c/state-action-observation.html">状态、观测与动作</a>），计算动作，发出去执行，再根据新的观测纠正偏差。闭环能纠正误差；只按事先算好的指令执行、不看反馈的叫<b>开环</b>，一旦有扰动就会越偏越远。</p><p><b>最经典的控制器：PID / PD</b>。设关节目标角度为q*，当前角度为q，角速度为q̇，PD控制器输出的力矩是</p><p class="formula"><code>τ = Kp · (q* − q) − Kd · q̇</code></p><p>偏差越大推得越用力（比例项），转得越快越要刹车（微分项），再加上误差累积的积分项就是<a class="ln" href="../n/pid.html">PID控制</a>。它不需要任何学习，至今仍运行在几乎所有机器人的关节里。更系统的方法如<a class="ln" href="../n/lqr.html">LQR最优控制</a>和<a class="ln" href="../n/mpc.html">模型预测控制MPC</a>利用系统模型求最优的反馈，见<a class="lc" href="../c/planning-mpc.html">规划与模型预测控制</a>。</p><p><b>分层的频率</b>。真实机器人里有好几层循环套在一起，越往下越快：电机电流环可达几十kHz；关节位置/力矩控制约1kHz；学习得到的策略网络通常10–50Hz，输出目标关节角交给下层PD去跟踪；任务级规划可能每几秒才更新一次。神经网络策略只负责“中间层”，它输出的不是电流，而是给底层控制器的目标。</p><p><b>大模型带来的矛盾</b>。VLA模型参数越大、推理越慢，控制频率就越低：<a class="ln" href="../n/rt-2.html">RT-2与VLA</a>的55B版本只有1–3Hz。解决办法主要有两种：一次输出未来一段动作序列，用<a class="lc" href="../c/action-chunking.html">动作表示：离散token、连续动作与动作块</a>把一次推理的结果分摊到多个控制周期，例如<a class="ln" href="../n/pi0.html">π0</a>能以最高50Hz控制机器人；以及在执行上一段动作的同时异步计算下一段，见<a class="ln" href="../n/rtc.html">实时动作分块RTC</a>。基于视频生成的<a class="ln" href="../n/dreamzero.html">DreamZero与世界动作模型WAM</a>通过大量系统优化，把每段动作的计算时间压到约150毫秒，达到7Hz的闭环控制。</p><p><b>它出现在哪里</b>：所有机器人策略论文都会报告控制频率；<a class="lc" href="../c/sim2real.html">仿真到现实的差距</a>中常见的失败原因之一就是仿真里没有模拟真实系统的计算和通信延迟。</p>
+<div class="example"><h4>例子</h4><p>一个关节用PD控制：Kp = 100 N·m/rad，Kd = 10 N·m·s/rad，目标角度1.0 rad，当前0.8 rad，角速度0.5 rad/s。输出力矩<code>τ = 100 × 0.2 − 10 × 0.5 = 15 N·m</code>。</p><p>频率与时间预算：50Hz意味着每个周期只有20毫秒，模型推理、图像传输和执行都要在这之内完成；3Hz时每个周期约333毫秒，机械臂以0.5m/s移动，一个周期内已走出约17厘米，中间发生的任何变化都看不到。</p></div>
+<h2>容易误解的地方</h2><ul><li>控制频率高不等于反应快：如果从拍照到执行有200毫秒延迟，50Hz也只是在用过时的信息做决策。</li><li>策略输出的频率和底层电机的控制频率是两回事，论文里说的“50Hz策略”通常运行在1kHz左右的关节控制器之上。</li><li>增益Kp、Kd太大会振荡，太小会软绵绵跟不上，学习型策略的表现也受底层增益影响。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:96" href="../n/mpc.html">模型预测控制MPC</a> <a class="chip hue" style="--h:30" href="../n/cybernetics.html">维纳《控制论》</a> <a class="chip hue" style="--h:96" href="../n/asimo.html">Honda ASIMO</a> <a class="chip hue" style="--h:96" href="../n/darpa-grand-challenge.html">DARPA无人车挑战赛</a> <a class="chip hue" style="--h:96" href="../n/darpa-urban-challenge.html">DARPA城市挑战赛</a> <a class="chip hue" style="--h:96" href="../n/google-self-driving.html">谷歌无人车项目启动</a> <a class="chip hue" style="--h:96" href="../n/ros.html">ROS机器人操作系统</a> <a class="chip hue" style="--h:96" href="../n/levine-grasping.html">机械臂农场抓取</a> <a class="chip hue" style="--h:96" href="../n/legged-rl.html">足式机器人强化学习</a> <a class="chip hue" style="--h:96" href="../n/anymal-terrain.html">ANYmal复杂地形行走</a> <a class="chip hue" style="--h:96" href="../n/rma.html">RMA快速运动适应</a> <a class="chip hue" style="--h:120" href="../n/gt-sophy.html">GT Sophy赛车</a> <a class="chip hue" style="--h:96" href="../n/fsd-v12.html">Tesla FSD v12端到端</a> <a class="chip hue" style="--h:96" href="../n/lerobot.html">Hugging Face LeRobot</a> <a class="chip hue" style="--h:96" href="../n/pid.html">PID控制</a> <a class="chip hue" style="--h:96" href="../n/lqr.html">LQR最优控制</a> <a class="chip hue" style="--h:96" href="../n/unimate.html">Unimate工业机器人</a> <a class="chip hue" style="--h:96" href="../n/stanford-arm.html">Stanford Arm</a> <a class="chip hue" style="--h:96" href="../n/zmp.html">ZMP零力矩点</a> <a class="chip hue" style="--h:96" href="../n/navlab.html">CMU NavLab</a> <a class="chip hue" style="--h:96" href="../n/dickmanns-vamors.html">Dickmanns视觉高速驾驶</a> <a class="chip hue" style="--h:96" href="../n/brooks-behavior.html">行为主义机器人学</a> <a class="chip hue" style="--h:96" href="../n/dmp.html">动态运动基元DMP</a> <a class="chip hue" style="--h:96" href="../n/ng-helicopter.html">直升机特技飞行RL</a> <a class="chip hue" style="--h:96" href="../n/bigdog.html">BigDog四足机器人</a> <a class="chip hue" style="--h:96" href="../n/pr2.html">Willow Garage PR2</a> <a class="chip hue" style="--h:96" href="../n/mujoco.html">MuJoCo物理仿真</a> <a class="chip hue" style="--h:96" href="../n/atlas.html">Atlas人形机器人</a> <a class="chip hue" style="--h:96" href="../n/darpa-robotics-challenge.html">DARPA机器人挑战赛</a> <a class="chip hue" style="--h:96" href="../n/cassie.html">Agility Cassie</a> <a class="chip hue" style="--h:96" href="../n/waymo-one.html">Waymo One商业Robotaxi</a> <a class="chip hue" style="--h:96" href="../n/digit.html">Agility Digit</a> <a class="chip hue" style="--h:96" href="../n/spot.html">Boston Dynamics Spot商用</a> <a class="chip hue" style="--h:96" href="../n/waymo-driverless.html">Waymo全无人驾驶开放运营</a> <a class="chip hue" style="--h:120" href="../n/quadswarm.html">四旋翼集群端到端RL</a> <a class="chip hue" style="--h:216" href="../n/bytetrack.html">ByteTrack</a> <a class="chip hue" style="--h:144" href="../n/tokamak-rl.html">强化学习控制托卡马克</a> <a class="chip hue" style="--h:96" href="../n/inner-monologue.html">Inner Monologue</a> <a class="chip hue" style="--h:96" href="../n/apollo-go.html">萝卜快跑全无人商业化</a> <a class="chip hue" style="--h:96" href="../n/optimus.html">Tesla Optimus</a> <a class="chip hue" style="--h:96" href="../n/humanoid-rl-locomotion.html">人形机器人RL行走</a> <a class="chip hue" style="--h:96" href="../n/op3-soccer.html">双足机器人踢足球</a> <a class="chip hue" style="--h:96" href="../n/swift-drone.html">Swift无人机竞速</a> <a class="chip hue" style="--h:96" href="../n/gello.html">GELLO遥操作</a> <a class="chip hue" style="--h:96" href="../n/robot-parkour.html">四足跑酷</a> <a class="chip hue" style="--h:96" href="../n/cruise-incident.html">Cruise事故与停运</a> <a class="chip hue" style="--h:96" href="../n/atlas-electric.html">电动Atlas</a> <a class="chip hue" style="--h:96" href="../n/unitree-g1.html">低价人形机器人Unitree G1</a> <a class="chip hue" style="--h:96" href="../n/table-tennis.html">乒乓球机器人</a> <a class="chip hue" style="--h:216" href="../n/mast3r-slam.html">MASt3R-SLAM</a> <a class="chip hue" style="--h:72" href="../n/jetson-thor.html">Jetson Thor机器人计算机</a> <a class="chip hue" style="--h:96" href="../n/figure-03.html">Figure 03</a> <a class="chip hue" style="--h:96" href="../n/helix-02.html">Figure Helix 02</a> <a class="chip hue" style="--h:96" href="../n/lingbot-va.html">LingBot-VA因果世界建模</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

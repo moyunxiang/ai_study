@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>条件生成与引导（Conditional Generation and Guidance） · AI脉络</title>
+<meta name="description" content="让生成模型按条件（文字、类别、草图）生成，并在采样时额外“推”一把，使结果更贴合条件。代价是多样性下降，多算一次网络。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/guidance.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="条件生成与引导（Conditional Generation and Guidance）">
+<meta property="og:description" content="让生成模型按条件（文字、类别、草图）生成，并在采样时额外“推”一把，使结果更贴合条件。代价是多样性下降，多算一次网络。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/guidance.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/guidance">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 生成模型 · 进阶</div>
+<h1>条件生成与引导</h1><div class="full">Conditional Generation and Guidance</div>
+<p class="muted" style="font-size:13px">也叫：CFG　classifier-free guidance　无分类器引导　分类器引导　classifier guidance　guidance scale</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/guidance">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>让生成模型按条件（文字、类别、草图）生成，并在采样时额外“推”一把，使结果更贴合条件。代价是多样性下降，多算一次网络。</b></p>
+<p class="tags">先要会：<a class="chip c" href="diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="score-function.html">分数函数与分数匹配</a> <a class="chip c" href="conditional-bayes.html">条件概率与贝叶斯公式</a></p>
+<p>无条件的扩散模型只会随机画“某张像样的图”，而用户要的是“一只戴帽子的柯基”。最直接的做法是<b>条件生成</b>：把条件y（文本经编码器得到的向量、类别编号等）作为额外输入喂给去噪网络，学<code>p(x|y)</code>。但实践发现，单纯这样训练出来的模型往往不够听话，生成的图与提示词只是“沾边”。于是有了<b>引导</b>：在采样时人为放大条件的作用。</p><p><b>分类器引导</b>。由<a class="lc" href="../c/conditional-bayes.html">条件概率与贝叶斯公式</a>，<code>p(x|y) ∝ p(x)·p(y|x)</code>，取对数再对x求梯度：</p><p class="formula"><code>∇log p(x|y) = ∇log p(x) + ∇log p(y|x)</code></p><p>第一项是无条件模型的<a class="lc" href="../c/score-function.html">分数函数与分数匹配</a>，第二项来自一个在噪声图像上训练的分类器。<a class="ln" href="../n/adm.html">扩散超越GAN</a>给第二项乘一个大于1的权重，相当于从<code>p(x)·p(y|x)^w</code>中采样，让图像“更像这一类”，用这个方法让扩散模型首次在ImageNet上超过GAN。缺点是要额外训练一个能处理噪声图的分类器。</p><p><b>无分类器引导（CFG）</b>。<a class="ln" href="../n/cfg.html">无分类器引导CFG</a>去掉了分类器：训练时随机把一部分（如10%）样本的条件换成“空条件”∅，让同一个网络既会有条件预测也会无条件预测。采样时每步算两次，再外推：</p><p class="formula"><code>ε̃ = ε_θ(x_t, ∅) + w·(ε_θ(x_t, y) − ε_θ(x_t, ∅))</code></p><p>w=1就是普通条件生成；w越大，越往“有条件减无条件”的方向推，图像越贴合提示、对比越强，但多样性下降，过大会颜色过饱和、失真。</p><p><b>它在哪里</b>。<a class="ln" href="../n/glide.html">GLIDE</a>和之后几乎所有文生图模型都用CFG，Stable Diffusion默认w=7.5。<a class="ln" href="../n/controlnet.html">ControlNet</a>用边缘图、姿态等空间条件控制生成；<a class="ln" href="../n/autoguidance.html">自引导Autoguidance</a>则用一个较差的模型代替无条件分支来引导。语言模型的解码里也有类似的对比解码思路。</p>
+<div class="example"><h4>例子</h4><p>某一步里，无条件分支预测的噪声是(0.2, −0.1)，有条件分支预测是(0.5, 0.1)，两者之差(0.3, 0.2)就是“文字带来的方向”。</p><ul><li>w=1：<code>(0.2, −0.1) + 1×(0.3, 0.2) = (0.5, 0.1)</code>，即普通条件预测。</li><li>w=3：<code>(0.2, −0.1) + 3×(0.3, 0.2) = (1.1, 0.5)</code>，沿文字方向多推了两倍。</li></ul><p>每一步都要跑两次网络（有条件、无条件），所以开CFG后采样计算量大约翻倍（实现上常把两份输入拼成一个batch一起算）。</p></div>
+<h2>容易误解的地方</h2><ul><li>引导权重的约定不统一：有的论文写<code>(1+w)·ε_c − w·ε_u</code>，此时w=0才是普通条件生成。看到“w=7.5”时先确认是哪种写法。</li><li>CFG外推出来的结果并不是某个真实分布的精确采样，它是有意偏向“典型样本”的技巧，这也是高引导下图像风格趋同的原因。</li><li>负面提示词（negative prompt）就是把无条件分支的∅换成一段不想要的描述。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:96" href="../n/dreamzero.html">DreamZero与世界动作模型WAM</a> <a class="chip hue" style="--h:288" href="../n/dall-e-2.html">DALL·E 2</a> <a class="chip hue" style="--h:288" href="../n/cfg.html">无分类器引导CFG</a> <a class="chip hue" style="--h:288" href="../n/stable-diffusion.html">Stable Diffusion开源</a> <a class="chip hue" style="--h:168" href="../n/musicgen.html">MusicGen</a> <a class="chip hue" style="--h:168" href="../n/voicebox.html">Voicebox</a> <a class="chip hue" style="--h:288" href="../n/sdxl.html">SDXL</a> <a class="chip hue" style="--h:288" href="../n/add.html">对抗扩散蒸馏SDXL Turbo</a> <a class="chip hue" style="--h:144" href="../n/mattergen.html">MatterGen</a> <a class="chip hue" style="--h:96" href="../n/gamengen.html">GameNGen</a> <a class="chip hue" style="--h:144" href="../n/boltz-1.html">Boltz-1开源复现AF3</a> <a class="chip hue" style="--h:288" href="../n/adm.html">扩散超越GAN</a> <a class="chip hue" style="--h:288" href="../n/glide.html">GLIDE</a> <a class="chip hue" style="--h:288" href="../n/video-diffusion.html">视频扩散模型</a> <a class="chip hue" style="--h:0" href="../n/diffusion-lm.html">Diffusion-LM</a> <a class="chip hue" style="--h:288" href="../n/imagen.html">Imagen</a> <a class="chip hue" style="--h:288" href="../n/midjourney.html">Midjourney公测</a> <a class="chip hue" style="--h:288" href="../n/automatic1111.html">AUTOMATIC1111 WebUI</a> <a class="chip hue" style="--h:288" href="../n/prompt-to-prompt.html">Prompt-to-Prompt</a> <a class="chip hue" style="--h:288" href="../n/dreamfusion.html">DreamFusion文本生成3D</a> <a class="chip hue" style="--h:288" href="../n/imagen-video.html">Imagen Video</a> <a class="chip hue" style="--h:288" href="../n/ediff-i.html">eDiff-I专家去噪器</a> <a class="chip hue" style="--h:288" href="../n/instructpix2pix.html">InstructPix2Pix</a> <a class="chip hue" style="--h:288" href="../n/magic3d.html">Magic3D</a> <a class="chip hue" style="--h:288" href="../n/sd-2.html">Stable Diffusion 2</a> <a class="chip hue" style="--h:288" href="../n/point-e.html">Point-E</a> <a class="chip hue" style="--h:144" href="../n/rfdiffusion.html">RFdiffusion蛋白质设计</a> <a class="chip hue" style="--h:288" href="../n/gen-1.html">Runway Gen-1</a> <a class="chip hue" style="--h:288" href="../n/midjourney-v5.html">Midjourney V5</a> <a class="chip hue" style="--h:288" href="../n/zero-terminal-snr.html">噪声调度缺陷与零终端SNR</a> <a class="chip hue" style="--h:288" href="../n/lcm.html">潜空间一致性模型LCM</a> <a class="chip hue" style="--h:144" href="../n/chroma.html">Chroma蛋白生成模型</a> <a class="chip hue" style="--h:288" href="../n/instantid.html">InstantID单图保ID</a> <a class="chip hue" style="--h:288" href="../n/autoguidance.html">自引导Autoguidance</a> <a class="chip hue" style="--h:288" href="../n/imagen-3.html">Imagen 3</a> <a class="chip hue" style="--h:288" href="../n/diffusion-search.html">扩散模型推理时扩展</a> <a class="chip hue" style="--h:288" href="../n/omnihuman.html">OmniHuman-1数字人</a> <a class="chip hue" style="--h:96" href="../n/cosmos-transfer.html">Cosmos-Transfer1</a> <a class="chip hue" style="--h:30" href="../n/ghibli-trend.html">吉卜力风潮</a> <a class="chip hue" style="--h:288" href="../n/vace.html">VACE视频全能编辑</a> <a class="chip hue" style="--h:96" href="../n/beyondmimic.html">BeyondMimic</a> <a class="chip hue" style="--h:288" href="../n/diffusionnft.html">DiffusionNFT前向过程RL</a> <a class="chip hue" style="--h:96" href="../n/cosmos-predict-2.5.html">Cosmos Predict 2.5</a> <a class="chip hue" style="--h:288" href="../n/ltx-2.html">LTX-2开源音视频</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

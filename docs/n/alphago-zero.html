@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AlphaGo Zero（2017） · AI脉络</title>
+<meta name="description" content="先要用十几万盘人类棋谱做监督学习，还要两张网络、手工特征和快速走子，强度被人类数据的质量和偏好所限制。 从随机下法开始只靠自我对弈：一张残差网络同时输出落子概率和胜率，MCTS搜索得到的走子分布当作策略的学习目标，对局胜负当作价值的学习目标。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/alphago-zero.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="AlphaGo Zero（2017）">
+<meta property="og:description" content="先要用十几万盘人类棋谱做监督学习，还要两张网络、手工特征和快速走子，强度被人类数据的质量和偏好所限制。 从随机下法开始只靠自我对弈：一张残差网络同时输出落子概率和胜率，MCTS搜索得到的走子分布当作策略的学习目标，对局胜负当作价值的学习目标。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/alphago-zero.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/alphago-zero">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 棋类与树搜索</div>
+<h1>AlphaGo Zero</h1>
+<div class="full">Mastering the Game of Go without Human Knowledge</div>
+<div class="meta"><span>2017.10</span><span>论文</span><span>重要</span><span>Nature 2017</span><span>Silver, Schrittwieser, Simonyan, Antonoglou, Huang, Guez, Hubert, Baker et al. · DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://www.nature.com/articles/nature24270" rel="noopener">Nature ↗</a><a class="btn sm" href="https://deepmind.google/discover/blog/alphago-zero-starting-from-scratch/" rel="noopener">DeepMind博客 ↗</a><a class="btn sm" href="../index.html#/n/alphago-zero">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/alphago.html">AlphaGo</a>先要用十几万盘人类棋谱做监督学习，还要两张网络、手工特征和快速走子，强度被人类数据的质量和偏好所限制。</p></div><div><h4>方法</h4><p>从随机下法开始只靠自我对弈：一张残差网络同时输出落子概率和胜率，MCTS搜索得到的走子分布当作策略的学习目标，对局胜负当作价值的学习目标。</p></div><div><h4>影响</h4><p>只用规则和自我对弈，3天训练就以100:0战胜曾击败李世石的版本，证明搜索+自我对弈的“策略迭代”可以完全不靠人类知识，直接引出AlphaZero和MuZero。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/alphago.html">AlphaGo</a>的训练分三步：先用人类高手棋谱监督学习一个策略网络，再用强化学习让它自我对弈提升，最后另训一个价值网络评估局面；对弈时还要配合快速随机走子（rollout）估计胜负。输入里有若干手工设计的围棋特征。</p><p>这套流程的问题是：起点依赖人类棋谱，人类的偏好和错误会被一起学进去；两张网络、rollout和手工特征让系统复杂、难以迁移到别的问题。一个自然的问题是：能不能像<a class="ln" href="../n/td-gammon.html">TD-Gammon</a>那样，只给规则，从零开始自己学会？</p><h2>方法</h2><p><b>一张网络两个头</b>。输入只有棋盘上黑白子的位置（加最近几步的历史），主干是<a class="ln" href="../n/resnet.html">ResNet</a>式的残差网络（20或40个残差块），输出两样东西：落子概率向量<code>p</code>和当前局面的胜率<code>v</code>。</p><p><b>搜索当老师</b>（见<a class="lc" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a>）。每走一步，都用当前网络引导<a class="ln" href="../n/mcts.html">蒙特卡洛树搜索UCT</a>做大量模拟：网络的<code>p</code>决定先探索哪些走法，叶子局面直接用<code>v</code>估值，不再做rollout。搜索结束后，各走法的访问次数归一化成分布<code>π</code>，它通常比网络直接给出的<code>p</code>更强。</p><p><b>自我对弈的策略迭代</b>。按<code>π</code>落子下完一整盘，得到胜负<code>z∈{+1,−1}</code>。然后用这批数据训练网络，损失为</p><p class="formula"><code>l = (z − v)² − πᵀ·log p + c‖θ‖²</code></p><p>第一项让价值逼近真实胜负，第二项让策略模仿搜索结果（交叉熵，见<a class="lc" href="../c/cross-entropy.html">交叉熵</a>），第三项是权重衰减。网络变强→搜索更强→产生更好的<code>π</code>和对局→网络再变强，这就是用搜索做“策略改进”、用网络做“策略评估”的循环。</p><h2>结果</h2><p>官方称：自我对弈训练3天后，以100:0击败与李世石对局的AlphaGo Lee版本；约21天达到AlphaGo Master的水平，40天后超过此前所有版本。论文还对比了网络结构：把两张网络合成一张、换用残差网络，各自都带来明显的棋力提升。</p><h2>后来的发展</h2><p>同一算法去掉围棋专属设计后就是两个月后的<a class="ln" href="../n/alphazero.html">AlphaZero</a>，再把规则也换成学出来的模型就是<a class="ln" href="../n/muzero.html">MuZero</a>。开源社区据此复现了Leela Zero和<a class="ln" href="../n/katago.html">KataGo</a>，后者大幅降低了所需算力。“搜索产生更好的目标、网络学习这个目标”的思路后来也出现在<a class="ln" href="../n/alphatensor.html">AlphaTensor</a>、<a class="ln" href="../n/alphadev.html">AlphaDev</a>等科学发现工作中。</p><h2>容易误解的地方</h2><ul><li>“从零开始”指不用人类棋谱和手工特征，但围棋规则、棋盘对称性等仍是人给的。</li><li>训练需要大规模算力生成自我对弈数据，“3天”并不意味着普通设备3天能复现。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>自我对弈产生数据极其耗算力，外界难以复现和研究。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/katago.html">KataGo</a></div></li><li>仍然依赖完美的规则模拟器来做搜索，无法用于规则未知或环境不可模拟的问题。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/muzero.html">MuZero</a></div></li><li>部分设计仍是围棋专属（如利用棋盘对称性做数据增强、只有胜负两种结局），换到其他棋类不能直接用。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/alphazero.html">AlphaZero</a></div></li><li>超人强度不等于没有漏洞：后来发现可以训练专门的对抗策略击败这类围棋AI。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/alphago.html">AlphaGo</a><span class="yr">2016.01 · RL</span> <span class="vk ok">已核对</span><div class=nt>去掉人类棋谱、手工特征和rollout，把策略和价值两张网络合成一张，解决了AlphaGo依赖人类数据、系统复杂的问题。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/resnet.html">ResNet</a><span class="yr">2015.12 · 视觉</span><div class=nt>主干换成残差网络，论文实验显示这一项单独就带来明显的棋力提升。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/td-gammon.html">TD-Gammon</a><span class="yr">1995 · RL</span><div class=nt>延续TD-Gammon从零自我对弈学习的思路，但加入了强力的树搜索作为学习目标。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/mcts.html">蒙特卡洛树搜索UCT</a><span class="yr">2006 · RL</span><div class=nt>MCTS既是下棋时的决策方法，也是训练时的“策略改进算子”，其访问次数分布就是网络的学习目标。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/alphago-lee.html">AlphaGo击败李世石</a><span class="yr">2016.03 · RL</span><div class=nt>作为对比对象的AlphaGo Lee正是击败李世石的版本，自我对弈3天即以100:0胜出。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/logistello.html">Logistello击败黑白棋世界冠军</a><span class="yr">1997.08 · RL</span><div class=nt>特征（棋盘图案）仍由人设计，学习的只是权重。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/alphazero.html">AlphaZero</a><span class="yr">2017.12 · RL</span><div class=nt>同一算法去掉围棋专属设计（对称性增强、二值结局、新旧网络选拔），推广到国际象棋和将棋。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:72" href="../n/ai-and-compute.html">《AI and Compute》：算力每3.4个月翻倍</a><span class="yr">2018.05 · 硬件</span><div class=nt>以AlphaGo Zero作为2017年的终点数据点，两者相差30万倍以上。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/muzero.html">MuZero</a><span class="yr">2019.11 · RL</span><div class=nt>仍然依赖完美的规则模拟器来做搜索，无法用于规则未知或环境不可模拟的问题。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:312" href="../n/debate.html">辩论式对齐</a><span class="yr">2018.05 · 安全·可解释</span><div class=nt>借用<a class="ln" href="../n/alphago-zero.html">AlphaGo Zero</a>式的自博弈来训练辩论双方。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:312" href="../n/iterated-amplification.html">迭代放大IDA</a><span class="yr">2018.10 · 安全·可解释</span><div class=nt>把<a class="ln" href="../n/alphago-zero.html">AlphaGo Zero</a>那种「搜索改进再蒸馏回策略」的循环用到人类监督上。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/katago.html">KataGo</a><span class="yr">2019.02 · RL</span><div class=nt>自我对弈产生数据极其耗算力，外界难以复现和研究。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a> <a class="chip c" href="../c/self-play.html">自我对弈</a> <a class="chip c" href="../c/policy-value.html">策略与价值函数</a> <a class="chip c" href="../c/residual-connection.html">残差连接</a> <a class="chip c" href="../c/cross-entropy.html">交叉熵</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a></p>
+<h2>本篇术语</h2><ul><li><b>rollout</b>　从某个局面开始用一个很快的简单策略把棋下完，看谁赢，用来粗略估计这个局面的好坏。AlphaGo Zero不再使用它。</li><li><b>策略迭代</b>　交替做两件事：评估当前策略有多好，再据此改进策略。这里由网络负责评估，由MCTS负责改进。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a>和<a class="lc" href="../c/self-play.html">自我对弈</a>。读Nature原文的Methods中“Self-play training pipeline”和损失函数部分。动手：在井字棋或五子棋小棋盘上实现一个迷你版（小网络+几十次模拟的MCTS+自我对弈），观察棋力随迭代上升。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://www.nature.com/articles/nature24270" rel="noopener">https://www.nature.com/articles/nature24270</a>（Nature页：标题、2017年10月发表、摘要中“winning 100–0 against the previously published, champion-defeating AlphaGo”；DeepMind博客（2017-10-18）：3天、40天超过Master；维基百科AlphaGo Zero条目：21天达到Master水平、20或40个残差块。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20AlphaGo%20Zero%EF%BC%88alphago-zero%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aalphago-zero%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/alphago-zero.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="qr-dqn.html"><small>本分支上一个 · 2017.10</small><b>分位数回归QR-DQN</b></a><a class="r" href="pbt.html"><small>本分支下一个 · 2017.11</small><b>基于种群的训练PBT</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DeepLab空洞卷积（2014） · AI脉络</title>
+<meta name="description" content="分类网络为了获得平移不变性层层下采样，最后的特征图只有原图的1/32，直接拿来做逐像素分割，物体边界模糊、细节丢失。 去掉最后两次池化的下采样，改用“带孔”的空洞卷积保持感受野，使输出只缩小8倍；再用全连接条件随机场根据颜色和位置把粗糙的预测贴合到真实边界上。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/deeplab.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DeepLab空洞卷积（2014）">
+<meta property="og:description" content="分类网络为了获得平移不变性层层下采样，最后的特征图只有原图的1/32，直接拿来做逐像素分割，物体边界模糊、细节丢失。 去掉最后两次池化的下采样，改用“带孔”的空洞卷积保持感受野，使输出只缩小8倍；再用全连接条件随机场根据颜色和位置把粗糙的预测贴合到真实边界上。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/deeplab.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/deeplab">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 图像分割</div>
+<h1>DeepLab空洞卷积</h1>
+<div class="full">Semantic Image Segmentation with Deep Convolutional Nets and Fully Connected CRFs</div>
+<div class="meta"><span>2014.12</span><span>论文</span><span>重要</span><span>ICLR 2015</span><span>Liang-Chieh Chen, George Papandreou, Iasonas Kokkinos, Kevin Murphy, Alan L. Yuille · UCLA / Google / 巴黎中央理工</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1412.7062" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://bitbucket.org/deeplab/deeplab-public" rel="noopener">代码（Caffe） ↗</a><a class="btn sm" href="../index.html#/n/deeplab">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>分类网络为了获得平移不变性层层下采样，最后的特征图只有原图的1/32，直接拿来做逐像素分割，物体边界模糊、细节丢失。</p></div><div><h4>方法</h4><p>去掉最后两次池化的下采样，改用“带孔”的空洞卷积保持感受野，使输出只缩小8倍；再用全连接条件随机场根据颜色和位置把粗糙的预测贴合到真实边界上。</p></div><div><h4>影响</h4><p>PASCAL VOC 2012分割测试集mean IoU达到71.6%，明显超过FCN；空洞卷积随后成为分割、检测、语音生成等任务的标准组件。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>语义分割要给每个像素打类别标签。<a class="ln" href="../n/fcn.html">全卷积网络FCN</a>把<a class="ln" href="../n/vgg.html">VGG</a>的全连接层改成卷积，让网络输出一张类别热图，但这张图的步长是32像素：一个输出点代表原图32×32的一块，再插值放大，边界自然很粗。</p><p>下采样（池化、步长）在分类里是好事：它扩大感受野、带来对小位移的不变性。但分割恰恰需要精确的位置。直接去掉池化，后面各层的卷积核就只能看到更小的区域，预训练权重也不再匹配。论文的问题是：怎样在不损失感受野、不重新训练整个网络的情况下，得到更密的输出？以及怎样把边界做准？</p><h2>方法</h2><p><b>空洞卷积（atrous / “带孔”算法）。</b>把VGG-16最后两个池化层的步长从2改成1，输出不再缩小；为了让后面的卷积核仍覆盖原来那么大的区域，在卷积核的元素之间插入空洞——等价于每隔r个像素取一个点做卷积：</p><p class="formula"><code>y[i] = Σ_k x[i + r·k] · w[k]</code></p><p>普通卷积r=1。一个3×3的卷积核、r=2时覆盖5×5的范围，r=4时覆盖9×9，参数量不变。论文对最后三个卷积层用r=2、第一个全连接层（改成卷积）用r=4，于是最终输出只比原图小8倍，而且可以直接沿用ImageNet预训练权重。这一技巧来自小波变换中的“à trous”算法。论文还把第一个全连接层的卷积核从7×7缩到3×3、配合r=12，得到感受野更大而更快的LargeFOV版本。</p><p><b>全连接条件随机场。</b>网络输出的每像素类别概率仍然在边界处模糊。作者在其后接一个<a class="ln" href="../n/crf.html">条件随机场</a>，能量函数为</p><p class="formula"><code>E(x) = Σ_i θ_i(x_i) + Σ_ij θ_ij(x_i, x_j)</code></p><p>一元项<code>θ_i = −log P(x_i)</code>来自网络；二元项对<b>所有</b>像素对都存在：如果两个像素位置近、颜色相似却被标成不同类别，就要付高代价。用均值场近似推断约10次迭代，把标签“吸附”到颜色边缘上。CRF不与网络联合训练，是一个后处理步骤。</p><h2>结果</h2><p>PASCAL VOC 2012测试集mean IoU：FCN-8s为62.2%；DeepLab-CRF为66.4%，加多尺度特征为67.1%，加大视野（LargeFOV）为70.3%，两者结合达到71.6%。网络部分在GPU上每秒约8帧，CRF推断每张图约0.5秒。</p><h2>后来的发展</h2><p>空洞卷积被广泛接受：后续的DeepLab v2/v3用不同空洞率并联得到多尺度特征（空洞空间金字塔池化），<a class="ln" href="../n/deeplabv3plus.html">DeepLabv3+</a>再加上解码器恢复边界并最终去掉了CRF；<a class="ln" href="../n/pspnet.html">PSPNet</a>用金字塔池化达到类似目的。WaveNet在一维音频上用指数增长的空洞率扩大感受野。CRF后处理则随着网络自身边界能力变强而被逐渐淘汰。</p><h2>容易误解的地方</h2><ul><li>空洞卷积不增加参数，增加的是覆盖范围；但因为特征图不再缩小，计算量和显存都会明显增加。</li><li>空洞率过大时，卷积核采样点之间间隔太大，可能漏掉细小结构（所谓网格效应）。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>CRF是独立的后处理，不参与训练，每张图还要额外约0.5秒，网络和CRF各自最优不等于整体最优。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/deeplabv3plus.html">DeepLabv3+</a></div></li><li>只在单一感受野上提取特征，同一张图里大小差异很大的物体难以兼顾，需要多尺度的上下文。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/pspnet.html">PSPNet</a> <a class="chip hue" style="--h:216" href="../n/deeplabv3plus.html">DeepLabv3+</a></div></li><li>输出步长仍是8，最后靠双线性插值放大，细长结构和小物体的边界依旧不够精细。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/deeplabv3plus.html">DeepLabv3+</a> <a class="chip hue" style="--h:216" href="../n/mask2former.html">Mask2Former通用分割</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/crf.html">条件随机场</a><span class="yr">2001 · NLP</span><div class=nt>用全连接CRF作后处理，把网络的粗糙概率图按颜色和位置相似性贴合到物体边界。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/vgg.html">VGG</a><span class="yr">2014.09 · 视觉</span><div class=nt>以ImageNet预训练的VGG-16为主干，只修改池化步长和后续卷积的空洞率。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/overfeat.html">OverFeat</a><span class="yr">2013.12 · 视觉</span><div class=nt>在OverFeat等工作的密集计算技巧基础上，提出不引入近似、可任意设定输出步长的空洞算法。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/fcn.html">全卷积网络FCN</a><span class="yr">2014.11 · 视觉</span><div class=nt>FCN的输出步长为32、边界粗糙；用空洞卷积把步长降到8，再用CRF细化边界，VOC 2012上从62.2%提升到71.6%。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/unet.html">U-Net</a><span class="yr">2015.05 · 视觉</span><div class=nt>同期恢复分辨率的两条路线：DeepLab用空洞卷积少下采样再接CRF，U-Net先下采样再逐级上采样并拼接浅层特征；医学和生成模型多用后者。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/mask2former.html">Mask2Former通用分割</a><span class="yr">2021.12 · 视觉</span><div class=nt>输出步长仍是8，最后靠双线性插值放大，细长结构和小物体的边界依旧不够精细。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/pspnet.html">PSPNet</a><span class="yr">2016.12 · 视觉</span><div class=nt>只在单一感受野上提取特征，同一张图里大小差异很大的物体难以兼顾，需要多尺度的上下文。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/deeplabv3plus.html">DeepLabv3+</a><span class="yr">2018.02 · 视觉</span><div class=nt>沿用空洞卷积与ASPP，补上解码器模块。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/convolution-op.html">卷积运算</a> <a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/iou-map.html">IoU与mAP</a> <a class="chip c" href="../c/graphical-model.html">概率图模型</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a></p>
+<h2>本篇术语</h2><ul><li><b>空洞卷积</b>　在卷积核元素之间插入间隔（空洞率r），用同样多的参数覆盖更大的区域，常用来在不下采样的情况下扩大感受野。</li><li><b>输出步长</b>　输入图像尺寸与网络输出特征图尺寸之比。步长32表示每个输出点对应原图32×32像素。</li><li><b>均值场推断</b>　一种近似推断方法：假设各像素标签相互独立，反复用邻居当前的标签分布更新每个像素的分布，几次迭代后收敛。</li></ul>
+<h2>怎么学</h2><p>先确认会<a class="lc" href="../c/conv-layer.html">卷积层、池化与感受野</a>和<a class="lc" href="../c/iou-map.html">IoU与mAP</a>，再看<a class="ln" href="../n/fcn.html">全卷积网络FCN</a>是如何把分类网络改成分割网络的。读原文第3节（空洞算法与图1）和第4节（全连接CRF）。动手：用PyTorch的nn.Conv2d(dilation=2)对一张小图做卷积，对比dilation=1时的感受野；再用torchvision的DeepLabV3模型分割一张照片，观察边界质量。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1412.7062" rel="noopener">https://arxiv.org/abs/1412.7062</a>（arXiv页确认标题、5位作者、v1提交于2014-12-22、摘要71.6% IOU与8帧/秒；正文确认ICLR 2015、步长32→8、最后三个卷积层2×与第一个全连接层4×空洞、源于小波undecimated变换、CRF能量函数与全连接二元项、CRF约0.5秒、测试集FCN-8s 62.2%、DeepLab-CRF 66.4%、MSc 67.1%、LargeFOV 70.3%、最佳71.6%、LargeFOV为3×3核加步长12。均值场固定10次迭代亦经正文确认；WaveNet与DeepLab v2/v3细节凭记忆。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DeepLab%E7%A9%BA%E6%B4%9E%E5%8D%B7%E7%A7%AF%EF%BC%88deeplab%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adeeplab%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/deeplab.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="fcn.html"><small>本分支上一个 · 2014.11</small><b>全卷积网络FCN</b></a><a class="r" href="c3d.html"><small>本分支下一个 · 2014.12</small><b>C3D三维卷积</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

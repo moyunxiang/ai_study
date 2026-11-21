@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>测试时训练TTT（分布偏移）（2019） · AI脉络</title>
+<meta name="description" content="模型训练完就冻结，测试数据一旦和训练分布不同（加噪、模糊、换场景），准确率会大幅下跌。 测试时把每个无标签样本变成一个自监督小任务（预测图像旋转角度），先在它上面更新特征提取器，再做预测。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ttt-shift.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="测试时训练TTT（分布偏移）（2019）">
+<meta property="og:description" content="模型训练完就冻结，测试数据一旦和训练分布不同（加噪、模糊、换场景），准确率会大幅下跌。 测试时把每个无标签样本变成一个自监督小任务（预测图像旋转角度），先在它上面更新特征提取器，再做预测。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ttt-shift.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ttt-shift">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 迁移与元学习</div>
+<h1>测试时训练TTT（分布偏移）</h1>
+<div class="full">Test-Time Training with Self-Supervision for Generalization under Distribution Shifts</div>
+<div class="meta"><span>2019.09</span><span>论文</span><span>延伸</span><span>ICML 2020</span><span>Yu Sun, Xiaolong Wang, Zhuang Liu, John Miller, Alexei A. Efros, Moritz Hardt · UC Berkeley 等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1909.13231" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/ttt-shift">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>模型训练完就冻结，测试数据一旦和训练分布不同（加噪、模糊、换场景），准确率会大幅下跌。</p></div><div><h4>方法</h4><p>测试时把每个无标签样本变成一个自监督小任务（预测图像旋转角度），先在它上面更新特征提取器，再做预测。</p></div><div><h4>影响</h4><p>提出“测试时训练”这一说法和做法，开启了测试时适应方向，后来又被推广成序列模型的层和长上下文方法。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>网络是Y形的：共享的特征提取器，后面分出主任务头（物体分类）和自监督头（把图像旋转0、90、180、270度后预测是哪一个，借自<a class="ln" href="../n/rotation-pretext.html">旋转预测前置任务</a>）。训练时两个损失相加做<a class="ln" href="../n/multitask.html">多任务学习</a>联合训练。</p><p>测试时，对每张输入图像只用它自己、不需要标签，在旋转预测损失上对共享特征提取器做10步梯度更新，再用更新后的特征和原来的主任务头分类；标准版每个样本用完就把参数复原，TTT-Online则沿测试流不断累积更新。论文给出凸情形下的理论：自监督损失和主损失的梯度内积为正时，这一步更新必然降低主损失。</p><p>结果：在CIFAR-10-C最强高斯噪声上，错误率从基线50.5%降到TTT的45.6%、TTT-Online的25.8%；在<a class="ln" href="../n/imagenet-c.html">ImageNet-C</a>同一设置下，ResNet-18准确率从1.3%升到TTT-Online的26.3%，而干净测试集上几乎不变。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每个样本都要做多步反向传播，推理比普通前向慢很多倍。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/tent.html">TENT测试时熵最小化</a></div></li><li>必须改动训练过程加上自监督分支，不能直接用于现成的预训练模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/tent.html">TENT测试时熵最小化</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/multitask.html">多任务学习</a><span class="yr">1997 · 基础</span><div class=nt>训练阶段用主任务与旋转预测的多任务联合训练得到共享特征。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/rotation-pretext.html">旋转预测前置任务</a><span class="yr">2018.03 · 视觉</span><div class=nt>直接把旋转预测这一自监督前置任务当作测试时的学习信号。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/imagenet-c.html">ImageNet-C</a><span class="yr">2019.03 · 数据·评测</span><div class=nt>在ImageNet-C与CIFAR-10-C等腐蚀基准上评估对分布偏移的鲁棒性。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/tent.html">TENT测试时熵最小化</a><span class="yr">2020.06 · 基础</span><div class=nt>TTT必须在训练时加自监督分支；Tent只用测试数据和熵目标，不改训练过程，可直接适配现成模型。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/distribution-shift.html">分布偏移</a> <a class="chip c" href="../c/self-supervised.html">自监督学习</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/transfer-learning.html">迁移学习</a></p>
+
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/distribution-shift.html">分布偏移</a>和<a class="lc" href="../c/self-supervised.html">自监督学习</a>；读论文第2节方法和图1；在CIFAR-10上训练带旋转头的ResNet，在加噪测试集上比较测试时更新前后的错误率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1909.13231" rel="noopener">https://arxiv.org/abs/1909.13231</a>（arXiv记录：标题、6位作者、v1 2019-09-29、摘要；ar5iv正文：Y形结构、四角度旋转预测、测试时只更新共享提取器、10步梯度、标准版与Online版、凸情形梯度内积定理、CIFAR-10-C 50.5/45.6/25.8%错误率与ImageNet-C 1.3%到26.3%准确率。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%B5%8B%E8%AF%95%E6%97%B6%E8%AE%AD%E7%BB%83TTT%EF%BC%88%E5%88%86%E5%B8%83%E5%81%8F%E7%A7%BB%EF%BC%89%EF%BC%88ttt-shift%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Attt-shift%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ttt-shift.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="lamb.html"><small>本分支上一个 · 2019.04</small><b>LAMB</b></a><a class="r" href="rmsnorm.html"><small>本分支下一个 · 2019.10</small><b>RMSNorm</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

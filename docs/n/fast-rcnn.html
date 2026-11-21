@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fast R-CNN（2015） · AI脉络</title>
+<meta name="description" content="R-CNN对每个候选框单独跑一遍CNN，用VGG16检测一张图要47秒；训练分三段，还要把特征写到硬盘，占几百GB。SPPnet共享了卷积计算，但训练仍是多阶段的，而且无法微调共享层之下的卷积层。 整张图只过一次卷积，用RoI池化从共享特征图上为每个候选框抠出固定大小（7×7）的特征，再用一个网络…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/fast-rcnn.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Fast R-CNN（2015）">
+<meta property="og:description" content="R-CNN对每个候选框单独跑一遍CNN，用VGG16检测一张图要47秒；训练分三段，还要把特征写到硬盘，占几百GB。SPPnet共享了卷积计算，但训练仍是多阶段的，而且无法微调共享层之下的卷积层。 整张图只过一次卷积，用RoI池化从共享特征图上为每个候选框抠出固定大小（7×7）的特征，再用一个网络…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/fast-rcnn.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/fast-rcnn">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 目标检测</div>
+<h1>Fast R-CNN</h1>
+<div class="full">Fast R-CNN</div>
+<div class="meta"><span>2015.04</span><span>论文</span><span>重要</span><span>ICCV 2015</span><span>Ross Girshick · Microsoft Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1504.08083" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/rbgirshick/fast-rcnn" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/fast-rcnn">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>R-CNN对每个候选框单独跑一遍CNN，用VGG16检测一张图要47秒；训练分三段，还要把特征写到硬盘，占几百GB。SPPnet共享了卷积计算，但训练仍是多阶段的，而且无法微调共享层之下的卷积层。</p></div><div><h4>方法</h4><p>整张图只过一次卷积，用RoI池化从共享特征图上为每个候选框抠出固定大小（7×7）的特征，再用一个网络同时输出类别和框修正，一个多任务损失端到端训练。</p></div><div><h4>影响</h4><p>用VGG16时训练比R-CNN快9倍、测试快213倍，精度还更高；“共享特征＋RoI池化＋多任务头”成为两阶段检测器的标准结构。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/rcnn.html">R-CNN</a>把检测精度大幅提高，但它的三个缺点很明显（论文原话总结）：</p><ul><li>训练是多阶段的：先微调CNN，再训练每类的SVM，最后训练框回归；</li><li>训练费时费空间：用VGG16在VOC 2007的5000张图上提特征要2.5个GPU天，特征要占几百GB硬盘；</li><li>检测慢：每个候选框都要单独过一遍网络，一张图47秒。</li></ul><p><a class="ln" href="../n/sppnet.html">SPPnet</a>的改进是：整张图只算一次卷积特征图，再在特征图上对每个候选框做空间金字塔池化，得到定长向量。这样测试快了很多，但它的训练仍是R-CNN式的三段流程，而且由于实现方式，微调时无法更新池化层之前的卷积层，限制了精度。</p><h2>方法</h2><p><b>整体流程。</b>输入一张图和它的约2000个候选框（仍由<a class="ln" href="../n/selective-search.html">选择性搜索</a>生成）。整张图过一遍<a class="ln" href="../n/vgg.html">VGG</a>的卷积层得到特征图；每个候选框投影到特征图上，经<b>RoI池化</b>变成7×7的固定大小特征，再过两个全连接层，最后分成两个并列的输出头：</p><ul><li>分类头：对K+1类（K个物体类加背景）做<a class="lc" href="../c/softmax.html">Softmax与logits</a>；</li><li>回归头：为每一类输出4个框修正量。</li></ul><p><b>RoI池化。</b>把候选框在特征图上对应的区域等分成7×7个格子，每格取最大值。无论候选框多大、长宽比如何，输出都是7×7×通道数，可以接全连接层。它就是只有一层的空间金字塔池化，而且能把梯度反传回卷积层。</p><p><b>多任务损失。</b><code>L = L_cls(p, u) + λ·[u ≥ 1]·L_loc(tᵘ, v)</code>。<code>L_cls</code>是真实类别u的对数损失；<code>L_loc</code>只对非背景框计算，用<b>平滑L1</b>：误差小于1时为<code>0.5x²</code>，否则为<code>|x| − 0.5</code>，比R-CNN用的L2损失对离群值更不敏感。分类和定位一起训练，不再需要SVM。</p><p><b>分层采样。</b>每个小批量只取2张图、每张图取64个候选框（共128个）。同一张图的候选框共享卷积计算，所以训练效率比“128个框来自128张图”高得多。</p><p><b>截断SVD加速。</b>检测时全连接层占了约45%的时间，用截断奇异值分解把大矩阵拆成两个小矩阵（见<a class="lc" href="../c/low-rank.html">低秩近似</a>），速度再提升且精度几乎不变。</p><h2>结果</h2><p>VGG16、VOC 2007测试集：Fast R-CNN mAP 66.9%，R-CNN 66.0%，SPPnet 63.1%。训练时间从R-CNN的84小时降到9.5小时（9倍）；检测从47秒降到约0.32秒/图（不含候选框生成，加截断SVD后为R-CNN的213倍）。比SPPnet训练快2.7倍、测试快约10倍。VOC 2012上mAP 65.7%（加额外数据68.4%），为当时最佳。实验还表明，微调卷积层能把mAP从61.4%提到66.9%，说明SPPnet不能微调卷积层是精度瓶颈之一。</p><h2>后来的发展</h2><p>两个月后，<a class="ln" href="../n/faster-rcnn.html">Faster R-CNN</a>把候选框生成也变成网络的一部分，构成完整的端到端检测器。RoI池化被<a class="ln" href="../n/mask-rcnn.html">Mask R-CNN</a>改进为没有取整误差的RoIAlign；平滑L1损失和“分类＋回归”双头结构被几乎所有后续检测器沿用，包括<a class="ln" href="../n/ssd.html">SSD</a>、<a class="ln" href="../n/retinanet.html">Focal Loss与RetinaNet</a>等单阶段方法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>候选框仍靠CPU上的选择性搜索生成，检测网络只要0.3秒，候选框却要更久，成了新的速度瓶颈。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/faster-rcnn.html">Faster R-CNN</a></div></li><li>RoI池化把候选框坐标和格子边界取整，特征与原图位置有偏差，对需要像素级精度的任务（实例分割）不利。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/mask-rcnn.html">Mask R-CNN</a></div></li><li>只在最后一层单一尺度的特征图上取特征，小物体在下采样16倍后几乎消失。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/fpn.html">特征金字塔FPN</a></div></li><li>整个流程每秒只能处理几张图，离视频级的实时检测还很远。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/yolo.html">YOLO</a> <a class="chip hue" style="--h:216" href="../n/ssd.html">SSD</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/dpm.html">可变形部件模型DPM</a><span class="yr">2008.06 · 视觉</span><div class=nt>每类要单独训练一个模型、每张图约2秒，在图像金字塔上做滑窗，类别一多就很慢。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/rcnn.html">R-CNN</a><span class="yr">2013.11 · 视觉</span><div class=nt>去掉逐框重复计算和三段式训练：测试快213倍、训练快9倍、不再占用几百GB硬盘，精度还略高。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/caffe.html">Caffe</a><span class="yr">2013.12 · 系统·效率</span><div class=nt>用Python和C++在Caffe上实现，并以MIT许可证开源。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/vgg.html">VGG</a><span class="yr">2014.09 · 视觉</span><div class=nt>以ImageNet预训练的VGG16为主干，把它的最后一个池化层替换为RoI池化。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/selective-search.html">选择性搜索</a><span class="yr">2013 · 视觉</span><div class=nt>候选框仍来自选择性搜索，每张图约2000个。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/overfeat.html">OverFeat</a><span class="yr">2013.12 · 视觉</span><div class=nt>多尺度滑动窗口和边框累积仍然很耗算力，检测精度落后于基于区域提议的方法。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/sppnet.html">SPPnet</a><span class="yr">2014.06 · 视觉</span><div class=nt>沿用整图共享卷积的思路，但用可反传梯度的单层RoI池化和单阶段训练，使卷积层也能微调，精度从63.1%提到66.9%。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/faster-rcnn.html">Faster R-CNN</a><span class="yr">2015.06 · 视觉</span><div class=nt>第二阶段完全沿用Fast R-CNN；新增的RPN与它共享卷积层，合成一个网络。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/yolo.html">YOLO</a><span class="yr">2015.06 · 视觉</span><div class=nt>Fast R-CNN精度更高（70.0%）但每秒0.5帧且背景误检多；两者互补，组合后mAP达75.0%。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/fpn.html">特征金字塔FPN</a><span class="yr">2016.12 · 视觉</span><div class=nt>只在最后一层单一尺度的特征图上取特征，小物体在下采样16倍后几乎消失。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/ssd.html">SSD</a><span class="yr">2015.12 · 视觉</span><div class=nt>整个流程每秒只能处理几张图，离视频级的实时检测还很远。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/mask-rcnn.html">Mask R-CNN</a><span class="yr">2017.03 · 视觉</span><div class=nt>RoI池化把候选框坐标和格子边界取整，特征与原图位置有偏差，对需要像素级精度的任务（实例分割）不利。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/iou-map.html">IoU与mAP</a> <a class="chip c" href="../c/anchor-nms.html">锚框与非极大值抑制</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/low-rank.html">低秩近似</a></p>
+<h2>本篇术语</h2><ul><li><b>RoI池化</b>　把特征图上任意大小的一块区域等分成固定的H×W个格子，每格取最大值，从而得到固定尺寸的特征。RoI指感兴趣区域。</li><li><b>平滑L1损失</b>　误差小时像平方损失（处处可导、靠近0时梯度变小），误差大时像绝对值损失（梯度不会因离群值而爆炸）。</li><li><b>多任务损失</b>　把几个任务（这里是分类和框回归）的损失加权相加，用同一个网络同时优化。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/rcnn.html">R-CNN</a>，理解它的三段式流程为什么慢。读原文第2节（RoI池化、多任务损失、分层采样）。动手：用torchvision.ops.roi_pool在一张特征图上对几个不同大小的框做池化，确认输出形状一致；再读torchvision的Faster R-CNN代码中RoIHeads部分，找到分类头和回归头。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1504.08083" rel="noopener">https://arxiv.org/abs/1504.08083</a>（arXiv页确认单一作者、v1提交于2015-04-30、ICCV 2015、训练快9倍测试快213倍、比SPPnet训练快3倍测试快10倍；正文确认R-CNN三大缺点（2.5 GPU天、几百GB、47秒/图）、7×7 RoI池化、平滑L1公式、N＝2/R＝128（每图64个）、VOC07 mAP 66.9 vs 66.0 vs 63.1、84小时→9.5小时、0.32秒/图、VOC12 65.7%/68.4%、不微调卷积层61.4%、全连接层占45%时间、SPPnet训练快2.7倍。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Fast%20R-CNN%EF%BC%88fast-rcnn%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Afast-rcnn%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/fast-rcnn.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="facenet.html"><small>本分支上一个 · 2015.03</small><b>FaceNet与三元组损失</b></a><a class="r" href="flownet.html"><small>本分支下一个 · 2015.04</small><b>FlowNet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

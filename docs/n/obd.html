@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>最优脑损伤OBD剪枝（1989） · AI脉络</title>
+<meta name="description" content="网络越大越难泛化、越慢，但删掉哪些权重才不伤性能？最直接的“删掉绝对值小的权重”没有理论依据，常常删错。 用损失函数的二阶导数估计“删掉某个权重会让训练误差上升多少”，按这个“显著性”从小到大删，删完再重新训练，反复进行。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/obd.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="最优脑损伤OBD剪枝（1989）">
+<meta property="og:description" content="网络越大越难泛化、越慢，但删掉哪些权重才不伤性能？最直接的“删掉绝对值小的权重”没有理论依据，常常删错。 用损失函数的二阶导数估计“删掉某个权重会让训练误差上升多少”，按这个“显著性”从小到大删，删完再重新训练，反复进行。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/obd.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/obd">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 模型压缩与蒸馏</div>
+<h1>最优脑损伤OBD剪枝</h1>
+<div class="full">Optimal Brain Damage</div>
+<div class="meta"><span>1989.11</span><span>论文</span><span>重要</span><span>NIPS 1989</span><span>Yann LeCun, John S. Denker, Sara A. Solla · AT&amp;T贝尔实验室</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://proceedings.neurips.cc/paper/1989/hash/6c9882bbac1c7093bd25041881277658-Abstract.html" rel="noopener">NeurIPS论文页 ↗</a><a class="btn sm" href="../index.html#/n/obd">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>网络越大越难泛化、越慢，但删掉哪些权重才不伤性能？最直接的“删掉绝对值小的权重”没有理论依据，常常删错。</p></div><div><h4>方法</h4><p>用损失函数的二阶导数估计“删掉某个权重会让训练误差上升多少”，按这个“显著性”从小到大删，删完再重新训练，反复进行。</p></div><div><h4>影响</h4><p>第一次给剪枝一个可计算的、基于损失曲率的准则。它开启的“按二阶信息判断参数重要性”路线一直延续到今天大模型的剪枝与量化。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>1980年代末，用<a class="ln" href="../n/backprop.html">反向传播</a>训练的网络开始用于真实任务，例如<a class="ln" href="../n/lecun-1989.html">卷积网络识别邮编</a>的手写数字识别网络。网络参数一多，就需要更多训练样本才能泛化（这与<a class="ln" href="../n/vc-dimension.html">VC维与一致收敛</a>给出的直觉一致），推理也更慢。一个自然的想法是训练完再删掉“不重要”的连接，但“不重要”怎么定义？</p><p>当时常见的做法是删掉绝对值最小的权重。问题是：一个权重很小，但如果损失对它非常敏感（曲率大），删掉它的代价可能比删掉一个大但无关紧要的权重还高。缺的是一个直接衡量“删掉它会让误差变多少”的指标。</p><h2>方法</h2><p>把训练误差E在当前参数附近做泰勒展开（见<a class="lc" href="../c/taylor-expansion.html">泰勒展开</a>）。参数改变δu时：</p><p class="formula"><code>δE ≈ Σ gᵢ·δuᵢ + ½ Σ hᵢᵢ·δuᵢ² + ½ Σ_{i≠j} hᵢⱼ·δuᵢ·δuⱼ</code></p><p>其中g是梯度、h是海森矩阵（见<a class="lc" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a>）的元素。论文做三个近似：</p><ul><li><b>极值近似</b>：训练已收敛，梯度<code>g ≈ 0</code>，第一项去掉。</li><li><b>二次近似</b>：更高阶项忽略。</li><li><b>对角近似</b>：删除多个参数造成的误差增量等于各自增量之和，交叉项<code>hᵢⱼ</code>忽略。</li></ul><p>于是把参数<code>u_k</code>置零（<code>δu_k = −u_k</code>）的代价就是它的<b>显著性</b>：<code>s_k = h_kk·u_k² / 2</code>。它同时考虑了权重大小和损失在这个方向上的弯曲程度：一个权重<code>u = 0.1</code>但<code>h = 100</code>，<code>s = 0.5</code>；另一个<code>u = 1</code>但<code>h = 0.1</code>，<code>s = 0.05</code>，后者反而更该删。</p><p>对角元素<code>h_kk</code>可以用一次类似反向传播的逐层回传算出，代价与求一次梯度同量级（推导中又忽略了一部分难算的二阶项）。整个流程：训练到收敛 → 算每个参数的显著性 → 删掉最小的一批 → 重新训练 → 重复。</p><p>论文在作者的手写数字识别网络上验证：论文图中把按显著性删除与按幅值删除对比，前者在删去同样多参数时误差上升得更慢；删除后重新训练，网络可以在参数明显减少的情况下保持原有精度。</p><h2>后来的发展</h2><p>三年后的<a class="ln" href="../n/obs.html">最优脑外科OBS</a>指出对角近似过强——删掉一个权重后，其余权重应当协同调整来补偿——于是用完整海森矩阵的逆来同时计算删除哪个和如何更新其余权重。这条二阶路线后来进入大模型：<a class="ln" href="../n/gptq.html">GPTQ训练后量化</a>用OBS式的逐列更新做量化，<a class="ln" href="../n/sparsegpt.html">SparseGPT一次性剪枝</a>用它一次性剪掉大模型一半权重。</p><p>另一方面，<a class="ln" href="../n/deep-compression.html">剪枝与量化压缩</a>在2015年证明，在现代大网络上简单的按幅值剪枝加重训就能把AlexNet、VGG压缩很多倍，二阶信息并非总是必要；<a class="ln" href="../n/lottery-ticket.html">彩票假说</a>则把剪枝变成研究“稀疏子网络为什么能训好”的工具。</p><h2>容易误解的地方</h2><ul><li>显著性只是对误差增量的近似：远离极小点、或一次删掉很多相关参数时，对角和二次近似都会失效，所以必须分批删、每批之后重训。</li><li>论文里的“参数”指独立的自由参数；在权重共享的卷积网络里，删一个参数等于同时删掉很多条连接。</li><li>删掉权重并不自动带来加速：零散分布的零在普通硬件上仍按稠密矩阵计算，需要结构化剪枝或稀疏硬件才能真正变快。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>对角近似忽略了参数之间的耦合，删掉一个权重后不调整其余权重来补偿，剪得多时误差估计偏差大。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/obs.html">最优脑外科OBS</a></div></li><li>每删一批都要重新训练，网络一大，“训练—删除—重训”的循环代价很高。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/sparsegpt.html">SparseGPT一次性剪枝</a></div></li><li>只删单个权重，得到的是不规则稀疏，在通用硬件上很难转化成实际的速度和存储收益。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/deep-compression.html">剪枝与量化压缩</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/backprop.html">反向传播</a><span class="yr">1986 · 基础</span><div class=nt>在反向传播训练好的网络上剪枝，并用一次类似反向传播的回传计算海森矩阵对角元。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/vc-dimension.html">VC维与一致收敛</a><span class="yr">1971 · 基础</span><div class=nt>以“自由参数越少、所需样本越少、泛化越好”的容量控制思想作为剪枝的动机。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/lecun-1989.html">卷积网络识别邮编</a><span class="yr">1989 · 视觉</span><div class=nt>实验对象就是作者的手写数字识别卷积网络，目标是在保持精度的同时缩小它。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/obs.html">最优脑外科OBS</a><span class="yr">1992.11 · 系统·效率</span><div class=nt>去掉OBD的对角Hessian假设，用完整逆Hessian选择权重并补偿其余权重。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/deep-compression.html">剪枝与量化压缩</a><span class="yr">2015.10 · 系统·效率</span><div class=nt>继承剪枝思路，但用幅值剪枝加重训，可用于上千万参数的网络。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/sparsegpt.html">SparseGPT一次性剪枝</a><span class="yr">2023.01 · 系统·效率</span><div class=nt>每删一批都要重新训练，网络一大，“训练—删除—重训”的循环代价很高。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/backpropagation.html">反向传播</a> <a class="chip c" href="../c/taylor-expansion.html">泰勒展开</a> <a class="chip c" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/generalization.html">泛化与过拟合</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a></p>
+<h2>本篇术语</h2><ul><li><b>剪枝（pruning）</b>　训练后删掉网络中一部分权重或神经元（置零或移除），以减小模型、加快推理，通常删完要再训练一会儿恢复精度。</li><li><b>显著性（saliency）</b>　OBD里删除某个参数会让训练误差增加多少的二阶估计，<code>s = h·u²/2</code>，越小越可以删。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/taylor-expansion.html">泰勒展开</a>和<a class="lc" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a>，理解为什么在极小点附近损失近似是二次函数。然后读原文第2、3节的推导。动手：在MNIST上训一个小MLP，分别按幅值和按<code>h·u²</code>（对角海森可以用PyTorch对每个参数做二次反向近似估计）删掉50%、80%、90%的权重，画出误差曲线对比。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://proceedings.neurips.cc/paper/1989/hash/6c9882bbac1c7093bd25041881277658-Abstract.html" rel="noopener">https://proceedings.neurips.cc/paper/1989/hash/6c9882bbac1c7093bd25041881277658-Abstract.html</a>（标题、作者LeCun/Denker/Solla、NIPS 1989；摘要中“用二阶导数信息在网络复杂度与训练误差之间权衡”、“删除不重要权重可提升泛化、减少所需样本、加速”，正文说明在作者的手写数字识别网络上验证。PDF为扫描件，具体删减比例等数字未能提取，正文只作定性描述。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%9C%80%E4%BC%98%E8%84%91%E6%8D%9F%E4%BC%A4OBD%E5%89%AA%E6%9E%9D%EF%BC%88obd%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aobd%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/obd.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="matlab.html"><small>本分支上一个 · 1984</small><b>MATLAB</b></a><a class="r" href="lapack.html"><small>本分支下一个 · 1992</small><b>LAPACK</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLaVA-CoT分阶段推理（2024） · AI脉络</title>
+<meta name="description" content="o1之后语言模型能先想后答，但视觉语言模型面对复杂视觉问答时往往直接给答案，缺乏系统、有条理的推理。 让模型按固定的四个阶段依次输出：总结问题、描述图像、逻辑推理、给出结论，用10万条带阶段标注的数据微调，并在测试时按阶段做搜索。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/llava-cot.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LLaVA-CoT分阶段推理（2024）">
+<meta property="og:description" content="o1之后语言模型能先想后答，但视觉语言模型面对复杂视觉问答时往往直接给答案，缺乏系统、有条理的推理。 让模型按固定的四个阶段依次输出：总结问题、描述图像、逻辑推理、给出结论，用10万条带阶段标注的数据微调，并在测试时按阶段做搜索。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/llava-cot.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/llava-cot">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:240"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/mm.html">多模态理解</a> › 多模态推理</div>
+<h1>LLaVA-CoT分阶段推理</h1>
+<div class="full">LLaVA-CoT: Let Vision Language Models Reason Step-by-Step</div>
+<div class="meta"><span>2024.11</span><span>论文</span><span>延伸</span><span>Guowei Xu, Peng Jin, Ziang Wu, Hao Li, Yibing Song, Lichao Sun, Li Yuan · 北京大学袁粒团队（PKU-YuanGroup）等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2411.10440" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/PKU-YuanGroup/LLaVA-CoT" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/llava-cot">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>o1之后语言模型能先想后答，但视觉语言模型面对复杂视觉问答时往往直接给答案，缺乏系统、有条理的推理。</p></div><div><h4>方法</h4><p>让模型按固定的四个阶段依次输出：总结问题、描述图像、逻辑推理、给出结论，用10万条带阶段标注的数据微调，并在测试时按阶段做搜索。</p></div><div><h4>影响</h4><p>开源社区最早一批“o1式”多模态推理模型之一（最初名为LLaVA-o1），带动了用结构化思维链数据训练VLM的工作。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>普通的<a class="ln" href="../n/cot.html">思维链CoT</a>提示让模型自由发挥推理过程，VLM常常跳步或一开始就猜答案。LLaVA-CoT把推理拆成四段，分别用<code>&lt;SUMMARY&gt;</code>、<code>&lt;CAPTION&gt;</code>、<code>&lt;REASONING&gt;</code>、<code>&lt;CONCLUSION&gt;</code>标签包住，模型一次推理中依次写完四段。</p><p>训练数据LLaVA-CoT-100k由GPT-4o为多个视觉问答数据集的题目生成四段式回答，过滤掉格式错误、拒答或最终答案与原标注不符的样本。基础模型是<a class="ln" href="../n/llama-3.2-vision.html">Llama 3.2 Vision</a>（Llama-3.2-11B-Vision-Instruct），全参数微调。测试时用阶段式回溯搜索（SWIRES）：每个阶段生成多个候选，由奖励模型打分保留高分者进入下一阶段；若某阶段没有候选超过阈值，就退回上一阶段重新生成。论文报告只用10万条样本加测试时扩展，在多模态推理基准上比基础模型平均高9.4%，并超过Gemini-1.5-pro、GPT-4o-mini和Llama-3.2-90B-Vision-Instruct。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>推理数据由GPT-4o蒸馏而来，能力上限受教师模型限制，且没有用强化学习自我提升。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:240" href="../n/vision-r1.html">Vision-R1</a></div></li><li>固定的四阶段格式对简单问题也要完整走一遍，输出冗长。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/cot.html">思维链CoT</a><span class="yr">2022.01 · 推理·智能体</span><div class=nt>把自由形式的思维链改成固定的四阶段结构。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:240" href="../n/gpt-4o.html">GPT-4o全模态实时模型</a><span class="yr">2024.05 · 多模态</span><div class=nt>用GPT-4o生成四阶段推理训练数据。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/o1.html">OpenAI o1推理模型</a><span class="yr">2024.09 · 推理·智能体</span><div class=nt>受o1“先想后答”的启发，把系统化推理带到VLM上。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:240" href="../n/llama-3.2-vision.html">Llama 3.2 Vision</a><span class="yr">2024.09 · 多模态</span><div class=nt>以Llama-3.2-11B-Vision-Instruct为基础模型微调。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:240" href="../n/vision-r1.html">Vision-R1</a><span class="yr">2025.03 · 多模态</span><div class=nt>LLaVA-CoT只做蒸馏数据的监督微调，Vision-R1加入强化学习让模型自我提升推理。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/reasoning-tokens.html">推理token与测试时计算</a> <a class="chip c" href="../c/instruction-tuning.html">指令微调与对话模板</a> <a class="chip c" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a> <a class="chip c" href="../c/knowledge-distillation.html">知识蒸馏</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/html/2411.10440v6" rel="noopener">https://arxiv.org/html/2411.10440v6</a>（标题、作者、2024-11-15 v1；摘要中四阶段、LLaVA-CoT-100k、SWIRES、+9.4%及超过的三个模型；正文中四个标签、GPT-4o生成数据与过滤规则、Llama-3.2-11B-Vision-Instruct基础模型。arXiv v1页面标题为LLaVA-o1: Let Vision Language Models Reason Step-by-Step；机构依据GitHub组织PKU-YuanGroup，论文页未显示单位）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20LLaVA-CoT%E5%88%86%E9%98%B6%E6%AE%B5%E6%8E%A8%E7%90%86%EF%BC%88llava-cot%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Allava-cot%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/llava-cot.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="janus.html"><small>本分支上一个 · 2024.10</small><b>理解与生成统一Janus</b></a><a class="r" href="fastvlm.html"><small>本分支下一个 · 2024.12</small><b>FastVLM高效编码</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Retrace离策略修正（2016） · AI脉络</title>
+<meta name="description" content="离策略学习要用旧策略采集的数据，但重要性采样修正的方差可能极大；而简单地截断又会引入偏差，甚至不再保证收敛。 把多种基于回报的离策略算法写成统一形式，提出Retrace(λ)：把每一步的重要性比率截断到最多1，既低方差又安全，还能充分利用接近同策略的数据。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/retrace.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Retrace离策略修正（2016）">
+<meta property="og:description" content="离策略学习要用旧策略采集的数据，但重要性采样修正的方差可能极大；而简单地截断又会引入偏差，甚至不再保证收敛。 把多种基于回报的离策略算法写成统一形式，提出Retrace(λ)：把每一步的重要性比率截断到最多1，既低方差又安全，还能充分利用接近同策略的数据。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/retrace.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/retrace">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 深度值函数</div>
+<h1>Retrace离策略修正</h1>
+<div class="full">Safe and Efficient Off-Policy Reinforcement Learning</div>
+<div class="meta"><span>2016.06</span><span>论文</span><span>延伸</span><span>NeurIPS 2016</span><span>Munos, Stepleton, Harutyunyan, Bellemare · Google DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1606.02647" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/retrace">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>离策略学习要用旧策略采集的数据，但重要性采样修正的方差可能极大；而简单地截断又会引入偏差，甚至不再保证收敛。</p></div><div><h4>方法</h4><p>把多种基于回报的离策略算法写成统一形式，提出Retrace(λ)：把每一步的重要性比率截断到最多1，既低方差又安全，还能充分利用接近同策略的数据。</p></div><div><h4>影响</h4><p>成为深度RL里标准的多步离策略修正，被<a class="ln" href="../n/acer.html">ACER</a>、<a class="ln" href="../n/impala.html">IMPALA与V-trace</a>（V-trace的思路）等采用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>多步回报（<a class="lc" href="../c/td-error.html">时序差分与自举</a>里的n步、λ回报）比一步TD更快传播奖励，但数据来自行为策略μ，目标是学习策略π，两者不同就必须修正。完整的重要性采样把每步的比率 <code>π(a|s)/μ(a|s)</code> 连乘，方差随步数爆炸；Tree-backup干脆不用比率，在数据接近同策略时又浪费数据。</p><p>Retrace(λ)用 <code>c = λ·min(1, π/μ)</code> 作为每一步的跟踪系数：比率大于1时截断为1，保证方差有界；小于1时按比例缩小，在行为策略远离目标策略时自动切断很远的未来。论文证明了对应的算子是收缩映射，并称这是第一个不需要GLIE假设（无限探索下贪心）就几乎必然收敛到Q*的基于回报的离策略控制算法，作为推论还证明了Watkins Q(λ)的收敛，这是1989年以来的未解问题。论文在Atari上展示了好处。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每一步都要读到行为策略当时的概率μ，回放里必须存下来；行为策略与目标策略差别很大时，截断使多步回报很快退化成一步。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/impala.html">IMPALA与V-trace</a></div></li><li>理论保证限于表格或带收缩性质的情形，与深度网络近似结合时仍无保证。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/deadly-triad.html">致命三元组</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/td-learning.html">时序差分学习</a><span class="yr">1988 · RL</span><div class=nt>基于TD(λ)的资格迹思想构造多步目标。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/q-learning.html">Q-learning</a><span class="yr">1992 · RL</span><div class=nt>把Q学习的一步离策略更新推广成带截断重要性采样的多步更新。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/experience-replay.html">经验回放</a><span class="yr">1992 · RL</span><div class=nt>只敢回放与当前策略一致的动作，大量旧经验被丢弃；用神经网络时回放离策略数据容易带偏价值估计。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/impala.html">IMPALA与V-trace</a><span class="yr">2018.02 · RL</span><div class=nt>沿用Retrace对重要性比率做截断连乘的思路，把它从Q函数改写为状态价值V，并用于策略梯度。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/disco-rl.html">DiscoRL：元学习发现RL算法</a><span class="yr">2025.10 · RL</span><div class=nt>预设含义的动作价值q的目标用Retrace计算，帮助元学习把精力集中在发现新的预测y、z上。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/acer.html">ACER</a><span class="yr">2016.11 · RL</span><div class=nt>用Retrace(λ)估计Q值目标，保证离策略多步修正的安全性。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/deadly-triad.html">致命三元组</a><span class="yr">2018.12 · RL</span><div class=nt>理论保证限于表格或带收缩性质的情形，与深度网络近似结合时仍无保证。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a> <a class="chip c" href="../c/importance-sampling.html">重要性采样</a> <a class="chip c" href="../c/td-error.html">时序差分与自举</a> <a class="chip c" href="../c/bellman-equation.html">Bellman方程</a></p>
+
+<h2>怎么学</h2><p>读原文第3节中的统一算子写法，再用表格MDP写一个Retrace评估，与普通重要性采样比较方差。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1606.02647" rel="noopener">https://arxiv.org/abs/1606.02647</a>（标题、4位作者、arXiv首次提交2016-06-08；摘要中三条性质、不需GLIE、Watkins Q(λ)收敛、Atari实验。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Retrace%E7%A6%BB%E7%AD%96%E7%95%A5%E4%BF%AE%E6%AD%A3%EF%BC%88retrace%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aretrace%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/retrace.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="dial.html"><small>本分支上一个 · 2016.05</small><b>DIAL/RIAL学习通信</b></a><a class="r" href="count-based-exploration.html"><small>本分支下一个 · 2016.06</small><b>伪计数探索</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

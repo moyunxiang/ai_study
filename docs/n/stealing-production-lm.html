@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>窃取生产级LLM的参数（2024） · AI脉络</title>
+<meta name="description" content="此前的多针对小模型或需要大量查询；人们不清楚能否从ChatGPT这类黑盒API里偷出真实的模型信息。 利用模型最后一层输出的logits总落在一个低维子空间里这一事实，对API做少量查询，就能恢复最后的嵌入投影层（至多差一个线性变换）。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/stealing-production-lm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="窃取生产级LLM的参数（2024）">
+<meta property="og:description" content="此前的多针对小模型或需要大量查询；人们不清楚能否从ChatGPT这类黑盒API里偷出真实的模型信息。 利用模型最后一层输出的logits总落在一个低维子空间里这一事实，对API做少量查询，就能恢复最后的嵌入投影层（至多差一个线性变换）。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/stealing-production-lm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/stealing-production-lm">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:312"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">环境 · 社会 › <a href="../t/safety.html">安全、对齐与可解释性</a> › 隐私与深度伪造</div>
+<h1>窃取生产级LLM的参数</h1>
+<div class="full">Stealing Part of a Production Language Model</div>
+<div class="meta"><span>2024.03</span><span>论文</span><span>延伸</span><span>arXiv 2024</span><span>Nicholas Carlini, Daniel Paleka, Krishnamurthy Dvijotham, Thomas Steinke, Jonathan Hayase, Matthew Jagielski 等 · Google DeepMind / ETH / OpenAI / 华盛顿大学等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2403.06634" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/stealing-production-lm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>此前的<a class="ln" href="../n/model-stealing.html">模型窃取</a>多针对小模型或需要大量查询；人们不清楚能否从ChatGPT这类黑盒API里偷出真实的模型信息。</p></div><div><h4>方法</h4><p>利用模型最后一层输出的logits总落在一个低维子空间里这一事实，对API做少量查询，就能恢复最后的嵌入投影层（至多差一个线性变换）。</p></div><div><h4>影响</h4><p>第一次从生产级商用语言模型中精确提取出非平凡的参数信息，推动API厂商隐藏或限制logit相关接口。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>语言模型的最后一步，是把宽度为h的隐藏向量乘以一个词表大小×h的投影矩阵，得到每个词的logits。因此无论查询什么提示，输出的logits向量都落在一个最多h维的子空间里，而词表往往有几万甚至十几万维。</p><p>攻击者只要用足够多的随机提示向API要回完整的logits（或通过logit偏置等接口技巧推算出它们），把这些向量堆成矩阵再做奇异值分解（见<a class="lc" href="../c/eigen-svd.html">特征分解与奇异值分解</a>），奇异值会在第h个之后骤降，这个位置就是隐藏维度，对应的子空间就是投影矩阵的列空间，因此能恢复投影层，只差一个未知的可逆线性变换。</p><p>作者在OpenAI的Ada和Babbage上以不到20美元的查询成本恢复了整个投影矩阵，确认它们的隐藏维度分别是1024和2048；对gpt-3.5-turbo，恢复了隐藏维度，并估计恢复整个矩阵的成本不到2000美元。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>攻击只拿到最后一层，无法恢复其余的参数，因此离“完整偷走模型”还很远。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>防御依赖厂商调整API，例如不再暴露完整logits或logit偏置，攻击与防御仍在博弈。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:312" href="../n/model-stealing.html">模型窃取</a><span class="yr">2016.09 · 安全·可解释</span><div class=nt>从Tramèr等人用预测API复制小型模型，推进到对生产级大语言模型提取精确的结构信息。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:312" href="../n/training-data-extraction.html">从LLM提取训练数据</a><span class="yr">2020.12 · 安全·可解释</span><div class=nt>提取到的数量有限，且需要大量生成和筛选；对更大的对齐后模型是否仍然有效，后来才有系统研究。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/embedding.html">嵌入向量</a> <a class="chip c" href="../c/dot-product.html">内积与余弦相似度</a></p>
+<h2>本篇术语</h2><ul><li><b>logits</b>　softmax之前的原始分数向量，每个词对应一个数。</li></ul>
+<h2>怎么学</h2><p>先补奇异值分解和logits的含义；读论文的攻击描述和防御一节；用一个小的GPT-2自己做一遍隐藏维度的恢复实验。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2403.06634" rel="noopener">https://arxiv.org/abs/2403.06634</a>（核对标题、作者、2024-03-11提交日期，摘要中的Ada/Babbage隐藏维度1024和2048、低于20美元和gpt-3.5-turbo约2000美元的估计。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E7%AA%83%E5%8F%96%E7%94%9F%E4%BA%A7%E7%BA%A7LLM%E7%9A%84%E5%8F%82%E6%95%B0%EF%BC%88stealing-production-lm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Astealing-production-lm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/stealing-production-lm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="voice-deepfake-fcc.html"><small>本分支上一个 · 2024.02</small><b>AI语音电话被FCC裁定违法</b></a><a class="r" href="sparse-feature-circuits.html"><small>本分支下一个 · 2024.03</small><b>稀疏特征电路</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

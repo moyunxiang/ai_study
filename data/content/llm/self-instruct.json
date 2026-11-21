@@ -8,23 +8,23 @@
   ],
   "problem": "指令微调需要大量人写的“指令—回答”数据，人工标注贵、数量少、题型单一；OpenAI的InstructGPT用的是不公开的用户数据。",
   "idea": "让未经指令微调的GPT-3自己出题：从175条人写的种子任务出发，反复让模型生成新指令、配上输入和输出，过滤掉重复和无效的，再用这些数据微调它自己。",
-  "impact": "几乎不需要人工标注就让GPT-3接近InstructGPT-001的水平，开启了“用大模型生成训练数据”的路线；Alpaca等一大批开源指令模型都直接沿用它的流程。",
+  "impact": "几乎不需要人工标注就让GPT-3在SuperNI上接近InstructGPT-001；“让大模型自己生成指令数据”的做法被Alpaca等开源指令模型沿用。",
   "background": "[[gpt-3]]能续写文本，但不会“听指令”：你问一个问题，它常常接着编出更多问题。[[instructgpt]]用人写的示范回答和人类偏好把它变成了助手，但数据来自OpenAI的付费用户和标注团队，外界无法复现。\n\n公开的替代品是把现成NLP数据集改写成指令格式，例如[[flan]]、[[t0]]和[[super-natural-instructions]]。这些数据由研究者编写，覆盖的多是分类、问答等学术任务，与真实用户会提的“帮我写封信”“把这段代码改一下”差距很大，而且继续扩充要靠更多人工。",
   "method": "流程是一个自举循环（bootstrapping），只用原始GPT-3（davinci）：\n\n**1. 生成指令**。任务池初始只有作者写的175个种子任务，每个一条指令和一个示例。每次从池中取8条指令（6条人写的、2条之前生成的）作为提示中的例子，让模型续写出新的指令。\n\n**2. 判断类型**。再用少样本提示让模型判断这条指令是不是分类任务。\n\n**3. 生成实例**。非分类任务用“先输入后输出”；分类任务改为“先输出后输入”——先定好类别标签，再让模型写出符合该标签的输入，避免生成的样本全挤在一个类别上。\n\n**4. 过滤**。新指令与池中任何一条指令的ROUGE-L重叠（见[[c:text-metrics]]）达到0.7及以上就丢弃；含“图片”等文本模型做不了的关键词的也丢弃；再去掉输入输出完全相同等无效样本。剩下的加入任务池，继续下一轮。\n\n最终得到52,445条指令、82,439个实例，用OpenAI的微调接口在这些数据上把GPT-3微调2轮，得到GPT3-Self-Inst（见[[c:instruction-tuning]]）。",
   "results": "在Super-NaturalInstructions的未见任务上，原始GPT-3的ROUGE-L只有6.8，Self-Instruct后为39.9，接近InstructGPT-001的40.8，超过用T0数据微调的GPT-3（37.9）。在作者新写的252条面向用户的指令上做人工评测，它明显好于用公开指令数据集微调的版本，与InstructGPT-001只差约5个百分点。抽查生成数据：92%的指令是有效任务，但只有58%的输出正确，全部字段都对的只有54%。生成数据花费约600美元API费用。",
-  "legacy": "三个月后，斯坦福的[[alpaca]]把生成模型换成更强的text-davinci-003，按同样流程造出5.2万条数据微调[[llama-1]]，开源指令模型随之大量出现。[[wizardlm]]让模型把指令逐步改写得更难，[[textbooks]]把“用模型造数据”推广到预训练阶段。用强模型的输出训练弱模型也带来了版权与条款争议，以及[[model-collapse]]这类对反复用合成数据训练的担忧。",
-  "pitfalls": "- Self-Instruct原文用的是**同一个**未对齐的GPT-3既出题又当学生，并不是“用更强模型蒸馏更弱模型”。后者是Alpaca等后续工作的做法。\n- 生成数据里接近一半含有错误，模型能从中受益，说明学的主要是“回答的格式和题型”，而非数据中的知识。",
+  "legacy": "三个月后，斯坦福的[[alpaca]]把生成模型换成更强的text-davinci-003，在Self-Instruct方法的基础上造出5.2万条数据微调[[llama-1]]。之后的[[wizardlm]]采用类似思路，让模型把指令逐步改写得更难。之后[[textbooks]]等工作也用模型生成的数据训练，用到了预训练阶段。用强模型的输出训练弱模型也带来了版权与条款争议，以及[[model-collapse]]这类对反复用合成数据训练的担忧。",
+  "pitfalls": "- Self-Instruct原文用的是**同一个**未对齐的GPT-3既出题又当学生，并不是“用更强模型蒸馏更弱模型”。后者是Alpaca等后续工作的做法。\n- 生成数据里接近一半含有错误，模型仍能从中受益。作者的解释是这些有错的样本多数格式正确或部分正确，仍能指导模型学会怎样回应指令；他们还发现用InstructGPT003重写输出后效果再提高约10%。",
   "limits": [
-    {"text": "生成数据质量不高：抽查中只有54%的样本所有字段都正确，错误会被学进模型。", "solved_by": ["lima", "textbooks"]},
+    {"text": "生成数据质量不高：抽查中只有54%的样本所有字段都正确，错误会被学进模型。", "solved_by": ["lima"]},
     {"text": "指令多为简单、单轮的任务，难度和多样性受限于生成模型本身的能力，缺少复杂推理和多轮对话。", "solved_by": ["wizardlm", "vicuna"]},
-    {"text": "只做了监督微调，没有用偏好数据或强化学习进一步对齐，与InstructGPT仍有差距。", "solved_by": ["dpo", "zephyr"]}
+    {"text": "只做了监督微调，没有用偏好数据或强化学习进一步对齐，与InstructGPT仍有差距。", "solved_by": ["zephyr"]}
   ],
   "relations": [
     {"to": "gpt-3", "type": "uses", "note": "原始的davinci版GPT-3既负责生成指令数据，也是被微调的对象。"},
-    {"to": "super-natural-instructions", "type": "extends", "note": "种子任务和主要评测集都来自同一团队的Super-NaturalInstructions，把人工编写的指令数据改成由模型自动扩充。"},
+    {"to": "super-natural-instructions", "type": "extends", "note": "同一团队（第一作者相同）此前的人工编写指令数据集；Self-Instruct把它作为主要评测集，并把“人工编写指令”改成由模型自动扩充。种子任务是作者另写的，不取自SuperNI。"},
     {"to": "instructgpt", "type": "rivals", "note": "InstructGPT靠私有用户数据、人工示范和RLHF对齐；Self-Instruct几乎不用人工，在SuperNI上接近InstructGPT-001。"},
     {"to": "t0", "type": "rivals", "note": "T0把已有NLP数据集改写成提示做多任务训练；用T0数据微调GPT-3的效果不如Self-Instruct生成的数据。"},
-    {"to": "flan", "type": "rivals", "note": "FLAN同样依赖人工整理的学术任务模板，题型覆盖远不如模型自由生成的指令广。"}
+    {"to": "flan", "type": "rivals", "note": "FLAN把现成学术数据集改写成指令模板；Self-Instruct认为这类人写的指令数据在数量和多样性上受限，改由模型自己生成指令。论文没有直接用FLAN数据做对照。"}
   ],
   "prereq": ["instruction-tuning", "pretrain-finetune", "zero-few-shot", "in-context-learning", "text-metrics"],
   "terms": [
@@ -32,5 +32,5 @@
     {"t": "合成数据", "d": "由模型而不是人类产生的训练数据。"}
   ],
   "learn": "先了解[[instructgpt]]为什么需要示范数据。读论文第2节（四个步骤）和表2的质量抽查，再看GitHub上的种子任务文件和生成提示。动手：用任意开源小模型，照着论文的提示格式生成50条指令，自己算它们之间的ROUGE-L并做去重。",
-  "check": {"source": "https://arxiv.org/abs/2212.10560", "confirmed": "标题、7位作者、arXiv v1于2022-12-20、PDF页眉ACL 2023；PDF：175个种子任务、8条示例（6人写+2生成）、ROUGE-L<0.7过滤、分类任务output-first、52,445条指令/82,439个实例、微调2轮、表3 ROUGE-L（GPT3 6.8、T0训练37.9、Self-Inst 39.9、InstructGPT001 40.8）、252条人工评测指令、表2质量抽查（92%/79%/58%/54%）、生成费用约600美元。Alpaca博客（crfm.stanford.edu 2023-03-13）：text-davinci-003生成5.2万条、按self-instruct方式、微调LLaMA-7B。"}
+  "check": {"source": "https://arxiv.org/abs/2212.10560", "confirmed": "标题、7位作者（UW、Tehran Polytechnic、ASU、JHU、AI2）、arXiv v1于2022-12-20、PDF页眉ACL 2023；PDF：175个种子任务、8条示例（6人写+2生成）、ROUGE-L<0.7过滤、分类任务output-first、52,445条指令/82,439个实例、微调2轮、表3 ROUGE-L（GPT3 6.8、T0训练37.9、Self-Inst 39.9、InstructGPT001 40.8）、252条人工评测指令、表2质量抽查（92%/79%/58%/54%）、生成费用约600美元。Alpaca博客（crfm.stanford.edu 2023-03-13）：text-davinci-003生成5.2万条、按self-instruct方式、微调LLaMA-7B。"}
 }

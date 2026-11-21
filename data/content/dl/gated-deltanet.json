@@ -19,7 +19,7 @@
   "problem": "线性注意力和Mamba2把上下文压进固定大小的状态矩阵，记得多了就互相覆盖；Mamba2只能把所有记忆一起按比例遗忘，DeltaNet能精确改写单条记忆却清不掉旧内容。",
   "idea": "把两种机制合成“门控delta规则”：`S_t = α_t·S_{t−1}(I − β_t k_t k_tᵀ) + β_t v_t k_tᵀ`，α_t负责整体快速清空，delta项负责按键精确替换，并给出可在GPU上分块并行训练的算法。",
   "impact": "1.3B参数、100B token的同条件对比中，语言建模和检索都超过Mamba2和DeltaNet；后被Qwen3-Next采用，并被Kimi Linear扩展为KDA。",
-  "background": "[[linear-attention]]把注意力改写成RNN：维护一个状态矩阵S（d_v×d_k），每读到一个token就“写入”`S ← S + v kᵀ`，查询时“读出”`o = S q`。生成每个token的代价固定，不像softmax注意力那样随上下文变长（见[[c:efficient-attention]]）。但S能存的近似正交的键值对最多只有约d_k条，序列一长，新旧记忆叠加在一起，检索就不准了。\n\n两种补救各有短板。[[mamba-2]]（以及[[gla]]、[[retnet]]）加入衰减`S ← α_t S + v kᵀ`，α_t∈(0,1)随输入变化，但它让所有记忆按同一比例淡化，想忘掉某一条就得连带忘掉全部。DeltaNet源于[[fast-weights]]一脉，用delta规则精确改写某个键对应的值，合成检索任务很强，但一次只改一条，遇到话题切换清不掉旧内容，在真实数据上表现一般。",
+  "background": "[[linear-attention]]把注意力改写成RNN：维护一个状态矩阵S（d_v×d_k），每读到一个token就“写入”`S ← S + v kᵀ`，查询时“读出”`o = S q`。生成每个token的代价固定，不像softmax注意力那样随上下文变长（见[[c:efficient-attention]]）。但S能存的近似正交的键值对最多只有约d_k条，序列一长，新旧记忆叠加在一起，检索就不准了。\n\n两种补救各有短板。[[mamba-2]]加入衰减`S ← α_t S + v kᵀ`，α_t∈(0,1)是随输入变化的标量（[[retnet]]用固定衰减、[[gla]]用按维度的门控衰减，思路类似），但它让所有记忆按同一比例淡化，想忘掉某一条就得连带忘掉全部。DeltaNet源于[[fast-weights]]一脉，用delta规则精确改写某个键对应的值，合成检索任务很强，但一次只改一条，遇到话题切换清不掉旧内容，在真实数据上表现一般。",
   "method": "**delta规则是什么**。把状态看作一个线性的“键→值”查找表，希望`S k_t ≈ v_t`。对损失`½‖S k_t − v_t‖²`做一步学习率为β_t的梯度下降，得到\n\n`S_t = S_{t−1} − β_t (S_{t−1} k_t − v_t) k_tᵀ = S_{t−1}(I − β_t k_t k_tᵀ) + β_t v_t k_tᵀ`\n\n这正是[[adaline]]的Widrow–Hoff最小均方规则。例子：若单位长度的键k原来存着v_old，取β=1写入v_new，则`S_t k = v_old − v_old + v_new = v_new`——只替换这一格，与k正交的其他记忆不受影响。普通线性注意力则会得到`v_old + v_new`的混合。\n\n**门控delta规则**：\n\n`S_t = S_{t−1}·α_t(I − β_t k_t k_tᵀ) + β_t v_t k_tᵀ`\n\nα_t→0时整块记忆被清空，α_t→1时退化为纯delta规则。α_t、β_t都由当前输入经线性层算出，α沿用Mamba2的参数化。\n\n**怎么并行训练**。逐步递推无法利用GPU。作者沿用前作的做法：把序列切成长度C的块，块内把一串`(I − β k kᵀ)`的乘积用WY表示压缩成几次矩阵乘法，再乘上块内累积的衰减；块与块之间只传递状态S。计算主要是矩阵乘法，能用上张量核。\n\n**层结构与混合**。q、k经线性投影、短卷积、SiLU和L2归一化；输出再经归一化和门控。混合版H1把它与滑动窗口注意力（SWA，见[[longformer]]）交替，H2再加入Mamba2层。",
   "results": "所有模型均为1.3B参数，用FineWeb-Edu的100B token在相同设置下训练。WikiText困惑度：Gated DeltaNet 16.42，Mamba2 16.56，DeltaNet 17.71，Transformer++ 18.53；常识推理平均准确率55.32，高于Mamba2的54.89；混合版H1为56.40。大海捞针S-NIAH-1在8K长度上为91.8%，Mamba2只有30.4%；S-NIAH-2在4K上为92.2%，DeltaNet掉到18.6%。截断到2K的真实检索任务平均30.6，仍低于Transformer++的37.0，而H2达到40.1。训练吞吐与DeltaNet基本相同，因转移矩阵更复杂，比Mamba2略慢。",
   "legacy": "[[qwen3-next]]把Gated DeltaNet与[[gated-attention]]混合，作为线性注意力层进入主流模型系列；作者仓库称后续的[[qwen3.5]]也在使用。[[kimi-linear]]把整头共用的α换成每个特征维度各自的遗忘率（KDA），以3:1与全注意力MLA混合，官方称在相同训练配方下超过纯全注意力，1M上下文时KV缓存最多减少75%、解码吞吐最高提升6倍。",
@@ -79,7 +79,7 @@
     {
       "to": "longformer",
       "type": "uses",
-      "note": "混合版本用滑动窗口注意力补足局部比较和精确检索能力。"
+      "note": "混合版本H1、H2用滑动窗口注意力补足局部比较和精确检索能力；这种局部窗口注意力Longformer已系统使用，但本文没有引用Longformer。"
     },
     {
       "to": "ttt",

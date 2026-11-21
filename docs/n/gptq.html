@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GPTQ训练后量化（2022） · AI脉络</title>
+<meta name="description" content="千亿参数模型的显存与带宽开销巨大，而此前的训练后量化方法要么在大模型上精度崩，要么算不动。 沿用的二阶信息思路，逐列量化权重并用近似逆Hessian把量化误差补偿到未量化的列，几小时内把175B模型压到3–4位。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/gptq.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="GPTQ训练后量化（2022）">
+<meta property="og:description" content="千亿参数模型的显存与带宽开销巨大，而此前的训练后量化方法要么在大模型上精度崩，要么算不动。 沿用的二阶信息思路，逐列量化权重并用近似逆Hessian把量化误差补偿到未量化的列，几小时内把175B模型压到3–4位。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/gptq.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/gptq">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 低比特量化</div>
+<h1>GPTQ训练后量化</h1>
+<div class="full">GPTQ: Accurate Post-Training Quantization for Generative Pre-trained Transformers</div>
+<div class="meta"><span>2022.10</span><span>论文</span><span>延伸</span><span>ICLR 2023</span><span>Elias Frantar, Saleh Ashkboos, Torsten Hoefler, Dan Alistarh · ISTA / ETH Zurich</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2210.17323" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/gptq">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>千亿参数模型的显存与带宽开销巨大，而此前的训练后量化方法要么在大模型上精度崩，要么算不动。</p></div><div><h4>方法</h4><p>沿用<a class="ln" href="../n/obs.html">最优脑外科OBS</a>的二阶信息思路，逐列量化权重并用近似逆Hessian把量化误差补偿到未量化的列，几小时内把175B模型压到3–4位。</p></div><div><h4>影响</h4><p>首个对千亿级语言模型做到3–4位几乎无损的训练后量化，成为后续开源量化工具的基础。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>对一层权重矩阵，按列依次量化：量化一列后，把产生的误差用该层输入的Hessian（<code>2XXᵀ</code>）的逆来更新还没量化的列，让整层输出尽量不变。GPTQ把OBS里每次选最优权重的昂贵做法，改成固定顺序、按块分批处理，并用Cholesky分解保证数值稳定，复杂度降到可处理上千亿参数。摘要称约4个GPU小时即可量化1750亿参数模型，3到4比特几乎无损，2比特或三值也能给出可用精度；定制内核在A100上端到端比FP16快约3.25倍，A6000上约4.5倍。<a class="ln" href="../n/llama-cpp.html">llama.cpp与本地推理</a>等本地推理项目都借鉴或支持GPTQ权重。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只量化权重，激活仍是高精度，且依赖一小批校准数据，可能在分布外任务上掉点。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/smoothquant.html">SmoothQuant</a></div></li><li>没有区分权重重要性，2比特以下误差仍大。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/awq.html">AWQ激活感知量化</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/integer-quant.html">量化感知训练与整数推理</a><span class="yr">2017.12 · 系统·效率</span><div class=nt>需要用完整训练数据做量化感知训练，模型很大或训练数据拿不到时代价过高。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/llm-int8.html">LLM.int8()与离群特征</a><span class="yr">2022.08 · 系统·效率</span><div class=nt>8位只能把显存减半，175B模型仍要约175GB；更激进的4位、3位量化在这种方法下会严重掉点。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/obs.html">最优脑外科OBS</a><span class="yr">1992.11 · 系统·效率</span><div class=nt>把OBS的二阶补偿思路改造成可扩展到千亿参数的逐列量化。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/deep-compression.html">剪枝与量化压缩</a><span class="yr">2015.10 · 系统·效率</span><div class=nt>后者做剪枝、量化和编码压缩的训练流程，GPTQ免训练、只做训练后量化。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/qlora.html">QLoRA</a><span class="yr">2023.05 · 系统·效率</span> <span class="vk ok">已核对</span><div class=nt>GPTQ的4位量化只用于推理；QLoRA让梯度穿过4位权重完成训练。论文在局限一节推测，3比特GPTQ量化的基座加LoRA也可能恢复16位微调的效果，但没有验证。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:72" href="../n/rtx-4090.html">RTX 4090与本地大模型</a><span class="yr">2022.10 · 硬件</span><div class=nt>GPTQ等4位量化方法让几十亿到三百多亿参数的模型能放进24GB显存，4090才成为本地大模型硬件。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/llama-cpp.html">llama.cpp与本地推理</a><span class="yr">2023.03 · 系统·效率</span><div class=nt>GPTQ用二阶信息做精细的4位量化但依赖GPU；llama.cpp用更简单的分块取整量化，换来在CPU和各种设备上都能跑，两者后来互相借鉴。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/smoothquant.html">SmoothQuant</a><span class="yr">2022.11 · 系统·效率</span><div class=nt>只量化权重，激活仍是高精度，且依赖一小批校准数据，可能在分布外任务上掉点。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/sparsegpt.html">SparseGPT一次性剪枝</a><span class="yr">2023.01 · 系统·效率</span><div class=nt>沿用其逐列近似二阶更新，把量化换成剪枝。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/awq.html">AWQ激活感知量化</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>同为4位权重量化：GPTQ靠逐列误差补偿，AWQ靠按激活保护重要通道，不需要重建。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/bitnet.html">1.58比特模型BitNet</a><span class="yr">2024.02 · 系统·效率</span><div class=nt>GPTQ在训练后把已有模型压到低位，BitNet从训练起就用三值权重，路线不同，但都为降低推理成本。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/quarot.html">QuaRot旋转量化</a><span class="yr">2024.03 · 系统·效率</span><div class=nt>旋转后的权重仍用GPTQ做训练后量化。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/quantization-concept.html">量化</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/covariance.html">协方差矩阵</a></p>
+
+<h2>怎么学</h2><p>先读<a class="lc" href="../c/quantization-concept.html">量化</a>，然后读论文算法一节；动手：用AutoGPTQ或llama.cpp工具量化一个小模型并比较困惑度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2210.17323" rel="noopener">https://arxiv.org/abs/2210.17323</a>（标题、4位作者、v1于2022-10-31；约4个GPU小时、175B、3/4比特、A100约3.25倍、A6000约4.5倍。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20GPTQ%E8%AE%AD%E7%BB%83%E5%90%8E%E9%87%8F%E5%8C%96%EF%BC%88gptq%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Agptq%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/gptq.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="tome.html"><small>本分支上一个 · 2022.10</small><b>Token Merging</b></a><a class="r" href="smoothquant.html"><small>本分支下一个 · 2022.11</small><b>SmoothQuant</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

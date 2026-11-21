@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mooncake以KV缓存为中心（2024） · AI脉络</title>
+<meta name="description" content="把预填充和解码分开后，长上下文和多轮对话里大量请求其实有重复前缀，每次重算预填充非常浪费，而GPU显存放不下这么多KV缓存。 把KV缓存当作一等公民：预填充与解码集群分离，同时用GPU集群里闲置的CPU内存、DRAM和SSD搭一个分布式KV缓存池，调度器以缓存命中为中心做决策。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/mooncake.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Mooncake以KV缓存为中心（2024）">
+<meta property="og:description" content="把预填充和解码分开后，长上下文和多轮对话里大量请求其实有重复前缀，每次重算预填充非常浪费，而GPU显存放不下这么多KV缓存。 把KV缓存当作一等公民：预填充与解码集群分离，同时用GPU集群里闲置的CPU内存、DRAM和SSD搭一个分布式KV缓存池，调度器以缓存命中为中心做决策。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/mooncake.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/mooncake">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 推理服务引擎</div>
+<h1>Mooncake以KV缓存为中心</h1>
+<div class="full">Mooncake: A KVCache-centric Disaggregated Architecture for LLM Serving</div>
+<div class="meta"><span>2024.06</span><span>论文</span><span>延伸</span><span>FAST 2025</span><span>Qin, Li, He, Zhang, Wu, Zheng, Xu et al. · 月之暗面(Moonshot AI), 清华大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2407.00079" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/mooncake">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/distserve.html">预填充-解码分离部署</a>把预填充和解码分开后，长上下文和多轮对话里大量请求其实有重复前缀，每次重算预填充非常浪费，而GPU显存放不下这么多KV缓存。</p></div><div><h4>方法</h4><p>把KV缓存当作一等公民：预填充与解码集群分离，同时用GPU集群里闲置的CPU内存、DRAM和SSD搭一个分布式KV缓存池，调度器以缓存命中为中心做决策。</p></div><div><h4>影响</h4><p>这是Kimi在线服务的真实架构，把前缀缓存和分离式部署结合起来，影响了后来的KV缓存池方案。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>Mooncake是Kimi的服务平台。架构上分三层：预填充集群、解码集群，以及利用GPU机器闲置CPU/DRAM/SSD组成的KV缓存池，缓存之间通过高速网络传输。核心是以KV缓存为中心的调度器：新请求来时，先看哪些节点缓存了它的前缀，再在命中率和延迟目标（SLO）之间权衡，把请求调到合适的预填充节点。</p><p>论文还关注过载场景，提出基于预测的提前拒绝策略：预判一个请求最终会超时就直接拒绝，避免白白占用资源。</p><h2>结果</h2><p>摘要称在某些模拟场景下，相比基线吞吐最高提升525%且满足SLO；在真实负载下，Kimi可多处理75%的请求。</p><h2>后来的发展</h2><p>此后相关思想进入通用推理框架，如<a class="ln" href="../n/nvidia-dynamo.html">NVIDIA Dynamo</a>中的KV感知路由和分级缓存。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>缓存池依赖RDMA等高速网络，网络条件差时命中收益被传输抵消。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>缓存命中率取决于负载的前缀重复度，对前缀分散的请求提升有限。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/nvidia-dynamo.html">NVIDIA Dynamo</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/sglang.html">SGLang与RadixAttention</a><span class="yr">2023.12 · 系统·效率</span><div class=nt>基数树缓存只存在于单个推理实例的显存里，多机多副本之间无法共享，请求被路由到别的副本就不能命中。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/distserve.html">预填充-解码分离部署</a><span class="yr">2024.01 · 系统·效率</span><div class=nt>在预填充-解码分离的基础上，加入全局KV缓存池和以缓存为中心的调度。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/nvidia-dynamo.html">NVIDIA Dynamo</a><span class="yr">2025.03 · 系统·效率</span><div class=nt>借鉴以KV缓存为中心的路由与分级存储思路。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/lmcache.html">LMCache KV缓存层</a><span class="yr">2025.10 · 系统·效率</span><div class=nt>都以KV缓存为中心设计推理系统；Mooncake是Kimi的内部架构，LMCache是可插入开源引擎的独立层，且支持把Mooncake存储作为后端。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/interconnect.html">互连：从芯片到机柜到集群</a> <a class="chip c" href="../c/context-window.html">上下文窗口</a></p>
+<h2>本篇术语</h2><ul><li><b>SLO</b>　服务等级目标，如首词延迟不超过多少毫秒。</li></ul>
+<h2>怎么学</h2><p>先读DistServe和vLLM → 读Mooncake第4节调度器 → 看开源的Mooncake Transfer Engine项目。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2407.00079" rel="noopener">https://arxiv.org/abs/2407.00079</a>（标题、作者、2024-06-24；摘要的KVCache-centric、525%吞吐、Kimi多处理75%请求。FAST 2025按已知信息，未核对。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Mooncake%E4%BB%A5KV%E7%BC%93%E5%AD%98%E4%B8%BA%E4%B8%AD%E5%BF%83%EF%BC%88mooncake%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amooncake%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/mooncake.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="api-price-war.html"><small>本分支上一个 · 2024.05</small><b>大模型API价格战</b></a><a class="r" href="apple-foundation-models.html"><small>本分支下一个 · 2024.06</small><b>Apple端侧基础模型</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -9,11 +9,11 @@
   ],
   "problem": "2016年的框架要么易用、要么快：TensorFlow、Theano的静态图快但难调试、难写动态模型；Chainer灵活但性能一般；Torch快但要写Lua，进不了Python生态。",
   "idea": "让深度学习程序就是普通Python程序：张量运算立即执行，自动微分在运行时记录计算再反向求导；性能靠C++核心、GPU异步执行、缓存显存分配器和引用计数等工程细节补回来。",
-  "impact": "几年内成为学术界的主流框架，此后大量开源模型和代码库（如Hugging Face Transformers）以它为默认实现，成为今天大模型研究最常用的工具。",
+  "impact": "在研究界的使用比例快速上升（论文统计ICLR 2019有296篇投稿提到它），此后大量开源模型和代码库（如Hugging Face Transformers）以它为主要实现。",
   "background": "到2016年，深度学习框架分成两派。**静态图派**（[[theano]]、[[tensorflow]]）先构造计算图再执行，便于整体优化和部署，但程序里看不到真实数值，带分支、循环的模型要用专门的控制流算子，调试困难。**命令式派**中，[[chainer]]首创define-by-run，代码就是Python，但性能不如静态图框架；[[torch7]]有成熟高效的C/CUDA张量库，却要用Lua编写，与[[numpy]]、scikit-learn所在的Python科学计算生态隔绝。\n\n同时，研究的模型越来越动态：变长序列的循环网络、树形网络、强化学习里的交互循环。论文开篇指出的矛盾是：已有框架在易用性和速度之间只能二选一。",
   "method": "论文把设计原则概括为：研究者优先，**宁可牺牲10%的速度换取简单得多的模型，但不能牺牲100%**。\n\n**一切皆Python**。层、模型、优化器、数据加载器都是普通的Python类。论文的例子：\n\n`class LinearLayer(Module):`\n`  def forward(self, activations):`\n`    t = torch.mm(activations, self.w)`\n`    return t + self.b`\n\n前向就是一个方法，可以用if、for、递归，可以下断点打印任意中间张量；张量与NumPy数组可以通过`torch.from_numpy()`零拷贝互转。\n\n**运行时自动微分**。采用运算符重载：每次执行一个可微运算，就在后台记录它的输入、输出和反向函数，形成一张只用于反向的图；`loss.backward()`时对它做反向模式自动微分（[[ad-reverse-mode]]），然后`optimizer.step()`更新参数。这一方式来自[[chainer]]、[[autograd-hips]]的思路。用户可以继承`torch.autograd.Function`自定义前向和反向。\n\n**把性能做回来**：\n\n- **C++核心**：张量、GPU与CPU算子、自动微分引擎都在C++库libtorch里实现，反向传播在多线程中执行、不占用Python全局解释器锁；卷积、矩阵乘法调用[[cudnn]]和cuBLAS。\n- **控制流与数据流分离**：Python只负责决定“下一个算哪个算子”，算子通过CUDA流异步排队到GPU上执行。CPU上解释Python的时间与GPU上的计算重叠，只要每个算子足够大，GPU就能被跑满。\n- **缓存显存分配器**：`cudaFree`可能阻塞到所有GPU任务完成，于是PyTorch自己缓存已申请的显存并复用，分配尺寸向上取整到512字节以减少碎片。论文对ResNet-50的追踪显示，第一轮迭代因调用`cudaMalloc/cudaFree`明显变慢，之后分配器开始复用，开销消失。\n- **引用计数**：张量一旦不再被引用立即释放显存，而不是等垃圾回收——论文特别提到Torch7依赖Lua的垃圾回收，用户常需手动触发回收。\n- **多进程**：`torch.multiprocessing`把发往子进程的张量放入共享内存，方便实现多GPU数据并行和[[hogwild]]式训练。",
   "results": "论文在单机上用32位浮点比较了训练吞吐：PyTorch在所有基准上与最快框架的差距都在17%以内。例如ResNet-50每秒212张图（Chainer 219、MXNet 218、TensorFlow 200），GNMTv2翻译模型每秒15512个token（TensorFlow 9631）。作者把性能接近归因于各框架都调用同一版本的cuDNN和cuBLAS。采用情况方面，论文称ICLR 2019有296篇投稿提到PyTorch，并统计了自2017年1月首次发布以来arXiv论文中提及PyTorch的比例持续上升。",
-  "legacy": "PyTorch很快成为研究界首选：[[hf-transformers]]以它为主要后端，[[lightning]]、[[fastai]]、[[timm]]、[[detectron2]]等生态建立在它之上，[[nanogpt]]等教学代码也用它写成。它的路线反过来影响了对手：[[tf2]]在2019年改为默认eager执行。\n\n后续版本补上了原设计的短板：[[pytorch-1]]用TorchScript让模型脱离Python部署，[[fsdp]]与[[torchtitan]]提供大模型分布式训练，[[pytorch-2]]的`torch.compile`在保持eager写法的同时捕获计算图、生成融合内核（借助[[triton-lang]]）。2022年PyTorch转入Linux基金会旗下独立管理。另一条路线[[jax]]以函数式变换加整图编译与它竞争，在部分大模型训练中使用。",
+  "legacy": "PyTorch之后在研究界被广泛使用：[[hf-transformers]]以它为主要后端，[[lightning]]、[[fastai]]、[[timm]]、[[detectron2]]等生态建立在它之上，[[nanogpt]]等教学代码也用它写成。2019年的[[tf2]]也把eager执行设为默认。\n\n后续版本补上了原设计的短板：[[pytorch-1]]用TorchScript让模型脱离Python部署，[[fsdp]]与[[torchtitan]]提供大模型分布式训练，[[pytorch-2]]的`torch.compile`在保持eager写法的同时捕获计算图、生成融合内核（借助[[triton-lang]]）。2022年9月Meta宣布PyTorch改由Linux基金会旗下独立的PyTorch基金会管理。另一条路线[[jax]]以函数式变换加整图编译与它竞争，在部分大模型训练中使用。",
   "pitfalls": "- 动态图不等于没有图：反向传播用的图在每次前向时重新构建，用完即释放，所以每个iteration的结构都可以不同。\n- 因为GPU异步执行，用Python的`time.time()`直接测一个算子的耗时往往只测到排队时间，需要先`torch.cuda.synchronize()`。\n- 梯度默认是累加的，每步训练前要`optimizer.zero_grad()`，否则梯度会叠加到上一步上。",
   "limits": [
     {"text": "逐个算子由Python调度执行，小算子多时解释器开销明显，也无法像静态图那样跨算子融合优化。", "solved_by": ["pytorch-2", "jax"]},
@@ -24,9 +24,9 @@
   "relations": [
     {"to": "torch7", "type": "extends", "note": "继承Torch7的张量库与模块化设计，把前端从Lua换成Python，并用引用计数替代Lua垃圾回收管理显存。"},
     {"to": "chainer", "type": "extends", "note": "沿用Chainer首创的define-by-run动态图和面向对象模型写法，论文明确称这一设计由Chainer和DyNet开创。"},
-    {"to": "autograd-hips", "type": "uses", "note": "运行时记录运算再反向求导的自动微分方式，借鉴了把这一技术带到NumPy数组上的autograd。"},
-    {"to": "theano", "type": "solves", "note": "解决静态图框架难调试、难写动态控制流的问题，同时用工程优化使速度不落下风。"},
-    {"to": "tensorflow", "type": "rivals", "note": "同一时期的主要竞争者：TensorFlow主打静态图与部署，PyTorch主打命令式易用；PyTorch在研究界胜出，TF 2随后转向eager。"},
+    {"to": "autograd-hips", "type": "extends", "note": "论文在背景中写到，autograd包让“运行时记录运算再反向求导”的技术在NumPy数组上流行起来；PyTorch采用了同一类运算符重载式自动微分。论文没有说直接使用了它的代码。"},
+    {"to": "theano", "type": "solves", "note": "针对静态图框架（论文以Theano等为例）难用、难调试、可表达的计算类型受限的问题，用即时执行改善了易用性，同时靠工程优化让速度保持在最快框架的17%以内。"},
+    {"to": "tensorflow", "type": "rivals", "note": "同一时期的主要竞争者：TensorFlow主打静态图与部署，PyTorch主打命令式易用；论文的单机测试中ResNet-50为212对200张/秒，GNMTv2为15512对9631个token/秒。"},
     {"to": "numpy", "type": "uses", "note": "张量接口与NumPy相近，并可与NumPy数组零拷贝互转，融入Python科学计算生态。"},
     {"to": "cudnn", "type": "uses", "note": "卷积等关键算子调用cuDNN和cuBLAS，这也是各框架单机性能接近的原因。"},
     {"to": "hogwild", "type": "uses", "note": "torch.multiprocessing透明地共享CUDA张量，使Hogwild!式的无锁异步训练很容易实现。"}

@@ -6,29 +6,29 @@
     {"label": "项目主页", "url": "https://openvla.github.io"},
     {"label": "GitHub", "url": "https://github.com/openvla/openvla"}
   ],
-  "problem": "RT-2证明了VLA路线可行，但模型闭源、55B参数，别人既不能复现也不能在自己的机器人上微调；开源的通用策略又都很小，没有继承大模型的语义知识。",
+  "problem": "RT-2显示了VLA路线可行，但模型闭源、55B参数，别人既不能复现也不能在自己的机器人上微调；开源的通用策略又都很小，没有继承大模型的语义知识。",
   "idea": "在开源的7B视觉-语言模型（Llama 2加DINOv2与SigLIP双视觉编码器）上，按RT-2的做法把动作离散成token，用Open X中97万条真机示范训练，并全部开源权重、代码和微调方法。",
-  "impact": "第一个被广泛使用的开源VLA：以七分之一的参数量超过RT-2-X，并证明用LoRA在单张消费级GPU上就能微调、4bit量化部署不掉点，成为之后VLA研究的标准基线。",
+  "impact": "开源7B VLA：参数约为RT-2-X的七分之一，29个任务上成功率高16.5个百分点；LoRA微调可在消费级GPU上进行，4bit量化后成功率不降。之后常被用作VLA对照基线。",
   "background": "[[rt-2]]把机器人动作写成文字token，让大视觉-语言模型直接输出动作，网络知识得以迁移到机器人控制上；[[open-x]]里的RT-2-X进一步用多机器人数据训练。但这些模型都没有开源，参数量高达55B，学术界无法使用。\n\n开源一侧，[[octo]]等通用策略只有几千万到上亿参数，视觉和语言编码器是小模型或从头训练，对没见过的物体和指令泛化有限。另外，此前没有人系统研究过VLA怎样高效微调到新机器人——而这恰恰是实际使用时最需要的。",
   "method": "**骨干**：基于Prismatic-7B视觉-语言模型：视觉部分约6亿参数，把[[dinov2]]（擅长空间几何细节）和[[siglip]]（擅长语义）两个编码器的特征按通道拼接；经两层MLP投影后送入7B的[[llama-2]]语言模型。输入是一张224×224的图像加一句语言指令。\n\n**动作token化**：沿用RT-2，把7维动作的每一维单独均匀切成256个区间，区间范围取训练数据的第1到第99百分位数（避免离群值把区间撑得太宽）。Llama分词器只预留了100个特殊token，不够用，于是直接覆盖词表里最少使用的256个token作为动作token。训练目标就是普通的下一个token预测，只对动作token计算损失。\n\n**数据与训练**：从Open X中筛选出97万条单臂、带第三视角相机的轨迹，并调整各子集权重。与语言模型只训1–2轮不同，它训练了27轮，直到动作token准确率超过95%；在64块A100上训练14天，共21,500 A100小时。\n\n**微调**：用[[lora]]只训练1.4%的参数，单张A100上10–15小时即可适配新任务。",
   "results": "在WidowX（BridgeData V2任务）和谷歌机器人上的29个任务中，开箱即用的OpenVLA绝对成功率比RT-2-X（55B）高16.5个百分点，参数量少7倍。在Franka上用少量示范微调时，在多物体、需要理解语言的任务上明显优于微调后的Octo和从头训练的[[diffusion-policy]]（平均高20.4个百分点）；但在动作单一、要求精细平滑的任务上Diffusion Policy仍更好。LoRA微调与全参数微调效果相当；4bit量化后显存从16.8GB降到7.0GB，成功率不降。在LIBERO四个子集上微调后平均成功率76.5%，略高于Octo（75.1%）和Diffusion Policy（72.4%）。推理在RTX 4090上约6Hz。",
-  "legacy": "OpenVLA成为VLA研究的默认起点和对照组。它暴露的问题直接引出了后续工作：逐维离散化又慢又不适合高频动作，催生了[[fast]]分词器；[[pi0]]改用流匹配动作专家输出连续动作块；[[openvla-oft]]用并行解码、动作块和连续动作回归，大幅提高了推理速度和LIBERO成绩；[[smolvla]]等则走小模型路线。",
+  "legacy": "之后不少VLA工作把OpenVLA当作起点或对照组。后续工作针对它的几个问题做了改进：[[fast]]指出逐维、逐步的分箱离散化在高频数据上表现差，改用基于离散余弦变换的压缩分词；[[pi0]]改用流匹配动作专家输出连续动作块；同一团队的[[openvla-oft]]以OpenVLA为基座，用并行解码、动作块和连续动作回归把LIBERO平均成功率从76.5%提到97.1%、动作生成吞吐量提高26倍；[[smolvla]]等则走小模型路线。",
   "pitfalls": "- OpenVLA输出的是单步动作，每一步都要自回归地生成7个token，所以慢；这不是Transformer本身的问题，而是动作表示的选择。\n- 它预训练只用了真机数据，没有像RT-2那样继续混合网络图文数据联合训练，部分语义能力可能在训练中被冲淡。",
   "limits": [
-    {"text": "只接受单张图像，不支持多相机、本体感知（关节状态）和历史观测。", "solved_by": ["openvla-oft", "pi0"]},
-    {"text": "逐维逐步自回归输出离散动作，推理只有约6Hz，无法用于50Hz的双臂灵巧操作。", "solved_by": ["pi0", "fast", "openvla-oft"]},
+    {"text": "只接受单张图像，不支持多相机、本体感知（关节状态）和历史观测。", "solved_by": ["openvla-oft", "pi0"], "stated": true},
+    {"text": "逐维逐步自回归输出离散动作，推理只有约6Hz，无法用于50Hz的双臂灵巧操作。", "solved_by": ["pi0", "fast", "openvla-oft"], "stated": true},
     {"text": "256档均匀离散化精度有限，在要求平滑精细轨迹的任务上不如Diffusion Policy。", "solved_by": ["pi0", "fast"]},
-    {"text": "测试任务上成功率通常低于90%，离实际部署要求的可靠性还远。", "solved_by": ["openvla-oft", "pi-star-0.6"]},
+    {"text": "测试任务上成功率通常低于90%，离实际部署要求的可靠性还远。", "solved_by": ["openvla-oft", "pi-star-0.6"], "stated": true},
     {"text": "只用机器人数据训练，没有与网络图文数据联合训练，VLM原有的语言和常识能力在训练中可能退化。", "solved_by": ["knowledge-insulation", "pi0.5"]}
   ],
   "relations": [
     {"to": "rt-2", "type": "solves", "note": "RT-2闭源且有55B参数；OpenVLA用7B开源模型复现了“动作即token”的路线，并在29个任务上超过RT-2-X。"},
     {"to": "open-x", "type": "uses", "note": "从Open X中筛选97万条轨迹作为训练数据，并重新调配各子集权重。"},
-    {"to": "dinov2", "type": "uses", "note": "DINOv2特征提供空间几何信息，与SigLIP拼接后显著改善空间推理。"},
+    {"to": "dinov2", "type": "uses", "note": "DINOv2特征提供空间几何信息，与SigLIP特征按通道拼接，作为视觉编码器的一半。"},
     {"to": "siglip", "type": "uses", "note": "SigLIP提供与语言对齐的语义特征，是视觉编码器的另一半。"},
     {"to": "llama-2", "type": "uses", "note": "7B的Llama 2作为语言骨干，并覆盖其词表中最少用的256个token作为动作token。"},
     {"to": "octo", "type": "rivals", "note": "同期开源通用策略；Octo小而灵活、从头训练，OpenVLA继承大VLM的语义能力，在多物体语言任务上微调效果更好。"},
-    {"to": "lora", "type": "uses", "note": "首次展示用LoRA微调VLA：只训1.4%的参数即可达到全参数微调的效果。"}
+    {"to": "lora", "type": "uses", "note": "论文称是首次展示用LoRA这类低秩适配方法高效微调VLA：只训1.4%的参数，效果与全参数微调相当。"}
   ],
   "prereq": ["vla-concept", "tokenization", "autoregressive", "pretrain-finetune", "peft-concept", "quantization-concept", "imitation-learning"],
   "terms": [

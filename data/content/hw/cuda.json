@@ -6,15 +6,15 @@
     {"label": "NVIDIA新闻稿（2006-11-08，存档）", "url": "https://web.archive.org/web/20080125045805/http://www.nvidia.com:80/object/IO_37226.html"},
     {"label": "NVIDIA新闻稿：CUDA SDK公开测试版（2007-02-16，存档）", "url": "https://web.archive.org/web/20070329144655/http://www.nvidia.com/object/IO_39918.html"},
     {"label": "Nickolls等：Scalable Parallel Programming with CUDA（ACM Queue 2008）", "url": "https://doi.org/10.1145/1365490.1365500"},
-    {"label": "CUDA C++ Programming Guide", "url": "https://docs.nvidia.com/cuda/cuda-c-programming-guide/"}
+    {"label": "CUDA Programming Guide", "url": "https://docs.nvidia.com/cuda/cuda-programming-guide/"}
   ],
   "problem": "GPU已有数百GFLOPS的算力，但要用它做通用计算，只能通过OpenGL/DirectX把数据伪装成纹理、把算法写成像素着色器，线程间不能通信，普通程序员用不了。",
   "idea": "给GPU配一套C语言扩展和编译器：程序员写一个“对单个元素做什么”的内核函数，按网格—线程块—线程三级结构一次启动成千上万个线程，块内线程可以共享片上内存并同步。",
-  "impact": "GPU从图形卡变成通用并行计算机。2009–2012年深度学习正是靠CUDA在GPU上提速几十倍才训得动大网络，此后几乎所有深度学习框架都建在CUDA之上，它也成了NVIDIA最难被替代的优势。",
+  "impact": "GPU从图形卡变成通用并行计算机。2009–2012年的几项深度学习工作用CUDA在GPU上获得几十倍提速，训练了当时少见的大网络；此后主流深度学习框架的GPU后端都以CUDA为主，它也常被认为是NVIDIA最难被替代的优势。",
   "background": "[[dennard-end]]以后，CPU单核不再自动变快，额外的晶体管只能变成更多并行单元。GPU天然就是这样的芯片：[[geforce-256]]起GPU承担几何计算，[[geforce3]]让着色器可以编程，算力很快超过CPU。\n\n但这时的“GPGPU”（用GPU做通用计算）非常别扭。想算两个数组相加，要把数组存成纹理图片，画一个覆盖整个屏幕的矩形，让像素着色器对每个像素读两张纹理、写出结果。每个着色器程序只能写自己那个像素，不能随意写内存的其他位置，线程之间也无法交换中间结果。斯坦福的[[brook-gpu]]用“流”和“内核”的抽象把图形细节藏了起来，但底下仍要翻译成图形API，受着色器的种种限制。\n\nBrook的作者Ian Buck 2004年加入NVIDIA，与负责GPU计算架构的John Nickolls一起把这套思路改造成CUDA，并且和同时设计的[[g80]]芯片一起做：硬件直接支持通用线程、共享内存和同步，不再经过图形管线。",
   "method": "**内核与线程编号**。CUDA是C的一组扩展。程序员用 `__global__` 声明一个内核函数，描述**一个线程**要做的事，再用 `kernel<<<网格大小, 块大小>>>(参数)` 一次启动大量线程。每个线程用内置变量算出自己负责哪一个元素：\n\n`i = blockIdx.x × blockDim.x + threadIdx.x`\n\n例如两个长度为100万的数组相加，每块256个线程、共3907块，每个线程只做 `c[i] = a[i] + b[i]` 一件事。\n\n**三级层次**。线程组成**线程块**，线程块组成**网格**。同一块内的线程运行在同一个SM（流多处理器）上，可以读写一块很快的**共享内存**（G80上每个SM 16KB），并用 `__syncthreads()` 屏障同步；不同块之间互不依赖，可以按任意顺序执行。正因为块彼此独立，同一个程序放到SM多或少的GPU上都能运行，SM越多跑得越快，这就是CUDA所说的“可扩展”。\n\n**硬件如何执行**。SM把线程按32个一组（warp）调度，同一warp执行同一条指令、处理不同数据，NVIDIA称之为SIMT（单指令多线程）。某个warp在等显存时，SM立即换另一个warp执行，所以一个SM上同时驻留几百个线程（计算能力1.0最多768个）来掩盖显存延迟。\n\n**内存层次**。寄存器（每线程私有）→ 共享内存（块内共享，片上）→ 全局显存（所有线程可见，容量大但慢）→ 主机内存（要用 `cudaMemcpy` 经PCIe显式拷贝）。写快程序的关键是减少对全局显存的访问。以矩阵乘为例：每个线程块把A、B各一个16×16的小块读进共享内存，块内每个数被重复使用16次，全局显存的读取量大约降到原来的1/16——这就是后来[[roofline]]模型里“提高运算强度”的具体做法。",
-  "results": "NVIDIA在2006年11月8日随[[g80]]（GeForce 8800）发布CUDA，称其为“第一个面向GPU的C编译器开发环境”，宣称一些问题可以比传统方法快到100倍（官方称）。2007年2月16日，开发包和C编译器以公开测试版提供给所有开发者，支持Windows XP和Linux。\n\n对AI最关键的数字来自后来的研究者：2009年[[gpu-dl-2009]]用CUDA在一块GTX 280上训练深度信念网络，比双核CPU快最多70倍，一个1亿参数的四层网络从几周缩短到一天左右；2012年[[alexnet]]用两块[[gtx-580]]、自己写的CUDA卷积代码，在5到6天内训完6000万参数的网络并赢下ImageNet比赛。据多家媒体2026年11月报道，NVIDIA在CUDA二十周年时称其开发者约1100万。",
-  "legacy": "CUDA之上很快长出一层层软件：2014年的[[cudnn]]把卷积等神经网络算子封装成库，[[caffe]]、[[theano]]、[[tensorflow]]、[[pytorch]]都通过它调用GPU；[[cutlass]]提供可组合的矩阵乘模板；[[triton-lang]]让研究者用Python写出接近手写CUDA性能的内核；[[flashattention]]则是“用共享内存分块减少显存读写”这一CUDA基本功在注意力上的应用。2025年NVIDIA又推出了以分块为单位编程的[[cuda-tile]]。\n\n硬件也围绕这套模型演进：[[tesla-gpu]]把GPU卖进超算和数据中心，[[v100]]加入专做矩阵乘的Tensor Core，[[nvlink]]和[[hbm]]补上了多卡通信和显存带宽。竞争者推出了AMD的ROCm（[[amd-instinct]]）、谷歌的[[tpu]]加[[xla]]，但大量现成代码、库和开发者经验都建立在CUDA上，这种积累是NVIDIA在AI芯片上长期领先的主要原因之一。",
+  "results": "NVIDIA在2006年11月8日发布CUDA，首发于搭载[[g80]]的GeForce 8800，称其为“业界第一个面向GPU的C编译器开发环境”，宣称一些问题可以比传统方法快到100倍（官方称）。2007年2月16日，开发包和C编译器以公开测试版提供给所有开发者，支持Windows XP和Linux。\n\n对AI最关键的数字来自后来的研究者：2009年[[gpu-dl-2009]]基于CUDA编程模型在一块GTX 280上训练深度信念网络，大模型上比双核CPU实现快最多70倍，一个1亿参数的四层网络从几周缩短到一天左右；2012年[[alexnet]]用两块[[gtx-580]]和自己写的GPU卷积代码（cuda-convnet），在5到6天内训完6000万参数的网络，在ILSVRC-2012上取得第一。2026年11月在SC26上纪念CUDA二十周年时，NVIDIA称有超过1100万开发者基于CUDA开发（据IT Brief Asia、Jon Peddie Research报道）。",
+  "legacy": "CUDA之上很快长出一层层软件：2014年的[[cudnn]]把卷积等神经网络算子封装成库，[[caffe]]、[[theano]]、[[tensorflow]]、[[pytorch]]都通过它调用GPU；[[cutlass]]提供可组合的矩阵乘模板；[[triton-lang]]让研究者用Python写出接近手写CUDA性能的内核；[[flashattention]]则是“用共享内存分块减少显存读写”这一CUDA基本功在注意力上的应用。2025年NVIDIA又推出了以分块为单位编程的[[cuda-tile]]。\n\n硬件也围绕这套模型演进：[[tesla-gpu]]把GPU卖进超算和数据中心，[[v100]]加入专做矩阵乘的Tensor Core，[[nvlink]]和[[hbm]]补上了多卡通信和显存带宽。竞争者推出了AMD的ROCm（[[amd-instinct]]）、谷歌的[[tpu]]加[[xla]]，但大量现成代码、库和开发者经验都建立在CUDA上，这种积累常被认为是NVIDIA在AI芯片上长期领先的主要原因之一。",
   "pitfalls": "- CUDA不只是一种语言，而是一整套平台：编译器、驱动、运行时、数学库和调试工具。\n- “CUDA核心”是NVIDIA对GPU里标量运算单元的营销叫法，它不能像CPU核心那样独立运行不同的程序。\n- GPU只对能拆成大量相同小任务的计算有优势；分支多、前后强依赖的串行代码放到GPU上反而更慢，还要付出PCIe拷贝的代价。",
   "limits": [
     {"text": "只能运行在NVIDIA的GPU上，代码与厂商深度绑定；其他厂商的硬件需要另起一套生态。", "solved_by": ["amd-instinct", "triton-lang", "mlir"]},
@@ -27,8 +27,7 @@
     {"to": "brook-gpu", "type": "solves", "note": "保留Brook的“内核作用于大量数据”思路，但不再翻译成图形着色器，去掉了不能随意写内存、线程不能通信的限制。"},
     {"to": "geforce3", "type": "solves", "note": "GeForce 3之后的GPGPU要把数据伪装成纹理、把计算写成着色器；CUDA让程序员直接用C写通用程序。"},
     {"to": "geforce-256", "type": "extends", "note": "GeForce 256开始把计算从CPU搬到GPU，CUDA把这条路推广到图形之外的任意数据并行计算。"},
-    {"to": "dennard-end", "type": "solves", "note": "单核不再变快后，软件必须写成大规模并行才能提速；CUDA给出了一个能让普通程序员写出上万线程程序的模型。"},
-    {"to": "memory-wall", "type": "extends", "note": "共享内存是由程序显式管理的片上高速存储，正是Wulf和McKee文中设想的缓解内存墙的办法之一。"}
+    {"to": "dennard-end", "type": "solves", "note": "单核不再变快后，软件必须写成大规模并行才能提速；CUDA给出了一个让普通程序员用C写出成千上万线程程序的模型。NVIDIA的发布材料没有直接把CUDA和登纳德缩放终结联系起来，这是事后的归纳。"}
   ],
   "prereq": ["cpu-gpu", "memory-bandwidth", "matrix-multiplication", "throughput-latency", "floating-point"],
   "terms": [
@@ -38,5 +37,5 @@
     {"t": "SIMT", "d": "单指令多线程：32个线程组成一个warp，同一时刻执行同一条指令、处理各自的数据；如果线程走了不同的分支，硬件要把两条分支依次执行。"}
   ],
   "learn": "先读[[c:cpu-gpu]]和[[c:memory-bandwidth]]，再读[[g80]]了解硬件。然后读CUDA C++ Programming Guide的“Programming Model”一章，弄清网格、线程块、线程和三类内存。动手：先写一个向量加法内核并与CPU版本比时间（注意把拷贝时间单独计入），再写矩阵乘的朴素版和共享内存分块版，用不同矩阵大小测速，最后对照[[roofline]]解释两者为什么差那么多。没有NVIDIA显卡可以用Google Colab的免费GPU。",
-  "check": {"source": "https://web.archive.org/web/20080125045805/http://www.nvidia.com:80/object/IO_37226.html", "confirmed": "NVIDIA 2006-11-08新闻稿：发布CUDA与“业界首个GPU C编译器开发环境”、“up to 100 times faster”、GeForce 8800上可用、Parallel Data Cache让128个1.35GHz核心协作。2007-02-16新闻稿（https://web.archive.org/web/20070329144655/http://www.nvidia.com/object/IO_39918.html）：SDK与C编译器公开测试版，Windows XP与Linux。维基百科CUDA页：原作者Ian Buck与John Nickolls、Buck 2004年加入NVIDIA把Brook改造成CUDA；规格表计算能力1.0每块最多512线程、warp 32、每SM 768线程、16KB共享内存。70倍、1亿参数见ICML 2009原文；5–6天、两块GTX 580、6000万参数见AlexNet NIPS 2012原文。1100万开发者来自Google News检索到的2026年11月IT Brief Asia、Forbes、Jon Peddie Research报道标题，原文未打开。"}
+  "check": {"source": "https://web.archive.org/web/20080125045805/http://www.nvidia.com:80/object/IO_37226.html", "confirmed": "NVIDIA 2006-11-08新闻稿：发布CUDA与“业界首个GPU C编译器开发环境”、“up to 100 times faster”、GeForce 8800上可用、Parallel Data Cache让128个1.35GHz核心协作。2007-02-16新闻稿（https://web.archive.org/web/20070329144655/http://www.nvidia.com/object/IO_39918.html）：SDK与C编译器公开测试版，Windows XP与Linux。维基百科CUDA页：原作者Ian Buck与John Nickolls、Buck 2004年加入NVIDIA把Brook改造成CUDA；规格表计算能力1.0每块最多512线程、warp 32、每SM 768线程、16KB共享内存。70倍、1亿参数见ICML 2009原文；5–6天、两块GTX 580、6000万参数见AlexNet NIPS 2012原文。“超过1100万开发者”见2026年11月IT Brief Asia与Jon Peddie Research报道正文（SC26纪念CUDA二十周年）。"}
 }

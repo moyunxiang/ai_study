@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Highway网络（2015） · AI脉络</title>
+<meta name="description" content="网络越深越难训：即便用了方差保持的初始化，几十层的普通网络用SGD也训不下去，只能靠分阶段训练或在中间层加辅助损失。 借用LSTM的门：每层输出 = 变换后的结果×门T + 原输入×(1−T)。门关上时这一层就是恒等映射，信息和梯度可以沿“高速公路”无衰减地穿过很多层。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/highway.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Highway网络（2015）">
+<meta property="og:description" content="网络越深越难训：即便用了方差保持的初始化，几十层的普通网络用SGD也训不下去，只能靠分阶段训练或在中间层加辅助损失。 借用LSTM的门：每层输出 = 变换后的结果×门T + 原输入×(1−T)。门关上时这一层就是恒等映射，信息和梯度可以沿“高速公路”无衰减地穿过很多层。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/highway.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/highway">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 深层训练配方</div>
+<h1>Highway网络</h1>
+<div class="full">Highway Networks</div>
+<div class="meta"><span>2015.05</span><span>论文</span><span>重要</span><span>ICML 2015 Deep Learning Workshop；完整版NIPS 2015</span><span>Rupesh Kumar Srivastava, Klaus Greff, Jürgen Schmidhuber · IDSIA</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1505.00387" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://arxiv.org/abs/1507.06228" rel="noopener">完整版 Training Very Deep Networks ↗</a><a class="btn sm" href="../index.html#/n/highway">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>网络越深越难训：即便用了方差保持的初始化，几十层的普通网络用SGD也训不下去，只能靠分阶段训练或在中间层加辅助损失。</p></div><div><h4>方法</h4><p>借用LSTM的门：每层输出 = 变换后的结果×门T + 原输入×(1−T)。门关上时这一层就是恒等映射，信息和梯度可以沿“高速公路”无衰减地穿过很多层。</p></div><div><h4>影响</h4><p>第一次用普通SGD直接训练上百层的前馈网络。半年后ResNet把门去掉、只留恒等捷径，成为深度网络的标准结构。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>到2015年，ImageNet上的进步大多来自更深的网络（<a class="ln" href="../n/vgg.html">VGG</a>、<a class="ln" href="../n/googlenet.html">GoogLeNet / Inception</a>），理论上深网络也能比浅网络更高效地表示某些函数。但多加几层并不简单：普通网络超过一二十层后，训练误差本身就降不下去。当时的对策都很曲折——专门的初始化（<a class="ln" href="../n/glorot-init.html">Xavier初始化</a>、<a class="ln" href="../n/he-init.html">He初始化与PReLU</a>），先训浅网络再加深，或者像GoogLeNet那样在中间层挂辅助分类器、像FitNets那样用老师网络的中间输出做提示。作者注意到，循环网络里同样的问题早已由<a class="ln" href="../n/lstm.html">LSTM</a>的门控解决：门控让信息沿时间几乎无衰减地传很远（见<a class="ln" href="../n/vanishing-gradient.html">梯度消失问题</a>）。</p><h2>方法</h2><p>普通层是<code>y = H(x)</code>。Highway层多一个“变换门”<code>T(x) = σ(W_T·x + b_T)</code>：</p><p class="formula"><code>y = H(x)·T(x) + x·(1 − T(x))</code></p><p>逐元素相乘。T接近0时<code>y ≈ x</code>，这一层直接把输入搬运过去，雅可比矩阵接近单位矩阵，梯度原样回传；T接近1时就是普通层。网络可以按样本、按单元自己决定每层“改多少、留多少”。论文一般形式里还有单独的携带门C，为简单起见取<code>C = 1 − T</code>。</p><p><b>关键的初始化</b>：把门的偏置<code>b_T</code>设成负数（如−1、−3），让网络在开始时偏向“搬运”，深层网络一开始就近似浅网络，梯度通畅；这一招直接借自LSTM遗忘门的偏置初始化。好处是它与H用什么激活、权重怎么初始化无关。</p><p>输入输出维度必须相同，需要改变维度时插入一个普通层。卷积版的H和T都是卷积。</p><h2>结果</h2><p>MNIST上比较10、20、50、100层：普通网络（用He初始化、各自随机搜索40组超参数）层数一多训练误差明显变差；Highway网络几乎不受深度影响，100层的最终训练误差比10层的好约一个数量级，作者还开始训练一个900层的网络且未见优化困难。CIFAR-10上，19层、约230万参数的Highway网络直接反向传播训练就达到92.24%，好于需要老师网络两阶段训练的FitNet（91.61%）。</p><h2>后来的发展</h2><p>2015年12月的<a class="ln" href="../n/resnet.html">ResNet</a>相当于把门固定为“恒等+残差相加”：<code>y = x + F(x)</code>，没有额外参数，在ImageNet上训到152层并夺冠，此后残差连接取代了Highway成为默认做法，<a class="ln" href="../n/transformer.html">Transformer</a>的每个子层也包着残差。Highway的门控思想则留在了LSTM、GRU以及后来的门控线性单元中。2024年的<a class="ln" href="../n/hyper-connections.html">超连接</a>重新回到“可学习地混合捷径与变换”的思路。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>门T需要和H一样多的参数与计算，每层成本约翻倍。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/resnet.html">ResNet</a></div></li><li>门可能学会关闭捷径，信息通路并非始终畅通；在ImageNet这样的大规模任务上没有验证几百层网络的效果。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/resnet.html">ResNet</a></div></li><li>深度带来的表示收益并不清楚：很多层可能学成近似恒等，存在冗余。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/stochastic-depth.html">随机深度</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/lstm.html">LSTM</a><span class="yr">1997 · 基础</span><div class=nt>把LSTM沿时间传递信息的门控和遗忘门负偏置初始化，搬到前馈网络的深度方向上。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/vanishing-gradient.html">梯度消失问题</a><span class="yr">1994 · 基础</span><div class=nt>门关闭时层的雅可比接近单位矩阵，梯度可跨越上百层不衰减，解决了深层前馈网络的梯度消失。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/glorot-init.html">Xavier初始化</a><span class="yr">2010 · 基础</span><div class=nt>初始化方案依赖激活函数的具体形式；Highway的负偏置初始化与H的形式无关。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/googlenet.html">GoogLeNet / Inception</a><span class="yr">2014.09 · 视觉</span><div class=nt>GoogLeNet靠中间层的辅助损失帮助梯度传递；Highway用结构上的捷径直接解决，不需要额外损失。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/he-init.html">He初始化与PReLU</a><span class="yr">2015.02 · 基础</span><div class=nt>实验表明即便用He初始化，普通网络到50、100层仍难以优化，而Highway网络不受深度影响。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/resnet.html">ResNet</a><span class="yr">2015.12 · 视觉</span> <span class="vk ok">已核对</span><div class=nt>同一时期针对“很深的网络难训练”的另一条路线：Highway用依赖数据的门控决定“变换”与“直通”的比例；ResNet用无参数的恒等捷径直接相加。ResNet论文把Highway列为同期工作，并称它还没有显示出极深带来的精度收益。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/bidaf.html">BiDAF双向注意力流</a><span class="yr">2016.11 · NLP</span><div class=nt>字符向量与词向量拼接后经过两层Highway网络。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/stochastic-depth.html">随机深度</a><span class="yr">2016.03 · 基础</span><div class=nt>同样想让极深网络好训练，Highway靠学出的门，随机深度靠随机丢层</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/hyper-connections.html">超连接</a><span class="yr">2024.09 · 基础</span><div class=nt>与Highway一样让层间连接可学习，但Highway是门控一条流，超连接是多条流的混合。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/mlp.html">多层感知机</a> <a class="chip c" href="../c/gating.html">门控机制</a> <a class="chip c" href="../c/vanishing-exploding.html">梯度消失与梯度爆炸</a> <a class="chip c" href="../c/residual-connection.html">残差连接</a> <a class="chip c" href="../c/initialization.html">参数初始化</a></p>
+<h2>本篇术语</h2><ul><li><b>变换门 / 携带门</b>　变换门T决定输出中有多少来自本层的变换H(x)，携带门C决定有多少直接来自输入x；本文取C=1−T。</li><li><b>FitNets</b>　2014年的一种训练细深网络的方法：先训一个浅而宽的老师网络，再用老师中间层的输出作为“提示”训练学生网络。</li></ul>
+<h2>怎么学</h2><p>先弄懂<a class="ln" href="../n/lstm.html">LSTM</a>的遗忘门和<a class="lc" href="../c/gating.html">门控机制</a>，再读原文第2节（式3–5和2.2节的偏置初始化，只有两页）。然后读<a class="ln" href="../n/resnet.html">ResNet</a>，比较<code>y = H·T + x·(1−T)</code>与<code>y = x + F(x)</code>的差别。动手：在MNIST上搭50层的普通MLP和Highway MLP，记录训练损失曲线和各层梯度范数。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1505.00387" rel="noopener">https://arxiv.org/abs/1505.00387</a>（标题、作者Srivastava/Greff/Schmidhuber、arXiv首次提交于2015-05-03；ar5iv全文中核对了式(3)、负偏置−1/−3初始化及其借鉴Gers 1999、MNIST上9/19/49/99层与每种40次随机搜索、100层比10层好约一个数量级、900层实验，以及CIFAR-10表1中的92.24%与FitNet 4的91.61%。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Highway%E7%BD%91%E7%BB%9C%EF%BC%88highway%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ahighway%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/highway.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="kfac.html"><small>本分支上一个 · 2015.03</small><b>K-FAC</b></a><a class="r" href="dl-nature-review.html"><small>本分支下一个 · 2015.05</small><b>Nature综述《Deep Learning》</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

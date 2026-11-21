@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fast3R千图重建（2025） · AI脉络</title>
+<meta name="description" content="DUSt3R一次只处理两张图，多视图重建要对所有图像对做推理再全局对齐，图一多就又慢又爆显存。 把所有视图的图像token放进同一个融合Transformer做全对全注意力，一次前向直接输出每张图在统一坐标系下的点图。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/fast3r.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Fast3R千图重建（2025）">
+<meta property="og:description" content="DUSt3R一次只处理两张图，多视图重建要对所有图像对做推理再全局对齐，图一多就又慢又爆显存。 把所有视图的图像token放进同一个融合Transformer做全对全注意力，一次前向直接输出每张图在统一坐标系下的点图。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/fast3r.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/fast3r">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 多视图几何与重建</div>
+<h1>Fast3R千图重建</h1>
+<div class="full">Fast3R: Towards 3D Reconstruction of 1000+ Images in One Forward Pass</div>
+<div class="meta"><span>2025.01</span><span>论文</span><span>延伸</span><span>Jianing Yang, Alexander Sax, Kevin J. Liang, Mikael Henaff, Hao Tang, Ang Cao, Joyce Chai, Franziska Meier, Matt Feiszli · Meta FAIR / 密歇根大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2501.13928" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://fast3r-3d.github.io" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/fast3r">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>DUSt3R一次只处理两张图，多视图重建要对所有图像对做推理再全局对齐，图一多就又慢又爆显存。</p></div><div><h4>方法</h4><p>把所有视图的图像token放进同一个融合Transformer做全对全注意力，一次前向直接输出每张图在统一坐标系下的点图。</p></div><div><h4>影响</h4><p>和同期的VGGT一起把前馈重建从成对推理推向多视图并行，单次前向可处理上千张图。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/dust3r.html">DUSt3R</a>把两张图映射成同一坐标系下的点图，但N张图要处理约N²对再做全局对齐。Fast3R把它推广为多视图：每张图先用<a class="ln" href="../n/croco.html">CroCo跨视图补全</a>预训练的ViT编码器（以DUSt3R权重初始化）独立编码，然后所有视图的图像块token一起送进一个24层融合Transformer做全对全<a class="lc" href="../c/self-attention.html">自注意力与多头注意力</a>，最后两个DPT头为每张图输出局部点图、全局点图及置信度。</p><p>关键技巧是图像序号位置编码：告诉融合Transformer哪些token来自同一张图。训练时只用20个视图，但序号是从1000个可选位置里随机抽的，所以推理时能处理远超训练时的视图数。</p><p>论文表格（A100，512×384输入）显示：8张图Fast3R约0.12秒，DUSt3R约8.4秒；32张图0.51秒对129秒；1000张图约138秒、峰值显存63 GiB，而DUSt3R在48张以上就显存溢出。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>全对全注意力的计算量随视图数平方增长，上千张图时仍需大显存。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只输出点图，相机内外参需从点图事后求解，位姿精度不如同时直接预测相机的模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/vggt.html">VGGT</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/croco.html">CroCo跨视图补全</a><span class="yr">2022.10 · 视觉</span><div class=nt>图像编码器沿用CroCo预训练的ViT（经DUSt3R权重初始化）。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/dust3r.html">DUSt3R</a><span class="yr">2023.12 · 视觉</span><div class=nt>解决DUSt3R成对处理加全局对齐、视图一多就慢且爆显存的问题。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/mast3r.html">MASt3R</a><span class="yr">2024.06 · 视觉</span><div class=nt>MASt3R在成对框架内改进匹配，Fast3R放弃成对，改为所有视图一次前向。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/vggt.html">VGGT</a><span class="yr">2025.03 · 视觉</span><div class=nt>只输出点图，相机内外参需从点图事后求解，位姿精度不如同时直接预测相机的模型。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/positional-encoding.html">位置编码</a> <a class="chip c" href="../c/image-patch.html">图像块与视觉token</a></p>
+<h2>本篇术语</h2><ul><li><b>全局对齐</b>　把多组成对预测的点图通过优化拼到同一坐标系，DUSt3R多视图时的必需后处理，开销随图对数增长。</li></ul>
+<h2>怎么学</h2><p>先读DUSt3R理解点图，再读Fast3R第3节融合Transformer与序号编码；对比同期的VGGT看两者设计差别。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2501.13928" rel="noopener">https://arxiv.org/abs/2501.13928</a>（核对了arXiv记录：标题、九位作者、v1提交于2025-01-23；HTML正文确认CroCo ViT编码器、24层融合Transformer、序号编码从1000中抽取、训练20视图、Table 2的耗时与显存数字。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Fast3R%E5%8D%83%E5%9B%BE%E9%87%8D%E5%BB%BA%EF%BC%88fast3r%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Afast3r%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/fast3r.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="video-depth-anything.html"><small>本分支上一个 · 2025.01</small><b>视频深度VDA</b></a><a class="r" href="yolov12.html"><small>本分支下一个 · 2025.02</small><b>YOLOv12</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

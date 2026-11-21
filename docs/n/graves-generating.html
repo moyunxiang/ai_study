@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LSTM字符级生成（2013） · AI脉络</title>
+<meta name="description" content="RNN语言模型已能给句子打分，但用它一步步“写”出长文本时，简单RNN记不住多少历史，很快就前后不连贯；而手写笔迹这类连续数据又无法用softmax输出。 用多层LSTM每次只预测下一个数据点：文本逐字符预测、从softmax分布中采样；手写逐笔画预测，输出一个二维高斯混合分布。再给网络加一个可学…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/graves-generating.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LSTM字符级生成（2013）">
+<meta property="og:description" content="RNN语言模型已能给句子打分，但用它一步步“写”出长文本时，简单RNN记不住多少历史，很快就前后不连贯；而手写笔迹这类连续数据又无法用softmax输出。 用多层LSTM每次只预测下一个数据点：文本逐字符预测、从softmax分布中采样；手写逐笔画预测，输出一个二维高斯混合分布。再给网络加一个可学…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/graves-generating.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/graves-generating">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 语言模型</div>
+<h1>LSTM字符级生成</h1>
+<div class="full">Generating Sequences With Recurrent Neural Networks</div>
+<div class="meta"><span>2013.08</span><span>论文</span><span>重要</span><span>arXiv 2013</span><span>Alex Graves · 多伦多大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1308.0850" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://www.cs.toronto.edu/~graves/handwriting.html" rel="noopener">手写合成在线演示（Graves主页） ↗</a><a class="btn sm" href="../index.html#/n/graves-generating">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>RNN语言模型已能给句子打分，但用它一步步“写”出长文本时，简单RNN记不住多少历史，很快就前后不连贯；而手写笔迹这类连续数据又无法用softmax输出。</p></div><div><h4>方法</h4><p>用多层LSTM每次只预测下一个数据点：文本逐字符预测、从softmax分布中采样；手写逐笔画预测，输出一个二维高斯混合分布。再给网络加一个可学习的“软窗口”，让它边写边决定当前该写文本中的哪个字母，实现从文字到手写的合成。</p></div><div><h4>影响</h4><p>第一次展示了“逐点预测+采样”能生成有长程结构、以假乱真的序列：生成的维基百科文本有像样的标记语法，合成的手写笔迹人眼难辨真假。其中的软窗口是注意力机制的直接前身，梯度裁剪等训练技巧也被广泛沿用。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/rnnlm.html">RNN语言模型</a>证明循环网络能做语言模型，但它的用途是给语音识别的候选打分。用这样的模型<b>生成</b>序列时，每一步把自己的输出喂回作为下一步输入，一旦早期出错就无法纠正；简单RNN的记忆又很短，生成的文本通常几个词之后就失去主题。论文认为，<a class="ln" href="../n/lstm.html">LSTM</a>的门控记忆更适合需要长程结构的生成。</p><p>另外两个问题：文本以词为单位时词表大、无法生成新词，按字符预测则要记住更长的距离；手写笔迹是连续的笔尖坐标，必须为实数值设计输出分布。至于“按给定文字写出笔迹”，文字与笔画长度不同、对应关系未知，此前只有<a class="ln" href="../n/rnn-t.html">RNN-Transducer</a>这类转导器方法。</p><h2>方法</h2><p><b>预测网络</b>。输入序列<code>x₁…x_T</code>，堆叠的LSTM层（每层都与输入和输出有跳连）在每一步输出下一个数据点的分布<code>Pr(x_{t+1} | y_t)</code>，训练目标是整条序列的负对数似然，用随时间反向传播计算梯度。为防止梯度过大，LSTM层输入处的导数被裁剪到<code>[−1, 1]</code>（见<a class="lc" href="../c/gradient-clipping.html">梯度裁剪</a>）。生成时从分布中采样一个值，再作为下一步输入。</p><p><b>文本</b>。按字符建模，输出层是字符表上的<a class="lc" href="../c/softmax.html">Softmax与logits</a>。维基百科实验用前1亿字节（Hutter Prize数据），7层、每层700个LSTM单元，约2130万参数；误差只回传到每100字节片段的开头，但隐状态一直往后传，网络最多可利用约1万个字符之前的信息。</p><p><b>手写</b>。每一步输入笔尖的偏移量和是否抬笔，输出20个二元高斯分量的混合（混合密度网络）加一个抬笔概率，每步共121个参数。</p><p><b>手写合成与软窗口</b>。要按文本c写字，网络在每步输出K个高斯函数的参数<code>(α, β, κ)</code>，在字符序列上形成一个“窗口”：<code>φ(t, u) = Σ_k α_k exp(−β_k (κ_k − u)²)</code>，再用这个权重对字符的独热向量加权求和送入网络。<code>κ</code>只能增加，所以窗口沿文本单调向前滑动，网络自己学会写完一个字母再移到下一个，即自动学出文字与笔画的对齐。</p><p><b>偏置采样与模仿风格</b>。采样时加一个偏置b，压低高斯方差，b越大字迹越工整但多样性越低；先把某人的真实笔迹作为前缀输入（priming），网络就能延续他的书写风格。</p><h2>结果</h2><p>Penn Treebank（单层1000个LSTM单元）：字符级模型最好每字符1.24比特，略逊于词级模型的1.23；论文指出词级更好，但加正则化后差距缩小，而字符级模型参数只有约430万（词级约5400万）。维基百科前1亿字节：验证集静态评估1.67、动态评估（测试时继续更新权重）1.33比特/字符；同数据上Hutter Prize冠军压缩算法为1.28，zip一类通用压缩通常超过2。生成的四页维基百科样本拼写大多是真实单词，能正确闭合括号和XML标签。手写合成在IAM在线手写数据库上训练，论文称部分无偏样本肉眼无法与真实笔迹区分。</p><h2>后来的发展</h2><p>两年后Karpathy的博客<a class="ln" href="../n/karpathy-rnn-blog.html">《RNN不可思议的有效性》</a>用同样的字符级LSTM生成莎士比亚、Linux源码，让“RNN会写东西”广为人知。软窗口的思路很快被推广：<a class="ln" href="../n/bahdanau-attention.html">注意力机制</a>把“按位置滑动的高斯窗口”换成“按内容计算权重”，从而能处理翻译中非单调的对齐；同期的神经图灵机也沿用了这种可微寻址。<a class="ln" href="../n/wavenet.html">WaveNet</a>等后来的自回归生成模型继承了“逐点预测、采样回喂”的框架，偏置采样则对应今天常用的低温度采样（见<a class="lc" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a>）。字符级与词级之争后来以<a class="ln" href="../n/bpe.html">BPE子词切分</a>式子词切分折中。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>生成的文本局部通顺但没有整体含义，段落之间主题随意跳转，远谈不上连贯的长文。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a></div></li><li>软窗口只能沿输入单调向前移动，适合文字到笔迹，但处理不了翻译中需要来回调序的对齐。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/bahdanau-attention.html">注意力机制</a></div></li><li>多层LSTM逐步计算，训练只能截断到100字节片段回传梯度，大模型训练慢、难以扩大规模。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a></div></li><li>采样时除了偏置几乎无法控制生成内容，常出现重复或离题，缺少系统的解码策略。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/lstm.html">LSTM</a><span class="yr">1997 · 基础</span><div class=nt>整个预测网络由堆叠的LSTM层构成，论文认为其门控记忆是生成长程结构的关键。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:168" href="../n/rnn-t.html">RNN-Transducer</a><span class="yr">2012.11 · 语音</span><div class=nt>都处理输入输出长度不同、对齐未知的问题：RNN转导器对所有对齐求和，这里改用网络自己控制的可微软窗口。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/rnnlm.html">RNN语言模型</a><span class="yr">2010.09 · NLP</span><div class=nt>把RNN语言模型从给候选打分推进到直接采样生成长序列，并从词级改为字符级，网络也从单层简单RNN换成深层LSTM。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:168" href="../n/graves-deep-rnn.html">深层双向LSTM识别</a><span class="yr">2013.03 · 语音</span><div class=nt>沿用同年语音识别工作中的深层堆叠LSTM与跳连结构，从识别任务转向生成任务。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/bahdanau-attention.html">注意力机制</a><span class="yr">2014.09 · NLP</span> <span class="vk">待核对</span><div class=nt>Graves在手写生成里用过可微的“软窗口”关注输入的不同位置；本文在相关工作里把它列为相似做法，并指出区别：Graves的窗口只能单调向前移动，而翻译需要调序，所以本文对每个源词都打分。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>多层LSTM逐步计算，训练只能截断到100字节片段回传梯度，大模型训练慢、难以扩大规模。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a><span class="yr">2019.02 · LLM</span><div class=nt>生成的文本局部通顺但没有整体含义，段落之间主题随意跳转，远谈不上连贯的长文。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/karpathy-rnn-blog.html">《RNN不可思议的有效性》</a><span class="yr">2015.05 · NLP</span><div class=nt>把LSTM字符级序列生成做成可动手复现的教程和开源代码，并加入隐层单元的可视化。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a> <a class="chip c" href="../c/gating.html">门控机制</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/gaussian.html">高斯分布</a> <a class="chip c" href="../c/gradient-clipping.html">梯度裁剪</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a></p>
+<h2>本篇术语</h2><ul><li><b>比特每字符（BPC）</b>　测试集上每个字符平均的−log₂概率，即编码一个字符平均需要的比特数，越低说明预测越准，可与压缩算法直接比较。</li><li><b>混合密度网络</b>　让神经网络输出一个高斯混合分布的参数（各分量的权重、均值、方差），用来对连续值做概率预测。</li><li><b>动态评估</b>　测试时边预测边用已见过的测试数据更新权重，让模型适应当前文本；每个测试数据只看一次，所以不算作弊。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/recurrent-layer.html">循环网络与隐状态</a>、<a class="lc" href="../c/gating.html">门控机制</a>和<a class="lc" href="../c/autoregressive.html">自回归生成</a>。读原文第2节（网络结构与梯度裁剪）、第3.2节（维基百科实验和生成样本）、第5.1节（软窗口公式）。动手：用PyTorch训练一个两层字符级LSTM，在一份小说文本上生成段落，并试试不同温度下的采样；再思考软窗口公式里κ只增不减意味着什么。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1308.0850" rel="noopener">https://arxiv.org/abs/1308.0850</a>（标题、唯一作者Alex Graves（多伦多大学），arXiv v1于2013-08-04提交；PDF中Penn Treebank表1（字符1.24、词1.23，1000单元，4.3M与54M参数）、维基百科7层×700单元约21.3M参数、100字节截断、约10K字符上下文、表2的1.42/1.67/1.33、PAQ-8 1.28、zip超过2；手写20个高斯分量、窗口公式、梯度裁剪[−1,1]。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20LSTM%E5%AD%97%E7%AC%A6%E7%BA%A7%E7%94%9F%E6%88%90%EF%BC%88graves-generating%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Agraves-generating%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/graves-generating.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="word2vec.html"><small>本分支上一个 · 2013.01</small><b>word2vec</b></a><a class="r" href="dssm.html"><small>本分支下一个 · 2013.10</small><b>DSSM深度语义匹配</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hogwild!并行SGD（2011） · AI脉络</title>
+<meta name="description" content="多核并行SGD需要给共享参数加锁，锁的同步开销让并行基本没有加速。 干脆不加锁，让多个线程同时读写共享参数，允许互相覆盖对方的更新；当问题是稀疏的、每次更新只改少量参数时，冲突很少，收敛基本不受影响。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/hogwild.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Hogwild!并行SGD（2011）">
+<meta property="og:description" content="多核并行SGD需要给共享参数加锁，锁的同步开销让并行基本没有加速。 干脆不加锁，让多个线程同时读写共享参数，允许互相覆盖对方的更新；当问题是稀疏的、每次更新只改少量参数时，冲突很少，收敛基本不受影响。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/hogwild.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/hogwild">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 分布式与数据并行</div>
+<h1>Hogwild!并行SGD</h1>
+<div class="full">Hogwild!: A Lock-Free Approach to Parallelizing Stochastic Gradient Descent</div>
+<div class="meta"><span>2011</span><span>论文</span><span>延伸</span><span>NIPS 2011</span><span>Feng Niu, Benjamin Recht, Christopher Ré, Stephen J. Wright · University of Wisconsin-Madison</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1106.5730" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/hogwild">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>多核并行SGD需要给共享参数加锁，锁的同步开销让并行基本没有加速。</p></div><div><h4>方法</h4><p>干脆不加锁，让多个线程同时读写共享参数，允许互相覆盖对方的更新；当问题是稀疏的、每次更新只改少量参数时，冲突很少，收敛基本不受影响。</p></div><div><h4>影响</h4><p>证明了异步、无锁的并行SGD在稀疏问题上可行，成为后来异步分布式训练（Downpour SGD、参数服务器）的理论依据。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>做法非常简单：多个处理器共享同一份参数向量，各自取样本、算梯度、直接写回，不加锁也不等待。作者给出理论分析：只要更新是稀疏的（每个样本只触及参数的很小一部分），两个线程同时改同一个参数的概率就很低，覆盖带来的误差只让收敛略慢一点。论文称在稀疏的机器学习问题上，比带锁的方案快一个数量级。</p><p>注意它的前提是稀疏。对稠密梯度的深度网络并无同样保证，但实践中异步更新在深度学习里仍被大量使用，如<a class="ln" href="../n/distbelief.html">DistBelief与Downpour SGD</a>的Downpour SGD。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>理论只在稀疏问题上成立，稠密的深度网络里异步带来的过期梯度可能伤害收敛。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/parameter-server.html">参数服务器</a></div></li><li>针对共享内存多核，不涉及多机通信。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/distbelief.html">DistBelief与Downpour SGD</a> <a class="chip hue" style="--h:192" href="../n/parameter-server.html">参数服务器</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/sgd.html">随机梯度下降</a><span class="yr">1951 · 基础</span><div class=nt>把SGD推广到无锁的多线程并行，并给出收敛理论。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/pytorch.html">PyTorch</a><span class="yr">2017.01 · 系统·效率</span> <span class="vk ok">已核对</span><div class=nt>torch.multiprocessing透明地共享CUDA张量，使Hogwild!式的无锁异步训练很容易实现。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/distbelief.html">DistBelief与Downpour SGD</a><span class="yr">2012.12 · 系统·效率</span><div class=nt>把Hogwild!在单机共享内存上的无锁异步SGD，推广到跨上千台机器、经由参数服务器的异步更新。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/parameter-server.html">参数服务器</a><span class="yr">2014.10 · 系统·效率</span><div class=nt>Hogwild!在单机上证明了稀疏问题的无锁异步更新可行；参数服务器把这种放松一致性的思想做到上千台机器。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/project-adam.html">Project Adam</a><span class="yr">2014.10 · 系统·效率</span><div class=nt>机器内部的线程使用无锁更新共享权重。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/batch-size-epoch.html">批大小、步数与轮数</a></p>
+
+<h2>怎么学</h2><p>读摘要和第1、2节；用多线程在共享numpy数组上做稀疏逻辑回归，对比加锁与不加锁。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1106.5730" rel="noopener">https://arxiv.org/abs/1106.5730</a>（arXiv abs页：HOGWILD!: A Lock-Free Approach to Parallelizing Stochastic Gradient Descent，Niu、Recht、Ré、Wright，v1日期2011-06-28；摘要中的无锁、稀疏条件、比加锁方案快一个数量级。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Hogwild%21%E5%B9%B6%E8%A1%8CSGD%EF%BC%88hogwild%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ahogwild%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/hogwild.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="theano.html"><small>本分支上一个 · 2010.06</small><b>Theano与自动微分</b></a><a class="r" href="torch7.html"><small>本分支下一个 · 2011</small><b>Torch7</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

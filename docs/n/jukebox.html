@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jukebox（2020） · AI脉络</title>
+<meta name="description" content="符号音乐模型（如Music Transformer）只能生成乐谱，没有人声和真实音色；直接生成原始音频的WaveNet几秒后就失去连贯性，因为一首4分钟的歌有1000万个采样点。 先用三层VQ-VAE把44.1kHz音频分别压缩8、32、128倍变成离散token，再用自回归Transformer…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/jukebox.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Jukebox（2020）">
+<meta property="og:description" content="符号音乐模型（如Music Transformer）只能生成乐谱，没有人声和真实音色；直接生成原始音频的WaveNet几秒后就失去连贯性，因为一首4分钟的歌有1000万个采样点。 先用三层VQ-VAE把44.1kHz音频分别压缩8、32、128倍变成离散token，再用自回归Transformer…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/jukebox.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/jukebox">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:168"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/speech.html">语音与音频</a> › 音乐与音效生成</div>
+<h1>Jukebox</h1>
+<div class="full">Jukebox: A Generative Model for Music</div>
+<div class="meta"><span>2020.04</span><span>论文</span><span>重要</span><span>arXiv 2020</span><span>Prafulla Dhariwal, Heewoo Jun, Christine Payne, Jong Wook Kim, Alec Radford, Ilya Sutskever · OpenAI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2005.00341" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/openai/jukebox" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/jukebox">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>符号音乐模型（如Music Transformer）只能生成乐谱，没有人声和真实音色；直接生成原始音频的WaveNet几秒后就失去连贯性，因为一首4分钟的歌有1000万个采样点。</p></div><div><h4>方法</h4><p>先用三层VQ-VAE把44.1kHz音频分别压缩8、32、128倍变成离散token，再用自回归Transformer在最粗的一层上生成，逐层“上采样”回细节，并以歌手、流派和歌词为条件。</p></div><div><h4>影响</h4><p>第一次从零生成带人声演唱、长达数分钟、风格可控的完整歌曲音频，确立了“音频压缩成离散token + 语言模型生成”的路线，后来的AudioLM、MusicLM、MusicGen都沿用这一思路。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>音乐生成此前有两条路。一条是符号音乐：<a class="ln" href="../n/music-transformer.html">Music Transformer</a>等模型生成MIDI音符序列，结构好，但只有音符，人声、音色、混音都要另外渲染。另一条是直接生成波形：<a class="ln" href="../n/wavenet.html">WaveNet</a>能做出几秒好听的片段，但CD音质每秒44100个采样点，一首4分钟的歌超过1000万个点，远超任何自回归模型的上下文，几秒后风格和乐器就会漂移。另一方面，<a class="ln" href="../n/vq-vae.html">VQ-VAE</a>和<a class="ln" href="../n/vq-vae-2.html">VQ-VAE-2</a>已经证明可以把图像压缩成离散码再在码上训练先验，<a class="ln" href="../n/gpt-2.html">GPT-2</a>则证明大规模Transformer能建模很长的token序列。Jukebox把两者结合用于音频。</p><h2>方法</h2><p><b>第一步：多层VQ-VAE压缩</b>（见<a class="lc" href="../c/vector-quantization.html">向量量化与离散token</a>、<a class="lc" href="../c/autoencoder.html">自编码器</a>）。三个独立的自编码器分别把波形压缩8倍、32倍、128倍，编码器输出的每个向量都替换成码本（2048个向量）中最近的那个，于是音频变成三条不同粗细的离散token序列。编码器和解码器是WaveNet风格的非因果空洞卷积。除了波形重建损失，还加了多分辨率频谱损失，否则高频细节会丢；码本里长期没被用到的向量会被随机重置，防止“码本坍塌”。</p><p><b>第二步：分层先验</b>。概率分解为<code>p(z) = p(z_top)·p(z_mid|z_top)·p(z_bot|z_mid, z_top)</code>。顶层先验是50亿参数的自回归Sparse Transformer（见<a class="ln" href="../n/sparse-transformer.html">稀疏注意力</a>、<a class="lc" href="../c/autoregressive.html">自回归生成</a>），上下文8192个token，在顶层约合24秒音频；中层和底层各有一个10亿参数的“上采样器”，以上一层的token为条件补出细节。更长的歌用滑动窗口续写。</p><p><b>第三步：条件控制</b>。每首歌的歌手、流派标签和“当前已播放到全曲的百分之几”作为条件输入。歌词条件用编码器-解码器结构：歌词字符先经编码器，音乐解码器通过交叉注意力学会何时唱哪个字；训练时用Spleeter分离出人声、再用自动对齐工具把歌词粗略对到每个片段上。</p><h2>结果</h2><p>训练数据是从网上收集的120万首歌（其中60万首英文），配LyricWiki的歌词和元数据。VQ-VAE在256块V100上训练3天；两个上采样器在128块V100上训练2周；顶层先验在512块V100上训练4周。生成的样例覆盖摇滚、嘻哈、爵士等流派，能模仿指定歌手的嗓音，歌词与旋律能对上。但代价极高：生成1分钟顶层token约需1小时，再上采样到音频约需8小时。作者也指出样本缺少副歌重复这类大尺度结构，细节处常有杂音。</p><h2>后来的发展</h2><p>Jukebox的生成速度让它几乎无法实用，但它的框架被继承了下来：先用神经编解码器把音频变成离散token，再用语言模型生成。<a class="ln" href="../n/soundstream.html">神经音频编解码器</a>和<a class="ln" href="../n/encodec.html">EnCodec</a>提供了更高保真的音频token，<a class="ln" href="../n/audiolm.html">AudioLM</a>把语义token与声学token分层，<a class="ln" href="../n/musiclm.html">MusicLM与音乐生成</a>和<a class="ln" href="../n/musicgen.html">MusicGen</a>把条件换成自由文本描述并大幅提速。Jukebox的中间层表示后来也被用作音乐理解任务的特征。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>生成极慢：1分钟歌曲大约要9小时（顶层1小时、上采样8小时），无法交互使用。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/musicgen.html">MusicGen</a> <a class="chip hue" style="--h:168" href="../n/stable-audio.html">Stable Audio</a></div></li><li>只能用歌手、流派、歌词控制，不能用自然语言描述想要的音乐。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/musiclm.html">MusicLM与音乐生成</a> <a class="chip hue" style="--h:168" href="../n/musicgen.html">MusicGen</a></div></li><li>局部好听但缺少副歌重复、问答式旋律等整首歌的大结构，细节处常有噪声和沙沙声。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/suno.html">Suno</a></div></li><li>只用英文歌训练，其他语言和曲风覆盖不足。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/yue.html">YuE开源歌曲生成</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/wavenet.html">WaveNet</a><span class="yr">2016.09 · 语音</span> <span class="vk ok">已核对</span><div class=nt>WaveNet直接建模采样点，几秒后就失去连贯；先压缩再建模让连贯性延长到分钟级。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a><span class="yr">2019.02 · LLM</span><div class=nt>沿用OpenAI用大规模自回归Transformer做生成式预训练的思路，把对象从文本token换成音频token。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/vq-vae.html">VQ-VAE</a><span class="yr">2017.11 · 生成</span><div class=nt>用VQ-VAE把原始音频压缩成离散码，让Transformer能在可承受的长度上建模。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/nsynth.html">NSynth</a><span class="yr">2017.04 · 语音</span><div class=nt>只覆盖单个音符，不是完整乐曲；音高、响度等不能被显式控制。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:168" href="../n/music-transformer.html">Music Transformer</a><span class="yr">2018.09 · 语音</span><div class=nt>Music Transformer生成符号音符，结构强但没有真实音色和人声；Jukebox直接生成音频，音色真实但结构较弱。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/sparse-transformer.html">稀疏注意力</a><span class="yr">2019.04 · LLM</span><div class=nt>顶层先验和上采样器都是Sparse Transformer，以处理8192个token的长上下文。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/vq-vae-2.html">VQ-VAE-2</a><span class="yr">2019.06 · 生成</span><div class=nt>借鉴VQ-VAE-2的多层级码本，但改为三个独立训练的自编码器，并加入频谱损失和码本重置。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/musicgen.html">MusicGen</a><span class="yr">2023.06 · 语音</span><div class=nt>生成极慢：1分钟歌曲大约要9小时（顶层1小时、上采样8小时），无法交互使用。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/suno.html">Suno</a><span class="yr">2023.12 · 语音</span><div class=nt>Jukebox证明了按歌词生成演唱可行但极慢；Suno把带人声的整首歌生成做到了普通用户可用的速度和质量。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/musiclm.html">MusicLM与音乐生成</a><span class="yr">2023.01 · 语音</span><div class=nt>只能用歌手、流派、歌词控制，不能用自然语言描述想要的音乐。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/stable-audio.html">Stable Audio</a><span class="yr">2023.09 · 语音</span><div class=nt>生成极慢：1分钟歌曲大约要9小时（顶层1小时、上采样8小时），无法交互使用。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/yue.html">YuE开源歌曲生成</a><span class="yr">2025.03 · 语音</span><div class=nt>同样做带人声歌曲生成，用现代LLM架构和更大规模训练提升歌词对齐。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+
+<h2>本篇术语</h2><ul><li><b>码本坍塌</b>　VQ-VAE训练中只有少数码本向量被使用、其余长期闲置，等于压缩容量大幅缩水。Jukebox把闲置向量随机重置到当前编码附近来缓解。</li><li><b>上采样器（upsampler）</b>　这里指以粗粒度token为条件、生成细粒度token的自回归模型，作用是给粗略的音乐骨架补上音色和细节。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2005.00341" rel="noopener">https://arxiv.org/abs/2005.00341</a>（标题、6位作者、arXiv首次提交2020-04-30；正文：8x/32x/128x、码本2048、8192 token约24/6/1.5秒、50亿顶层先验512 V100 4周、10亿上采样器128 V100 2周、VQ-VAE 256 V100 3天、120万首歌（60万英文）、约1小时+8小时生成1分钟、缺少副歌结构、仅英文。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Jukebox%EF%BC%88jukebox%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ajukebox%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/jukebox.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ddsp.html"><small>本分支上一个 · 2020.01</small><b>DDSP可微信号处理</b></a><a class="r" href="conformer.html"><small>本分支下一个 · 2020.05</small><b>Conformer</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RRT快速随机树（1998） · AI脉络</title>
+<meta name="description" content="机械臂有六七个关节、汽车不能横着走，路径规划要在高维且带运动约束的空间里进行；网格搜索维数一高就爆炸，PRM又难以连接带约束的状态。 从起点长一棵树：每次在空间里随机撒一个点，找树上离它最近的节点，朝它前进一小步，若不碰撞就加入树。随机点天然落在大片未探索区域，树会迅速铺满空间。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/rrt.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RRT快速随机树（1998）">
+<meta property="og:description" content="机械臂有六七个关节、汽车不能横着走，路径规划要在高维且带运动约束的空间里进行；网格搜索维数一高就爆炸，PRM又难以连接带约束的状态。 从起点长一棵树：每次在空间里随机撒一个点，找树上离它最近的节点，朝它前进一小步，若不碰撞就加入树。随机点天然落在大片未探索区域，树会迅速铺满空间。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/rrt.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/rrt">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 经典控制与规划</div>
+<h1>RRT快速随机树</h1>
+<div class="full">Rapidly-Exploring Random Trees: A New Tool for Path Planning</div>
+<div class="meta"><span>1998.10</span><span>论文</span><span>重要</span><span>Iowa State University技术报告TR 98-11, 1998</span><span>Steven M. LaValle · Iowa State University（后与James Kuffner合作推广）</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="http://lavalle.pl/papers/Lav98c.pdf" rel="noopener">技术报告PDF ↗</a><a class="btn sm" href="http://lavalle.pl/rrt/about.html" rel="noopener">LaValle: About RRTs ↗</a><a class="btn sm" href="https://en.wikipedia.org/wiki/Rapidly_exploring_random_tree" rel="noopener">Wikipedia: RRT ↗</a><a class="btn sm" href="../index.html#/n/rrt">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>机械臂有六七个关节、汽车不能横着走，路径规划要在高维且带运动约束的空间里进行；网格搜索维数一高就爆炸，PRM又难以连接带约束的状态。</p></div><div><h4>方法</h4><p>从起点长一棵树：每次在空间里随机撒一个点，找树上离它最近的节点，朝它前进一小步，若不碰撞就加入树。随机点天然落在大片未探索区域，树会迅速铺满空间。</p></div><div><h4>影响</h4><p>成为机器人和自动驾驶中最常用的采样式规划器之一，衍生出RRT-Connect、RRT*等大量变体，至今是机械臂运动规划库的标准组件。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>运动规划的问题是：给定机器人的起始姿态和目标姿态，找一条不碰撞的路径。机器人的“姿态”要用所有关节角一起描述，一个7关节机械臂的状态就是7维空间里的一个点，这个空间叫位形空间（configuration space）。</p><p>把空间切成网格再用<a class="ln" href="../n/a-star.html">A*搜索</a>搜索，在2维很好用；但每维切100格，7维就是10¹⁴个格子，根本存不下（见<a class="lc" href="../c/curse-of-dimensionality.html">维度灾难</a>）。1996年的<a class="ln" href="../n/prm-planning.html">PRM概率路图</a>改用随机采样：先在空间里撒大量无碰撞点，把相近的点连成一张路图，再在图上搜索。PRM适合在同一环境里反复查询，但每次连边都要解“从A精确走到B”的问题。对汽车、带速度的机器人这类有微分约束的系统（汽车不能原地横移），这个两点连接问题本身就很难。</p><h2>方法</h2><p>RRT只需要一个更简单的操作：从已有状态出发，施加一个控制，前进一小段。算法循环K次：</p><ul><li>随机采样一个状态<code>q_rand</code>；</li><li>在树中找离它最近的节点<code>q_near</code>；</li><li>从<code>q_near</code>朝<code>q_rand</code>方向前进固定步长<code>Δq</code>，得到<code>q_new</code>（有运动约束时，就选一个控制输入并数值积分一小段时间）；</li><li>若这一小段不碰撞，把<code>q_new</code>和边<code>(q_near, q_new)</code>加入树。</li></ul><p><b>为什么会“快速”探索</b>。树上每个节点被选为扩展点的概率，正比于它的Voronoi区域（空间中离它比离其他节点都近的那片区域）的大小。树边缘的节点面对大片空白，Voronoi区域最大，所以最常被扩展，树会自动向未探索区域生长。LaValle用平面正方形里从中心(50,50)出发的例子演示：树很快伸向四个角，而“随机选节点、随机选动作”的朴素随机树只会在起点附近打转。</p><p><b>朝目标偏置</b>。实际实现中，以一个小概率直接把目标当作采样点，树就会在探索之余向目标收拢；也可以从起点和终点各长一棵树、让它们相向生长（后来的RRT-Connect）。</p><h2>后来的发展</h2><p>LaValle与Kuffner在2001年的IJRR论文中把RRT系统化地用于带动力学约束的规划。它简单、无需预处理、对维数不敏感，成为机械臂规划软件的标准组件，也被<a class="ln" href="../n/darpa-urban-challenge.html">DARPA城市挑战赛</a>中的参赛车辆用于实时轨迹规划。2010年起的RRT*等变体解决了路径不最优的问题。</p><p>在学习时代，RRT常被用作生成演示数据的“专家”，或与学习到的采样分布、碰撞检测网络结合；但对于抓取、插入这类与物体接触的操作任务，主流已转向从演示中直接学策略（如<a class="ln" href="../n/diffusion-policy.html">Diffusion Policy</a>）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只保证找到一条可行路径，不保证最短；已证明在温和条件下RRT路径代价几乎必然收敛到非最优值，实际路径弯弯曲曲，需要后处理平滑。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>狭窄通道（如穿过只比机械臂略宽的缝隙）被随机点采中的概率极低，树可能长时间找不到通过的路。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>假设环境几何已知且静止、给出的是开环轨迹；对接触丰富的操作和动态变化的场景无能为力。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/diffusion-policy.html">Diffusion Policy</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/mcmc.html">Metropolis采样与MCMC</a><span class="yr">1953 · 基础</span><div class=nt>同属用随机采样代替穷举的蒙特卡洛思路：RRT可以看作一种把搜索偏向最大Voronoi区域的蒙特卡洛方法。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/a-star.html">A*搜索</a><span class="yr">1968.07 · 具身·世界模型</span><div class=nt>A*需要把空间离散成网格，格子数随维数指数增长；RRT用随机采样绕开了显式离散化，在7维以上的机械臂空间仍可用。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/prm-planning.html">PRM概率路图</a><span class="yr">1996.08 · 具身·世界模型</span><div class=nt>PRM要在任意两点之间精确连边，有微分约束时很难；RRT只需从已有节点施加控制向前走一步，天然适用于汽车等非完整约束系统，且无需预先建图。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/darpa-urban-challenge.html">DARPA城市挑战赛</a><span class="yr">2007.11 · 具身·世界模型</span><div class=nt>MIT的Talos以闭环RRT为运动规划核心，实时生成动力学可行且安全的轨迹。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/diffusion-policy.html">Diffusion Policy</a><span class="yr">2023.03 · 具身·世界模型</span><div class=nt>假设环境几何已知且静止、给出的是开环轨迹；对接触丰富的操作和动态变化的场景无能为力。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/rrt-star.html">RRT*渐近最优规划</a><span class="yr">2011.05 · 具身·世界模型</span><div class=nt>在RRT的树扩展上加入选父节点和重连，使其渐近最优。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/graph-basics.html">图、树与搜索</a> <a class="chip c" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a> <a class="chip c" href="../c/curse-of-dimensionality.html">维度灾难</a> <a class="chip c" href="../c/monte-carlo.html">蒙特卡洛采样</a> <a class="chip c" href="../c/kinematics-dof.html">自由度、运动学与本体感知</a></p>
+<h2>本篇术语</h2><ul><li><b>位形空间</b>　把机器人所有关节角（或位置与朝向）合起来看成一个点所在的空间。障碍物在这个空间里变成一片禁区，规划就是在其中找一条连通的曲线。</li><li><b>微分约束 / 非完整约束</b>　对运动方式而不只是位置的限制，例如汽车只能沿车头方向前进、转弯半径有下限，不能直接平移到旁边的车位。</li><li><b>Voronoi区域</b>　对一组点，每个点“管辖”的那片离它最近的区域。RRT扩展哪个节点，取决于随机点落在谁的Voronoi区域里。</li></ul>
+<h2>怎么学</h2><p>先熟悉<a class="lc" href="../c/graph-basics.html">图、树与搜索</a>与<a class="lc" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a>，以及位形空间的概念（<a class="lc" href="../c/kinematics-dof.html">自由度、运动学与本体感知</a>）。读LaValle的About RRTs页面和技术报告的算法部分。动手：用Python在一个带矩形障碍物的二维平面上实现RRT（约50行），画出每100次迭代后的树；再加上10%的目标偏置和双向生长，比较找到路径所需的迭代次数。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="http://lavalle.pl/rrt/about.html" rel="noopener">http://lavalle.pl/rrt/about.html</a>、<a href="https://en.wikipedia.org/wiki/Rapidly_exploring_random_tree" rel="noopener">https://en.wikipedia.org/wiki/Rapidly_exploring_random_tree</a>（维基参考文献：LaValle 1998年10月，技术报告TR 98-11，Iowa State University计算机系；LaValle与Kuffner 2001 IJRR 20(5)《Randomized Kinodynamic Planning》；算法伪代码、Voronoi偏置、目标偏置、RRT路径几乎必然收敛到非最优值及RRT*（Karaman与Frazzoli 2010）。LaValle页面：适用于非完整/动力学约束、从(50,50)出发的正方形例子与朴素随机树对比。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20RRT%E5%BF%AB%E9%80%9F%E9%9A%8F%E6%9C%BA%E6%A0%91%EF%BC%88rrt%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Arrt%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/rrt.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="lfd.html"><small>本分支上一个 · 1997</small><b>机器人示教学习</b></a><a class="r" href="mcl.html"><small>本分支下一个 · 1999.05</small><b>蒙特卡洛定位</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

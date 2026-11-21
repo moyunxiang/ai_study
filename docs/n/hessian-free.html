@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hessian-free优化（2010） · AI脉络</title>
+<meta name="description" content="二阶优化（牛顿法）理论上收敛快，但深层网络的Hessian矩阵有参数个数平方那么大，存不下也求不了逆；一阶方法在深层和循环网络上又很慢。 不显式构造Hessian，而是用共轭梯度法迭代求解牛顿方程，只需要“Hessian乘向量”这一种运算，它可以用一次额外的反传高效算出。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/hessian-free.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Hessian-free优化（2010）">
+<meta property="og:description" content="二阶优化（牛顿法）理论上收敛快，但深层网络的Hessian矩阵有参数个数平方那么大，存不下也求不了逆；一阶方法在深层和循环网络上又很慢。 不显式构造Hessian，而是用共轭梯度法迭代求解牛顿方程，只需要“Hessian乘向量”这一种运算，它可以用一次额外的反传高效算出。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/hessian-free.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/hessian-free">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 优化器与学习率</div>
+<h1>Hessian-free优化</h1>
+<div class="full">Deep Learning via Hessian-free Optimization</div>
+<div class="meta"><span>2010.06</span><span>论文</span><span>延伸</span><span>ICML 2010</span><span>James Martens · University of Toronto</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://icml.cc/Conferences/2010/papers/458.pdf" rel="noopener">ICML论文PDF ↗</a><a class="btn sm" href="../index.html#/n/hessian-free">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>二阶优化（牛顿法）理论上收敛快，但深层网络的Hessian矩阵有参数个数平方那么大，存不下也求不了逆；一阶方法在深层和循环网络上又很慢。</p></div><div><h4>方法</h4><p>不显式构造Hessian，而是用共轭梯度法迭代求解牛顿方程，只需要“Hessian乘向量”这一种运算，它可以用一次额外的反传高效算出。</p></div><div><h4>影响</h4><p>第一次不借助预训练就让深层自编码器和循环网络用二阶方法训练得很好，直接促成了Sutskever等人对优化与初始化的研究，也是后来K-FAC的先行者。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>每一步，牛顿法要解线性方程<code>H·d = −g</code>得到更新方向<code>d</code>。作者用共轭梯度（CG）法迭代求解，它只需要反复计算矩阵与向量的乘积<code>H·v</code>，不需要看到<code>H</code>本身。<code>H·v</code>可以通过一次类似反向传播的过程精确算出，成本与计算一次梯度同阶。</p><p>几个让它在神经网络上真正可行的关键处理：（1）用高斯-牛顿矩阵（一个半正定的近似）代替真正的Hessian，避免曲率为负；（2）加阻尼项，用信赖域式的调节让每步更新保持在近似可信的范围；（3）用大批量数据估计曲率，CG只迭代有限步就停；（4）在较大的小批量上计算。</p><p>论文称，该方法在深层自编码器等任务上，不需要预训练就能达到与预训练相当或更好的结果。（具体数字未核对，故不引用。）</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每次更新需要几十次CG迭代，每次迭代要对大批量数据算一次<code>H·v</code>，相比一阶方法每步代价高得多，不容易扩展到超大模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/kfac.html">K-FAC</a> <a class="chip hue" style="--h:48" href="../n/adam.html">Adam</a></div></li><li>需要仔细调阻尼和CG迭代次数，实现复杂；后来发现简单的动量加良好初始化也能达到类似效果。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/nesterov-dl.html">动量与初始化的重要性</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/lbfgs.html">L-BFGS</a><span class="yr">1989 · 基础</span><div class=nt>同为二阶近似方法：L-BFGS用历史梯度差拼出曲率，Hessian-free用共轭梯度加Hessian乘向量直接求牛顿方向。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/natural-gradient.html">自然梯度</a><span class="yr">1998 · 基础</span><div class=nt>用高斯-牛顿近似（与Fisher矩阵紧密相关）作曲率矩阵，在每步用CG求近似自然梯度方向。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/adam.html">Adam</a><span class="yr">2014.12 · 基础</span><div class=nt>每次更新需要几十次CG迭代，每次迭代要对大批量数据算一次<code>H·v</code>，相比一阶方法每步代价高得多，不容易扩展到超大模型。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/rmsprop.html">RMSProp</a><span class="yr">2012 · 基础</span><div class=nt>同一时期训练深层网络和RNN的二阶路线；RMSProp只用一阶信息、实现简单，最终在实践中胜出。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/grad-clipping.html">梯度裁剪</a><span class="yr">2012.11 · 基础</span><div class=nt>Martens与Sutskever用二阶优化训练RNN；本文用一阶SGD加裁剪在同样的人造任务上取得更高成功率，一阶路线后来成为主流。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/nesterov-dl.html">动量与初始化的重要性</a><span class="yr">2013.06 · 基础</span><div class=nt>展示简单SGD配动量和好初始化也能达到Hessian-free的效果，二阶方法的优势被大大缩小。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/kfac.html">K-FAC</a><span class="yr">2015.03 · 基础</span><div class=nt>同为二阶思路；Hessian-free靠共轭梯度反复做矩阵向量积，K-FAC直接构造易求逆的近似矩阵，更适合小批量噪声场景</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/backpropagation.html">反向传播</a> <a class="chip c" href="../c/loss-landscape.html">损失曲面、局部极小与鞍点</a> <a class="chip c" href="../c/convexity.html">凸函数与凸优化</a></p>
+<h2>本篇术语</h2><ul><li><b>共轭梯度法</b>　解线性方程组的迭代算法，每步只需要矩阵乘向量，不需要矩阵本身，对大而稀疏的问题很高效。</li><li><b>高斯-牛顿矩阵</b>　Hessian的一种半正定近似，由输出对参数的Jacobian构成，不含二阶导项。</li></ul>
+<h2>怎么学</h2><p>先学<a class="lc" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a>和<a class="lc" href="../c/gradient-descent.html">梯度下降</a>，读论文第2–3节。想看工程细节可读Martens之后的改进论文。动手：用PyTorch的Hessian-vector product实现一个小网络上的CG牛顿步。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://icml.cc/Conferences/2010/papers/458.pdf" rel="noopener">https://icml.cc/Conferences/2010/papers/458.pdf</a>（ICML 2010会议论文PDF能下载（本次会话中确认文件存在，但文字为压缩流，未能抽出可读内容）；标题、作者与方法要点来自已有了解；Crossref另见同作者2012年Tricks of the Trade章节‘Training Deep and Recurrent Networks with Hessian-Free Optimization’。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Hessian-free%E4%BC%98%E5%8C%96%EF%BC%88hessian-free%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ahessian-free%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/hessian-free.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="nce.html"><small>本分支上一个 · 2010.05</small><b>噪声对比估计NCE</b></a><a class="r" href="adagrad.html"><small>本分支下一个 · 2011</small><b>AdaGrad</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

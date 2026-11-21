@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>线性预测编码LPC（1971） · AI脉络</title>
+<meta name="description" content="语音波形每秒上万个采样点，直接传输和存储都很贵；而声道形状（决定是哪个音）藏在波形里，没有可靠的自动方法把它估出来。 假设当前采样可以由前面12个采样线性组合预测，用最小均方误差求出12个预测系数，它们就描述了声道滤波器；再配上基音周期、清浊标志和能量，共15个参数即可重建语音。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/lpc.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="线性预测编码LPC（1971）">
+<meta property="og:description" content="语音波形每秒上万个采样点，直接传输和存储都很贵；而声道形状（决定是哪个音）藏在波形里，没有可靠的自动方法把它估出来。 假设当前采样可以由前面12个采样线性组合预测，用最小均方误差求出12个预测系数，它们就描述了声道滤波器；再配上基音周期、清浊标志和能量，共15个参数即可重建语音。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/lpc.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/lpc">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:168"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/speech.html">语音与音频</a> › 早期识别与声学特征</div>
+<h1>线性预测编码LPC</h1>
+<div class="full">Speech Analysis and Synthesis by Linear Prediction of the Speech Wave</div>
+<div class="meta"><span>1971.08</span><span>论文</span><span>重要</span><span>JASA 50(2B), 1971</span><span>Bishnu S. Atal, Suzanne L. Hanauer · 贝尔电话实验室（Murray Hill）</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1121/1.1912679" rel="noopener">JASA论文 ↗</a><a class="btn sm" href="https://en.wikipedia.org/wiki/Linear_predictive_coding" rel="noopener">Wikipedia：Linear predictive coding ↗</a><a class="btn sm" href="../index.html#/n/lpc">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>语音波形每秒上万个采样点，直接传输和存储都很贵；而声道形状（决定是哪个音）藏在波形里，没有可靠的自动方法把它估出来。</p></div><div><h4>方法</h4><p>假设当前采样可以由前面12个采样线性组合预测，用最小均方误差求出12个预测系数，它们就描述了声道滤波器；再配上基音周期、清浊标志和能量，共15个参数即可重建语音。</p></div><div><h4>影响</h4><p>把“声源+声道滤波器”模型变成可以自动计算的参数，成为1970–80年代语音编码、合成和识别特征的通用工具，手机语音编码至今仍基于它的思路。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>语音学的<b>源-滤波器模型</b>认为：声带振动（或气流摩擦）产生声源，声道（喉、口、鼻腔）像一组共振管对声源滤波，不同的口型对应不同的滤波器，于是发出不同的音。听感上区分音素的主要是滤波器，即频谱的包络和其中的共振峰。</p><p>问题是怎样从一段录音里把滤波器估出来。<a class="ln" href="../n/audrey.html">贝尔实验室Audrey</a>那样用过零计数只能粗估一两个主频；手工从频谱图上读共振峰又不可能自动化。电话公司还有另一个动机：如果只传几个描述声道的参数而不是整段波形，带宽可以省下一大截。1966–1969年间，日本的板仓文忠与斋藤收三、贝尔实验室的Atal与Schroeder等人分别把线性预测用到语音上，这篇论文给出了完整的分析-合成系统。</p><h2>方法</h2><p><b>线性预测</b>。把语音以10kHz采样，假设第n个采样可以用前p个采样的加权和来预测（论文取p=12）：</p><p class="formula"><code>ŝ(n) = a₁·s(n−1) + a₂·s(n−2) + … + a₁₂·s(n−12)</code></p><p>预测误差<code>e(n) = s(n) − ŝ(n)</code>。在一小段语音（一帧）里选系数使<code>Σ e(n)²</code>最小，这是一个最小二乘问题（见<a class="lc" href="../c/linear-regression.html">线性回归</a>），对系数求偏导等于0，得到一组只涉及信号自相关的线性方程，直接解出<code>a_k</code>。</p><p><b>为什么系数描述了声道</b>。把上式改写成滤波器形式，语音<code>s</code>等于误差<code>e</code>通过<code>H(z) = 1 / (1 − Σ a_k·z⁻ᵏ)</code>这个只有极点的滤波器。12个系数对应最多6对共振峰，<code>H</code>的频率响应就是平滑的频谱包络，共振峰的频率和带宽都可以从中算出。误差<code>e</code>则近似声源：浊音时是一串周期脉冲，清音时像白噪声。</p><p><b>编码与合成</b>。每帧只需传15个参数：12个预测系数、基音周期、一个清浊二值标志、语音的均方根能量。接收端用周期脉冲（浊音）或白噪声（清音）激励同一个滤波器，就能合成出语音。</p><h2>结果</h2><p>论文展示了用这15个参数可以高效传输和存储语音，并能由同一分析得到共振峰频率与带宽、频谱包络、自相关函数等其他语音特征。据Wikipedia引述的林肯实验室史料，1973年首次实现了2400比特/秒的实时LPC，1974年在ARPANET上以3500比特/秒完成了首次实时双向LPC分组语音通话。作为对比，普通数字电话约为每秒数万比特。</p><h2>后来的发展</h2><p>LPC在三个方向上都成了标准部件。编码：后来的码激励线性预测（CELP）及GSM等手机语音标准都建立在线性预测之上，FLAC等无损音频格式也用它做预测。合成：1980年代的Speak &amp; Spell玩具用10阶LPC发音，<a class="ln" href="../n/klatt-synth.html">Klatt共振峰合成器</a>则走了另一条由人设定共振峰的路。识别：<a class="ln" href="../n/harpy.html">Harpy</a>用基于LPC的Itakura距离比对音素模板，LPC倒谱也是早期HMM识别器的常用特征，直到<a class="ln" href="../n/mfcc.html">MFCC特征</a>和<a class="ln" href="../n/plp.html">感知线性预测PLP</a>以更贴近人耳的频率刻度取而代之。神经网络时代，<a class="ln" href="../n/soundstream.html">神经音频编解码器</a>、<a class="ln" href="../n/encodec.html">EnCodec</a>等神经编解码器在同样码率下大幅超越了它的音质。</p><h2>容易误解的地方</h2><ul><li>线性预测本身早在Wiener的滤波理论里就有，LPC的贡献是把它与源-滤波器模型结合、用于语音的自动分析和合成。</li><li>全极点模型对元音很准，但对鼻音等既有共振又有反共振（零点）的音只是近似。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>激励只分“周期脉冲”和“白噪声”两种，合成语音带明显的嗡嗡机器味，自然度差。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/unit-selection.html">单元选择拼接合成</a> <a class="chip hue" style="--h:168" href="../n/wavenet.html">WaveNet</a></div></li><li>频谱在线性频率轴上等精度建模，与人耳对低频更敏感的特性不符，作为识别特征对说话人和噪声较敏感。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/mfcc.html">MFCC特征</a> <a class="chip hue" style="--h:168" href="../n/plp.html">感知线性预测PLP</a></div></li><li>全极点模型不能准确表示鼻音等带反共振的音；低码率下音质有明显上限。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/soundstream.html">神经音频编解码器</a> <a class="chip hue" style="--h:168" href="../n/encodec.html">EnCodec</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/shannon-ngram.html">香农：语言的统计模型</a><span class="yr">1948 · NLP</span><div class=nt>预测编码的思路来自香农信息论之后的编码研究：能被预测的部分不必传输，只传预测不了的残差和少量参数。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/audrey.html">贝尔实验室Audrey</a><span class="yr">1952.11 · 语音</span><div class=nt>Audrey只能用过零计数粗估两个主频；LPC从波形自动求出完整的声道频谱包络，共振峰的频率和带宽都能算出来。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/wavenet.html">WaveNet</a><span class="yr">2016.09 · 语音</span><div class=nt>激励只分“周期脉冲”和“白噪声”两种，合成语音带明显的嗡嗡机器味，自然度差。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:168" href="../n/harpy.html">Harpy</a><span class="yr">1976 · 语音</span><div class=nt>语音参数分析和音素模板的距离（Itakura距离）都建立在线性预测之上。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/mfcc.html">MFCC特征</a><span class="yr">1980.08 · 语音</span><div class=nt>在同一识别任务上，梅尔倒谱胜过线性预测倒谱、线性预测谱和反射系数等基于LPC的表示，原因是它按人耳的频率分辨率分配精度。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:168" href="../n/sphinx.html">CMU SPHINX</a><span class="yr">1988 · 语音</span><div class=nt>每帧特征是由线性预测分析导出的倒谱系数及其差分。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:168" href="../n/unit-selection.html">单元选择拼接合成</a><span class="yr">1996.05 · 语音</span><div class=nt>LPC声码合成用少量参数重建波形，体积小但有明显的机器声；单元选择用大存储换真实录音的音质，商用上胜出。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/soundstream.html">神经音频编解码器</a><span class="yr">2021.07 · 语音</span><div class=nt>传统参数/波形编解码器在3kbps左右音质明显下降；端到端学习的编解码器在同等码率下听感好得多，且适用于音乐和一般音频。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/encodec.html">EnCodec</a><span class="yr">2022.10 · 语音</span><div class=nt>全极点模型不能准确表示鼻音等带反共振的音；低码率下音质有明显上限。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:168" href="../n/klatt-synth.html">Klatt共振峰合成器</a><span class="yr">1980.03 · 语音</span><div class=nt>同样用滤波器建模声道，但LPC由数据自动估计系数，Klatt合成器由人手工设定共振峰参数。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/plp.html">感知线性预测PLP</a><span class="yr">1990.04 · 语音</span><div class=nt>在LPC全极点建模之前加入听觉处理，改善跨说话人鲁棒性。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/waveform-spectrogram.html">波形、频谱与梅尔谱</a> <a class="chip c" href="../c/linear-regression.html">线性回归</a> <a class="chip c" href="../c/fourier-transform.html">傅里叶变换与频域</a> <a class="chip c" href="../c/vocoder-codec.html">声码器与音频编解码</a> <a class="chip c" href="../c/convolution-op.html">卷积运算</a></p>
+<h2>本篇术语</h2><ul><li><b>源-滤波器模型</b>　把语音看成声源（声带脉冲或气流噪声）经过声道滤波器的输出。滤波器决定音色和音素，声源决定音高和清浊。</li><li><b>全极点滤波器</b>　传递函数只有分母、没有分子的滤波器。分母的根（极点）靠近单位圆的地方，频率响应出现尖峰，对应共振峰。</li><li><b>基音周期</b>　浊音时声带每振动一次所用的时间，其倒数就是音高（基频）。</li></ul>
+<h2>怎么学</h2><p>先确认会<a class="lc" href="../c/linear-regression.html">线性回归</a>的最小二乘解法和<a class="lc" href="../c/waveform-spectrogram.html">波形、频谱与梅尔谱</a>。然后读论文前两节的预测模型推导。动手：用Python录一段元音，按20毫秒分帧，用librosa.lpc求12阶系数，画出<code>1/|A(e^{jω})|</code>的频率响应并与FFT频谱叠在一起，能看到包络沿着谐波峰顶走；再用脉冲串激励这个滤波器，听听重建出的声音。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://api.crossref.org/works/10.1121/1.1912679" rel="noopener">https://api.crossref.org/works/10.1121/1.1912679</a>（Crossref：标题、作者Atal/Hanauer（Bell Telephone Laboratories, Murray Hill）、JASA 50卷2B期637–655页、1971-08-01；摘要中的10kHz采样、前12个采样线性组合、最小均方误差、15个参数（12系数+基音周期+清浊标志+均方根值）及脉冲/白噪声激励。板仓与斋藤1966、1973年2400 bit/s、1974年ARPANET 3500 bit/s、Speak &amp; Spell 10阶LPC、GSM与FLAC见Wikipedia Linear predictive coding条目。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E7%BA%BF%E6%80%A7%E9%A2%84%E6%B5%8B%E7%BC%96%E7%A0%81LPC%EF%BC%88lpc%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Alpc%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/lpc.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="arpa-sur.html"><small>本分支上一个 · 1971</small><b>ARPA语音理解计划</b></a><a class="r" href="dragon-1975.html"><small>本分支下一个 · 1975.02</small><b>Baker的DRAGON系统</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

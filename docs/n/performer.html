@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Performer核近似注意力（2020） · AI脉络</title>
+<meta name="description" content="线性注意力之前的做法要么靠稀疏、低秩等先验近似，要么与softmax注意力不等价；缺少对标准注意力的有理论保证的近似。 用正的正交随机特征（FAVOR+）去无偏或近似无偏地估计softmax注意力核，先把Q、K映射到特征空间再先乘K和V，使复杂度降到线性。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/performer.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Performer核近似注意力（2020）">
+<meta property="og:description" content="线性注意力之前的做法要么靠稀疏、低秩等先验近似，要么与softmax注意力不等价；缺少对标准注意力的有理论保证的近似。 用正的正交随机特征（FAVOR+）去无偏或近似无偏地估计softmax注意力核，先把Q、K映射到特征空间再先乘K和V，使复杂度降到线性。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/performer.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/performer">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 长上下文与高效注意力</div>
+<h1>Performer核近似注意力</h1>
+<div class="full">Rethinking Attention with Performers</div>
+<div class="meta"><span>2020.09</span><span>论文</span><span>延伸</span><span>ICLR 2021</span><span>Krzysztof Choromanski, Valerii Likhosherstov, David Dohan, Xingyou Song, Andreea Gane 等 · Google / 剑桥大学 / DeepMind / 艾伦·图灵研究所</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2009.14794" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/performer">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>线性注意力之前的做法要么靠稀疏、低秩等先验近似，要么与softmax注意力不等价；缺少对标准注意力的有理论保证的近似。</p></div><div><h4>方法</h4><p>用正的正交随机特征（FAVOR+）去无偏或近似无偏地估计softmax注意力核，先把Q、K映射到特征空间再先乘K和V，使复杂度降到线性。</p></div><div><h4>影响</h4><p>提供了一种与标准Transformer兼容、可证明近似softmax注意力的线性方案，但实践中被精确注意力内核压过。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>softmax注意力的权重是 <code>exp(q·k)</code>，可以看作一个核函数。如果能找到特征映射φ，使 <code>exp(q·k) ≈ φ(q)·φ(k)</code>，那么 <code>softmax(QKᵀ)V ≈ φ(Q)(φ(K)ᵀV)</code>，只要先算后面括号里的，就可以绕开n×n的矩阵（思路与<a class="ln" href="../n/linear-attention.html">线性注意力</a>一致）。</p><p>Performer用随机特征去逼近这个映射。关键是FAVOR+：采用<b>正</b>的随机特征（普通三角函数特征可能出现负值，导致估计方差极大、训练不稳）和<b>正交</b>的随机方向以降低方差。摘要称它对注意力矩阵的估计是无偏或近乎无偏的，有一致收敛和低方差的理论保证，并在像素预测、文本和蛋白质序列任务上与其他高效注意力方法相比有竞争力。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>随机特征的数量与近似精度要折中，实际效果仍可能不如精确的softmax注意力。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a></div></li><li>精确注意力在优化的内核下已经足够快，近似方法在大模型中很少被采用。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a> <a class="chip hue" style="--h:48" href="../n/mamba.html">Mamba状态空间模型</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>设计成可以直接替换标准注意力，与原模型兼容。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/linear-attention.html">线性注意力</a><span class="yr">2020.06 · 基础</span><div class=nt>沿着线性注意力的核分解思路，用随机特征近似真正的softmax核而不是换一个核。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/linformer.html">Linformer低秩注意力</a><span class="yr">2020.06 · LLM</span><div class=nt>长度维的投影矩阵绑定了固定的序列长度，对可变长输入和逐词自回归生成不方便。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/rope.html">旋转位置编码RoPE</a><span class="yr">2021.04 · LLM</span><div class=nt>论文专门说明RoPE可以与Performer式的线性注意力结合，而加性相对位置编码做不到。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/s4.html">S4结构化状态空间</a><span class="yr">2021.10 · 基础</span><div class=nt>高效注意力变体在LRA上平均不到60%、Path-X只有瞎猜水平，S4用完全不同的递推路线超过它们。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a><span class="yr">2022.05 · 系统·效率</span><div class=nt>随机特征的数量与近似精度要折中，实际效果仍可能不如精确的softmax注意力。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/mamba.html">Mamba状态空间模型</a><span class="yr">2023.12 · 基础</span><div class=nt>精确注意力在优化的内核下已经足够快，近似方法在大模型中很少被采用。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/kernel-trick.html">核技巧与间隔</a> <a class="chip c" href="../c/big-o.html">时间与空间复杂度</a> <a class="chip c" href="../c/efficient-attention.html">稀疏注意力与高效注意力</a> <a class="chip c" href="../c/monte-carlo.html">蒙特卡洛采样</a></p>
+
+<h2>怎么学</h2><p>先看<a class="ln" href="../n/linear-attention.html">线性注意力</a>和<a class="lc" href="../c/kernel-trick.html">核技巧与间隔</a>；读原文第2–3节的FAVOR+构造；自己用随机傅里叶特征验证一次内积近似。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2009.14794" rel="noopener">https://arxiv.org/abs/2009.14794</a>（标题、作者（前5位）、arXiv首次提交于2020-09-30；摘要中FAVOR+、线性复杂度、无偏或近乎无偏估计、像素/文本/蛋白质任务。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Performer%E6%A0%B8%E8%BF%91%E4%BC%BC%E6%B3%A8%E6%84%8F%E5%8A%9B%EF%BC%88performer%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aperformer%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/performer.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="bigbird.html"><small>本分支上一个 · 2020.07</small><b>BigBird稀疏注意力</b></a><a class="r" href="summarize-hf.html"><small>本分支下一个 · 2020.09</small><b>人类反馈学摘要</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

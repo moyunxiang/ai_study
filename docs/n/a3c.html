@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>A3C（2016） · AI脉络</title>
+<meta name="description" content="靠庞大的经验回放池来打破样本间的相关性，占内存、只能离策略，还要GPU；在线RL的数据相关又会让训练不稳。 让多个actor-learner线程在同一台多核CPU上并行玩各自的环境副本，异步地更新共享参数；不同线程经验不同，自然去相关，不再需要回放池。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/a3c.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="A3C（2016）">
+<meta property="og:description" content="靠庞大的经验回放池来打破样本间的相关性，占内存、只能离策略，还要GPU；在线RL的数据相关又会让训练不稳。 让多个actor-learner线程在同一台多核CPU上并行玩各自的环境副本，异步地更新共享参数；不同线程经验不同，自然去相关，不再需要回放池。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/a3c.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/a3c">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 策略梯度与演员评论家</div>
+<h1>A3C</h1>
+<div class="full">Asynchronous Methods for Deep Reinforcement Learning</div>
+<div class="meta"><span>2016.02</span><span>论文</span><span>延伸</span><span>ICML 2016</span><span>Mnih, Badia, Mirza, Graves, Lillicrap, Harley, Silver, Kavukcuoglu · Google DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1602.01783" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/a3c">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/dqn.html">DQN</a>靠庞大的经验回放池来打破样本间的相关性，占内存、只能离策略，还要GPU；在线RL的数据相关又会让训练不稳。</p></div><div><h4>方法</h4><p>让多个actor-learner线程在同一台多核CPU上并行玩各自的环境副本，异步地更新共享参数；不同线程经验不同，自然去相关，不再需要回放池。</p></div><div><h4>影响</h4><p>证明并行比回放池更简单地稳定了深度RL，在Atari上只用CPU就达到当时最优，是<a class="ln" href="../n/ppo.html">PPO</a>时代之前最常见的基线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>论文把四种标准算法做成异步版本：一步Q学习、n步Q学习、<a class="ln" href="../n/sarsa.html">SARSA</a>和优势actor-critic。表现最好的是异步优势actor-critic，也就是A3C。每个线程拿共享网络的参数副本，在环境里跑最多t_max步（如5步），用n步回报估计优势 <code>A = R − V(s)</code>，然后算出策略梯度和价值损失的梯度，直接（无锁地）加到共享参数上。策略损失里还加了一项熵奖励，防止策略过早变得确定。</p><p>摘要称A3C在Atari上用单个多核CPU训练，所花时间只有此前最佳的一半，同时超过了当时的最好成绩；它在多种连续运动控制任务以及第一人称视角的随机3D迷宫导航中也成功。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>异步更新使用的参数是过期的，梯度质量不稳定；学习器不能充分用上GPU。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/impala.html">IMPALA与V-trace</a></div></li><li>on-policy、不重复使用旧样本，样本效率低。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/acer.html">ACER</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/reinforce.html">REINFORCE策略梯度</a><span class="yr">1992 · RL</span> <span class="vk ok">已核对</span><div class=nt>策略梯度部分用n步回报和价值基线降低REINFORCE的方差。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/actor-critic-1983.html">Actor-Critic（ASE/ACE）</a><span class="yr">1983 · RL</span> <span class="vk">待核对</span><div class=nt>状态由人工设计的162格解码器离散化，系统不学习表示，状态维度一多盒子数就爆炸。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/dqn.html">DQN</a><span class="yr">2013.12 · RL</span><div class=nt>DQN用回放池去相关，A3C用并行actor去相关；后来的大规模系统两者兼收。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/ppo.html">PPO</a><span class="yr">2017.07 · RL</span> <span class="vk ok">已核对</span><div class=nt>沿用A3C/A2C的多actor并行采样与共享网络结构，但让每批数据训练多轮；在49款Atari游戏上按训练全程平均回报，PPO、ACER、A2C分别胜出30、18、1款。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/world-models.html">World Models</a><span class="yr">2018.03 · 具身·世界模型</span> <span class="vk ok">已核对</span><div class=nt>论文表1中A3C在CarRacing上为591–652分；在这个任务上，先学压缩表示和预测模型再做决策的效果好于这些端到端无模型结果。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/rl2.html">RL²元强化学习</a><span class="yr">2016.11 · RL</span><div class=nt>把A3C时代成熟的深度策略梯度训练用作外层的“慢”学习器（本文实际用的是TRPO；同期DeepMind的同类工作用A3C），由它学出内层的“快”学习算法。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/icm.html">好奇心模块ICM</a><span class="yr">2017.05 · RL</span><div class=nt>策略学习用A3C，ICM只负责额外提供内在奖励，可以接在任何RL算法上。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/rainbow.html">Rainbow</a><span class="yr">2017.10 · RL</span><div class=nt>多步回报目标在A3C中已被使用，Rainbow把它与分布式学习结合；A3C也是对比基线之一（中位数118%）。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/carla.html">CARLA驾驶仿真器</a><span class="yr">2017.11 · 具身·世界模型</span><div class=nt>强化学习基线用A3C训练端到端驾驶，结果显示在复杂城市导航上远不如模块化和模仿学习方法。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/impala.html">IMPALA与V-trace</a><span class="yr">2018.02 · RL</span><div class=nt>把A3C中“每个线程既采样又算梯度”拆成actor与GPU学习者，解决吞吐和GPU利用率问题，单机即快一个量级。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/acer.html">ACER</a><span class="yr">2016.11 · RL</span><div class=nt>在A3C的异步actor-critic基础上加入经验回放，提高样本效率。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/unreal.html">UNREAL辅助任务</a><span class="yr">2016.11 · RL</span><div class=nt>在A3C之上加入多个辅助伪奖励任务共享表示。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/feudal-networks.html">FeUdal Networks</a><span class="yr">2017.03 · RL</span><div class=nt>基于A3C的异步actor-critic训练。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/es-openai.html">进化策略作为RL替代</a><span class="yr">2017.03 · RL</span><div class=nt>在Atari和MuJoCo上与当时的A3C、TRPO等做对比，用更多算力换更简单的并行。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/openai-baselines.html">OpenAI Baselines与A2C</a><span class="yr">2017.05 · RL</span><div class=nt>A2C把A3C的异步更新改为同步批量更新。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/human-preferences.html">从人类偏好学习奖励</a><span class="yr">2017.06 · RL</span><div class=nt>用A3C在学出的奖励模型上训练智能体。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/world-of-bits.html">World of Bits / MiniWoB</a><span class="yr">2017.07 · 数据·评测</span><div class=nt>用异步强化学习训练网页智能体，并与行为克隆结合。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a> <a class="chip c" href="../c/td-error.html">时序差分与自举</a> <a class="chip c" href="../c/exploration-exploitation.html">探索与利用</a></p>
+
+<h2>怎么学</h2><p>读原文第4节算法伪代码，然后看同步版A2C（<a class="ln" href="../n/openai-baselines.html">OpenAI Baselines与A2C</a>）为什么在GPU上更好用。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1602.01783" rel="noopener">https://arxiv.org/abs/1602.01783</a>（标题、8位作者、arXiv首次提交2016-02-04；摘要中异步actor-critic、单个多核CPU、训练时间为此前最佳的一半、连续控制与3D迷宫。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20A3C%EF%BC%88a3c%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aa3c%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/a3c.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="alphago.html"><small>本分支上一个 · 2016.01</small><b>AlphaGo</b></a><a class="r" href="nfsp.html"><small>本分支下一个 · 2016.03</small><b>神经虚拟自我对弈NFSP</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

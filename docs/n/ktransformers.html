@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KTransformers混合推理（2024） · AI脉络</title>
+<meta name="description" content="DeepSeek-V3/R1这类数百B参数的MoE模型权重远超单张消费级显卡的显存，纯GPU部署需要多卡服务器，纯CPU又太慢。 利用MoE的稀疏性：注意力和常用专家放在GPU上，绝大多数专家权重放进便宜的大容量内存由CPU计算，再用AMX/AVX-512优化内核和调度减少CPU算力与同步瓶颈。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ktransformers.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="KTransformers混合推理（2024）">
+<meta property="og:description" content="DeepSeek-V3/R1这类数百B参数的MoE模型权重远超单张消费级显卡的显存，纯GPU部署需要多卡服务器，纯CPU又太慢。 利用MoE的稀疏性：注意力和常用专家放在GPU上，绝大多数专家权重放进便宜的大容量内存由CPU计算，再用AMX/AVX-512优化内核和调度减少CPU算力与同步瓶颈。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ktransformers.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ktransformers">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 本地与端侧部署</div>
+<h1>KTransformers混合推理</h1>
+<div class="full">KTransformers: Unleashing the Full Potential of CPU/GPU Hybrid Inference for MoE Models</div>
+<div class="meta"><span>2024.07</span><span>系统</span><span>延伸</span><span>SOSP 2025</span><span>Hongtao Chen, Weiyu Xie, Boxin Zhang, Jingqi Tang, Jiahao Wang, Jianwei Dong, Shaoyuan Chen, Ziwei Yuan et al. · 清华大学MADSys实验室, 趋境科技（Approaching.AI）</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://github.com/kvcache-ai/ktransformers" rel="noopener">GitHub ↗</a><a class="btn sm" href="https://doi.org/10.1145/3731569.3764843" rel="noopener">SOSP 2025论文 ↗</a><a class="btn sm" href="../index.html#/n/ktransformers">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>DeepSeek-V3/R1这类数百B参数的MoE模型权重远超单张消费级显卡的显存，纯GPU部署需要多卡服务器，纯CPU又太慢。</p></div><div><h4>方法</h4><p>利用MoE的稀疏性：注意力和常用专家放在GPU上，绝大多数专家权重放进便宜的大容量内存由CPU计算，再用AMX/AVX-512优化内核和调度减少CPU算力与同步瓶颈。</p></div><div><h4>影响</h4><p>2025年2月起让DeepSeek-R1/V3能在单张24GB显卡加大内存的工作站上本地运行，成为“本地部署满血大模型”讨论的焦点之一，后集成进SGLang。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/mixtral.html">Mixtral 8x7B</a>、<a class="ln" href="../n/deepseek-v2.html">DeepSeek-V2与MLA</a>以来的MoE模型每个token只激活少数专家，总参数巨大但单步计算量不大。这正适合混合部署：显存小但带宽高的GPU负责每步都要用的注意力和共享部分，内存大但算力弱的CPU负责存放并计算被选中的路由专家。</p><p>难点在于CPU算不过来、CPU与GPU之间来回同步太频繁。KTransformers为Intel AMX和AVX-512/AVX2写了针对INT4/INT8量化专家的矩阵乘内核，按NUMA布局管理内存，并把热门专家放在GPU、冷门专家放在CPU，让两边并行而不是互相等待。项目2024年7月开源，与<a class="ln" href="../n/llama-cpp.html">llama.cpp与本地推理</a>相比更专注于大型MoE模型。</p><p>项目公告称2025年2月10日起支持在单卡24GB显存加382GB内存上运行DeepSeek-R1/V3，提速3到28倍；之后上下文在24GB显存下扩到139K。2025年10月论文发表于SOSP，同月宣布集成进SGLang。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>速度高度依赖CPU型号（是否有AMX）和内存带宽，并发高时远不如多卡GPU服务器，主要适合个人或低并发场景。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/llama-cpp.html">llama.cpp与本地推理</a><span class="yr">2023.03 · 系统·效率</span><div class=nt>同为让大模型跑在个人机器上：llama.cpp通用、覆盖面广，KTransformers专攻大型MoE的CPU-GPU分工。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/mixtral.html">Mixtral 8x7B</a><span class="yr">2024.01 · LLM</span><div class=nt>MoE稀疏激活使大部分专家可以放在CPU侧，Mixtral是这类开源MoE的起点。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/deepseek-v2.html">DeepSeek-V2与MLA</a><span class="yr">2024.05 · LLM</span><div class=nt>主要服务DeepSeek系列MoE模型，后扩展到V3/R1及其他开源MoE。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/mixture-of-experts.html">混合专家</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/quantization-concept.html">量化</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://github.com/kvcache-ai/ktransformers" rel="noopener">https://github.com/kvcache-ai/ktransformers</a>（GitHub仓库创建于2024-07-26（gh api）；README：MADSys@清华与Approaching.AI维护、2025-02-10支持DeepSeek-R1/V3单卡24GB显存加382GB内存、最高3–28倍、2025-03-05上下文139K、AMX与AVX512/AVX2的INT4/INT8内核、NUMA感知、热专家放GPU冷专家放CPU、2025-10-10集成SGLang。SOSP 2025论文标题与作者来自OpenAlex。3–28倍的对比基线README未写明。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20KTransformers%E6%B7%B7%E5%90%88%E6%8E%A8%E7%90%86%EF%BC%88ktransformers%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aktransformers%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ktransformers.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="min-p.html"><small>本分支上一个 · 2024.07</small><b>Min-p采样</b></a><a class="r" href="prompt-caching.html"><small>本分支下一个 · 2024.08</small><b>Prompt Caching</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

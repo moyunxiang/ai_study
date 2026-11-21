@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FramePack长视频（2025） · AI脉络</title>
+<meta name="description" content="逐段生成长视频时有两难：保留的历史帧越多，上下文越长、算不动（遗忘）；历史一短，误差逐段累积、画面越来越崩（漂移）。 按重要性压缩历史帧：越近的帧用越小的patch保留越多token，越远的帧压得越狠，总上下文长度收敛到常数；再用先定首尾、倒序生成等采样方式防漂移。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/framepack.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="FramePack长视频（2025）">
+<meta property="og:description" content="逐段生成长视频时有两难：保留的历史帧越多，上下文越长、算不动（遗忘）；历史一短，误差逐段累积、画面越来越崩（漂移）。 按重要性压缩历史帧：越近的帧用越小的patch保留越多token，越远的帧压得越狠，总上下文长度收敛到常数；再用先定首尾、倒序生成等采样方式防漂移。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/framepack.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/framepack">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 视频生成</div>
+<h1>FramePack长视频</h1>
+<div class="full">Frame Context Packing and Drift Prevention in Next-Frame-Prediction Video Diffusion Models</div>
+<div class="meta"><span>2025.04</span><span>论文</span><span>延伸</span><span>NeurIPS 2025</span><span>Lvmin Zhang, Shengqu Cai, Muyang Li, Gordon Wetzstein, Maneesh Agrawala · 斯坦福大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2504.12626" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/lllyasviel/FramePack" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/framepack">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>逐段生成长视频时有两难：保留的历史帧越多，上下文越长、算不动（遗忘）；历史一短，误差逐段累积、画面越来越崩（漂移）。</p></div><div><h4>方法</h4><p>按重要性压缩历史帧：越近的帧用越小的patch保留越多token，越远的帧压得越狠，总上下文长度收敛到常数；再用先定首尾、倒序生成等采样方式防漂移。</p></div><div><h4>影响</h4><p>让13B视频模型能以固定显存生成上千帧的长视频，开源后迅速流行，“遗忘与漂移”也成为长视频生成的标准提法。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>FramePack把视频生成写成“下一帧（段）预测”：每次根据已有帧生成接下来的一段。难点是历史帧数随视频变长线性增长。</p><p><b>打包</b>：按时间远近给历史帧排名，第i名的帧用更大的patchify核编码，token数约为单帧的1/λ^i。取λ=2时，无论历史多长，总上下文都收敛到约3倍单帧长度；480p单帧约1560个token，总量约4680个。不同压缩率配不同的输入投影层。</p><p><b>防漂移</b>：单向因果生成会让误差一路累积。论文的做法是先生成首尾两段作为锚点再填中间，或者<b>倒序</b>生成，让每一段都朝一张已知的高质量帧（如用户给的首帧）靠拢，这对图生视频尤其有效；消融中倒序防漂移在全部漂移指标上最好。</p><p>实现上以修改过的<a class="ln" href="../n/hunyuanvideo.html">HunyuanVideo</a>为默认底模（也支持<a class="ln" href="../n/wan.html">开源视频生成Wan</a>），13B模型在单台8×A100上以480p、batch 64训练。作者Lvmin Zhang也是<a class="ln" href="../n/controlnet.html">ControlNet</a>的作者。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>远处历史被大幅压缩，长视频中较早出现的细节和场景仍可能被遗忘。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>倒序与锚点采样适合图生视频，对需要随时改提示词的实时交互生成不适用。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/longlive.html">LongLive实时长视频</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/diffusion-forcing.html">Diffusion Forcing</a><span class="yr">2024.07 · 生成</span><div class=nt>都处理长视频的误差累积：Diffusion Forcing靠逐帧噪声等级，FramePack靠上下文压缩与采样顺序。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/hunyuanvideo.html">HunyuanVideo</a><span class="yr">2024.12 · 生成</span><div class=nt>以去掉多模态LLM依赖、加入SigLIP编码器的HunyuanVideo为默认底模。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/wan.html">开源视频生成Wan</a><span class="yr">2025.02 · 生成</span><div class=nt>同样在Wan上实现并验证。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/longlive.html">LongLive实时长视频</a><span class="yr">2025.09 · 生成</span><div class=nt>倒序与锚点采样适合图生视频，对需要随时改提示词的实时交互生成不适用。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/image-patch.html">图像块与视觉token</a> <a class="chip c" href="../c/context-window.html">上下文窗口</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2504.12626" rel="noopener">https://arxiv.org/abs/2504.12626</a>（核对当前标题（v1原题Packing Input Frame Context in Next-Frame Prediction Models for Video Generation）、作者、v1日期2025-04-17；正文中λ^i压缩、总长度约3倍单帧、480p约1560 token、倒序防漂移消融、HunyuanVideo默认底模、13B模型8×A100 batch 64；NeurIPS 2025发表记录。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20FramePack%E9%95%BF%E8%A7%86%E9%A2%91%EF%BC%88framepack%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aframepack%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/framepack.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="repa-e.html"><small>本分支上一个 · 2025.04</small><b>REPA-E端到端调VAE</b></a><a class="r" href="skyreels-v2.html"><small>本分支下一个 · 2025.04</small><b>SkyReels-V2无限时长</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

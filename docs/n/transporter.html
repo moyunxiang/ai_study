@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Transporter Networks（2020） · AI脉络</title>
+<meta name="description" content="端到端的视觉操作策略要几百上千条示范才学得会，而且不懂“物体平移或旋转后，该做的动作也跟着平移旋转”这个简单道理；依赖物体模型或关键点的方法又换个物体就不灵。 把“拿起放下”看成空间位移：一个全卷积网络在俯视图上逐像素打分选拿取点，再把拿取点周围的特征块当模板、旋转多份，与整张图做互相关，找出最匹…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/transporter.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Transporter Networks（2020）">
+<meta property="og:description" content="端到端的视觉操作策略要几百上千条示范才学得会，而且不懂“物体平移或旋转后，该做的动作也跟着平移旋转”这个简单道理；依赖物体模型或关键点的方法又换个物体就不灵。 把“拿起放下”看成空间位移：一个全卷积网络在俯视图上逐像素打分选拿取点，再把拿取点周围的特征块当模板、旋转多份，与整张图做互相关，找出最匹…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/transporter.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/transporter">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 操作技能学习</div>
+<h1>Transporter Networks</h1>
+<div class="full">Transporter Networks: Rearranging the Visual World for Robotic Manipulation</div>
+<div class="meta"><span>2020.10</span><span>论文</span><span>重要</span><span>CoRL 2020</span><span>Andy Zeng, Pete Florence, Jonathan Tompson, Stefan Welker, Jonathan Chien, Maria Attarian, Travis Armstrong, Ivan Krasin et al. · Google Research（Robotics at Google）</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2010.14406" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://transporternets.github.io" rel="noopener">项目主页与代码（含Ravens基准） ↗</a><a class="btn sm" href="../index.html#/n/transporter">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>端到端的视觉操作策略要几百上千条示范才学得会，而且不懂“物体平移或旋转后，该做的动作也跟着平移旋转”这个简单道理；依赖物体模型或关键点的方法又换个物体就不灵。</p></div><div><h4>方法</h4><p>把“拿起放下”看成空间位移：一个全卷积网络在俯视图上逐像素打分选拿取点，再把拿取点周围的特征块当模板、旋转多份，与整张图做互相关，找出最匹配的放置位置和角度。</p></div><div><h4>影响</h4><p>很多桌面重排任务只要1到10条示范就能学会，还能处理绳子、成堆小物件；它的“在哪里做”结构后来被CLIPort、PerAct继承，是语言条件操作的重要底座。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>2020年，用学习做桌面操作（堆积木、装配、整理）主要有两类方法。一类是端到端策略：卷积网络把图像压成一个向量，再用全连接层回归动作坐标（见<a class="ln" href="../n/e2e-visuomotor.html">端到端视觉运动策略</a>）。这类网络把“方块在左上角”和“方块在右下角”当作两件需要分别学的事，要很多示范才能覆盖各种位置，而且一个场景有多个正确答案时（四个角哪个都能放），回归会取平均、落在中间。另一类依赖物体的先验：已知的CAD模型、标准位姿或关键点，换个没见过的物体就要重新标注。<a class="ln" href="../n/qt-opt.html">QT-Opt</a>这样的强化学习方法则需要几十万次试验。</p><h2>方法</h2><p><b>观测</b>。把校准过的RGB-D相机图像融合、投影成桌面的正交俯视图（160×320像素，每像素对应约3毫米见方的一根竖柱）。这样图上平移一个像素，就是真实世界里平移固定距离。</p><p><b>选拿取点</b>。一个<a class="ln" href="../n/fcn.html">全卷积网络FCN</a>对俯视图每个像素输出一个分数，取最高的像素作为吸盘拿取位置。因为是卷积（见<a class="lc" href="../c/conv-layer.html">卷积层、池化与感受野</a>），物体平移，分数图就跟着平移——这就是平移<a class="lc" href="../c/equivariance.html">不变性与等变性</a>，不用对每个位置单独学。</p><p><b>“搬运”出放置点</b>。另外两个全卷积网络分别把整张图编码成密集特征图 <code>φ(o)</code>，把拿取点周围裁出的一小块编码成 <code>ψ(o[T_pick])</code>。把这块特征当模板，在整张特征图上滑动做互相关：</p><p class="formula"><code>Q_place(τ) = ψ(o[T_pick]) ∗ φ(o)[τ]</code></p><p>得分最高的位置 <code>τ</code> 就是放置点，好比把拿起来的那块图像“搬”到最合适的地方叠上去。为了求放置角度，把模板旋转成k份分别做互相关，哪一份得分最高就用哪个角度。</p><p><b>训练</b>。纯<a class="lc" href="../c/imitation-learning.html">模仿学习与行为克隆</a>：示范给出正确的拿取和放置像素，对分数图做<a class="lc" href="../c/softmax.html">Softmax与logits</a>后用交叉熵训练。多峰的答案天然被表示成分数图上的多个高峰，不会被平均掉。</p><h2>结果</h2><p>在自建的10个仿真任务（Ravens基准）上与多种端到端基线比较。插方块任务只用1条示范成功率就是100%；汉诺塔1条示范73.1%、100条97.3%；最难的搭金字塔1000条示范78.2%，同条件下基线大多不到一半。它甚至常比直接输入真实物体位姿的MLP更省示范。扩展到6自由度插方块，1000条示范91%。真实机器人上也做了验证。</p><h2>后来的发展</h2><p><a class="ln" href="../n/cliport.html">CLIPort</a>直接保留了它的“在哪里”这一路，再并上<a class="ln" href="../n/clip.html">CLIP</a>的“是什么”一路，让同一个网络听懂语言指令；<a class="ln" href="../n/peract.html">PerAct</a>把二维俯视图换成三维体素，把同样的“在空间里打分选动作”推广到6自由度。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>动作只是一次“拿起—放下”的两个位姿，不能表达连续轨迹和需要实时反馈的精细动作，比如穿线、翻转、倒水。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/aloha-act.html">ALOHA与ACT</a> <a class="chip hue" style="--h:96" href="../n/diffusion-policy.html">Diffusion Policy</a></div></li><li>每个任务单独训练，目标靠示范隐式给出，不能用语言告诉它“把红色的放进绿色碗里”。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/cliport.html">CLIPort</a></div></li><li>依赖校准好的俯视正交视图，本质是二维平面操作，6自由度只能多级回归近似，示范少时精度明显下降。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/peract.html">PerAct</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/e2e-visuomotor.html">端到端视觉运动策略</a><span class="yr">2015.04 · 具身·世界模型</span><div class=nt>端到端回归动作的策略不具平移等变、多峰时会取平均；Transporter用逐像素打分和模板互相关，把需要的示范从成百上千条降到个位数。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/qt-opt.html">QT-Opt</a><span class="yr">2018.06 · 具身·世界模型</span><div class=nt>同为Google机器人团队的抓取/操作工作：QT-Opt靠几十万次真机强化学习试验，Transporter靠少量示范加强结构先验。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/fcn.html">全卷积网络FCN</a><span class="yr">2014.11 · 视觉</span><div class=nt>拿取打分和特征提取都用全卷积网络，借它的逐像素输出和平移等变性。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/dex-net.html">Dex-Net 2.0</a><span class="yr">2017.03 · 具身·世界模型</span><div class=nt>Dex-Net靠物体模型和解析抓取质量合成数据学抓取点；Transporter不需要任何物体模型，只用示范中的RGB-D图像。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/cliport.html">CLIPort</a><span class="yr">2021.09 · 具身·世界模型</span><div class=nt>完整保留Transporter的拿取—放置打分和模板互相关框架作为“在哪里”的空间流，加上语言条件。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/diffusion-policy.html">Diffusion Policy</a><span class="yr">2023.03 · 具身·世界模型</span><div class=nt>动作只是一次“拿起—放下”的两个位姿，不能表达连续轨迹和需要实时反馈的精细动作，比如穿线、翻转、倒水。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/aloha-act.html">ALOHA与ACT</a><span class="yr">2023.04 · 具身·世界模型</span><div class=nt>动作只是一次“拿起—放下”的两个位姿，不能表达连续轨迹和需要实时反馈的精细动作，比如穿线、翻转、倒水。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/peract.html">PerAct</a><span class="yr">2022.09 · 具身·世界模型</span><div class=nt>依赖校准好的俯视正交视图，本质是二维平面操作，6自由度只能多级回归近似，示范少时精度明显下降。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/equivariance.html">不变性与等变性</a> <a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a></p>
+<h2>本篇术语</h2><ul><li><b>互相关（cross-correlation）</b>　把一个小模板在大图上逐位置滑动、计算对应元素乘积之和，值越大表示该位置与模板越相似；卷积网络里的“卷积”实际就是互相关。</li><li><b>正交俯视图</b>　从正上方平行投影得到的图像，没有近大远小，图上每个像素对应桌面上固定大小的一块区域。</li><li><b>Ravens</b>　论文开源的仿真基准，用PyBullet搭建，UR5e机械臂配吸盘，包含堆叠、装配、推、绳子等10个任务和自动生成示范的程序。</li></ul>
+<h2>怎么学</h2><p>先补卷积和等变性 → 读原文第3节（方法）和图3，再看表2的示范数对比 → 动手：用开源的Ravens代码训练插方块任务，分别给1、10、100条示范比较成功率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2010.14406" rel="noopener">https://arxiv.org/abs/2010.14406</a>、<a href="https://arxiv.org/html/2010.14406" rel="noopener">https://arxiv.org/html/2010.14406</a>（标题、作者、2020-10-27首次提交；俯视图160×320、每像素3.125毫米；互相关公式；表中block-insertion 1条示范100%、汉诺塔73.1%/97.3%、搭金字塔1000条78.2%、6DoF插方块1000条91%；Ravens基于PyBullet与UR5e吸盘。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Transporter%20Networks%EF%BC%88transporter%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Atransporter%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/transporter.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="lift-splat.html"><small>本分支上一个 · 2020.08</small><b>Lift-Splat-Shoot</b></a><a class="r" href="anymal-terrain.html"><small>本分支下一个 · 2020.10</small><b>ANYmal复杂地形行走</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

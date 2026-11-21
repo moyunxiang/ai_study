@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Minitron剪枝加蒸馏（2024） · AI脉络</title>
+<meta name="description" content="同一家族要出15B、8B、4B等多个尺寸时，通常每个都从头预训练，算力成本成倍增加。 只训一个大模型，再按重要性剪掉层、神经元、注意力头和嵌入通道，用原模型当老师做蒸馏，只花原训练数据不到3%就恢复能力。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/minitron.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Minitron剪枝加蒸馏（2024）">
+<meta property="og:description" content="同一家族要出15B、8B、4B等多个尺寸时，通常每个都从头预训练，算力成本成倍增加。 只训一个大模型，再按重要性剪掉层、神经元、注意力头和嵌入通道，用原模型当老师做蒸馏，只花原训练数据不到3%就恢复能力。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/minitron.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/minitron">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 模型压缩与蒸馏</div>
+<h1>Minitron剪枝加蒸馏</h1>
+<div class="full">Compact Language Models via Pruning and Knowledge Distillation</div>
+<div class="meta"><span>2024.07</span><span>论文</span><span>延伸</span><span>Saurav Muralidharan, Sharath Turuvekere Sreenivas, Raviraj Joshi, Marcin Chochowski, Mostofa Patwary, Mohammad Shoeybi, Bryan Catanzaro, Jan Kautz et al. · NVIDIA</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2407.14679" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/NVlabs/Minitron" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/minitron">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>同一家族要出15B、8B、4B等多个尺寸时，通常每个都从头预训练，算力成本成倍增加。</p></div><div><h4>方法</h4><p>只训一个大模型，再按重要性剪掉层、神经元、注意力头和嵌入通道，用原模型当老师做蒸馏，只花原训练数据不到3%就恢复能力。</p></div><div><h4>影响</h4><p>给出大模型“先剪再蒸”的实用配方，NVIDIA随后用它从Llama 3.1、Mistral NeMo等模型压出一系列小模型。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>从头训练一个小模型要消耗与大模型同量级的数据。Minitron的做法是从已训好的Nemotron-4 15B出发，分两步。</p><p><b>剪枝</b>：只用1024条样本做前向传播，统计每个MLP神经元、注意力头、嵌入通道的激活大小作为重要性（不需要算梯度），层的重要性则用去掉它后困惑度的变化来衡量，然后按目标尺寸剪掉最不重要的部分。论文的一条经验是：在15B以下的规模，剪宽度（神经元、头、通道）比剪深度（整层）好。</p><p><b>蒸馏恢复</b>：剪完的模型以未剪的原模型为老师，只用输出logits上的KL散度训练（<a class="ln" href="../n/distillation.html">知识蒸馏</a>），比用普通的下一词交叉熵效果更好。</p><p>最终的Minitron 8B和4B各用约940亿token重训，官方称每个模型比从头训练少用最多40倍的token，MMLU比从头训练的同尺寸模型最多高16%。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要一个已训好的大老师和它的原始数据分布；剪枝策略的经验结论是在15B以下得到的，更大规模未验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/distillation.html">知识蒸馏</a><span class="yr">2015.03 · 系统·效率</span><div class=nt>剪枝后的恢复训练只用对原模型logits的KL蒸馏损失。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/minilm.html">MiniLM</a><span class="yr">2020.02 · 系统·效率</span><div class=nt>延续用大模型蒸馏出小模型的路线，但先用剪枝从老师本身继承结构和权重。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/sparsegpt.html">SparseGPT一次性剪枝</a><span class="yr">2023.01 · 系统·效率</span><div class=nt>SparseGPT做免重训的非结构化剪枝，Minitron做结构化剪枝再蒸馏重训，得到真正变小、能直接加速的稠密模型。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/knowledge-distillation.html">知识蒸馏</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2407.14679" rel="noopener">https://arxiv.org/abs/2407.14679</a>（标题、作者、v1日期2024-07-19、NVIDIA；摘要中不到3%数据、2–4倍压缩、最多40倍少token、MMLU最多+16%；arXiv HTML v2：1024条校准样本的激活重要性、宽度剪枝优于深度剪枝、只用logits KL蒸馏、最终模型重训94B token。后续工作arXiv 2408.11796（2024-08-21，LLM Pruning and Distillation in Practice: The Minitron Approach）把Llama 3.1 8B压到4B、Mistral NeMo 12B压到8B（MN-Minitron-8B）。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Minitron%E5%89%AA%E6%9E%9D%E5%8A%A0%E8%92%B8%E9%A6%8F%EF%BC%88minitron%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aminitron%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/minitron.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="flashattention-3.html"><small>本分支上一个 · 2024.07</small><b>FlashAttention-3</b></a><a class="r" href="min-p.html"><small>本分支下一个 · 2024.07</small><b>Min-p采样</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

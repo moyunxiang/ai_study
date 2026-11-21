@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>优先经验回放（2015） · AI脉络</title>
+<meta name="description" content="的回放池从100万条经验里均匀抽样：大部分是已经学会的平凡片段，少数关键的、出乎意料的经验很少被抽到，学习慢。 按TD误差的大小给每条经验设优先级，误差越大越常被重放；用带α的随机抽样保证多样性，再用重要性采样权重修正非均匀抽样带来的偏差。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/per.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="优先经验回放（2015）">
+<meta property="og:description" content="的回放池从100万条经验里均匀抽样：大部分是已经学会的平凡片段，少数关键的、出乎意料的经验很少被抽到，学习慢。 按TD误差的大小给每条经验设优先级，误差越大越常被重放；用带α的随机抽样保证多样性，再用重要性采样权重修正非均匀抽样带来的偏差。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/per.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/per">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 深度值函数</div>
+<h1>优先经验回放</h1>
+<div class="full">Prioritized Experience Replay</div>
+<div class="meta"><span>2015.11</span><span>论文</span><span>重要</span><span>ICLR 2016</span><span>Schaul, Quan, Antonoglou, Silver · Google DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1511.05952" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/per">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/dqn-nature.html">DQN（Nature版）</a>的回放池从100万条经验里均匀抽样：大部分是已经学会的平凡片段，少数关键的、出乎意料的经验很少被抽到，学习慢。</p></div><div><h4>方法</h4><p>按TD误差的大小给每条经验设优先级，误差越大越常被重放；用带α的随机抽样保证多样性，再用重要性采样权重修正非均匀抽样带来的偏差。</p></div><div><h4>影响</h4><p>让DQN在49款游戏中的41款上提升，中位数分数从48%到106%；与Double DQN叠加后刷新Atari纪录，成为<a class="ln" href="../n/rainbow.html">Rainbow</a>和<a class="ln" href="../n/apex.html">Ape-X</a>的核心部件。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/experience-replay.html">经验回放</a>让智能体反复利用过去的经验，但DQN对池里的每条经验一视同仁。设想一个奖励极稀疏的游戏：几十万步里只有几条带奖励的经验，均匀抽样时它们被抽中的机会和其他经验一样少，奖励信息要很久才能传播开。论文也提到，神经科学研究在海马体中观察到了类似的经验回放，且回放并不均匀。论文的问题是：该优先重放哪些经验？</p><h2>方法</h2><p><b>用TD误差衡量“值得学”</b>。一条经验<code>(s,a,r,s&#x27;)</code>的TD误差<code>δ = r + γ·maxQ(s&#x27;,·) − Q(s,a)</code>（见<a class="lc" href="../c/td-error.html">时序差分与自举</a>）越大，说明网络对它预测得越差，从中能学到的也越多。</p><p><b>随机优先，而非贪心</b>。只挑误差最大的会出问题：误差小的经验可能永远不再被重放，噪声大的经验会被反复抽中。所以按如下概率抽样：</p><p class="formula"><code>P(i) = pᵢ^α / Σₖ pₖ^α</code></p><p>α=0就是均匀抽样，α越大越偏向高优先级。优先级有两种定义：按比例<code>pᵢ = |δᵢ| + ε</code>，或按排名<code>pᵢ = 1/rank(i)</code>（对异常值更稳）。新经验先给当前最大优先级，保证至少被学一次。按比例版用“和树”（每个节点存子节点之和的二叉树）实现，抽样和更新都是<code>O(log N)</code>。</p><p><b>修正偏差</b>。非均匀抽样改变了训练数据的分布，期望意义下的梯度会有偏。于是每条样本的损失乘以<a class="lc" href="../c/importance-sampling.html">重要性采样</a>权重<code>wᵢ = (N·P(i))^(−β)</code>（再除以最大值归一化）；β从初值线性升到1，训练后期完全修正。调参得到：按排名版α=0.7、β₀=0.5，按比例版α=0.6、β₀=0.4。</p><h2>结果</h2><p>在一个专门设计的“盲目悬崖行走”玩具任务上，优先回放让学习所需的更新次数比均匀回放少得多。在Atari上，给DQN加优先回放后，49款游戏中41款提升，人类归一化分数中位数从48%升到106%。叠加在调参版<a class="ln" href="../n/double-dqn.html">Double DQN</a>上，57款游戏的中位数从111%升到128%，平均数从418%升到551%，按排名版与按比例版分别只用47%和38%的训练时间就追平了Double DQN的最终中位数。</p><h2>后来的发展</h2><p><a class="ln" href="../n/rainbow.html">Rainbow</a>的消融实验中，去掉优先回放是对性能伤害最大的两项之一。<a class="ln" href="../n/apex.html">Ape-X</a>把它扩展到分布式：几百个actor把经验连同初始优先级送进一个共享回放池，<a class="ln" href="../n/r2d2.html">R2D2</a>又把它用于整段序列。</p><h2>容易误解的地方</h2><ul><li>优先级是在经验<b>上次被抽到时</b>算出的TD误差，网络更新后很多条的优先级已经过时，只有被重新抽到才会刷新。</li><li>不加重要性采样修正的优先回放在训练后期会有偏，论文把β退火到1正是为了这个。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>优先级只在样本被抽中时才更新，绝大多数经验的优先级是过时的，且TD误差本身也受随机奖励噪声影响。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>维护优先级的和树需要集中式结构，单机DQN下回放池规模和吞吐受限。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/apex.html">Ape-X</a></div></li><li>新增α、β两个超参数，且需要调小学习率，与其他改进的交互需要重新调参。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/rainbow.html">Rainbow</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/dqn.html">DQN</a><span class="yr">2013.12 · RL</span> <span class="vk ok">已核对</span><div class=nt>回放池均匀抽样，大量“已经学会”的平凡经验被反复训练，少数关键经验很少被抽到。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/td-learning.html">时序差分学习</a><span class="yr">1988 · RL</span><div class=nt>以TD误差的绝对值作为“意外程度”，决定一条经验的重放频率。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/dyna.html">Dyna：学习与规划合一</a><span class="yr">1990 · RL</span><div class=nt>假想经验从见过的状态中均匀随机挑选，搜索控制非常粗糙，大问题里大量计算浪费在无关状态上。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/experience-replay.html">经验回放</a><span class="yr">1992 · RL</span><div class=nt>把均匀抽样的回放池改为按TD误差的优先级抽样。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/dqn-nature.html">DQN（Nature版）</a><span class="yr">2015.02 · RL</span><div class=nt>实现了Nature DQN论文自己指出的改进方向：优先抽取能学到最多的经验，41/49款游戏提升。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/double-dqn.html">Double DQN</a><span class="yr">2015.09 · RL</span><div class=nt>主要实验以Double DQN为基础，两项改进可叠加，合起来刷新Atari纪录。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/c51.html">分布式RL C51</a><span class="yr">2017.07 · RL</span><div class=nt>优先回放改的是抽样，C51改的是学习目标；C51单项的平均分701%超过优先回放的434%。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/rainbow.html">Rainbow</a><span class="yr">2017.10 · RL</span><div class=nt>采用按比例优先回放，但把优先级从TD误差改为KL损失；消融中它是最关键的两个部件之一。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/apex.html">Ape-X</a><span class="yr">2018.03 · RL</span><div class=nt>把优先经验回放放进分布式架构，优先级改在actor端计算。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/td-error.html">时序差分与自举</a> <a class="chip c" href="../c/importance-sampling.html">重要性采样</a> <a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a> <a class="chip c" href="../c/probability-basics.html">随机变量与概率分布</a></p>
+<h2>本篇术语</h2><ul><li><b>和树（sum-tree）</b>　叶子存每条经验的优先级、每个内部节点存子节点之和的二叉树。从根往下按随机数走一遍，就能以与优先级成比例的概率抽到一条经验。</li><li><b>优先级指数α</b>　控制抽样有多偏向高优先级：α=0为均匀抽样，α=1为完全按优先级比例抽样。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/importance-sampling.html">重要性采样</a>和<a class="lc" href="../c/td-error.html">时序差分与自举</a>。读原文第3节（3.3随机优先与3.4偏差修正）和算法1。动手：用Python实现一个和树，在自己的DQN里替换均匀回放池，并记录被抽中样本的平均TD误差变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1511.05952" rel="noopener">https://arxiv.org/abs/1511.05952</a>（标题、4位作者、arXiv v1于2015-11-18、ICLR 2016；正文中的P(i)公式、按比例/按排名两种优先级、和树、wᵢ=(N·P(i))^−β与β退火、α=0.7/β₀=0.5与α=0.6/β₀=0.4、41/49款与中位数48%→106%、57款上111%→128%与418%→551%、47%与38%训练时间。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E4%BC%98%E5%85%88%E7%BB%8F%E9%AA%8C%E5%9B%9E%E6%94%BE%EF%BC%88per%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aper%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/per.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ddpg.html"><small>本分支上一个 · 2015.09</small><b>DDPG</b></a><a class="r" href="dueling-dqn.html"><small>本分支下一个 · 2015.11</small><b>Dueling DQN</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

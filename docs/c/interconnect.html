@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>互连：从芯片到机柜到集群（Interconnect: Chip, Rack, Cluster） · AI脉络</title>
+<meta name="description" content="芯片之间怎样传数据：封装内靠硅中介层，机柜内靠NVLink等专用链路，机柜之间靠InfiniBand或以太网；越往外带宽越低，集群设计就是按这几层安排通信。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/interconnect.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="互连：从芯片到机柜到集群（Interconnect: Chip, Rack, Cluster）">
+<meta property="og:description" content="芯片之间怎样传数据：封装内靠硅中介层，机柜内靠NVLink等专用链路，机柜之间靠InfiniBand或以太网；越往外带宽越低，集群设计就是按这几层安排通信。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/interconnect.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/interconnect">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 系统与硬件 · 进阶</div>
+<h1>互连：从芯片到机柜到集群</h1><div class="full">Interconnect: Chip, Rack, Cluster</div>
+<p class="muted" style="font-size:13px">也叫：互联　NVLink　InfiniBand　RDMA　网络拓扑　片间互连　scale-up　scale-out</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/interconnect">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>芯片之间怎样传数据：封装内靠硅中介层，机柜内靠NVLink等专用链路，机柜之间靠InfiniBand或以太网；越往外带宽越低，集群设计就是按这几层安排通信。</b></p>
+<p class="tags">先要会：<a class="chip c" href="distributed-training.html">分布式训练：数据并行与模型并行</a></p>
+<p>一块GPU再快，训练前沿模型也要上万块一起工作，而它们每一步都要交换梯度或激活值（见<a class="lc" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a>）。如果数据传得慢，GPU就只能停下来等。所以AI集群的性能一半在芯片，一半在“线”。互连可以按距离分成四层，每往外一层，带宽大约降一个数量级。</p><p><b>1. 封装内（毫米级）</b>。计算芯片和<a class="ln" href="../n/hbm.html">HBM高带宽内存</a>放在同一块硅中介层上，几千根微细导线并排连接，见<a class="ln" href="../n/cowos.html">CoWoS先进封装</a>。Blackwell的B200由两颗计算芯片拼成，两者之间的芯片间链路带宽官方称达10TB/s，让软件把它当作一块GPU。</p><p><b>2. 机器内与机柜内（米级）</b>。传统服务器用PCIe连接CPU和GPU，PCIe 5.0 x16单方向约64GB/s。NVIDIA的<a class="ln" href="../n/nvlink.html">NVLink与NVSwitch</a>是GPU之间的专用链路，H100每卡900GB/s（双向合计）；NVSwitch交换芯片让8块卡两两全速互通。<a class="ln" href="../n/blackwell.html">Blackwell与整机柜液冷</a>这一代更进一步，GB200 NVL72用铜缆背板把整个机柜的72块GPU连成一个NVLink域，每卡1.8TB/s、全柜130TB/s，官方称它可以“像一块巨大的GPU”一样工作。张量并行这种每层都要通信的切法只能在这一层做。开放标准的对应物是<a class="ln" href="../n/ualink.html">UALink开放互连</a>。</p><p><b>3. 机柜之间（几十到几百米）</b>。每块GPU配一张网卡，经多层交换机组成胖树网络。主流是<a class="ln" href="../n/infiniband.html">InfiniBand</a>（NVIDIA收购<a class="ln" href="../n/mellanox.html">NVIDIA收购Mellanox</a>得来）和针对AI改造的以太网，如<a class="ln" href="../n/roce.html">RoCE：以太网上的RDMA</a>、<a class="ln" href="../n/spectrum-x.html">Spectrum-X AI以太网</a>、<a class="ln" href="../n/uec.html">Ultra Ethernet联盟</a>。单卡网络带宽400–800Gb/s，也就是50–100GB/s，比NVLink低一个数量级。远距离链路要用光模块把电信号转成光，<a class="ln" href="../n/cpo.html">共封装光学交换机</a>把光器件直接封装到交换芯片旁边以省电。</p><p><b>4. 数据中心之间（公里级）</b>。超大训练开始跨楼甚至跨园区，带宽更低、延迟更高，需要<a class="ln" href="../n/diloco.html">DiLoCo低通信训练</a>这类低通信训练算法。</p><p><b>它出现在哪里</b>：Google的<a class="ln" href="../n/tpu-v4.html">TPU v4与光路交换</a>用光路交换机动态重连几千块芯片；华为的<a class="ln" href="../n/cloudmatrix.html">CloudMatrix 384超节点</a>用大量光互连把384颗昇腾连成一个超节点，以弥补单芯片性能差距。</p>
+<div class="example"><h4>例子</h4><p>传输14GB数据（7B模型的一份BF16梯度）需要多久：</p><ul><li>NVLink 5（单方向约900GB/s）：约16毫秒</li><li>PCIe 5.0 x16（单方向约64GB/s）：约0.22秒</li><li>400Gb/s网卡（50GB/s）：约0.28秒</li></ul><p>相差十几倍。所以并行策略的通用规则是：通信最频繁的张量并行放在NVLink域内，通信较少的数据并行放在跨机柜网络上。</p></div>
+<h2>容易误解的地方</h2><ul><li>网络带宽常用比特每秒（Gb/s），显存和NVLink常用字节每秒（GB/s），相差8倍，比较前要换算。</li><li>“双向合计”和“单方向”的数字也差2倍，厂商宣传通常给合计值。</li><li>带宽不是唯一指标：all-reduce由大量小消息组成时，延迟和拥塞控制同样决定速度。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:72" href="../n/h100.html">H100</a> <a class="chip hue" style="--h:72" href="../n/nvlink.html">NVLink与NVSwitch</a> <a class="chip hue" style="--h:72" href="../n/tpu-v2.html">TPU v2/v3与TPU Pod</a> <a class="chip hue" style="--h:72" href="../n/frontier.html">Frontier：首台E级超算</a> <a class="chip hue" style="--h:72" href="../n/export-controls.html">美国对华先进芯片出口管制</a> <a class="chip hue" style="--h:72" href="../n/blackwell.html">Blackwell与整机柜液冷</a> <a class="chip hue" style="--h:72" href="../n/stargate.html">Stargate与吉瓦级数据中心</a> <a class="chip hue" style="--h:192" href="../n/deepseek-infra-week.html">DeepSeek开源周</a> <a class="chip hue" style="--h:72" href="../n/vera-rubin.html">Vera Rubin NVL72</a> <a class="chip hue" style="--h:192" href="../n/ring-allreduce.html">Ring All-Reduce</a> <a class="chip hue" style="--h:192" href="../n/horovod.html">Horovod</a> <a class="chip hue" style="--h:192" href="../n/pipedream.html">PipeDream与1F1B流水线</a> <a class="chip hue" style="--h:192" href="../n/mesh-tensorflow.html">Mesh-TensorFlow张量切分</a> <a class="chip hue" style="--h:192" href="../n/megatron.html">Megatron-LM模型并行</a> <a class="chip hue" style="--h:0" href="../n/gshard.html">GShard</a> <a class="chip hue" style="--h:192" href="../n/megatron-3d.html">Megatron 3D并行</a> <a class="chip hue" style="--h:0" href="../n/pangu-alpha.html">盘古α</a> <a class="chip hue" style="--h:72" href="../n/meta-rsc.html">Meta RSC超级集群</a> <a class="chip hue" style="--h:192" href="../n/fsdp.html">PyTorch FSDP</a> <a class="chip hue" style="--h:72" href="../n/spectrum-x.html">Spectrum-X AI以太网</a> <a class="chip hue" style="--h:72" href="../n/uec.html">Ultra Ethernet联盟</a> <a class="chip hue" style="--h:72" href="../n/export-controls-2023.html">2023年10月管制升级</a> <a class="chip hue" style="--h:192" href="../n/diloco.html">DiLoCo低通信训练</a> <a class="chip hue" style="--h:72" href="../n/tpu-v5p.html">TPU v5e/v5p</a> <a class="chip hue" style="--h:192" href="../n/megascale.html">MegaScale万卡训练与容错</a> <a class="chip hue" style="--h:72" href="../n/trillium.html">TPU v6 Trillium</a> <a class="chip hue" style="--h:72" href="../n/ualink.html">UALink开放互连</a> <a class="chip hue" style="--h:192" href="../n/mooncake.html">Mooncake以KV缓存为中心</a> <a class="chip hue" style="--h:72" href="../n/colossus.html">xAI Colossus：122天建成10万卡集群</a> <a class="chip hue" style="--h:192" href="../n/torchtitan.html">TorchTitan</a> <a class="chip hue" style="--h:192" href="../n/intellect-1.html">INTELLECT-1去中心化训练</a> <a class="chip hue" style="--h:72" href="../n/ascend.html">华为昇腾与国产算力</a> <a class="chip hue" style="--h:72" href="../n/diffusion-rule.html">AI扩散规则及撤销</a> <a class="chip hue" style="--h:72" href="../n/blackwell-ultra.html">Blackwell Ultra/GB300</a> <a class="chip hue" style="--h:72" href="../n/cpo.html">共封装光学交换机</a> <a class="chip hue" style="--h:192" href="../n/nvidia-dynamo.html">NVIDIA Dynamo</a> <a class="chip hue" style="--h:72" href="../n/rubin-ultra-kyber.html">Rubin Ultra与Kyber路线图</a> <a class="chip hue" style="--h:72" href="../n/cloudmatrix.html">CloudMatrix 384超节点</a> <a class="chip hue" style="--h:72" href="../n/tpu-ironwood.html">TPU Ironwood</a> <a class="chip hue" style="--h:72" href="../n/800v-dc.html">800V直流与兆瓦机柜</a> <a class="chip hue" style="--h:72" href="../n/nvlink-fusion.html">NVLink Fusion开放互连</a> <a class="chip hue" style="--h:72" href="../n/ascend-roadmap.html">昇腾950–970路线图</a> <a class="chip hue" style="--h:72" href="../n/china-nvidia-ban.html">中国叫停采购NVIDIA</a> <a class="chip hue" style="--h:72" href="../n/fairwater.html">Microsoft Fairwater</a> <a class="chip hue" style="--h:72" href="../n/nvidia-intel.html">NVIDIA入股Intel</a> <a class="chip hue" style="--h:72" href="../n/orbital-dc.html">太空数据中心</a> <a class="chip hue" style="--h:72" href="../n/amd-helios.html">AMD Helios机柜与MI455X</a> <a class="chip hue" style="--h:72" href="../n/tpu-8.html">TPU 8t/8i：训练推理分家</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

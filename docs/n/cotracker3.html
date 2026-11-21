@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CoTracker3（2024） · AI脉络</title>
+<meta name="description" content="点跟踪器几乎都在合成视频上训练，因为真实视频的逐点轨迹无法人工标注；合成与真实的差距限制了精度，而BootsTAPIR这类自训练方案要用1500万条视频。 用几个只在合成数据上训好的跟踪器当老师，给无标注真实视频生成伪标签来训练学生；同时把跟踪器结构大幅简化。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/cotracker3.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CoTracker3（2024）">
+<meta property="og:description" content="点跟踪器几乎都在合成视频上训练，因为真实视频的逐点轨迹无法人工标注；合成与真实的差距限制了精度，而BootsTAPIR这类自训练方案要用1500万条视频。 用几个只在合成数据上训好的跟踪器当老师，给无标注真实视频生成伪标签来训练学生；同时把跟踪器结构大幅简化。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/cotracker3.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/cotracker3">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 视频与运动</div>
+<h1>CoTracker3</h1>
+<div class="full">CoTracker3: Simpler and Better Point Tracking by Pseudo-Labelling Real Videos</div>
+<div class="meta"><span>2024.10</span><span>论文</span><span>延伸</span><span>ICCV 2025</span><span>Nikita Karaev, Iurii Makarov, Jianyuan Wang, Natalia Neverova, Andrea Vedaldi, Christian Rupprecht · Meta AI / 牛津大学VGG</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2410.11831" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://openaccess.thecvf.com/content/ICCV2025/html/Karaev_CoTracker3_Simpler_and_Better_Point_Tracking_by_Pseudo-Labelling_Real_Videos_ICCV_2025_paper.html" rel="noopener">ICCV 2025 ↗</a><a class="btn sm" href="../index.html#/n/cotracker3">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>点跟踪器几乎都在合成视频上训练，因为真实视频的逐点轨迹无法人工标注；合成与真实的差距限制了精度，而BootsTAPIR这类自训练方案要用1500万条视频。</p></div><div><h4>方法</h4><p>用几个只在合成数据上训好的跟踪器当老师，给无标注真实视频生成伪标签来训练学生；同时把跟踪器结构大幅简化。</p></div><div><h4>影响</h4><p>只用约1.5万条真实视频（少1000倍数据）就超过BootsTAPIR，成为2025年点跟踪最常用的开源基线之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>点跟踪（Tracking Any Point）的任务是：给定视频第一帧上任意一个点，输出它在之后每一帧的位置以及是否被遮挡。<a class="ln" href="../n/cotracker.html">CoTracker</a>和<a class="ln" href="../n/tapir.html">TAPIR任意点跟踪</a>是这一方向的代表，但都受限于只能用Kubric这类合成数据训练。</p><p>CoTracker3的训练配方很简单：收集无标注的真实视频，每个批次随机挑一位老师（CoTracker3在线版、离线版、CoTracker、TAPIR，均只在合成数据上训练且训练中不更新），用老师的预测轨迹作为伪标签训练学生。模型本身也做了减法：去掉了TAPIR等方法的全局匹配阶段，用一个简单的MLP处理4D相关特征，可见性在迭代中一并更新，参数比CoTracker少约一半。</p><p>论文报告在TAP-Vid平均上，离线版（Kubric加1.5万真实视频）AJ 64.4、δavg 76.9，高于用1500万视频的BootsTAPIR的61.4、73.6；对遮挡点的跟踪提升尤其明显。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>伪标签来自老师模型，老师共同的系统性错误（如无纹理区域漂移）会被学生继承。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>输出的是二维像素轨迹，不直接给出点的三维运动与相机运动，需要与深度或重建模型组合。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/d4rt.html">D4RT动态4D重建</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/raft.html">RAFT光流</a><span class="yr">2020.03 · 视觉</span><div class=nt>沿用RAFT以来基于相关特征迭代细化位置的做法。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/tapir.html">TAPIR任意点跟踪</a><span class="yr">2023.06 · 视觉</span><div class=nt>TAPIR是生成伪标签的老师之一；CoTracker3去掉了TAPIR式的全局匹配阶段。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/cotracker.html">CoTracker</a><span class="yr">2023.07 · 视觉</span><div class=nt>同一团队的第三代，保留联合跟踪多点的Transformer思路并简化结构。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/d4rt.html">D4RT动态4D重建</a><span class="yr">2025.12 · 视觉</span><div class=nt>输出的是二维像素轨迹，不直接给出点的三维运动与相机运动，需要与深度或重建模型组合。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/knowledge-distillation.html">知识蒸馏</a> <a class="chip c" href="../c/semi-supervised.html">半监督学习与伪标签</a> <a class="chip c" href="../c/distribution-shift.html">分布偏移</a></p>
+<h2>本篇术语</h2><ul><li><b>伪标签</b>　用已有模型对无标注数据做出的预测，当作近似的标注来训练新模型。</li><li><b>AJ（平均Jaccard）</b>　TAP-Vid基准的主指标，同时考察位置误差是否在阈值内和遮挡判断是否正确。</li></ul>
+<h2>怎么学</h2><p>先读CoTracker了解多点联合跟踪，再读CoTracker3第3节伪标签训练流程；用官方在线版在一段手机视频上跟踪网格点。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2410.11831" rel="noopener">https://arxiv.org/abs/2410.11831</a>（核对了arXiv记录：标题、六位作者、v1提交于2024-10-15、摘要中的少1000倍数据；HTML正文确认1.5万真实视频、四位老师、TAP-Vid平均AJ 64.4/δavg 76.9对BootsTAPIR 61.4/73.6；ICCV 2025见CVF开放获取页。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20CoTracker3%EF%BC%88cotracker3%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acotracker3%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/cotracker3.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="depth-pro.html"><small>本分支上一个 · 2024.10</small><b>Depth Pro度量深度</b></a><a class="r" href="d-fine.html"><small>本分支下一个 · 2024.10</small><b>D-FINE</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

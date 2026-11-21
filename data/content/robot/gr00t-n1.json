@@ -1,31 +1,28 @@
 {
   "id": "gr00t-n1",
-  "who": "NVIDIA（Johan Bjorck, Fernando Castañeda, Nikita Cherniadev, Xingye Da等，作者按字母排序；项目负责人Linxi “Jim” Fan、Yuke Zhu）",
+  "who": "NVIDIA（Johan Bjorck, Fernando Castañeda, Nikita Cherniadev, Xingye Da等，arXiv作者列表按姓氏字母排序；附录列出的研究负责人为Linxi “Jim” Fan、Yuke Zhu）",
   "links": [
     {"label": "arXiv", "url": "https://arxiv.org/abs/2503.14734"},
     {"label": "GitHub: Isaac-GR00T", "url": "https://github.com/NVIDIA/Isaac-GR00T"}
   ],
   "problem": "人形机器人的真机数据极其昂贵，各家只能在自己的“数据孤岛”上训练；而π0这类通用VLA既不开源训练数据，也没有专门处理人形双臂灵巧手的形态差异。",
   "idea": "沿用“VLM理解+流匹配DiT出动作”的双系统结构，把训练数据组织成金字塔：底层是网络数据和人类视频，中层是仿真和视频生成模型合成的轨迹，顶层是少量真机遥操作；无动作的数据用潜动作或逆动力学模型补标签。",
-  "impact": "NVIDIA发布的第一个开源人形机器人基础模型（2.2B），连同部分训练数据和仿真基准一起开放；证明用视频生成模型把88小时真机数据扩增到827小时能带来稳定提升。",
-  "background": "[[pi0]]确立了“预训练VLM+连续动作专家”的VLA结构，[[helix]]也提出了类似的“慢思考+快执行”双系统设计。但人形机器人有两个特殊困难：一是形态多——单臂、双臂、带灵巧手、带腰和头的人形，状态和动作维度各不相同；二是数据少——人形真机遥操作极其耗时，各公司的数据互不共享，形成“数据孤岛”。\n\nNVIDIA手里有另外两类资源：[[isaac-gym]]一脉的大规模仿真，以及[[cosmos]]等视频生成模型。问题是能否把仿真轨迹、生成的视频、人类视频和真机数据放进同一个模型一起训练。",
+  "impact": "NVIDIA开源的人形机器人基础模型（2.2B），论文称模型权重、训练数据和仿真基准都已公开；实验显示用视频生成模型把88小时真机数据扩增到827小时后，仿真和真机成功率都有提升。",
+  "background": "[[pi0]]确立了“预训练VLM+连续动作专家”的VLA结构，[[helix]]也提出了类似的“慢思考+快执行”双系统设计。但人形机器人有两个特殊困难：一是形态多——单臂、双臂、带灵巧手、带腰和头的人形，状态和动作维度各不相同；二是数据少——人形真机遥操作极其耗时，各公司的数据互不共享，形成“数据孤岛”。\n\nNVIDIA手里有另外两类资源：大规模仿真数据生成工具（GR00T N1的仿真任务建在RoboCasa框架上，用DexMimicGen合成轨迹），以及图生视频模型。问题是能否把仿真轨迹、生成的视频、人类视频和真机数据放进同一个模型一起训练。",
   "method": "**System 2（视觉-语言）**：NVIDIA Eagle-2 VLM，输入图像和指令，在L40上约10Hz运行。实验发现用语言模型**中间层**（第12层）而非最后一层的特征，推理更快、策略成功率也更高。\n\n**System 1（动作）**：一个用流匹配训练的扩散Transformer（[[dit]]），以带噪声的动作块和本体状态为输入，通过交叉注意力读取VLM特征，输出去噪后的动作，最高可达120Hz闭环控制。每种机器人形态各有一个小MLP做状态和动作的编码/解码，主体共享。整个模型2.2B参数（VLM占1.34B），在L40上生成16步动作块需63.9毫秒。两个系统端到端联合训练。\n\n**数据金字塔**：\n- 底层：VLM预训练用的网络图文数据和开源人类第一视角视频；\n- 中层：用DexMimicGen（[[mimicgen]]的灵巧双臂扩展）从少量人类示范自动生成仿真轨迹，11小时生成78万条，相当于6500小时人工示范；用视频生成模型（LoRA微调的Wan2.1图生视频14B等）根据真机首帧和新的语言指令生成“反事实”的机器人视频，把88小时真机数据扩增到827小时；\n- 顶层：Fourier GR-1人形等真机遥操作数据。\n\n**给无动作数据贴标签**：在所有视频上训练一个VQ-VAE潜动作模型，把相邻画面的变化编码成潜动作，作为一种虚拟的“潜动作形态”参与训练；或者用训练好的逆动力学模型推断伪动作。\n\n预训练约用5万H100 GPU小时。",
   "results": "仿真基准（每任务100条示范后训练）：RoboCasa、DexMimicGen双臂灵巧、GR-1人形三组任务平均成功率45.0%，Diffusion Policy为33.4%、BC-Transformer为26.4%，在GR-1任务上领先17个百分点以上。真机GR-1人形（抓放、开关物体、工业装配、双臂协作等）：比Diffusion Policy在10%数据和全部数据下分别高32.4和30.4个百分点；只用10%数据的GR00T N1只比用全部数据的Diffusion Policy低3.8个百分点。加入视频生成的神经轨迹后，RoboCasa在30/100/300条示范下平均提升4.2/8.8/6.8个百分点，真机8个任务平均提升5.8个百分点。",
-  "legacy": "GR00T N1之后NVIDIA持续迭代（N1.5、[[gr00t-n2]]），并推出专门用世界模型生成训练数据的[[dreamgen]]。它把“合成数据+真机数据的金字塔”和“潜动作统一无标注视频”变成了人形VLA的常见配方，开源权重也被多家人形机器人公司和研究组用作起点。",
+  "legacy": "GR00T N1之后NVIDIA持续迭代（N1.5、[[gr00t-n2]]），并推出专门用世界模型生成训练数据的[[dreamgen]]。“合成数据+真机数据的金字塔”和“用潜动作给无标注视频贴标签”之后在不少人形VLA工作中出现；NVIDIA在2026年3月的新闻稿中称多家人形机器人公司正在采用GR00T N系列模型。",
   "pitfalls": "- 双系统并不是两个独立训练的模型，System 1和System 2是联合端到端训练的；“10Hz/120Hz”指两部分的运行频率可以不同。\n- 视频生成的“神经轨迹”本身没有动作，必须靠潜动作或逆动力学模型补标签，标签质量受这些模型限制。",
   "limits": [
-    {"text": "主要针对短时程的桌面操作，长时程的移动-操作（边走边干活）尚未解决。", "solved_by": ["gr00t-n2"]},
-    {"text": "视频生成和仿真合成的数据难以同时做到多样、反事实又符合物理规律，限制了合成数据的质量。", "solved_by": ["dreamgen", "cosmos-predict-2.5"]},
-    {"text": "2B级的VLM在空间推理和语言理解上有限，作者预期更强的视觉-语言骨干会带来提升。", "solved_by": ["gr00t-n2"]},
+    {"text": "主要针对短时程的桌面操作，长时程的移动-操作（边走边干活）尚未解决。", "solved_by": [], "stated": true},
+    {"text": "视频生成和仿真合成的数据难以同时做到多样、反事实又符合物理规律，限制了合成数据的质量。", "solved_by": ["dreamgen", "cosmos-predict-2.5"], "stated": true},
+    {"text": "2B级的VLM在空间推理和语言理解上有限，作者预期更强的视觉-语言骨干会带来提升。", "solved_by": [], "stated": true},
     {"text": "真机评测只在Fourier GR-1等少数平台上进行，跨形态泛化主要在仿真中验证。", "solved_by": []}
   ],
   "relations": [
     {"to": "pi0", "type": "extends", "note": "沿用“VLM+流匹配动作模块”的结构，动作编码方式也参照π0；扩展到多形态人形，并把动作模块做成通过交叉注意力读取VLM中间层特征的DiT。"},
-    {"to": "cosmos", "type": "uses", "note": "把Cosmos等图生视频模型作为可微调的“神经轨迹”生成器，扩增真机数据约10倍。"},
-    {"to": "isaac-gym", "type": "uses", "note": "中层的大量仿真轨迹依托NVIDIA的GPU仿真与Omniverse渲染体系生成。"},
     {"to": "mimicgen", "type": "uses", "note": "用其灵巧双臂扩展DexMimicGen，从少量人类示范自动合成78万条仿真轨迹。"},
-    {"to": "helix", "type": "rivals", "note": "Figure的Helix同期提出慢速VLM+快速动作网络的双系统人形VLA，但闭源；GR00T N1开源权重与部分数据。"},
-    {"to": "genie", "type": "uses", "note": "用VQ-VAE潜动作模型给无动作的人类视频和生成视频贴标签，思路源自Genie一类的潜动作学习。"},
+    {"to": "helix", "type": "rivals", "note": "Figure的Helix（2025-02）同样是慢速VLM+快速动作网络的双系统人形VLA，但Figure没有公布Helix的权重；GR00T N1公开了权重与训练数据。GR00T N1论文本身没有提到Helix。"},
     {"to": "wan", "type": "uses", "note": "附录中用LoRA微调Wan2.1图生视频14B模型生成神经轨迹。"}
   ],
   "prereq": ["vla-concept", "normalizing-flow", "action-chunking", "sim2real", "vector-quantization", "kinematics-dof", "imitation-learning"],

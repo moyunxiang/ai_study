@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RMSNorm（2019） · AI脉络</title>
+<meta name="description" content="LayerNorm能稳定训练，但每一层都要先算均值、再算方差，在RNN里每个时间步都要做，额外开销抵消了它带来的收敛加速。 猜测LayerNorm起作用的是“缩放不变性”而不是“减均值”，于是去掉减均值，只用均方根RMS来缩放： ā = a / RMS(a) · g 。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/rmsnorm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RMSNorm（2019）">
+<meta property="og:description" content="LayerNorm能稳定训练，但每一层都要先算均值、再算方差，在RNN里每个时间步都要做，额外开销抵消了它带来的收敛加速。 猜测LayerNorm起作用的是“缩放不变性”而不是“减均值”，于是去掉减均值，只用均方根RMS来缩放： ā = a / RMS(a) · g 。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/rmsnorm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/rmsnorm">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 深层训练配方</div>
+<h1>RMSNorm</h1>
+<div class="full">Root Mean Square Layer Normalization</div>
+<div class="meta"><span>2019.10</span><span>论文</span><span>重要</span><span>NeurIPS 2019</span><span>Biao Zhang, Rico Sennrich · University of Edinburgh / University of Zurich</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1910.07467" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/bzhangGo/rmsnorm" rel="noopener">官方代码 ↗</a><a class="btn sm" href="https://arxiv.org/abs/2302.13971" rel="noopener">LLaMA论文第2.2节（采用RMSNorm） ↗</a><a class="btn sm" href="../index.html#/n/rmsnorm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>LayerNorm能稳定训练，但每一层都要先算均值、再算方差，在RNN里每个时间步都要做，额外开销抵消了它带来的收敛加速。</p></div><div><h4>方法</h4><p>猜测LayerNorm起作用的是“缩放不变性”而不是“减均值”，于是去掉减均值，只用均方根RMS来缩放：<code>ā = a / RMS(a) · g</code>。</p></div><div><h4>影响</h4><p>效果与LayerNorm相当，在不同模型上把运行时间缩短7%到64%；后来Gopher、LLaMA等大语言模型都用它替代LayerNorm。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/layernorm.html">Layer Normalization</a>对一层的输入向量a先减去均值μ、再除以标准差σ，最后乘可学习的增益g、加偏置b：<code>ā_i = (a_i − μ)/σ · g_i + b_i</code>（见<a class="lc" href="../c/normalization-layer.html">归一化层</a>）。它不依赖批次统计，所以比<a class="ln" href="../n/batchnorm.html">Batch Normalization</a>更适合变长序列和RNN，也成了<a class="ln" href="../n/transformer.html">Transformer</a>每个子层必备的部件。</p><p>问题是代价。作者在GRU版RNNSearch翻译模型上观察到：按训练步数算，加了LayerNorm的模型收敛快得多；但按实际耗时算，优势大幅缩水，因为每一步都要多算两遍统计量，而RNN要在每个时间步都做一次。论文想知道LayerNorm的两个性质——对输入整体平移不敏感（re-centering）和对输入整体缩放不敏感（re-scaling）——到底哪个是必需的。</p><h2>方法</h2><p><b>只保留缩放</b>。RMSNorm把均值和方差两个统计量换成一个均方根：</p><p class="formula"><code>RMS(a) = √( (1/n) Σ a_i² )，  ā_i = a_i / RMS(a) · g_i</code></p><p>没有减均值，通常也不加偏置。当输入均值恰好为0时，它与LayerNorm完全相同。</p><p><b>为什么够用</b>。RMS是线性的：<code>RMS(αa) = α·RMS(a)</code>，所以把输入或权重矩阵整体放大α倍，输出不变。论文进一步推导：梯度对输入的缩放不敏感，而与权重的缩放成反比——权重变大时更新自动变小，相当于隐式的学习率自适应。它丢掉的只是对整体平移的不变性。</p><p><b>例子</b>。a = (3, 4)：RMS = √((9+16)/2) ≈ 3.54，输出约为(0.85, 1.13)·g；LayerNorm则先减掉均值3.5得到(−0.5, 0.5)，输出(−1, 1)。</p><p><b>部分RMSNorm（pRMSNorm）</b>。假设同层神经元同分布，只用前p%个元素估计RMS，实验中p取6.25%仍能正常收敛。</p><h2>结果</h2><p>实验覆盖WMT14英德翻译（RNNSearch和Transformer）、CNN/Daily Mail阅读理解、COCO图文检索和CIFAR-10分类。TensorFlow版RNNSearch上，LayerNorm每1000步耗时665秒，RMSNorm为501秒，快24.7%，BLEU（newstest2014/2017）分别为22.6/23.6和22.4/23.7。Transformer-base上快6.9%，BLEU为26.8/27.7对26.6/27.7；不加归一化的Transformer则训练失败。总体加速7%到64%，取决于框架、硬件和模型。CIFAR-10上LayerNorm和RMSNorm都不如BatchNorm。</p><h2>后来的发展</h2><p><a class="ln" href="../n/pre-ln.html">Pre-LN Transformer</a>确定了把归一化放在子层输入处之后，RMSNorm成了这个位置的常用选择：<a class="ln" href="../n/gopher.html">Gopher</a>用它代替LayerNorm，<a class="ln" href="../n/llama-1.html">LLaMA</a>原文写明在每个子层输入做RMSNorm预归一化，此后大多数开放权重大模型沿用这一组合。<a class="ln" href="../n/t5.html">T5</a>原文写的“只缩放、不加偏置的简化版层归一化”在形式上也是同一回事。后来<a class="ln" href="../n/dyt.html">无归一化Transformer DyT</a>进一步尝试用逐元素的tanh函数完全去掉归一化统计量。</p><h2>容易误解的地方</h2><ul><li>RMSNorm不是“没有归一化”：它仍按每个token自己的向量做缩放，只是不减均值。</li><li>7%到64%是整个模型的运行时间缩短，不是归一化层本身；在注意力和矩阵乘法占主导的大Transformer里，收益接近下限。</li><li>pRMSNorm理论上更省，但作者自己没有观察到稳定的实际加速。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>“减均值可有可无”只是假设并经验验证，论文没有从理论上说明什么情况下丢掉平移不变性会有害。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只回答了怎么归一化，没回答放在哪里：放在残差之后的Post-LN结构在深层Transformer上仍依赖学习率预热、容易发散。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/pre-ln.html">Pre-LN Transformer</a></div></li><li>每层仍要对每个token做一次求和归约，算子受内存带宽限制；部分RMSNorm的理论加速在实测中没有兑现。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/dyt.html">无归一化Transformer DyT</a></div></li><li>在卷积网络的图像分类上不如BatchNorm，作为通用归一化并不占优。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/layernorm.html">Layer Normalization</a><span class="yr">2016.07 · 基础</span> <span class="vk ok">已核对</span><div class=nt>去掉LayerNorm的减均值和偏置，只按均方根缩放，在精度相当的前提下减少每步计算开销。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/batchnorm.html">Batch Normalization</a><span class="yr">2015.02 · 基础</span><div class=nt>BatchNorm依赖批内统计，不适合RNN和变长序列；RMSNorm按单个样本归一化，但在CNN图像分类上仍是BatchNorm更好。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>在Transformer-base翻译模型上验证可直接替换LayerNorm，BLEU持平、训练快6.9%。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/weight-norm.html">权重归一化</a><span class="yr">2016.02 · 基础</span><div class=nt>论文把权重归一化作为对照，比较各方法对输入、权重缩放与平移的不变性。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/groupnorm.html">Group Normalization</a><span class="yr">2018.03 · 基础</span><div class=nt>部分RMSNorm只用一部分神经元估计统计量，作者说这一想法部分受组归一化启发。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/pre-ln.html">Pre-LN Transformer</a><span class="yr">2020.02 · LLM</span><div class=nt>只回答了怎么归一化，没回答放在哪里：放在残差之后的Post-LN结构在深层Transformer上仍依赖学习率预热、容易发散。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/gopher.html">Gopher</a><span class="yr">2021.12 · LLM</span><div class=nt>用更省计算的RMSNorm替代LayerNorm，这一改动后来被LLaMA等主流模型继承。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/dyt.html">无归一化Transformer DyT</a><span class="yr">2025.03 · 基础</span><div class=nt>每层仍要对每个token做一次求和归约，算子受内存带宽限制；部分RMSNorm的理论加速在实测中没有兑现。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/expectation-variance.html">期望与方差</a> <a class="chip c" href="../c/norm.html">范数与距离</a> <a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/learning-rate.html">学习率与学习率调度</a></p>
+<h2>本篇术语</h2><ul><li><b>均方根（RMS）</b>　把向量各元素平方、取平均、再开根号，衡量向量的整体大小；不减均值。</li><li><b>缩放不变性</b>　把输入或权重整体乘上一个常数，归一化后的输出不变；RMSNorm保留了这一性质。</li><li><b>平移不变性</b>　给输入每个元素都加上同一个数，输出不变；LayerNorm靠减均值获得，RMSNorm放弃了它。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/normalization-layer.html">归一化层</a>，把<a class="ln" href="../n/layernorm.html">Layer Normalization</a>的公式写熟。读原文第3–4节（不变性分析与表1）和表2、表4的耗时对比。动手：用PyTorch写一个10行的RMSNorm模块，替换nanoGPT里的LayerNorm，比较验证损失和每步耗时；再对同一个向量分别算LayerNorm和RMSNorm的输出，体会减均值的差别。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/html/1910.07467" rel="noopener">https://arxiv.org/html/1910.07467</a>（arXiv记录：标题、两位作者、v1提交2019-10-16，摘要中7%~64%；正文公式、不变性与隐式学习率分析、pRMSNorm取6.25%及“未观察到稳定加速”、表2（RNNSearch：LayerNorm 665s/22.6/23.6，RMSNorm 501s/22.4/23.7，24.7%）、表4（Transformer 6.9%，无归一化训练失败）、CIFAR-10不如BatchNorm、受GroupNorm启发；官方代码README（数据目录名neurips19_rmsnorm）；LLaMA论文（arXiv 2302.13971）第2.2节Pre-normalization用RMSNorm、SwiGLU用2/3·4d。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20RMSNorm%EF%BC%88rmsnorm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Armsnorm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/rmsnorm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ttt-shift.html"><small>本分支上一个 · 2019.09</small><b>测试时训练TTT（分布偏移）</b></a><a class="r" href="double-descent.html"><small>本分支下一个 · 2019.12</small><b>双下降</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LightGBM（2017） · AI脉络</title>
+<meta name="description" content="梯度提升树每找一次分裂点都要把所有样本、所有特征扫一遍；数据到千万行、特征到千万维时，XGBoost要么很慢，要么内存不够。 两招减少要扫的东西：按梯度大小采样，只留梯度大的样本加一小部分随机的小梯度样本（GOSS）；把几乎从不同时非零的稀疏特征捆成一个特征（EFB）。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/lightgbm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LightGBM（2017）">
+<meta property="og:description" content="梯度提升树每找一次分裂点都要把所有样本、所有特征扫一遍；数据到千万行、特征到千万维时，XGBoost要么很慢，要么内存不够。 两招减少要扫的东西：按梯度大小采样，只留梯度大的样本加一小部分随机的小梯度样本（GOSS）；把几乎从不同时非零的稀疏特征捆成一个特征（EFB）。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/lightgbm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/lightgbm">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 决策树与集成</div>
+<h1>LightGBM</h1>
+<div class="full">LightGBM: A Highly Efficient Gradient Boosting Decision Tree</div>
+<div class="meta"><span>2017.12</span><span>论文</span><span>重要</span><span>NIPS 2017</span><span>Guolin Ke, Qi Meng, Thomas Finley, Taifeng Wang, Wei Chen, Weidong Ma, Qiwei Ye, Tie-Yan Liu · Microsoft Research / 北京大学 / Microsoft Redmond</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://papers.nips.cc/paper_files/paper/2017/hash/6449f44a102fde848669bdd9eb6b76fa-Abstract.html" rel="noopener">NIPS 2017论文页 ↗</a><a class="btn sm" href="https://lightgbm.readthedocs.io/en/latest/Features.html" rel="noopener">官方文档：Features（直方图、按叶生长） ↗</a><a class="btn sm" href="https://github.com/microsoft/LightGBM" rel="noopener">GitHub代码 ↗</a><a class="btn sm" href="../index.html#/n/lightgbm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>梯度提升树每找一次分裂点都要把所有样本、所有特征扫一遍；数据到千万行、特征到千万维时，XGBoost要么很慢，要么内存不够。</p></div><div><h4>方法</h4><p>两招减少要扫的东西：按梯度大小采样，只留梯度大的样本加一小部分随机的小梯度样本（GOSS）；把几乎从不同时非零的稀疏特征捆成一个特征（EFB）。</p></div><div><h4>影响</h4><p>在5个大数据集上比不用这两招的直方图版本快1.6到21倍，精度几乎不变；开源库与XGBoost、CatBoost一起成为表格数据上最常用的提升树工具。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/gradient-boosting.html">梯度提升机GBM</a>（GBDT）每一轮拟合一棵回归树去逼近当前损失的负梯度，最费时的是建树时找分裂点。找法有两种：预排序，把每个特征的取值排好序后枚举所有切点，精确但又慢又占内存；直方图，先把连续取值分到有限个桶里，按桶累加梯度，只在桶边界上找切点。直方图法里，建直方图的代价是<code>O(样本数 × 特征数)</code>，找切点只要<code>O(桶数 × 特征数)</code>，瓶颈在样本数和特征数。</p><p><a class="ln" href="../n/xgboost.html">XGBoost</a>在论文测试的KDD Cup 2010、2012数据上（1900万和1.19亿行，2900万和5400万维稀疏特征），直方图版本直接内存溢出。减少样本和特征并不容易：<a class="ln" href="../n/adaboost.html">AdaBoost与集成学习</a>式的加速按样本权重采样，而GBDT没有样本权重。</p><h2>方法</h2><p><b>基础：直方图加按叶生长</b>。连续特征先分桶；树每次挑当前损失下降最大的那片叶子分裂（best-first），而不是一层一层长。</p><p><b>GOSS：基于梯度的单边采样</b>。梯度绝对值大的样本还没拟合好，对分裂增益的贡献也大。GOSS每轮按<code>|g|</code>排序，保留前<code>a</code>比例的大梯度样本，再从剩下的样本里随机抽<code>b</code>比例（相对全体），计算增益时把抽中的小梯度样本乘以<code>(1−a)/b</code>，补回被丢掉的那部分梯度和。例如100万个样本、<code>a = b = 0.1</code>：留下梯度最大的10万个，再从其余90万中随机抽10万个、每个权重记为9，建树只用这20万个。论文证明，同样采样率下这比均匀随机采样估计的增益更准。</p><p><b>EFB：互斥特征捆绑</b>。高维稀疏特征里，许多列（典型如<a class="lc" href="../c/one-hot.html">独热编码与词表</a>编码出来的列）几乎从不同时非零。把它们合成一个特征，直方图代价就从<code>O(样本数 × 特征数)</code>降到<code>O(样本数 × 捆数)</code>。找最少的捆是NP难的（可由图着色归约），作者用贪心着色近似求解，并允许少量冲突。合并时给各特征的桶编号加偏移：特征A落在<code>[0, 10)</code>、B落在<code>[0, 20)</code>，把B加10变成<code>[10, 30)</code>，合成的新特征仍能区分两者。</p><h2>结果</h2><p>在5个数据集上比较每轮训练时间：LightGBM相对不带GOSS和EFB的自家直方图版本，在Allstate、Flight Delay、LETOR、KDD10、KDD12上分别快21、6、1.6、14、13倍；相对XGBoost直方图版本最多快9倍。精度几乎不变，例如KDD12测试AUC为0.7051，基线为0.7049。GOSS只用10%到20%的数据带来约2倍提速（预测和算梯度仍在全量数据上做），且同采样率下精度始终高于普通随机采样；EFB在大规模稀疏数据上贡献了大部分提速。</p><h2>后来的发展</h2><p>LightGBM说明：在直方图法之上，瓶颈是每轮要看多少样本、多少特征，两者都能按梯度和稀疏结构有选择地压缩而几乎不损精度。官方文档列出的后续改进包括用父节点减去兄弟节点得到直方图，以及对类别特征直接按梯度统计排序找最优二分、不必先做独热编码。</p><p>它与同年的<a class="ln" href="../n/catboost.html">CatBoost</a>、<a class="ln" href="../n/xgboost.html">XGBoost</a>至今仍是表格数据（风控、广告点击、排序、数据竞赛）的首选；在这类数据上，深度网络至今没有稳定地取代它们。</p><h2>容易误解的地方</h2><ul><li>GOSS不是简单丢弃小梯度样本：直接丢弃会改变数据分布、损害精度，<code>(1−a)/b</code>的放大系数是关键。</li><li>按叶生长在数据量小时容易过拟合，官方文档建议用<code>max_depth</code>和叶子数加以限制；即使设了<code>max_depth</code>，树仍按叶生长。</li><li>论文中的提速对比是「每轮训练时间」，不同数据集差别很大：稠密、特征少的LETOR只快1.6倍，提速主要出现在大规模稀疏数据上。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>按叶生长的树深度不受控，样本少时容易过拟合，需要人工调叶子数、最大深度等超参数。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>GOSS只能减少建树的样本，每轮的预测和梯度计算仍在全量数据上进行；对稠密、低维的数据，GOSS和EFB的提速有限。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>和所有树模型一样，分裂离散、不可微，不能从原始信号中学特征，也无法像深度模型那样先在大量表格上预训练再迁移，效果仍依赖人工特征工程。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/cart.html">决策树CART</a><span class="yr">1984 · 基础</span><div class=nt>基学习器仍是CART式的二叉回归树，以分裂后的方差增益选切点。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/gradient-boosting.html">梯度提升机GBM</a><span class="yr">2001 · 基础</span><div class=nt>完全沿用GBDT的「每轮拟合负梯度」框架，只改变建树时用哪些样本和特征来估计分裂增益。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/xgboost.html">XGBoost</a><span class="yr">2016.03 · 基础</span><div class=nt>XGBoost在千万行、千万维稀疏数据上又慢又可能内存溢出；GOSS和EFB把建直方图的样本数和特征数都降下来，在相同精度下快一个量级。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/adaboost.html">AdaBoost与集成学习</a><span class="yr">1997 · 基础</span><div class=nt>AdaBoost可以按样本权重采样加速，GBDT没有样本权重；GOSS用梯度绝对值充当这个「重要性」。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/catboost.html">CatBoost</a><span class="yr">2017.06 · 基础</span><div class=nt>同年的另一款提升树库，重点是类别特征和预测偏移带来的偏差，LightGBM重点是速度和内存；两者至今并存。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/decision-tree.html">决策树</a> <a class="chip c" href="../c/ensemble.html">集成学习</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/one-hot.html">独热编码与词表</a> <a class="chip c" href="../c/big-o.html">时间与空间复杂度</a></p>
+<h2>本篇术语</h2><ul><li><b>直方图算法</b>　把连续特征的取值分成有限个桶（例如几百个），建树时按桶累加梯度，只在桶边界上找切点，比枚举全部取值省时省内存。</li><li><b>按叶生长（leaf-wise）</b>　每次只分裂当前损失下降最多的那片叶子，而不是把同一层的所有节点都分裂一遍（按层生长）。</li><li><b>方差增益</b>　GBDT选切点的标准：切分后左右两边负梯度之和的平方除以各自样本数，再相加；越大说明这刀把梯度方向不同的样本分得越开。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/decision-tree.html">决策树</a>和<a class="lc" href="../c/ensemble.html">集成学习</a>，读懂<a class="ln" href="../n/gradient-boosting.html">梯度提升机GBM</a>与<a class="ln" href="../n/xgboost.html">XGBoost</a>两个节点。再读原文第2.1节（直方图算法的复杂度）、第3.1节与算法2（GOSS，只有十几行伪代码）、第4节的算法3和4（EFB），实验看表2和表3。动手：在一个有几百万行、带大量独热特征的数据上，用lightgbm库分别开关<code>data_sample_strategy=&#x27;goss&#x27;</code>和<code>enable_bundle</code>，记录每轮时间和验证集AUC，再和xgboost的<code>tree_method=&#x27;hist&#x27;</code>对比。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://papers.nips.cc/paper_files/paper/2017/file/6449f44a102fde848669bdd9eb6b76fa-Paper.pdf" rel="noopener">https://papers.nips.cc/paper_files/paper/2017/file/6449f44a102fde848669bdd9eb6b76fa-Paper.pdf</a>（标题、8位作者及Microsoft Research / 北京大学 / Microsoft Redmond单位、NIPS 2017（Long Beach）；摘要中的「up to over 20 times」；算法2的`(1−a)/b`系数；EFB的NP难证明与偏移合并示例（[0,10)与[0,20)）；表1数据规模；表2/表3中的21/6/1.6/14/13倍、相对xgb_his最多9倍、KDD12 AUC 0.7051/0.7049/0.7029；GOSS用10%–20%数据约2倍提速；实验机器配置。另打开官方文档Features页确认按叶生长、小数据过拟合与max_depth、直方图相减和类别特征最优切分。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20LightGBM%EF%BC%88lightgbm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Alightgbm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/lightgbm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="loss-landscape.html"><small>本分支上一个 · 2017.12</small><b>损失曲面可视化</b></a><a class="r" href="gcn-oversmoothing.html"><small>本分支下一个 · 2018.01</small><b>GCN过平滑</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

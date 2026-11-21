@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ELECTRA替换词检测（2020） · AI脉络</title>
+<meta name="description" content="BERT每句话只遮住15%的词，也只从这15%的位置学习，其余85%的计算几乎白算；要训得好就得堆大量算力，小团队训不起。 用一个小的掩码语言模型（生成器）把部分词换成“以假乱真”的替代词，再训练主模型（判别器）对 每一个 词判断“是原词还是被换过”，让所有位置都提供训练信号。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/electra.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ELECTRA替换词检测（2020）">
+<meta property="og:description" content="BERT每句话只遮住15%的词，也只从这15%的位置学习，其余85%的计算几乎白算；要训得好就得堆大量算力，小团队训不起。 用一个小的掩码语言模型（生成器）把部分词换成“以假乱真”的替代词，再训练主模型（判别器）对 每一个 词判断“是原词还是被换过”，让所有位置都提供训练信号。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/electra.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/electra">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 预训练目标</div>
+<h1>ELECTRA替换词检测</h1>
+<div class="full">ELECTRA: Pre-training Text Encoders as Discriminators Rather Than Generators</div>
+<div class="meta"><span>2020.03</span><span>论文</span><span>重要</span><span>ICLR 2020</span><span>Clark, Luong, Le, Manning · Stanford / Google Brain</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2003.10555" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/google-research/electra" rel="noopener">代码与模型 ↗</a><a class="btn sm" href="../index.html#/n/electra">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>BERT每句话只遮住15%的词，也只从这15%的位置学习，其余85%的计算几乎白算；要训得好就得堆大量算力，小团队训不起。</p></div><div><h4>方法</h4><p>用一个小的掩码语言模型（生成器）把部分词换成“以假乱真”的替代词，再训练主模型（判别器）对<b>每一个</b>词判断“是原词还是被换过”，让所有位置都提供训练信号。</p></div><div><h4>影响</h4><p>同等算力下明显优于BERT：14M参数的小模型在一块GPU上训4天，GLUE超过算力多约30倍的GPT；大模型用不到1/4算力追平RoBERTa和XLNet，说明预训练任务的设计本身就能大幅节省算力。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/bert.html">BERT</a>的掩码语言建模（MLM，见<a class="lc" href="../c/masked-modeling.html">掩码建模</a>）随机挑出15%的token换成[MASK]，让模型猜原词。问题有两个：</p><ul><li><b>样本效率低。</b>损失只在被遮的15%位置上计算，一句128个token的句子只产生约19个预测目标。<a class="ln" href="../n/roberta.html">RoBERTa</a>、<a class="ln" href="../n/xlnet.html">XLNet</a>靠更多数据和更长训练把效果推上去，代价是数倍于BERT的算力。</li><li><b>训练与使用不一致。</b>预训练时输入里有[MASK]，微调和使用时从不出现。</li></ul><p>想用较少算力得到好的编码器，<a class="ln" href="../n/tinybert.html">TinyBERT</a>等方法走的是先训大模型再蒸馏；本文想直接从预训练任务入手。</p><h2>方法</h2><p><b>替换词检测</b>（replaced token detection）。两个Transformer编码器一起训练：</p><p>1. <b>生成器G</b>：一个小的MLM。对输入随机遮住约15%的位置，G在这些位置按自己预测的分布采样一个词填回去。例如“the chef cooked the meal”遮住chef和cooked，G可能填回“the chef ate the meal”——chef猜对了，cooked被换成了ate。</p><p>2. <b>判别器D</b>：主模型。读入被改过的句子，对<b>每个位置</b>做二分类：这个词是原文还是被替换的？上例的正确答案是：只有ate是假的。注意，G恰好猜对的词算作“原词”。</p><p>总损失是<code>L = L_MLM(G) + λ·L_Disc(D)</code>。采样这一步不可导，所以判别器的损失不回传给生成器。预训练结束后扔掉G，只用D去微调下游任务。</p><p><b>它不是GAN。</b>虽然结构像<a class="ln" href="../n/gan.html">生成对抗网络GAN</a>（生成器造假、判别器识别），但G只是普通地用最大似然学猜词，并不试图骗过D。作者试过用强化学习对抗训练G，效果反而更差：对抗训练的生成器MLM准确率只有58%（最大似然训练的是65%），而且输出分布过于集中。</p><p><b>两个细节。</b>一是G要小：G为D的1/4到1/2大小时效果最好，G太强会让判别任务难到D学不好。二是G与D共享词嵌入：G的softmax每步都更新整个词表的嵌入，D只能更新句中出现的词，共享后D得益。</p><p>从另一个角度看，它是<a class="ln" href="../n/word2vec.html">word2vec</a>负采样和<a class="ln" href="../n/nce.html">噪声对比估计NCE</a>“区分真样本与噪声样本”思想的大规模版本，只是噪声由一个学出来的生成器提供。</p><h2>结果</h2><p>GLUE开发集：ELECTRA-Small（1400万参数，1块V100训4天）得79.9，同配置的BERT-Small为75.1，更大的GPT（1.17亿参数）为78.8；ELECTRA-Base得85.1，BERT-Base为82.2。大模型上，ELECTRA-400K只用了RoBERTa-500K约1/4的算力，平均分89.0对88.9；训练更久的ELECTRA-1.75M为89.5，超过XLNet的89.1，并刷新SQuAD 2.0纪录。</p><p>消融说明收益主要来自“所有位置都学习”：只在被遮的15%位置算判别损失时GLUE为82.4，与BERT的82.2几乎一样；完整ELECTRA为85.0。</p><h2>后来的发展</h2><p>ELECTRA证明了预训练目标的设计能带来与加大算力相当的收益，替换词检测后来被一些编码器模型直接采用（如微软的DeBERTaV3）。它也让“小团队一块GPU也能预训练一个可用的语言模型”成为现实。</p><p>不过2020年之后，研究主流迅速转向<a class="ln" href="../n/gpt-3.html">GPT-3</a>式的大型解码器：它们能直接生成、能靠提示完成新任务，而ELECTRA这类编码器需要为每个任务微调。编码器模型的主要用武之地变成了检索、分类和嵌入等需要高效理解的场景。</p><h2>容易误解的地方</h2><ul><li>判别器的任务不是猜出原词，只是判断“是否被换过”，所以输出是每个位置一个二分类概率，而不是整个词表上的分布。</li><li>预训练后真正用的是判别器，生成器被丢弃；不能拿ELECTRA来生成文本。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>要同时训练生成器和判别器，生成器大小是一个敏感的新超参数，太强太弱都会伤害效果。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>生成器和判别器直接共享词嵌入，但两者的损失会把嵌入往不同方向拉（后来DeBERTaV3称之为“拔河”），共享方式并不理想。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>得到的是只能做理解任务的编码器，不能生成文本，也无法像大型解码器那样靠提示完成没见过的任务。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/bert.html">BERT</a><span class="yr">2018.10 · LLM</span> <span class="vk ok">已核对</span><div class=nt>BERT只从15%被遮的位置学习且存在[MASK]不一致；ELECTRA让每个位置都参与训练，同等算力下GLUE明显更高。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/roberta.html">RoBERTa</a><span class="yr">2019.07 · LLM</span> <span class="vk ok">已核对</span><div class=nt>RoBERTa靠更多数据和算力提升BERT；ELECTRA靠更好的预训练任务，用不到1/4算力达到同等水平。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/word2vec.html">word2vec</a><span class="yr">2013.01 · NLP</span><div class=nt>可看作把CBOW负采样和噪声对比估计（NCE）“判断真样本还是噪声”的思路放大到Transformer，并把噪声来源换成学出来的生成器。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/gan.html">生成对抗网络GAN</a><span class="yr">2014.06 · 生成</span><div class=nt>借用生成器与判别器的结构，但生成器用最大似然训练而非对抗训练，因为文本采样不可导、对抗训练效果更差。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/albert.html">ALBERT参数共享</a><span class="yr">2019.09 · LLM</span><div class=nt>仍是只从15%被遮位置学习的掩码语言模型，预训练效率不高。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/xlnet.html">XLNet</a><span class="yr">2019.06 · LLM</span><div class=nt>XLNet用排列语言建模消除[MASK]不一致；ELECTRA用替换词检测，算力更少而分数相当或更高。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/tinybert.html">TinyBERT</a><span class="yr">2019.09 · 系统·效率</span><div class=nt>TinyBERT先训大模型再蒸馏出小模型；ELECTRA-Small直接从头预训练，侧重降低预训练成本。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/deberta.html">DeBERTa解耦注意力</a><span class="yr">2020.06 · LLM</span><div class=nt>同期改进BERT的另一条路线：ELECTRA改预训练目标，DeBERTa改注意力结构；后来的DeBERTa v3把两者合在一起。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/logistic-regression.html">逻辑回归</a> <a class="chip c" href="../c/cross-entropy.html">交叉熵</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/contrastive-learning.html">对比学习</a></p>
+<h2>本篇术语</h2><ul><li><b>替换词检测</b>　把句中部分词换成看似合理的替代词，让模型对每个位置判断这个词是不是被换过。</li><li><b>生成器 / 判别器</b>　生成器是负责造替代词的小掩码语言模型；判别器是负责识别替代词、最终留下来使用的主模型。</li><li><b>样本效率</b>　用同样多的数据或算力能学到多少。ELECTRA每句话的每个位置都提供信号，所以样本效率更高。</li></ul>
+<h2>怎么学</h2><p>先懂<a class="ln" href="../n/bert.html">BERT</a>的掩码语言建模和二分类的交叉熵。读原文第2节（方法，图1）、第3.2节（生成器大小、权重共享）和第3.5节（消融，表5）。动手：用Hugging Face加载google/electra-small-discriminator，喂一句手动替换了一个词的句子，看它给每个位置的“被替换”概率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2003.10555" rel="noopener">https://arxiv.org/abs/2003.10555</a>（标题、4位作者、v1提交于2020-03-23；摘要中“one GPU for 4 days”“30x more compute”“less than 1/4 of their compute”；ar5iv全文表1（ELECTRA-Small 79.9、BERT-Small 75.1、GPT 78.8、ELECTRA-Base 85.1、BERT-Base 82.2）、表2（ELECTRA-400K 89.0、RoBERTa-500K 88.9、XLNet 89.1、ELECTRA-1.75M 89.5）、表5（85.0/84.3/82.4/82.4/82.2）、生成器1/4到1/2最佳、对抗训练58%对65%、与NCE和CBOW负采样的关系。另核对DeBERTaV3摘要（arXiv 2111.09543）：改用替换词检测，并指出ELECTRA共享嵌入的“拔河”问题。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ELECTRA%E6%9B%BF%E6%8D%A2%E8%AF%8D%E6%A3%80%E6%B5%8B%EF%BC%88electra%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aelectra%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/electra.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="codebert.html"><small>本分支上一个 · 2020.02</small><b>CodeBERT</b></a><a class="r" href="longformer.html"><small>本分支下一个 · 2020.04</small><b>Longformer滑窗注意力</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

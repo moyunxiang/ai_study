@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>图网络物理模拟器GNS（2020） · AI脉络</title>
+<meta name="description" content="流体、软体、刚体的物理模拟靠为每种材料专门写的求解器，既难写又慢；此前的学习式模拟器往往只针对一种材料，换粒子数或换场景就失效。 把物理系统看成一张粒子图：粒子是节点，距离近的粒子之间连边，用学到的消息传递预测每个粒子的加速度，再用积分得到下一步位置，反复滚动即得到整段模拟。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/gns.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="图网络物理模拟器GNS（2020）">
+<meta property="og:description" content="流体、软体、刚体的物理模拟靠为每种材料专门写的求解器，既难写又慢；此前的学习式模拟器往往只针对一种材料，换粒子数或换场景就失效。 把物理系统看成一张粒子图：粒子是节点，距离近的粒子之间连边，用学到的消息传递预测每个粒子的加速度，再用积分得到下一步位置，反复滚动即得到整段模拟。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/gns.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/gns">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:144"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/sci.html">AI for Science</a> › 物理模拟与控制</div>
+<h1>图网络物理模拟器GNS</h1>
+<div class="full">Learning to Simulate Complex Physics with Graph Networks</div>
+<div class="meta"><span>2020.02</span><span>论文</span><span>重要</span><span>ICML 2020</span><span>Sanchez-Gonzalez, Godwin, Pfaff, Ying, Leskovec, Battaglia · DeepMind / Stanford</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2002.09405" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/gns">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>流体、软体、刚体的物理模拟靠为每种材料专门写的求解器，既难写又慢；此前的学习式模拟器往往只针对一种材料，换粒子数或换场景就失效。</p></div><div><h4>方法</h4><p>把物理系统看成一张粒子图：粒子是节点，距离近的粒子之间连边，用学到的消息传递预测每个粒子的加速度，再用积分得到下一步位置，反复滚动即得到整段模拟。</p></div><div><h4>影响</h4><p>给出了一个通用的学习式物理模拟器，能跨材料、跨粒子数泛化，是后来MeshGraphNets等基于图网络的模拟器的基础。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>传统粒子模拟（如光滑粒子流体动力学、物质点法）需要针对流体、沙子、粘弹性体写不同的力学模型，还要小心地调参数以保证稳定。深度学习里的<a class="ln" href="../n/mpnn.html">消息传递神经网络MPNN</a>已经在分子上展示了图网络的能力，但用于通用物理模拟有两个问题：一是长时间滚动预测误差会累积，几步之后粒子就开始乱飞；二是模型往往在训练时的粒子数、场景上才有效，换一个大得多的场景就失败。</p><h2>方法</h2><p><b>图的表示</b>。每一时刻，系统状态是一组粒子，每个粒子带有最近若干步的速度、位置和材料类型。把距离小于某个连接半径的粒子对连成边，边特征是相对位移和距离。</p><p><b>编码-处理-解码</b>。编码器把节点和边的特征各自映射为隐向量；处理器是若干步（论文称消息传递步数）的图网络，每一步每个节点从邻居收集消息、更新自己的状态（见<a class="lc" href="../c/message-passing.html">图神经网络与消息传递</a>）；解码器从每个节点的最终隐状态输出加速度。</p><p><b>时间积分</b>。用半隐式欧拉积分，由预测的加速度更新速度和位置，得到下一帧。模型一次只预测一个时间步，训练时是单步损失，使用时反复把自己的输出当输入，滚动成长序列。</p><p><b>抗误差累积</b>。训练时给输入的历史位置加上高斯噪声，让模型习惯“有一点错误的输入”，推理滚动时对自己累积的小误差更鲁棒。</p><h2>结果</h2><p>按摘要，模型能够从训练时有几千个粒子的单步预测，泛化到不同的初始条件、数千步的滚动，以及测试时至少多一个数量级的粒子数。作者发现对长时间表现起决定作用的两个因素是消息传递步数和训练数据加噪来抑制误差累积，而模型对超参数选择较不敏感。</p><h2>后来的发展</h2><p>GNS证明“图网络加噪声训练”可以做通用的物理模拟，其后<a class="ln" href="../n/meshgraphnets.html">MeshGraphNets</a>把它推广到网格上的模拟（如布料和空气动力学），同样的思想进入<a class="ln" href="../n/graphcast.html">GraphCast与AI天气预报</a>这类天气预报模型。局限也很明显：速度比不过好的传统求解器的并行实现，物理守恒定律没有被硬性保证。</p><h2>容易误解的地方</h2><ul><li>模型学的是数据里的动力学，不保证质量、动量、能量守恒；长时间滚动可能出现不物理的现象。</li><li>加噪训练是针对“自己喂自己”时误差累积的技巧，不是为了提高单步精度。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>自回归滚动时误差逐步累积，只靠加噪缓解，没有保证长时间的稳定性和守恒。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/gencast.html">GenCast扩散集合预报</a></div></li><li>每一步要对粒子对做邻居搜索和多步消息传递，规模上去后比专用求解器的并行实现还慢。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>粒子表示适合流体和软体，对工程中常见的有限元网格模拟没有直接适配。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/meshgraphnets.html">MeshGraphNets</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/mpnn.html">消息传递神经网络MPNN</a><span class="yr">2017.04 · 基础</span><div class=nt>把用于分子的消息传递网络搬到粒子物理模拟，并让模型一步步滚动预测。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:144" href="../n/graphcast.html">GraphCast与AI天气预报</a><span class="yr">2022.12 · 科学</span><div class=nt>沿用同一团队用图网络学习物理模拟器的“编码-处理-解码”和自回归滚动，从粒子、流体推广到全球大气。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/gencast.html">GenCast扩散集合预报</a><span class="yr">2023.12 · 科学</span><div class=nt>自回归滚动时误差逐步累积，只靠加噪缓解，没有保证长时间的稳定性和守恒。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/meshgraphnets.html">MeshGraphNets</a><span class="yr">2020.10 · 科学</span><div class=nt>把粒子图换成网格图，并加入自适应网格。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/message-passing.html">图神经网络与消息传递</a> <a class="chip c" href="../c/supervised-learning.html">监督学习</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/derivative-gradient.html">导数、偏导与梯度</a> <a class="chip c" href="../c/ode-sde.html">常微分方程与随机微分方程</a></p>
+<h2>本篇术语</h2><ul><li><b>滚动预测</b>　模型每次只预测下一小步，再把预测结果当作下一次的输入，重复很多步得到长序列。</li><li><b>半隐式欧拉积分</b>　先用加速度更新速度，再用新速度更新位置，是物理模拟里常用的稳定简单积分方式。</li></ul>
+<h2>怎么学</h2><p>先学<a class="lc" href="../c/message-passing.html">图神经网络与消息传递</a>和<a class="lc" href="../c/autoregressive.html">自回归生成</a>。读原文的方法部分，重点看噪声注入。动手：对一个小的二维粒子下落数据集，用邻居图加几层消息传递训练单步预测，分别在加噪和不加噪下滚动100步，比较误差。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2002.09405" rel="noopener">https://arxiv.org/abs/2002.09405</a>（标题、6位作者、arXiv首次提交2020-02-21；摘要中的粒子图表示、学到的消息传递、从几千粒子训练泛化到数量级更多粒子、数千步滚动、消息传递步数与加噪为主要因素。ICML 2020和半隐式欧拉积分细节为记忆，未逐项核对。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%9B%BE%E7%BD%91%E7%BB%9C%E7%89%A9%E7%90%86%E6%A8%A1%E6%8B%9F%E5%99%A8GNS%EF%BC%88gns%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Agns%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/gns.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="halicin.html"><small>本分支上一个 · 2020.02</small><b>深度学习发现抗生素Halicin</b></a><a class="r" href="weatherbench.html"><small>本分支下一个 · 2020.02</small><b>WeatherBench</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

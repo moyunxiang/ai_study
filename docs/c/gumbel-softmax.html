@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>离散变量的梯度：直通估计与Gumbel-Softmax（Gradients Through Discrete Variables） · AI脉络</title>
+<meta name="description" content="离散采样（选第几个类别、取哪个码本向量）没有梯度；直通估计和Gumbel-Softmax是两种让梯度“穿过”离散选择、从而能端到端训练的近似办法。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/gumbel-softmax.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="离散变量的梯度：直通估计与Gumbel-Softmax（Gradients Through Discrete Variables）">
+<meta property="og:description" content="离散采样（选第几个类别、取哪个码本向量）没有梯度；直通估计和Gumbel-Softmax是两种让梯度“穿过”离散选择、从而能端到端训练的近似办法。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/gumbel-softmax.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/gumbel-softmax">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 概率统计与信息论 · 进阶</div>
+<h1>离散变量的梯度：直通估计与Gumbel-Softmax</h1><div class="full">Gradients Through Discrete Variables</div>
+<p class="muted" style="font-size:13px">也叫：STE　直通估计器　straight-through estimator　Gumbel-Max　Concrete分布　离散梯度</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/gumbel-softmax">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>离散采样（选第几个类别、取哪个码本向量）没有梯度；直通估计和Gumbel-Softmax是两种让梯度“穿过”离散选择、从而能端到端训练的近似办法。</b></p>
+<p class="tags">先要会：<a class="chip c" href="backpropagation.html">反向传播</a> <a class="chip c" href="softmax.html">Softmax与logits</a> <a class="chip c" href="reparameterization.html">重参数化技巧</a></p>
+<p><a class="lc" href="../c/backpropagation.html">反向传播</a>要求每一步都可导。但很多模型中间有离散选择：<a class="ln" href="../n/vq-vae.html">VQ-VAE</a>要从码本里选最近的向量，离散隐变量模型要采样一个类别，硬注意力要选一个位置。argmax或采样操作的输出是阶梯状的，几乎处处导数为0，梯度传不回去。<a class="lc" href="../c/reparameterization.html">重参数化技巧</a>对连续高斯有效，对离散分布不直接适用。</p><p><b>直通估计</b>（Straight-Through Estimator，STE）：前向传播照常做离散操作，反向传播时假装这一步是恒等函数，把输出的梯度原样传给输入。它是有偏的近似，但简单、常常够用。VQ-VAE就是这样把梯度从解码器直接拷贝给编码器输出；<a class="ln" href="../n/bnn.html">二值化神经网络BNN</a>等低比特量化训练也依赖STE（见<a class="lc" href="../c/quantization-concept.html">量化</a>）。</p><p><b>Gumbel-Max技巧</b>：要从概率π₁…π_K里采样，可以给每个log π_i加一个独立的Gumbel噪声<code>g_i = −log(−log u_i)</code>，u_i在(0,1)均匀分布，然后取argmax。结果恰好服从类别分布π。这把“随机性”和“参数”分开了，正是重参数化的思路。</p><p><b>Gumbel-Softmax</b>（2016年两组人同时提出，另一个名字叫Concrete分布）：把不可导的argmax换成带温度τ的<a class="lc" href="../c/softmax.html">Softmax与logits</a>：</p><p class="formula"><code>y_i = softmax((log π_i + g_i) / τ)</code></p><p>τ → 0时y趋近独热向量，τ大时更平滑。训练时常从较大τ逐步退火。也可以前向用硬的独热、反向用软的y的梯度，叫Straight-Through Gumbel-Softmax。</p><p><b>在AI里</b>：<a class="ln" href="../n/dall-e.html">DALL·E</a>第一阶段训练离散VAE时用Gumbel-Softmax松弛；离散token化的图像、语音模型（见<a class="lc" href="../c/vector-quantization.html">向量量化与离散token</a>）广泛使用直通估计；神经架构搜索中选择操作类型也用过Gumbel-Softmax。</p>
+<div class="example"><h4>例子</h4><p>三类概率π = [0.5, 0.3, 0.2]，log π ≈ [−0.69, −1.20, −1.61]。抽到u = [0.6, 0.2, 0.9]，Gumbel噪声g ≈ [0.67, −0.48, 2.25]，相加得[−0.02, −1.68, 0.64]。</p><ul><li>argmax：选第3类（Gumbel-Max的采样结果）。</li><li>τ = 1：softmax得[0.32, 0.06, 0.62]，平滑但偏向第3类。</li><li>τ = 0.1：[0.00, 0.00, 1.00]，几乎就是独热。</li><li>τ = 5：[0.35, 0.25, 0.40]，接近均匀。</li></ul></div>
+<h2>容易误解的地方</h2><ul><li>两种方法给出的都是有偏梯度，模型优化的不完全是你写下的目标。</li><li>τ太小时梯度方差很大、训练不稳；τ太大时训练和测试（测试用硬选择）的行为差距大。</li><li>另一类无偏方法是REINFORCE式的得分函数估计（见<a class="lc" href="../c/policy-gradient-concept.html">策略梯度</a>），无偏但方差大，适用场景不同。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:288" href="../n/vq-vae.html">VQ-VAE</a> <a class="chip hue" style="--h:168" href="../n/wav2vec-2.html">wav2vec 2.0</a> <a class="chip hue" style="--h:288" href="../n/dall-e.html">DALL·E</a> <a class="chip hue" style="--h:48" href="../n/ste.html">直通估计器STE</a> <a class="chip hue" style="--h:168" href="../n/vq-wav2vec.html">vq-wav2vec</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

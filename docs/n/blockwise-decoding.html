@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>分块并行解码（2018） · AI脉络</title>
+<meta name="description" content="自回归模型生成每个词都要先看到前一个词，一个词一个词地生成，延迟和输出长度成正比，无法并行。 额外训练几个预测头，一次猜接下来的k个词，再让原模型一次并行验证，保留与它自己结果一致的最长前缀。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/blockwise-decoding.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="分块并行解码（2018）">
+<meta property="og:description" content="自回归模型生成每个词都要先看到前一个词，一个词一个词地生成，延迟和输出长度成正比，无法并行。 额外训练几个预测头，一次猜接下来的k个词，再让原模型一次并行验证，保留与它自己结果一致的最长前缀。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/blockwise-decoding.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/blockwise-decoding">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 解码与生成控制</div>
+<h1>分块并行解码</h1>
+<div class="full">Blockwise Parallel Decoding for Deep Autoregressive Models</div>
+<div class="meta"><span>2018.11</span><span>论文</span><span>延伸</span><span>NeurIPS 2018</span><span>Mitchell Stern, Noam Shazeer, Jakob Uszkoreit · Google</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1811.03115" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/blockwise-decoding">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>自回归模型生成每个词都要先看到前一个词，一个词一个词地生成，延迟和输出长度成正比，无法并行。</p></div><div><h4>方法</h4><p>额外训练几个预测头，一次猜接下来的k个词，再让原模型一次并行验证，保留与它自己结果一致的最长前缀。</p></div><div><h4>影响</h4><p>这是「先猜后验证」思路的雏形，直接启发了推测解码。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>做法分三步。<b>预测</b>：在模型上加几个独立的预测头，在同一位置分别猜第t+1、t+2……t+k个词。<b>验证</b>：把这k个猜测拼到已生成内容后面，让原模型对这些位置并行打分，看它自己的贪心选择是否与猜测一致。<b>接受</b>：保留最长的一致前缀，然后从下一位置继续。</p><p>因为验证只保留与贪心解码一致的前缀，所以质量不会下降。摘要称在机器翻译和图像超分辨率上，迭代次数最多减少2倍且无质量损失，若容许轻微下降最多减少7倍，实际时钟时间最多快4倍。后来<a class="ln" href="../n/speculative-decoding.html">推测解码</a>改用小模型作草稿，<a class="ln" href="../n/medusa.html">Medusa多解码头</a>则再次用多个解码头。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要额外训练预测头，且只支持贪心解码的一致性验证。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/speculative-decoding.html">推测解码</a></div></li><li>猜得越远越不准，接受长度有限。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/medusa.html">Medusa多解码头</a> <a class="chip hue" style="--h:192" href="../n/eagle.html">EAGLE特征级推测解码</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>在Transformer自注意力模型上，用并行评分验证猜测。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/speculative-decoding.html">推测解码</a><span class="yr">2022.11 · 系统·效率</span><div class=nt>后者要改模型并只做贪心验证；本文用拒绝采样在不改模型的前提下保持采样分布。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/medusa.html">Medusa多解码头</a><span class="yr">2024.01 · 系统·效率</span><div class=nt>猜得越远越不准，接受长度有限。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/eagle.html">EAGLE特征级推测解码</a><span class="yr">2024.01 · 系统·效率</span><div class=nt>猜得越远越不准，接受长度有限。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+
+<h2>怎么学</h2><p>手写一个玩具版本：假装有一个能一次猜3个词的模型，统计平均每步接受几个词。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1811.03115" rel="noopener">https://arxiv.org/abs/1811.03115</a>（标题、3位作者、v1提交2018-11-07、NIPS 2018；摘要：迭代最多减少2倍无损、7倍轻微下降、时钟最多快4倍。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%88%86%E5%9D%97%E5%B9%B6%E8%A1%8C%E8%A7%A3%E7%A0%81%EF%BC%88blockwise-decoding%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ablockwise-decoding%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/blockwise-decoding.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="gpipe.html"><small>本分支上一个 · 2018.11</small><b>GPipe流水线并行</b></a><a class="r" href="hf-transformers.html"><small>本分支下一个 · 2018.11</small><b>Hugging Face Transformers</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

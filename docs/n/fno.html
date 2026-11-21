@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>傅里叶神经算子FNO（2020） · AI脉络</title>
+<meta name="description" content="传统偏微分方程求解器每换一组参数就要重新算，高分辨率的湍流模拟极慢；已有的神经网络求解器要么只学一个方程实例，要么换分辨率就要重训。 让神经算子的积分核在傅里叶空间里直接参数化：对输入做傅里叶变换，在低频模式上乘一个可学习的矩阵，再变换回去，叠加逐点的线性变换和非线性。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/fno.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="傅里叶神经算子FNO（2020）">
+<meta property="og:description" content="传统偏微分方程求解器每换一组参数就要重新算，高分辨率的湍流模拟极慢；已有的神经网络求解器要么只学一个方程实例，要么换分辨率就要重训。 让神经算子的积分核在傅里叶空间里直接参数化：对输入做傅里叶变换，在低频模式上乘一个可学习的矩阵，再变换回去，叠加逐点的线性变换和非线性。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/fno.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/fno">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:144"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/sci.html">AI for Science</a> › 物理模拟与控制</div>
+<h1>傅里叶神经算子FNO</h1>
+<div class="full">Fourier Neural Operator for Parametric Partial Differential Equations</div>
+<div class="meta"><span>2020.10</span><span>论文</span><span>重要</span><span>ICLR 2021（arXiv 2020）</span><span>Li, Kovachki, Azizzadenesheli, Liu, Bhattacharya, Stuart, Anandkumar · Caltech / Purdue</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2010.08895" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/fno">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>传统偏微分方程求解器每换一组参数就要重新算，高分辨率的湍流模拟极慢；已有的神经网络求解器要么只学一个方程实例，要么换分辨率就要重训。</p></div><div><h4>方法</h4><p>让神经算子的积分核在傅里叶空间里直接参数化：对输入做傅里叶变换，在低频模式上乘一个可学习的矩阵，再变换回去，叠加逐点的线性变换和非线性。</p></div><div><h4>影响</h4><p>学习PDE解算子的主流架构，在规则网格上比传统求解器快几个数量级，并催生了FourCastNet等基于它的大规模天气预报模型。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>计算流体力学等领域依赖数值求解器，每次解一个特定的初值和参数，湍流这类问题需要极细的网格，计算量很大。<a class="ln" href="../n/deeponet.html">DeepONet算子学习</a>已经证明可以学“条件到解”的算子，但它在固定传感点上采样，且对规则网格上的空间结构没有利用。图像领域的<a class="lc" href="../c/convolution-op.html">卷积运算</a>之所以高效，是因为同一个卷积核在各个位置共享；而PDE的解算子往往也是平移不变的积分算子。把积分核写成卷积的形式，就可以用<a class="lc" href="../c/fourier-transform.html">傅里叶变换与频域</a>把卷积变成频域乘法，从而又快又全局。</p><h2>方法</h2><p>FNO由若干层叠成。每一层把输入函数 <code>v</code> 变成下一层的 <code>v&#x27;</code>：</p><p class="formula"><code>v&#x27;(x) = σ( W·v(x) + (K v)(x) )</code></p><p>其中 <code>W</code> 是一个逐点（每个网格点共享）的线性变换，<code>σ</code> 是非线性激活（见<a class="lc" href="../c/neuron-activation.html">神经元与激活函数</a>），<code>K</code> 是傅里叶积分算子，具体做法是：</p><p>1. 对 <code>v</code> 做快速傅里叶变换（FFT），得到各频率分量； 2. 只保留最低的若干个频率模式，对每个保留的模式乘一个可学习的复数矩阵 <code>R</code>；高频模式直接丢弃； 3. 做反傅里叶变换回到空间域。</p><p>因为参数 <code>R</code> 是定义在频率上的，不依赖具体的网格点个数，所以在低分辨率网格上训练出来的模型可以直接在更高分辨率上评估（论文称之为零样本超分辨率）。整个流程是端到端的，输入是初值或系数场，输出是解。FFT的代价是 <code>O(n log n)</code>，所以比较快。</p><h2>结果</h2><p>论文在Burgers方程、Darcy流和Navier-Stokes方程上做了实验。据摘要，FNO是第一个成功建模湍流并能做零样本超分辨率的基于机器学习的方法，比传统PDE求解器最多快三个数量级，并在固定分辨率下比之前基于学习的求解器更准确。</p><h2>后来的发展</h2><p>FNO成为神经算子最常用的基线。同组把它扩展到球面几何和全球天气，得到<a class="ln" href="../n/fourcastnet.html">FourCastNet</a>，这是第一批可与数值预报竞争的AI全球天气模型之一；也有人把它用于地震、材料和碳封存仿真。后续研究围绕它的短板展开：不规则网格、长时间自回归预测的稳定性、以及更大规模的预训练PDE基础模型，如<a class="ln" href="../n/poseidon.html">Poseidon PDE基础模型</a>。</p><h2>容易误解的地方</h2><ul><li>“零样本超分辨率”指的是评估时网格更密，而不是模型凭空产生训练数据没有的细节；结果仍受保留的低频模式数限制。</li><li>FNO基于FFT，天然适合规则网格和周期边界，对复杂几何需要额外处理。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>依赖FFT，适合规则网格和周期边界；对不规则网格、复杂几何的工程问题，需要额外映射或补丁。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/meshgraphnets.html">MeshGraphNets</a></div></li><li>只保留低频模式，会丢掉小尺度的高频细节，对强湍流的精细结构有损失。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>用于长时间预测时是自回归滚动，误差会逐步累积，稳定性没有保证。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/gencast.html">GenCast扩散集合预报</a></div></li><li>仍需要大量由传统求解器生成的训练数据，每个方程族都要单独训练一个模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/poseidon.html">Poseidon PDE基础模型</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:144" href="../n/deeponet.html">DeepONet算子学习</a><span class="yr">2019.10 · 科学</span><div class=nt>同为学习PDE解算子；DeepONet用分支和主干网络，FNO用傅里叶积分层，在规则网格上更快、对分辨率更不敏感。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/pinn.html">物理信息神经网络PINN</a><span class="yr">2017.11 · 科学</span><div class=nt>PINN每个问题都要重新训练；FNO学一整族方程的解算子，对新条件只需一次前向。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:144" href="../n/fourcastnet.html">FourCastNet</a><span class="yr">2022.02 · 科学</span><div class=nt>把傅里叶神经算子的频域混合改造成适合大图的AFNO，用在全球大气场上。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:144" href="../n/pangu-weather.html">盘古天气</a><span class="yr">2022.11 · 科学</span><div class=nt>FourCastNet基于傅里叶神经算子；盘古完全采用注意力路线。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/gencast.html">GenCast扩散集合预报</a><span class="yr">2023.12 · 科学</span><div class=nt>用于长时间预测时是自回归滚动，误差会逐步累积，稳定性没有保证。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/meshgraphnets.html">MeshGraphNets</a><span class="yr">2020.10 · 科学</span><div class=nt>依赖FFT，适合规则网格和周期边界；对不规则网格、复杂几何的工程问题，需要额外映射或补丁。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:144" href="../n/transolver.html">Transolver物理注意力</a><span class="yr">2024.02 · 科学</span><div class=nt>FNO用傅里叶变换处理规则网格，Transolver面向一般几何的网格。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/poseidon.html">Poseidon PDE基础模型</a><span class="yr">2024.05 · 科学</span><div class=nt>沿用算子学习的目标，从为每个方程训练单独的神经算子，转向预训练的基础模型。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:144" href="../n/the-well.html">The Well物理仿真数据集</a><span class="yr">2024.11 · 科学</span><div class=nt>把FNO等神经算子作为基线，在多种物理问题上评测。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/fourier-transform.html">傅里叶变换与频域</a> <a class="chip c" href="../c/convolution-op.html">卷积运算</a> <a class="chip c" href="../c/mlp.html">多层感知机</a> <a class="chip c" href="../c/supervised-learning.html">监督学习</a> <a class="chip c" href="../c/ode-sde.html">常微分方程与随机微分方程</a></p>
+<h2>本篇术语</h2><ul><li><b>神经算子</b>　学习函数到函数映射的神经网络，输入输出都是定义在连续域上的函数，网络参数不依赖网格分辨率。</li><li><b>零样本超分辨率</b>　只在低分辨率网格上训练，直接在更高分辨率网格上预测，不再微调。</li></ul>
+<h2>怎么学</h2><p>先学<a class="lc" href="../c/fourier-transform.html">傅里叶变换与频域</a>和<a class="lc" href="../c/convolution-op.html">卷积运算</a>（卷积定理）。读原文第3、4节，对照作者开源的neuraloperator代码。动手：生成一维Burgers方程的数据，训练一个小FNO，再用更高分辨率的初值测试它。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2010.08895" rel="noopener">https://arxiv.org/abs/2010.08895</a>（标题、7位作者、arXiv首次提交2020-10-18；摘要中的傅里叶空间参数化积分核、Burgers/Darcy/Navier-Stokes实验、湍流零样本超分辨率、比传统求解器最多快三个数量级。ICLR 2021、层的具体公式与保留低频模式的做法为一般了解，未在原文核对。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%82%85%E9%87%8C%E5%8F%B6%E7%A5%9E%E7%BB%8F%E7%AE%97%E5%AD%90FNO%EF%BC%88fno%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Afno%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/fno.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="oc20.html"><small>本分支上一个 · 2020.10</small><b>Open Catalyst 2020</b></a><a class="r" href="meshgraphnets.html"><small>本分支下一个 · 2020.10</small><b>MeshGraphNets</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

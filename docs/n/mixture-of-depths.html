@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>深度混合MoD（2024） · AI脉络</title>
+<meta name="description" content="Transformer给每个token分配完全相同的计算量，可“的”“了”这样的词和关键推理步骤显然不需要一样多的算力。 每一层用一个路由器只挑出top-k个token走注意力和MLP，其余token经残差直接跳过这一层；k事先固定，计算图是静态的。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/mixture-of-depths.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="深度混合MoD（2024）">
+<meta property="og:description" content="Transformer给每个token分配完全相同的计算量，可“的”“了”这样的词和关键推理步骤显然不需要一样多的算力。 每一层用一个路由器只挑出top-k个token走注意力和MLP，其余token经残差直接跳过这一层；k事先固定，计算图是静态的。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/mixture-of-depths.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/mixture-of-depths">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 架构与组件</div>
+<h1>深度混合MoD</h1>
+<div class="full">Mixture-of-Depths: Dynamically allocating compute in transformer-based language models</div>
+<div class="meta"><span>2024.04</span><span>论文</span><span>延伸</span><span>David Raposo, Sam Ritter, Blake Richards, Timothy Lillicrap, Peter Conway Humphreys, Adam Santoro · Google DeepMind / McGill大学 / Mila</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2404.02258" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/mixture-of-depths">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Transformer给每个token分配完全相同的计算量，可“的”“了”这样的词和关键推理步骤显然不需要一样多的算力。</p></div><div><h4>方法</h4><p>每一层用一个路由器只挑出top-k个token走注意力和MLP，其余token经残差直接跳过这一层；k事先固定，计算图是静态的。</p></div><div><h4>影响</h4><p>把MoE“按token路由”的思想从宽度搬到深度，成为后来递归混合MoR、零计算专家等“自适应计算”设计的直接参照。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/switch-transformer.html">稀疏MoE大模型</a>这类MoE让每个token只用一部分专家，节省的是“宽度”上的计算；<a class="ln" href="../n/universal-transformer.html">Universal Transformer</a>等自适应计算时间的方法想让不同token计算不同层数，但计算量不可预测、难以高效实现。</p><p>MoD的做法：在某些层前放一个打分路由器，序列里得分最高的k个token进入这一层的自注意力和MLP，其余token什么都不做、沿残差连接直接传到下一层。因为k是预先定好的（论文发现每隔一层放一个、容量只取12.5%的设置最好），每层张量形状固定，可以用静态计算图高效实现；但哪些token被选中是由内容决定的，所以计算在token和深度两个维度上都是动态分配的。</p><p>论文报告：在同等训练FLOPs和训练时间下，MoD模型能追平基线性能，而每次前向只需一部分FLOPs，采样时每步可以快50%以上。top-k选择在自回归采样时会用到未来token的信息，作者用一个辅助损失或一个小MLP预测器（预测某个token是否会进入top-k，准确率97%以上）来解决这个因果性问题，评测时性能损失很小。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>top-k路由在训练时依赖整段序列，自回归推理时需要额外的预测器近似，增加了实现复杂度。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/mixture-of-recursions.html">递归混合MoR</a></div></li><li>只在较小规模上验证，与MoE、KV缓存和大规模推理框架怎样结合没有给出成熟方案。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/longcat-flash.html">美团LongCat-Flash</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/sparse-moe.html">稀疏门控MoE层</a><span class="yr">2017.01 · LLM</span><div class=nt>沿用稀疏门控的top-k路由机制。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/universal-transformer.html">Universal Transformer</a><span class="yr">2018.07 · LLM</span><div class=nt>自适应计算时间计算量不可预测；MoD用固定容量的top-k路由让总计算量可预测。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/switch-transformer.html">稀疏MoE大模型</a><span class="yr">2021.01 · LLM</span><div class=nt>把MoE式的按token路由从选专家改成选“算不算这一层”。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/mixture-of-recursions.html">递归混合MoR</a><span class="yr">2025.07 · LLM</span><div class=nt>把MoD的按token跳层推广为按token决定递归次数，并据此只缓存活跃token的KV。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/longcat-flash.html">美团LongCat-Flash</a><span class="yr">2025.09 · LLM</span><div class=nt>与MoD让token跳层的思路相通，LongCat把“可以不算”做成MoE里的一类专家。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/residual-connection.html">残差连接</a> <a class="chip c" href="../c/mixture-of-experts.html">混合专家</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2404.02258" rel="noopener">https://arxiv.org/abs/2404.02258</a>（标题、6位作者、v1提交于2024-04-02；摘要中top-k路由、k预先固定、静态计算图、同等FLOPs追平基线、采样时快50%以上。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%B7%B1%E5%BA%A6%E6%B7%B7%E5%90%88MoD%EF%BC%88mixture-of-depths%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amixture-of-depths%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/mixture-of-depths.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="infini-attention.html"><small>本分支上一个 · 2024.04</small><b>Infini-attention</b></a><a class="r" href="llama-3.html"><small>本分支下一个 · 2024.04</small><b>Llama 3</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

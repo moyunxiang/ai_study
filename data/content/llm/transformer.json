@@ -1,35 +1,35 @@
 {
   "id": "transformer",
-  "who": "Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, Polosukhin · Google Brain / Google Research",
+  "who": "Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, Polosukhin · Google Brain / Google Research / 多伦多大学",
   "venue": "NeurIPS 2017",
   "links": [
     {"label": "arXiv", "url": "https://arxiv.org/abs/1706.03762"},
     {"label": "The Annotated Transformer", "url": "https://nlp.seas.harvard.edu/annotated-transformer/"},
     {"label": "The Illustrated Transformer", "url": "https://jalammar.github.io/illustrated-transformer/"}
   ],
-  "problem": "当时最好的翻译模型是带注意力的RNN：必须一个词一个词按顺序算，训练无法并行，句子一长前面的信息就传不到后面。",
+  "problem": "当时最好的翻译模型是带注意力的RNN：必须一个词一个词按顺序算，一句话内部无法并行训练；相隔很远的两个词之间，信号要沿时间步走很多步。",
   "idea": "彻底去掉循环和卷积，只用自注意力：每个词直接与句中所有词计算相关性并加权汇总，一层之内任意两个位置就能交换信息，整句可以并行计算。",
-  "impact": "训练速度和可堆叠的规模上了一个量级，直接催生GPT、BERT，并在几年内成为语言、视觉、语音、生物等几乎所有领域的通用架构。",
-  "background": "2017年，机器翻译的主流是[[seq2seq]]加[[bahdanau-attention]]：编码器RNN把源句读成一串隐状态，解码器RNN每生成一个词，就用注意力回头看一遍源句。它有两个硬伤。\n\n第一，RNN的第t步必须等第t-1步算完（见[[c:recurrent-layer]]），一个句子内部无法并行，GPU大部分时间在空转，想用更多数据就只能等更久。\n\n第二，相隔很远的两个词要交换信息，信号得沿着时间步一步步传过去，路径长度与距离成正比，容易丢失（见[[c:vanishing-exploding]]）。[[lstm]]缓解了但没有根治。\n\n同年稍早的[[convs2s]]用卷积换掉了RNN，可以并行了，但远距离的两个词仍要堆很多层才能互相看到。注意力在这些模型里只是配角——这篇论文的问题是：能不能只留下注意力？",
-  "method": "**自注意力**（见[[c:self-attention]]）。把每个词的向量分别线性变换成三个向量：查询Q、键K、值V。一个词的Q与所有词的K做内积，得到它对每个词的关注分数；分数过softmax变成权重，再对所有词的V加权求和，就是这个词的新表示。整句写成矩阵就是一行：\n\n`Attention(Q, K, V) = softmax(Q·Kᵀ / √d_k) · V`\n\n除以`√d_k`是因为维度高时内积的数值会很大，softmax会饱和、梯度接近0。\n\n**多头注意力**。把上面的过程并行做8次，每次用不同的变换矩阵，让不同的头关注不同的关系（比如一个头看语法依赖，一个头看指代），最后拼起来。\n\n**位置编码**（见[[c:positional-encoding]]）。注意力本身不分先后——把句子打乱结果一样。所以给每个位置的词向量加上一组由不同频率的正弦、余弦构成的向量，让模型知道顺序。\n\n**一层的结构**（见[[c:transformer-block]]）。自注意力 → 逐位置的两层前馈网络，每个子层外面包一圈残差连接（来自[[resnet]]）和[[layernorm]]。没有这两样，6层就很难训。\n\n**整体**。编码器堆6层；解码器也是6层，每层多一个看编码器输出的注意力，并且自注意力加了掩码，保证生成第t个词时看不到后面的词。训练用[[adam]]加一个先线性升高、再按步数平方根倒数衰减的学习率（warmup），以及dropout和标签平滑。",
-  "results": "WMT 2014英德翻译BLEU 28.4，比此前最好的结果（包括多模型集成）高2分以上；英法41.8，是当时的单模型最佳。大模型在8块P100上只训练了3.5天，训练成本是之前最好模型的几分之一到几十分之一。论文还把它用到英语句法分析上，说明它不只是个翻译模型。",
-  "legacy": "一年之内出现了两种用法：只留解码器做从左到右的生成式预训练（[[gpt-1]]），只留编码器做双向的掩码预训练（[[bert]]）。此后规模一路放大到[[gpt-3]]及之后的所有大语言模型。2020年[[vit]]把图像切成小块当作词输入，Transformer进入视觉；扩散模型的骨干后来也换成了它（[[dit]]）。\n\n今天的大模型与原论文相比主要改了四处：归一化挪到子层之前（pre-LN），正弦位置编码换成旋转位置编码（[[rope]]），优化器换成[[adamw]]，激活函数和前馈层有小改动。主体结构九年没变。",
-  "pitfalls": "- “Attention Is All You Need”不等于注意力是这篇论文发明的。注意力来自[[bahdanau-attention]]，这篇的贡献是证明**只用**注意力就够了。\n- 论文里的Transformer是编码器-解码器结构，为翻译设计。现在说的“Transformer语言模型”大多只有解码器那一半。\n- 自注意力的计算量和显存随序列长度**平方**增长，并不比RNN省计算；它赢在可以并行，以及任意两个位置之间的路径长度是1。",
+  "impact": "在翻译上用明显更少的训练计算拿到了更高的BLEU；GPT和BERT都明确以它为骨架，之后几年它被推广到视觉、语音等许多领域。",
+  "background": "2017年，机器翻译的主流是[[seq2seq]]加[[bahdanau-attention]]：编码器RNN把源句读成一串隐状态，解码器RNN每生成一个词，就用注意力回头看一遍源句。它有两个硬伤。\n\n第一，RNN的第t步必须等第t-1步算完（见[[c:recurrent-layer]]），一个句子内部无法并行（论文原话是这种固有的顺序性“排除了训练样本内部的并行”），想用更多数据就只能等更久。\n\n第二，相隔很远的两个词要交换信息，信号得沿着时间步一步步传过去，路径长度与距离成正比，容易丢失（见[[c:vanishing-exploding]]）。[[lstm]]缓解了但没有根治。\n\n同年稍早的[[convs2s]]用卷积换掉了RNN，可以并行了，但远距离的两个词仍要堆很多层才能互相看到——论文指出，在ConvS2S里关联两个位置所需的运算次数随距离线性增长，在ByteNet里按对数增长。注意力在这些模型里只是配角——这篇论文的问题是：能不能只留下注意力？",
+  "method": "**自注意力**（见[[c:self-attention]]）。把每个词的向量分别线性变换成三个向量：查询Q、键K、值V。一个词的Q与所有词的K做内积，得到它对每个词的关注分数；分数过softmax变成权重，再对所有词的V加权求和，就是这个词的新表示。整句写成矩阵就是一行：\n\n`Attention(Q, K, V) = softmax(Q·Kᵀ / √d_k) · V`\n\n除以`√d_k`是因为维度高时内积的数值会很大，softmax会饱和、梯度接近0。\n\n**多头注意力**。把上面的过程并行做8次，每次用不同的变换矩阵，让模型同时从不同的表示子空间里取信息（模型维度512，每个头64维），最后拼起来。论文附录的可视化里，有些头的行为看起来与句子结构有关，有两个头看起来在做指代消解。\n\n**位置编码**（见[[c:positional-encoding]]）。注意力本身不分先后——把句子打乱结果一样。所以给每个位置的词向量加上一组由不同频率的正弦、余弦构成的向量，让模型知道顺序。\n\n**一层的结构**（见[[c:transformer-block]]）。自注意力 → 逐位置的两层前馈网络，每个子层外面包一圈残差连接（引用[[resnet]]）再接[[layernorm]]，即`LayerNorm(x + Sublayer(x))`。\n\n**整体**。编码器堆6层；解码器也是6层，每层多一个看编码器输出的注意力，并且自注意力加了掩码，保证生成第t个词时看不到后面的词。训练用[[adam]]加一个先线性升高、再按步数平方根倒数衰减的学习率（warmup），以及dropout和标签平滑。",
+  "results": "WMT 2014英德翻译（约450万句对）BLEU 28.4，比此前最好的结果（ConvS2S集成26.36）高2分以上，基础版模型27.3也已超过所有此前的模型和集成；英法（3600万句）41.8，是当时的单模型最佳。大模型在8块P100上训练3.5天，基础版只要12小时。论文表2估算大模型训练约用2.3×10¹⁹次浮点运算，而英法任务上此前的强模型如GNMT+RL单模型约1.4×10²⁰、其集成约1.1×10²¹。论文还把它用到英语句法分析上：4层模型只用WSJ训练F1 91.3，半监督92.7，除RNN语法外好于此前报告的所有模型。",
+  "legacy": "2018年出现了两种用法：只留解码器做从左到右的生成式预训练（[[gpt-1]]），只留编码器做双向的掩码预训练（[[bert]]）。此后规模一路放大到[[gpt-3]]及之后的所有大语言模型。2020年[[vit]]把图像切成小块当作词输入，Transformer进入视觉；一部分扩散模型的骨干后来也换成了它（[[dit]]）。\n\n今天的大模型与原论文相比常见的改动有：归一化挪到子层之前（[[pre-ln]]），正弦位置编码换成旋转位置编码（[[rope]]），优化器换成[[adamw]]，激活函数和前馈层有小改动；“注意力+前馈、外面包残差和归一化”的层结构多数仍被沿用。",
+  "pitfalls": "- “Attention Is All You Need”不等于注意力是这篇论文发明的。注意力来自[[bahdanau-attention]]，这篇的贡献是在翻译上显示**只用**注意力就够了。\n- 论文里的Transformer是编码器-解码器结构，为翻译设计。现在说的“Transformer语言模型”大多只有解码器那一半。\n- 自注意力的计算量和显存随序列长度**平方**增长，并不比RNN省计算；它赢在可以并行，以及任意两个位置之间的路径长度是1。",
   "limits": [
-    {"text": "计算量与显存随序列长度平方增长，原始模型只能处理几百个token，长文档放不进去。", "solved_by": ["transformer-xl", "reformer", "flashattention", "gemini-1.5"]},
-    {"text": "正弦绝对位置编码对训练时没见过的长度外推很差，也不直接表达“相距多远”。", "solved_by": ["rope"]},
+    {"text": "计算量与显存随序列长度平方增长，处理长文档代价很高；论文自己也把“受限的局部注意力”列为处理图像、音频、视频等长输入的后续方向。", "solved_by": ["transformer-xl", "reformer", "flashattention", "gemini-1.5"], "stated": true},
+    {"text": "正弦绝对位置编码不直接表达“相距多远”，作者只是猜测它可能外推到更长的序列，后来的实验发现外推效果并不好。", "solved_by": ["rope", "alibi"]},
     {"text": "仍然需要成对的标注数据（平行语料）来训练，没有利用海量的无标注文本。", "solved_by": ["gpt-1", "bert"]},
-    {"text": "归一化放在残差之后（post-LN），层数加深后训练不稳定，必须依赖warmup。", "solved_by": ["gpt-2"]},
-    {"text": "只在文本序列上验证，图像、语音等其他模态是否适用并不清楚。", "solved_by": ["vit", "whisper"]}
+    {"text": "归一化放在残差之后（post-LN），层数加深后训练不稳定，必须依赖warmup。", "solved_by": ["pre-ln"]},
+    {"text": "只在文本序列上验证，图像、语音等其他模态是否适用并不清楚。", "solved_by": ["vit", "whisper"], "stated": true}
   ],
   "relations": [
     {"to": "bahdanau-attention", "type": "extends", "note": "把原本只是RNN附属部件的注意力，变成模型里唯一的信息交换方式。"},
-    {"to": "seq2seq", "type": "solves", "note": "去掉循环，解决了RNN编码器-解码器无法并行训练、长程依赖弱的问题。"},
-    {"to": "convs2s", "type": "rivals", "note": "同年用卷积取代RNN的方案；Transformer让任意两个位置一步可达，效果和速度都更好，卷积路线随后被放弃。"},
-    {"to": "resnet", "type": "uses", "note": "每个子层外的残差连接直接来自ResNet，没有它深层堆叠训不动。"},
-    {"to": "layernorm", "type": "uses", "note": "序列长度不固定、批内统计量不稳定，所以用LayerNorm而不是BatchNorm。"},
-    {"to": "adam", "type": "uses", "note": "用Adam配合warmup学习率调度训练，这个组合成为之后的默认配置。"},
-    {"to": "bpe", "type": "uses", "note": "输入输出都用子词切分，词表约3.7万。"}
+    {"to": "seq2seq", "type": "solves", "note": "论文以循环编码器-解码器的顺序计算无法在句内并行为动机，去掉循环后训练可以整句并行，任意两个位置之间的路径长度从O(n)降到O(1)。"},
+    {"to": "convs2s", "type": "rivals", "note": "同年用卷积取代RNN的方案，论文表1、表2直接与它比较：卷积关联两个远处位置需要多层，自注意力一层可达；英德、英法BLEU都超过ConvS2S及其集成。之后的主流翻译系统多数转向Transformer。"},
+    {"to": "resnet", "type": "uses", "note": "每个子层外都包一个残差连接，论文引用He等人的残差学习。"},
+    {"to": "layernorm", "type": "uses", "note": "每个子层的残差相加之后接层归一化（引用Ba等人），即LayerNorm(x + Sublayer(x))；论文没有解释为什么选它而不选BatchNorm。"},
+    {"to": "adam", "type": "uses", "note": "用Adam（β₁=0.9、β₂=0.98）配合4000步warmup、之后按步数平方根倒数衰减的学习率训练。"},
+    {"to": "bpe", "type": "uses", "note": "英德用字节对编码（BPE），源和目标共享约3.7万词表；英法用3.2万的词片（word-piece）词表。"}
   ],
   "prereq": ["self-attention", "softmax", "encoder-decoder", "residual-connection", "normalization-layer", "positional-encoding", "embedding"],
   "terms": [

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>REPA-E端到端调VAE（2025） · AI脉络</title>
+<meta name="description" content="潜扩散模型一直是两阶段：先训好VAE再冻结，只训扩散网络。直接用扩散损失把两者一起训，潜空间会坍塌、效果反而变差。 端到端训练时，VAE只接收REPA表征对齐损失的梯度（扩散损失对VAE停梯度），让VAE和扩散Transformer一起调。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/repa-e.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="REPA-E端到端调VAE（2025）">
+<meta property="og:description" content="潜扩散模型一直是两阶段：先训好VAE再冻结，只训扩散网络。直接用扩散损失把两者一起训，潜空间会坍塌、效果反而变差。 端到端训练时，VAE只接收REPA表征对齐损失的梯度（扩散损失对VAE停梯度），让VAE和扩散Transformer一起调。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/repa-e.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/repa-e">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 潜空间与骨架网络</div>
+<h1>REPA-E端到端调VAE</h1>
+<div class="full">REPA-E: Unlocking VAE for End-to-End Tuning with Latent Diffusion Transformers</div>
+<div class="meta"><span>2025.04</span><span>论文</span><span>延伸</span><span>ICCV 2025</span><span>Xingjian Leng, Jaskirat Singh, Yunzhong Hou, Zhenchang Xing, Saining Xie, Liang Zheng · 澳大利亚国立大学 / CSIRO Data61 / 纽约大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2504.10483" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://end2end-diffusion.github.io" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/repa-e">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>潜扩散模型一直是两阶段：先训好VAE再冻结，只训扩散网络。直接用扩散损失把两者一起训，潜空间会坍塌、效果反而变差。</p></div><div><h4>方法</h4><p>端到端训练时，VAE只接收REPA表征对齐损失的梯度（扩散损失对VAE停梯度），让VAE和扩散Transformer一起调。</p></div><div><h4>影响</h4><p>训练比REPA快17倍以上、比原始做法快45倍；ImageNet 256上FID 1.12（有CFG）/1.69（无CFG），调完的VAE本身也更好用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/ldm.html">潜空间扩散LDM</a>以来，VAE一旦训好就被冻结。原因是：如果让扩散损失也更新VAE，最省事的办法就是把潜变量压得极其简单（比如方差趋近于零），去噪任务变容易，但图像信息丢了——即潜空间坍塌。</p><p>REPA-E发现，<a class="ln" href="../n/repa.html">表征对齐REPA</a>的表征对齐损失可以充当安全的端到端信号：它要求扩散网络中间层与<a class="ln" href="../n/dinov2.html">DINOv2</a>特征对齐，这个目标不会因为潜空间变简单而被“骗过”。做法是VAE与<a class="ln" href="../n/sit.html">SiT插值Transformer</a>一起训练，扩散损失对VAE停梯度，只让对齐损失回传到VAE；同时保留VAE自身的重建损失。</p><p>作者观察到，端到端调整会自动改善潜空间结构：SD-VAE潜变量里的高频噪声被抹平，过度平滑的VAE则补回细节。最终版本在ImageNet 256×256上FID 1.12（有CFG）和1.69（无CFG）。它与<a class="ln" href="../n/va-vae.html">VA-VAE重建与生成之困</a>、<a class="ln" href="../n/rae.html">表征自编码器RAE</a>一起，把“VAE该学什么样的潜空间”变成2025年的热点问题。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍依赖外部预训练表征模型（DINOv2等）提供对齐目标，只在ImageNet类条件生成上系统验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>仍保留VAE这一环，没有回答“潜空间是否必要”。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/rae.html">表征自编码器RAE</a> <a class="chip hue" style="--h:288" href="../n/pmf.html">pMF像素空间一步生成</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/ldm.html">潜空间扩散LDM</a><span class="yr">2021.12 · 生成</span><div class=nt>打破潜扩散“VAE必须冻结”的两阶段限制，用对齐损失避免端到端训练时的潜空间坍塌。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/repa.html">表征对齐REPA</a><span class="yr">2024.10 · 生成</span><div class=nt>把REPA的对齐损失从只训扩散网络扩展为同时更新VAE。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/sit.html">SiT插值Transformer</a><span class="yr">2024.01 · 生成</span><div class=nt>以SiT作为潜空间扩散骨干。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/va-vae.html">VA-VAE重建与生成之困</a><span class="yr">2025.01 · 生成</span><div class=nt>VA-VAE在训VAE时就对齐视觉基础模型，REPA-E则在扩散训练中端到端调VAE。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/rae.html">表征自编码器RAE</a><span class="yr">2025.10 · 生成</span><div class=nt>仍保留VAE这一环，没有回答“潜空间是否必要”。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/pmf.html">pMF像素空间一步生成</a><span class="yr">2026.01 · 生成</span><div class=nt>仍保留VAE这一环，没有回答“潜空间是否必要”。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/latent-space.html">潜空间</a> <a class="chip c" href="../c/autoencoder.html">自编码器</a> <a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/self-supervised.html">自监督学习</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2504.10483" rel="noopener">https://arxiv.org/abs/2504.10483</a>（核对标题、作者与ANU/CSIRO/NYU署名、v1日期2025-04-14；摘要中扩散损失端到端无效、REPA损失解锁联合训练、比REPA快17倍、比原始快45倍；最终版FID 1.12/1.69（v1为1.26/1.83），ICCV 2025。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20REPA-E%E7%AB%AF%E5%88%B0%E7%AB%AF%E8%B0%83VAE%EF%BC%88repa-e%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Arepa-e%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/repa-e.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="gpt-4o-image.html"><small>本分支上一个 · 2025.03</small><b>GPT-4o原生图像生成</b></a><a class="r" href="framepack.html"><small>本分支下一个 · 2025.04</small><b>FramePack长视频</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

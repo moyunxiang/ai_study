@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>稀疏注意力与高效注意力（Sparse and Efficient Attention） · AI脉络</title>
+<meta name="description" content="标准注意力的计算和内存随序列长度平方增长；高效注意力通过只看部分位置、近似、或改进实现方式，把长上下文的成本降下来。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/efficient-attention.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="稀疏注意力与高效注意力（Sparse and Efficient Attention）">
+<meta property="og:description" content="标准注意力的计算和内存随序列长度平方增长；高效注意力通过只看部分位置、近似、或改进实现方式，把长上下文的成本降下来。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/efficient-attention.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/efficient-attention">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 神经网络组件 · 进阶</div>
+<h1>稀疏注意力与高效注意力</h1><div class="full">Sparse and Efficient Attention</div>
+<p class="muted" style="font-size:13px">也叫：sparse attention　线性注意力　linear attention　滑动窗口注意力　长序列注意力　FlashAttention</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/efficient-attention">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>标准注意力的计算和内存随序列长度平方增长；高效注意力通过只看部分位置、近似、或改进实现方式，把长上下文的成本降下来。</b></p>
+<p class="tags">先要会：<a class="chip c" href="self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="big-o.html">时间与空间复杂度</a> <a class="chip c" href="memory-bandwidth.html">显存、内存带宽与“内存墙”</a></p>
+<p><a class="lc" href="../c/self-attention.html">自注意力与多头注意力</a>要为每对位置算一个分数，序列长度n时注意力矩阵是n×n。n = 1000时只有一百万个数，n = 128k时有一百七十亿个。这限制了<a class="lc" href="../c/context-window.html">上下文窗口</a>能开多长，也让长文档、长视频、长代码库的处理很贵。改进方向大致有四类。</p><p><b>1. 稀疏注意力：只算一部分位置对</b>。<a class="ln" href="../n/sparse-transformer.html">稀疏注意力</a>用固定的跨步模式；<a class="ln" href="../n/longformer.html">Longformer滑窗注意力</a>让每个token只看前后w个位置的滑动窗口，再加几个能看全局的特殊token；<a class="ln" href="../n/bigbird.html">BigBird稀疏注意力</a>组合了窗口、全局和随机连接。代价从n²降到n·w。缺点是模式是人定的，可能漏掉远处真正相关的内容。近年的<a class="ln" href="../n/nsa.html">原生稀疏注意力NSA</a>等方法让模型自己学习选哪些块，并做到与硬件对齐。</p><p><b>2. 线性化与低秩近似</b>。注意力里的softmax(QKᵀ)V如果去掉softmax、换成核函数φ(Q)φ(K)ᵀ，就能先算φ(K)ᵀV（d×d），复杂度变成O(n)，这是<a class="ln" href="../n/linear-attention.html">线性注意力</a>和<a class="ln" href="../n/performer.html">Performer核近似注意力</a>的思路；<a class="ln" href="../n/reformer.html">高效长序列注意力</a>用局部敏感哈希只在相似的键之间算注意力。线性注意力可以写成RNN形式，与<a class="lc" href="../c/state-space-model.html">状态空间模型与线性RNN</a>是同一家族。</p><p><b>3. 不改数学，改实现</b>。<a class="ln" href="../n/flashattention.html">FlashAttention</a>不近似任何东西，计算量也不变，而是把计算分块放在GPU片上高速缓存里完成，从不把n×n矩阵写回显存，用<a class="ln" href="../n/online-softmax.html">Online Softmax</a>边算边归一化。它的加速来自减少<a class="lc" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a>上的读写，已经成为默认实现。</p><p><b>4. 压缩KV缓存</b>。生成时每步都要读一遍所有历史的K、V。<a class="ln" href="../n/mqa.html">多查询注意力MQA</a>和<a class="ln" href="../n/gqa.html">分组查询注意力GQA</a>让多个查询头共享同一组K、V；<a class="ln" href="../n/deepseek-v2.html">DeepSeek-V2与MLA</a>的MLA把K、V压缩成低维潜向量，都直接减少<a class="lc" href="../c/kv-cache.html">KV缓存</a>的显存占用。</p>
+<div class="example"><h4>例子</h4><p>序列长度n = 131072（128k）：</p><ul><li>完整注意力矩阵有n² ≈ 1.7×10¹⁰个元素，按FP16每个2字节，单头单层就是32 GiB——这就是为什么不能把它整个写进显存。</li><li>改用窗口w = 4096的滑动窗口注意力，每个token只看4096个位置，计算量是完整注意力的4096/131072 = 1/32。</li><li>FlashAttention计算量仍是n²量级，但只在片上缓存里分块处理，不需要那32 GiB。</li></ul></div>
+<h2>容易误解的地方</h2><ul><li>“线性复杂度”不等于实际更快：n不够大时，常数项和硬件利用率往往让近似方法比FlashAttention还慢。</li><li>很多近似方法在困惑度上接近完整注意力，却在“大海捞针”式的精确检索任务上明显变差。</li><li>FlashAttention是精确注意力的快速实现，不属于近似方法，二者常被混为一谈。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:0" href="../n/icl-gradient-descent.html">ICL即梯度下降</a> <a class="chip hue" style="--h:48" href="../n/gated-deltanet.html">Gated DeltaNet</a> <a class="chip hue" style="--h:0" href="../n/minimax-01.html">MiniMax-01闪电注意力</a> <a class="chip hue" style="--h:0" href="../n/nsa.html">原生稀疏注意力NSA</a> <a class="chip hue" style="--h:240" href="../n/deepseek-ocr.html">DeepSeek-OCR光学压缩</a> <a class="chip hue" style="--h:0" href="../n/kimi-linear.html">Kimi Linear</a> <a class="chip hue" style="--h:168" href="../n/music-transformer.html">Music Transformer</a> <a class="chip hue" style="--h:0" href="../n/sparse-transformer.html">稀疏注意力</a> <a class="chip hue" style="--h:0" href="../n/reformer.html">高效长序列注意力</a> <a class="chip hue" style="--h:0" href="../n/longformer.html">Longformer滑窗注意力</a> <a class="chip hue" style="--h:0" href="../n/linformer.html">Linformer低秩注意力</a> <a class="chip hue" style="--h:0" href="../n/bigbird.html">BigBird稀疏注意力</a> <a class="chip hue" style="--h:0" href="../n/performer.html">Performer核近似注意力</a> <a class="chip hue" style="--h:216" href="../n/deformable-detr.html">Deformable DETR</a> <a class="chip hue" style="--h:48" href="../n/hyena.html">Hyena长卷积算子</a> <a class="chip hue" style="--h:0" href="../n/retnet.html">RetNet</a> <a class="chip hue" style="--h:0" href="../n/mistral-7b.html">Mistral 7B</a> <a class="chip hue" style="--h:144" href="../n/evo.html">Evo基因组语言模型</a> <a class="chip hue" style="--h:144" href="../n/transolver.html">Transolver物理注意力</a> <a class="chip hue" style="--h:216" href="../n/yolov12.html">YOLOv12</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MegaSaM动态SfM（2024） · AI脉络</title>
+<meta name="description" content="传统SfM和单目SLAM假设场景基本静止、相机有足够视差；对手机随手拍、人物在动、相机几乎不平移的视频，位姿和深度经常算错。 在深度视觉SLAM（DROID-SLAM）上加入运动物体掩码、单目深度先验和不确定性感知的全局束调整，让它能处理动态、低视差视频。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/megasam.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MegaSaM动态SfM（2024）">
+<meta property="og:description" content="传统SfM和单目SLAM假设场景基本静止、相机有足够视差；对手机随手拍、人物在动、相机几乎不平移的视频，位姿和深度经常算错。 在深度视觉SLAM（DROID-SLAM）上加入运动物体掩码、单目深度先验和不确定性感知的全局束调整，让它能处理动态、低视差视频。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/megasam.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/megasam">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 多视图几何与重建</div>
+<h1>MegaSaM动态SfM</h1>
+<div class="full">MegaSaM: Accurate, Fast, and Robust Structure and Motion from Casual Dynamic Videos</div>
+<div class="meta"><span>2024.12</span><span>论文</span><span>延伸</span><span>CVPR 2025（最佳论文提名奖）</span><span>Zhengqi Li, Richard Tucker, Forrester Cole, Qianqian Wang, Linyi Jin, Vickie Ye, Angjoo Kanazawa, Aleksander Holynski, Noah Snavely · Google DeepMind / UC Berkeley / 密歇根大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2412.04463" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://mega-sam.github.io/" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/megasam">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>传统SfM和单目SLAM假设场景基本静止、相机有足够视差；对手机随手拍、人物在动、相机几乎不平移的视频，位姿和深度经常算错。</p></div><div><h4>方法</h4><p>在深度视觉SLAM（DROID-SLAM）上加入运动物体掩码、单目深度先验和不确定性感知的全局束调整，让它能处理动态、低视差视频。</p></div><div><h4>影响</h4><p>获CVPR 2025最佳论文提名奖，成为从野外动态视频恢复相机轨迹和稠密深度的常用基线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>从一段视频同时求出每帧相机位姿和深度，叫运动恢复结构（SfM）。<a class="ln" href="../n/colmap.html">COLMAP</a>这类几何流水线遇到运动物体和小视差就会失败；纯网络方法要么太慢，要么在不受控的相机运动下不稳。</p><p>MegaSaM以深度视觉SLAM框架DROID-SLAM为底（它基于<a class="ln" href="../n/raft.html">RAFT光流</a>式的迭代光流更新），做了三处关键修改：一是让网络在估计光流和不确定性的同时预测物体运动图，把动的像素从相机位姿估计里排除；二是把单目深度先验接入训练和推理——<a class="ln" href="../n/depth-anything.html">Depth Anything</a>提供更准且一致的相对深度，UniDepth提供尺度和平移估计；三是不确定性感知的全局束调整，根据可观测性判断什么时候需要用单目深度来约束。位姿确定后再做一次视频深度优化。</p><p>论文表格显示在Sintel上每帧约1秒，而CasualSAM需约1.6分钟；位姿与深度精度在合成和真实视频上都明显优于此前和同期方法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍是逐视频的优化流程，比一次前馈的网络慢，不适合实时或超长视频。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/d4rt.html">D4RT动态4D重建</a></div></li><li>精度依赖外部单目深度模型的质量，深度先验出错时位姿也会受影响。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/colmap.html">COLMAP</a><span class="yr">2016.06 · 视觉</span><div class=nt>解决COLMAP类方法在动态场景、低视差视频上失败的问题。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/raft.html">RAFT光流</a><span class="yr">2020.03 · 视觉</span><div class=nt>底层的DROID-SLAM沿用RAFT式相关特征与迭代更新来估计稠密对应。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/depth-anything.html">Depth Anything</a><span class="yr">2024.01 · 视觉</span><div class=nt>用Depth Anything的单目深度作为几何先验。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/monst3r.html">MonST3R动态几何</a><span class="yr">2024.10 · 视觉</span><div class=nt>同期处理动态视频几何：MonST3R用前馈点图网络，MegaSaM走深度SLAM加优化的路线。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/d4rt.html">D4RT动态4D重建</a><span class="yr">2025.12 · 视觉</span><div class=nt>仍是逐视频的优化流程，比一次前馈的网络慢，不适合实时或超长视频。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a></p>
+<h2>本篇术语</h2><ul><li><b>束调整（bundle adjustment）</b>　同时微调所有相机位姿和三维点，使三维点投影回各帧图像时与观测位置的误差最小。</li><li><b>视差</b>　相机移动时近处物体在画面中移动得比远处多，这种差异是从图像恢复深度的依据；相机只转不移时几乎没有视差。</li></ul>
+<h2>怎么学</h2><p>先补针孔相机与束调整的基本概念，了解DROID-SLAM的结构，再读MegaSaM第3节三处修改；用官方代码处理一段手机拍的动态视频。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2412.04463" rel="noopener">https://arxiv.org/abs/2412.04463</a>（核对了arXiv记录：标题、九位作者、v1提交于2024-12-05；HTML正文确认基于DROID-SLAM、DepthAnything与UniDepth先验、运动掩码、Sintel每帧1.0秒对CasualSAM 1.6分钟；CVPR 2025官方奖项页确认最佳论文提名奖。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MegaSaM%E5%8A%A8%E6%80%81SfM%EF%BC%88megasam%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amegasam%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/megasam.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mast3r-slam.html"><small>本分支上一个 · 2024.12</small><b>MASt3R-SLAM</b></a><a class="r" href="cut3r.html"><small>本分支下一个 · 2025.01</small><b>CUT3R持续状态重建</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

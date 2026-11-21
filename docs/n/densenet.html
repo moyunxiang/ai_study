@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DenseNet（2016） · AI脉络</title>
+<meta name="description" content="ResNet把很多层做深了，但随机深度等实验表明，深ResNet里很多层可以随机丢掉而几乎不影响结果——层与层之间存在大量冗余，参数利用率不高。 在一个稠密块内，每一层都以前面所有层输出的拼接作为输入，自己只新产生少量（k个，如12或32）特征图；L层的块里有L(L+1)/2条直接连接，鼓励特征被…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/densenet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DenseNet（2016）">
+<meta property="og:description" content="ResNet把很多层做深了，但随机深度等实验表明，深ResNet里很多层可以随机丢掉而几乎不影响结果——层与层之间存在大量冗余，参数利用率不高。 在一个稠密块内，每一层都以前面所有层输出的拼接作为输入，自己只新产生少量（k个，如12或32）特征图；L层的块里有L(L+1)/2条直接连接，鼓励特征被…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/densenet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/densenet">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 卷积骨干网络</div>
+<h1>DenseNet</h1>
+<div class="full">Densely Connected Convolutional Networks</div>
+<div class="meta"><span>2016.08</span><span>论文</span><span>重要</span><span>CVPR 2017</span><span>Gao Huang（黄高）, Zhuang Liu（刘壮）, Laurens van der Maaten, Kilian Q. Weinberger · 康奈尔大学 / 清华大学 / Facebook AI Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1608.06993" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/liuzhuang13/DenseNet" rel="noopener">代码与预训练模型 ↗</a><a class="btn sm" href="../index.html#/n/densenet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>ResNet把很多层做深了，但随机深度等实验表明，深ResNet里很多层可以随机丢掉而几乎不影响结果——层与层之间存在大量冗余，参数利用率不高。</p></div><div><h4>方法</h4><p>在一个稠密块内，每一层都以前面所有层输出的拼接作为输入，自己只新产生少量（k个，如12或32）特征图；L层的块里有L(L+1)/2条直接连接，鼓励特征被反复复用。</p></div><div><h4>影响</h4><p>在CIFAR和SVHN上刷新纪录，在ImageNet上用约一半的参数和计算达到ResNet的精度；“特征复用”和“窄而密”的设计成为与残差并列的另一种连接范式。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/resnet.html">ResNet</a>用<code>x + F(x)</code>的恒等捷径训练出上百层网络，此后一年里出现了多个改进：<a class="ln" href="../n/preact-resnet.html">预激活ResNet</a>训出1001层，<a class="ln" href="../n/wide-resnet.html">Wide ResNet</a>发现变宽比变深划算，<a class="ln" href="../n/stochastic-depth.html">随机深度</a>在训练时随机跳过整个残差块，反而让1202层ResNet训练得更好。</p><p>随机深度的结果说明了一件事：深ResNet里很多层的贡献很小，删掉它们网络照样工作。原因之一是，相加的方式会把新特征和旧特征混在一起，每一层都要“重新学”一些前面已有的信息才能传下去，造成冗余。另一方面，<a class="ln" href="../n/googlenet.html">GoogLeNet / Inception</a>已经用通道拼接合并不同分支的特征。DenseNet的问题是：如果让每一层都能直接拿到前面所有层的原始特征，是否可以用更窄的层、更少的参数达到同样效果？</p><h2>方法</h2><p><b>稠密连接。</b>在一个稠密块里，第ℓ层的输入是前面所有层输出在通道维上的拼接：</p><p class="formula"><code>x_ℓ = H_ℓ([x₀, x₁, …, x_{ℓ−1}])</code></p><p>对比ResNet的<code>x_ℓ = H_ℓ(x_{ℓ−1}) + x_{ℓ−1}</code>：ResNet是<b>相加</b>，信息被混合；DenseNet是<b>拼接</b>，前面每层的特征原封不动地保留，后面任意一层都可以直接读取（见<a class="lc" href="../c/residual-connection.html">残差连接</a>）。每个<code>H_ℓ</code>是“BN—ReLU—3×3卷积”。</p><p><b>增长率k。</b>每层只新产生k个特征图，第ℓ层的输入有<code>k₀ + k·(ℓ−1)</code>个通道。k可以很小（12、24、32），因为每层只需补充“集体知识”里缺的那一点，而不必重新传递已有信息。</p><p><b>过渡层。</b>拼接要求特征图尺寸相同，所以网络分成若干稠密块，块与块之间用“1×1卷积＋2×2平均池化”的过渡层下采样。</p><p><b>DenseNet-BC。</b>两项压缩：B（瓶颈）在每个3×3卷积前加一个输出4k通道的1×1卷积；C（压缩）让过渡层把通道数乘以θ＝0.5。ImageNet上用的是DenseNet-BC、k＝32的121、169、201、264层四种配置。</p><p>例子：一个5层稠密块、k＝4、输入16通道，第5层的输入是16＋4×4＝32通道，而块的输出是16＋5×4＝36通道。</p><h2>结果</h2><p>CIFAR（标准增强）：DenseNet-BC（190层、k＝40、2560万参数）在C10+上错误率3.46%、C100+上17.18%，明显低于Wide ResNet。参数效率：100层、k＝12的DenseNet-BC只有80万参数，在C10+上为4.51%，与1000多万参数的1001层预激活ResNet（4.62%）相当，参数少90%。ImageNet：DenseNet-201（约2000万参数）的验证错误率与超过4000万参数的ResNet-101相近；计算量与ResNet-50相同的DenseNet，精度与计算量是其两倍的ResNet-101持平。</p><h2>后来的发展</h2><p>DenseNet在医学图像、分割（如DenseNet式的U-Net变体）和小数据场景中被广泛使用；“特征复用”的观点也影响了后来对网络连接方式的研究，<a class="ln" href="../n/hyper-connections.html">超连接</a>等工作继续探索比单一残差更丰富的层间连接。</p><p>但在工业界的主干网络竞争中，DenseNet没有取代ResNet：拼接让特征图越来越宽，显存占用和内存访问量大，在GPU上的实际速度并不像参数量那样占优。之后的高效网络（<a class="ln" href="../n/mobilenetv2.html">MobileNetV2</a>、<a class="ln" href="../n/efficientnet.html">EfficientNet</a>、<a class="ln" href="../n/regnet.html">RegNet设计空间</a>）大多回到残差相加的设计。</p><h2>容易误解的地方</h2><ul><li>DenseNet参数少不等于速度快：拼接后的特征图很宽，朴素实现的显存占用会随层数快速增长，作者另写了技术报告介绍省显存的实现。</li><li>“每层与所有层相连”只在一个稠密块内部成立，块与块之间靠过渡层串联。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>拼接使每层的输入通道随深度线性增加，中间特征图要全部保存，朴素实现显存占用很大，限制了批大小和网络规模。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>大量窄层和拼接操作的内存访问开销大，参数和FLOPs少并不能换来同等的GPU实际推理速度。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/mobilenetv2.html">MobileNetV2</a> <a class="chip hue" style="--h:216" href="../n/regnet.html">RegNet设计空间</a></div></li><li>仍是纯卷积结构，每层只看局部邻域，长距离依赖要靠堆叠很多层间接获得。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/non-local.html">Non-local网络</a> <a class="chip hue" style="--h:216" href="../n/vit.html">Vision Transformer</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/resnet.html">ResNet</a><span class="yr">2015.12 · 视觉</span><div class=nt>把残差的“相加”换成“拼接”，并把捷径从相邻层推广到块内所有层之间，用更少参数达到同等精度。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/googlenet.html">GoogLeNet / Inception</a><span class="yr">2014.09 · 视觉</span><div class=nt>Inception模块已用通道拼接合并多分支特征；DenseNet把拼接用在层与层之间的连接上。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/stochastic-depth.html">随机深度</a><span class="yr">2016.03 · 基础</span><div class=nt>随机深度显示深ResNet中很多层是冗余的；DenseNet据此设计窄层加特征复用的结构，减少冗余。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/preact-resnet.html">预激活ResNet</a><span class="yr">2016.03 · 视觉</span><div class=nt>同期加深残差网络的方案；100层DenseNet-BC用约十分之一的参数达到1001层预激活ResNet的精度。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/wide-resnet.html">Wide ResNet</a><span class="yr">2016.05 · 视觉</span><div class=nt>Wide ResNet靠加宽换精度、参数超过3000万；DenseNet靠窄层和特征复用，以更少参数在CIFAR上取得更低错误率。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/vit.html">Vision Transformer</a><span class="yr">2020.10 · 视觉</span><div class=nt>仍是纯卷积结构，每层只看局部邻域，长距离依赖要靠堆叠很多层间接获得。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:144" href="../n/chexnet.html">CheXNet</a><span class="yr">2017.11 · 科学</span><div class=nt>直接把121层DenseNet作为主干网络来微调。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/non-local.html">Non-local网络</a><span class="yr">2017.11 · 视觉</span><div class=nt>仍是纯卷积结构，每层只看局部邻域，长距离依赖要靠堆叠很多层间接获得。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/mobilenetv2.html">MobileNetV2</a><span class="yr">2018.01 · 视觉</span><div class=nt>大量窄层和拼接操作的内存访问开销大，参数和FLOPs少并不能换来同等的GPU实际推理速度。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/regnet.html">RegNet设计空间</a><span class="yr">2020.03 · 视觉</span><div class=nt>大量窄层和拼接操作的内存访问开销大，参数和FLOPs少并不能换来同等的GPU实际推理速度。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/residual-connection.html">残差连接</a> <a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a> <a class="chip c" href="../c/vanishing-exploding.html">梯度消失与梯度爆炸</a></p>
+<h2>本篇术语</h2><ul><li><b>稠密块</b>　一组特征图尺寸相同的层，其中每一层都接收前面所有层输出的拼接，并把自己的输出传给后面所有层。</li><li><b>增长率</b>　稠密块中每层新产生的特征图数量k，决定了每层为“集体知识”添加多少新信息。</li><li><b>过渡层</b>　位于两个稠密块之间，用1×1卷积压缩通道、平均池化减半尺寸。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/resnet.html">ResNet</a>并补<a class="lc" href="../c/residual-connection.html">残差连接</a>。读原文第3节（稠密连接、增长率、过渡层、BC版本）和图1、图2。动手：用PyTorch写一个k＝12、6层的稠密块，打印每层输入通道数，验证<code>k₀ + k·(ℓ−1)</code>；再在CIFAR-10上比较参数量相近的DenseNet与ResNet。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1608.06993" rel="noopener">https://arxiv.org/abs/1608.06993</a>（arXiv页确认标题、4位作者、v1提交于2016-08-25、CVPR 2017、L(L+1)/2条连接；正文确认拼接公式、增长率k、过渡层为1×1卷积加2×2平均池化、瓶颈4k、θ＝0.5、ImageNet用k＝32、C10+ 3.46%与C100+ 17.18%（190层k＝40、25.6M参数）、100层k＝12（0.8M）4.51% vs 1001层预激活ResNet 4.62%且参数少90%、DenseNet-201（20M）≈ResNet-101（&gt;40M）、与ResNet-50同计算量的DenseNet≈ResNet-101、提及省显存实现的技术报告、Wide ResNet等超过30M参数。原文首页确认作者单位（康奈尔、清华、FAIR）。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DenseNet%EF%BC%88densenet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adensenet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/densenet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="colmap.html"><small>本分支上一个 · 2016.06</small><b>COLMAP</b></a><a class="r" href="dncnn.html"><small>本分支下一个 · 2016.08</small><b>DnCNN去噪</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

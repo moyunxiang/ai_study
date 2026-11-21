@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>μP与超参数迁移（2022） · AI脉络</title>
+<meta name="description" content="几十亿参数的模型无法反复试超参数；在小模型上调好再搬过去又不灵，因为按标准参数化，最优学习率会随网络变宽而漂移。 换一种参数化（μP）：按层的宽度缩放初始化方差和学习率，使每层在训练中的更新幅度与宽度无关，最优超参数就不随宽度变化，可以在小模型上调好后直接照搬（μTransfer）。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/mup.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="μP与超参数迁移（2022）">
+<meta property="og:description" content="几十亿参数的模型无法反复试超参数；在小模型上调好再搬过去又不灵，因为按标准参数化，最优学习率会随网络变宽而漂移。 换一种参数化（μP）：按层的宽度缩放初始化方差和学习率，使每层在训练中的更新幅度与宽度无关，最优超参数就不随宽度变化，可以在小模型上调好后直接照搬（μTransfer）。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/mup.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/mup">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 泛化与学习理论</div>
+<h1>μP与超参数迁移</h1>
+<div class="full">Tensor Programs V: Tuning Large Neural Networks via Zero-Shot Hyperparameter Transfer</div>
+<div class="meta"><span>2022.03</span><span>论文</span><span>重要</span><span>NeurIPS 2021</span><span>Greg Yang, Edward J. Hu, Igor Babuschkin, Szymon Sidor, Xiaodong Liu, David Farhi, Nick Ryder, Jakub Pachocki et al. · Microsoft / OpenAI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2203.03466" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/microsoft/mup" rel="noopener">官方代码 mup ↗</a><a class="btn sm" href="https://arxiv.org/abs/2011.14522" rel="noopener">前作：无限宽网络中的特征学习（Tensor Programs IV） ↗</a><a class="btn sm" href="../index.html#/n/mup">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>几十亿参数的模型无法反复试超参数；在小模型上调好再搬过去又不灵，因为按标准参数化，最优学习率会随网络变宽而漂移。</p></div><div><h4>方法</h4><p>换一种参数化（μP）：按层的宽度缩放初始化方差和学习率，使每层在训练中的更新幅度与宽度无关，最优超参数就不随宽度变化，可以在小模型上调好后直接照搬（μTransfer）。</p></div><div><h4>影响</h4><p>从4000万参数的代理模型迁移超参数，训练出的GPT-3 6.7B胜过原版，调参成本只占预训练的7%；把“大模型怎么调参”变成可推导的问题。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>超参数（学习率、初始化尺度等，见<a class="lc" href="../c/hyperparameter.html">超参数与调参</a>）对结果影响很大，但大模型训练一次就极其昂贵，不可能网格搜索。实践中大家在小模型上调，再凭经验猜大模型的值，结果时好时坏。论文图1显示：用Adam训练不同宽度的Transformer，在标准参数化（SP，即PyTorch默认的初始化加全局统一学习率）下，最优学习率随宽度明显移动。</p><p>理论方面，<a class="ln" href="../n/ntk.html">神经正切核</a>指出无限宽网络在特定参数化下退化为核方法，<a class="ln" href="../n/lazy-training.html">惰性训练与特征学习</a>进一步说明这时参数几乎不动、网络不学习特征。作者在前作Tensor Programs IV中证明：SP和NTK参数化都没有“能学特征”的无限宽极限，并提出最大更新参数化μP，让每一层在训练中都以与宽度无关的幅度更新。本文把它变成调参方法。</p><h2>方法</h2><p><b>直觉：中心极限定理</b>。n个独立的零均值单位方差变量求和，乘<code>1/√n</code>才收敛到非平凡的高斯；乘1会发散，乘<code>1/n</code>会趋于0。如果把一个系数写成<code>c = α/√n</code>，那么最优的α在n变大时趋于稳定，可以直接从小n复制到大n。μP就是给网络里每类参数找到这样“正确”的缩放。</p><p><b>μP的规则（以Adam为例，fan_in为该层输入宽度）</b>：</p><ul><li>隐藏层权重：初始化方差<code>1/fan_in</code>（与SP相同），学习率按<code>1/fan_in</code>缩小（SP不变）；</li><li>输出层权重：初始化方差<code>1/fan_in²</code>（SP为<code>1/fan_in</code>），学习率按<code>1/fan_in</code>缩小；</li><li>输入层权重和偏置：初始化方差<code>1/fan_in</code>，学习率不随宽度变化；</li><li>注意力分数用<code>q·k/d</code>代替<code>q·k/√d</code>。</li></ul><p>例子：把宽256的代理模型放大到4096（16倍），隐藏层的Adam学习率除以16，输出层初始化标准差也相应缩小，其他超参数原样复制。</p><p><b>为什么SP不行</b>。训练一步后，SP下输出logits和注意力分数随宽度变大而爆炸，最优学习率只好变小来压住它们，词嵌入等其他部分却因此学得太慢。</p><p><b>μTransfer流程</b>：目标模型写成μP → 调一个窄（也可以更浅）的代理模型 → 把超参数零样本复制过去。能迁移的是学习率、调度、初始化尺度、输出乘子等优化类超参数；dropout、权重衰减这类正则化超参数不能迁移。</p><h2>结果</h2><p>BERT：从1300万参数的代理模型迁移，超过已发表的BERT-large（3.5亿参数）结果，总调参成本约等于预训练一次BERT-large。GPT-3：从4000万参数代理迁移到6.7B，调参成本只占预训练的7%；验证损失1.98，用原超参数重训的同模型为2.03，整体与两倍大的13B原版相当。经验上，宽度、批大小、序列长度和训练步数需分别不低于256、32、128和5000步左右，跨深度迁移只在Pre-LN结构上成立。</p><h2>后来的发展</h2><p>代码以<code>pip install mup</code>发布。“让每层的更新幅度与规模无关”的思路后来被推广到深度方向，也影响了新优化器的设计：<a class="ln" href="../n/muon-scalable.html">Muon规模化到LLM</a>专门调整每个参数的更新尺度，使<a class="ln" href="../n/muon.html">Muon优化器</a>能直接沿用为<a class="ln" href="../n/adamw.html">AdamW</a>调好的学习率和权重衰减。</p><h2>容易误解的地方</h2><ul><li>μP不是新的网络结构，也不改变模型能表示什么；它只改变初始化和学习率随宽度的缩放方式，换算后的小模型与大模型在“相对意义上”行为一致。</li><li>只把学习率按宽度缩放、不改输出层初始化和注意力缩放，并不等于μP，迁移会失效。官方仓库建议用“坐标检查”画出激活随宽度的变化来验证实现。</li><li>迁移的是最优超参数，不是性能预测；正则化超参数仍需在目标规模上调。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>严格理论只覆盖宽度方向；跨深度迁移是经验结果，只在Pre-LN Transformer上成立，初始化标准差跨深度也迁移不好。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>dropout、权重衰减等正则化超参数依赖数据量和模型大小，无法迁移，仍要在目标规模上调。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>规则是为SGD、Adam这类逐坐标优化器推导的，换用矩阵级的新优化器时需要重新确定每层的更新尺度。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/muon-scalable.html">Muon规模化到LLM</a></div></li><li>需要改动模型代码（输出乘子、注意力用1/d缩放等），实现稍有疏漏就会悄悄失效，限制了它在工业界的普及。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/adam.html">Adam</a><span class="yr">2014.12 · 基础</span><div class=nt>给Adam推导出逐层学习率随fan_in缩放的规则，替代全局统一的学习率。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/bert.html">BERT</a><span class="yr">2018.10 · LLM</span><div class=nt>用1300万参数代理模型同时为BERT-base和BERT-large调参，超过已发表结果。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/gpt-3.html">GPT-3</a><span class="yr">2020.05 · LLM</span><div class=nt>以GPT-3 6.7B为目标验证μTransfer，迁移超参数后的模型优于原版并接近13B。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/he-init.html">He初始化与PReLU</a><span class="yr">2015.02 · 基础</span><div class=nt>He初始化只保证初始化时激活尺度稳定；μP进一步规定训练过程中各层学习率如何随宽度缩放。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/ntk.html">神经正切核</a><span class="yr">2018.06 · 基础</span><div class=nt>NTK参数化下无限宽网络退化为核方法、不学习特征；μP给出能学习特征的无限宽极限，并据此做超参数迁移。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/lazy-training.html">惰性训练与特征学习</a><span class="yr">2018.12 · 基础</span><div class=nt>惰性训练说明某些缩放下参数几乎不动；μP选取让每层都“最大限度”更新的缩放，避开惰性区。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/tensor-programs-iv.html">Tensor Programs IV</a><span class="yr">2020.11 · 基础</span><div class=nt>只在Word2Vec和少样本学习等相对简单的任务上计算了极限，没有直接用于大型网络的调参。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/muon-scalable.html">Muon规模化到LLM</a><span class="yr">2025.02 · 基础</span><div class=nt>规则是为SGD、Adam这类逐坐标优化器推导的，换用矩阵级的新优化器时需要重新确定每层的更新尺度。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/hyperparameter.html">超参数与调参</a> <a class="chip c" href="../c/initialization.html">参数初始化</a> <a class="chip c" href="../c/learning-rate.html">学习率与学习率调度</a> <a class="chip c" href="../c/adaptive-optimizer.html">自适应学习率优化器</a> <a class="chip c" href="../c/expectation-variance.html">期望与方差</a> <a class="chip c" href="../c/gaussian.html">高斯分布</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a></p>
+<h2>本篇术语</h2><ul><li><b>参数化（parametrization）</b>　规定每层权重如何初始化、学习率如何随网络宽度缩放的一套约定；同一个网络结构可以有不同参数化。</li><li><b>标准参数化（SP）</b>　常见框架的默认做法：初始化方差按1/fan_in，所有层共用一个学习率。</li><li><b>μTransfer</b>　在μP下调一个小代理模型，把得到的超参数不经调整直接用于大模型的流程。</li><li><b>坐标检查</b>　训练几步后画出各层激活平均大小随宽度的变化，μP实现正确时这些曲线应基本水平。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/initialization.html">参数初始化</a>和<a class="lc" href="../c/adaptive-optimizer.html">自适应学习率优化器</a>，了解<a class="ln" href="../n/ntk.html">神经正切核</a>说的“宽网络像核方法”。读原文第2节（中心极限定理的直觉）、表3（μP规则）和图1、图5。动手：用官方mup库把一个小MLP或nanoGPT改成μP，在宽度128到2048之间扫学习率，画出SP与μP下损失随学习率的曲线，看最优点是否对齐。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/html/2203.03466" rel="noopener">https://arxiv.org/html/2203.03466</a>（arXiv记录：标题、作者、v1提交2022-03-07，摘要中13M→BERT-large、40M→GPT-3 6.7B、7%；正文第2节中心极限定理论证、表3（隐藏层/输出层初始化与Adam学习率缩放、1/d注意力）、SP下logits与注意力分数随宽度爆炸、正则化超参数不能迁移、最低宽度256/批32/序列128/5000步、跨深度只对Pre-LN成立、表7验证损失1.98 vs 2.03、宽度256到32,768、与13B相当；Semantic Scholar记录发表于NeurIPS 2021；Tensor Programs IV摘要（arXiv 2011.14522）；microsoft/mup README的坐标检查说明。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%CE%BCP%E4%B8%8E%E8%B6%85%E5%8F%82%E6%95%B0%E8%BF%81%E7%A7%BB%EF%BC%88mup%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amup%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/mup.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="grokking.html"><small>本分支上一个 · 2022.01</small><b>Grokking</b></a><a class="r" href="forward-forward.html"><small>本分支下一个 · 2022.12</small><b>前向-前向算法</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ESMFold（2022） · AI脉络</title>
+<meta name="description" content="AlphaFold 2必须先对每条序列做多序列比对（MSA）搜索，既慢又依赖进化近亲；对没有近亲的孤儿蛋白效果差，也难以覆盖宏基因组里数亿条序列。 把蛋白质语言模型ESM-2扩大到150亿参数，直接从单条序列预测原子级结构，不再需要MSA。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/esmfold.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ESMFold（2022）">
+<meta property="og:description" content="AlphaFold 2必须先对每条序列做多序列比对（MSA）搜索，既慢又依赖进化近亲；对没有近亲的孤儿蛋白效果差，也难以覆盖宏基因组里数亿条序列。 把蛋白质语言模型ESM-2扩大到150亿参数，直接从单条序列预测原子级结构，不再需要MSA。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/esmfold.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/esmfold">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:144"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/sci.html">AI for Science</a> › 生物序列模型</div>
+<h1>ESMFold</h1>
+<div class="full">Evolutionary-scale prediction of atomic-level protein structure with a language model</div>
+<div class="meta"><span>2022.07</span><span>论文</span><span>重要</span><span>Science 2023</span><span>Lin, Akin, Rao, Hie, Zhu, Lu, Smetanin, Verkuil, Rives et al. · Meta AI (FAIR)</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://www.biorxiv.org/content/10.1101/2022.07.20.500902v3" rel="noopener">bioRxiv ↗</a><a class="btn sm" href="https://www.science.org/doi/10.1126/science.ade2574" rel="noopener">Science ↗</a><a class="btn sm" href="../index.html#/n/esmfold">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>AlphaFold 2必须先对每条序列做多序列比对（MSA）搜索，既慢又依赖进化近亲；对没有近亲的孤儿蛋白效果差，也难以覆盖宏基因组里数亿条序列。</p></div><div><h4>方法</h4><p>把蛋白质语言模型ESM-2扩大到150亿参数，直接从单条序列预测原子级结构，不再需要MSA。</p></div><div><h4>影响</h4><p>结构预测提速一个数量级，并用它预测了6亿多条宏基因组蛋白，建成ESM宏基因组图谱。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/alphafold-2.html">AlphaFold 2</a>精度极高，但流程的第一步是在海量序列库里检索同源序列、拼成MSA，因为共进化信号是它推断空间接触的主要线索。这一步耗时，并且对只有很少近亲的序列信息不足。与此同时，<a class="ln" href="../n/esm.html">蛋白质语言模型ESM</a>和<a class="ln" href="../n/prottrans.html">ProtTrans</a>等蛋白质语言模型显示：只在蛋白序列上做掩码预测（见<a class="lc" href="../c/masked-modeling.html">掩码建模</a>），模型内部就会学到结构和功能信息。关键疑问是：语言模型学到的信息足够精细到原子级结构吗？</p><h2>方法</h2><p>先训练ESM-2：用掩码语言建模在大量蛋白序列上预训练，模型规模从几百万一路放大到150亿参数。研究发现随着规模增大，其注意力图里出现越来越清晰的残基接触。然后在ESM-2的表示之上接一个折叠头（folding head），结构类似AlphaFold 2的Evoformer与结构模块的简化版，输出每个原子的三维坐标，同时输出每个残基的置信度pLDDT。整个系统只吃一条序列，没有MSA检索。训练结构监督数据来自实验结构以及AlphaFold预测的结构。</p><h2>结果</h2><p>论文摘要报告：这使高分辨率结构预测提速一个数量级；据此预测了超过6.17亿条宏基因组蛋白序列的结构，其中超过2.25亿条被预测为高置信度，即ESM Metagenomic Atlas。</p><h2>后来的发展</h2><p>ESMFold证明了语言模型表示可以替代MSA，<a class="ln" href="../n/esm3.html">ESM3</a>把序列、结构、功能统一进一个生成式语言模型。精度方面，ESMFold整体仍不及依赖MSA的AlphaFold 2；之后<a class="ln" href="../n/alphafold-3.html">AlphaFold 3</a>与<a class="ln" href="../n/boltz-1.html">Boltz-1开源复现AF3</a>等把重点转向复合物与配体。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>精度整体低于AlphaFold 2，尤其是在低困惑度（语言模型本身没学好）的序列上。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/alphafold-3.html">AlphaFold 3</a></div></li><li>只预测单链蛋白，不处理多链复合物、配体、核酸和修饰。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/alphafold-3.html">AlphaFold 3</a> <a class="chip hue" style="--h:144" href="../n/boltz-1.html">Boltz-1开源复现AF3</a></div></li><li>对语言模型规模依赖极强，150亿参数的训练与推理成本很高，小实验室难以复现。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/openfold.html">OpenFold</a></div></li><li>只能预测结构，不能反向设计新序列，也没有功能信息。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/esm3.html">ESM3</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:144" href="../n/alphafold-2.html">AlphaFold 2</a><span class="yr">2020.11 · 科学</span> <span class="vk ok">已核对</span><div class=nt>同样预测原子级结构，AlphaFold 2靠MSA、精度更高，ESMFold放弃MSA换取速度。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/coevolution-contacts.html">共进化接触预测DCA</a><span class="yr">2011.12 · 科学</span><div class=nt>需要家族里有大量同源序列，对序列少的“孤儿”蛋白、新设计的蛋白基本无效。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:144" href="../n/rosettafold.html">RoseTTAFold</a><span class="yr">2021.07 · 科学</span><div class=nt>同样基于深度学习的结构预测，但仍使用MSA。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:144" href="../n/alphafold-db.html">AlphaFold蛋白结构数据库</a><span class="yr">2021.07 · 科学</span><div class=nt>把预测从已测序的约两亿条蛋白，扩展到数亿条宏基因组序列。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/esm.html">蛋白质语言模型ESM</a><span class="yr">2019.04 · 科学</span><div class=nt>沿ESM的蛋白质语言模型路线，把规模放大到150亿参数并接上结构折叠头。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:144" href="../n/prottrans.html">ProtTrans</a><span class="yr">2020.07 · 科学</span><div class=nt>同期的蛋白质语言模型路线，ProtTrans主要用于迁移到下游任务，ESMFold直接做结构预测。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/openfold.html">OpenFold</a><span class="yr">2022.11 · 科学</span><div class=nt>重训仍依赖大规模多序列比对检索，计算和存储成本很高。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/alphafold-3.html">AlphaFold 3</a><span class="yr">2024.05 · 科学</span><div class=nt>精度整体低于AlphaFold 2，尤其是在低困惑度（语言模型本身没学好）的序列上。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:144" href="../n/esm3.html">ESM3</a><span class="yr">2024.06 · 科学</span><div class=nt>沿用ESM系列语言模型加结构头的思路，把结构从输出变成与序列并列的输入输出轨道。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/boltz-1.html">Boltz-1开源复现AF3</a><span class="yr">2024.11 · 科学</span><div class=nt>只预测单链蛋白，不处理多链复合物、配体、核酸和修饰。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/openfold.html">OpenFold</a><span class="yr">2022.11 · 科学</span><div class=nt>对语言模型规模依赖极强，150亿参数的训练与推理成本很高，小实验室难以复现。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/embedding.html">嵌入向量</a> <a class="chip c" href="../c/scaling-law-concept.html">幂律与规模定律</a></p>
+<h2>本篇术语</h2><ul><li><b>MSA</b>　多序列比对：把一条蛋白质与进化上相近的序列逐位对齐，共同变化的位置暗示它们在空间上靠近。</li><li><b>pLDDT</b>　预测结构每个残基的置信度分数，0到100，越高越可信。</li></ul>
+<h2>怎么学</h2><p>先理解<a class="lc" href="../c/masked-modeling.html">掩码建模</a>，再读原文关于规模与结构涌现的部分。用esm的Python包对一条序列跑ESMFold，对比同一序列在AlphaFold数据库中的结构。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI:10.1126/science.ade2574&amp;resultType=core&amp;format=json" rel="noopener">https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI:10.1126/science.ade2574&amp;resultType=core&amp;format=json</a>（Europe PMC记录的Science摘要：15B参数、数量级提速、&gt;6.17亿条序列、&gt;2.25亿高置信；bioRxiv首发日期2022-07（骨架一致，v3页面显示为2022.07.20.500902）。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ESMFold%EF%BC%88esmfold%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aesmfold%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/esmfold.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mace.html"><small>本分支上一个 · 2022.06</small><b>MACE</b></a><a class="r" href="diffdock.html"><small>本分支下一个 · 2022.10</small><b>DiffDock</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

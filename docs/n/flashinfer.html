@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FlashInfer注意力引擎（2025） · AI脉络</title>
+<meta name="description" content="推理引擎里KV缓存的存法五花八门（分页、前缀共享、稀疏），注意力变体也越来越多，每种组合都要手写一份高性能内核。 用统一的块稀疏格式描述各种KV缓存布局，再用JIT模板把注意力变体编译成内核，配合负载均衡调度兼容CUDAGraph。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/flashinfer.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="FlashInfer注意力引擎（2025）">
+<meta property="og:description" content="推理引擎里KV缓存的存法五花八门（分页、前缀共享、稀疏），注意力变体也越来越多，每种组合都要手写一份高性能内核。 用统一的块稀疏格式描述各种KV缓存布局，再用JIT模板把注意力变体编译成内核，配合负载均衡调度兼容CUDAGraph。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/flashinfer.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/flashinfer">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 编译器与高性能算子</div>
+<h1>FlashInfer注意力引擎</h1>
+<div class="full">FlashInfer: Efficient and Customizable Attention Engine for LLM Inference Serving</div>
+<div class="meta"><span>2025.01</span><span>论文</span><span>重要</span><span>MLSys 2025（Outstanding Paper）</span><span>Zihao Ye, Lequn Chen, Ruihang Lai, Wuwei Lin, Yineng Zhang, Stephanie Wang, Tianqi Chen, Baris Kasikci et al. · 华盛顿大学, NVIDIA, Perplexity AI, 卡内基梅隆大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2501.01005" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/flashinfer-ai/flashinfer" rel="noopener">GitHub ↗</a><a class="btn sm" href="https://news.cs.washington.edu/2025/07/01/allen-school-researchers-receive-best-paper-award-for-speeding-up-llm-performance-with-flashinfer" rel="noopener">UW新闻：MLSys 2025获奖 ↗</a><a class="btn sm" href="../index.html#/n/flashinfer">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>推理引擎里KV缓存的存法五花八门（分页、前缀共享、稀疏），注意力变体也越来越多，每种组合都要手写一份高性能内核。</p></div><div><h4>方法</h4><p>用统一的块稀疏格式描述各种KV缓存布局，再用JIT模板把注意力变体编译成内核，配合负载均衡调度兼容CUDAGraph。</p></div><div><h4>影响</h4><p>成为vLLM、SGLang、MLC-Engine共用的注意力与采样内核层，获MLSys 2025杰出论文奖。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/flashattention.html">FlashAttention</a>和<a class="ln" href="../n/flashattention-2.html">FlashAttention-2</a>解决的是训练时的注意力：一批序列长度整齐、KV连续存放。到了推理服务里情况完全不同：<a class="ln" href="../n/vllm.html">vLLM与PagedAttention</a>把KV缓存切成页（PagedAttention），<a class="ln" href="../n/sglang.html">SGLang与RadixAttention</a>用基数树让多个请求共享前缀，长上下文又引入稀疏注意力。每个请求长短不一，有的在预填充、有的在逐词解码，批次每一步都在变。</p><p>结果是每个推理引擎都在维护自己的一套注意力内核，加一个新变体（滑动窗口、带软上限的logits、MLA）就要改一遍CUDA代码，而且很难同时做到灵活和快。</p><h2>方法</h2><p>FlashInfer把问题拆成三层。</p><p><b>存储格式</b>：把任何KV缓存布局都看成一个块稀疏矩阵（BSR格式）——行是查询，列是KV块，有值的块表示这个查询要看这块KV。分页缓存、前缀共享、树形推测解码的掩码都能写成这种形式；多种块大小还能组合使用，例如共享前缀用大块存一次，各请求私有的部分用小块。</p><p><b>可定制模板</b>：用户只描述注意力变体在哪一步不同（如何变换logits、如何加掩码），框架在运行时用JIT编译把它填进一个高性能的FlashAttention式模板。</p><p><b>调度</b>：CPU端先根据本批次每个请求的长度算出一份均衡的分工计划，GPU上的持久化内核照计划执行。这样每一步批次形状再怎么变，内核配置都固定，可以被CUDAGraph整段录制回放，省掉反复启动内核的开销。</p><h2>结果</h2><p>论文称在推理服务基准上，相对编译器后端（Triton）的逐token延迟降低29%–69%；长上下文推理延迟降低28%–30%；并行生成场景提速13%–17%。</p><h2>后来的发展</h2><p>FlashInfer已集成进<a class="ln" href="../n/sglang.html">SGLang与RadixAttention</a>、<a class="ln" href="../n/vllm.html">vLLM与PagedAttention</a>、MLC-Engine等主流引擎，NVIDIA也把自家的推理内核通过它发布，事实上成为开源推理栈里的公共内核层。它代表了一个趋势：推理引擎负责调度和缓存管理，内核交给专门的库；同期的<a class="ln" href="../n/sageattention.html">SageAttention八比特注意力</a>等量化注意力也走类似的即插即用路线。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>主要面向NVIDIA GPU，其他硬件上的支持和性能明显落后。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>调度计划在CPU端计算，批次极小、步数极多时这部分开销占比上升。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/tvm.html">TVM深度学习编译器</a><span class="yr">2018.02 · 系统·效率</span><div class=nt>作者团队来自TVM/MLC，把编译器式的模板与JIT思想用到注意力内核上。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/vllm.html">vLLM与PagedAttention</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>vLLM的分页KV缓存需要专门内核，FlashInfer用统一的块稀疏格式承接分页布局，成为其可选注意力后端。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/flashattention-2.html">FlashAttention-2</a><span class="yr">2023.07 · 系统·效率</span><div class=nt>沿用FlashAttention的分块与在线softmax，把它从训练场景推广到格式多样的推理KV缓存。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/sglang.html">SGLang与RadixAttention</a><span class="yr">2023.12 · 系统·效率</span><div class=nt>SGLang的前缀共享是FlashInfer组合格式的典型用例，SGLang也默认采用其内核。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+<h2>本篇术语</h2><ul><li><b>块稀疏格式（BSR）</b>　把矩阵切成固定大小的块，只记录非零块的位置和内容；这里用来描述每个查询要读哪些KV块。</li><li><b>CUDAGraph</b>　把一串GPU内核调用录制成一张图后整体回放，省掉每次从CPU逐个发起内核的开销，但要求每次的形状配置固定。</li><li><b>JIT编译</b>　程序运行时才把代码编译成机器码，这里用来按用户描述的注意力变体即时生成内核。</li></ul>
+<h2>怎么学</h2><p>先懂<a class="ln" href="../n/flashattention.html">FlashAttention</a>的分块计算和<a class="ln" href="../n/vllm.html">vLLM与PagedAttention</a>的分页KV缓存 → 读论文第3节块稀疏格式与第4节调度 → 在SGLang里切换注意力后端对比延迟。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2501.01005" rel="noopener">https://arxiv.org/abs/2501.01005</a>（标题、作者与机构（UW、NVIDIA、Perplexity AI、CMU）、v1日期2025-01-02、MLSys 2025收录；摘要中29–69%、28–30%、13–17%三组数字；BSR格式、JIT模板、CUDAGraph兼容调度见arXiv HTML正文。获奖信息来自UW新闻与MLSys 2025奖项页（Outstanding Paper Award）。NVIDIA通过FlashInfer发布推理内核一事依据NVIDIA开发者博客标题“Run High-Performance LLM Inference Kernels from NVIDIA Using FlashInfer”。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20FlashInfer%E6%B3%A8%E6%84%8F%E5%8A%9B%E5%BC%95%E6%93%8E%EF%BC%88flashinfer%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aflashinfer%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/flashinfer.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="xgrammar.html"><small>本分支上一个 · 2024.11</small><b>XGrammar结构化生成</b></a><a class="r" href="deepseek-infra-week.html"><small>本分支下一个 · 2025.02</small><b>DeepSeek开源周</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

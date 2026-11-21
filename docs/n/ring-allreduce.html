@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ring All-Reduce（2017） · AI脉络</title>
+<meta name="description" content="数据并行训练里，每步都要把所有GPU上的梯度求平均。若汇总到一台机器再分发，这台机器的带宽随GPU数量线性成为瓶颈。 把GPU连成一个环，梯度切成N块，先做一轮scatter-reduce再做一轮allgather，每块只在相邻GPU之间传递，每张卡的通信量基本不随卡数增加。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ring-allreduce.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Ring All-Reduce（2017）">
+<meta property="og:description" content="数据并行训练里，每步都要把所有GPU上的梯度求平均。若汇总到一台机器再分发，这台机器的带宽随GPU数量线性成为瓶颈。 把GPU连成一个环，梯度切成N块，先做一轮scatter-reduce再做一轮allgather，每块只在相邻GPU之间传递，每张卡的通信量基本不随卡数增加。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ring-allreduce.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ring-allreduce">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 分布式与数据并行</div>
+<h1>Ring All-Reduce</h1>
+<div class="full">Bringing HPC Techniques to Deep Learning</div>
+<div class="meta"><span>2017.02</span><span>思想</span><span>延伸</span><span>Andrew Gibiansky等 · Baidu Silicon Valley AI Lab</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://andrew.gibiansky.com/blog/machine-learning/baidu-allreduce/" rel="noopener">Baidu Research 说明博文 ↗</a><a class="btn sm" href="../index.html#/n/ring-allreduce">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>数据并行训练里，每步都要把所有GPU上的梯度求平均。若汇总到一台机器再分发，这台机器的带宽随GPU数量线性成为瓶颈。</p></div><div><h4>方法</h4><p>把GPU连成一个环，梯度切成N块，先做一轮scatter-reduce再做一轮allgather，每块只在相邻GPU之间传递，每张卡的通信量基本不随卡数增加。</p></div><div><h4>影响</h4><p>成为多机多卡训练的标准通信方式，Horovod、NCCL等都采用，为后来的大模型并行打下基础。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>设N张GPU，每张持有长度K的梯度。朴素做法是所有人把梯度发给一台「归约」机器求平均再发回，该机器的流量与N成正比。</p><p>Ring Allreduce让每张卡只与环上的左右邻居通信。第一阶段scatter-reduce：把梯度切成N段，进行N−1轮，每轮每张卡把一段发给下一个邻居并累加收到的一段，结束时每张卡恰好持有一段的完整总和。第二阶段allgather：再进行N−1轮，把这些完整的段沿环传一圈，最终每张卡都得到全部平均梯度。每张卡发送的数据量为<code>2(N−1)K/N</code>，当N较大时趋近<code>2K</code>，几乎与卡数无关。</p><p>博文还指出可以与反向传播重叠：输出层的梯度先算出，可以先传输，同时继续计算前面各层。博文的基准是40块GPU（5节点×8卡）每轮约650–700毫秒，单卡约370毫秒。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>速度被环上最慢的一条链路决定，跨机网络慢时整体变慢。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>仍是同步数据并行，每张卡必须放得下完整模型，模型变大后不再适用。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/megatron.html">Megatron-LM模型并行</a> <a class="chip hue" style="--h:192" href="../n/zero.html">ZeRO与DeepSpeed</a></div></li><li>需要一个易用的库把它接进训练框架。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/horovod.html">Horovod</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:72" href="../n/cuda.html">CUDA</a><span class="yr">2006.11 · 硬件</span> <span class="vk">待核对</span><div class=nt>编程模型只描述一块GPU内部的并行；多卡、多机之间如何切分模型和同步梯度要用户自己解决。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/tensorflow.html">TensorFlow</a><span class="yr">2015.11 · 系统·效率</span> <span class="vk">待核对</span><div class=nt>参数服务器式的分布式训练配置繁琐，同步训练扩展到多机多卡时效率不高。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:72" href="../n/google-cat.html">Google Brain猫脸实验</a><span class="yr">2011.12 · 硬件</span><div class=nt>异步随机梯度下降中各副本用的是过时的参数，训练结果难以复现，规模越大越不稳定。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/distbelief.html">DistBelief与Downpour SGD</a><span class="yr">2012.12 · 系统·效率</span><div class=nt>异步更新导致梯度基于过时参数，缺乏收敛保证，副本数一多就需要热启动、AdaGrad等技巧才能稳定。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/parameter-server.html">参数服务器</a><span class="yr">2014.10 · 系统·效率</span><div class=nt>参数服务器的中心节点带宽随卡数成为瓶颈，环形通信把每张卡的流量压到近似常数。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/horovod.html">Horovod</a><span class="yr">2018.02 · 系统·效率</span><div class=nt>通信核心就是环形allreduce。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/megatron.html">Megatron-LM模型并行</a><span class="yr">2019.09 · 系统·效率</span><div class=nt>仍是同步数据并行，每张卡必须放得下完整模型，模型变大后不再适用。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/zero.html">ZeRO与DeepSpeed</a><span class="yr">2019.10 · 系统·效率</span><div class=nt>仍是同步数据并行，每张卡必须放得下完整模型，模型变大后不再适用。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="../c/interconnect.html">互连：从芯片到机柜到集群</a></p>
+
+<h2>怎么学</h2><p>读博文的图示，然后用几个进程在纸上或代码里模拟4个节点的环，验证结束时每个节点得到相同总和。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://andrew.gibiansky.com/blog/machine-learning/baidu-allreduce/" rel="noopener">https://andrew.gibiansky.com/blog/machine-learning/baidu-allreduce/</a>（博文日期2017-02-21；通信量公式2(N−1)K/N；40 GPU基准650–700毫秒对单卡约370毫秒。该做法由百度SVAIL提出，博文作者为Andrew Gibiansky。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Ring%20All-Reduce%EF%BC%88ring-allreduce%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aring-allreduce%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ring-allreduce.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="pytorch.html"><small>本分支上一个 · 2017.01</small><b>PyTorch</b></a><a class="r" href="xla.html"><small>本分支下一个 · 2017.03</small><b>XLA编译器</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

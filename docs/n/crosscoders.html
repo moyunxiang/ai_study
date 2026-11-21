@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>交叉编码器与模型对比（2024） · AI脉络</title>
+<meta name="description" content="稀疏自编码器（）一次只拆一层，同一特征常分散在多层（跨层叠加）；想比较两个模型（如微调前后）学到的特征有何不同，也缺少办法。 让一个稀疏字典同时读写多层甚至多个模型的激活，得到跨层、跨模型共享的特征，并能分出某个模型独有的特征。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/crosscoders.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="交叉编码器与模型对比（2024）">
+<meta property="og:description" content="稀疏自编码器（）一次只拆一层，同一特征常分散在多层（跨层叠加）；想比较两个模型（如微调前后）学到的特征有何不同，也缺少办法。 让一个稀疏字典同时读写多层甚至多个模型的激活，得到跨层、跨模型共享的特征，并能分出某个模型独有的特征。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/crosscoders.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/crosscoders">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:312"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">环境 · 社会 › <a href="../t/safety.html">安全、对齐与可解释性</a> › 机制可解释性</div>
+<h1>交叉编码器与模型对比</h1>
+<div class="full">Sparse Crosscoders for Cross-Layer Features and Model Diffing</div>
+<div class="meta"><span>2024.10</span><span>论文</span><span>延伸</span><span>Jack Lindsey, Adly Templeton, Jonathan Marcus, Thomas Conerly, Joshua Batson, Christopher Olah · Anthropic</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://transformer-circuits.pub/2024/crosscoders/index.html" rel="noopener">Transformer Circuits ↗</a><a class="btn sm" href="../index.html#/n/crosscoders">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>稀疏自编码器（<a class="ln" href="../n/monosemanticity.html">稀疏自编码器与单义特征</a>）一次只拆一层，同一特征常分散在多层（跨层叠加）；想比较两个模型（如微调前后）学到的特征有何不同，也缺少办法。</p></div><div><h4>方法</h4><p>让一个稀疏字典同时读写多层甚至多个模型的激活，得到跨层、跨模型共享的特征，并能分出某个模型独有的特征。</p></div><div><h4>影响</h4><p>把“模型对比（model diffing）”变成可操作的方法，后来被用来找微调中新出现的特征，例如OpenAI对涌现失准的分析。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>普通稀疏自编码器在一层上编码再重建该层；<a class="ln" href="../n/transcoders.html">Transcoders</a>用一层预测下一层；交叉编码器（crosscoder）则把多层激活一起编码成一组稀疏特征 <code>f(x)=ReLU(Σ_l W_enc^l a^l(x)+b)</code>，再用各层自己的解码器分别重建每一层。损失是各层重建误差之和，加上按各层解码器范数之和加权的稀疏惩罚 <code>Σ_i f_i(x)·Σ_l‖W_dec,i^l‖</code>，这样它的损失能和逐层SAE之和直接比较。</p><p>把“多层”换成“两个模型”，就是模型对比：作者在Claude 3 Sonnet中间层和它的基座模型上训练了100万特征的交叉编码器，发现特征按两个模型解码器范数的相对大小清楚地分成三群：基座独有、微调后独有、共享。共享特征在两个模型里的方向几乎都高度一致；微调独有的特征里有一些与扮演助手、人机对话相关，但大多数还不能直接解释。这是一份初步研究报告。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>模型独有的特征大多难以解释，方法是否会人为制造出“独有”特征尚不清楚。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:312" href="../n/monosemanticity.html">稀疏自编码器与单义特征</a><span class="yr">2023.10 · 安全·可解释</span><div class=nt>把单层稀疏字典学习扩展到多层和多个模型。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:312" href="../n/scaling-monosemanticity.html">SAE扩展到生产模型</a><span class="yr">2024.05 · 安全·可解释</span><div class=nt>在同一套Claude 3 Sonnet的字典学习基础设施上做模型对比。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:312" href="../n/transcoders.html">Transcoders</a><span class="yr">2024.06 · 安全·可解释</span><div class=nt>转码器读一层写下一层，交叉编码器同时读写多层。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:312" href="../n/persona-features.html">失准人格特征</a><span class="yr">2025.06 · 安全·可解释</span><div class=nt>沿用模型对比的思路，把它用于定位安全相关的行为变化。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autoencoder.html">自编码器</a> <a class="chip c" href="../c/regularization.html">正则化与权重衰减</a> <a class="chip c" href="../c/residual-connection.html">残差连接</a> <a class="chip c" href="../c/feature-representation.html">特征与表示学习</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://transformer-circuits.pub/2024/crosscoders/index.html" rel="noopener">https://transformer-circuits.pub/2024/crosscoders/index.html</a>（官方页面核对：标题、6位作者、2024-10-25；编码器/解码器公式与按解码器范数加权的L1惩罚；Claude 3 Sonnet与基座模型、100万特征、三群特征、共享特征方向一致、独有特征多数难解释。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E4%BA%A4%E5%8F%89%E7%BC%96%E7%A0%81%E5%99%A8%E4%B8%8E%E6%A8%A1%E5%9E%8B%E5%AF%B9%E6%AF%94%EF%BC%88crosscoders%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acrosscoders%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/crosscoders.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="machines-of-loving-grace.html"><small>本分支上一个 · 2024.10</small><b>《Machines of Loving Grace》</b></a><a class="r" href="in-context-scheming.html"><small>本分支下一个 · 2024.12</small><b>上下文中的图谋</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

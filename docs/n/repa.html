@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>表征对齐REPA（2024） · AI脉络</title>
+<meta name="description" content="扩散Transformer训练极慢：SiT-XL要训700万步才达到较好的FID。原因之一是它得从加噪图像里自己摸索出有意义的视觉表征，而这件事自监督模型早就做得很好了。 训练时加一个正则项：把DiT中间层对加噪图像的隐状态，经过一个小MLP投影后，与预训练DINOv2对干净图像提取的特征按图块对…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/repa.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="表征对齐REPA（2024）">
+<meta property="og:description" content="扩散Transformer训练极慢：SiT-XL要训700万步才达到较好的FID。原因之一是它得从加噪图像里自己摸索出有意义的视觉表征，而这件事自监督模型早就做得很好了。 训练时加一个正则项：把DiT中间层对加噪图像的隐状态，经过一个小MLP投影后，与预训练DINOv2对干净图像提取的特征按图块对…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/repa.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/repa">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 潜空间与骨架网络</div>
+<h1>表征对齐REPA</h1>
+<div class="full">Representation Alignment for Generation: Training Diffusion Transformers Is Easier Than You Think</div>
+<div class="meta"><span>2024.10</span><span>论文</span><span>重要</span><span>ICLR 2025</span><span>Sihyun Yu, Sangkyung Kwak, Huiwon Jang, Jongheon Jeong, Jonathan Huang, Jinwoo Shin, Saining Xie · KAIST / 高丽大学 / Scaled Foundations / 纽约大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2410.06940" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://sihyun.me/REPA/" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/repa">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>扩散Transformer训练极慢：SiT-XL要训700万步才达到较好的FID。原因之一是它得从加噪图像里自己摸索出有意义的视觉表征，而这件事自监督模型早就做得很好了。</p></div><div><h4>方法</h4><p>训练时加一个正则项：把DiT中间层对加噪图像的隐状态，经过一个小MLP投影后，与预训练DINOv2对干净图像提取的特征按图块对齐（最大化余弦相似度）。</p></div><div><h4>影响</h4><p>训练速度提升超过17.5倍，400K步就超过原本700万步的效果，ImageNet 256上FID达到1.42；让“生成模型应借用表征模型”成为2025年的研究热点。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/dit.html">Diffusion Transformer</a>和<a class="ln" href="../n/sit.html">SiT插值Transformer</a>把扩散模型的骨干换成了Transformer，质量很好，但训练要花很长时间。另一方面，研究者早就发现扩散模型内部会学到有用的视觉表征：拿它的中间层特征做分类，效果不错。但这些表征比<a class="ln" href="../n/dinov2.html">DINOv2</a>这类专门的自监督表征模型要差得多。</p><p>作者的推测是：扩散模型训练慢，很大程度上是因为它同时在做两件事——学习“图像里有什么”的语义表征，以及学习“如何去噪生成细节”；前一件事做得又慢又不好。既然已经有了很强的现成表征模型，能不能直接把它“教”给扩散模型？</p><h2>方法</h2><p>设x是干净图像，经VAE编码后加噪得到z_t。DiT（或SiT）照常做去噪/速度预测训练。同时：</p><ul><li>用冻结的预训练编码器（如DINOv2）对<b>干净图像</b>x提取每个图块的特征 <code>y = f(x)</code>，共N个图块。</li><li>取DiT前几层（默认到第8层）对<b>加噪输入</b>的隐状态 <code>h_t</code>，经一个只在训练时使用的小MLP投影 <code>h_φ(h_t)</code>，使其维度与y一致。</li><li>对每个图块计算余弦相似度，取平均后的负值作为对齐损失：<code>L_REPA = −(1/N)·Σ_n sim(y[n], h_φ(h_t[n]))</code>。</li></ul><p>总损失为 <code>L = L_velocity + λ·L_REPA</code>，λ取0.5左右即可，在0.25到1.0之间效果都稳定。</p><p>直观上，这要求DiT的前几层必须从带噪的图像中“认出”与DINOv2一致的语义结构，后面的层就可以专心做去噪和生成细节。推理时不需要DINOv2和投影头，模型结构不变，没有额外开销。</p><h2>结果</h2><p>SiT-XL/2加REPA在40万步时FID为7.9（不加引导），而原始SiT-XL/2训练700万步才到8.3，即提速超过17.5倍。训练800个epoch后，配合限制区间的无分类器引导，ImageNet 256×256上FID达到1.42；只用普通引导（尺度1.35）为1.80。对齐越强的表征编码器带来越好的生成效果。</p><h2>后来的发展</h2><p>REPA引发了一连串“表征与生成”相结合的工作：<a class="ln" href="../n/va-vae.html">VA-VAE重建与生成之困</a>把对齐从DiT内部挪到VAE潜空间，让潜变量本身更“语义化”；后续的REPA-E尝试端到端联合训练VAE与DiT；同一团队的<a class="ln" href="../n/rae.html">表征自编码器RAE</a>更进一步，直接用DINOv2这类表征编码器充当扩散模型的自编码器。“扩散模型的训练瓶颈在表征”这一观点也影响了视频和统一多模态模型的设计。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>依赖一个外部的预训练表征模型，生成质量受其能力和训练数据的限制，也增加了训练时的计算。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只在DiT内部做对齐，潜空间仍是为重建设计的SD-VAE，语义结构差的问题没有从源头解决。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/va-vae.html">VA-VAE重建与生成之困</a> <a class="chip hue" style="--h:288" href="../n/rae.html">表征自编码器RAE</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/dit.html">Diffusion Transformer</a><span class="yr">2022.12 · 生成</span> <span class="vk ok">已核对</span><div class=nt>解决DiT类模型训练收敛慢的问题，40万步超过原本700万步的效果。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/mae.html">掩码自编码器MAE</a><span class="yr">2021.11 · 视觉</span><div class=nt>此前有工作把MAE式掩码重建作为扩散训练的辅助目标来加速；REPA改为对齐外部表征，效果更好。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/dinov2.html">DINOv2</a><span class="yr">2023.04 · 视觉</span><div class=nt>以冻结的DINOv2特征作为对齐目标，把自监督学到的语义表征传给扩散模型。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/sit.html">SiT插值Transformer</a><span class="yr">2024.01 · 生成</span><div class=nt>主要实验在SiT（插值/速度预测的DiT）上进行，损失直接加在其速度预测损失上。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/rae.html">表征自编码器RAE</a><span class="yr">2025.10 · 生成</span><div class=nt>REPA在DiT内部对齐DINOv2特征；RAE直接把DINOv2特征空间当作扩散的潜空间，训练再快约16倍。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/va-vae.html">VA-VAE重建与生成之困</a><span class="yr">2025.01 · 生成</span><div class=nt>REPA在扩散模型内部对齐基础模型表征，VA-VAE把同样思想前移到分词器。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/repa-e.html">REPA-E端到端调VAE</a><span class="yr">2025.04 · 生成</span><div class=nt>把REPA的对齐损失从只训扩散网络扩展为同时更新VAE。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/self-supervised.html">自监督学习</a> <a class="chip c" href="../c/feature-representation.html">特征与表示学习</a> <a class="chip c" href="../c/dot-product.html">内积与余弦相似度</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a></p>
+<h2>本篇术语</h2><ul><li><b>表征对齐</b>　让一个模型的中间特征在某种相似度下接近另一个模型的特征，常用余弦相似度。</li><li><b>投影头</b>　接在主网络特征后面的小MLP，只用于计算辅助损失，推理时丢弃。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/dit.html">Diffusion Transformer</a>和<a class="ln" href="../n/dinov2.html">DINOv2</a>，补<a class="lc" href="../c/self-supervised.html">自监督学习</a>与<a class="lc" href="../c/feature-representation.html">特征与表示学习</a>。读原文第3节（对齐分析与方法）和图1、图2中“扩散特征与DINOv2的对齐度随训练变化”的曲线。动手：在官方代码上训练一个小的SiT-B，比较加与不加REPA时前10万步的FID曲线。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2410.06940" rel="noopener">https://arxiv.org/abs/2410.06940</a>（标题、7位作者与机构；正文（arxiv.org/html）中损失形式与λ、默认对齐到第8层、提速超过17.5倍、40万步FID 7.9对700万步8.3、800 epoch FID 1.42（引导区间）与1.80（w=1.35）。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E8%A1%A8%E5%BE%81%E5%AF%B9%E9%BD%90REPA%EF%BC%88repa%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Arepa%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/repa.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="dc-ae.html"><small>本分支上一个 · 2024.10</small><b>深度压缩自编码器DC-AE</b></a><a class="r" href="scm.html"><small>本分支下一个 · 2024.10</small><b>连续时间一致性模型sCM</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

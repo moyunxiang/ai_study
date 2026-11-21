@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OWL-ViT（2022） · AI脉络</title>
+<meta name="description" content="检测模型只能认训练集里标注过的固定类别；带框标注的数据很少，长尾类别更是几乎没有，而图文对比模型虽然认得万物，却不会画框。 取标准ViT，先做CLIP式图文对比预训练，再去掉最后的池化，让每个图像token直接输出一个框和一个类别嵌入；类别名过文本编码器，与框的嵌入比相似度，从而检测任意文字描述的…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/owl-vit.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OWL-ViT（2022）">
+<meta property="og:description" content="检测模型只能认训练集里标注过的固定类别；带框标注的数据很少，长尾类别更是几乎没有，而图文对比模型虽然认得万物，却不会画框。 取标准ViT，先做CLIP式图文对比预训练，再去掉最后的池化，让每个图像token直接输出一个框和一个类别嵌入；类别名过文本编码器，与框的嵌入比相似度，从而检测任意文字描述的…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/owl-vit.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/owl-vit">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 目标检测</div>
+<h1>OWL-ViT</h1>
+<div class="full">Simple Open-Vocabulary Object Detection with Vision Transformers</div>
+<div class="meta"><span>2022.05</span><span>论文</span><span>延伸</span><span>ECCV 2022</span><span>Matthias Minderer, Alexey Gritsenko, Austin Stone, Maxim Neumann, Dirk Weissenborn, Alexey Dosovitskiy, Aravindh Mahendran, Anurag Arnab, Mostafa Dehghani, Zhuoran Shen et al. · Google Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2205.06230" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/google-research/scenic/tree/main/scenic/projects/owl_vit" rel="noopener">官方代码 ↗</a><a class="btn sm" href="../index.html#/n/owl-vit">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>检测模型只能认训练集里标注过的固定类别；带框标注的数据很少，长尾类别更是几乎没有，而图文对比模型虽然认得万物，却不会画框。</p></div><div><h4>方法</h4><p>取标准ViT，先做CLIP式图文对比预训练，再去掉最后的池化，让每个图像token直接输出一个框和一个类别嵌入；类别名过文本编码器，与框的嵌入比相似度，从而检测任意文字描述的物体。</p></div><div><h4>影响</h4><p>给出一套把图文模型迁移成开放词表检测器的简单配方，并显示检测效果随图像级预训练和模型规模稳定提升，是后来YOLO-World等开放词表检测的参照。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>做法分两步。第一步，用<a class="ln" href="../n/clip.html">CLIP</a>的方式在海量图文对上预训练一个标准的<a class="ln" href="../n/vit.html">Vision Transformer</a>和一个文本编码器。第二步，把ViT最后的token池化去掉，每个输出token额外接一个小网络预测一个框（中心、宽、高），再接一个线性层把token映射成「类别嵌入」；训练检测时用二分图匹配把预测框和标注框一一配对，这一点沿用了<a class="ln" href="../n/detr.html">DETR</a>。</p><p>分类头不再是固定的N个类别的权重，而是把类别名（如“一只猫”）送入文本编码器得到的向量：框的类别嵌入与每个文本向量做相似度，就得到该框属于各类别的分数。这样训练时只见过的类别，推理时换成任何新词也能用。同一结构也支持单样本图像条件检测：用一张示例图的嵌入代替文本去找相似物体。</p><p>论文还分析了缩放性质：增大图像级预训练规模和模型尺寸都能带来下游检测的持续提升，并给出微调时所需的适配策略与正则化。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>检测阶段的框标注数据规模仍远小于图文对，罕见类别上的定位精度明显落后于常见类别。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/yolo-world.html">YOLO-World</a></div></li><li>每次检测都要跑完整的大ViT，速度不适合实时场景。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/yolo-world.html">YOLO-World</a> <a class="chip hue" style="--h:216" href="../n/rt-detr.html">RT-DETR实时DETR</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:240" href="../n/clip.html">CLIP</a><span class="yr">2021.01 · 多模态</span> <span class="vk ok">已核对</span><div class=nt>沿用CLIP的图文对比预训练，把图像级对齐迁移到框级别。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/vit.html">Vision Transformer</a><span class="yr">2020.10 · 视觉</span><div class=nt>用几乎不改动的标准ViT作为检测骨干，每个输出token对应一个框。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/detr.html">DETR</a><span class="yr">2020.05 · 视觉</span><div class=nt>借用DETR的集合预测和二分图匹配损失，免去锚框与NMS设计。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:264" href="../n/refcoco.html">ReferItGame / RefCOCO</a><span class="yr">2014.10 · 数据·评测</span><div class=nt>图像来自COCO的常见物体类别，描述风格受游戏诱导，与真实对话中的指代有差距。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/vild.html">ViLD开放词表检测</a><span class="yr">2021.04 · 视觉</span><div class=nt>依赖两阶段检测器和先裁剪区域再送老师的过程，推理和训练都较慢。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:240" href="../n/grounding-dino.html">Grounding DINO</a><span class="yr">2023.03 · 多模态</span><div class=nt>OWL-ViT在CLIP式双塔上直接加检测头，图文融合很浅；Grounding DINO选择深度融合，在COCO零样本和指代表达上更强，代价是更慢。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/sam-3.html">SAM 3概念分割</a><span class="yr">2025.11 · 视觉</span><div class=nt>以OWLv2为最强开放词表基线，SAM 3在SA-Co/Gold上的cgF1超过其两倍。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/rt-detr.html">RT-DETR实时DETR</a><span class="yr">2023.04 · 视觉</span><div class=nt>每次检测都要跑完整的大ViT，速度不适合实时场景。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/yolo-world.html">YOLO-World</a><span class="yr">2024.01 · 视觉</span><div class=nt>检测阶段的框标注数据规模仍远小于图文对，罕见类别上的定位精度明显落后于常见类别。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-supervised.html">自监督学习</a> <a class="chip c" href="../c/contrastive-learning.html">对比学习</a> <a class="chip c" href="../c/zero-few-shot.html">零样本与少样本</a> <a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/iou-map.html">IoU与mAP</a> <a class="chip c" href="../c/embedding.html">嵌入向量</a></p>
+
+<h2>怎么学</h2><p>先读CLIP和DETR两篇的核心机制，再读OWL-ViT的方法部分；动手可用官方发布的代码和模型，对自己的图片试不同文字查询。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2205.06230" rel="noopener">https://arxiv.org/abs/2205.06230</a>（arXiv页面确认标题、v1日期2022-05-12、作者含Minderer、Dosovitskiy，摘要写明标准ViT、对比图文预训练加端到端检测微调、支持文本条件和单样本图像条件检测。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20OWL-ViT%EF%BC%88owl-vit%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aowl-vit%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/owl-vit.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="vitpose.html"><small>本分支上一个 · 2022.04</small><b>ViTPose</b></a><a class="r" href="yolov7.html"><small>本分支下一个 · 2022.07</small><b>YOLOv7</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

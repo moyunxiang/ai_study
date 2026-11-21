@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DreamGaussian（2023） · AI脉络</title>
+<meta name="description" content="用式分数蒸馏（SDS）生成3D，每个物体都要对NeRF做数十分钟到数小时的优化，太慢，难以实际使用。 把3D表示从NeRF换成：高斯点可以逐步增密，收敛远快于NeRF；再把高斯转成带贴图的网格并在UV空间精修纹理。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dreamgaussian.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DreamGaussian（2023）">
+<meta property="og:description" content="用式分数蒸馏（SDS）生成3D，每个物体都要对NeRF做数十分钟到数小时的优化，太慢，难以实际使用。 把3D表示从NeRF换成：高斯点可以逐步增密，收敛远快于NeRF；再把高斯转成带贴图的网格并在UV空间精修纹理。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dreamgaussian.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dreamgaussian">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 三维生成</div>
+<h1>DreamGaussian</h1>
+<div class="full">DreamGaussian: Generative Gaussian Splatting for Efficient 3D Content Creation</div>
+<div class="meta"><span>2023.09</span><span>论文</span><span>延伸</span><span>ICLR 2024</span><span>Jiaxiang Tang, Jiawei Ren, Hang Zhou, Ziwei Liu, Gang Zeng · 北京大学、南洋理工大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2309.16653" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/dreamgaussian">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>用<a class="ln" href="../n/dreamfusion.html">DreamFusion文本生成3D</a>式分数蒸馏（SDS）生成3D，每个物体都要对NeRF做数十分钟到数小时的优化，太慢，难以实际使用。</p></div><div><h4>方法</h4><p>把3D表示从NeRF换成<a class="ln" href="../n/3dgs.html">3D高斯泼溅</a>：高斯点可以逐步增密，收敛远快于NeRF；再把高斯转成带贴图的网格并在UV空间精修纹理。</p></div><div><h4>影响</h4><p>单张图像生成带纹理网格只需约2分钟，比此前方法快约10倍（论文摘要），确立了“高斯+SDS”这条快速优化式3D生成路线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>此前的图生3D/文生3D方法大多沿用<a class="ln" href="../n/dreamfusion.html">DreamFusion文本生成3D</a>：用一个预训练的2D扩散模型给NeRF渲染出的图打分，把梯度回传给3D表示（见<a class="lc" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a>）。NeRF要做大量体渲染采样，所以慢。</p><p>DreamGaussian分两个阶段。第一阶段用3D高斯作为表示，在SDS指导下优化，输入单张图时还借助<a class="ln" href="../n/zero123.html">Zero-1-to-3</a>提供新视角的先验。作者指出，3D高斯可以随优化不断分裂、增密，比NeRF常用的剪枝空体素收敛快得多。第二阶段从高斯里提取网格，再把渲染图投到UV贴图上，用较短的图像空间扩散去噪监督精修纹理，得到可直接放进图形软件的带贴图网格。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>SDS的老毛病仍在：多视角不一致（如多张脸）、纹理偏过饱和，单张图输入时背面细节靠猜。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/instant3d.html">Instant3D</a> <a class="chip hue" style="--h:288" href="../n/trellis.html">TRELLIS结构化3D潜变量</a></div></li><li>每个物体仍需单独优化，只是从小时级降到分钟级，没有变成一次前馈。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/lrm.html">大重建模型LRM</a> <a class="chip hue" style="--h:288" href="../n/gs-lrm.html">GS-LRM高斯重建</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/3dgs.html">3D高斯泼溅</a><span class="yr">2023.08 · 视觉</span><div class=nt>用3D高斯替代NeRF作为被优化的3D表示，利用其快速收敛。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/dreamfusion.html">DreamFusion文本生成3D</a><span class="yr">2022.09 · 生成</span><div class=nt>保留SDS思想，但把数小时的优化缩短到约2分钟。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/zero123.html">Zero-1-to-3</a><span class="yr">2023.03 · 生成</span><div class=nt>图生3D时用Zero-1-to-3的新视角扩散先验作为监督。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/lrm.html">大重建模型LRM</a><span class="yr">2023.11 · 生成</span><div class=nt>每个物体仍需单独优化，只是从小时级降到分钟级，没有变成一次前馈。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/trellis.html">TRELLIS结构化3D潜变量</a><span class="yr">2024.12 · 生成</span><div class=nt>SDS的老毛病仍在：多视角不一致（如多张脸）、纹理偏过饱和，单张图输入时背面细节靠猜。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/instant3d.html">Instant3D</a><span class="yr">2023.11 · 生成</span><div class=nt>SDS的老毛病仍在：多视角不一致（如多张脸）、纹理偏过饱和，单张图输入时背面细节靠猜。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/gs-lrm.html">GS-LRM高斯重建</a><span class="yr">2024.04 · 生成</span><div class=nt>每个物体仍需单独优化，只是从小时级降到分钟级，没有变成一次前馈。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a></p>
+<h2>本篇术语</h2><ul><li><b>SDS</b>　分数蒸馏采样：让2D扩散模型评判3D渲染图，把“该怎么改图”的方向回传给3D表示。</li></ul>
+<h2>怎么学</h2><p>先读3D高斯泼溅与DreamFusion的SDS部分 → 读本文第3节 → 跑官方代码对比NeRF与高斯的收敛速度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2309.16653" rel="noopener">https://arxiv.org/abs/2309.16653</a>（标题、作者、v1日期2023-09-28、摘要中的约2分钟、约10倍加速、渐进增密优于NeRF剪枝、UV空间纹理精修；ICLR 2024与Zero123的具体用法来自记忆，未核对正文）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DreamGaussian%EF%BC%88dreamgaussian%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adreamgaussian%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dreamgaussian.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="pixart-alpha.html"><small>本分支上一个 · 2023.09</small><b>PixArt-α</b></a><a class="r" href="magvit-v2.html"><small>本分支下一个 · 2023.10</small><b>MAGVIT-v2与LFQ分词器</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

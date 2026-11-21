@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>STRIPS规划（1971） · AI脉络</title>
+<meta name="description" content="机器人要自己想出“先去哪、再推哪个箱子”的动作序列；纯用定理证明来规划时，每一步都要重新推导世界里哪些事实没变（框架问题），稍复杂就解不出来。 把每个动作写成“前提 + 删除表 + 增加表”：执行后只删掉和加上列出的事实，其余默认不变；定理证明只用来检查前提和目标，搜索动作序列交给GPS式的手段—…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/strips.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="STRIPS规划（1971）">
+<meta property="og:description" content="机器人要自己想出“先去哪、再推哪个箱子”的动作序列；纯用定理证明来规划时，每一步都要重新推导世界里哪些事实没变（框架问题），稍复杂就解不出来。 把每个动作写成“前提 + 删除表 + 增加表”：执行后只删掉和加上列出的事实，其余默认不变；定理证明只用来检查前提和目标，搜索动作序列交给GPS式的手段—…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/strips.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/strips">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 经典控制与规划</div>
+<h1>STRIPS规划</h1>
+<div class="full">STRIPS: A New Approach to the Application of Theorem Proving to Problem Solving</div>
+<div class="meta"><span>1971</span><span>论文</span><span>重要</span><span>IJCAI 1971；Artificial Intelligence 2 (1971)</span><span>Richard E. Fikes, Nils J. Nilsson · Stanford Research Institute（SRI）</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://ai.stanford.edu/~nilsson/OnlinePubs-Nils/PublishedPapers/strips.pdf" rel="noopener">论文PDF ↗</a><a class="btn sm" href="https://en.wikipedia.org/wiki/Stanford_Research_Institute_Problem_Solver" rel="noopener">Wikipedia: STRIPS ↗</a><a class="btn sm" href="../index.html#/n/strips">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>机器人要自己想出“先去哪、再推哪个箱子”的动作序列；纯用定理证明来规划时，每一步都要重新推导世界里哪些事实没变（框架问题），稍复杂就解不出来。</p></div><div><h4>方法</h4><p>把每个动作写成“前提 + 删除表 + 增加表”：执行后只删掉和加上列出的事实，其余默认不变；定理证明只用来检查前提和目标，搜索动作序列交给GPS式的手段—目的分析。</p></div><div><h4>影响</h4><p>给出了此后几十年经典规划的标准动作表示，前提/增加/删除三件套至今是规划语言的核心，也是Shakey机器人的规划器。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>1960年代末，SRI在做会移动、会推箱子的机器人（即后来的<a class="ln" href="../n/shakey.html">Shakey机器人</a>）。给它一个目标，比如“把三个箱子推到一起”，它得自己规划出一串动作。</p><p>当时有两条路。一条是<a class="ln" href="../n/gps.html">通用问题求解器GPS</a>式的手段—目的分析：比较当前状态和目标的差异，找能减少差异的操作；但GPS的状态是简单的表结构，装不下机器人世界里房间、门、物体位置这么多事实。另一条是Green的做法：把世界和动作都写成一阶逻辑公式，让定理证明器直接证出一个动作序列。论文指出它被“框架问题”拖累：每做一个动作，都要用公理证明其他所有事实仍然成立，非平凡的问题解不出来。</p><h2>方法</h2><p>STRIPS把世界模型表示为一组一阶谓词公式，例如<code>ATR(a)</code>（机器人在a处）、<code>AT(BOX1, b)</code>（箱子1在b处）。每个动作（算子）写成三部分。以推箱子为例：</p><p><code>push(k, m, n)</code>：前提<code>AT(k, m) ∧ ATR(m)</code>；删除表<code>ATR(m), AT(k, m)</code>；增加表<code>AT(k, n), ATR(n)</code>。</p><p>执行一个算子就是从当前公式集里删掉删除表、加上增加表，没提到的事实一律原样保留，框架问题由这条约定绕了过去。</p><p>搜索是两层分工。定理证明器（SRI的归结证明器QA3.5）只在单个世界模型内部回答问题：目标是否已经成立？某个算子的前提是否满足？证不出来时，残留的未完成证明就是“差异”。搜索层像GPS一样，找增加表能消除这个差异的算子，把它的前提设为子目标，递归下去；用一个评估函数（考虑剩余目标数、差异复杂度等）决定先展开哪个节点。整个程序用LISP写在PDP-10上（见<a class="ln" href="../n/lisp.html">Lisp语言</a>）。</p><h2>结果</h2><p>论文的“三箱子”问题：机器人在a，箱子分别在b、c、d，目标是三个箱子在同一处。STRIPS很快给出<code>goto(a, c)、push(BOX2, c, b)、goto(b, d)、push(BOX3, d, b)</code>；论文称Green的定理证明规划器解不了这个版本，只解出了只需两个动作的简化版。另有几个更大的例子：一条走廊连着四个房间，世界模型里写明了哪扇门连哪两个房间、灯开关在哪、状态如何，机器人要完成开灯、搬箱子等任务。</p><h2>后来的发展</h2><p>STRIPS的动作表示被后来的经典规划几乎原样继承，规划领域通用的描述语言PDDL就是在它的基础上扩展的。它也确立了“感知 → 符号世界模型 → 规划 → 执行”的机器人架构，这一架构在1991年遭到<a class="ln" href="../n/brooks-behavior.html">行为主义机器人学</a>的正面批评。到大语言模型时代，<a class="ln" href="../n/saycan.html">SayCan</a>、<a class="ln" href="../n/code-as-policies.html">Code as Policies</a>等工作让语言模型来做高层规划，等于把手写的算子和世界模型换成了从数据里学到的常识。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>假设动作结果确定、世界完全已知且只因机器人而变；真实机器人轮子打滑、箱子被人挪走，规划就失效，只能靠执行监控重新规划。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/pomdp.html">POMDP规划</a> <a class="chip hue" style="--h:96" href="../n/probabilistic-robotics.html">《概率机器人》</a></div></li><li>谓词和算子全部由人手写，符号与摄像头看到的像素之间没有连接；换一个环境就要重写一套世界模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/saycan.html">SayCan</a> <a class="chip hue" style="--h:96" href="../n/code-as-policies.html">Code as Policies</a></div></li><li>手段—目的分析一次只盯一个差异，多个目标相互干扰时可能给出很长甚至错误的计划，搜索量随计划长度指数增长。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:30" href="../n/gps.html">通用问题求解器GPS</a><span class="yr">1959 · 事件</span><div class=nt>沿用GPS的手段—目的分析来搜索动作序列，但把状态从简单表结构换成可容纳大量事实的一阶逻辑世界模型。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:30" href="../n/lisp.html">Lisp语言</a><span class="yr">1960.04 · 事件</span><div class=nt>程序用LISP实现在PDP-10上，符号公式的增删和归结证明都依赖LISP的表处理。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/a-star.html">A*搜索</a><span class="yr">1968.07 · 具身·世界模型</span><div class=nt>同出自SRI的机器人项目；STRIPS同样用一个启发式评估函数决定先展开搜索树中的哪个节点。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/pomdp.html">POMDP规划</a><span class="yr">1998 · RL</span><div class=nt>经典规划假设动作结果确定、世界完全已知；POMDP同时处理动作不确定和观测不确定。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/options.html">Options时间抽象框架</a><span class="yr">1999 · RL</span><div class=nt>经典规划的宏操作符是确定性的开环序列；option是带随机终止的闭环策略，并有完整的价值理论。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/probabilistic-robotics.html">《概率机器人》</a><span class="yr">2005.08 · 具身·世界模型</span><div class=nt>假设动作结果确定、世界完全已知且只因机器人而变；真实机器人轮子打滑、箱子被人挪走，规划就失效，只能靠执行监控重新规划。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/saycan.html">SayCan</a><span class="yr">2022.04 · 具身·世界模型</span><div class=nt>谓词和算子全部由人手写，符号与摄像头看到的像素之间没有连接；换一个环境就要重写一套世界模型。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/code-as-policies.html">Code as Policies</a><span class="yr">2022.09 · 具身·世界模型</span><div class=nt>谓词和算子全部由人手写，符号与摄像头看到的像素之间没有连接；换一个环境就要重写一套世界模型。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/shakey.html">Shakey机器人</a><span class="yr">1972 · 具身·世界模型</span><div class=nt>用STRIPS规划器把任务分解为动作序列。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/logic-symbolic.html">命题逻辑、谓词逻辑与符号推理</a> <a class="chip c" href="../c/graph-basics.html">图、树与搜索</a> <a class="chip c" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a> <a class="chip c" href="../c/state-action-observation.html">状态、观测与动作</a></p>
+<h2>本篇术语</h2><ul><li><b>框架问题</b>　用逻辑描述动作时，不仅要写动作改变了什么，还要证明它没改变什么；事实一多，这部分推理就爆炸。</li><li><b>算子（operator）</b>　规划里对一个动作的抽象描述：何时能做（前提）、做完后哪些事实不再成立（删除表）、哪些新事实成立（增加表）。</li><li><b>手段—目的分析</b>　比较当前状态与目标的差异，挑一个能减少差异的操作；若该操作还不能执行，就把它的前提当作新的子目标。</li></ul>
+<h2>怎么学</h2><p>先了解一阶逻辑的谓词写法（<a class="lc" href="../c/logic-symbolic.html">命题逻辑、谓词逻辑与符号推理</a>）和树搜索（<a class="lc" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a>）。读原文第2节（问题表示与搜索）和第3.2节（算子描述），对着三箱子例子手工推一遍。动手：用Python写一个最小的STRIPS规划器（状态是事实集合，算子是前提/增加/删除三组集合，用宽度优先搜索），解积木世界问题。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://ai.stanford.edu/~nilsson/OnlinePubs-Nils/PublishedPapers/strips.pdf" rel="noopener">https://ai.stanford.edu/~nilsson/OnlinePubs-Nils/PublishedPapers/strips.pdf</a>（标题、作者Fikes与Nilsson（SRI）、2nd IJCAI 1971年9月发表、Artificial Intelligence 2 (1971) 189–208；push/goto算子的前提、删除表与增加表；QA3.5归结证明器、GPS式手段—目的分析、评估函数；LISP/PDP-10实现；三箱子问题的四步解及Green系统只解出两步简化版；四房间走廊例子。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20STRIPS%E8%A7%84%E5%88%92%EF%BC%88strips%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Astrips%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/strips.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="stanford-arm.html"><small>本分支上一个 · 1969</small><b>Stanford Arm</b></a><a class="r" href="zmp.html"><small>本分支下一个 · 1972</small><b>ZMP零力矩点</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

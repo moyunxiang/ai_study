@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>重要性采样（Importance Sampling） · AI脉络</title>
+<meta name="description" content="想求分布p下的期望，却从另一个分布q里采样，再给每个样本乘上权重p(x)/q(x)来纠正偏差。它让我们能复用别的分布产生的样本，选得好还能大幅降低方差。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/importance-sampling.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="重要性采样（Importance Sampling）">
+<meta property="og:description" content="想求分布p下的期望，却从另一个分布q里采样，再给每个样本乘上权重p(x)/q(x)来纠正偏差。它让我们能复用别的分布产生的样本，选得好还能大幅降低方差。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/importance-sampling.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/importance-sampling">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 概率统计与信息论 · 入门</div>
+<h1>重要性采样</h1><div class="full">Importance Sampling</div>
+<p class="muted" style="font-size:13px">也叫：IS　重要性权重　importance weight　重要性比率　importance ratio　离策略修正</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/importance-sampling">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>想求分布p下的期望，却从另一个分布q里采样，再给每个样本乘上权重p(x)/q(x)来纠正偏差。它让我们能复用别的分布产生的样本，选得好还能大幅降低方差。</b></p>
+<p class="tags">先要会：<a class="chip c" href="monte-carlo.html">蒙特卡洛采样</a> <a class="chip c" href="expectation-variance.html">期望与方差</a> <a class="chip c" href="gaussian.html">高斯分布</a></p>
+<p><a class="lc" href="../c/monte-carlo.html">蒙特卡洛采样</a>要求从目标分布p中采样，但很多时候做不到或不划算：p可能根本无法直接采样；或者p下我们关心的事件极少发生，抽一万个样本也碰不到几次；在强化学习里，手头的数据是旧策略收集的，而我们想评估的是新策略。重要性采样解决的都是同一个问题：用q的样本估计p下的期望。</p><p><b>推导</b>。只要在p(x) &gt; 0的地方q(x) &gt; 0：</p><p class="formula"><code>E_{x~p}[f(x)] = Σ_x p(x) f(x) = Σ_x q(x) · (p(x)/q(x)) · f(x) = E_{x~q}[w(x) f(x)]</code></p><p>其中<code>w(x) = p(x)/q(x)</code>叫重要性权重。于是从q中抽x_1, …, x_N，用<code>(1/N) Σ_i w(x_i) f(x_i)</code>估计，仍然是无偏的。</p><p><b>方差是关键</b>。q选得好，样本集中在<code>p(x)|f(x)|</code>大的地方，方差可以比直接采样小几个数量级；q选得差（尤其在p大而q很小的地方），权重会极大且不稳定，估计反而更糟。理论上最优的q正比于<code>p(x)|f(x)|</code>。</p><p><b>它出现在哪里</b>。强化学习中，用行为策略β收集的数据评估目标策略π时，要乘上概率比<code>π(a|s)/β(a|s)</code>，这是<a class="lc" href="../c/on-off-policy.html">on-policy与off-policy</a>的核心。<a class="ln" href="../n/trpo.html">TRPO</a>和<a class="ln" href="../n/ppo.html">PPO</a>的目标函数里都有新旧策略的概率比<code>π_θ(a|s)/π_old(a|s)</code>，这就是重要性权重；PPO把它截断在[1−ε, 1+ε]内，正是为了控制权重过大带来的方差。<a class="ln" href="../n/iwae.html">重要性加权IWAE</a>在VAE中用多个样本的重要性加权平均，得到比<a class="lc" href="../c/elbo.html">变分推断与ELBO</a>更紧的似然下界。</p>
+<div class="example"><h4>例子</h4><p>估计标准正态X超过3的概率（真值约0.00135）。直接采样10000个点，平均只有约13.5个超过3，估计的相对标准误差约27%。改从q = N(3, 1)采样，约一半样本落在3以上，每个样本的权重是w(x) = p(x)/q(x) = exp(−3x + 4.5)，例如x = 3时w ≈ 0.0111，x = 3.5时w ≈ 0.0025。同样用10000个样本，相对标准误差降到约1.8%，精度提高了约15倍。</p></div>
+<h2>容易误解的地方</h2><ul><li>如果q在p有概率的某些区域几乎为0，估计在有限样本下会严重偏离，而且样本方差本身也看不出问题。</li><li>高维时权重往往极度不均：少数样本的权重占了绝大部分，有效样本数远小于N。实践中常对权重做截断或归一化，代价是引入少量偏差。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:120" href="../n/ppo.html">PPO</a> <a class="chip hue" style="--h:120" href="../n/linucb.html">LinUCB上下文老虎机</a> <a class="chip hue" style="--h:96" href="../n/guided-policy-search.html">引导策略搜索GPS</a> <a class="chip hue" style="--h:120" href="../n/per.html">优先经验回放</a> <a class="chip hue" style="--h:24" href="../n/lm-limits.html">探索语言模型的极限</a> <a class="chip hue" style="--h:120" href="../n/impala.html">IMPALA与V-trace</a> <a class="chip hue" style="--h:288" href="../n/improved-ddpm.html">改进DDPM</a> <a class="chip hue" style="--h:336" href="../n/dapo.html">DAPO</a> <a class="chip hue" style="--h:96" href="../n/mcl.html">蒙特卡洛定位</a> <a class="chip hue" style="--h:120" href="../n/exp3.html">对抗老虎机EXP3</a> <a class="chip hue" style="--h:120" href="../n/trpo.html">TRPO</a> <a class="chip hue" style="--h:288" href="../n/iwae.html">重要性加权IWAE</a> <a class="chip hue" style="--h:120" href="../n/retrace.html">Retrace离策略修正</a> <a class="chip hue" style="--h:120" href="../n/acer.html">ACER</a> <a class="chip hue" style="--h:120" href="../n/youtube-reinforce.html">YouTube REINFORCE推荐</a> <a class="chip hue" style="--h:120" href="../n/offline-rl-tutorial.html">离线RL综述与问题定义</a> <a class="chip hue" style="--h:120" href="../n/sampled-muzero.html">Sampled MuZero</a> <a class="chip hue" style="--h:336" href="../n/gspo.html">GSPO序列级优化</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

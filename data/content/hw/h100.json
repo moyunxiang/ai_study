@@ -9,28 +9,28 @@
   ],
   "problem": "Transformer已成为几乎所有大模型的结构，但A100最低只到16位浮点，显存带宽和跨服务器互连也跟不上千亿参数模型的训练与推理。",
   "idea": "第四代Tensor Core加入8位浮点FP8，并配一个按层自动选择精度和缩放因子的Transformer Engine；首个采用HBM3（约3TB/s），NVLink每卡900GB/s并可经外部交换机跨服务器扩展。",
-  "impact": "ChatGPT之后大模型训练和推理的主力芯片：Llama 3在1.6万块H100上训练，xAI等公司建起10万卡级集群。需求远超供给，H100成了2023年最稀缺的商品，也是出口管制和地缘博弈的焦点。",
+  "impact": "ChatGPT之后大模型训练和推理最常用的芯片之一：Llama 3 405B在最多1.6万块H100上训练，xAI在2024年建成约10万块H100的Colossus集群。2023年需求远超供给，它也是对华出口管制的焦点之一。",
   "background": "2020年的[[a100]]已经让BF16训练成为常规。但到2022年，局面变了三点。\n\n第一，[[transformer]]统一了语言、视觉、语音的模型结构，Transformer里绝大多数计算是大矩阵乘，对精度并不苛刻，16位还有浪费：如果能用8位，同样的芯片面积可以多做一倍乘法，同样的显存带宽可以多搬一倍数据（见[[c:floating-point]]）。但8位浮点的数值范围极窄，直接把16位训练改成8位会溢出或下溢，训练会发散。\n\n第二，模型参数从百亿走向千亿（如[[mt-nlg]]的5300亿），一台8卡服务器装不下，训练要切到几百上千块卡上，跨服务器的通信只能走InfiniBand，带宽比机内NVLink低得多（见[[c:distributed-training]]）。\n\n第三，生成式推理每产出一个token都要把全部权重从显存读一遍，速度主要由显存带宽决定（见[[c:memory-bandwidth]]），A100的1.5TB/s成了瓶颈。",
-  "method": "据NVIDIA技术博客，H100 SXM版用台积电4N工艺（为NVIDIA定制的5nm级工艺），800亿个晶体管，132个流处理器（SM），热设计功耗700W。\n\n**FP8与Transformer Engine**。新增两种8位浮点输入格式：E4M3（4位指数、3位尾数）精度稍高、范围窄，适合前向的权重和激活；E5M2（5位指数、2位尾数）范围更宽，适合反向的梯度。乘积用FP16或FP32累加。FP8相对FP16/BF16存储减半、吞吐翻倍。\n\n难点在于范围太窄。Transformer Engine是硬件加软件库的组合：每一层计算完，统计输出张量的数值分布（比如最大绝对值），据此算一个缩放因子，把张量整体乘以它，压进FP8能表示的区间再存下来；同时根据下一层的类型决定用FP8还是16位。举例：如果某层激活的最大值是0.01，而E4M3最大能表示448，就先乘一个约4万的系数，用满FP8的刻度，计算后再除回去。这是[[mixed-precision]]里“损失缩放”的思想推广到每个张量。\n\n**算力**（初版规格，不含稀疏）：FP16/BF16 Tensor Core约1000 TFLOPS，FP8约2000 TFLOPS，同频下每个SM的FP16吞吐是A100的2倍、FP8是4倍。\n\n**内存**。80GB HBM3，带宽约3TB/s，是A100的近2倍（见[[hbm]]）；二级缓存50MB。HBM与GPU通过台积电[[cowos]]先进封装放在同一块硅中介层上。\n\n**互连**。第四代[[nvlink]]每卡900GB/s，是A100的1.5倍；新增外部NVLink交换机，官方称最多可把256块H100连成一个NVLink域，带宽是用HDR InfiniBand的9倍。跨更大规模仍用InfiniBand（见[[mellanox]]）。\n\n**编程模型**。新增张量内存加速器（TMA），专门在显存和片上共享内存之间异步搬运大块数据；新增线程块集群，允许多个SM直接读写彼此的共享内存。这让少量线程就能喂满Tensor Core，后来[[flashattention-3]]等核函数就是围绕这些特性重写的。",
-  "results": "NVIDIA官方称：相比A100，大语言模型训练最多快9倍、推理最多快30倍；8卡DGX H100的FP8算力32 PFLOPS。这些是含FP8和特定模型的最好情况。\n\n第三方实际数据：[[llama-3.1]]论文写明405B模型在最多1.6万块H100（每块700W、80GB HBM3）上训练，每卡实际达到380–430 TFLOPS，BF16的模型算力利用率（MFU）为38%–43%。[[deepseek-v3]]在2048块H800（H100的出口特供版，削减了卡间互连带宽）上用FP8混合精度训练，全部训练耗时278.8万GPU小时。",
-  "legacy": "H100定义了2023–2024年的AI算力单位：公司融资、集群规模、云租价都以“多少张H100”来计。需求远超CoWoS封装和HBM的产能，引发[[cowos-crunch]]和[[gpu-shortage]]；2024年xAI用10万块Hopper GPU建成[[colossus]]。\n\n它也处在地缘政治中心：2022年10月的[[export-controls]]以A100、H100为界，NVIDIA先推出降互连带宽的H800，2023年10月规则收紧后（[[export-controls-2023]]）又改推H20。\n\n技术上，FP8训练在H100上从“可行”变为常规；后续[[h200]]把显存换成141GB HBM3e，[[blackwell]]加入FP4并把NVLink域扩大到72卡整机柜。",
+  "method": "据NVIDIA技术博客，H100 SXM版用台积电4N工艺（为NVIDIA定制的5nm级工艺），800亿个晶体管，132个流处理器（SM），热设计功耗700W。\n\n**FP8与Transformer Engine**。新增两种8位浮点输入格式：E4M3（4位指数、3位尾数）精度稍高、范围窄，适合前向的权重和激活；E5M2（5位指数、2位尾数）范围更宽，适合反向的梯度。乘积用FP16或FP32累加。FP8相对FP16/BF16存储减半、吞吐翻倍。\n\n难点在于范围太窄。Transformer Engine是硬件加软件库的组合：每一层计算完，统计输出张量的数值分布（比如最大绝对值），据此算一个缩放因子，把张量整体乘以它，压进FP8能表示的区间再存下来；同时根据下一层的类型决定用FP8还是16位。举例：如果某层激活的最大值是0.01，而E4M3最大能表示448，就先乘一个约4万的系数，用满FP8的刻度，计算后再除回去。这是[[mixed-precision]]里“损失缩放”的思想推广到每个张量。\n\n**算力**（初版规格，不含稀疏）：FP16/BF16 Tensor Core约1000 TFLOPS，FP8约2000 TFLOPS，同频下每个SM的FP16吞吐是A100的2倍、FP8是4倍。\n\n**内存**。80GB HBM3，带宽约3TB/s，是A100的近2倍（见[[hbm]]）；二级缓存50MB。HBM与GPU通过台积电[[cowos]]先进封装放在同一块硅中介层上。\n\n**互连**。第四代[[nvlink]]每卡900GB/s，是A100的1.5倍；新增外部NVLink交换机，官方称最多可把256块H100连成一个NVLink域，带宽是上一代用HDR InfiniBand连接时的9倍。跨更大规模仍用InfiniBand（见[[mellanox]]）。\n\n**编程模型**。新增张量内存加速器（TMA），专门在显存和片上共享内存之间异步搬运大块数据；新增线程块集群，允许多个SM直接读写彼此的共享内存。这让少量线程就能喂满Tensor Core，后来[[flashattention-3]]等核函数就是围绕这些特性重写的。",
+  "results": "NVIDIA官方称：相比A100，大语言模型训练最多快9倍、推理最多快30倍；8卡DGX H100的FP8算力32 PFLOPS。这些是含FP8和特定模型的最好情况。\n\n第三方实际数据：[[llama-3.1]]论文写明405B模型在最多1.6万块H100（每块700W、80GB HBM3）上训练，每卡实际达到380–430 TFLOPS，BF16的模型算力利用率（MFU）为38%–43%。[[deepseek-v3]]在2048块H800（面向中国市场的出口版，带宽低于H100）上用FP8混合精度训练，全部训练耗时278.8万GPU小时。",
+  "legacy": "2023–2024年，集群规模常以“多少张H100”来描述。维基百科记载2023年AI热潮中H100需求极大；封装与HBM产能紧张、显卡短缺见[[cowos-crunch]]和[[gpu-shortage]]；2024年xAI用约10万块H100建成[[colossus]]。\n\n它也处在地缘政治中心：2022年8月美国政府要求A100、H100对华出口须获许可证，10月出台正式规则（[[export-controls]]）；NVIDIA先推出带宽低于H100的H800，2023年底规则收紧（[[export-controls-2023]]）、H800也被纳入限制后，又推出基于Hopper的H20。\n\n技术上，FP8训练在H100上从“可行”变为常规；后续[[h200]]把显存换成141GB HBM3e，[[blackwell]]加入FP4并把NVLink域扩大到72卡整机柜。",
   "pitfalls": "- “比A100快9倍/30倍”是NVIDIA在特定大模型、用FP8与A100的16位对比的最好情况；同精度（FP16 Tensor Core）下的芯片峰值提升约3倍。\n- 常见规格有SXM（700W，带宽最高）和PCIe（350W，2TB/s）两种版本，数字差异很大，引用时要看清。\n- FP8主要加速矩阵乘；softmax、归一化等仍用16位或32位，权重主副本和优化器状态也不是FP8。",
   "limits": [
     {"text": "80GB显存对千亿参数模型的推理太小，长上下文的KV缓存更是放不下，只能多卡拆分。", "solved_by": ["h200", "mi300x", "blackwell"]},
     {"text": "FP8只能按整个张量做一个缩放因子，遇到个别异常大的值时其他数精度损失大，训练稳定性要靠经验调参。", "solved_by": ["mx-formats", "deepseek-v3"]},
     {"text": "实际部署中NVLink高速域仍以8卡服务器为主，更大规模要走InfiniBand，千亿参数模型的张量并行被限制在一台机器内。", "solved_by": ["blackwell"]},
     {"text": "单卡功耗700W、风冷为主，机柜功率密度和数据中心供电成为扩容瓶颈。", "solved_by": ["blackwell", "800v-dc"]},
-    {"text": "依赖台积电CoWoS封装和HBM，产能远低于需求，交货周期一度长达数月。", "solved_by": []}
+    {"text": "依赖台积电CoWoS封装和HBM，2023年前后产能一度跟不上需求。", "solved_by": []}
   ],
   "relations": [
     {"to": "a100", "type": "solves", "note": "补上A100没有8位浮点、显存带宽不足和NVLink只限机内的短板：FP8吞吐翻倍、HBM3带宽近2倍、NVLink可跨服务器。"},
     {"to": "transformer", "type": "uses", "note": "Transformer Engine专为Transformer层设计，按层动态选择FP8或16位。"},
     {"to": "mixed-precision", "type": "extends", "note": "把混合精度训练从16位推进到8位，把全局损失缩放推广为逐张量的动态缩放。"},
     {"to": "hbm", "type": "uses", "note": "首个采用HBM3的GPU，80GB、约3TB/s。"},
-    {"to": "cowos", "type": "uses", "note": "GPU与HBM靠台积电CoWoS封装集成，封装产能直接决定了H100的出货量。"},
+    {"to": "cowos", "type": "uses", "note": "GPU与HBM靠台积电CoWoS先进封装集成在同一块中介层上，封装产能因此成为H100供货的限制因素之一。"},
     {"to": "nvlink", "type": "uses", "note": "第四代NVLink每卡900GB/s，并首次通过外部NVLink交换机连接多台服务器。"},
     {"to": "mellanox", "type": "uses", "note": "跨机扩展依赖收购Mellanox得来的InfiniBand与ConnectX网卡。"},
-    {"to": "tpu-v4", "type": "rivals", "note": "谷歌TPU v4用光路交换连接4096颗芯片；H100以CUDA生态和更通用的设计胜出，成为外部市场的标准，TPU主要供谷歌自用和少数大客户。"}
+    {"to": "tpu-v4", "type": "rivals", "note": "同一时期训练大模型的两条路线：谷歌TPU v4以4096颗芯片组成SuperPod，是谷歌自研的专用芯片；H100是跑CUDA生态的通用GPU，由各家公司采购后自建集群。"}
   ],
   "prereq": ["floating-point", "quantization-concept", "memory-bandwidth", "distributed-training", "interconnect", "transformer-block", "cpu-gpu"],
   "terms": [

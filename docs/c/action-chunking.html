@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>动作表示：离散token、连续动作与动作块（Action Representations and Action Chunking） · AI脉络</title>
+<meta name="description" content="动作可以离散成token逐个生成，也可以直接输出连续数值，或用扩散/流匹配生成；动作块指一次预测未来一整段动作，而不是只预测下一步。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/action-chunking.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="动作表示：离散token、连续动作与动作块（Action Representations and Action Chunking）">
+<meta property="og:description" content="动作可以离散成token逐个生成，也可以直接输出连续数值，或用扩散/流匹配生成；动作块指一次预测未来一整段动作，而不是只预测下一步。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/action-chunking.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/action-chunking">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 具身与控制 · 进阶</div>
+<h1>动作表示：离散token、连续动作与动作块</h1><div class="full">Action Representations and Action Chunking</div>
+<p class="muted" style="font-size:13px">也叫：动作分块　action chunk　动作token　action token　ACT</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/action-chunking">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>动作可以离散成token逐个生成，也可以直接输出连续数值，或用扩散/流匹配生成；动作块指一次预测未来一整段动作，而不是只预测下一步。</b></p>
+<p class="tags">先要会：<a class="chip c" href="state-action-observation.html">状态、观测与动作</a> <a class="chip c" href="imitation-learning.html">模仿学习与行为克隆</a></p>
+<p>机器人的动作是一组连续实数（例如7个关节角增量），而现代模型最擅长的是预测离散token或去噪生成。怎么把动作“喂”给模型、再从模型里“取”出来，直接决定了策略的精度、速度和能否复用大模型。</p><p><b>路线一：离散token</b>。把每个动作维度的取值范围均匀切成若干个箱子，用箱子编号当token，让<a class="lc" href="../c/autoregressive.html">自回归生成</a>模型像写字一样逐个输出。<a class="ln" href="../n/rt-1.html">RT-1</a>和<a class="ln" href="../n/rt-2.html">RT-2与VLA</a>把每维切成256档，好处是可以直接复用视觉语言模型的词表和训练方式。缺点是精度有限，而且高频控制时相邻时刻的动作几乎一样，逐个预测既慢又容易出错。<a class="ln" href="../n/fast.html">FAST动作分词与π0-FAST</a>改为先对一段动作做离散余弦变换（类似JPEG压缩），再对频域系数编码，token数大大减少。</p><p><b>路线二：连续回归</b>。网络直接输出实数，用均方误差训练。简单快速，但遇到<b>多峰</b>问题会失败：如果演示里有人从左边绕过障碍、有人从右边绕，均方误差最小的答案是“直直撞上去”的平均值。</p><p><b>路线三：生成式动作头</b>。把动作当成要生成的样本，用<a class="lc" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a>或<a class="lc" href="../c/normalizing-flow.html">可逆流与流匹配</a>里的流匹配，从噪声逐步去噪出动作，能自然表示多峰分布。代表是<a class="ln" href="../n/diffusion-policy.html">Diffusion Policy</a>，以及<a class="ln" href="../n/pi0.html">π0</a>的流匹配“动作专家”。</p><p><b>动作块（action chunking）</b>。不只预测下一步，而是一次预测未来H步<code>[a_t, a_t+1, …, a_t+H−1]</code>。好处有三：一是<b>减少决策次数</b>，模仿学习的误差会随决策次数累积，一次决定一段，累积就少；二是动作<b>更连贯</b>，能表达“先慢后快”这类时间结构，也能处理演示中的停顿；三是<b>降低推理频率要求</b>，大模型一次推理慢一点也来得及，见<a class="lc" href="../c/control-loop.html">控制回路与控制频率</a>。代价是执行一段动作时不看新观测，反应变慢。<a class="ln" href="../n/aloha-act.html">ALOHA与ACT</a>首先系统使用动作块，并对重叠的多次预测做加权平均（时间集成）让动作平滑；<a class="ln" href="../n/rtc.html">实时动作分块RTC</a>在执行当前动作块的同时计算下一块，并保证两块之间平滑衔接。</p><p><b>它出现在哪里</b>：今天几乎所有VLA都输出动作块；离散token与连续动作头的取舍是<a class="lc" href="../c/vla-concept.html">VLA与WAM的基本结构</a>的核心设计选择之一。</p>
+<div class="example"><h4>例子</h4><p>离散化：Δx的范围是[−1, 1]，切成256档，每档宽<code>2/256 ≈ 0.0078</code>。Δx = 0.3落在第<code>⌊(0.3+1)/2 × 256⌋ = 166</code>档，模型输出token「166」，执行时还原成该档的中心值约0.301。</p><p>动作块：<a class="ln" href="../n/aloha-act.html">ALOHA与ACT</a>以50Hz控制，每次预测k = 100步，即未来2秒的动作。一个1000步（20秒）的任务，如果每步都重新决策要推理1000次；每次执行完整的100步只需10次。<a class="ln" href="../n/pi0.html">π0</a>的动作块为H = 50。</p></div>
+<h2>容易误解的地方</h2><ul><li>动作块越长越平滑，但对意外变化反应越慢；实际常只执行前一部分就重新预测。</li><li>离散化的箱子范围通常按训练数据的分位数设定，换机器人或任务后要重新统计，否则会截断动作。</li><li>扩散/流匹配动作头需要多步去噪，速度比单次回归慢，<a class="ln" href="../n/pi0.html">π0</a>用了10步积分。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:96" href="../n/pi0.html">π0</a> <a class="chip hue" style="--h:96" href="../n/dreamzero.html">DreamZero与世界动作模型WAM</a> <a class="chip hue" style="--h:96" href="../n/diffusion-policy.html">Diffusion Policy</a> <a class="chip hue" style="--h:96" href="../n/aloha-act.html">ALOHA与ACT</a> <a class="chip hue" style="--h:96" href="../n/open-x.html">Open X-Embodiment</a> <a class="chip hue" style="--h:96" href="../n/umi.html">UMI手持夹爪采集</a> <a class="chip hue" style="--h:96" href="../n/lerobot.html">Hugging Face LeRobot</a> <a class="chip hue" style="--h:96" href="../n/vpp.html">Video Prediction Policy</a> <a class="chip hue" style="--h:96" href="../n/fast.html">FAST动作分词与π0-FAST</a> <a class="chip hue" style="--h:96" href="../n/uva.html">UVA统一视频动作</a> <a class="chip hue" style="--h:96" href="../n/gr00t-n1.html">GR00T N1</a> <a class="chip hue" style="--h:96" href="../n/pi0.5.html">π0.5</a> <a class="chip hue" style="--h:96" href="../n/uwm.html">UWM统一世界模型</a> <a class="chip hue" style="--h:96" href="../n/cosmos-policy.html">Cosmos Policy</a> <a class="chip hue" style="--h:96" href="../n/dactyl-rubik.html">机械手解魔方</a> <a class="chip hue" style="--h:96" href="../n/peract.html">PerAct</a> <a class="chip hue" style="--h:96" href="../n/mobile-aloha.html">Mobile ALOHA</a> <a class="chip hue" style="--h:96" href="../n/rt-h.html">RT-H动作层级</a> <a class="chip hue" style="--h:96" href="../n/humanplus.html">HumanPlus</a> <a class="chip hue" style="--h:96" href="../n/egomimic.html">EgoMimic</a> <a class="chip hue" style="--h:96" href="../n/rdt-1b.html">RDT-1B</a> <a class="chip hue" style="--h:96" href="../n/cogact.html">CogACT</a> <a class="chip hue" style="--h:96" href="../n/openvla-oft.html">OpenVLA-OFT</a> <a class="chip hue" style="--h:96" href="../n/knowledge-insulation.html">知识隔离VLA</a> <a class="chip hue" style="--h:96" href="../n/rtc.html">实时动作分块RTC</a> <a class="chip hue" style="--h:96" href="../n/smolvla.html">SmolVLA</a> <a class="chip hue" style="--h:96" href="../n/gr-3.html">GR-3</a> <a class="chip hue" style="--h:96" href="../n/pi-rl.html">πRL流匹配VLA在线RL</a> <a class="chip hue" style="--h:96" href="../n/gigaworld-policy.html">GigaWorld-Policy</a> <a class="chip hue" style="--h:96" href="../n/flux-3-action.html">FLUX 3 Action</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

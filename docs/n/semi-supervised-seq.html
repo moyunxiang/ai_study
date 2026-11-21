@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>序列预训练（Dai &amp; Le）（2015） · AI脉络</title>
+<meta name="description" content="用LSTM直接做长文档分类很难训：IMDB影评平均241词，加大隐状态或反传步数，目标函数就发散，效果反而不如词袋模型。当时的无标注数据只用来训练词向量。 先在无标注文本上把整个LSTM预训练好（要么当语言模型预测下一个词，要么当序列自编码器把整句读进去再复述出来），再用这组权重初始化分类器做监督…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/semi-supervised-seq.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="序列预训练（Dai &amp; Le）（2015）">
+<meta property="og:description" content="用LSTM直接做长文档分类很难训：IMDB影评平均241词，加大隐状态或反传步数，目标函数就发散，效果反而不如词袋模型。当时的无标注数据只用来训练词向量。 先在无标注文本上把整个LSTM预训练好（要么当语言模型预测下一个词，要么当序列自编码器把整句读进去再复述出来），再用这组权重初始化分类器做监督…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/semi-supervised-seq.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/semi-supervised-seq">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 语言模型</div>
+<h1>序列预训练（Dai &amp; Le）</h1>
+<div class="full">Semi-supervised Sequence Learning</div>
+<div class="meta"><span>2015.11</span><span>论文</span><span>重要</span><span>NeurIPS 2015</span><span>Andrew M. Dai, Quoc V. Le · Google</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1511.01432" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/semi-supervised-seq">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>用LSTM直接做长文档分类很难训：IMDB影评平均241词，加大隐状态或反传步数，目标函数就发散，效果反而不如词袋模型。当时的无标注数据只用来训练词向量。</p></div><div><h4>方法</h4><p>先在无标注文本上把整个LSTM预训练好（要么当语言模型预测下一个词，要么当序列自编码器把整句读进去再复述出来），再用这组权重初始化分类器做监督微调。</p></div><div><h4>影响</h4><p>第一次清楚展示“先在无标注文本上预训练整个循环网络、再微调”能让LSTM在多项文本分类任务上追平或超过当时最好结果，是ULMFiT、GPT-1、BERT之前预训练-微调路线的直接源头。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>2015年的文本分类，最强基线仍是词袋加朴素贝叶斯-SVM、卷积网络（<a class="ln" href="../n/kim-cnn.html">TextCNN句子分类</a>）和段落向量（<a class="ln" href="../n/doc2vec.html">doc2vec段落向量</a>）。按理说<a class="ln" href="../n/lstm.html">LSTM</a>能按顺序读完整篇文档，应该更强，但实际很难训。作者在IMDB影评上调参后，随机初始化的LSTM测试准确率约86.5%，比多数基线差约5个百分点；而且一旦增大隐状态或把截断反传步数拉长，训练就迅速崩溃，梯度裁剪也救不回来。</p><p>当时利用无标注文本的主流方式是<a class="ln" href="../n/word2vec.html">word2vec</a>：只预训练第一层的词向量，网络其余部分仍从随机初始化开始。</p><h2>方法</h2><p><b>两种预训练</b>，都只用无标注文本（见<a class="lc" href="../c/self-supervised.html">自监督学习</a>）：</p><ul><li><b>语言模型（LM-LSTM）</b>：像<a class="ln" href="../n/rnnlm.html">RNN语言模型</a>一样，读到第t个词时预测第t+1个词。</li><li><b>序列自编码器（SA-LSTM）</b>：借用<a class="ln" href="../n/seq2seq.html">Seq2Seq</a>的结构，编码器LSTM把句子“W X Y Z”读完，解码器从这个状态出发把“W X Y Z”原样复述出来。编码器和解码器共享权重。复述迫使最后的隐状态记住整句内容。</li></ul><p><b>微调</b>（见<a class="lc" href="../c/pretrain-finetune.html">预训练与微调</a>）。用预训练得到的权重（包括词向量和LSTM本体）初始化分类网络，在最后一个时间步的隐状态上接分类层，再用标注数据训练全部参数。为防止过拟合，对输入词向量做很强的<a class="lc" href="../c/dropout-concept.html">Dropout</a>，IMDB上丢掉80%的嵌入维度。</p><p><b>更多无标注数据</b>。预训练语料不必和任务同一来源：做烂番茄短评分类时，作者额外用了亚马逊商品评论来预训练序列自编码器。</p><h2>结果</h2><p>IMDB测试错误率：调好参数并加dropout的LSTM为13.50%，用word2vec初始化词向量为10.00%，LM-LSTM为7.64%，SA-LSTM为7.24%，此前最好的段落向量为7.42%。四个数据集上SA-LSTM对比此前最佳：IMDB 7.24% vs 7.42%，烂番茄16.7% vs 18.5%，20 Newsgroups 15.6% vs 17.1%，DBpedia（字符级）1.19% vs 1.74%。烂番茄上，只用word2vec词向量的LSTM错误率20.5%，用亚马逊评论预训练后降到16.7%。论文还发现预训练过的LSTM对隐状态大小、反传步数几乎不敏感，训练稳定得多。</p><h2>后来的发展</h2><p>这篇的结论，即“预训练整个网络比只预训练词向量好得多”，被后来的工作一路放大：<a class="ln" href="../n/ulmfit.html">ULMFiT</a>用通用领域大语料预训练语言模型再分阶段微调，<a class="ln" href="../n/elmo.html">ELMo</a>把预训练LSTM的各层表示当作特征，<a class="ln" href="../n/gpt-1.html">GPT-1</a>把预训练语言模型换成Transformer，<a class="ln" href="../n/bert.html">BERT</a>又改成双向的掩码预测。<a class="ln" href="../n/sentiment-neuron.html">情感神经元</a>则在大量亚马逊评论上训练字节级语言模型，发现单个神经元就能表示情感。序列自编码器这一目标后来用得很少，语言模型式的预测下一个词成为主流。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>预训练语料大多与任务同领域（甚至就是任务本身的无标注部分），换一个任务就得重新预训练，没有形成一个可通用的预训练模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/ulmfit.html">ULMFiT</a> <a class="chip hue" style="--h:0" href="../n/gpt-1.html">GPT-1</a></div></li><li>微调时直接更新全部参数，容易把预训练学到的东西冲掉，需要很重的dropout并仔细调参。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/ulmfit.html">ULMFiT</a></div></li><li>LSTM只能单向逐词处理，长文档仍需截断反传，难以并行，也放大不到更大规模。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/gpt-1.html">GPT-1</a> <a class="chip hue" style="--h:0" href="../n/bert.html">BERT</a></div></li><li>只在文本分类上验证，问答、推理、序列标注等需要逐词表示的任务没有覆盖。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/elmo.html">ELMo</a> <a class="chip hue" style="--h:0" href="../n/bert.html">BERT</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/lstm.html">LSTM</a><span class="yr">1997 · 基础</span><div class=nt>缓解了LSTM在长文档上随机初始化训练不稳定、对超参数极敏感的问题。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/word2vec.html">word2vec</a><span class="yr">2013.01 · NLP</span><div class=nt>word2vec只预训练词向量这一层，本文把整个循环网络都放到无标注文本上预训练，IMDB错误率从10.00%降到7.24%。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/seq2seq.html">Seq2Seq</a><span class="yr">2014.09 · NLP</span><div class=nt>序列自编码器就是输入和输出相同的Seq2Seq：编码器读入句子，解码器把它复述出来。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/rnnlm.html">RNN语言模型</a><span class="yr">2010.09 · NLP</span><div class=nt>LM-LSTM的预训练目标就是RNN语言模型的“预测下一个词”。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/doc2vec.html">doc2vec段落向量</a><span class="yr">2014.05 · NLP</span><div class=nt>段落向量是当时IMDB上的最好结果（7.42%）；本文用预训练LSTM微调超过了它。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/skip-thought.html">Skip-Thought句向量</a><span class="yr">2015.06 · NLP</span><div class=nt>同年用无标注文本学句子编码器的另一条路：Skip-Thought预测相邻句子并冻结编码器当特征，本文复述本句并对整个网络微调。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/gpt-1.html">GPT-1</a><span class="yr">2018.06 · LLM</span> <span class="vk ok">已核对</span><div class=nt>Dai与Le用LSTM语言模型（及序列自编码器）预训练再微调做文本分类；OpenAI博客明说本文建立在这一方法之上，并把它换成Transformer、推广到更多任务。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/bert.html">BERT</a><span class="yr">2018.10 · LLM</span><div class=nt>LSTM只能单向逐词处理，长文档仍需截断反传，难以并行，也放大不到更大规模。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/ulmfit.html">ULMFiT</a><span class="yr">2018.01 · LLM</span><div class=nt>Dai与Le的语言模型预训练需要大量领域内数据、小数据上不稳；ULMFiT用通用语料预训练加三种微调技巧解决。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/elmo.html">ELMo</a><span class="yr">2018.02 · LLM</span><div class=nt>只在文本分类上验证，问答、推理、序列标注等需要逐词表示的任务没有覆盖。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/sentiment-neuron.html">情感神经元</a><span class="yr">2017.04 · NLP</span><div class=nt>继续无监督预训练再用于下游任务的思路。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/autoencoder.html">自编码器</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/self-supervised.html">自监督学习</a> <a class="chip c" href="../c/dropout-concept.html">Dropout</a></p>
+<h2>本篇术语</h2><ul><li><b>序列自编码器</b>　一个先读入整个序列、再把它原样生成出来的编码器-解码器。为了复述成功，编码器的最终状态必须概括整句内容。</li><li><b>截断反向传播（truncated BPTT）</b>　训练循环网络时只把梯度往回传固定步数（本文IMDB用400步），以控制显存和计算量。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/language-model.html">语言模型</a>、<a class="lc" href="../c/autoencoder.html">自编码器</a>和<a class="lc" href="../c/pretrain-finetune.html">预训练与微调</a>，读过<a class="ln" href="../n/seq2seq.html">Seq2Seq</a>。读原文第2、3节和表2（IMDB上各种初始化方式的对比，最能说明问题）。动手：在IMDB无标注部分上训练一个小LSTM语言模型，再分别用随机初始化和预训练初始化去做情感分类，对比收敛速度和测试错误率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/html/1511.01432" rel="noopener">https://arxiv.org/html/1511.01432</a>（标题、2位作者、arXiv首次提交2015-11-04；正文IMDB 25,000标注/50,000无标注、平均241词、随机LSTM约86.5%准确率、80%嵌入维度dropout；表1四个数据集错误率（7.24/7.42、16.7/18.5、15.6/17.1、1.19/1.74）；表2的13.50%、10.00%、7.64%、7.24%；烂番茄word2vec 20.5%→亚马逊预训练16.7%。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%BA%8F%E5%88%97%E9%A2%84%E8%AE%AD%E7%BB%83%EF%BC%88Dai%20%26%20Le%EF%BC%89%EF%BC%88semi-supervised-seq%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asemi-supervised-seq%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/semi-supervised-seq.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mmi-diversity.html"><small>本分支上一个 · 2015.10</small><b>对话多样性MMI目标</b></a><a class="r" href="mixer.html"><small>本分支下一个 · 2015.11</small><b>MIXER序列级训练</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

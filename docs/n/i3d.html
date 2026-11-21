@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>I3D与Kinetics（2017） · AI脉络</title>
+<meta name="description" content="视频动作识别的数据集只有一万来段视频，各种网络结构分不出高下；3D卷积网络从零训练又浅又差，用不上ImageNet上练好的图像网络。 发布40万段、400类的Kinetics数据集；把ImageNet上训好的二维网络“膨胀”成三维：每个k×k卷积核沿时间复制k份再除以k，直接继承图像权重。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/i3d.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="I3D与Kinetics（2017）">
+<meta property="og:description" content="视频动作识别的数据集只有一万来段视频，各种网络结构分不出高下；3D卷积网络从零训练又浅又差，用不上ImageNet上练好的图像网络。 发布40万段、400类的Kinetics数据集；把ImageNet上训好的二维网络“膨胀”成三维：每个k×k卷积核沿时间复制k份再除以k，直接继承图像权重。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/i3d.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/i3d">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 视频与运动</div>
+<h1>I3D与Kinetics</h1>
+<div class="full">Quo Vadis, Action Recognition? A New Model and the Kinetics Dataset</div>
+<div class="meta"><span>2017.05</span><span>论文</span><span>重要</span><span>CVPR 2017</span><span>João Carreira, Andrew Zisserman · DeepMind / University of Oxford</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1705.07750" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/google-deepmind/kinetics-i3d" rel="noopener">官方代码 ↗</a><a class="btn sm" href="../index.html#/n/i3d">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>视频动作识别的数据集只有一万来段视频，各种网络结构分不出高下；3D卷积网络从零训练又浅又差，用不上ImageNet上练好的图像网络。</p></div><div><h4>方法</h4><p>发布40万段、400类的Kinetics数据集；把ImageNet上训好的二维网络“膨胀”成三维：每个k×k卷积核沿时间复制k份再除以k，直接继承图像权重。</p></div><div><h4>影响</h4><p>“Kinetics预训练 + 膨胀3D卷积”成为2017–2020年视频理解的标准起点，UCF-101上准确率推到98%，此后的视频网络几乎都在Kinetics上报告结果。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>2017年视频动作识别有两条路线。<a class="ln" href="../n/two-stream.html">双流网络</a>用两个二维CNN，一个看单帧RGB，一个看预先算好的光流（相邻帧之间每个像素的运动），最后把两边的预测平均。它能用ImageNet预训练，效果好，但对时间的建模只是“几帧拼在一起”。<a class="ln" href="../n/c3d.html">C3D三维卷积</a>直接用三维卷积在“时间×高×宽”上滑动，能真正学到时空特征，但三维网络参数多，只能从零训练，层数也浅。</p><p>更根本的问题是数据：常用的<a class="ln" href="../n/ucf101.html">UCF101</a>和HMDB-51规模很小（Kinetics的数据量是它们的约一百倍），各种方法都在这上面得到差不多的分数，无法判断哪种结构更好。视频领域缺一个像<a class="ln" href="../n/imagenet.html">ImageNet</a>那样的大数据集。</p><h2>方法</h2><p><b>Kinetics数据集</b>（见<a class="ln" href="../n/kinetics.html">Kinetics</a>）。从YouTube收集400类人体动作（单人动作如喝水、人与人交互如握手、人与物交互如修剪草坪），每类至少400段、每段约10秒、各来自不同视频，训练集共约24万段，每类另有100段做测试。规模比UCF-101和HMDB-51大两个数量级。</p><p><b>膨胀（inflation）</b>。拿一个在ImageNet上设计好的二维网络（论文用带BatchNorm的Inception-v1），把每个<code>N×N</code>的卷积核和池化核加上时间维变成<code>N×N×N</code>，网络结构不用重新设计。</p><p><b>从二维权重初始化</b>。把一张图片重复T次，就得到一段“无聊视频”。要求三维网络在这段视频上的输出与二维网络在原图上的输出一样，只需把二维卷积核沿时间轴复制<code>N</code>份并除以<code>N</code>。例如3×3核变成3×3×3，每一片权重是原来的1/3，三片相加正好等于原响应。这样三维网络一开始就具备ImageNet学到的空间特征。</p><p><b>双流I3D</b>。RGB和光流各训练一个I3D，预测平均。训练时输入64帧，时间感受野远长于双流网络的10帧。</p><h2>结果</h2><p>在Kinetics上，双流I3D（ImageNet初始化后再训）top-1准确率74.2%、top-5 91.3%，高于论文中复现的双流网络、C3D式3D网络等全部基线。用Kinetics预训练再迁移到小数据集，三个划分平均后UCF-101达到98.0%、HMDB-51达到80.9%，超过此前所有已发表方法。论文还发现，在Kinetics上光流对准确率的贡献比在UCF-101、HMDB-51上小得多，作者认为是Kinetics里镜头运动多。</p><h2>后来的发展</h2><p>这之后视频模型的标准流程变成“Kinetics预训练 + 下游微调”。<a class="ln" href="../n/non-local.html">Non-local网络</a>在I3D上加自注意力式的长程模块；<a class="ln" href="../n/slowfast.html">SlowFast</a>用快慢两条三维卷积通路取代了预先计算光流；<a class="ln" href="../n/timesformer.html">TimeSformer</a>、<a class="ln" href="../n/mvit.html">MViT多尺度ViT</a>把视频Transformer也放在Kinetics上比较；<a class="ln" href="../n/videomae.html">VideoMAE</a>则用自监督预训练进一步减少对标注的依赖。“把二维模型膨胀成三维并继承权重”的思路后来也常被用来把图像模型改造成视频模型。</p><h2>容易误解的地方</h2><ul><li>I3D的最高分仍依赖光流流（预先用TV-L1等算法计算），光流的计算成本不包含在网络里，实际部署时很重。</li><li>“膨胀初始化”只给了一个合理的起点，时间方向的特征仍要在视频数据上学；没有Kinetics这样的大数据，膨胀本身帮助有限。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>最好结果依赖预先计算的光流，光流算一段视频的代价往往比网络本身还大。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/slowfast.html">SlowFast</a></div></li><li>三维卷积只覆盖64帧左右的短片段，长时间的动作结构建模不了，计算量也随帧数线性增长。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/non-local.html">Non-local网络</a> <a class="chip hue" style="--h:216" href="../n/timesformer.html">TimeSformer</a></div></li><li>Kinetics里很多动作靠场景和物体就能猜出，测不出模型是否真正理解运动。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>依赖大量人工标注的视频类别，扩展到更多动作代价高。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/videomae.html">VideoMAE</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/batchnorm.html">Batch Normalization</a><span class="yr">2015.02 · 基础</span></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/kinetics.html">Kinetics</a><span class="yr">2017.05 · 数据·评测</span><div class=nt>同一篇论文发布的Kinetics-400，是I3D能训练好的前提。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:264" href="../n/ucf101.html">UCF101</a><span class="yr">2012.12 · 数据·评测</span><div class=nt>UCF-101太小、各结构分数相近；论文用Kinetics预训练后在它上面拉开差距并推到98.0%。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/two-stream.html">双流网络</a><span class="yr">2014.06 · 视觉</span><div class=nt>保留RGB加光流的双流结构，但每一路都从二维网络换成膨胀后的三维网络。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/googlenet.html">GoogLeNet / Inception</a><span class="yr">2014.09 · 视觉</span><div class=nt>被膨胀的二维网络就是Inception-v1（GoogLeNet）结构，加上BatchNorm。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/c3d.html">C3D三维卷积</a><span class="yr">2014.12 · 视觉</span><div class=nt>C3D只能从零训练、网络浅；I3D通过膨胀直接继承ImageNet上深网络的结构和权重。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/inception-v3.html">Inception v3</a><span class="yr">2015.12 · 视觉</span><div class=nt>骨干取自Inception系列（论文实际用的是带BatchNorm的Inception-v1），把它的卷积和池化核膨胀成三维。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/non-local.html">Non-local网络</a><span class="yr">2017.11 · 视觉</span><div class=nt>把非局部块加入I3D类视频网络，建立跨帧的长程联系。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/slowfast.html">SlowFast</a><span class="yr">2018.12 · 视觉</span><div class=nt>沿用三维卷积的I3D式骨干，分成两个帧率不同的通路。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/timesformer.html">TimeSformer</a><span class="yr">2021.02 · 视觉</span><div class=nt>三维卷积只覆盖64帧左右的短片段，长时间的动作结构建模不了，计算量也随帧数线性增长。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/videomae.html">VideoMAE</a><span class="yr">2022.03 · 视觉</span><div class=nt>依赖大量人工标注的视频类别，扩展到更多动作代价高。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/image-tensor.html">图像作为张量</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/transfer-learning.html">迁移学习</a> <a class="chip c" href="../c/top-k-error.html">Top-1与Top-5错误率</a></p>
+<h2>本篇术语</h2><ul><li><b>光流</b>　相邻两帧之间每个像素的位移向量（水平、竖直两个分量），可当作描述运动的“图像”输入网络。</li><li><b>膨胀（inflation）</b>　把二维卷积核N×N扩展为三维N×N×N，并把二维权重沿时间复制、除以N，使网络结构和预训练权重都能直接沿用。</li><li><b>Kinetics</b>　DeepMind从YouTube收集的人体动作视频数据集，首版400类，训练集约24万段、每段约10秒。</li></ul>
+<h2>怎么学</h2><p>先理解<a class="lc" href="../c/conv-layer.html">卷积层、池化与感受野</a>和<a class="ln" href="../n/two-stream.html">双流网络</a>的双流思想。读原文第2.4节（膨胀和“无聊视频”初始化）以及表2–表4。动手：把torchvision里的一个二维ResNet按论文方法膨胀成三维，喂入一段把同一张图复制16次的“视频”，验证输出与原二维网络一致。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1705.07750" rel="noopener">https://arxiv.org/abs/1705.07750</a>（标题、作者Carreira与Zisserman、arXiv v1提交于2017-05-22；摘要中的80.9%（HMDB-51）和98.0%（UCF-101）、400类且每类400段以上；正文中约24万训练视频、每段约10秒、每类100段测试、表3中Kinetics上74.2%/91.3%、64帧对10帧。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20I3D%E4%B8%8EKinetics%EF%BC%88i3d%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ai3d%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/i3d.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mobilenet.html"><small>本分支上一个 · 2017.04</small><b>MobileNet</b></a><a class="r" href="pointnet2.html"><small>本分支下一个 · 2017.06</small><b>PointNet++</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

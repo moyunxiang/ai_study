@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>生成质量指标：IS与FID（Inception Score and FID） · AI脉络</title>
+<meta name="description" content="用一个预训练图像分类网络给生成图片打分：IS看生成图是否各自清晰可辨且种类多样，FID比较生成图与真实图在特征空间中的分布距离，越低越好。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/generation-metrics.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="生成质量指标：IS与FID（Inception Score and FID）">
+<meta property="og:description" content="用一个预训练图像分类网络给生成图片打分：IS看生成图是否各自清晰可辨且种类多样，FID比较生成图与真实图在特征空间中的分布距离，越低越好。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/generation-metrics.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/generation-metrics">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 评测与实验方法 · 进阶</div>
+<h1>生成质量指标：IS与FID</h1><div class="full">Inception Score and FID</div>
+<p class="muted" style="font-size:13px">也叫：Fréchet Inception Distance　图像生成评测　Inception分数　FD　CLIP score　生成模型评测</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/generation-metrics">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>用一个预训练图像分类网络给生成图片打分：IS看生成图是否各自清晰可辨且种类多样，FID比较生成图与真实图在特征空间中的分布距离，越低越好。</b></p>
+<p class="tags">先要会：<a class="chip c" href="kl-divergence.html">KL散度</a> <a class="chip c" href="gaussian.html">高斯分布</a> <a class="chip c" href="generative-modeling.html">生成建模的目标</a></p>
+<p>生成模型（见<a class="lc" href="../c/generative-modeling.html">生成建模的目标</a>）的目标是让生成样本的分布接近真实数据分布。可这个分布的概率密度一般算不出来，也没有“标准答案”可以逐张比对。让人看图打分最直接，但成本高、主观、难以复现。2016年前后，GAN研究急需一个自动指标来比较方法，于是出现了借用现成分类网络的两种做法。</p><p><b>Inception Score（IS）</b>（<a class="ln" href="../n/improved-gan.html">GAN训练技巧与IS</a>，2016）。把生成图x送进在<a class="ln" href="../n/imagenet.html">ImageNet</a>上训练好的Inception网络，得到类别分布<code>p(y|x)</code>。好的生成器应满足两点：每张图都清楚地像某一类（<code>p(y|x)</code>很尖）；所有图合起来覆盖很多类（边缘分布<code>p(y) = E_x p(y|x)</code>很平）。两者的差距用<a class="lc" href="../c/kl-divergence.html">KL散度</a>衡量：</p><p class="formula"><code>IS = exp( E_x KL( p(y|x) ‖ p(y) ) )</code></p><p>IS越高越好，最小为1，最大等于类别数（1000）。它的问题是完全不看真实数据：生成器只要每类产出一张很像的图就能得高分。</p><p><b>Fréchet Inception Distance（FID）</b>（<a class="ln" href="../n/fid.html">FID与Inception Score</a>，2017）。把大量真实图和生成图都送进Inception网络，取最后一层池化后的2048维特征，分别拟合一个多维<a class="lc" href="../c/gaussian.html">高斯分布</a>（均值μ、协方差Σ，见<a class="lc" href="../c/covariance.html">协方差矩阵</a>），然后计算两个高斯之间的Fréchet距离：</p><p class="formula"><code>FID = ‖μ_r − μ_g‖² + Tr( Σ_r + Σ_g − 2(Σ_r Σ_g)^(1/2) )</code></p><p>FID越低越好，0表示两组特征的均值和协方差完全一样。它同时惩罚质量差（均值偏）和多样性不足（协方差小，即<a class="lc" href="../c/mode-collapse.html">模式坍塌与模式覆盖</a>），比IS更可靠，成了图像生成的头号指标。</p><p><b>它出现在哪里</b>：从<a class="ln" href="../n/biggan.html">BigGAN</a>、<a class="ln" href="../n/stylegan.html">StyleGAN</a>到扩散模型<a class="ln" href="../n/adm.html">扩散超越GAN</a>，图像生成论文几乎都报告FID（常用5万张生成图计算），IS作为补充。文生图模型还会加上衡量图文是否对得上的CLIP分数，视频生成则有专门的<a class="ln" href="../n/vbench.html">VBench视频生成评测</a>。</p>
+<div class="example"><h4>例子</h4><p><b>IS的两个极端</b>（3个类别）：三张生成图的分类结果分别是(1,0,0)、(0,1,0)、(0,0,1)，每张都确定、合起来均匀，边缘分布为(1/3,1/3,1/3)，每张的KL都是log 3，IS = 3（满分）。如果三张都是(1,0,0)，边缘分布也是(1,0,0)，KL = 0，IS = 1（最差）。</p><p><b>FID的一维版本</b>：特征只有1维时公式化为<code>(μ_r − μ_g)² + (σ_r − σ_g)²</code>。真实特征μ = 0、σ = 1，生成特征μ = 0.5、σ = 0.8，FID = 0.25 + 0.04 = 0.29。</p></div>
+<h2>容易误解的地方</h2><ul><li>FID依赖样本数，样本少时偏高；不同论文的FID只有在相同样本数、相同实现、相同参考集下才可比。</li><li>两者都依赖在ImageNet上训练的Inception网络，对人脸、医学图像等与ImageNet差别大的领域，特征未必反映人眼感受到的质量。</li><li>FID低不代表每张图都好，也不能判断模型是否只是记住了训练图。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:288" href="../n/ldm.html">潜空间扩散LDM</a> <a class="chip hue" style="--h:288" href="../n/improved-gan.html">GAN训练技巧与IS</a> <a class="chip hue" style="--h:264" href="../n/fid.html">FID与Inception Score</a> <a class="chip hue" style="--h:288" href="../n/progan.html">渐进式增长GAN</a> <a class="chip hue" style="--h:288" href="../n/stylegan.html">StyleGAN</a> <a class="chip hue" style="--h:288" href="../n/stylegan2.html">StyleGAN2</a> <a class="chip hue" style="--h:288" href="../n/improved-ddpm.html">改进DDPM</a> <a class="chip hue" style="--h:288" href="../n/maskgit.html">MaskGIT并行掩码生成</a> <a class="chip hue" style="--h:288" href="../n/dall-e-2.html">DALL·E 2</a> <a class="chip hue" style="--h:288" href="../n/dpm-solver.html">DPM-Solver</a> <a class="chip hue" style="--h:288" href="../n/edm.html">EDM设计空间</a> <a class="chip hue" style="--h:288" href="../n/cfg.html">无分类器引导CFG</a> <a class="chip hue" style="--h:288" href="../n/flow-matching.html">Flow Matching</a> <a class="chip hue" style="--h:288" href="../n/dall-e-3.html">DALL·E 3与重写描述</a> <a class="chip hue" style="--h:288" href="../n/mar.html">无量化自回归MAR</a> <a class="chip hue" style="--h:288" href="../n/rae.html">表征自编码器RAE</a> <a class="chip hue" style="--h:240" href="../n/show-and-tell.html">图像描述Show and Tell</a> <a class="chip hue" style="--h:24" href="../n/rush-summarization.html">神经生成式摘要</a> <a class="chip hue" style="--h:24" href="../n/mmi-diversity.html">对话多样性MMI目标</a> <a class="chip hue" style="--h:264" href="../n/nocaps.html">nocaps</a> <a class="chip hue" style="--h:288" href="../n/adm.html">扩散超越GAN</a> <a class="chip hue" style="--h:288" href="../n/glide.html">GLIDE</a> <a class="chip hue" style="--h:240" href="../n/blip.html">BLIP</a> <a class="chip hue" style="--h:0" href="../n/hallucination-survey.html">幻觉综述</a> <a class="chip hue" style="--h:288" href="../n/imagen.html">Imagen</a> <a class="chip hue" style="--h:0" href="../n/diffuseq.html">DiffuSeq</a> <a class="chip hue" style="--h:288" href="../n/ideogram.html">Ideogram与文字渲染</a> <a class="chip hue" style="--h:288" href="../n/pika.html">Pika 1.0</a> <a class="chip hue" style="--h:264" href="../n/vbench.html">VBench视频生成评测</a> <a class="chip hue" style="--h:288" href="../n/sit.html">SiT插值Transformer</a> <a class="chip hue" style="--h:288" href="../n/autoguidance.html">自引导Autoguidance</a> <a class="chip hue" style="--h:288" href="../n/dream-machine.html">Luma Dream Machine</a> <a class="chip hue" style="--h:288" href="../n/gen-3.html">Runway Gen-3 Alpha</a> <a class="chip hue" style="--h:288" href="../n/imagen-3.html">Imagen 3</a> <a class="chip hue" style="--h:288" href="../n/veo-2.html">Veo 2</a> <a class="chip hue" style="--h:288" href="../n/diffusion-search.html">扩散模型推理时扩展</a> <a class="chip hue" style="--h:288" href="../n/sora-2.html">Sora 2</a> <a class="chip hue" style="--h:288" href="../n/veo-3.1.html">Veo 3.1</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

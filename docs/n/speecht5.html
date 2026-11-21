@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SpeechT5（2021） · AI脉络</title>
+<meta name="description" content="语音预训练模型（wav2vec 2.0、HuBERT）只有编码器，只擅长识别类任务；生成语音、语音翻译还得另训模型，文本数据也用不上。 仿照T5做一个语音与文本共用的编码器-解码器，外面接六个分模态的前后处理网络，并用跨模态向量量化把两种模态对齐到同一语义空间。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/speecht5.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SpeechT5（2021）">
+<meta property="og:description" content="语音预训练模型（wav2vec 2.0、HuBERT）只有编码器，只擅长识别类任务；生成语音、语音翻译还得另训模型，文本数据也用不上。 仿照T5做一个语音与文本共用的编码器-解码器，外面接六个分模态的前后处理网络，并用跨模态向量量化把两种模态对齐到同一语义空间。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/speecht5.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/speecht5">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:168"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/speech.html">语音与音频</a> › 语音自监督与多语言</div>
+<h1>SpeechT5</h1>
+<div class="full">SpeechT5: Unified-Modal Encoder-Decoder Pre-Training for Spoken Language Processing</div>
+<div class="meta"><span>2021.10</span><span>论文</span><span>延伸</span><span>Junyi Ao, Rui Wang, Long Zhou, Chengyi Wang, Shuo Ren, Yu Wu, Shujie Liu et al. · 微软亚洲研究院等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2110.07205" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/microsoft/SpeechT5" rel="noopener">代码与模型 ↗</a><a class="btn sm" href="../index.html#/n/speecht5">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>语音预训练模型（wav2vec 2.0、HuBERT）只有编码器，只擅长识别类任务；生成语音、语音翻译还得另训模型，文本数据也用不上。</p></div><div><h4>方法</h4><p>仿照T5做一个语音与文本共用的编码器-解码器，外面接六个分模态的前后处理网络，并用跨模态向量量化把两种模态对齐到同一语义空间。</p></div><div><h4>影响</h4><p>第一次用一个预训练模型同时覆盖语音识别、合成、翻译、转换、增强和说话人识别，为后来的统一语音语言模型提供了范式。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>此前的语音自监督模型（<a class="ln" href="../n/wav2vec-2.html">wav2vec 2.0</a>、<a class="ln" href="../n/hubert.html">HuBERT</a>）只预训练编码器，识别时再接一个输出层；做语音合成这类需要「生成」的任务，解码器仍要从零训练。NLP这边的<a class="ln" href="../n/t5.html">T5</a>则把所有任务都写成「文本进、文本出」，用同一个<a class="lc" href="../c/encoder-decoder.html">编码器-解码器</a>。SpeechT5把这个思路搬到语音上。</p><p>结构上，中间是一个共享的Transformer编码器-解码器；语音和文本各有输入用的预处理网络（pre-net）和输出用的后处理网络（post-net），共六个。语音输入先变成声学特征，文本输入变成词向量，经共享主体后，再由对应的post-net生成文本或语音频谱。于是同一个主体既能做语音到文本（识别），也能做文本到语音（合成），还能做语音到语音（转换、增强）。</p><p>预训练用两类无标注数据：未标注语音上做<a class="lc" href="../c/masked-modeling.html">掩码建模</a>式的去噪重建，未标注文本上做类似的文本去噪。为让两种模态在同一空间里对齐，论文提出跨模态向量量化（见<a class="lc" href="../c/vector-quantization.html">向量量化与离散token</a>）：用一组共享的离散隐变量单元作为编码器与解码器之间的接口，训练时随机把一部分语音或文本状态替换成这些单元，迫使模型把两种模态映射到共同的语义表示。</p><h2>结果</h2><p>论文在语音识别、合成、翻译、转换、增强和说话人识别六类任务上做了微调评测，摘要称各项任务上都显示出该框架的优势。具体分数本次未逐项核对，故不列出。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>预训练仍以较小规模的有限语音语料为主，且各任务需要分别微调，没有做到不微调、一个模型通吃。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/whisper.html">Whisper</a></div></li><li>模型输出的是连续频谱，合成语音的音质和零样本说话人克隆能力有限；后来的路线改用离散编码器token并用语言模型生成。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/vall-e.html">VALL-E</a> <a class="chip hue" style="--h:168" href="../n/audiolm.html">AudioLM</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/t5.html">T5</a><span class="yr">2019.10 · LLM</span><div class=nt>沿用T5的统一编码器-解码器思路，从纯文本推广到语音与文本两种模态。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:168" href="../n/wav2vec-2.html">wav2vec 2.0</a><span class="yr">2020.06 · 语音</span><div class=nt>继承其用无标注语音做自监督预训练的做法，但同时加入文本数据并面向多种任务。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:168" href="../n/hubert.html">HuBERT</a><span class="yr">2021.06 · 语音</span><div class=nt>在只预训练编码器的语音自监督基础上，补上预训练的解码器，使生成类任务也能受益。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/whisper.html">Whisper</a><span class="yr">2022.09 · 语音</span><div class=nt>预训练仍以较小规模的有限语音语料为主，且各任务需要分别微调，没有做到不微调、一个模型通吃。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/vall-e.html">VALL-E</a><span class="yr">2023.01 · 语音</span><div class=nt>模型输出的是连续频谱，合成语音的音质和零样本说话人克隆能力有限；后来的路线改用离散编码器token并用语言模型生成。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/audiolm.html">AudioLM</a><span class="yr">2022.09 · 语音</span><div class=nt>模型输出的是连续频谱，合成语音的音质和零样本说话人克隆能力有限；后来的路线改用离散编码器token并用语言模型生成。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-supervised.html">自监督学习</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a> <a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/vector-quantization.html">向量量化与离散token</a></p>
+<h2>本篇术语</h2><ul><li><b>pre-net / post-net</b>　放在共享主体前后的小网络，负责把语音或文本转成主体能处理的向量，并把主体输出转回对应模态。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/self-supervised.html">自监督学习</a>与<a class="lc" href="../c/encoder-decoder.html">编码器-解码器</a>，再读<a class="ln" href="../n/t5.html">T5</a>了解统一文本到文本的思路；读SpeechT5原文的模型结构与跨模态向量量化两节；动手可用Hugging Face中发布的SpeechT5模型试做合成或识别。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2110.07205" rel="noopener">https://arxiv.org/abs/2110.07205</a>（通过lookup.py核对标题、10位以上作者、arXiv v1日期2021-10-14，以及摘要中的共享编码器-解码器、六个分模态pre/post-net、跨模态向量量化和六类任务。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SpeechT5%EF%BC%88speecht5%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aspeecht5%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/speecht5.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="wavlm.html"><small>本分支上一个 · 2021.10</small><b>WavLM</b></a><a class="r" href="yourtts.html"><small>本分支下一个 · 2021.12</small><b>YourTTS</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

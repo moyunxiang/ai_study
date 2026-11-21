@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ECoT具身思维链（2024） · AI脉络</title>
+<meta name="description" content="VLA直接从图像和指令映射到动作，遇到训练分布外的物体和场景就失灵；直接套用思维链提示对小规模机器人数据训练出的VLA几乎没用。 训练VLA在输出动作前先写一串与画面绑定的推理：改写任务、计划、当前子任务、移动方向、夹爪像素位置、物体框，再给动作。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ecot.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ECoT具身思维链（2024）">
+<meta property="og:description" content="VLA直接从图像和指令映射到动作，遇到训练分布外的物体和场景就失灵；直接套用思维链提示对小规模机器人数据训练出的VLA几乎没用。 训练VLA在输出动作前先写一串与画面绑定的推理：改写任务、计划、当前子任务、移动方向、夹爪像素位置、物体框，再给动作。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ecot.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ecot">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 语言规划与具身推理</div>
+<h1>ECoT具身思维链</h1>
+<div class="full">Robotic Control via Embodied Chain-of-Thought Reasoning</div>
+<div class="meta"><span>2024.07</span><span>论文</span><span>重要</span><span>CoRL 2024</span><span>Michał Zawalski, William Chen, Karl Pertsch, Oier Mees, Chelsea Finn, Sergey Levine · UC Berkeley、Stanford</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2407.08693" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/ecot">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>VLA直接从图像和指令映射到动作，遇到训练分布外的物体和场景就失灵；直接套用思维链提示对小规模机器人数据训练出的VLA几乎没用。</p></div><div><h4>方法</h4><p>训练VLA在输出动作前先写一串与画面绑定的推理：改写任务、计划、当前子任务、移动方向、夹爪像素位置、物体框，再给动作。</p></div><div><h4>影响</h4><p>在不加机器人数据的前提下把OpenVLA的泛化任务成功率绝对提升28%，开启了“先推理再动作”的具身推理VLA路线。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/openvla.html">OpenVLA</a>等VLA把互联网预训练的视觉语言模型拿来当策略骨干，泛化比从头训练的策略好，但它们仍是“看一眼就出动作”。大语言模型里，<a class="ln" href="../n/cot.html">思维链CoT</a>（思维链）让模型先写中间步骤再回答，复杂问题上提升明显。问题是：机器人训练数据里的指令都很简单，直接提示VLA“一步步想”效果很差；而且纯语言层面的子任务拆解，不知道物体在画面哪里、夹爪现在在哪，对控制帮助有限。</p><h2>方法</h2><p>ECoT规定了一条固定顺序的推理链，每一步都输出成文本token：TASK（改写指令）→ PLAN（高层步骤）→ SUBTASK（当前要做的子任务）→ MOVE（如“向左移”这类低层移动描述）→ GRIPPER（夹爪在图像里的像素坐标）→ OBJECTS（物体名称和边界框），最后才输出动作token。</p><p>难点在训练数据：Bridge V2里没有这些标注。作者搭了一条全自动标注流水线——用Prismatic VLM写场景描述，用Grounding DINO框物体，把本体感知数据转成模板化的移动原语，用OWLv2和SAM定位夹爪，再让Gemini把指令、场景和动作串成计划与子任务。整套流程在250多万条转移上跑了约7天。然后在这些数据上微调OpenVLA 7B，让它学会先推理后行动。</p><h2>结果</h2><p>在真实WidowX机械臂上每种方法评测314次，ECoT在困难泛化任务上把OpenVLA的绝对成功率提高28%；人类用自然语言纠正推理链后，最难任务的成功率又提高48%。代价是每步输出的token从7个涨到约350个，控制频率明显下降；论文试了“推理每5步才更新一次”和异步执行两种办法，分别提速24%和40%。</p><h2>后来的发展</h2><p>ECoT让“具身推理”成为VLA的一个独立设计维度：后来的<a class="ln" href="../n/molmoact.html">MolmoAct动作推理模型</a>把推理换成深度token和可编辑的二维轨迹，<a class="ln" href="../n/gemini-robotics-1.5.html">Gemini Robotics 1.5</a>等闭源模型也把“先想再动”作为卖点。推理带来的延迟、推理内容与实际动作不一致，仍是这条路线争论的焦点。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每步要先生成约350个推理token，控制频率大幅下降，难以用于高频控制。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>推理结构是人为固定的模板，与任务无关；推理链和动作只是相关，不保证动作照着推理执行。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/molmoact.html">MolmoAct动作推理模型</a></div></li><li>只在Bridge V2一种机器人数据上训练，跨机器人迁移和仿真环境（SIMPLER）里没有提升。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/cot.html">思维链CoT</a><span class="yr">2022.01 · 推理·智能体</span><div class=nt>把语言模型的思维链迁移到机器人控制，并要求每一步都落到画面和机器人状态上。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/rt-2.html">RT-2与VLA</a><span class="yr">2023.07 · 具身·世界模型</span><div class=nt>沿用RT-2把动作写成token、由VLM自回归输出的VLA框架。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/bridgedata-v2.html">BridgeData V2</a><span class="yr">2023.08 · 具身·世界模型</span><div class=nt>训练数据和自动标注都基于Bridge V2。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/openvla.html">OpenVLA</a><span class="yr">2024.06 · 具身·世界模型</span><div class=nt>直接以OpenVLA 7B为底座，在其动作输出前插入推理token。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/molmoact.html">MolmoAct动作推理模型</a><span class="yr">2025.08 · 具身·世界模型</span><div class=nt>把ECoT的文字推理链换成深度token和可视化轨迹这种空间推理。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/vla-concept.html">VLA与WAM的基本结构</a> <a class="chip c" href="../c/reasoning-tokens.html">推理token与测试时计算</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/state-action-observation.html">状态、观测与动作</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a></p>
+<h2>本篇术语</h2><ul><li><b>具身推理</b>　推理内容不只是语言上的计划，还包括物体在画面里的位置、机械手该往哪移等与身体和环境直接相关的信息。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/openvla.html">OpenVLA</a>的讲解了解VLA如何输出动作token → 读论文第3节的推理步骤和第4节的标注流水线 → 对比第5节有无推理的失败案例。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2407.08693" rel="noopener">https://arxiv.org/abs/2407.08693</a>（标题、作者、v1日期2024-07-11、摘要中28%；HTML正文中的推理步骤列表、标注流水线组件、314次评测、48%、7→350 token、24%/40%提速。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ECoT%E5%85%B7%E8%BA%AB%E6%80%9D%E7%BB%B4%E9%93%BE%EF%BC%88ecot%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aecot%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ecot.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="open-television.html"><small>本分支上一个 · 2024.07</small><b>Open-TeleVision</b></a><a class="r" href="gamengen.html"><small>本分支下一个 · 2024.08</small><b>GameNGen</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

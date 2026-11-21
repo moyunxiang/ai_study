@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>端到端测试时训练TTT-E2E（2025） · AI脉络</title>
+<meta name="description" content="全注意力处理长上下文时每个token的计算随长度增长；Mamba 2、Gated DeltaNet等线性循环模型延迟恒定，但随上下文变长效果跟不上全注意力。 不改架构：用滑动窗口注意力的标准Transformer，测试时在读到的上下文上继续做下一个token预测训练，把上下文压进权重；训练时用元学…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ttt-e2e.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="端到端测试时训练TTT-E2E（2025）">
+<meta property="og:description" content="全注意力处理长上下文时每个token的计算随长度增长；Mamba 2、Gated DeltaNet等线性循环模型延迟恒定，但随上下文变长效果跟不上全注意力。 不改架构：用滑动窗口注意力的标准Transformer，测试时在读到的上下文上继续做下一个token预测训练，把上下文压进权重；训练时用元学…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ttt-e2e.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ttt-e2e">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 线性循环与状态空间</div>
+<h1>端到端测试时训练TTT-E2E</h1>
+<div class="full">End-to-End Test-Time Training for Long Context</div>
+<div class="meta"><span>2025.12</span><span>论文</span><span>延伸</span><span>Arnuv Tandon, Karan Dalal, Xinhao Li, Daniel Koceja, Marcel Rød, Sam Buchanan, Xiaolong Wang, Yu Sun et al. · Stanford / Astera Institute / NVIDIA / UC Berkeley / UC San Diego</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2512.23675" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://arxiv.org/html/2512.23675" rel="noopener">arXiv HTML全文 ↗</a><a class="btn sm" href="../index.html#/n/ttt-e2e">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>全注意力处理长上下文时每个token的计算随长度增长；Mamba 2、Gated DeltaNet等线性循环模型延迟恒定，但随上下文变长效果跟不上全注意力。</p></div><div><h4>方法</h4><p>不改架构：用滑动窗口注意力的标准Transformer，测试时在读到的上下文上继续做下一个token预测训练，把上下文压进权重；训练时用元学习优化这种测试时学习的初始化。</p></div><div><h4>影响</h4><p>把长上下文建模重新表述为持续学习问题，是测试时训练从“专门的层”走向“整个模型”的代表工作。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>此前的<a class="ln" href="../n/ttt.html">测试时训练层TTT</a>把测试时训练做成一种新的序列层，内部用自监督重建目标。TTT-E2E换了思路：模型就是带8K滑动窗口注意力的普通Transformer，窗口之外的信息不靠注意力，而是靠测试时学习——每读1K个token，就用下一个token预测损失对模型做一次梯度更新，只更新最后四分之一层的MLP，嵌入、归一化和注意力层冻结，被更新的块再加一个不动的MLP保存预训练知识。</p><p>训练阶段把每条序列都当作测试序列：内循环做上述测试时训练，外循环对“测试时训练之后”的损失求梯度来优化初始权重，也就是<a class="ln" href="../n/maml.html">MAML元学习</a>式的二阶梯度。作者称它在测试时和训练时两端都是端到端的。</p><p>摘要报告：3B模型、164B训练token下，TTT-E2E的损失随上下文长度的变化与全注意力一致，而<a class="ln" href="../n/mamba-2.html">Mamba-2与状态空间对偶</a>和<a class="ln" href="../n/gated-deltanet.html">Gated DeltaNet</a>做不到；推理延迟像RNN一样与上下文长度无关，在128K上下文时比全注意力快2.7倍。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>在RULER单针检索（大海捞针）任务上远不如全注意力，压缩会丢掉看似无关的细节。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>需要梯度的梯度，现有FlashAttention实现不支持，8K上下文训练比全注意力慢3.4倍。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>实验在中小规模，解码评估有限，小模型在更长上下文上微调不稳定。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/maml.html">MAML元学习</a><span class="yr">2017.03 · 基础</span><div class=nt>训练时用MAML式外循环，对测试时训练之后的损失求二阶梯度来学初始化。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/gated-deltanet.html">Gated DeltaNet</a><span class="yr">2024.12 · 基础</span><div class=nt>同样追求恒定推理延迟；论文报告Gated DeltaNet与Mamba 2随上下文变长不能像全注意力那样持续降低损失，TTT-E2E可以。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/mamba-2.html">Mamba-2与状态空间对偶</a><span class="yr">2024.05 · 基础</span><div class=nt>作为线性循环基线被比较，长上下文扩展性不及TTT-E2E。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/ttt.html">测试时训练层TTT</a><span class="yr">2024.07 · 基础</span><div class=nt>同一作者线；TTT层只在一层内部做测试时学习，TTT-E2E让整个模型在测试时用语言建模损失持续学习。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/titans.html">Titans测试时记忆</a><span class="yr">2024.12 · 基础</span><div class=nt>Titans加一个在测试时更新的神经记忆模块；TTT-E2E不加新模块，直接更新标准Transformer的部分MLP。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/context-window.html">上下文窗口</a> <a class="chip c" href="../c/meta-learning.html">元学习</a> <a class="chip c" href="../c/continual-learning.html">持续学习与灾难性遗忘</a> <a class="chip c" href="../c/state-space-model.html">状态空间模型与线性RNN</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a></p>
+
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/ttt.html">测试时训练层TTT</a>和<a class="lc" href="../c/meta-learning.html">元学习</a>；读论文第2节方法与第3节缩放实验；用一个小Transformer在长文本上实现内循环“读1K token、更新一次MLP”，观察窗口外信息是否被记住。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/html/2512.23675" rel="noopener">https://arxiv.org/html/2512.23675</a>（arXiv记录：标题、v1 2025-12-29、14位作者；HTML正文：作者机构、8K滑动窗口、1K token小批次、只更新最后1/4块的MLP并加静态MLP、MAML式元学习、3B/164B token、128K时快2.7倍、S-NIAH上不如全注意力、8K时训练慢3.4倍。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E7%AB%AF%E5%88%B0%E7%AB%AF%E6%B5%8B%E8%AF%95%E6%97%B6%E8%AE%AD%E7%BB%83TTT-E2E%EF%BC%88ttt-e2e%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Attt-e2e%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ttt-e2e.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mhc.html"><small>本分支上一个 · 2025.12</small><b>mHC流形约束超连接</b></a><span></span></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

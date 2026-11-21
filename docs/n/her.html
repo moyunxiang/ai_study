@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>后见经验回放HER（2017） · AI脉络</title>
+<meta name="description" content="机器人任务若只在“完成/未完成”时给奖励，智能体几乎永远拿不到第一个成功信号；靠人精心设计的稠密奖励又费时、需要专业知识，而且常常会把学习带偏。 失败的轨迹换个目标看就是成功的：把一段没达到目标g的经历，在回放池里重新标注成“目标就是我实际到达的那个状态”，于是每段经历都带有正面奖励，离策略算法就…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/her.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="后见经验回放HER（2017）">
+<meta property="og:description" content="机器人任务若只在“完成/未完成”时给奖励，智能体几乎永远拿不到第一个成功信号；靠人精心设计的稠密奖励又费时、需要专业知识，而且常常会把学习带偏。 失败的轨迹换个目标看就是成功的：把一段没达到目标g的经历，在回放池里重新标注成“目标就是我实际到达的那个状态”，于是每段经历都带有正面奖励，离策略算法就…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/her.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/her">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 分层、表示与元学习</div>
+<h1>后见经验回放HER</h1>
+<div class="full">Hindsight Experience Replay</div>
+<div class="meta"><span>2017.07</span><span>论文</span><span>重要</span><span>NIPS 2017</span><span>Andrychowicz, Wolski, Ray, Schneider, Fong, Welinder, McGrew, Tobin et al.（含Abbeel、Zaremba） · OpenAI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1707.01495" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/her">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>机器人任务若只在“完成/未完成”时给奖励，智能体几乎永远拿不到第一个成功信号；靠人精心设计的稠密奖励又费时、需要专业知识，而且常常会把学习带偏。</p></div><div><h4>方法</h4><p>失败的轨迹换个目标看就是成功的：把一段没达到目标g的经历，在回放池里重新标注成“目标就是我实际到达的那个状态”，于是每段经历都带有正面奖励，离策略算法就能从中学习。</p></div><div><h4>影响</h4><p>只用二值奖励就让机械臂学会推、滑、抓放物体（不用HER的DDPG全部失败），“事后重标注目标”成为目标条件RL和机器人学习的标准技巧。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>想象学打冰球：一杆打偏到了球门右边。普通RL只记下“没进，奖励0”，几乎学不到东西；人却会想“如果球门在右边一点，这杆就进了”。</p><p>在强化学习里，奖励稀疏是机器人操作的大难题（见<a class="lc" href="../c/reward-design.html">奖励设计与奖励投机</a>）。常见办法是<a class="ln" href="../n/reward-shaping.html">基于势函数的奖励塑形</a>：比如按物体与目标的距离给连续奖励。但复杂任务的奖励塑形往往需要多个手工加权项，而且稍不注意，智能体就会去优化塑形项本身而非真正目标。另一类办法是加强探索（<a class="ln" href="../n/count-based-exploration.html">伪计数探索</a>等），但当状态空间巨大时，问题不是探索得不够多样，而是根本不可能碰巧走到目标。</p><p><a class="ln" href="../n/uvfa.html">通用值函数近似UVFA</a>（2015）提出了“通用价值函数”<code>Q(s, a, g)</code>：让一个网络同时以状态和目标为输入，从而能在多个目标之间泛化。HER的出发点就是利用这种多目标结构。</p><h2>方法</h2><p><b>设定</b>。每个回合随机给一个目标g（例如“把方块推到(x, y)”），策略和Q函数都以<code>(s, g)</code>为输入。奖励是二值稀疏的：只要没达成目标就是−1，达成为0。</p><p><b>事后重放</b>。一个回合结束后，把轨迹里的每一步<code>(sₜ, aₜ, sₜ₊₁)</code>存进<a class="ln" href="../n/experience-replay.html">经验回放</a>池时存两份：一份带原始目标g（奖励几乎全是−1）；另一份把目标换成这一回合中实际到达过的某个状态g&#x27;，并按新目标重新计算奖励——在g&#x27;附近的那几步就成了“成功”。这样至少一半的回放数据都带有有用的奖励信号。之所以可以这样改写，是因为算法是离策略的（见<a class="lc" href="../c/on-off-policy.html">on-policy与off-policy</a>）：换了目标的数据虽然不是“为了g&#x27;而采集的”，仍然可以用来学习<code>Q(s, a, g&#x27;)</code>。</p><p><b>选哪些目标重放</b>。论文比较了几种策略：只用回合最终状态（final）、用同一回合中这一步之后随机k个状态（future）、用同一回合任意状态、用整个回放池任意状态。future、k=4或8效果最好；k再大，原始目标的数据占比太低，效果反而下降。HER可以接在任何离策略算法上，论文用<a class="ln" href="../n/ddpg.html">DDPG</a>做机械臂实验，用<a class="ln" href="../n/dqn-nature.html">DQN（Nature版）</a>式的DQN做位翻转实验。</p><p>随着训练推进，智能体能到达的地方越来越远，重标注的目标也随之变难，相当于自动形成了一个由易到难的课程。</p><h2>结果</h2><p><b>位翻转玩具实验</b>：状态是n个比特，每步翻一位，必须与随机目标完全一致才有奖励。普通DQN只能解n≤13，加HER后n到50都能轻松解决。</p><p><b>机械臂</b>：在MuJoCo模拟的7自由度Fetch机械臂上做推方块、滑冰球、抓取放置三个任务，奖励只有成功与否。不用HER的DDPG一个任务都学不会，加了基于计数的探索也只在滑动任务上有一些进展；DDPG+HER几乎完美地完成了全部三个任务。反直觉的是，把二值奖励换成作者尝试过的塑形奖励后，DDPG和DDPG+HER都在所有任务上失败。</p><p><b>真机部署</b>：把模拟中训练的抓放策略不经微调放到真实Fetch机器人上，方块位置由另一个CNN从相机图像估计。最初5次成功2次；在训练时给观测加上标准差1厘米的高斯噪声后，提高到5次全部成功。</p><h2>后来的发展</h2><p>HER让“目标条件强化学习”成为机器人操作研究中常用的设定，“事后重标注”也被广泛用于其他需要从失败中学习的场景。<a class="ln" href="../n/contrastive-rl.html">对比RL（目标条件）</a>后来把目标条件RL重新表述为对比表示学习，可以直接以图像为目标；<a class="ln" href="../n/rl-1000-layer.html">1000层网络的自监督RL</a>则在同类目标到达任务上把网络加深到1000层。机器人领域后来更多转向大规模示范数据与模仿学习（如<a class="ln" href="../n/diffusion-policy.html">Diffusion Policy</a>），但在仿真中从稀疏奖励学技能时，HER式重标注仍是常用的基础手段。</p><h2>容易误解的地方</h2><ul><li>HER不是探索方法：它不让智能体去新地方，而是从已去过的地方榨出学习信号。</li><li>它要求任务能写成“到达某个目标状态”，并且能从状态中读出“实际达成了哪个目标”。对Atari游戏得分这类不是目标到达式的任务，HER无从下手。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只适用于目标到达式任务，且需要人手指定从状态到目标的映射（如物体坐标），对以图像为目标的任务支持不足。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/contrastive-rl.html">对比RL（目标条件）</a></div></li><li>在环境存在随机性时，用事后到达的状态当目标会让价值估计偏乐观，论文没有处理这种偏差。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>依赖模拟器中的精确状态，直接上真机对感知误差很敏感，需要加噪声等额外手段。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/dactyl.html">Dactyl灵巧手</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/experience-replay.html">经验回放</a><span class="yr">1992 · RL</span><div class=nt>在经验回放时额外存入换了目标、重算了奖励的副本，把失败经验变成成功样本。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/reward-shaping.html">基于势函数的奖励塑形</a><span class="yr">1999 · RL</span><div class=nt>绕开人工奖励塑形，只用二值奖励；实验中作者尝试的塑形奖励反而让所有方法失败。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/dpg.html">确定性策略梯度DPG</a><span class="yr">2014.06 · RL</span><div class=nt>确定性策略自身不探索，只能靠人为加噪声，噪声大小难调，在稀疏奖励任务上很弱。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/uvfa.html">通用值函数近似UVFA</a><span class="yr">2015.07 · RL</span><div class=nt>以通用价值函数Q(s, a, g)为基础，目标作为网络输入，这样重标注后的数据才能被同一个网络学习。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/ddpg.html">DDPG</a><span class="yr">2015.09 · RL</span><div class=nt>机械臂实验的底层算法是DDPG，HER只改变回放池里存什么数据。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/count-based-exploration.html">伪计数探索</a><span class="yr">2016.06 · RL</span><div class=nt>同为解决稀疏奖励：计数探索鼓励去新状态，HER改写学习目标；在机械臂任务上前者几乎无效。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/dactyl.html">Dactyl灵巧手</a><span class="yr">2018.08 · 具身·世界模型</span><div class=nt>依赖模拟器中的精确状态，直接上真机对感知误差很敏感，需要加噪声等额外手段。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/rl-1000-layer.html">1000层网络的自监督RL</a><span class="yr">2025.03 · RL</span><div class=nt>SAC+HER、TD3+HER是基于TD与目标重标注的标准目标条件方法，它们4层后即饱和，加深的对比RL在10个任务中8个上超过它们。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/contrastive-rl.html">对比RL（目标条件）</a><span class="yr">2022.06 · RL</span><div class=nt>同样从未来状态当作目标做重标记，但把这个想法改成对比学习目标。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/reward-design.html">奖励设计与奖励投机</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/policy-value.html">策略与价值函数</a> <a class="chip c" href="../c/state-action-observation.html">状态、观测与动作</a> <a class="chip c" href="../c/exploration-exploitation.html">探索与利用</a></p>
+<h2>本篇术语</h2><ul><li><b>目标条件强化学习</b>　策略和价值函数都多了一个“目标”输入，同一个网络要学会到达各种不同的目标。</li><li><b>事后重标注</b>　回合结束后，把实际到达的状态当作“本来的目标”重新计算奖励，使失败的轨迹也成为某个目标下的成功示范。</li></ul>
+<h2>怎么学</h2><p>先读懂<a class="ln" href="../n/ddpg.html">DDPG</a>和<a class="ln" href="../n/uvfa.html">通用值函数近似UVFA</a>的思路，并补<a class="lc" href="../c/reward-design.html">奖励设计与奖励投机</a>。读原文3.1节的位翻转例子和算法1，再看4.5节不同重标注策略的比较。动手：先在位翻转环境上用DQN复现“n=15不加HER失败、加HER成功”，再用Gymnasium-Robotics的FetchPush跑DDPG+HER。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1707.01495" rel="noopener">https://arxiv.org/abs/1707.01495</a>（标题、作者（OpenAI）、arXiv v1于2017-07-05；正文中位翻转n≤13对n达50、7自由度Fetch机械臂三项任务与二值奖励、不用HER全部失败与计数探索仅滑动有进展、塑形奖励下均失败、future策略k=4/8最佳且k&gt;8下降、真机2/5提升到5/5（1厘米高斯噪声）、隐式课程的说法。NIPS 2017未在本页核对。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%90%8E%E8%A7%81%E7%BB%8F%E9%AA%8C%E5%9B%9E%E6%94%BEHER%EF%BC%88her%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aher%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/her.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="c51.html"><small>本分支上一个 · 2017.07</small><b>分布式RL C51</b></a><a class="r" href="ppo.html"><small>本分支下一个 · 2017.07</small><b>PPO</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

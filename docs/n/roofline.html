@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roofline性能模型（2009） · AI脉络</title>
+<meta name="description" content="多核处理器五花八门，程序跑得慢时很难判断是算力不够还是内存带宽不够，也不知道该先做哪种优化。 用一张对数坐标图回答：横轴是每从DRAM读1字节做多少次浮点运算（运算强度），可达性能等于峰值算力与“带宽×运算强度”中较小的那个，图形像一个屋顶。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/roofline.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Roofline性能模型（2009）">
+<meta property="og:description" content="多核处理器五花八门，程序跑得慢时很难判断是算力不够还是内存带宽不够，也不知道该先做哪种优化。 用一张对数坐标图回答：横轴是每从DRAM读1字节做多少次浮点运算（运算强度），可达性能等于峰值算力与“带宽×运算强度”中较小的那个，图形像一个屋顶。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/roofline.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/roofline">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:72"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/hw.html">硬件与算力</a> › 内存与带宽</div>
+<h1>Roofline性能模型</h1>
+<div class="full">Roofline: An Insightful Visual Performance Model for Multicore Architectures</div>
+<div class="meta"><span>2009.04</span><span>论文</span><span>重要</span><span>Communications of the ACM 52(4)，2009年4月（技术报告UCB/EECS-2008-134，2008年10月）</span><span>Samuel Williams, Andrew Waterman, David A. Patterson · UC伯克利 Parallel Computing Laboratory</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1145/1498765.1498785" rel="noopener">CACM（DOI） ↗</a><a class="btn sm" href="https://www2.eecs.berkeley.edu/Pubs/TechRpts/2008/EECS-2008-134.pdf" rel="noopener">伯克利技术报告PDF ↗</a><a class="btn sm" href="https://en.wikipedia.org/wiki/Roofline_model" rel="noopener">Wikipedia：Roofline model ↗</a><a class="btn sm" href="../index.html#/n/roofline">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>多核处理器五花八门，程序跑得慢时很难判断是算力不够还是内存带宽不够，也不知道该先做哪种优化。</p></div><div><h4>方法</h4><p>用一张对数坐标图回答：横轴是每从DRAM读1字节做多少次浮点运算（运算强度），可达性能等于峰值算力与“带宽×运算强度”中较小的那个，图形像一个屋顶。</p></div><div><h4>影响</h4><p>成为判断程序“卡在计算还是卡在内存”的标准工具。到了大模型时代，它直接解释了为什么逐token生成的推理受限于显存带宽而不是算力。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>2005年后处理器转向多核（<a class="ln" href="../n/dennard-end.html">Dennard缩放终结与并行转向</a>），但多核没有统一的设计套路：有的用少量复杂核心，有的用大量简单核心，IBM Cell甚至用显式管理的本地存储代替缓存。同一个程序在不同芯片上的瓶颈完全不同。更早的<a class="ln" href="../n/memory-wall.html">内存墙</a>只用平均延迟推算了内存与处理器的差距，回答不了“我这个程序到底卡在哪”。作者认为片外内存带宽常常是最紧的资源，所以模型要把处理器性能和片外内存流量联系起来。</p><h2>方法</h2><p><b>运算强度</b>：每传输1字节DRAM数据所做的浮点运算次数（FLOP/字节），字节按经过缓存过滤后真正到达主存的流量计。</p><p><b>屋顶公式</b>：</p><p class="formula"><code>可达性能 = min(峰值浮点性能, 峰值内存带宽 × 运算强度)</code></p><p>在对数坐标上，前一项是水平线，后一项是45度斜线，两线交点叫<b>脊点</b>。程序的运算强度落在脊点左边就受限于带宽，右边就受限于算力。</p><p><b>一个AI例子</b>：用FP16权重做矩阵乘向量，每个权重2字节、只做一次乘加（2次运算），运算强度约1 FLOP/字节，远在今天GPU的脊点左边，所以大模型逐个生成token时主要在等显存。一次同时处理B个请求，同一权重被用B次，运算强度约变成B倍——这就是推理要做批处理的原因。</p><p><b>天花板</b>：屋顶下再画几条线，表示不用SIMD、乘加不平衡、不做预取时的上限，它们的顺序提示了优化的顺序。</p><h2>结果</h2><p>以双路2.2GHz AMD Opteron X2为例：峰值双精度17.6 GFLOPS，实测带宽15GB/s；乘加不平衡时降到8.8 GFLOPS，不做软件预取时带宽只有11GB/s。四核Opteron X4内存通道不变、峰值算力高四倍多，脊点从1.0右移到4.4，运算强度低于1的程序换新芯片几乎不会变快。作者还在Intel Xeon、Sun T2+和IBM Cell上分析了稀疏矩阵乘向量（运算强度0.17–0.25）、三维FFT（1.09–1.64）等四个内核。</p><h2>后来的发展</h2><p>2017年<a class="ln" href="../n/tpu.html">Google TPU</a>论文用Roofline分析线上负载，发现多数受限于内存带宽；2024年的<a class="ln" href="../n/ai-memory-wall.html">AI与内存墙</a>用它说明解码器Transformer逐词生成落在带宽受限区。<a class="ln" href="../n/flashattention.html">FlashAttention</a>用分块减少显存读写、<a class="ln" href="../n/vllm.html">vLLM与PagedAttention</a>等推理系统把多个请求拼批，本质都是提高运算强度。硬件上，<a class="ln" href="../n/hbm.html">HBM高带宽内存</a>抬高了斜线，Tensor Core（<a class="ln" href="../n/v100.html">V100与Tensor Core</a>）抬高了水平线，使脊点进一步右移，“喂饱算力”更难。</p><h2>容易误解的地方</h2><ul><li>屋顶给出的是<b>上界</b>，程序达不到屋顶很正常；它告诉你差距在哪一侧，而不是保证能达到。</li><li>运算强度不是程序固定不变的属性：缓存大小、分块方式、批大小都会改变它。同一个矩阵乘，分块做得好坏可以让运算强度相差十几倍。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只考虑一层内存（DRAM）和峰值算力，没有刻画片上多级缓存、延迟以及芯片间互连带宽，对多卡和集群训练的通信瓶颈说明不了问题。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只做诊断：它能指出程序受限于带宽，但提高运算强度要靠对每个内核手工重写数据访问方式（分块、算子融合）。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a> <a class="chip hue" style="--h:192" href="../n/triton-lang.html">Triton GPU编程语言</a></div></li><li>模型按单一浮点精度画一条水平线；后来的AI芯片在FP16、INT8、FP8等不同精度下峰值相差数倍，需要同时画多条屋顶。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:72" href="../n/amdahl-law.html">Amdahl定律</a><span class="yr">1967.04 · 硬件</span><div class=nt>论文把Amdahl定律当作“界限与瓶颈分析”的典范，Roofline把同样的上界思路用到算力和内存带宽上。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:72" href="../n/systolic-array.html">脉动阵列</a><span class="yr">1982.01 · 硬件</span><div class=nt>问题规模大于阵列时必须分块，中间结果要反复写回和读取存储器，I/O又重新成为瓶颈。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:72" href="../n/memory-wall.html">内存墙</a><span class="yr">1995.03 · 硬件</span><div class=nt>内存墙只给出延迟差距的趋势推算；Roofline把带宽和算力放进同一张图，能判断具体程序卡在哪一边。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:72" href="../n/dennard-end.html">Dennard缩放终结与并行转向</a><span class="yr">2005 · 硬件</span><div class=nt>并行转向带来了设计各异的多核芯片，正是为了在这些芯片之间做比较和指导优化，作者提出了这个模型。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:72" href="../n/tpu.html">Google TPU</a><span class="yr">2016.05 · 硬件</span> <span class="vk ok">已核对</span><div class=nt>论文用Roofline模型分析各负载是受限于算力还是内存带宽，并据此指出下一代应升级内存。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/triton-lang.html">Triton GPU编程语言</a><span class="yr">2019.06 · 系统·效率</span><div class=nt>只做诊断：它能指出程序受限于带宽，但提高运算强度要靠对每个内核手工重写数据访问方式（分块、算子融合）。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a><span class="yr">2022.05 · 系统·效率</span><div class=nt>只做诊断：它能指出程序受限于带宽，但提高运算强度要靠对每个内核手工重写数据访问方式（分块、算子融合）。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:72" href="../n/ai-memory-wall.html">AI与内存墙</a><span class="yr">2024.03 · 硬件</span><div class=nt>用Roofline思路判断解码阶段处于带宽受限区。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a> <a class="chip c" href="../c/matrix-multiplication.html">矩阵乘法与线性变换</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+<h2>本篇术语</h2><ul><li><b>运算强度</b>　每从主存搬1字节数据所做的运算次数，单位FLOP/字节。数值越高，越不容易被内存带宽拖住。</li><li><b>脊点</b>　屋顶上斜线与水平线的交点，其横坐标等于峰值算力除以峰值带宽，是跑满这台机器所需的最低运算强度。</li><li><b>天花板（ceiling）</b>　屋顶下方表示缺少某种优化时的性能上限的线，例如不用SIMD指令或不做预取时能达到的最高性能。</li></ul>
+<h2>怎么学</h2><p>先读<a class="lc" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a>和<a class="lc" href="../c/params-flops.html">参数量、计算量与显存</a>。然后读技术报告第3–4节（只有几页）和图1、图2。动手：查一款你能用的GPU的峰值算力和显存带宽，算出脊点；再估算矩阵乘向量和N×N矩阵乘的运算强度，把它们画在同一张对数坐标图上，看看N多大时矩阵乘才进入算力受限区。最后读<a class="ln" href="../n/ai-memory-wall.html">AI与内存墙</a>，用这张图解释大模型推理为什么要做批处理。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://www2.eecs.berkeley.edu/Pubs/TechRpts/2008/EECS-2008-134.pdf" rel="noopener">https://www2.eecs.berkeley.edu/Pubs/TechRpts/2008/EECS-2008-134.pdf</a>（技术报告全文：三位作者与机构、2008-10-17；运算强度定义（缓存过滤后的DRAM流量）；公式Attainable GFlops/sec = Min(Peak FP, Peak BW × OI)；Opteron X2 17.6 GFLOPS、15GB/s；天花板8.8与2.2 GFLOPS、11GB/s无预取；脊点X2为1.0、X4为4.4；四台机器与四个内核的运算强度区间（表2）。CACM 2009年4月发表信息经OpenAlex核对。TPU用Roofline见本站tpu节点（arXiv 1704.04760），AI内存墙见arXiv 2403.14123。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Roofline%E6%80%A7%E8%83%BD%E6%A8%A1%E5%9E%8B%EF%BC%88roofline%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aroofline%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/roofline.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="tesla-gpu.html"><small>本分支上一个 · 2007.06</small><b>Tesla计算卡与Fermi</b></a><a class="r" href="gpu-dl-2009.html"><small>本分支下一个 · 2009.06</small><b>GPU训练深度网络</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

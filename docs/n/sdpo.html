@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SDPO自蒸馏策略优化（2026） · AI脉络</title>
+<meta name="description" content="可验证奖励强化学习每次尝试只得到一个对错分数，模型不知道错在哪一步；可许多环境其实会返回报错信息、评审意见这样的文字反馈。 让「看过反馈的自己」当老师：把同一个模型在题目加反馈条件下的逐词预测，蒸馏回只看题目的自己，把文字反馈变成密集的逐词信号。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sdpo.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SDPO自蒸馏策略优化（2026）">
+<meta property="og:description" content="可验证奖励强化学习每次尝试只得到一个对错分数，模型不知道错在哪一步；可许多环境其实会返回报错信息、评审意见这样的文字反馈。 让「看过反馈的自己」当老师：把同一个模型在题目加反馈条件下的逐词预测，蒸馏回只看题目的自己，把文字反馈变成密集的逐词信号。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sdpo.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sdpo">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:336"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/agent.html">推理、检索与智能体</a> › 可验证奖励强化学习</div>
+<h1>SDPO自蒸馏策略优化</h1>
+<div class="full">Reinforcement Learning via Self-Distillation</div>
+<div class="meta"><span>2026.01</span><span>论文</span><span>延伸</span><span>Jonas Hübotter, Frederike Lübeck, Lejs Behric, Anton Baumann, Marco Bagatella, Daniel Marta, Ido Hakimi, Idan Shenfeld et al. · ETH Zurich / MIT / 斯坦福等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2601.20802" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/sdpo">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>可验证奖励强化学习每次尝试只得到一个对错分数，模型不知道错在哪一步；可许多环境其实会返回报错信息、评审意见这样的文字反馈。</p></div><div><h4>方法</h4><p>让「看过反馈的自己」当老师：把同一个模型在题目加反馈条件下的逐词预测，蒸馏回只看题目的自己，把文字反馈变成密集的逐词信号。</p></div><div><h4>影响</h4><p>在LiveCodeBench v6上以48.8%对41.2%超过GRPO、回答短3倍以上，与OPSD同期把「在策略自蒸馏」推成2026年上半年的热门方向。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>学生是只看到题目的当前策略；老师是同一个模型，但提示里多了反馈f——可能是运行报错、评审意见，或同组里另一个答对了的回答。学生先采样一组尝试，环境给出反馈；然后老师对学生的每个尝试逐词重新打分，训练目标是让学生的逐词分布靠近老师（论文用对称的JS散度，老师一侧停止梯度）。</p><p>每个词的优势就等于老师与学生对数概率之差，所以可以直接替换<a class="ln" href="../n/grpo.html">GRPO</a>里的优势接入现有RLVR代码。老师不是冻结的：用学生权重的指数滑动平均，否则效果明显变差。即使环境只给对错分数，也可以把成功的回答当作失败回答的反馈。</p><p>在Qwen3-8B上，LiveCodeBench v6最终准确率48.8%，GRPO为41.2%，达到GRPO最终成绩所需的生成次数少4倍；化学问答等任务上也更快更好，平均回答长度短3倍以上。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>老师只是「读了反馈的自己」，若模型读不懂报错或反馈本身含糊，逐词信号就不可靠。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>在部分任务上并不稳定占优，例如Olmo3-7B的工具使用任务训练5小时后低于GRPO。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/on-policy-distill.html">在策略蒸馏OPD</a><span class="yr">2025.10 · 系统·效率</span><div class=nt>在策略蒸馏需要一个更强的外部老师，SDPO不需要。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:336" href="../n/opsd.html">在策略自蒸馏OPSD</a><span class="yr">2026.01 · 推理·智能体</span><div class=nt>同期工作：OPSD的老师多看到参考答案，SDPO的老师多看到环境反馈或成功的同组回答。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/gkd.html">在策略蒸馏GKD</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>沿用在策略蒸馏「在学生自己的轨迹上对齐老师分布」的做法，但老师换成带反馈的自己。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/grpo.html">GRPO</a><span class="yr">2024.02 · 推理·智能体</span><div class=nt>GRPO每次尝试只有一个标量奖励、信用分配困难，SDPO用自蒸馏得到逐词的密集优势。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/knowledge-distillation.html">知识蒸馏</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/credit-assignment.html">信用分配</a></p>
+
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/gkd.html">在策略蒸馏GKD</a>与<a class="ln" href="../n/opsd.html">在策略自蒸馏OPSD</a> → 读原文第2节自老师构造与优势公式、图1 → 动手：取一道失败的编程题，把报错加进提示，比较模型在加与不加报错时对原回答每个词的概率差。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2601.20802" rel="noopener">https://arxiv.org/abs/2601.20802</a>（标题、作者、v1提交于2026-01-28；正文（arxiv.org/html/2601.20802v2）核对自老师构造、JS散度与停止梯度、EMA老师、逐词优势、LiveCodeBench v6 48.8%对41.2%与4倍生成次数、回答短3倍以上、Olmo工具任务5小时65.0对62.1。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SDPO%E8%87%AA%E8%92%B8%E9%A6%8F%E7%AD%96%E7%95%A5%E4%BC%98%E5%8C%96%EF%BC%88sdpo%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asdpo%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sdpo.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ttt-discover.html"><small>本分支上一个 · 2026.01</small><b>TTT-Discover测试时发现</b></a><a class="r" href="agent-teams.html"><small>本分支下一个 · 2026.02</small><b>并行智能体团队</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

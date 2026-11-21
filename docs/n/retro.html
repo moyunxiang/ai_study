@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RETRO（2021） · AI脉络</title>
+<meta name="description" content="语言模型要变强只能不断加参数，知识全靠权重硬记；已有的检索方法（kNN-LM、RAG）检索库只有几十亿token，或只用于问答微调。 把文本切成64个token的块，生成每一块时用冻结的BERT向量从2万亿token的库里找最近的邻居块，再通过“分块交叉注意力”把邻居信息送进自回归语言模型。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/retro.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RETRO（2021）">
+<meta property="og:description" content="语言模型要变强只能不断加参数，知识全靠权重硬记；已有的检索方法（kNN-LM、RAG）检索库只有几十亿token，或只用于问答微调。 把文本切成64个token的块，生成每一块时用冻结的BERT向量从2万亿token的库里找最近的邻居块，再通过“分块交叉注意力”把邻居信息送进自回归语言模型。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/retro.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/retro">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:336"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/agent.html">推理、检索与智能体</a> › 检索增强生成</div>
+<h1>RETRO</h1>
+<div class="full">Improving language models by retrieving from trillions of tokens</div>
+<div class="meta"><span>2021.12</span><span>论文</span><span>重要</span><span>ICML 2022</span><span>Sebastian Borgeaud, Arthur Mensch, Jordan Hoffmann, Trevor Cai, Eliza Rutherford, Katie Millican, George van den Driessche, Laurent Sifre et al. · DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2112.04426" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/retro">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>语言模型要变强只能不断加参数，知识全靠权重硬记；已有的检索方法（kNN-LM、RAG）检索库只有几十亿token，或只用于问答微调。</p></div><div><h4>方法</h4><p>把文本切成64个token的块，生成每一块时用冻结的BERT向量从2万亿token的库里找最近的邻居块，再通过“分块交叉注意力”把邻居信息送进自回归语言模型。</p></div><div><h4>影响</h4><p>75亿参数的RETRO在The Pile上达到与GPT-3、Jurassic-1相当的水平，参数少约25倍，证明“检索库规模”可以部分替代“参数规模”。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>2020到2021年，提升语言模型的主要办法是加参数（<a class="ln" href="../n/gpt-3.html">GPT-3</a>有1750亿，同期的<a class="ln" href="../n/gopher.html">Gopher</a>有2800亿），模型要把所有知识都记进权重里。检索是另一条路：<a class="ln" href="../n/knn-lm.html">kNN-LM</a>在每个token位置查一个“上下文向量→下一个词”的库，但每个token都要存一条键，库大了存不下；<a class="ln" href="../n/realm.html">REALM</a>和<a class="ln" href="../n/rag.html">检索增强生成RAG</a>检索维基百科段落，但库只有几千万段，且主要用于问答微调，而不是作为通用语言模型的一部分。问题是：检索能不能扩到训练语料本身那么大（万亿token），并在预训练阶段就让模型学会用它？</p><h2>方法</h2><p><b>分块检索</b>。输入序列（2048个token）被切成32块，每块64个token。检索库也按64个token一块存储，键是这一块的BERT平均嵌入（BERT冻结，不训练，所以整个库可以事先算一遍），值是这一块加上它在原文中的后续64个token，共128个token。生成时，对当前块C_u用L2距离<code>d(C, N) = ‖BERT(C) − BERT(N)‖²</code>找k个近邻（训练时k=2），借助SCaNN近似近邻库，在2万亿token的库上一次查询约10毫秒。</p><p><b>分块交叉注意力（CCA）</b>。邻居先过一个小的Transformer编码器；主模型的部分层里，第u+1块的token对第u块检索到的邻居做交叉注意力（见<a class="lc" href="../c/attention-concept.html">注意力机制</a>）。这样既保持因果性（生成时不会看到未来），计算量也只随块数线性增长。例如模型正在写一段关于某位科学家的文字，检索到的邻居块可能是维基百科中这位科学家生平的原句及其下文，模型可以直接参考。</p><p><b>防止泄漏</b>。训练文档与测试文档用13-gram的MinHash Jaccard相似度比对，相似度≥0.8的训练文档被删掉，并报告按重叠程度分组的结果。</p><h2>结果</h2><p>在Wikitext103上，用维基百科作检索库时RETRO验证集困惑度18.46，与作者复现的kNN-LM（18.52）相当，但只存0.06B个键（kNN-LM要4B个）；检索库换成1740亿token的C4后降到12.87。在The Pile上，75亿参数的RETRO在多数子集上超过1780亿的Jurassic-1和2800亿的Gopher。微调后在Natural Questions上EM 45.5，与RAG（44.5）相当，但低于FiD（51.4）。作者也指出：一部分收益来自直接抄写与测试集重叠的邻居。</p><h2>后来的发展</h2><p>RETRO让“检索增强预训练”成为一个研究方向，之后的<a class="ln" href="../n/atlas-ra.html">Atlas检索增强少样本</a>在少样本问答上进一步验证了检索可以替代大量参数。但它的路线（从头训练带专用交叉注意力层的模型）在工业界没有普及：大模型时代更常见的做法是不改模型结构，直接把检索结果放进提示词（<a class="ln" href="../n/llamaindex.html">LlamaIndex</a>等框架）。它的另一个影响是在评测里认真处理训练集与测试集的重叠，这一问题后来在<a class="lc" href="../c/data-contamination.html">数据泄漏与基准污染</a>相关工作中被反复讨论。</p><h2>容易误解的地方</h2><ul><li>“参数少25倍”是在语言建模指标上与GPT-3、Jurassic-1比较；它的总存储包括2万亿token的检索库，并不意味着整体资源少25倍。</li><li>部分低困惑度来自检索到与测试文档高度重叠的文本，不完全是“更懂语言”。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要从头训练或改造模型结构（加分块交叉注意力层），不能直接给现成大模型加检索。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:336" href="../n/llamaindex.html">LlamaIndex</a></div></li><li>检索器是冻结的BERT，只按表面相似度找邻居，不会针对任务学习“什么对生成有用”。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:336" href="../n/atlas-ra.html">Atlas检索增强少样本</a></div></li><li>问答任务上模型不够依赖检索内容，NQ上落后FiD约6个点，增加邻居数也不再提升。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>检索库与评测集的重叠难以彻底去除，部分收益来自抄写近似重复的文本，评估结果需要谨慎解读。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/rag.html">检索增强生成RAG</a><span class="yr">2020.05 · 推理·智能体</span> <span class="vk ok">已核对</span><div class=nt>RAG只在微调阶段为问答检索维基百科；RETRO把检索放进预训练，库扩到2万亿token，用于通用语言建模。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/realm.html">REALM</a><span class="yr">2020.02 · 推理·智能体</span> <span class="vk ok">已核对</span><div class=nt>同样是预训练时就接入检索，但REALM要随训练反复重建索引；RETRO冻结BERT检索器，库可以一次建好、做得极大。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/gpt-3.html">GPT-3</a><span class="yr">2020.05 · LLM</span><div class=nt>GPT-3靠1750亿参数记知识；RETRO用75亿参数加检索库，在The Pile上达到相当水平。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/gopher.html">Gopher</a><span class="yr">2021.12 · LLM</span><div class=nt>DeepMind同期的2800亿参数纯参数模型；RETRO 7.5B在多数Pile子集上超过它。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/knn-lm.html">kNN-LM</a><span class="yr">2019.11 · 推理·智能体</span><div class=nt>kNN-LM每个token存一条键，库大时存储爆炸；RETRO按64个token一块检索，在同样的维基百科库上效果相当，键的数量少约60倍。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/knowledge-in-params.html">参数里能装多少知识</a><span class="yr">2020.02 · LLM</span><div class=nt>知识只存在参数里，无法更新，也难以判断答案是不是编造的，容易出现幻觉。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:336" href="../n/fusion-in-decoder.html">FiD融合解码</a><span class="yr">2020.07 · 推理·智能体</span><div class=nt>问答微调上FiD让解码器读大量段落，NQ上51.4胜过RETRO的45.5。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/atlas-ra.html">Atlas检索增强少样本</a><span class="yr">2022.08 · 推理·智能体</span><div class=nt>检索器是冻结的BERT，只按表面相似度找邻居，不会针对任务学习“什么对生成有用”。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/llamaindex.html">LlamaIndex</a><span class="yr">2022.11 · 推理·智能体</span><div class=nt>需要从头训练或改造模型结构（加分块交叉注意力层），不能直接给现成大模型加检索。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/retrieval.html">检索与向量数据库</a> <a class="chip c" href="../c/attention-concept.html">注意力机制</a> <a class="chip c" href="../c/embedding.html">嵌入向量</a> <a class="chip c" href="../c/perplexity.html">困惑度</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a></p>
+<h2>本篇术语</h2><ul><li><b>分块交叉注意力（CCA）</b>　把序列按64个token分块，每一块的token只对前一块检索到的邻居做交叉注意力，既不偷看未来，又让计算量随长度线性增长。</li><li><b>bits-per-byte</b>　每个字节平均需要多少比特来编码，越低越好；与分词方式无关，便于比较不同模型。</li><li><b>MinHash</b>　一种快速估计两篇文档n-gram集合相似度（Jaccard系数）的哈希技巧，常用于大规模去重。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/rag.html">检索增强生成RAG</a>和<a class="ln" href="../n/knn-lm.html">kNN-LM</a>理解两种检索思路，再读原文第2节（图2的架构示意最关键）和表4、表5。注意第2.6节如何处理测试集泄漏。动手：用sentence-transformers给一批文本按固定长度切块建索引，对一个句子找最近的块并看它的下文，体会“邻居+续写”为什么有用。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2112.04426" rel="noopener">https://arxiv.org/abs/2112.04426</a>（标题、作者、arXiv v1于2021-12-08提交；摘要中2万亿token库、25倍参数；正文（ar5iv）：块长64、邻居+续写共128 token、k=2、SCaNN约10ms、13-gram MinHash≥0.8去重；表4 Wikitext103 RETRO 18.46 vs kNN-LM 18.52、0.06B vs 4B键、C4库12.87；表5 NQ 45.5、RAG 44.5、FiD 51.4；与178B Jurassic-1、280B Gopher比较。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20RETRO%EF%BC%88retro%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aretro%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/retro.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="scratchpad.html"><small>本分支上一个 · 2021.11</small><b>Scratchpad草稿纸</b></a><a class="r" href="contriever.html"><small>本分支下一个 · 2021.12</small><b>Contriever无监督检索</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

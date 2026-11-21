@@ -1,0 +1,66 @@
+{
+  "id": "transformer",
+  "status": "source",
+  "date": "2026-11-22",
+  "by": "ai:claude-opus",
+  "sources": [
+    {"url": "https://arxiv.org/abs/1706.03762", "what": "arXiv官方记录（经scripts/lookup.py）：标题、8位作者、v1提交2017-06-12、摘要中的28.4/41.8与3.5天8 GPU"},
+    {"url": "https://arxiv.org/html/1706.03762", "what": "HTML全文：作者单位、第3节结构参数、残差与层归一化、√d_k缩放理由、位置编码、优化器与warmup、BPE/词片词表、表1表2、句法分析、结论"},
+    {"url": "https://arxiv.org/pdf/1706.03762v7", "what": "PDF全文：表2各行BLEU与FLOPs、第3.5节位置编码选择理由、参考文献[1][2][9][11][13][20][31][35]、附录图4图5注意力可视化"}
+  ],
+  "checked": [
+    "8位作者；单位Google Brain、Google Research、University of Toronto（Gomez）；arXiv v1 2017-06-12",
+    "编码器、解码器各N=6层；h=8个头，d_model=512，d_k=d_v=64；每个子层LayerNorm(x + Sublayer(x))，残差引[11] He等，层归一化引[1] Ba等",
+    "√d_k缩放理由：内积变大会把softmax推入梯度极小的区域",
+    "正弦位置编码；作者选它是因为“可能”外推到更长序列（第3.5节，属假设）",
+    "Adam β₁=0.9、β₂=0.98、ε=10⁻⁹，warmup_steps=4000，之后按步数平方根倒数衰减；dropout 0.1、标签平滑0.1",
+    "英德约450万句对、BPE共享词表约3.7万；英法3600万句、3.2万词片词表",
+    "表2：Transformer big英德28.4、英法41.8（正文写41.0，与表和摘要不一致）；base 27.3；此前英德最好为ConvS2S集成26.36；训练FLOPs big 2.3×10¹⁹、base 3.3×10¹⁸，GNMT+RL英法1.4×10²⁰、其集成1.1×10²¹",
+    "8块P100：base 10万步约12小时，big 3.5天",
+    "表1：自注意力每层O(n²·d)、顺序操作O(1)、最大路径O(1)；循环O(n)；正文称ConvS2S关联远处位置的运算次数随距离线性增长、ByteNet按对数增长",
+    "句法分析：4层模型WSJ only F1 91.3、半监督92.7，除RNN语法外好于此前所有报告",
+    "结论：计划扩展到文本以外的模态，并研究受限局部注意力以处理图像、音频、视频等大输入"
+  ],
+  "changed": [
+    "who原只写Google Brain / Google Research，漏了多伦多大学（Gomez），已补上",
+    "problem原写“句子一长前面的信息就传不到后面”，与带注意力的RNN事实不符且无来源，改为“相隔很远的两个词之间信号要沿时间步走很多步”",
+    "impact原写“训练速度和可堆叠的规模上了一个量级，直接催生GPT、BERT，并在几年内成为……几乎所有领域的通用架构”，改为翻译上的训练计算与BLEU结果、“GPT和BERT都明确以它为骨架”“被推广到视觉、语音等许多领域”",
+    "background删去“GPU大部分时间在空转”（无来源），换成论文原话；补上论文对ConvS2S/ByteNet运算次数随距离增长的说法",
+    "method原写多头“比如一个头看语法依赖，一个头看指代”，改为论文的说法（不同表示子空间）和附录可视化的实际描述；删去“没有这两样，6层就很难训”（论文没有这样说）",
+    "results原写训练成本是“之前最好模型的几分之一到几十分之一”：英德上big模型2.3×10¹⁹其实高于ConvS2S单模型9.6×10¹⁸，改为列出表2的具体FLOPs对比（限定英法任务）；补上base模型、数据规模和句法分析F1",
+    "legacy原写“一年之内出现了两种用法”：BERT（2018-10）距本文16个月，改为“2018年出现了两种用法”；“扩散模型的骨干也换成了它”改为“一部分扩散模型”；“主要改了四处……主体结构九年没变”改为“常见的改动有……层结构多数仍被沿用”",
+    "pitfalls里“证明只用注意力就够了”改为“在翻译上显示”",
+    "limits第1条删去“原始模型只能处理几百个token”（论文没有给出这个上限），加 stated: true（结论里写了受限注意力处理长输入的后续方向）",
+    "limits第2条改写为“作者只是猜测正弦编码可能外推”，solved_by增加alibi（其摘要明确以外推为动机）",
+    "limits第4条（post-LN需warmup）的solved_by把gpt-2换成pre-ln：GPT-2并未以训练稳定性为动机，Xiong等人2020年的论文明确分析了post-LN为什么需要warmup",
+    "limits第5条（只在文本上验证）加 stated: true",
+    "relations/seq2seq的note原写“解决了……无法并行训练、长程依赖弱的问题”，改为论文实际的动机和表1的路径长度对比",
+    "relations/convs2s的note删去“效果和速度都更好，卷积路线随后被放弃”，改为表1表2的具体比较和“之后的主流翻译系统多数转向Transformer”",
+    "relations/resnet的note删去“没有它深层堆叠训不动”；relations/layernorm的note删去“批内统计量不稳定所以不用BatchNorm”（论文没有给出选择理由）；relations/adam的note删去“成为之后的默认配置”，改为具体超参数；relations/bpe的note补上英法用的是词片词表"
+  ],
+  "unverified": [
+    "legacy里“层结构多数仍被沿用”与pre-LN、RoPE、AdamW等常见改动属于对后来模型的概括，未逐一核对具体模型",
+    "limits/solved_by里gemini-1.5（百万token上下文）与whisper（语音）只核对了摘要，二者并未把原始Transformer的这一局限作为直接动机"
+  ],
+  "edges": {
+    "bahdanau-attention": "ok",
+    "seq2seq": "revised",
+    "convs2s": "revised",
+    "resnet": "revised",
+    "layernorm": "revised",
+    "adam": "revised",
+    "bpe": "revised",
+    "transformer-xl": "ok",
+    "reformer": "ok",
+    "flashattention": "ok",
+    "gemini-1.5": "weak",
+    "rope": "ok",
+    "alibi": "ok",
+    "gpt-1": "weak",
+    "bert": "ok",
+    "pre-ln": "ok",
+    "vit": "ok",
+    "whisper": "weak"
+  },
+  "registry": {}
+}

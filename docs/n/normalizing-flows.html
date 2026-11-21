@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>标准化流（2015） · AI脉络</title>
+<meta name="description" content="VAE的近似后验被限定为对角高斯，真实后验往往是多峰、弯曲的，近似得不准就会让变分下界与真实似然之间留下很大差距。 从一个简单高斯出发，连续施加K个可逆变换，用变量替换公式精确追踪每一步的密度变化，得到一个任意复杂、但仍能采样和计算密度的后验分布。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/normalizing-flows.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="标准化流（2015）">
+<meta property="og:description" content="VAE的近似后验被限定为对角高斯，真实后验往往是多峰、弯曲的，近似得不准就会让变分下界与真实似然之间留下很大差距。 从一个简单高斯出发，连续施加K个可逆变换，用变量替换公式精确追踪每一步的密度变化，得到一个任意复杂、但仍能采样和计算密度的后验分布。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/normalizing-flows.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/normalizing-flows">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 隐变量与标准化流</div>
+<h1>标准化流</h1>
+<div class="full">Variational Inference with Normalizing Flows</div>
+<div class="meta"><span>2015.05</span><span>论文</span><span>重要</span><span>ICML 2015</span><span>Danilo Jimenez Rezende, Shakir Mohamed · Google DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1505.05770" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://arxiv.org/abs/1912.02762" rel="noopener">Papamakarios et al.：Normalizing Flows综述 ↗</a><a class="btn sm" href="https://lilianweng.github.io/posts/2018-10-13-flow-models/" rel="noopener">Lilian Weng：Flow-based Deep Generative Models ↗</a><a class="btn sm" href="../index.html#/n/normalizing-flows">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>VAE的近似后验被限定为对角高斯，真实后验往往是多峰、弯曲的，近似得不准就会让变分下界与真实似然之间留下很大差距。</p></div><div><h4>方法</h4><p>从一个简单高斯出发，连续施加K个可逆变换，用变量替换公式精确追踪每一步的密度变化，得到一个任意复杂、但仍能采样和计算密度的后验分布。</p></div><div><h4>影响</h4><p>确立了“标准化流”这个名字和用可逆变换链构造分布的框架，引出IAF、RealNVP、Glow等一整类流模型，并延续到今天的连续流与流匹配。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/vae.html">变分自编码器VAE</a>用编码器输出一个对角高斯<code>q(z|x)</code>来近似真实后验<code>p(z|x)</code>。对角高斯意味着各维度独立、只有一个峰。可是真实后验常常是弯曲的、多峰的：比如一张模糊的“1/7”图像，后验应该在“1”和“7”两处各有一个峰。用单峰高斯去近似，ELBO与真实对数似然之间的差距（就是那个KL项）就降不下来，作者认为这正是变分推断效果常常不如MCMC的主要原因。</p><p>此前的改进办法要么只加一点相关性（全协方差高斯），要么用混合分布，但计算代价高、表达力仍有限。同期的<a class="ln" href="../n/nice.html">NICE可逆耦合层</a>已经用可逆耦合层构造了能精确算似然的生成模型，但它是用在数据空间上，而不是用来改进变分后验。</p><h2>方法</h2><p><b>变量替换公式</b>（见<a class="lc" href="../c/normalizing-flow.html">可逆流与流匹配</a>）。如果<code>z&#x27; = f(z)</code>是一个光滑可逆函数，那么</p><p class="formula"><code>q(z&#x27;) = q(z) · |det ∂f/∂z|⁻¹</code></p><p>直观地说：变换把某个区域拉大了，概率质量不变，密度就要相应变小，拉伸倍数就是雅可比行列式（见<a class="lc" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a>）。连续做K次变换，对数密度只是逐项相加：</p><p class="formula"><code>ln q_K(z_K) = ln q₀(z₀) − Σ_k ln|det ∂f_k/∂z_{k−1}|</code></p><p>“流”指概率密度沿着这串变换流动，“标准化”指它始终保持积分为1。</p><p><b>行列式要便宜</b>。一般D维矩阵的行列式要O(D³)计算。论文设计了两种行列式只需O(D)的变换：</p><ul><li><b>平面流</b>：<code>f(z) = z + u·h(wᵀz + b)</code>，h是tanh之类的非线性。它沿着一个超平面的法向把空间压缩或拉伸。雅可比行列式是<code>|1 + uᵀψ(z)|</code>，其中<code>ψ(z) = h&#x27;(wᵀz + b)·w</code>。</li><li><b>径向流</b>：围绕某个参考点z₀把空间径向收缩或扩张。</li></ul><p><b>用于VAE</b>。编码器除了输出μ、σ，还输出这K个变换的参数。采样时先按重参数化得到z₀，再依次经过K个变换得到z_K；ELBO中多出来的就是各步对数行列式之和，仍然可以用反向传播优化。</p><p>论文还指出，当K趋于无穷、每步无限小时，朗之万动力学和哈密顿蒙特卡洛也可以看作一种流，而且其极限分布就是真实后验——这把变分推断与MCMC联系了起来。</p><h2>结果</h2><p>在二值化MNIST上（40维隐变量），对角高斯后验的DLGM负对数似然上界为89.9，加入K=10、20、40、80个平面流后依次降到87.5、86.5、85.7、85.1，流越长越好；同样长度下用NICE式变换为88.6到87.2，不如平面流。在二维的非高斯玩具分布上，平面流用少得多的参数就能达到与NICE相近的拟合效果。CIFAR-10小图块上同样观察到流越长似然越好。</p><h2>后来的发展</h2><p>很快出现了更强的流：<a class="ln" href="../n/iaf.html">逆自回归流IAF</a>用自回归结构让每一层都能表达更复杂的依赖，更适合高维隐变量；<a class="ln" href="../n/realnvp.html">标准化流RealNVP</a>与<a class="ln" href="../n/glow.html">Glow</a>把可逆耦合层直接用在图像像素上，得到能精确算似然、一步采样的图像生成模型；<a class="ln" href="../n/ffjord.html">FFJORD连续标准化流</a>把离散的K步变成连续时间的常微分方程。2022年的<a class="ln" href="../n/flow-matching.html">Flow Matching</a>与<a class="ln" href="../n/rectified-flow.html">整流Rectified Flow</a>沿用“从高斯连续变形到数据”的思想，但换了一种不需要计算行列式的训练方式，成为Stable Diffusion 3、FLUX等模型的训练框架。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>平面流和径向流每一层只能做很简单的形变，高维隐空间里需要堆非常多层才有明显效果。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/iaf.html">逆自回归流IAF</a></div></li><li>论文只把流用于改进变分后验，没有用它直接为高维图像建模并精确计算似然。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/realnvp.html">标准化流RealNVP</a> <a class="chip hue" style="--h:288" href="../n/glow.html">Glow</a></div></li><li>平面流没有解析逆变换，只能单向计算密度，不能从数据反推隐变量。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/realnvp.html">标准化流RealNVP</a></div></li><li>为了保证行列式便宜，变换的形式受到严格限制，表达力与计算代价之间的取舍始终存在。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/ffjord.html">FFJORD连续标准化流</a> <a class="chip hue" style="--h:288" href="../n/flow-matching.html">Flow Matching</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/vae.html">变分自编码器VAE</a><span class="yr">2013.12 · 生成</span> <span class="vk ok">已核对</span><div class=nt>用可逆变换链替代对角高斯后验，缓解了VAE后验表达力不足、下界不紧的问题。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/mcmc.html">Metropolis采样与MCMC</a><span class="yr">1953 · 基础</span><div class=nt>MCMC近似后验更准但慢；论文把朗之万和哈密顿动力学解释为无穷小流，试图兼得两者之长。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/stochastic-backprop.html">随机反向传播DLGM</a><span class="yr">2014.01 · 生成</span><div class=nt>实验基于同一作者的深层隐高斯模型DLGM及其重参数化梯度估计。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/nice.html">NICE可逆耦合层</a><span class="yr">2014.10 · 生成</span><div class=nt>沿用“可逆变换＋可算行列式”的思路，但用于变分后验；论文直接以NICE式变换作对比，平面流在同等长度下效果更好。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/iwae.html">重要性加权IWAE</a><span class="yr">2015.09 · 生成</span><div class=nt>k个样本的代价是k倍，且当k很大时识别网络的梯度信号变弱。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/flow-matching.html">Flow Matching</a><span class="yr">2022.10 · 生成</span><div class=nt>为了保证行列式便宜，变换的形式受到严格限制，表达力与计算代价之间的取舍始终存在。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/realnvp.html">标准化流RealNVP</a><span class="yr">2016.05 · 生成</span><div class=nt>论文只把流用于改进变分后验，没有用它直接为高维图像建模并精确计算似然。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/iaf.html">逆自回归流IAF</a><span class="yr">2016.06 · 生成</span><div class=nt>把流的变换改成自回归形式，使其可扩展到高维隐空间。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/glow.html">Glow</a><span class="yr">2018.07 · 生成</span><div class=nt>论文只把流用于改进变分后验，没有用它直接为高维图像建模并精确计算似然。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/ffjord.html">FFJORD连续标准化流</a><span class="yr">2018.10 · 生成</span><div class=nt>为了保证行列式便宜，变换的形式受到严格限制，表达力与计算代价之间的取舍始终存在。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/elbo.html">变分推断与ELBO</a> <a class="chip c" href="../c/reparameterization.html">重参数化技巧</a> <a class="chip c" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a> <a class="chip c" href="../c/normalizing-flow.html">可逆流与流匹配</a> <a class="chip c" href="../c/gaussian.html">高斯分布</a> <a class="chip c" href="../c/latent-variable.html">隐变量模型</a></p>
+<h2>本篇术语</h2><ul><li><b>变量替换公式</b>　随机变量经可逆变换后，新密度等于旧密度除以变换的雅可比行列式的绝对值。</li><li><b>平面流</b>　f(z) = z + u·h(wᵀz + b)：沿着一个方向推挤空间的一层简单可逆变换，行列式只需O(D)计算。</li></ul>
+<h2>怎么学</h2><p>先复习<a class="lc" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a>中的行列式与一维变量替换（<code>p_y(y) = p_x(x)/|dy/dx|</code>），并读懂<a class="ln" href="../n/vae.html">变分自编码器VAE</a>。然后读原文第3节（流的定义、平面流和径向流）和第4节（用于推断）。动手：用PyTorch实现平面流，在二维平面上把标准高斯拟合到论文图3那种环形或双峰能量函数，观察K=2、8、32时的差别。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1505.05770" rel="noopener">https://arxiv.org/abs/1505.05770</a>（标题、作者Rezende与Mohamed、arXiv v1提交于2015-05-21、comments注明ICML 2015（第32届）；正文（ar5iv）中的变量替换公式、平面流与行列式、二值化MNIST表2：对角高斯89.9，NF K=10/20/40/80为87.5/86.5/85.7/85.1，NICE为88.6至87.2。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%A0%87%E5%87%86%E5%8C%96%E6%B5%81%EF%BC%88normalizing-flows%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Anormalizing-flows%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/normalizing-flows.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="diffusion-2015.html"><small>本分支上一个 · 2015.03</small><b>扩散模型的起点</b></a><a class="r" href="lapgan.html"><small>本分支下一个 · 2015.06</small><b>LAPGAN</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

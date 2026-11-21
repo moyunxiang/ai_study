@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>表征自编码器RAE（2025） · AI脉络</title>
+<meta name="description" content="几乎所有潜空间扩散模型都还在用2021年的SD-VAE：它只为像素重建而训练，潜空间缺少语义结构；REPA只能在DiT内部“补课”，没有从源头改变潜空间。 直接拿冻结的预训练表征编码器（如DINOv2）当编码器，只训练一个ViT解码器把特征还原成图像，构成“表征自编码器”；再解决在高维语义潜空间里…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/rae.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="表征自编码器RAE（2025）">
+<meta property="og:description" content="几乎所有潜空间扩散模型都还在用2021年的SD-VAE：它只为像素重建而训练，潜空间缺少语义结构；REPA只能在DiT内部“补课”，没有从源头改变潜空间。 直接拿冻结的预训练表征编码器（如DINOv2）当编码器，只训练一个ViT解码器把特征还原成图像，构成“表征自编码器”；再解决在高维语义潜空间里…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/rae.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/rae">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 潜空间与骨架网络</div>
+<h1>表征自编码器RAE</h1>
+<div class="full">Diffusion Transformers with Representation Autoencoders</div>
+<div class="meta"><span>2025.10</span><span>论文</span><span>重要</span><span>Boyang Zheng, Nanye Ma, Shengbang Tong, Saining Xie · 纽约大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2510.11690" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://rae-dit.github.io/" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/rae">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>几乎所有潜空间扩散模型都还在用2021年的SD-VAE：它只为像素重建而训练，潜空间缺少语义结构；REPA只能在DiT内部“补课”，没有从源头改变潜空间。</p></div><div><h4>方法</h4><p>直接拿冻结的预训练表征编码器（如DINOv2）当编码器，只训练一个ViT解码器把特征还原成图像，构成“表征自编码器”；再解决在高维语义潜空间里训练扩散模型的几个障碍。</p></div><div><h4>影响</h4><p>ImageNet 256上不加引导FID 1.51、加引导1.13，训练比REPA快约16倍，挑战了“语义编码器不适合重建和生成”的成见，提出用表征模型统一理解与生成的潜空间。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/ldm.html">潜空间扩散LDM</a>之后，扩散模型的潜空间几乎固定为SD-VAE这一类自编码器：把图像压成低维潜变量（如32×32×4），目标只是重建像素。这样的潜空间对重建好，但缺乏语义：相似内容的图不一定在潜空间里接近，扩散模型得自己从头学“图里有什么”。</p><p><a class="ln" href="../n/repa.html">表征对齐REPA</a>发现，把DiT的中间层与<a class="ln" href="../n/dinov2.html">DINOv2</a>特征对齐能大幅加速训练，这说明语义表征对生成很有帮助。<a class="ln" href="../n/va-vae.html">VA-VAE重建与生成之困</a>进一步在VAE训练时对齐视觉基础模型。但大家普遍认为：DINOv2这类表征编码器的特征维度高（每个图块768维）、为理解而训练、丢掉了像素细节，所以既不能用来重建，也不适合直接在上面做扩散。本文质疑这个假设。</p><h2>方法</h2><p><b>表征自编码器（RAE）</b>：编码器是冻结的预训练表征模型（默认DINOv2-B），不做任何压缩，每个图块输出一个768维token；只训练一个ViT解码器把这些token还原成图像。结果出人意料：DINOv2-B做编码器的重建rFID为0.49，比SD-VAE的0.62还好；<a class="ln" href="../n/mae.html">掩码自编码器MAE</a>-B编码器为0.16，SigLIP2-B为0.53。而且编码器和解码器的计算量分别只有SD-VAE的约六分之一和三分之一。</p><p><b>在高维潜空间里训练扩散</b>：作者发现标准DiT直接在这种潜空间上训练效果很差，找到了三个原因并逐一解决：</p><ul><li><b>宽度</b>：扩散Transformer的宽度必须不小于token维度。宽384的DiT-S在768维token上连单张图都拟合不了。</li><li><b>噪声调度</b>：维度越高，同样的噪声破坏的信息越少，因此要把噪声调度按维度平移（系数<code>α = √(m/n)</code>，m为潜变量维度，n为基准维度4096）。这一项让gFID从23.08降到4.81。</li><li><b>解码器加噪训练</b>：扩散模型生成的潜变量总带一点误差，训练解码器时给输入加噪，让它对这种误差更鲁棒，gFID进一步降到4.28（重建rFID略升到0.57）。</li></ul><p><b>DiT^DH</b>：为了在不让计算量平方增长的前提下增加宽度，在标准DiT后面接一个“浅而宽”的扩散头（DDT head）。</p><h2>结果</h2><p>ImageNet 256×256上，最终模型DiT^DH-XL不加引导FID 1.51，加引导1.13；512×512加引导同样为1.13。训练效率上，基于RAE的DiT-XL训练80个epoch即达到gFID 4.28，DiT^DH-XL达到2.16；在同等模型规模下，作者称比REPA-XL快约16倍、比SiT-XL快约47倍。</p><h2>后来的发展</h2><p>RAE发布于2025年10月，它把<a class="ln" href="../n/repa.html">表征对齐REPA</a>开启的“生成借用表征”路线推到了尽头：不再对齐，而是直接把表征空间当作生成空间。这让“一个编码器同时服务理解和生成”的统一多模态设计更具可行性。同一时期的<a class="ln" href="../n/jit.html">JiT像素空间x预测</a>则走向另一个方向，干脆不用自编码器、直接在像素空间做扩散。两者都在挑战LDM以来“先训一个重建型VAE”的默认做法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>实验只在ImageNet类别条件生成上完成，大规模文生图和视频上是否同样有效尚未验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>潜变量维度高（每个图块768维）且不压缩，扩散模型必须足够宽，序列长时成本可能高于低维VAE。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>冻结的语义编码器会丢失部分细节（如精确的文字、纹理），对需要像素级保真的任务可能不足。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/dit.html">Diffusion Transformer</a><span class="yr">2022.12 · 生成</span> <span class="vk ok">已核对</span><div class=nt>分析DiT在高维潜空间失败的原因，并提出加宽扩散头的DiT^DH。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/ldm.html">潜空间扩散LDM</a><span class="yr">2021.12 · 生成</span><div class=nt>替换LDM沿用至今的SD-VAE：重建更好、计算更省，且潜空间具有语义结构。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/mae.html">掩码自编码器MAE</a><span class="yr">2021.11 · 视觉</span><div class=nt>作者也用MAE编码器构建RAE，重建rFID为0.16，说明多种表征模型都可用。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/dinov2.html">DINOv2</a><span class="yr">2023.04 · 视觉</span><div class=nt>默认用冻结的DINOv2-B作为编码器，只训练解码器。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/mar.html">无量化自回归MAR</a><span class="yr">2024.06 · 生成</span><div class=nt>仍依赖一个预训练的KL自编码器，生成质量受其重建能力和潜空间结构限制。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/repa.html">表征对齐REPA</a><span class="yr">2024.10 · 生成</span><div class=nt>REPA在DiT内部对齐DINOv2特征；RAE直接把DINOv2特征空间当作扩散的潜空间，训练再快约16倍。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/dc-ae.html">深度压缩自编码器DC-AE</a><span class="yr">2024.10 · 生成</span><div class=nt>极高压缩比下细节与文字仍会损失，且压缩比越高对扩散模型的语义建模要求越高。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/sana.html">SANA线性DiT</a><span class="yr">2024.10 · 生成</span><div class=nt>32倍压缩带来细节损失的风险，需要自编码器同步改进。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/va-vae.html">VA-VAE重建与生成之困</a><span class="yr">2025.01 · 生成</span><div class=nt>VA-VAE在训练VAE时对齐视觉基础模型，仍保留压缩型VAE；RAE干脆不训练编码器。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/repa-e.html">REPA-E端到端调VAE</a><span class="yr">2025.04 · 生成</span><div class=nt>仍保留VAE这一环，没有回答“潜空间是否必要”。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/latent-space.html">潜空间</a> <a class="chip c" href="../c/autoencoder.html">自编码器</a> <a class="chip c" href="../c/self-supervised.html">自监督学习</a> <a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/noise-schedule.html">噪声调度与采样步数</a> <a class="chip c" href="../c/generation-metrics.html">生成质量指标：IS与FID</a></p>
+<h2>本篇术语</h2><ul><li><b>表征自编码器（RAE）</b>　编码器是冻结的预训练表征模型、只训练解码器的自编码器。</li><li><b>rFID / gFID</b>　rFID衡量自编码器重建图像的质量，gFID衡量生成模型生成图像的质量，都用FID计算，越低越好。</li><li><b>噪声调度平移</b>　按潜变量维度调整各时间步的噪声强度，使高维空间里的去噪难度与低维时相当。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/ldm.html">潜空间扩散LDM</a>、<a class="ln" href="../n/dit.html">Diffusion Transformer</a>和<a class="ln" href="../n/repa.html">表征对齐REPA</a>，补<a class="lc" href="../c/noise-schedule.html">噪声调度与采样步数</a>和<a class="lc" href="../c/self-supervised.html">自监督学习</a>。读原文第3节（RAE的重建实验）和第4节（三个障碍与对策）。动手：用DINOv2提取一批图像特征，训练一个小ViT解码器重建，观察哪些细节能还原、哪些丢失。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2510.11690" rel="noopener">https://arxiv.org/abs/2510.11690</a>（标题、4位作者（纽约大学）、v1提交于2025-10-13、技术报告；摘要FID 1.51/1.13；正文（arxiv.org/html）中rFID 0.49/0.62/0.16/0.53、计算量约6倍与3倍、宽度要求、α=√(m/n)与n=4096、gFID 23.08→4.81→4.28、DiT^DH-XL 80 epoch 2.16、比REPA-XL快16倍、比SiT-XL快47倍。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E8%A1%A8%E5%BE%81%E8%87%AA%E7%BC%96%E7%A0%81%E5%99%A8RAE%EF%BC%88rae%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Arae%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/rae.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="sora-2.html"><small>本分支上一个 · 2025.09</small><b>Sora 2</b></a><a class="r" href="veo-3.1.html"><small>本分支下一个 · 2025.10</small><b>Veo 3.1</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

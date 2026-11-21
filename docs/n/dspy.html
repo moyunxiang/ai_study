@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DSPy（2023） · AI脉络</title>
+<meta name="description" content="LLM应用通常由好几次模型调用串成流水线，每一步都靠人反复试出来的长提示模板；换个模型或改一步流程，所有提示都得重调。 把提示换成可“编译”的程序：开发者只用签名声明每一步的输入输出（如question -&gt; answer），由优化器在少量训练样本上运行整条流水线，自动挑出能让指标变好的示范样例，…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dspy.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DSPy（2023）">
+<meta property="og:description" content="LLM应用通常由好几次模型调用串成流水线，每一步都靠人反复试出来的长提示模板；换个模型或改一步流程，所有提示都得重调。 把提示换成可“编译”的程序：开发者只用签名声明每一步的输入输出（如question -&gt; answer），由优化器在少量训练样本上运行整条流水线，自动挑出能让指标变好的示范样例，…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dspy.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dspy">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:336"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/agent.html">推理、检索与智能体</a> › 提示、上下文与记忆</div>
+<h1>DSPy</h1>
+<div class="full">DSPy: Compiling Declarative Language Model Calls into Self-Improving Pipelines</div>
+<div class="meta"><span>2023.10</span><span>论文</span><span>重要</span><span>ICLR 2024</span><span>Omar Khattab, Arnav Singhvi, Paridhi Maheshwari, Zhiyuan Zhang, Keshav Santhanam, Heather Miller, Matei Zaharia, Christopher Potts et al. · Stanford University / UC Berkeley 等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2310.03714" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/stanfordnlp/dspy" rel="noopener">GitHub: stanfordnlp/dspy ↗</a><a class="btn sm" href="../index.html#/n/dspy">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>LLM应用通常由好几次模型调用串成流水线，每一步都靠人反复试出来的长提示模板；换个模型或改一步流程，所有提示都得重调。</p></div><div><h4>方法</h4><p>把提示换成可“编译”的程序：开发者只用签名声明每一步的输入输出（如question -&gt; answer），由优化器在少量训练样本上运行整条流水线，自动挑出能让指标变好的示范样例，填进各步提示或用来微调小模型。</p></div><div><h4>影响</h4><p>把“提示工程”变成类似训练神经网络的过程：写模块、定指标、编译。GPT-3.5和Llama2-13b-chat上自动编译的流水线比普通少样本提示高出25%和65%以上，DSPy也成为最常用的提示优化框架之一。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>2023年，<a class="ln" href="../n/langchain.html">LangChain</a>等框架让开发者把检索、推理、工具调用组合成多步流水线，但每一步的提示仍是手写的字符串模板，往往几百字、靠试错得来。模板与具体模型强绑定：从GPT-3.5换到开源模型，效果可能大幅下降。<a class="ln" href="../n/ape.html">自动提示工程APE</a>和<a class="ln" href="../n/opro.html">OPRO以LLM为优化器</a>已经尝试让模型自动生成提示，但它们优化的是单个提示，不处理多步流水线中“每一步该怎么提示、各步怎样配合”的问题。作者的出发点是：深度学习早就不手写特征，而是声明层、定义损失、交给优化器——提示能不能也这样？</p><h2>方法</h2><p><b>签名（signature）</b>。声明一步要做的变换，而不是写提示。比如<code>dspy.Predict(“question -&gt; answer”)</code>就是一个完整的问答程序，字段名本身表达语义；DSPy负责把它展开成具体提示并解析输出。</p><p><b>模块（module）</b>。把常见提示技巧做成可复用、带参数的模块：<code>Predict</code>、<code>ChainOfThought</code>（先写推理，见<a class="ln" href="../n/cot.html">思维链CoT</a>）、<code>ReAct</code>（见<a class="ln" href="../n/react.html">ReAct</a>）、多条推理链比较等，以及<code>Retrieve</code>检索模块（支持ColBERTv2等检索器）。模块可以像PyTorch层一样用普通Python控制流组合，例如“检索→带推理地回答”的RAG程序只有几行。</p><p><b>编译器与优化器</b>（论文称teleprompter）。输入是程序、少量训练样本（可以只有问题和最终答案）和一个评价指标（如答案精确匹配）。最常用的<code>BootstrapFewShot</code>在训练样本上实际运行整个程序，记录每个模块的输入输出轨迹；凡是最终通过指标检验的轨迹，就把其中各模块的输入输出当作该模块的示范样例，自动填进提示。这与<a class="ln" href="../n/star.html">STaR自举推理</a>“只保留答对的推理”同一思路，只是推广到了多个模块。还有随机搜索示范组合、集成多个编译结果，以及<code>BootstrapFinetune</code>——用大模型产生的轨迹去微调T5-Large这样的小模型。</p><h2>结果</h2><p>GSM8K（表1）：GPT-3.5直接回答测试集准确率25.2%，用<code>ChainOfThought</code>模块编译后72.9%，再集成达到81.6%（开发集88.3%）；Llama2-13b-chat从9.4%提到最高46.9%。论文总结为：靠编译正确的模块，不同模型从4–20%提升到49–88%。HotPotQA多跳问答（表2，用ColBERTv2检索维基百科摘要）：GPT-3.5的多跳程序经自举后测试集答案EM 39.6，集成后45.6，少样本基线为31.5。每次编译通常只需几分钟到几十分钟，最多运行程序几千次。</p><h2>后来的发展</h2><p>DSPy让“提示优化”成为一个独立方向。2024年6月作者团队发表MIPRO（arXiv 2406.11695），同时优化多步程序的指令文字和示范样例；框架本身也常被用来把同一流水线迁移到不同模型上。它和<a class="ln" href="../n/opro.html">OPRO以LLM为优化器</a>一起推动人们把提示看作可以用数据和指标优化的参数，而不是手艺；2025年的<a class="ln" href="../n/ace.html">智能体上下文工程ACE</a>则把这种思路扩展到智能体不断演化的上下文。</p><h2>容易误解的地方</h2><ul><li>DSPy不训练大模型的权重（除非用BootstrapFinetune微调小模型）；“编译”主要是在挑选和组合提示里的示范样例。</li><li>效果依赖评价指标：指标写得不对，优化器会找到投机取巧但无用的样例。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>初版主要优化各模块的示范样例，指令文字本身仍由签名自动展开，没有被系统地搜索和改写。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>必须有可自动计算的评价指标和一批训练样本，开放式写作、对话等难以定义指标的任务不好用。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>编译要把整个流水线运行成百上千次，大模型调用费用不低，且结果受随机采样影响需多次运行。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只在GSM8K和HotPotQA两个案例上系统评估，复杂智能体任务上的效果没有验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:336" href="../n/cot.html">思维链CoT</a><span class="yr">2022.01 · 推理·智能体</span><div class=nt>把思维链封装成ChainOfThought模块，GSM8K上编译后从25.2%提到72.9%。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:336" href="../n/react.html">ReAct</a><span class="yr">2022.10 · 推理·智能体</span><div class=nt>把ReAct智能体循环封装成模块，HotPotQA上自举编译后效果超过人工写的示范。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:336" href="../n/colbert.html">ColBERT后期交互</a><span class="yr">2020.04 · 推理·智能体</span><div class=nt>HotPotQA案例的检索模块用的是同一作者团队的ColBERTv2。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/star.html">STaR自举推理</a><span class="yr">2022.03 · 推理·智能体</span><div class=nt>沿用STaR“运行、只保留通过检验的轨迹作为训练数据”的自举思想，推广到多个模块组成的程序。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/langchain.html">LangChain</a><span class="yr">2022.10 · 推理·智能体</span><div class=nt>LangChain式流水线依赖手写提示模板，换模型就要重调；DSPy用签名和编译器自动生成各步提示。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/ape.html">自动提示工程APE</a><span class="yr">2022.11 · 推理·智能体</span><div class=nt>APE让模型为单个任务自动搜索指令；DSPy把自动优化推广到多步流水线，优化的是每个模块的示范样例。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/opro.html">OPRO以LLM为优化器</a><span class="yr">2023.09 · 推理·智能体</span><div class=nt>优化出的提示往往只对特定模型和任务有效，换模型需重新搜索，也缺乏理论保证。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/sglang.html">SGLang与RadixAttention</a><span class="yr">2023.12 · 系统·效率</span><div class=nt>评测中包含DSPy编写的RAG流水线，作为“多次调用、共享上下文”的典型语言模型程序。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/gepa.html">GEPA反思式提示进化</a><span class="yr">2025.07 · 推理·智能体</span><div class=nt>面向DSPy式的多模块LLM程序做提示优化，并以DSPy的MIPROv2为主要对照。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/ace.html">智能体上下文工程ACE</a><span class="yr">2025.10 · 推理·智能体</span><div class=nt>同属不改权重的提示优化，但用增量式手册避免整体重写带来的信息丢失。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/in-context-learning.html">上下文学习与提示</a> <a class="chip c" href="../c/zero-few-shot.html">零样本与少样本</a> <a class="chip c" href="../c/retrieval.html">检索与向量数据库</a> <a class="chip c" href="../c/agent-loop.html">智能体循环</a> <a class="chip c" href="../c/hyperparameter.html">超参数与调参</a></p>
+<h2>本篇术语</h2><ul><li><b>签名（signature）</b>　用“输入字段 -&gt; 输出字段”的形式声明一步LLM调用要做什么，例如“context, question -&gt; answer”，不写具体提示词。</li><li><b>teleprompter / 优化器</b>　DSPy中负责“编译”的组件：在训练样本上运行程序，根据指标挑选示范样例或生成微调数据。</li><li><b>示范样例（demonstration）</b>　放在提示里的输入输出示例，即少样本提示中的“样本”。</li></ul>
+<h2>怎么学</h2><p>先熟悉<a class="lc" href="../c/in-context-learning.html">上下文学习与提示</a>和<a class="ln" href="../n/rag.html">检索增强生成RAG</a>的基本流程。读原文第3节（签名与模块）和第4节（编译），再看表1理解不同编译策略的差别。动手：按官方教程用DSPy写一个“检索→ChainOfThought回答”的程序，准备20条问答样本，比较编译前后在验证集上的准确率，并打印编译后实际生成的提示看看它选了哪些样例。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2310.03714" rel="noopener">https://arxiv.org/abs/2310.03714</a>（标题、作者、arXiv v1于2023-10-05提交；摘要中25%与65%；正文（ar5iv）：question -&gt; answer示例、teleprompter命名、BootstrapFewShot/BootstrapFinetune、ColBERTv2检索；表1 GPT-3.5 vanilla 25.2、CoT bootstrap 72.9、ensemble 81.6/88.3、Llama2 9.4→46.9、“4–20%到49–88%”；表2 multihop测试EM 31.5/39.6/45.6；编译耗时几分钟到几十分钟。；arXiv 2406.11695（2024-06-17）MIPRO同时优化指令与示范。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DSPy%EF%BC%88dspy%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adspy%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dspy.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="self-rag.html"><small>本分支上一个 · 2023.10</small><b>Self-RAG</b></a><a class="r" href="cannot-self-correct.html"><small>本分支下一个 · 2023.10</small><b>自我纠错的局限</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

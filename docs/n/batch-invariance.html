@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>批不变性与确定性推理（2025） · AI脉络</title>
+<meta name="description" content="温度设为0的LLM推理，同样的输入每次输出仍可能不同；常见解释是浮点加法不满足结合律加并发，但这不能解释为什么单次运行总是一致。 真正原因是前向计算缺少「批不变性」：同一请求的结果取决于同时处理的批大小，而批大小随服务器负载变化；让核函数对批大小不变即可得到可复现输出。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/batch-invariance.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="批不变性与确定性推理（2025）">
+<meta property="og:description" content="温度设为0的LLM推理，同样的输入每次输出仍可能不同；常见解释是浮点加法不满足结合律加并发，但这不能解释为什么单次运行总是一致。 真正原因是前向计算缺少「批不变性」：同一请求的结果取决于同时处理的批大小，而批大小随服务器负载变化；让核函数对批大小不变即可得到可复现输出。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/batch-invariance.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/batch-invariance">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 推理服务引擎</div>
+<h1>批不变性与确定性推理</h1>
+<div class="full">Defeating Nondeterminism in LLM Inference</div>
+<div class="meta"><span>2025.09</span><span>思想</span><span>延伸</span><span>Horace He 与 Thinking Machines Lab 同事</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/" rel="noopener">博客 ↗</a><a class="btn sm" href="../index.html#/n/batch-invariance">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>温度设为0的LLM推理，同样的输入每次输出仍可能不同；常见解释是浮点加法不满足结合律加并发，但这不能解释为什么单次运行总是一致。</p></div><div><h4>方法</h4><p>真正原因是前向计算缺少「批不变性」：同一请求的结果取决于同时处理的批大小，而批大小随服务器负载变化；让核函数对批大小不变即可得到可复现输出。</p></div><div><h4>影响</h4><p>给出可复现推理的具体做法，并使得「真正的在线策略强化学习」成为可能。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>文章（2025年9月10日）先做实验：对Qwen3-235B-A22B-Instruct-2507在温度0下采样1000次，提示是「Tell me about Richard Feynman」，每次生成1000个词元，得到80种不同输出，最常见的出现78次，前102个词元完全一致，第103个词元开始分叉。</p><p>作者指出：每个核函数单独看是运行间确定的，但当它被用在整体推理系统中时，整个系统对用户来说是不确定的，因为服务器负载决定了批大小，而RMSNorm、矩阵乘、注意力的归约顺序会随批大小变化，浮点加法顺序不同结果就不同。解决办法是写批不变的内核（固定归约策略，不随批大小改变），代价是一定的性能损失，文章也给出了性能测试和对强化学习的好处。</p><h2>后来的发展</h2><p>这篇文章让「推理引擎做到逐位可复现」成为一个明确的工程目标，推理框架陆续加入确定性模式。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>批不变内核比最快的内核慢，是否在吞吐与可复现之间取舍取决于场景。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只保证同一软硬件版本内可复现，换GPU或库版本结果仍可能不同。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/vllm.html">vLLM与PagedAttention</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>指出vLLM、SGLang等引擎即使温度为0也不确定，并给出在其中实现批不变的方法。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/floating-point.html">浮点精度：FP32、FP16、BF16、INT8</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a></p>
+<h2>本篇术语</h2><ul><li><b>批不变性</b>　同一个请求的计算结果不依赖与它一起处理的其他请求数量。</li></ul>
+<h2>怎么学</h2><p>先了解浮点加法不满足结合律 → 读原博客的内核一节 → 在vLLM中试用确定性模式并比较吞吐。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/" rel="noopener">https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/</a>（发布日期2025-09-10；1000次采样、80种不同输出、最常见78次、前102个词元一致、批大小导致的不确定性。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%89%B9%E4%B8%8D%E5%8F%98%E6%80%A7%E4%B8%8E%E7%A1%AE%E5%AE%9A%E6%80%A7%E6%8E%A8%E7%90%86%EF%BC%88batch-invariance%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Abatch-invariance%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/batch-invariance.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="nvfp4.html"><small>本分支上一个 · 2025.09</small><b>NVFP4四比特预训练</b></a><a class="r" href="lora-without-regret.html"><small>本分支下一个 · 2025.09</small><b>LoRA Without Regret</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

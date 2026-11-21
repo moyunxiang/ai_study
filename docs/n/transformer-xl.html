@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Transformer-XL（2019） · AI脉络</title>
+<meta name="description" content="语言模型把长文本切成固定长度的片段分别处理，片段之间信息完全不通，既看不到片段外的上下文，开头几个词也几乎没有上文。 处理新片段时，把上一个片段算出的隐状态缓存下来当作额外的上文，并改用相对位置编码，使缓存的状态可以复用。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/transformer-xl.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Transformer-XL（2019）">
+<meta property="og:description" content="语言模型把长文本切成固定长度的片段分别处理，片段之间信息完全不通，既看不到片段外的上下文，开头几个词也几乎没有上文。 处理新片段时，把上一个片段算出的隐状态缓存下来当作额外的上文，并改用相对位置编码，使缓存的状态可以复用。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/transformer-xl.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/transformer-xl">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 长上下文与高效注意力</div>
+<h1>Transformer-XL</h1>
+<div class="full">Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context</div>
+<div class="meta"><span>2019.01</span><span>论文</span><span>延伸</span><span>ACL 2019</span><span>Zihang Dai, Zhilin Yang, Yiming Yang, Jaime Carbonell, Quoc V. Le, Ruslan Salakhutdinov · 卡内基梅隆大学 / Google Brain</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1901.02860" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/transformer-xl">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/transformer.html">Transformer</a>语言模型把长文本切成固定长度的片段分别处理，片段之间信息完全不通，既看不到片段外的上下文，开头几个词也几乎没有上文。</p></div><div><h4>方法</h4><p>处理新片段时，把上一个片段算出的隐状态缓存下来当作额外的上文，并改用相对位置编码，使缓存的状态可以复用。</p></div><div><h4>影响</h4><p>让Transformer能利用超过训练长度的上文，成为<a class="ln" href="../n/xlnet.html">XLNet</a>、<a class="ln" href="../n/compressive-transformer.html">压缩记忆Transformer</a>的基础，其相对位置思路影响了后续位置编码。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>固定长度片段训练有两个后果：片段边界处的词没有上文（作者称之为上下文碎片化），模型能用的依赖长度也不超过片段长度。</p><p>Transformer-XL的做法是<b>片段级循环</b>：处理第t个片段时，把第t−1个片段每一层的隐状态缓存起来（不再反向传播梯度），让第t个片段的注意力同时看到自己和缓存。第t+1个片段看到的缓存里又包含了更早的信息，所以有效上文可以随层数一层层延长。</p><p>缓存的状态里已经加过绝对位置编码，不同片段的位置会重复冲突，所以作者改用<b>相对位置编码</b>：注意力分数里只出现词与词的相对距离，不再出现绝对位置。</p><p>官方摘要称：学到的依赖比RNN长80%、比原始Transformer长450%；评估时最多快1800多倍；在enwiki8上达到0.99 bpc，WikiText-103上困惑度18.3。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>缓存只是把上一个片段原样保留，旧片段越多内存越大，更早的信息只能被丢弃。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/compressive-transformer.html">压缩记忆Transformer</a></div></li><li>注意力仍然是对缓存内全部位置计算，长度一大成本依然随长度增长。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/longformer.html">Longformer滑窗注意力</a> <a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span> <span class="vk ok">已核对</span><div class=nt>在Transformer上加入跨片段的状态缓存和相对位置编码，突破固定长度上下文。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/lm-limits.html">探索语言模型的极限</a><span class="yr">2016.02 · NLP</span><div class=nt>10亿词基准的句子是打乱的，模型只能看到单句上下文，学不到跨句、篇章级的依赖。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/awd-lstm.html">AWD-LSTM</a><span class="yr">2017.08 · NLP</span><div class=nt>加一个不需训练的缓存就能降低6–11个困惑度，说明LSTM记不住几百个词之前出现过的内容，长程依赖仍弱。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/gated-cnn-lm.html">门控卷积语言模型GLU</a><span class="yr">2016.12 · NLP</span><div class=nt>上下文长度固定，无法像RNN那样原则上处理无限历史。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:168" href="../n/conformer.html">Conformer</a><span class="yr">2020.05 · 语音</span> <span class="vk ok">已核对</span><div class=nt>自注意力采用Transformer-XL的相对正弦位置编码，消融显示去掉它错误率明显上升。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/alibi.html">ALiBi线性偏置位置</a><span class="yr">2021.08 · LLM</span><div class=nt>Transformer-XL靠缓存上一段的隐状态延长上下文；ALiBi在WikiText-103上用更长的训练长度（3072）超过了它的困惑度。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/gopher.html">Gopher</a><span class="yr">2021.12 · LLM</span><div class=nt>采用其相对位置编码，以便在比训练更长的文档上评估。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a><span class="yr">2022.05 · 系统·效率</span><div class=nt>注意力仍然是对缓存内全部位置计算，长度一大成本依然随长度增长。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/position-interpolation.html">位置插值扩上下文</a><span class="yr">2023.06 · LLM</span><div class=nt>Transformer-XL用循环记忆跨段传递信息，需要改结构；位置插值保留原结构，直接看到完整的长窗口。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/xlnet.html">XLNet</a><span class="yr">2019.06 · LLM</span><div class=nt>沿用Transformer-XL的片段循环与相对位置编码，使其可处理更长上文。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/compressive-transformer.html">压缩记忆Transformer</a><span class="yr">2019.11 · LLM</span><div class=nt>在Transformer-XL的片段记忆之外再加一层压缩记忆，保留更久的历史。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/longformer.html">Longformer滑窗注意力</a><span class="yr">2020.04 · LLM</span><div class=nt>注意力仍然是对缓存内全部位置计算，长度一大成本依然随长度增长。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/memorizing-transformer.html">外接kNN记忆</a><span class="yr">2022.03 · LLM</span><div class=nt>把Transformer-XL的短期缓存换成可检索的大规模外部记忆。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/rmt.html">循环记忆Transformer</a><span class="yr">2022.07 · LLM</span><div class=nt>把Transformer-XL的隐状态缓存换成显式的记忆token循环。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/context-window.html">上下文窗口</a> <a class="chip c" href="../c/positional-encoding.html">位置编码</a> <a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/perplexity.html">困惑度</a></p>
+<h2>本篇术语</h2><ul><li><b>上下文碎片化</b>　把长文本硬切成固定长度片段后，每个片段开头的词看不到前文，边界处的预测变差。</li></ul>
+<h2>怎么学</h2><p>先理解<a class="lc" href="../c/context-window.html">上下文窗口</a>和<a class="lc" href="../c/positional-encoding.html">位置编码</a>；读原文第3节的片段循环和相对位置公式；对照<a class="ln" href="../n/relative-position.html">相对位置表示</a>看两者相对位置写法的差异。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1901.02860" rel="noopener">https://arxiv.org/abs/1901.02860</a>（标题、6位作者、arXiv首次提交于2019-01-09；摘要中依赖比RNN长80%、比原始Transformer长450%、评估快1800+倍、enwiki8 0.99、WikiText-103 18.3。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Transformer-XL%EF%BC%88transformer-xl%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Atransformer-xl%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/transformer-xl.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="xlm.html"><small>本分支上一个 · 2019.01</small><b>跨语言预训练XLM</b></a><a class="r" href="gpt-2.html"><small>本分支下一个 · 2019.02</small><b>GPT-2</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

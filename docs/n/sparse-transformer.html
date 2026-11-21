@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>稀疏注意力（2019） · AI脉络</title>
+<meta name="description" content="自注意力要对所有位置两两计算，时间和显存随序列长度的平方增长，几千个位置就吃不消。 把完整的注意力矩阵拆成几种稀疏的模式（如只看附近的、只看固定间隔的），每个位置只关注约√n个位置，复杂度降到 O(n√n) 。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sparse-transformer.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="稀疏注意力（2019）">
+<meta property="og:description" content="自注意力要对所有位置两两计算，时间和显存随序列长度的平方增长，几千个位置就吃不消。 把完整的注意力矩阵拆成几种稀疏的模式（如只看附近的、只看固定间隔的），每个位置只关注约√n个位置，复杂度降到 O(n√n) 。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sparse-transformer.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sparse-transformer">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 长上下文与高效注意力</div>
+<h1>稀疏注意力</h1>
+<div class="full">Generating Long Sequences with Sparse Transformers</div>
+<div class="meta"><span>2019.04</span><span>论文</span><span>延伸</span><span>Rewon Child, Scott Gray, Alec Radford, Ilya Sutskever · OpenAI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1904.10509" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/sparse-transformer">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>自注意力要对所有位置两两计算，时间和显存随序列长度的平方增长，几千个位置就吃不消。</p></div><div><h4>方法</h4><p>把完整的注意力矩阵拆成几种稀疏的模式（如只看附近的、只看固定间隔的），每个位置只关注约√n个位置，复杂度降到 <code>O(n√n)</code>。</p></div><div><h4>影响</h4><p>证明稀疏注意力足以建模数万步的序列，是<a class="ln" href="../n/longformer.html">Longformer滑窗注意力</a>、<a class="ln" href="../n/bigbird.html">BigBird稀疏注意力</a>一系列工作的起点，也被<a class="ln" href="../n/gpt-3.html">GPT-3</a>的层采用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>核心是<b>分解注意力</b>：把一次对全部n个位置的注意力，拆成两步各看约√n个位置。一种模式是「滑窗」，只看最近的一段；另一种是「跨步」，每隔固定距离看一个。两步叠加，任意两个位置在两层之内仍能互通，信息不会断。</p><p>作者还做了几项工程改动：改进残差块和初始化，使数百层的网络也能训练；反向传播时重新计算注意力矩阵而不是存储，省显存；写了专门的稀疏注意力GPU核。</p><p>同一结构被用于图像、音频和从原始字节建模的文本。摘要称在Enwik8、CIFAR-10、ImageNet-64的密度建模上刷新了当时的最好结果，并指出原则上可以建模长达一百万步的序列。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>稀疏模式是人工设计的，对不同数据要不同的模式，没有统一的选法。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/longformer.html">Longformer滑窗注意力</a> <a class="chip hue" style="--h:0" href="../n/bigbird.html">BigBird稀疏注意力</a></div></li><li>复杂度仍高于线性，且稀疏运算在通用硬件上不容易跑得高效。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>把完整的二次方注意力改成固定的稀疏模式，降低长序列的成本。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/gpt-3.html">GPT-3</a><span class="yr">2020.05 · LLM</span> <span class="vk ok">已核对</span><div class=nt>层间交替使用稠密注意力和Sparse Transformer的局部带状稀疏注意力。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/dall-e.html">DALL·E</a><span class="yr">2021.01 · 生成</span> <span class="vk ok">已核对</span><div class=nt>Transformer使用稀疏注意力模式以降低1280长度序列的计算量。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:168" href="../n/jukebox.html">Jukebox</a><span class="yr">2020.04 · 语音</span><div class=nt>顶层先验和上采样器都是Sparse Transformer，以处理8192个token的长上下文。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a><span class="yr">2022.05 · 系统·效率</span><div class=nt>复杂度仍高于线性，且稀疏运算在通用硬件上不容易跑得高效。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/nsa.html">原生稀疏注意力NSA</a><span class="yr">2025.02 · LLM</span><div class=nt>从固定的稀疏图案改为由内容决定的、可端到端训练的动态块选择。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/reformer.html">高效长序列注意力</a><span class="yr">2020.01 · LLM</span><div class=nt>同样为降低注意力成本：Sparse Transformer用固定模式，Reformer用基于内容的哈希分桶。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/longformer.html">Longformer滑窗注意力</a><span class="yr">2020.04 · LLM</span><div class=nt>同样用稀疏注意力降成本，但改成更简单的滑窗加全局词，并真正做了预训练和下游微调。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/bigbird.html">BigBird稀疏注意力</a><span class="yr">2020.07 · LLM</span><div class=nt>延续稀疏注意力降成本的思路，改成更灵活的组合模式。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/big-o.html">时间与空间复杂度</a> <a class="chip c" href="../c/efficient-attention.html">稀疏注意力与高效注意力</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a></p>
+
+<h2>怎么学</h2><p>先读<a class="lc" href="../c/efficient-attention.html">稀疏注意力与高效注意力</a>；原文第3–4节有稀疏模式的图，建议自己画出n=16时两种模式的掩码矩阵。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1904.10509" rel="noopener">https://arxiv.org/abs/1904.10509</a>（标题、4位作者、arXiv首次提交于2019-04-23；摘要中 O(n√n)、数万步序列、数百层、Enwik8/CIFAR-10/ImageNet-64 SOTA。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E7%A8%80%E7%96%8F%E6%B3%A8%E6%84%8F%E5%8A%9B%EF%BC%88sparse-transformer%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asparse-transformer%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sparse-transformer.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="gpt-2.html"><small>本分支上一个 · 2019.02</small><b>GPT-2</b></a><a class="r" href="mask-predict.html"><small>本分支下一个 · 2019.04</small><b>Mask-Predict并行解码</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

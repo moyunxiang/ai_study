@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PyTorch 2与torch.compile（2023） · AI脉络</title>
+<meta name="description" content="PyTorch的即时执行（eager）好写好调，但框架一次只看到一个算子，无法做算子融合等全图优化；此前的图捕获工具TorchScript在真实模型上只有约一半能用。 在Python解释器执行字节码之前拦截它，把其中连续的PyTorch操作抽成计算图交给编译器，遇到看不懂的Python代码就“断图…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/pytorch-2.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PyTorch 2与torch.compile（2023）">
+<meta property="og:description" content="PyTorch的即时执行（eager）好写好调，但框架一次只看到一个算子，无法做算子融合等全图优化；此前的图捕获工具TorchScript在真实模型上只有约一半能用。 在Python解释器执行字节码之前拦截它，把其中连续的PyTorch操作抽成计算图交给编译器，遇到看不懂的Python代码就“断图…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/pytorch-2.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/pytorch-2">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 编译器与高性能算子</div>
+<h1>PyTorch 2与torch.compile</h1>
+<div class="full">PyTorch 2: Faster Machine Learning Through Dynamic Python Bytecode Transformation and Graph Compilation</div>
+<div class="meta"><span>2023.03</span><span>系统</span><span>重要</span><span>ASPLOS 2024（PyTorch 2.0发布于2023-03）</span><span>Jason Ansel, Edward Z. Yang, Horace He, Natalia Gimelshein, Animesh Jain, Michael Voznesensky, Bin Bao, Peter Bell et al. · Meta / PyTorch团队</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1145/3620665.3640366" rel="noopener">论文（ACM） ↗</a><a class="btn sm" href="https://pytorch.org/blog/pytorch-2.0-release/" rel="noopener">PyTorch 2.0发布博客 ↗</a><a class="btn sm" href="https://docs.pytorch.org/assets/pytorch2-2.pdf" rel="noopener">论文PDF ↗</a><a class="btn sm" href="../index.html#/n/pytorch-2">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>PyTorch的即时执行（eager）好写好调，但框架一次只看到一个算子，无法做算子融合等全图优化；此前的图捕获工具TorchScript在真实模型上只有约一半能用。</p></div><div><h4>方法</h4><p>在Python解释器执行字节码之前拦截它，把其中连续的PyTorch操作抽成计算图交给编译器，遇到看不懂的Python代码就“断图”回退执行，用户只需加一行torch.compile。</p></div><div><h4>影响</h4><p>让PyTorch在保留eager体验的同时获得编译器加速：默认后端把模型编译成Triton内核，在180多个真实模型上推理几何平均提速2.27倍，成为今天训练和推理大模型的常规手段。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/pytorch.html">PyTorch</a>胜出的原因是即时执行：每行Python代码立刻在GPU上算出结果，可以随意打印、用if和循环、单步调试。代价是框架每次只看到一个算子，比如<code>x * w + b</code>后接GELU会变成三四个独立的GPU内核，每个都要把中间结果写回显存再读出来，很多时间花在搬数据上（见<a class="lc" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a>）。TensorFlow、<a class="ln" href="../n/jax.html">JAX</a>借助<a class="ln" href="../n/xla.html">XLA编译器</a>能整图编译，但要求用户按图的方式写程序。</p><p>PyTorch此前尝试过几种图捕获：<a class="ln" href="../n/pytorch-1.html">PyTorch 1.0与TorchScript</a>的TorchScript要么记录一次运行轨迹（遇到数据相关的分支就会错），要么解析Python源码（只支持Python的一个子集）。论文统计，torch.jit.script在TorchBench真实模型上只有约一半能成功，Hugging Face的模型因为返回特殊的输出类型全部失败；用户常要花几周改写代码才能“TorchScript化”一个大模型。</p><h2>方法</h2><p><b>TorchDynamo：在字节码层面捕获图</b>。CPython的PEP 523允许替换函数帧的求值函数。TorchDynamo在每个Python函数执行前分析它的字节码，把其中的PyTorch张量操作记录成一个FX图；遇到无法处理的东西（打印、调用C扩展、依赖张量具体数值的分支）就在那里<b>断图</b>：前半段图交给编译器，那段Python照常执行，之后再继续捕获。编译结果会被缓存，并附带<b>守卫</b>（guard）：检查张量形状、类型、全局状态等假设是否仍成立，成立就直接复用，否则重新编译。因此用户代码无需任何改动。</p><p><b>AOTAutograd</b>：在编译前把反向传播图也提前生成出来，使训练时的前向和反向都能被编译。</p><p><b>TorchInductor：默认后端</b>。把FX图降低成一套循环级的中间表示，做算子融合、内存规划等优化，然后在GPU上生成<a class="ln" href="../n/triton-lang.html">Triton GPU编程语言</a>内核、在CPU上生成C++代码。例如逐元素操作和归约可以融合成一个Triton内核，中间结果留在片上不落显存。</p><h2>结果</h2><p>图捕获：在TorchBench的80个模型上，TorchDynamo成功74个（93%），TorchScript只有36个（45%）。加速：在NVIDIA A100上的180多个真实模型（TorchBench、Hugging Face、TIMM）中，TorchInductor推理几何平均提速2.27倍、训练1.41倍，优于论文比较的另外六种编译后端。PyTorch 2.0于2023年3月15日发布，torch.compile是其主要新接口，并且完全向后兼容。</p><h2>后来的发展</h2><p>torch.compile成为PyTorch训练和推理的常规选项：<a class="ln" href="../n/torchtitan.html">TorchTitan</a>等大规模训练框架把它与<a class="ln" href="../n/fsdp.html">PyTorch FSDP</a>组合使用，<a class="ln" href="../n/vllm.html">vLLM与PagedAttention</a>、<a class="ln" href="../n/sglang.html">SGLang与RadixAttention</a>等推理引擎用它融合非注意力部分的算子；<a class="ln" href="../n/executorch.html">ExecuTorch 1.0</a>借助同一套图捕获把模型导出到手机和边缘设备。它也让<a class="ln" href="../n/triton-lang.html">Triton GPU编程语言</a>从少数专家的工具变成了框架默认的代码生成目标。</p><h2>容易误解的地方</h2><ul><li>torch.compile不是把整个程序变成静态图：断图越多，能融合的部分越少，加速越小。</li><li>第一次运行要编译，可能需要几十秒到几分钟；张量形状频繁变化会触发反复重编译。</li><li>它主要省的是显存读写和Python开销，对已经被大矩阵乘主导的模型，加速有限。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>动态形状、数据相关的控制流会导致断图和反复重编译，首次编译时间长，在线服务里难以预测延迟。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>编译只覆盖单进程内的计算图，与分布式训练的切分、通信重叠等组合起来仍需手工处理。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/torchtitan.html">TorchTitan</a></div></li><li>生成的是要在Python运行时里执行的代码，不能直接部署到没有Python的手机和嵌入式设备。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/executorch.html">ExecuTorch 1.0</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/pytorch.html">PyTorch</a><span class="yr">2017.01 · 系统·效率</span> <span class="vk">待核对</span><div class=nt>保留PyTorch的即时执行编程方式，在其下方加一层可选的编译器，100%向后兼容。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/chainer.html">Chainer与Define-by-Run</a><span class="yr">2015.06 · 系统·效率</span><div class=nt>每一步运算都要经过Python解释器调度，小算子多时开销显著，也无法做跨算子的全局优化。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/tvm.html">TVM深度学习编译器</a><span class="yr">2018.02 · 系统·效率</span><div class=nt>与训练框架是分离的两套系统，研究者在训练阶段仍要靠手写CUDA内核获得性能。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/triton-lang.html">Triton GPU编程语言</a><span class="yr">2019.06 · 系统·效率</span><div class=nt>TorchInductor在GPU上把融合后的算子生成为Triton内核，而不是手写CUDA。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/xla.html">XLA编译器</a><span class="yr">2017.03 · 系统·效率</span><div class=nt>XLA要求整图可追踪，适合JAX/TensorFlow的函数式写法；PyTorch 2允许断图回退到Python，以灵活性换取部分优化空间。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/pytorch-1.html">PyTorch 1.0与TorchScript</a><span class="yr">2018.12 · 系统·效率</span><div class=nt>TorchScript要求用户改写代码且在真实模型上只有约45%能捕获；TorchDynamo在字节码层面捕获，能处理93%且无需改代码。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/jax.html">JAX</a><span class="yr">2018.12 · 系统·效率</span><div class=nt>JAX用jit追踪纯函数获得编译优化，PyTorch 2把类似收益带到了任意命令式Python代码上。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/tf2.html">TensorFlow 2与Eager</a><span class="yr">2019.09 · 系统·效率</span><div class=nt>在研究社区的份额已被PyTorch和JAX取代。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/torchtitan.html">TorchTitan</a><span class="yr">2024.10 · 系统·效率</span><div class=nt>编译只覆盖单进程内的计算图，与分布式训练的切分、通信重叠等组合起来仍需手工处理。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/executorch.html">ExecuTorch 1.0</a><span class="yr">2025.10 · 系统·效率</span><div class=nt>基于PyTorch 2的图导出机制得到可部署的程序。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autodiff.html">自动微分与计算图</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/backpropagation.html">反向传播</a></p>
+<h2>本篇术语</h2><ul><li><b>即时执行（eager mode）</b>　每条运算语句立刻执行并得到结果，与先构建完整计算图再统一执行的“图模式”相对。</li><li><b>断图（graph break）</b>　TorchDynamo遇到无法放进图里的Python代码时，把图在此处切开，前后各自编译，中间那段照常由Python执行。</li><li><b>守卫（guard）</b>　编译时所做假设（如张量形状、数据类型）的检查函数；下次调用时假设成立就复用编译结果，否则重新编译。</li><li><b>算子融合</b>　把多个原本各自读写显存的算子合并成一个GPU内核，中间结果留在片上，减少显存读写。</li></ul>
+<h2>怎么学</h2><p>先确认会<a class="lc" href="../c/autodiff.html">自动微分与计算图</a>，理解PyTorch即时执行的方式。然后读论文第2节（以往图捕获方法的问题）和第3节（TorchDynamo的守卫与断图）。动手：对一个小Transformer分别跑eager和torch.compile，比较速度；再设置环境变量TORCH_LOGS=graph_breaks,output_code，查看断图位置和生成的Triton代码。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1145/3620665.3640366" rel="noopener">https://doi.org/10.1145/3620665.3640366</a>（OpenAlex记录的标题、作者、ASPLOS 2024；摘要中的TorchDynamo/TorchInductor、2.27×推理与1.41×训练几何平均加速、180多个模型、优于六种编译器；论文PDF表1的TorchBench 80个模型中TorchDynamo 74（93%）与TorchScript 36（45%）；PyTorch博客的2.0发布日期2023-03-15。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20PyTorch%202%E4%B8%8Etorch.compile%EF%BC%88pytorch-2%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Apytorch-2%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/pytorch-2.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="peft-lib.html"><small>本分支上一个 · 2023.02</small><b>Hugging Face PEFT库</b></a><a class="r" href="llama-cpp.html"><small>本分支下一个 · 2023.03</small><b>llama.cpp与本地推理</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

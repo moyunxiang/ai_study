@@ -17,11 +17,11 @@
   ],
   "problem": "让模型调用工具时，开发者只能在提示里约定一种文本格式（如ReAct的Search[...]），再用正则表达式去解析；模型一旦写错格式，程序就崩溃。",
   "idea": "开发者在API请求里用JSON Schema描述可用函数；模型经过专门微调，能判断何时需要调用函数，并输出符合函数签名的JSON参数，由开发者的程序执行后再把结果交回模型。",
-  "impact": "把“工具调用”从提示技巧变成了API的一等功能，各家模型厂商随后都提供了同样形式的接口。今天几乎所有智能体框架、编码智能体和MCP都建立在这一接口之上。",
-  "background": "2022到2023年上半年，让大模型使用工具主要靠提示：[[react]]在示例里约定`Search[实体]`这样的文本格式，[[langchain]]提供了一堆解析器把模型输出的文本变成函数调用。[[toolformer]]证明可以把调用API的能力训练进模型，但只覆盖少数几个工具。OpenAI自己的[[chatgpt-plugins]]（2023年3月）让ChatGPT读OpenAPI文档调用第三方服务，但只能在ChatGPT产品里用。开发者的普遍痛点是：模型输出的格式不稳定，经常多一句解释、少一个括号，解析失败只能重试。",
-  "method": "2023年6月13日，OpenAI发布新版GPT-4和GPT-3.5-turbo（gpt-4-0613、gpt-3.5-turbo-0613），同时推出函数调用（见[[c:tool-calling]]）。流程是：\n\n1. 开发者在请求中附上函数列表，每个函数有名字、自然语言描述，以及用JSON Schema写的参数定义，例如`get_weather(location: string, unit: celsius | fahrenheit)`；\n2. 用户问“波士顿现在冷吗？”，模型不直接回答，而是返回一个结构化的调用请求：函数名`get_weather`，参数`{location: Boston}`；\n3. 开发者的程序真正调用天气接口，把结果作为一条“函数”角色的消息发回；\n4. 模型读结果后用自然语言回答，或继续调用下一个函数。\n\n官方称这些模型“经过微调，能检测何时需要调用函数，并以符合函数签名的JSON作答”。注意模型**只负责生成调用请求**，执行仍由开发者完成，这让开发者可以在执行前检查和拦截。官方举的用途包括：调用外部工具回答问题、把自然语言转成数据库查询、从文本中抽取结构化数据。",
-  "results": "同一次更新还推出了上下文为16k token的gpt-3.5-turbo（价格是原版的两倍），原版gpt-3.5-turbo降价25%，text-embedding-ada-002降价75%。函数调用本身没有公布准确率数字。此后其他厂商陆续推出同样形式的接口，例如Anthropic在2024年5月30日宣布Claude 3全系列的工具调用正式可用，用途描述几乎相同：抽取结构化数据、把自然语言转为API调用、查询数据库。",
-  "legacy": "函数调用成为智能体的基础接口：[[devday-2023]]在其上推出Assistants API和GPTs；[[toolllm]]等开源工作用它的格式构造训练数据，让开源模型也学会调用工具；[[structured-outputs]]进一步保证输出严格符合Schema。2024年底的[[mcp]]把“函数怎么描述、怎么发现”标准化，让同一个工具能接入不同模型和应用；编码智能体如[[swe-agent]]、[[claude-code]]本质上都是“模型发调用请求—程序执行—结果回传”的循环。",
+  "impact": "把“工具调用”从提示技巧变成了API的一项正式功能。之后Anthropic等厂商也提供了形式相近的接口，许多智能体框架、编码智能体和MCP都以这种“模型发结构化调用、程序执行”的方式工作。",
+  "background": "2022到2023年上半年，让大模型使用工具主要靠提示：[[react]]在示例里约定`Search[实体]`这样的文本格式，[[langchain]]提供了一堆解析器把模型输出的文本变成函数调用。[[toolformer]]显示可以把调用API的能力训练进模型，但只覆盖少数几个工具。OpenAI自己的[[chatgpt-plugins]]（2023年3月）让ChatGPT读OpenAPI文档调用第三方服务，但只能在ChatGPT产品里用。开发者的普遍痛点是：模型输出的格式不稳定，经常多一句解释、少一个括号，解析失败只能重试。",
+  "method": "2023年6月13日，OpenAI发布新版GPT-4和GPT-3.5-turbo（gpt-4-0613、gpt-3.5-turbo-0613），同时推出函数调用（见[[c:tool-calling]]）。流程是：\n\n1. 开发者在请求中附上函数列表，每个函数有名字、自然语言描述，以及用JSON Schema写的参数定义，例如`get_current_weather(location: string, unit: celsius | fahrenheit)`；\n2. 用户问“波士顿天气怎么样？”，模型不直接回答，而是返回一个结构化的调用请求：函数名`get_current_weather`，参数`{location: Boston}`；\n3. 开发者的程序真正调用天气接口，把结果作为一条新消息发回给模型；\n4. 模型读结果后用自然语言回答，或继续调用下一个函数。\n\n官方称这些模型“经过微调，能检测何时需要调用函数，并以符合函数签名的JSON作答”。注意模型**只负责生成调用请求**，执行仍由开发者完成，这让开发者可以在执行前检查和拦截。官方举的用途包括：调用外部工具回答问题、把自然语言转成API调用或数据库查询、从文本中抽取结构化数据。公告同时提醒，工具返回的不可信数据可能指使模型执行意外操作，建议只接可信工具，并在发邮件、下单等有现实影响的操作前加用户确认。",
+  "results": "同一次更新还推出了上下文为16k token的gpt-3.5-turbo（价格是原版的两倍），gpt-3.5-turbo的输入token降价25%，text-embedding-ada-002降价75%。函数调用本身没有公布准确率数字。此后其他厂商陆续推出同样形式的接口，例如Anthropic在2024年5月30日宣布Claude 3全系列的工具调用正式可用，用途描述几乎相同：抽取结构化数据、把自然语言转为API调用、查询数据库。",
+  "legacy": "之后的智能体产品多以函数调用为基础接口：[[devday-2023]]推出Assistants API和GPTs；[[toolllm]]等开源工作用ChatGPT构造工具调用训练数据，让开源模型也学会调用工具；2024年8月的[[structured-outputs]]让输出严格符合Schema——OpenAI在该公告中称，在其复杂Schema评测上gpt-4-0613不到40%，新模型加结构化输出为100%。2024年底的[[mcp]]把“函数怎么描述、怎么发现”标准化，让同一个工具能接入不同模型和应用；编码智能体如[[swe-agent]]、[[claude-code]]本质上都是“模型发调用请求—程序执行—结果回传”的循环。",
   "pitfalls": "- 函数调用不是模型自己去执行函数；模型只输出想调用什么、参数是什么，执行和权限控制完全在开发者一侧。\n- 早期版本只是“尽量”符合Schema，并不保证JSON一定合法或参数一定齐全。",
   "limits": [
     {
@@ -55,7 +55,7 @@
     {
       "to": "react",
       "type": "solves",
-      "note": "ReAct靠提示约定文本动作格式、用字符串解析；函数调用让模型直接输出结构化调用，格式错误大幅减少。"
+      "note": "ReAct靠提示约定文本动作格式、用字符串解析；函数调用改为在API里用JSON Schema声明函数、由专门微调过的模型输出结构化参数。OpenAI公告没有提到ReAct，这是事后的对照。"
     },
     {
       "to": "toolformer",
@@ -75,7 +75,7 @@
     {
       "to": "langchain",
       "type": "solves",
-      "note": "LangChain等框架原本要用输出解析器把模型文本转成调用；函数调用把这一步移进模型和API，框架随即改为直接使用它。"
+      "note": "LangChain等框架原本要用输出解析器把模型文本转成调用；函数调用把这一步移进模型和API，框架可以直接使用它。"
     }
   ],
   "prereq": [
@@ -97,7 +97,7 @@
   ],
   "learn": "先理解[[c:tool-calling]]和[[c:agent-loop]]。然后用任意一家支持工具调用的API写一个最小程序：定义一个查天气或查数据库的函数，处理模型返回的调用请求、执行、回传结果，直到模型给出最终回答。最后读[[mcp]]，看它如何把这里的函数定义变成独立的服务。",
   "check": {
-    "source": "https://techcrunch.com/2023/06/13/openai-intros-new-generative-text-features-while-reducing-pricing/",
-    "confirmed": "OpenAI原文页面对抓取返回403，Hacker News记录其发布于2023-06-13；TechCrunch同日报道：新版GPT-3.5-turbo和GPT-4带函数调用、引用官方“fine-tuned to both detect when a function needs to be called…respond with JSON that adheres to the function signature”、三种用途、16k上下文版两倍价格、原版降价25%、ada-002降价75%；Anthropic官方2024-05-30宣布Claude 3全系工具调用GA。"
+    "source": "https://openai.com/index/function-calling-and-other-api-updates/",
+    "confirmed": "2026-11-22复核时直接读到OpenAI公告全文：2023-06-13、gpt-4-0613/gpt-3.5-turbo-0613、“fine-tuned to both detect when a function needs to be called…and to respond with JSON that adheres to the function signature”、三类用途、get_current_weather示例、16k版两倍价格、gpt-3.5-turbo输入token降25%、ada-002降75%；Anthropic官方2024-05-30宣布Claude 3全系工具调用GA。"
   }
 }

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>重参数化技巧（Reparameterization Trick） · AI脉络</title>
+<meta name="description" content="把“从带参数的分布中采样”改写成“先采固定的噪声，再用参数做确定性变换”，比如z = μ + σ·ε。这样梯度就能穿过采样步骤传回参数，而且方差通常小得多。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/reparameterization.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="重参数化技巧（Reparameterization Trick）">
+<meta property="og:description" content="把“从带参数的分布中采样”改写成“先采固定的噪声，再用参数做确定性变换”，比如z = μ + σ·ε。这样梯度就能穿过采样步骤传回参数，而且方差通常小得多。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/reparameterization.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/reparameterization">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 概率统计与信息论 · 进阶</div>
+<h1>重参数化技巧</h1><div class="full">Reparameterization Trick</div>
+<p class="muted" style="font-size:13px">也叫：重参数技巧　pathwise gradient　路径梯度</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/reparameterization">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>把“从带参数的分布中采样”改写成“先采固定的噪声，再用参数做确定性变换”，比如z = μ + σ·ε。这样梯度就能穿过采样步骤传回参数，而且方差通常小得多。</b></p>
+<p class="tags">先要会：<a class="chip c" href="gaussian.html">高斯分布</a> <a class="chip c" href="chain-rule.html">链式法则</a> <a class="chip c" href="monte-carlo.html">蒙特卡洛采样</a> <a class="chip c" href="elbo.html">变分推断与ELBO</a></p>
+<p>训练VAE时要最大化<a class="lc" href="../c/elbo.html">变分推断与ELBO</a>，其中有一项是<code>E_{z~q_φ}[f(z)]</code>：从编码器给出的分布<code>N(μ, σ²)</code>里采样z，再算解码器的损失。问题是，采样是一个随机操作，“抽到哪个z”对μ和σ的导数是什么？如果梯度在这里断掉，编码器就学不到东西。</p><p><b>技巧</b>。把随机性从参数上剥离出去：</p><p><code>z = μ + σ · ε</code>，ε ~ N(0, 1)</p><p>z的分布仍然是<code>N(μ, σ²)</code>（见<a class="lc" href="../c/gaussian.html">高斯分布</a>的线性变换性质），但现在随机性全在ε里，ε与参数无关；z是μ、σ的确定性函数。于是</p><p class="formula"><code>∇_φ E_{z~q_φ}[f(z)] = E_ε[∇_φ f(μ + σε)]</code></p><p>右边可以用<a class="lc" href="../c/monte-carlo.html">蒙特卡洛采样</a>采几个ε来估计，梯度按普通的<a class="lc" href="../c/chain-rule.html">链式法则</a>传过<code>z = μ + σε</code>即可，<code>∂z/∂μ = 1</code>，<code>∂z/∂σ = ε</code>。</p><p><b>另一条路及其缺点</b>。不重参数化也能求梯度，用所谓“得分函数估计”（log-derivative技巧）：<code>∇_φ E[f(z)] = E[f(z) ∇_φ log q_φ(z)]</code>。它对任何分布都适用，强化学习中的<a class="ln" href="../n/reinforce.html">REINFORCE策略梯度</a>就是它，但它只利用了f的值、没用f的导数，方差往往大得多。</p><p><b>它出现在哪里</b>。<a class="ln" href="../n/vae.html">变分自编码器VAE</a>和同期的<a class="ln" href="../n/stochastic-backprop.html">随机反向传播DLGM</a>都以重参数化为核心技巧，使得编码器和解码器可以用一次反向传播端到端训练。<a class="ln" href="../n/ddpm.html">DDPM</a>的前向加噪写成<code>x_t = √ᾱ_t·x_0 + √(1 − ᾱ_t)·ε</code>，也是同一种写法，网络被训练来预测这个ε，见<a class="lc" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a>。离散变量不能直接这样做，常用Gumbel-Softmax等连续松弛来近似。</p>
+<div class="example"><h4>例子</h4><p>f(z) = z²，z ~ N(μ, σ²)，μ = 1，σ = 0.5。精确值：E[z²] = μ² + σ²，所以∂/∂μ = 2μ = 2，∂/∂σ = 2σ = 1。重参数化时抽到ε = 0.8，则z = 1.4，单样本梯度：∂f/∂μ = 2z×1 = 2.8，∂f/∂σ = 2z×ε = 2.24；对多个ε取平均就会趋近于2和1。比较方差：对μ的梯度，重参数化估计的标准差为1；得分函数估计f(z)·(z−μ)/σ²的标准差约4.66，同样精度需要约22倍的样本。</p></div>
+<h2>容易误解的地方</h2><ul><li>重参数化要求f对z可导，并且分布能写成“固定噪声的可导变换”，所以它不能直接用于离散变量，也不能用于不可导的奖励函数。</li><li>它降低的是梯度估计的方差，不改变目标本身；结果好坏仍取决于ELBO与模型设计。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:288" href="../n/vae.html">变分自编码器VAE</a> <a class="chip hue" style="--h:288" href="../n/normalizing-flows.html">标准化流</a> <a class="chip hue" style="--h:96" href="../n/dreamer.html">Dreamer</a> <a class="chip hue" style="--h:288" href="../n/stochastic-backprop.html">随机反向传播DLGM</a> <a class="chip hue" style="--h:96" href="../n/sv2p.html">SV2P随机视频预测</a> <a class="chip hue" style="--h:96" href="../n/dreamerv2.html">DreamerV2</a> <a class="chip hue" style="--h:216" href="../n/pixelsplat.html">pixelSplat前馈高斯</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

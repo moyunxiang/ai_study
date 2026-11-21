@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>D-FINE（2024） · AI脉络</title>
+<meta name="description" content="实时DETR检测器直接回归框的四个坐标，定位精度受限，而且深层解码器学到的精确定位无法回传给浅层。 把框回归改成对每条边偏移量的概率分布做逐层细化，并让最深层的精细分布通过自蒸馏教给浅层。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/d-fine.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="D-FINE（2024）">
+<meta property="og:description" content="实时DETR检测器直接回归框的四个坐标，定位精度受限，而且深层解码器学到的精确定位无法回传给浅层。 把框回归改成对每条边偏移量的概率分布做逐层细化，并让最深层的精细分布通过自蒸馏教给浅层。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/d-fine.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/d-fine">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 目标检测</div>
+<h1>D-FINE</h1>
+<div class="full">D-FINE: Redefine Regression Task in DETRs as Fine-grained Distribution Refinement</div>
+<div class="meta"><span>2024.10</span><span>论文</span><span>延伸</span><span>Yansong Peng, Hebei Li, Peixi Wu, Yueyi Zhang, Xiaoyan Sun, Feng Wu · 中国科学技术大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2410.13842" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/Peterande/D-FINE" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/d-fine">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>实时DETR检测器直接回归框的四个坐标，定位精度受限，而且深层解码器学到的精确定位无法回传给浅层。</p></div><div><h4>方法</h4><p>把框回归改成对每条边偏移量的概率分布做逐层细化，并让最深层的精细分布通过自蒸馏教给浅层。</p></div><div><h4>影响</h4><p>在T4 GPU实时速度下把COCO精度推到新高，与后续的DEIM一起成为2025年实时检测的主要基线，RF-DETR等工作都以它为对照。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/detr.html">DETR</a>式检测器的解码器有多层，每层都输出一组框，后一层在前一层基础上修正。D-FINE认为直接预测固定坐标太粗：坐标值本身没有表达“这条边大概在哪、有多确定”。</p><p>它有两个部件。一是细粒度分布细化（FDR）：每条边（上下左右）不再输出一个数，而是输出一组离散偏移量上的概率分布，每层解码器在上一层分布的基础上做残差式细化，最终位置取分布的期望。二是全局最优定位自蒸馏（GO-LSD）：把最后一层细化好的分布当作老师，用<a class="lc" href="../c/knowledge-distillation.html">知识蒸馏</a>的方式监督浅层的分布，浅层学好后深层只需修正更小的残差。此外还对计算密集的模块做了轻量化。</p><p>摘要报告D-FINE-L/X在COCO上达到54.0%/55.8% AP，T4上分别124/78 FPS；先在Objects365上预训练后为57.1%/59.3% AP。把FDR和GO-LSD装到其他DETR上可提升最多5.3% AP，额外参数和训练成本几乎为零。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只能检测训练时定义好的固定类别，换数据集需要重新标注和微调。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/rf-detr.html">RF-DETR</a> <a class="chip hue" style="--h:216" href="../n/sam-3.html">SAM 3概念分割</a></div></li><li>DETR式一对一匹配训练收敛仍慢，小数据集上需要较长训练。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/deformable-detr.html">Deformable DETR</a><span class="yr">2020.10 · 视觉</span><div class=nt>解码器采用可变形注意力。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/dino-detr.html">DINO（检测）</a><span class="yr">2022.03 · 视觉</span><div class=nt>沿用DINO检测器逐层细化框的解码器设计，把每层输出从坐标换成分布。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/rt-detr.html">RT-DETR实时DETR</a><span class="yr">2023.04 · 视觉</span><div class=nt>在RT-DETR的实时DETR框架上改造回归头和训练目标。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/yolov10.html">YOLOv10免NMS</a><span class="yr">2024.05 · 视觉</span><div class=nt>同为免NMS的实时检测器，YOLOv10走卷积YOLO路线，D-FINE走DETR路线并在同等速度下精度更高。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/sam-3.html">SAM 3概念分割</a><span class="yr">2025.11 · 视觉</span><div class=nt>只能检测训练时定义好的固定类别，换数据集需要重新标注和微调。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/rf-detr.html">RF-DETR</a><span class="yr">2025.11 · 视觉</span><div class=nt>只能检测训练时定义好的固定类别，换数据集需要重新标注和微调。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/iou-map.html">IoU与mAP</a> <a class="chip c" href="../c/knowledge-distillation.html">知识蒸馏</a> <a class="chip c" href="../c/probability-basics.html">随机变量与概率分布</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a></p>
+<h2>本篇术语</h2><ul><li><b>边界框回归</b>　预测物体外接矩形的位置，通常是中心点加宽高或四条边到参考点的距离。</li><li><b>自蒸馏</b>　老师和学生是同一个网络的不同部分（这里是深层教浅层），不需要另外训练一个老师模型。</li></ul>
+<h2>怎么学</h2><p>先读DETR和RT-DETR，再读D-FINE第3节FDR与GO-LSD的公式；用官方代码在小数据集上微调D-FINE-S对比RT-DETR。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2410.13842" rel="noopener">https://arxiv.org/abs/2410.13842</a>（核对了arXiv记录：标题、六位作者（中国科大）、v1提交于2024-10-17、摘要中的54.0/55.8 AP、124/78 FPS、Objects365预训练后57.1/59.3 AP、最多提升5.3 AP。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20D-FINE%EF%BC%88d-fine%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ad-fine%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/d-fine.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="cotracker3.html"><small>本分支上一个 · 2024.10</small><b>CoTracker3</b></a><a class="r" href="moge.html"><small>本分支下一个 · 2024.10</small><b>MoGe单目几何</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

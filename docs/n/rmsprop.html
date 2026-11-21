@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RMSProp（2012） · AI脉络</title>
+<meta name="description" content="不同权重的梯度大小可以差好几个数量级，还会随训练变化，一个全局学习率很难同时照顾；AdaGrad的累积平方只增不减，训练久了步长会缩到几乎为0。 为每个权重维护梯度平方的指数滑动平均，用它的平方根去除梯度：只记住“最近”的梯度大小，于是步长既能自适应，又不会无限衰减。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/rmsprop.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RMSProp（2012）">
+<meta property="og:description" content="不同权重的梯度大小可以差好几个数量级，还会随训练变化，一个全局学习率很难同时照顾；AdaGrad的累积平方只增不减，训练久了步长会缩到几乎为0。 为每个权重维护梯度平方的指数滑动平均，用它的平方根去除梯度：只记住“最近”的梯度大小，于是步长既能自适应，又不会无限衰减。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/rmsprop.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/rmsprop">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 优化器与学习率</div>
+<h1>RMSProp</h1>
+<div class="full">Neural Networks for Machine Learning, Lecture 6e: rmsprop</div>
+<div class="meta"><span>2012</span><span>思想</span><span>重要</span><span>Coursera《Neural Networks for Machine Learning》第6e讲，2012</span><span>Geoffrey Hinton（与Nitish Srivastava、Kevin Swersky；方法归功于Tijmen Tieleman） · University of Toronto</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf" rel="noopener">讲义PDF（Lecture 6） ↗</a><a class="btn sm" href="https://www.ruder.io/optimizing-gradient-descent/" rel="noopener">Ruder：梯度下降优化算法综述 ↗</a><a class="btn sm" href="../index.html#/n/rmsprop">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>不同权重的梯度大小可以差好几个数量级，还会随训练变化，一个全局学习率很难同时照顾；AdaGrad的累积平方只增不减，训练久了步长会缩到几乎为0。</p></div><div><h4>方法</h4><p>为每个权重维护梯度平方的指数滑动平均，用它的平方根去除梯度：只记住“最近”的梯度大小，于是步长既能自适应，又不会无限衰减。</p></div><div><h4>影响</h4><p>一页幻灯片上的方法，没有正式论文，却成为2013–2015年训练RNN和深度强化学习的常用优化器，并与动量合并成了Adam。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/sgd.html">随机梯度下降</a>对所有参数用同一个学习率。可神经网络里各层、各权重的梯度尺度差别很大，学习率设大了，梯度大的权重会震荡发散；设小了，梯度小的权重几乎不动。</p><p>已有两种思路。一是<b>Rprop</b>：全批量训练时只看梯度的符号，每个权重有自己的步长，前后两次梯度同号就乘1.2，异号就乘0.5。但它在小批量上会出错：讲义举例，一个权重在9个小批量上梯度为+0.1、第10个为−0.9，平均下来它该基本不动，Rprop却会按相同幅度增9次、减1次，权重大幅漂移。二是<a class="ln" href="../n/adagrad.html">AdaGrad</a>：用累积的梯度平方归一化，但累积量只增不减，学习率单调下降，训练后期几乎停滞。</p><h2>方法</h2><p>讲义的说法是：Rprop相当于把梯度除以它自身的大小，问题在于每个小批量除的数不一样；那就让相邻小批量除的数尽量接近——用滑动平均。对每个权重w：</p><p class="formula"><code>MeanSquare(w, t) = 0.9 · MeanSquare(w, t−1) + 0.1 · (∂E/∂w)²</code></p><p class="formula"><code>w ← w − η · (∂E/∂w) / √MeanSquare(w, t)</code></p><p>今天通常写成<code>v ← ρv + (1−ρ)g²</code>，<code>θ ← θ − η·g/(√v + ε)</code>，ρ常取0.9，ε防止除零。</p><p>与AdaGrad唯一的区别是把“求和”换成“指数加权平均”：大约只记住最近十来步的梯度大小。若某个权重的梯度一直很大，分母变大，步长自动缩小；若梯度一直很小，分母也小，步长相对放大。所有权重的有效步长被拉到相近的尺度。讲义还讨论了与普通动量、Nesterov动量结合，并称与普通动量结合时“帮助不如往常大，需要更多研究”。</p><h2>结果</h2><p>讲义没有给出系统实验，只说用均方根去除梯度“让学习效果好得多”（Tieleman，未发表）。它的影响主要来自后来的使用：2013年<a class="ln" href="../n/graves-generating.html">LSTM字符级生成</a>用RMSProp训练LSTM生成手写和文本，DeepMind的<a class="ln" href="../n/dqn.html">DQN</a>也用它训练Q网络。</p><h2>后来的发展</h2><p><a class="ln" href="../n/adam.html">Adam</a>（2014）基本上就是“RMSProp + 动量 + 偏差修正”：一阶矩取梯度的滑动平均，二阶矩就是RMSProp的分母。此后Adam及其变体<a class="ln" href="../n/adamw.html">AdamW</a>取代RMSProp成为默认选择，但在部分强化学习代码和小模型里RMSProp仍在使用。它也是深度学习里少见的、以一页课程幻灯片为出处而被广泛引用的方法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>滑动平均从0开始，训练最初几步分母偏小、步长偏大，没有修正。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/adam.html">Adam</a></div></li><li>本身不含动量，讲义也承认与动量结合的效果不清楚。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/adam.html">Adam</a></div></li><li>没有论文，也没有收敛性分析，超参数和细节在各个实现里并不统一。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/adam.html">Adam</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/momentum.html">动量法</a><span class="yr">1964 · 基础</span><div class=nt>讲义讨论了与普通动量和Nesterov动量的组合，这一组合后来在Adam中定型。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/sgd.html">随机梯度下降</a><span class="yr">1951 · 基础</span><div class=nt>在小批量SGD上为每个权重加上按近期梯度大小归一化的步长。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/hessian-free.html">Hessian-free优化</a><span class="yr">2010.06 · 基础</span><div class=nt>同一时期训练深层网络和RNN的二阶路线；RMSProp只用一阶信息、实现简单，最终在实践中胜出。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/adagrad.html">AdaGrad</a><span class="yr">2011 · 基础</span><div class=nt>把AdaGrad的梯度平方累加换成指数滑动平均，解决了学习率单调衰减到0的问题。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/dqn.html">DQN</a><span class="yr">2013.12 · RL</span> <span class="vk ok">已核对</span><div class=nt>用RMSProp做小批量优化。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/adam.html">Adam</a><span class="yr">2014.12 · 基础</span> <span class="vk ok">已核对</span><div class=nt>二阶矩部分就是RMSProp，Adam在其上加了动量形式的一阶矩和偏差修正，并给出了正式的论文与分析。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="../c/learning-rate.html">学习率与学习率调度</a> <a class="chip c" href="../c/adaptive-optimizer.html">自适应学习率优化器</a> <a class="chip c" href="../c/momentum.html">动量</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a></p>
+<h2>本篇术语</h2><ul><li><b>Rprop</b>　1990年代的全批量优化方法：只用梯度的符号决定方向，每个权重的步长根据前后两次梯度是否同号来放大或缩小。</li><li><b>指数滑动平均</b>　<code>v ← ρv + (1−ρ)x</code>。越近的值权重越大，越早的值按ρ的幂次衰减，ρ=0.9时大约相当于平均最近10个值。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/adagrad.html">AdaGrad</a>的更新式，再看讲义第6e讲的三页幻灯片（Rprop、为何Rprop不适合小批量、RMSProp）。然后对照<a class="ln" href="../n/adam.html">Adam</a>的算法框，找出两者哪几行相同。动手：在一个病态的二次函数（两个方向曲率相差100倍）上比较SGD、AdaGrad和RMSProp的轨迹。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf" rel="noopener">https://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf</a>（第6e讲标题“rmsprop: Divide the gradient by a running average of its recent magnitude”，署名Hinton、Srivastava、Swersky；Rprop的×1.2/×0.5规则、+0.1×9与−0.9的反例、MeanSquare = 0.9·旧值 + 0.1·梯度²、“Tijmen Tieleman, unpublished”、与动量结合“帮助不如往常大”。另在ar5iv上核对了Graves 2013（arXiv 1308.0850）用rmsprop训练网络。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20RMSProp%EF%BC%88rmsprop%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Armsprop%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/rmsprop.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ng-ml-course.html"><small>本分支上一个 · 2011.10</small><b>吴恩达机器学习公开课</b></a><a class="r" href="random-search-hpo.html"><small>本分支下一个 · 2012.02</small><b>超参数随机搜索</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

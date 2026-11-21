@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>先校准再用（2021） · AI脉络</title>
+<meta name="description" content="GPT-3的少样本提示极不稳定：换一种格式、换几个示例、甚至只调换示例顺序，准确率就能从接近瞎猜跳到接近最好。 不稳定来自模型对某些答案的固有偏好。先喂一个“没有内容”的测试输入（如N/A）测出这种偏好，再把输出概率按它重新缩放，使空输入下各答案概率相等。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/calibrate-before-use.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="先校准再用（2021）">
+<meta property="og:description" content="GPT-3的少样本提示极不稳定：换一种格式、换几个示例、甚至只调换示例顺序，准确率就能从接近瞎猜跳到接近最好。 不稳定来自模型对某些答案的固有偏好。先喂一个“没有内容”的测试输入（如N/A）测出这种偏好，再把输出概率按它重新缩放，使空输入下各答案概率相等。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/calibrate-before-use.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/calibrate-before-use">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 能力的机理</div>
+<h1>先校准再用</h1>
+<div class="full">Calibrate Before Use: Improving Few-Shot Performance of Language Models</div>
+<div class="meta"><span>2021.02</span><span>论文</span><span>重要</span><span>ICML 2021</span><span>Tony Z. Zhao, Eric Wallace, Shi Feng, Dan Klein, Sameer Singh · UC Berkeley / UC Irvine</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2102.09690" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/tonyzhaozh/few-shot-learning" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/calibrate-before-use">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>GPT-3的少样本提示极不稳定：换一种格式、换几个示例、甚至只调换示例顺序，准确率就能从接近瞎猜跳到接近最好。</p></div><div><h4>方法</h4><p>不稳定来自模型对某些答案的固有偏好。先喂一个“没有内容”的测试输入（如N/A）测出这种偏好，再把输出概率按它重新缩放，使空输入下各答案概率相等。</p></div><div><h4>影响</h4><p>把少样本不稳定问题拆成三种可测量的偏差，并给出一个不需要任何标注数据、几乎零成本的修正方法，GPT-3和GPT-2平均准确率最多提升30个百分点。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/gpt-3.html">GPT-3</a>让“在提示里放几个例子就能做分类”变得可行，但实际用起来很不可靠。作者在情感分类SST-2上用GPT-3 2.7B做4样本实验：同一组4个示例，只改变排列顺序，准确率可以从54.3%（接近随机的50%）到93.4%（接近最好水平）。换提示模板、换示例也有类似的大幅波动。传统机器学习里训练样本的顺序几乎无关紧要，这里却和选哪些样本一样重要。用户没有大验证集去挑最好的提示，这让少样本学习难以落地。</p><h2>方法</h2><p><b>诊断：三种偏差</b>。</p><ul><li>多数标签偏差：示例里哪个标签多，模型就倾向预测哪个。</li><li>近因偏差：提示末尾的几个示例是什么标签，模型就倾向输出那个标签。以[正 正 负 负]排列的4个示例，会让预测偏向“负”。</li><li>常见词偏差：模型偏爱预训练数据里常见的词，比如问答时更愿意答「United States」而不是「Saint Lucia」。</li></ul><p>这些偏差的共同效果是：模型输出的标签概率整体被“推歪”了一个固定方向。</p><p><b>修正：上下文校准</b>。设模型对各标签的概率为<code>p̂</code>，做一个仿射变换<code>q = softmax(W·p̂ + b)</code>。困难在于没有标注数据来拟合<code>W</code>和<code>b</code>。作者的办法是：保持提示里的示例不变，把测试输入换成没有内容的字符串，例如</p><p>「Input: Subpar acting. Sentiment: Negative Input: Beautiful film. Sentiment: Positive Input: N/A Sentiment:」</p><p>理想情况下模型对N/A应该五五开，但实际可能给出62%“正”。把这时的概率记为<code>p̂_cf</code>，令<code>W = diag(p̂_cf)⁻¹</code>、<code>b = 0</code>，就把这个偏差除掉了。实践中对「N/A」、「[MASK]」和空字符串三个空输入的概率取平均。<code>W</code>只取对角阵，参数量与标签数成正比；生成任务只校准第一个token。</p><h2>结果</h2><p>在文本分类、事实抽取、信息抽取等任务上，校准后GPT-3和GPT-2的平均准确率提升，最多达30.0个百分点（绝对值），而且在不同示例、不同顺序、不同模板之间的方差明显变小。不同的空输入效果相近，例如SST-2上未校准66.5%，用三种空输入平均校准后79.0%。</p><h2>后来的发展</h2><p>这篇论文让“少样本提示的方差”成为必须报告的问题。同期的<a class="ln" href="../n/prompt-order-sensitivity.html">示例顺序敏感性</a>专门研究如何不靠标注挑出好的示例顺序，<a class="ln" href="../n/good-icl-examples.html">怎样选好示例</a>研究如何检索合适的示例。此后指令微调（<a class="ln" href="../n/t0.html">T0多任务提示训练</a>、<a class="ln" href="../n/flan-t5.html">Flan-T5与指令规模化</a>、<a class="ln" href="../n/instructgpt.html">InstructGPT与RLHF</a>）让模型可以直接按零样本指令工作，减少了对精心拼装少样本提示的依赖，“先校准”在日常使用中不再常见；但“模型对某些答案、某些位置有固有偏好”这一诊断在之后的大模型上仍反复被观察到，用空输入或对照输入估计偏差再扣除的思路也被后来的去偏方法沿用。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只修正“整体推向某个答案”这类线性偏差，不能提升模型本身理解任务的能力；对开放式生成只校准第一个token。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>仍依赖少量示例和固定模板，没有回答“示例里到底哪部分在起作用”。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/icl-demonstrations.html">示例标签不重要？</a></div></li><li>提示敏感性的根源在于模型只做过语言建模、没学过“按指令完成任务”，校准只是事后补救。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/t0.html">T0多任务提示训练</a> <a class="chip hue" style="--h:0" href="../n/flan-t5.html">Flan-T5与指令规模化</a> <a class="chip hue" style="--h:0" href="../n/instructgpt.html">InstructGPT与RLHF</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/gpt-3.html">GPT-3</a><span class="yr">2020.05 · LLM</span> <span class="vk ok">已核对</span><div class=nt>缓解了GPT-3少样本提示对格式、示例和顺序高度敏感的问题。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a><span class="yr">2019.02 · LLM</span><div class=nt>除GPT-3外也在GPT-2 1.5B上验证，说明偏差不只出现在某一个模型上。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/calibration.html">神经网络校准</a><span class="yr">2017.06 · 基础</span><div class=nt>借用分类器校准里的“向量缩放”（只取对角阵W），但用空输入代替标注验证集来拟合参数。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/good-icl-examples.html">怎样选好示例</a><span class="yr">2021.01 · LLM</span><div class=nt>同期另一条路线：与其事后校准，不如为每个测试样本检索语义相近的示例。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/instructgpt.html">InstructGPT与RLHF</a><span class="yr">2022.03 · LLM</span><div class=nt>提示敏感性的根源在于模型只做过语言建模、没学过“按指令完成任务”，校准只是事后补救。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/t0.html">T0多任务提示训练</a><span class="yr">2021.10 · LLM</span><div class=nt>该文指出模型对提示措辞和格式极其敏感；T0用每个数据集多条模板训练，降低了不同措辞之间的性能波动。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/icl-demonstrations.html">示例标签不重要？</a><span class="yr">2022.02 · LLM</span><div class=nt>该文发现模型偏好某些标签词；本文把标签空间单独拆出来，量化其作用。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/flan-t5.html">Flan-T5与指令规模化</a><span class="yr">2022.10 · LLM</span><div class=nt>提示敏感性的根源在于模型只做过语言建模、没学过“按指令完成任务”，校准只是事后补救。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/prompt-order-sensitivity.html">示例顺序敏感性</a><span class="yr">2021.04 · LLM</span><div class=nt>同样关注提示对输出的偏置，但从示例顺序而非内容无关输入入手，并给出选顺序的方法。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/in-context-learning.html">上下文学习与提示</a> <a class="chip c" href="../c/zero-few-shot.html">零样本与少样本</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/language-model.html">语言模型</a></p>
+<h2>本篇术语</h2><ul><li><b>空输入（content-free input）</b>　像「N/A」或空字符串这种不带任何任务信息的测试输入。模型对它的预测反映的是纯粹的偏好，而不是对输入的判断。</li><li><b>上下文校准</b>　用空输入测出偏好，再把真实输入的输出概率除以这个偏好并重新归一化。整个过程不需要标注数据，也不改模型参数。</li></ul>
+<h2>怎么学</h2><p>先懂<a class="lc" href="../c/in-context-learning.html">上下文学习与提示</a>和<a class="lc" href="../c/softmax.html">Softmax与logits</a>。读原文第3节（图2–4展示方差和偏差）和第5节（校准公式）。动手：用一个小的开源语言模型做4样本情感分类，枚举示例的24种排列，画出准确率分布；再加上N/A校准，看分布如何变窄。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2102.09690" rel="noopener">https://arxiv.org/abs/2102.09690</a>（标题、5位作者、arXiv v1于2021-02-19；摘要中“最多30.0%绝对提升”；全文（ar5iv）的54.3%→93.4%顺序波动、三种偏差、W=diag(p̂_cf)⁻¹与b=0、三个空输入平均、N/A时62%正、SST-2 66.5→79.0。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%85%88%E6%A0%A1%E5%87%86%E5%86%8D%E7%94%A8%EF%BC%88calibrate-before-use%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acalibrate-before-use%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/calibrate-before-use.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="switch-transformer.html"><small>本分支上一个 · 2021.01</small><b>稀疏MoE大模型</b></a><a class="r" href="glm.html"><small>本分支下一个 · 2021.03</small><b>GLM空白填充</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

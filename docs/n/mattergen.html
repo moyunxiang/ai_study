@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MatterGen（2023） · AI脉络</title>
+<meta name="description" content="材料发现靠筛选已有数据库，只能找已想到的候选；早期的材料生成模型产出的晶体多数不稳定，也只能满足很少的属性约束。 设计一个专门针对晶体的扩散模型，同时对原子类型、坐标和晶格做加噪与去噪，并用适配器模块对任意属性做微调，实现按需求生成材料。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/mattergen.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MatterGen（2023）">
+<meta property="og:description" content="材料发现靠筛选已有数据库，只能找已想到的候选；早期的材料生成模型产出的晶体多数不稳定，也只能满足很少的属性约束。 设计一个专门针对晶体的扩散模型，同时对原子类型、坐标和晶格做加噪与去噪，并用适配器模块对任意属性做微调，实现按需求生成材料。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/mattergen.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/mattergen">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:144"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/sci.html">AI for Science</a> › 原子模拟与材料</div>
+<h1>MatterGen</h1>
+<div class="full">MatterGen: a generative model for inorganic materials design</div>
+<div class="meta"><span>2023.12</span><span>论文</span><span>重要</span><span>Nature 2025</span><span>Zeni, Pinsler, Zügner, Fowler, Horton, Fu, Shysheya, Crabbé et al. · Microsoft Research AI for Science</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2312.03687" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/mattergen">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>材料发现靠筛选已有数据库，只能找已想到的候选；早期的材料生成模型产出的晶体多数不稳定，也只能满足很少的属性约束。</p></div><div><h4>方法</h4><p>设计一个专门针对晶体的扩散模型，同时对原子类型、坐标和晶格做加噪与去噪，并用适配器模块对任意属性做微调，实现按需求生成材料。</p></div><div><h4>影响</h4><p>生成的结构新颖且稳定的比例比此前模型高出一倍以上，并且能按化学组成、对称性、磁性、力学等性质定向生成。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/gnome.html">GNoME材料发现</a>这类工作靠预测稳定性来筛选海量候选，但搜索空间仍受限于人类已提出的结构。生成模型可以直接「从性质到结构」，然而晶体有周期性边界和三类不同变量（离散的元素种类、连续的原子分数坐标、晶格矩阵），早期的方法如晶体VAE只能得到较少稳定结构。<a class="ln" href="../n/ddpm.html">DDPM</a>证明了扩散模型的生成质量，但需要针对晶体做改造。</p><h2>方法</h2><p>MatterGen把一个晶体表示为原子类型、分数坐标和晶格三项。<b>扩散过程</b>：对每一项各自设计加噪：坐标用周期性空间上的包裹正态分布，晶格向一个与原子数相关的分布扩散，原子类型用离散扩散；反向过程由一个等变图神经网络预测去噪量（见<a class="lc" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a>与<a class="lc" href="../c/equivariance.html">不变性与等变性</a>）。<b>预训练</b>：在Materials Project与Alexandria的稳定结构上训练。<b>微调</b>：给基础模型加入适配器模块（见<a class="lc" href="../c/peft-concept.html">参数高效微调</a>），用带属性标签的小数据集就能让生成朝向目标性质，并配合无分类器引导（见<a class="lc" href="../c/guidance.html">条件生成与引导</a>）。</p><h2>结果</h2><p>摘要报告：相比此前的生成模型，MatterGen生成的结构新颖且稳定的概率高出两倍以上，并且与局部能量最小值的距离近15倍以上；微调后能生成具有指定化学组成、对称性以及力学、电子、磁性质的稳定新材料，还展示了同时要求高磁密度与低供应链风险的多属性设计。</p><h2>后来的发展</h2><p>MatterGen使「逆向设计材料」从概念变成可用工具，微软还把它与MatterSim势函数组合成闭环（未核对）。它和<a class="ln" href="../n/gnome.html">GNoME材料发现</a>分别代表了生成与筛选两条路线，也影响了后续<a class="ln" href="../n/uma.html">UMA通用原子模型</a>等通用模型与新材料数据集的建设。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>评价稳定性依靠DFT和模型势函数，真实合成与测量的验证样本仍很少。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/a-lab.html">A-Lab自主实验室</a></div></li><li>只涉及无机晶体，不含缺陷、表面、非晶与分子晶体。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/uma.html">UMA通用原子模型</a></div></li><li>生成的多是理想周期结构，是否容易合成、动力学是否稳定并不保证。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/a-lab.html">A-Lab自主实验室</a></div></li><li>属性微调需要有标签的DFT数据，对难计算的性质（如超导温度）几乎无法使用。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/ddpm.html">DDPM</a><span class="yr">2020.06 · 生成</span><div class=nt>基于去噪扩散模型，并针对晶体的周期性与离散变量做改造。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/chem-vae.html">分子VAE自动化学设计</a><span class="yr">2016.10 · 科学</span><div class=nt>早期生成模型稳定晶体比例低、属性约束少；扩散加适配器微调明显提高稳定性与可控性。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/chemcrow.html">ChemCrow</a><span class="yr">2023.04 · 科学</span><div class=nt>只能合成已知化合物，发现新分子的例子仅限一个发色团，没有闭环优化。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:144" href="../n/mol-edm.html">分子等变扩散EDM</a><span class="yr">2022.03 · 科学</span><div class=nt>把分子的等变扩散推广到周期性晶体。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:144" href="../n/chgnet.html">CHGNet</a><span class="yr">2023.02 · 科学</span><div class=nt>训练与评估中使用的材料数据与能量计算同属这一图网络势函数生态（具体用法未核对）。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/gnome.html">GNoME材料发现</a><span class="yr">2023.11 · 科学</span><div class=nt>GNoME靠筛选发现稳定晶体，MatterGen把同类数据用于直接生成。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/a-lab.html">A-Lab自主实验室</a><span class="yr">2023.11 · 科学</span><div class=nt>评价稳定性依靠DFT和模型势函数，真实合成与测量的验证样本仍很少。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/uma.html">UMA通用原子模型</a><span class="yr">2025.06 · 科学</span><div class=nt>只涉及无机晶体，不含缺陷、表面、非晶与分子晶体。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/guidance.html">条件生成与引导</a> <a class="chip c" href="../c/equivariance.html">不变性与等变性</a> <a class="chip c" href="../c/latent-space.html">潜空间</a> <a class="chip c" href="../c/generative-modeling.html">生成建模的目标</a></p>
+<h2>本篇术语</h2><ul><li><b>能量高于凸包</b>　衡量晶体相对于最稳定相的能量差，越接近0越稳定，常用0.1 eV/原子作稳定阈值。</li><li><b>适配器</b>　插入预训练模型内部的小型可训练模块，只训练它们就能让模型适应新条件。</li></ul>
+<h2>怎么学</h2><p>先学<a class="lc" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a>。读原文的扩散过程与属性微调两节，用微软开源的MatterGen代码生成一批晶体，再用某个势函数检查稳定性。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2312.03687" rel="noopener">https://arxiv.org/abs/2312.03687</a>（标题、作者、v1日期2023-12-06；摘要中扩散过程细化原子类型、坐标和晶格，适配器微调，新颖稳定比例高两倍以上，更接近能量最小值15倍以上，多属性设计。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MatterGen%EF%BC%88mattergen%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amattergen%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/mattergen.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mace-mp-0.html"><small>本分支上一个 · 2023.12</small><b>MACE-MP-0材料基础模型</b></a><a class="r" href="gencast.html"><small>本分支下一个 · 2023.12</small><b>GenCast扩散集合预报</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

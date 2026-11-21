@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Go-Explore（2019） · AI脉络</title>
+<meta name="description" content="好奇心类方法在Montezuma&#x27;s Revenge上仍远未通关，在Pitfall上一分都拿不到：内在奖励一旦被“用完”，智能体就忘了还有没探索完的地方，也很难再准确回到那里。 显式保存一个“去过的有趣状态”的档案；每次从档案里挑一个状态，先直接回到那里（模拟器里直接恢复存档），再从那里随机探索，…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/go-explore.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Go-Explore（2019）">
+<meta property="og:description" content="好奇心类方法在Montezuma&#x27;s Revenge上仍远未通关，在Pitfall上一分都拿不到：内在奖励一旦被“用完”，智能体就忘了还有没探索完的地方，也很难再准确回到那里。 显式保存一个“去过的有趣状态”的档案；每次从档案里挑一个状态，先直接回到那里（模拟器里直接恢复存档），再从那里随机探索，…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/go-explore.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/go-explore">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 探索与好奇心</div>
+<h1>Go-Explore</h1>
+<div class="full">Go-Explore: a New Approach for Hard-Exploration Problems</div>
+<div class="meta"><span>2019.01</span><span>论文</span><span>重要</span><span>arXiv 2019；正式版Nature 2021（First return, then explore）</span><span>Adrien Ecoffet, Joost Huizinga, Joel Lehman, Kenneth O. Stanley, Jeff Clune · Uber AI Labs</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1901.10995" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://ar5iv.labs.arxiv.org/html/1901.10995" rel="noopener">ar5iv全文 ↗</a><a class="btn sm" href="https://www.nature.com/articles/s41586-020-03157-9" rel="noopener">Nature 2021版 ↗</a><a class="btn sm" href="../index.html#/n/go-explore">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>好奇心类方法在Montezuma&#x27;s Revenge上仍远未通关，在Pitfall上一分都拿不到：内在奖励一旦被“用完”，智能体就忘了还有没探索完的地方，也很难再准确回到那里。</p></div><div><h4>方法</h4><p>显式保存一个“去过的有趣状态”的档案；每次从档案里挑一个状态，先直接回到那里（模拟器里直接恢复存档），再从那里随机探索，把新发现的状态加入档案；找到高分路线后再用模仿学习把它训练成能应对随机性的神经网络策略。</p></div><div><h4>影响</h4><p>Montezuma不用领域知识平均43,000多分，约为此前最好成绩的4倍；加入简单领域知识后Pitfall首次得到正分。它把“探索失败”的原因拆解为脱离和脱轨两个问题，影响了后续探索研究。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/count-based-exploration.html">伪计数探索</a>、<a class="ln" href="../n/rnd.html">随机网络蒸馏RND</a>等内在奖励方法让Montezuma&#x27;s Revenge从几乎0分提高到几千分，但依旧离通关很远，Pitfall上更是全军覆没：游戏里常有负奖励而几乎没有正奖励，RL智能体学会的最优策略就是站着不动。连直接在模拟器里做规划的<a class="ln" href="../n/mcts.html">蒙特卡洛树搜索UCT</a>（UCT）在Montezuma上也是0分。</p><p>论文认为根源有两个：</p><ul><li><b>脱离（detachment）</b>：内在奖励是“消耗品”，去过的地方奖励就没了。智能体若在探索A区时转去B区，A区边缘的奖励已经被它自己消耗完，就不会再回到那片前沿。</li><li><b>脱轨（derailment）</b>：即便想回到某个有希望的状态，RL在路上也会因为探索噪声随机走偏，很少能准确到达。</li></ul><h2>方法</h2><p><b>阶段一：探索直到解决</b>。</p><ul><li><b>单元（cell）表示</b>：把相似状态归为一格。无领域知识时，把画面转成灰度、缩到很小的分辨率、只保留8级亮度，同一缩略图就算同一个单元；有领域知识时用角色坐标、房间号、钥匙数等。</li><li><b>档案</b>：记录每个见过的单元，以及到达它的最高分轨迹。</li><li><b>循环</b>：按启发式权重（访问次数少、新近被发现的优先）从档案选一个单元 → <b>先回去</b>：利用Atari模拟器是确定性的，直接恢复存档或重放轨迹，不加任何探索 → <b>再探索</b>：从那里随机动作走一段 → 新单元加入档案，或用更高分/更短的轨迹替换旧记录。</li></ul><p>先回后探同时解决了脱离（档案不会遗忘）和脱轨（回去时不出错）。</p><p><b>阶段二：鲁棒化</b>。阶段一得到的是确定环境中的一串动作，换上随机扰动就失效。于是把最好的轨迹当作演示，用“反向算法”做模仿学习：先让策略从轨迹接近终点处开始学，学会后起点逐步往前挪，最终得到一个直接看像素、能应对随机性的神经网络策略（见<a class="lc" href="../c/imitation-learning.html">模仿学习与行为克隆</a>）。</p><h2>结果</h2><p>Montezuma&#x27;s Revenge：不用领域知识平均43,763分；加领域知识后平均666,474分，最好一次超过1800万分、通过1441关，超过人类世界纪录。Pitfall：加领域知识后平均59,494分、最高107,363分（游戏上限约112,000），是第一个在Pitfall上得正分的算法。</p><h2>后来的发展</h2><p>“脱离/脱轨”的分析和“先回去再探索”的思路被广泛引用。批评主要在于阶段一依赖可恢复的确定性模拟器，测试设置与标准Atari协议不同；2021年Nature正式版报告在所有难探索Atari游戏上超过此前最好成绩、解决了所有此前未被解决的Atari游戏，增加了稀疏奖励的机械臂抓放任务，并展示加入目标条件策略来“回去”可以在训练全程应对随机性。同期DeepMind的<a class="ln" href="../n/agent57.html">Agent57</a>则在不利用模拟器的标准设置下，首次在全部57个Atari游戏上超过人类基线。</p><h2>容易误解的地方</h2><ul><li>阶段一的“回去”靠直接恢复模拟器状态，这在真实世界做不到；Go-Explore在Atari上的成绩与在标准随机设置下纯RL的成绩不能直接比。</li><li>好的成绩很大程度上依赖单元表示；用了领域知识的结果与不用的结果差了一个数量级。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>阶段一依赖可以随时恢复存档的确定性模拟器，无法直接用于真实环境或不可复位的系统。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>单元表示需要人为设计；无领域知识的缩略图方案只在部分游戏上有效。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只在少数难探索游戏上报告结果，没有证明在全部Atari游戏上都适用。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/agent57.html">Agent57</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/mcts.html">蒙特卡洛树搜索UCT</a><span class="yr">2006 · RL</span><div class=nt>同样利用可复位的模拟器做搜索；UCT在Montezuma上得0分，而Go-Explore按单元新颖度挑选起点，探索深得多。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/ale.html">Arcade学习环境ALE</a><span class="yr">2012.07 · RL</span><div class=nt>Montezuma&#x27;s Revenge等稀疏奖励游戏上所有方法都接近零分，探索问题完全没有解决。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/dqn-nature.html">DQN（Nature版）</a><span class="yr">2015.02 · RL</span><div class=nt>Montezuma&#x27;s Revenge等需要长程探索的游戏得分接近零，ε-贪心找不到稀疏奖励。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/icm.html">好奇心模块ICM</a><span class="yr">2017.05 · RL</span><div class=nt>好奇心路线把探索塞进奖励里，Go-Explore把探索放到奖励之外的档案与选择机制里。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/rainbow.html">Rainbow</a><span class="yr">2017.10 · RL</span><div class=nt>Montezuma&#x27;s Revenge等困难探索游戏仍接近零分，Noisy Nets解决不了长程探索。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/rnd.html">随机网络蒸馏RND</a><span class="yr">2018.10 · RL</span><div class=nt>RND在Montezuma上平均约8000分、Pitfall上0分附近；Go-Explore用先回去再探索把两者分别提高到数万分和首次正分。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/count-based-exploration.html">伪计数探索</a><span class="yr">2016.06 · RL</span><div class=nt>指出伪计数等内在奖励方法会“脱离”已发现的前沿，用显式档案代替会被消耗的内在奖励。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/agent57.html">Agent57</a><span class="yr">2020.03 · RL</span><div class=nt>两者都攻克难探索游戏：Go-Explore依赖可恢复的确定性模拟器，Agent57在标准设置下纯靠学习完成。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/exploration-exploitation.html">探索与利用</a> <a class="chip c" href="../c/reward-return.html">奖励、回报与折扣</a> <a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a> <a class="chip c" href="../c/policy-value.html">策略与价值函数</a></p>
+<h2>本篇术语</h2><ul><li><b>脱离（detachment）</b>　内在奖励被消耗后，智能体不再回到尚未探索完的前沿区域。</li><li><b>脱轨（derailment）</b>　想返回某个有希望的状态时，探索噪声让智能体中途偏离、到不了那里。</li><li><b>单元（cell）</b>　把相似的观测归为同一类的粗粒度状态表示，档案按单元记录去过哪里。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/rnd.html">随机网络蒸馏RND</a>的讲解，理解内在奖励方法的局限。读原文第1节对脱离与脱轨的论述、第2节两个阶段的算法。动手：在一个确定性的迷宫或简单Atari游戏上，用“缩略图当单元 + 恢复存档 + 随机探索”实现阶段一，统计档案中的单元数随迭代的增长。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://ar5iv.labs.arxiv.org/html/1901.10995" rel="noopener">https://ar5iv.labs.arxiv.org/html/1901.10995</a>（标题、5位作者（Uber AI Labs）、arXiv 1901编号；摘要中43,000分约为此前4倍、650,000分、最高1800万；正文中666,474、1441关、Pitfall均值59,494、最高107,363、上限112,000、无领域知识43,763；UCT在Montezuma上0分；单元表示为灰度+降采样+8级亮度。另经Europe PMC核对Nature 2021版摘要（目标条件策略、机器人抓放任务）。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Go-Explore%EF%BC%88go-explore%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ago-explore%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/go-explore.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="youtube-reinforce.html"><small>本分支上一个 · 2018.12</small><b>YouTube REINFORCE推荐</b></a><a class="r" href="smac.html"><small>本分支下一个 · 2019.02</small><b>星际多智能体挑战SMAC</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

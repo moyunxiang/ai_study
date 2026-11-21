@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DiffusionDrive截断扩散（2024） · AI脉络</title>
+<meta name="description" content="扩散策略能表示多种合理的驾驶轨迹，但去噪步数多、跑不到实时；直接用于开放、动态的交通场景还容易模式坍缩到单一轨迹。 用若干条先验锚点轨迹代替纯高斯噪声作为起点，截断扩散日程，只需2步去噪；配合与场景上下文交互的级联扩散解码器。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/diffusiondrive.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DiffusionDrive截断扩散（2024）">
+<meta property="og:description" content="扩散策略能表示多种合理的驾驶轨迹，但去噪步数多、跑不到实时；直接用于开放、动态的交通场景还容易模式坍缩到单一轨迹。 用若干条先验锚点轨迹代替纯高斯噪声作为起点，截断扩散日程，只需2步去噪；配合与场景上下文交互的级联扩散解码器。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/diffusiondrive.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/diffusiondrive">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 自动驾驶</div>
+<h1>DiffusionDrive截断扩散</h1>
+<div class="full">DiffusionDrive: Truncated Diffusion Model for End-to-End Autonomous Driving</div>
+<div class="meta"><span>2024.11</span><span>论文</span><span>延伸</span><span>CVPR 2025</span><span>Bencheng Liao, Shaoyu Chen, Haoran Yin, Bo Jiang, Cheng Wang, Sixu Yan, Xinbang Zhang, Xiangyu Li et al. · 华中科技大学、地平线</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2411.15139" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/hustvl/DiffusionDrive" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/diffusiondrive">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>扩散策略能表示多种合理的驾驶轨迹，但去噪步数多、跑不到实时；直接用于开放、动态的交通场景还容易模式坍缩到单一轨迹。</p></div><div><h4>方法</h4><p>用若干条先验锚点轨迹代替纯高斯噪声作为起点，截断扩散日程，只需2步去噪；配合与场景上下文交互的级联扩散解码器。</p></div><div><h4>影响</h4><p>NAVSIM上88.1 PDMS刷新纪录，4090上45帧每秒实时运行；扩散规划器成为端到端自动驾驶的主流方案之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>端到端自动驾驶（如<a class="ln" href="../n/uniad.html">UniAD端到端规划</a>、<a class="ln" href="../n/vad.html">VAD矢量化端到端</a>）多用回归直接输出一条轨迹，碰到“左绕还是右绕都行”的场景会把两种选择平均成一条撞上去的轨迹。机器人领域的<a class="ln" href="../n/diffusion-policy.html">Diffusion Policy</a>能表示多峰分布，但直接搬过来需要几十步去噪，且实验中容易坍缩到单一模式。</p><p>DiffusionDrive的核心是“截断扩散”：先从数据中聚出一组代表不同驾驶意图的锚点轨迹，在锚点上加少量噪声作为起点，模型学习从“锚定的高斯分布”去噪到真实轨迹分布，于是只需很短的扩散日程。解码器采用级联结构，每一步都与感知特征交互。论文报告去噪步数比普通扩散策略少10倍，2步即可得到多样且高质量的轨迹；在NAVSIM上用ResNet-34骨干达到88.1 PDMS，在4090上45帧每秒。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>评测主要基于NAVSIM这类开环或伪闭环基准，真实闭环驾驶中的表现没有充分验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>锚点轨迹来自数据聚类，罕见的长尾驾驶行为可能缺少合适的锚点。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/diffusion-policy.html">Diffusion Policy</a><span class="yr">2023.03 · 具身·世界模型</span><div class=nt>把扩散策略从机器人操作搬到驾驶规划，并用截断日程解决步数多、模式坍缩的问题。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/transfuser.html">TransFuser</a><span class="yr">2021.04 · 具身·世界模型</span><div class=nt>在NAVSIM上沿用TransFuser式的感知骨干做对齐比较。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/vad.html">VAD矢量化端到端</a><span class="yr">2023.03 · 具身·世界模型</span><div class=nt>VAD等回归式规划只给一条轨迹，难以表示多种合理选择，DiffusionDrive用扩散生成多模态轨迹。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/end-to-end.html">端到端学习</a> <a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a> <a class="chip c" href="../c/noise-schedule.html">噪声调度与采样步数</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2411.15139" rel="noopener">https://arxiv.org/abs/2411.15139</a>（标题、作者、v1日期2024-11-22、摘要中锚点与截断日程、级联扩散解码器、10倍步数减少、2步、NAVSIM 88.1 PDMS、ResNet-34、4090上45 FPS；CVPR 2025来自OpenAlex记录。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DiffusionDrive%E6%88%AA%E6%96%AD%E6%89%A9%E6%95%A3%EF%BC%88diffusiondrive%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adiffusiondrive%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/diffusiondrive.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="pad.html"><small>本分支上一个 · 2024.11</small><b>PAD联合去噪</b></a><a class="r" href="genesis.html"><small>本分支下一个 · 2024.12</small><b>Genesis物理引擎</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

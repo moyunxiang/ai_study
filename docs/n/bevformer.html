@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BEVFormer（2022） · AI脉络</title>
+<meta name="description" content="纯视觉的3D检测要么逐相机检测再拼接，要么像Lift-Splat那样先估深度再投影，深度估不准就全盘出错；单帧方法还测不准车速，被遮挡的物体也容易丢。 在俯视图上铺一张200×200的可学习查询网格，每个查询按自己的三维位置投影到各相机图像里，用可变形注意力取特征；再用另一层注意力读取上一时刻的B…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/bevformer.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="BEVFormer（2022）">
+<meta property="og:description" content="纯视觉的3D检测要么逐相机检测再拼接，要么像Lift-Splat那样先估深度再投影，深度估不准就全盘出错；单帧方法还测不准车速，被遮挡的物体也容易丢。 在俯视图上铺一张200×200的可学习查询网格，每个查询按自己的三维位置投影到各相机图像里，用可变形注意力取特征；再用另一层注意力读取上一时刻的B…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/bevformer.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/bevformer">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 自动驾驶</div>
+<h1>BEVFormer</h1>
+<div class="full">BEVFormer: Learning Bird&#x27;s-Eye-View Representation from Multi-Camera Images via Spatiotemporal Transformers</div>
+<div class="meta"><span>2022.03</span><span>论文</span><span>重要</span><span>ECCV 2022</span><span>Zhiqi Li, Wenhai Wang, Hongyang Li, Enze Xie, Chonghao Sima, Tong Lu, Qiao Yu, Jifeng Dai · 南京大学 / 上海人工智能实验室 / 香港大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2203.17270" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/zhiqi-li/BEVFormer" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/bevformer">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>纯视觉的3D检测要么逐相机检测再拼接，要么像Lift-Splat那样先估深度再投影，深度估不准就全盘出错；单帧方法还测不准车速，被遮挡的物体也容易丢。</p></div><div><h4>方法</h4><p>在俯视图上铺一张200×200的可学习查询网格，每个查询按自己的三维位置投影到各相机图像里，用可变形注意力取特征；再用另一层注意力读取上一时刻的BEV特征，融合时间信息。</p></div><div><h4>影响</h4><p>nuScenes测试集NDS达到56.9%，比之前最好的纯视觉方法高9分、接近激光雷达方法；把Tesla在发布会上展示的“查询式BEV+时序”做成了公开方法，成为纯视觉BEV感知的代表性基线。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/lift-splat.html">Lift-Splat-Shoot</a>给出了一种把多相机图像变成鸟瞰图（BEV）的方法：先给每个像素预测深度分布，再把特征投到三维、压成俯视图。它的弱点是一切都建立在深度估计之上，而单目深度本来就很难估准。另一条路是<a class="ln" href="../n/detr.html">DETR</a>风格的检测：DETR3D用一组可学习的三维物体查询，投影到图像上取特征直接回归三维框，不需要深度，但只有稀疏的物体，没有能同时服务检测和地图分割的稠密BEV特征。</p><p>此外多数方法只看当前一帧，判断不了前车在加速还是刹车，也容易漏掉被挡住的行人。2021年<a class="ln" href="../n/tesla-hydranet-bev.html">Tesla HydraNet与BEV</a>在发布会上展示了用注意力把多相机融合到俯视空间、并加入时序队列的思路，但没有公开细节。</p><h2>方法</h2><p><b>BEV查询</b>。在自车周围±51.2米的范围内铺一张200×200的网格，每格约0.5米，每格放一个可学习的256维查询向量 <code>Q_p</code>，负责“这块地面上有什么”。编码器有6层，每层依次做两件事：</p><p><b>时间自注意力</b>。保留上一时刻的BEV特征 <code>B_{t−1}</code>，先按自车的运动把它平移旋转对齐到当前坐标系（同一格对应同一块真实地面），再让当前查询通过注意力去读取它。这样历史信息一帧帧循环传下来，速度和被遮挡物体就有了线索。</p><p><b>空间交叉注意力</b>。每个查询代表的是一根竖直的“柱子”：在这一格上预设若干个不同高度的三维参考点，用相机内外参把它们投影到各个相机图像上（见<a class="lc" href="../c/camera-geometry.html">相机模型与多视图几何</a>）。只有能看到这些点的相机才参与计算；在投影点附近，用<a class="ln" href="../n/deformable-detr.html">Deformable DETR</a>的可变形注意力只采样少数几个位置的特征并加权求和（见<a class="lc" href="../c/attention-concept.html">注意力机制</a>）。这样不用显式估深度，也比全局注意力省算力。</p><p><b>任务头</b>。得到的BEV特征 <code>B_t</code> 一方面接一个改造过的Deformable DETR检测头，直接输出三维框和速度、无需NMS；另一方面接分割头，输出车道、可行驶区域等地图元素。</p><h2>结果</h2><p>在<a class="ln" href="../n/nuscenes.html">nuScenes</a>测试集上，纯视觉方法NDS达到56.9%，比此前最好的DETR3D（47.9%）高9.0分，与当时一些激光雷达方法相当；地图分割中最难的车道线比Lift-Splat高5分以上。加入时序后，速度估计更准，低可见度物体的召回率也提高。</p><h2>后来的发展</h2><p>BEVFormer与<a class="ln" href="../n/lift-splat.html">Lift-Splat-Shoot</a>一起成为纯视觉BEV感知的两大基线。它的BEV特征直接被<a class="ln" href="../n/uniad.html">UniAD端到端规划</a>用作端到端驾驶系统的底座，把检测、跟踪、建图、预测和规划串在一起。BEV之后，业界又把俯视平面扩展为三维占用栅格（<a class="ln" href="../n/tesla-occupancy.html">Tesla占用网络</a>、<a class="ln" href="../n/occworld.html">OccWorld占用世界模型</a>）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>BEV是二维俯视平面，高度信息被压缩，对悬空物、不规则形状障碍和类别之外的物体表达有限。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/tesla-occupancy.html">Tesla占用网络</a> <a class="chip hue" style="--h:96" href="../n/occworld.html">OccWorld占用世界模型</a></div></li><li>只做感知，预测和规划仍要另外的模块，感知误差和信息损失会在模块接口处累积。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/uniad.html">UniAD端到端规划</a></div></li><li>6层编码器、6路相机的大分辨率输入计算量大，原始模型难以在车载芯片上实时运行。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>依赖nuScenes这类人工标注三维框的数据，标注成本高、数据规模受限。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/detr.html">DETR</a><span class="yr">2020.05 · 视觉</span><div class=nt>把DETR“可学习查询+交叉注意力”的思路从稀疏的物体查询扩展为稠密的BEV网格查询。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/lift-splat.html">Lift-Splat-Shoot</a><span class="yr">2020.08 · 具身·世界模型</span><div class=nt>同样把多相机特征变到BEV：Lift-Splat显式预测深度再投影，BEVFormer让BEV查询反向投影到图像去取特征，不依赖深度估计，并加入了时序。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/tesla-hydranet-bev.html">Tesla HydraNet与BEV</a><span class="yr">2021.08 · 具身·世界模型</span><div class=nt>把Tesla发布会上展示的“注意力融合到BEV+时序记忆”思路，做成了公开、可复现并在公开基准上评测的方法。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/nuscenes.html">nuScenes</a><span class="yr">2019.03 · 数据·评测</span><div class=nt>主要在nuScenes的6相机数据上训练和评测，以NDS为主指标。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/deformable-detr.html">Deformable DETR</a><span class="yr">2020.10 · 视觉</span><div class=nt>空间交叉注意力和检测头都基于可变形注意力，只在参考点附近采样少数位置，计算量可控。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/emma.html">Waymo EMMA</a><span class="yr">2024.10 · 具身·世界模型</span><div class=nt>在纯相机3D检测上，相同召回下车辆精度比专门的BEVFormer相对高16.3%。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/tesla-occupancy.html">Tesla占用网络</a><span class="yr">2022.06 · 具身·世界模型</span><div class=nt>BEV是二维俯视平面，高度信息被压缩，对悬空物、不规则形状障碍和类别之外的物体表达有限。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/uniad.html">UniAD端到端规划</a><span class="yr">2022.12 · 具身·世界模型</span><div class=nt>以鸟瞰特征作为统一的场景表示。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/occworld.html">OccWorld占用世界模型</a><span class="yr">2023.11 · 具身·世界模型</span><div class=nt>BEV是二维俯视平面，高度信息被压缩，对悬空物、不规则形状障碍和类别之外的物体表达有限。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/attention-concept.html">注意力机制</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/iou-map.html">IoU与mAP</a></p>
+<h2>本篇术语</h2><ul><li><b>NDS（nuScenes检测分数）</b>　nuScenes的综合指标，由平均精度mAP与位置、尺寸、朝向、速度、属性五项误差加权合成，取值0–1，越高越好。</li><li><b>可变形注意力</b>　不让每个查询和所有位置计算注意力，而是在一个参考点周围学出少数几个采样偏移，只在这些点上取特征加权求和。</li><li><b>自车运动对齐</b>　车在移动，上一帧的俯视图要按自车的平移和旋转变换到当前坐标系，才能和当前帧逐格对应。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/detr.html">DETR</a>和<a class="ln" href="../n/lift-splat.html">Lift-Splat-Shoot</a> → 读原文第3节（BEV查询、空间交叉注意力、时间自注意力）和图2 → 动手：用开源代码在nuScenes mini上推理，把BEV特征和检测框可视化，观察去掉时间注意力后速度误差的变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2203.17270" rel="noopener">https://arxiv.org/abs/2203.17270</a>、<a href="https://arxiv.org/html/2203.17270" rel="noopener">https://arxiv.org/html/2203.17270</a>（标题、作者、2022-03-31首次提交；BEV查询200×200、范围±51.2米、每格0.512米、通道256、6层编码器；柱状参考点与预设高度、可变形注意力、按自车运动对齐历史BEV；nuScenes测试集NDS 56.9%对DETR3D 47.9%、车道线分割比Lift-Splat高5分以上。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20BEVFormer%EF%BC%88bevformer%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Abevformer%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/bevformer.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="bc-z.html"><small>本分支上一个 · 2022.02</small><b>BC-Z</b></a><a class="r" href="r3m.html"><small>本分支下一个 · 2022.03</small><b>R3M机器人视觉表示</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

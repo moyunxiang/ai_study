@@ -73,12 +73,12 @@
 
 - 不要改动已有的登记表、已有的讲解文件、`data/concepts.txt`、`data/tree.json`、任何脚本和前端文件。只能新建上面提到的文件，以及在 `data/threads/<track>.json` 里插入 `assign` 行和 `aka` 字段。
 - 不要运行git命令。向外部网站发请求时只用主题关键词，不要带任何个人信息。
-- 站长自己有一篇在审稿中的论文（标题含“Robust Information-Gain Control”，简称DR-IG），**不得收录或提及**。
+- 站长本人尚未公开的工作**不得收录或提及**。具体是哪些，由主session在任务说明里单独告知，不写进仓库。
 
 ## 自检
 
 ```
-cd /Users/moyunxiang/kevinelw/study/coding/ai_study
+# 在仓库根目录下运行
 python3 scripts/build.py --check 2>&1 | grep -E "<track>\.hot|threads/<track>|ideas/<track>|aliases/<track>|content/<track>/"
 ```
 

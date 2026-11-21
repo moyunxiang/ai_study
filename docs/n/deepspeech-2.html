@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deep Speech 2（2015） · AI脉络</title>
+<meta name="description" content="Deep Speech只有一个循环层，吃不下上万小时的数据；端到端系统也还没证明能换一种完全不同的语言照样工作，部署延迟也没解决。 把网络加深到最多11层（卷积+多层双向RNN），用针对RNN的批归一化和按句长排序的课程学习让深网络训得动，再靠高性能计算把训练提速7倍。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/deepspeech-2.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Deep Speech 2（2015）">
+<meta property="og:description" content="Deep Speech只有一个循环层，吃不下上万小时的数据；端到端系统也还没证明能换一种完全不同的语言照样工作，部署延迟也没解决。 把网络加深到最多11层（卷积+多层双向RNN），用针对RNN的批归一化和按句长排序的课程学习让深网络训得动，再靠高性能计算把训练提速7倍。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/deepspeech-2.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/deepspeech-2">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:168"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/speech.html">语音与音频</a> › 端到端识别</div>
+<h1>Deep Speech 2</h1>
+<div class="full">Deep Speech 2: End-to-End Speech Recognition in English and Mandarin</div>
+<div class="meta"><span>2015.12</span><span>论文</span><span>重要</span><span>ICML 2016</span><span>Amodei, Anubhai, Battenberg, Case, Casper, Catanzaro, Chen, Chrzanowski et al.（34位） · 百度硅谷人工智能实验室</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1512.02595" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/deepspeech-2">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Deep Speech只有一个循环层，吃不下上万小时的数据；端到端系统也还没证明能换一种完全不同的语言照样工作，部署延迟也没解决。</p></div><div><h4>方法</h4><p>把网络加深到最多11层（卷积+多层双向RNN），用针对RNN的批归一化和按句长排序的课程学习让深网络训得动，再靠高性能计算把训练提速7倍。</p></div><div><h4>影响</h4><p>同一套方法几乎不改就同时做好英语和普通话，在多个朗读语音测试集上达到或超过众包转写员，并以67毫秒延迟上线百度产品。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/deepspeech.html">Deep Speech端到端识别</a>证明了端到端RNN加<a class="ln" href="../n/ctc.html">CTC</a>可以在Switchboard上赢过混合系统，但它的结构很浅：一个循环层、无归一化。作者发现，这样的小模型无法利用上万小时的数据，而直接加深RNN又难训练、太慢。另外两个问题也没解决：端到端方法能否推广到与英语差异很大的语言（普通话有约6000个常用汉字、声调），以及双向RNN要听完整句才能出字，部署时延迟太高。</p><h2>方法</h2><p><b>更深的网络</b>。输入频谱先过1–3层卷积（在时间和频率两个方向上都滑动的2D卷积效果最好），再接最多7层双向循环层（普通RNN或GRU），最后是全连接层和CTC输出层。英语输出字母，普通话直接输出简体汉字，不用拼音也不用显式建模声调。</p><p><b>让深网络训得动</b>。一是<b>序列级批归一化</b>：只对循环层的输入部分<code>W·h</code>做<a class="ln" href="../n/batchnorm.html">Batch Normalization</a>，统计量在整个小批量的所有时间步上算。二是<b>SortaGrad</b>：CTC损失是很多个小于1的概率连乘，长句损失大、梯度不稳，所以第一轮训练按句子长短从短到长喂数据，之后再随机打乱。</p><p><b>减少计算</b>。循环层前用较大步长下采样时间；英语为此把输出单位改成不重叠的双字母组合（the cat → th, e, 空格, ca, t），让输出序列变短。</p><p><b>部署</b>。用只往前看的单向RNN加一个<b>行卷积</b>层，它只看未来很少几帧，就能接近双向模型的准确率；服务器端用Batch Dispatch把同时到达的多个用户请求拼成一批送进GPU。训练端则自写GPU版CTC和all-reduce，16块GPU上持续约50 TFLOP/s，单模型训练3–5天。</p><h2>结果</h2><p>训练数据英语11940小时、普通话9400小时。在百度内部3300句综合测试集上，DS2（约1亿参数）把DS1的24.01%降到13.59%，相对降低43.4%。朗读语音上，WSJ eval&#x27;92/&#x27;93为3.60%/4.98%，LibriSpeech test-clean为5.33%，都低于众包转写员（5.03%/8.08%/5.83%）；test-other为13.25%，与人工的12.69%接近。真实噪声的CHiME eval real上DS2为21.79%，人工为11.84%，差距仍大。普通话短语音查询上，DS2错误率3.7%，5人小组共同转写为4.0%。部署后在10路并发下98分位计算延迟为67毫秒。</p><h2>后来的发展</h2><p>DS2把“端到端识别是工程规模问题”这一点推到极致，它的卷积前端加多层循环加CTC的结构被大量开源项目照搬。随后的研究在三个方向上替换了它的部件：用<a class="ln" href="../n/las.html">Listen, Attend and Spell</a>和<a class="ln" href="../n/chiu-s2s-asr.html">序列到序列识别超越传统</a>这类注意力解码器减少对外部语言模型的依赖；用<a class="ln" href="../n/rnn-t.html">RNN-Transducer</a>做真正的流式识别（<a class="ln" href="../n/streaming-rnnt-mobile.html">端侧流式RNN-T</a>）；用<a class="ln" href="../n/specaugment.html">SpecAugment</a>、<a class="ln" href="../n/wav2vec-2.html">wav2vec 2.0</a>减少对标注数据的需求，最后由<a class="ln" href="../n/whisper.html">Whisper</a>用几十万小时弱标注数据把鲁棒性再提高一截。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>真实噪声和远场场景仍远落后于人：CHiME真实噪声测试集上错误率接近人工转写的两倍。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/whisper.html">Whisper</a></div></li><li>依赖约1.2万小时的内部标注数据和多GPU集群，学术界和其他语言难以复制。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/wav2vec-2.html">wav2vec 2.0</a> <a class="chip hue" style="--h:168" href="../n/whisper.html">Whisper</a></div></li><li>CTC假设各帧输出相互独立，准确率仍要靠带约8.5亿个n-gram的外部语言模型和束搜索补救。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/chiu-s2s-asr.html">序列到序列识别超越传统</a> <a class="chip hue" style="--h:168" href="../n/streaming-rnnt-mobile.html">端侧流式RNN-T</a></div></li><li>批归一化依赖批次统计，推理时单条流式语音难以直接使用，部署时要另做处理。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/conformer.html">Conformer</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/batchnorm.html">Batch Normalization</a><span class="yr">2015.02 · 基础</span><div class=nt>把批归一化改造成作用在循环层输入上的序列级版本，是深层RNN能训起来的关键之一。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:168" href="../n/ctc.html">CTC</a><span class="yr">2006 · 语音</span><div class=nt>仍以CTC为训练目标；为长句的CTC损失不稳定专门设计了SortaGrad。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:168" href="../n/graves-deep-rnn.html">深层双向LSTM识别</a><span class="yr">2013.03 · 语音</span><div class=nt>沿用多层双向循环加CTC的结构，把层数和数据量放大两个数量级。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/deepspeech.html">Deep Speech端到端识别</a><span class="yr">2014.12 · 语音</span><div class=nt>解决DS1网络太浅、吃不下大数据的问题：加深到多层卷积加多层循环，同一测试集上错误率相对降低43%。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/librispeech.html">LibriSpeech</a><span class="yr">2015.04 · 数据·评测</span><div class=nt>以LibriSpeech、WSJ和CHiME等公开集与人工转写对比，衡量与人类水平的差距。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:168" href="../n/las.html">Listen, Attend and Spell</a><span class="yr">2015.08 · 语音</span><div class=nt>同年出现的注意力端到端路线，LAS把语言模型也学进网络；DS2坚持CTC加外部n-gram，后来注意力和Transducer路线成为主流。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/conformer.html">Conformer</a><span class="yr">2020.05 · 语音</span><div class=nt>批归一化依赖批次统计，推理时单条流式语音难以直接使用，部署时要另做处理。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/whisper.html">Whisper</a><span class="yr">2022.09 · 语音</span><div class=nt>真实噪声和远场场景仍远落后于人：CHiME真实噪声测试集上错误率接近人工转写的两倍。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/wav2vec-2.html">wav2vec 2.0</a><span class="yr">2020.06 · 语音</span><div class=nt>依赖约1.2万小时的内部标注数据和多GPU集群，学术界和其他语言难以复制。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/chiu-s2s-asr.html">序列到序列识别超越传统</a><span class="yr">2017.12 · 语音</span><div class=nt>CTC假设各帧输出相互独立，准确率仍要靠带约8.5亿个n-gram的外部语言模型和束搜索补救。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/streaming-rnnt-mobile.html">端侧流式RNN-T</a><span class="yr">2018.11 · 语音</span><div class=nt>CTC假设各帧输出相互独立，准确率仍要靠带约8.5亿个n-gram的外部语言模型和束搜索补救。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+
+<h2>本篇术语</h2><ul><li><b>课程学习（SortaGrad）</b>　先让模型学简单样本、再学难样本。DS2里“简单”就是句子短，只在第一轮按长度排序。</li><li><b>行卷积（row convolution）</b>　放在单向RNN之上的一个小卷积层，每个时刻把未来少数几帧的隐状态加权求和，让模型用很小的等待换来接近双向模型的准确率。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1512.02595" rel="noopener">https://arxiv.org/abs/1512.02595</a>（标题、作者、arXiv首次提交2015-12-08；正文：11940/9400小时、最多11层、50 TFLOP/s、3–5天、表12 24.01→13.59（43.4%）、表13 WSJ/LibriSpeech与人工对比、表15 CHiME real 21.79对11.84、普通话3.7%对4.0%、67毫秒延迟、约8.5亿n-gram。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Deep%20Speech%202%EF%BC%88deepspeech-2%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adeepspeech-2%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/deepspeech-2.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="las.html"><small>本分支上一个 · 2015.08</small><b>Listen, Attend and Spell</b></a><a class="r" href="lf-mmi.html"><small>本分支下一个 · 2016.09</small><b>无词图MMI链式模型</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

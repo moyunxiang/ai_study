@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>参数高效微调（Parameter-Efficient Fine-Tuning） · AI脉络</title>
+<meta name="description" content="微调大模型时冻结绝大部分原有参数，只训练很少一部分新增或选定的参数，从而大幅降低显存、存储和切换任务的成本。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/peft-concept.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="参数高效微调（Parameter-Efficient Fine-Tuning）">
+<meta property="og:description" content="微调大模型时冻结绝大部分原有参数，只训练很少一部分新增或选定的参数，从而大幅降低显存、存储和切换任务的成本。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/peft-concept.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/peft-concept">交互版</a>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 系统与硬件 · 进阶</div>
+<h1>参数高效微调</h1><div class="full">Parameter-Efficient Fine-Tuning</div>
+<p class="muted" style="font-size:13px">也叫：PEFT　LoRA　Adapter　适配器　低秩适配　轻量微调　prefix tuning</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/peft-concept">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>微调大模型时冻结绝大部分原有参数，只训练很少一部分新增或选定的参数，从而大幅降低显存、存储和切换任务的成本。</b></p>
+<p class="tags">先要会：<a class="chip c" href="pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="low-rank.html">低秩近似</a> <a class="chip c" href="params-flops.html">参数量、计算量与显存</a></p>
+<p><a class="lc" href="../c/pretrain-finetune.html">预训练与微调</a>的标准做法是<b>全量微调</b>：用新任务的数据更新模型的全部参数。模型小的时候这没问题，到了几十亿参数就出现三个麻烦。一是<b>训练显存</b>：用Adam训练时，每个参数除了权重本身，还要存梯度和两份优化器状态，混合精度下合计约16字节/参数（见<a class="lc" href="../c/params-flops.html">参数量、计算量与显存</a>、<a class="lc" href="../c/adaptive-optimizer.html">自适应学习率优化器</a>）。二是<b>存储和部署</b>：每个任务都要保存一整份模型副本，100个客户就是100份几十GB的文件。三是小数据上更新全部参数容易过拟合，也容易丢掉原有能力（见<a class="lc" href="../c/continual-learning.html">持续学习与灾难性遗忘</a>）。</p><p><b>参数高效微调（PEFT）</b>的思路是：既然预训练模型已经很好，适配新任务只需要很小的改动，那就冻结原模型，只训练一小部分参数。主要有三类做法：</p><ul><li><b>加入新模块</b>：<a class="ln" href="../n/adapters.html">Adapter</a>在每层插入一个“先降维再升维”的小瓶颈网络，只训练它。</li><li><b>加入可训练的输入</b>：<a class="ln" href="../n/prefix-tuning.html">Prefix / Prompt Tuning</a>在每层的注意力前拼接一段可学习的向量（软提示），模型本身不动。</li><li><b>重参数化已有权重</b>：<a class="ln" href="../n/lora.html">LoRA</a>假设微调带来的权重变化是低秩的（见<a class="lc" href="../c/low-rank.html">低秩近似</a>），把权重写成</li></ul><p class="formula"><code>W&#x27; = W + ΔW = W + B·A</code></p><p>其中W（d×k）冻结，只训练<code>B</code>（d×r）和<code>A</code>（r×k），秩r通常只有4–64。A随机初始化、B初始化为0，所以训练开始时模型与原模型完全相同。训练完后可以把<code>B·A</code>直接加回W，推理时没有任何额外开销。</p><p>还有只训练偏置项的<a class="ln" href="../n/bitfit.html">BitFit</a>等更极端的做法。<a class="ln" href="../n/qlora.html">QLoRA</a>把冻结的底座量化到4比特（见<a class="lc" href="../c/quantization-concept.html">量化</a>），再在上面训练LoRA，使消费级或单张数据中心GPU也能微调很大的模型。</p><p><b>它出现在哪里</b>：LoRA原论文报告，对GPT-3 175B，可训练参数比全量微调少约1万倍，显存需求降到约1/3；如今开源社区的模型微调绝大多数用LoRA或QLoRA，<a class="ln" href="../n/peft-lib.html">Hugging Face PEFT库</a>把这些方法做成了统一的库；扩散模型的风格、角色定制也普遍用LoRA（<a class="ln" href="../n/sd-lora.html">LoRA微调扩散模型</a>）。一个底座加许多个几十MB的LoRA文件，可以在服务时按请求切换（<a class="ln" href="../n/s-lora.html">S-LoRA多适配器服务</a>）。</p>
+<div class="example"><h4>例子</h4><p>一个4096×4096的注意力投影矩阵有<code>4096 × 4096 ≈ 1678万</code>个参数。加秩r = 8的LoRA，只需训练<code>4096×8 + 8×4096 = 65536</code>个参数，约为原矩阵的0.39%。</p><p>对一个7B参数的模型：全量微调用Adam约需<code>7×10⁹ × 16字节 ≈ 112GB</code>（还没算激活），一张80GB的卡放不下；LoRA只需把底座以FP16存一份（约14GB），梯度和优化器状态只针对几百万个LoRA参数；QLoRA把底座压到4比特，约3.5GB。</p></div>
+<h2>容易误解的地方</h2><ul><li>PEFT省的是可训练参数和优化器状态，前向和反向仍要经过整个模型，计算量并没有按比例减少。</li><li>秩r太小或只加在少数层上，复杂任务（如学习大量新知识）效果可能明显不如全量微调。</li><li>LoRA微调不等于不会遗忘，学习率过大时同样会破坏原有能力。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:192" href="../n/lora.html">LoRA</a> <a class="chip hue" style="--h:144" href="../n/med-palm.html">Med-PaLM</a> <a class="chip hue" style="--h:192" href="../n/qlora.html">QLoRA</a> <a class="chip hue" style="--h:144" href="../n/mattergen.html">MatterGen</a> <a class="chip hue" style="--h:144" href="../n/aurora.html">Aurora地球系统基础模型</a> <a class="chip hue" style="--h:96" href="../n/openvla.html">OpenVLA</a> <a class="chip hue" style="--h:192" href="../n/adapters.html">Adapter</a> <a class="chip hue" style="--h:192" href="../n/prefix-tuning.html">Prefix / Prompt Tuning</a> <a class="chip hue" style="--h:192" href="../n/p-tuning.html">P-Tuning</a> <a class="chip hue" style="--h:192" href="../n/bitfit.html">BitFit</a> <a class="chip hue" style="--h:240" href="../n/frozen.html">Frozen冻结LM读图</a> <a class="chip hue" style="--h:192" href="../n/ia3.html">(IA)³</a> <a class="chip hue" style="--h:288" href="../n/sd-lora.html">LoRA微调扩散模型</a> <a class="chip hue" style="--h:192" href="../n/task-arithmetic.html">任务算术与模型合并</a> <a class="chip hue" style="--h:288" href="../n/comfyui.html">ComfyUI节点工作流</a> <a class="chip hue" style="--h:288" href="../n/controlnet.html">ControlNet</a> <a class="chip hue" style="--h:192" href="../n/peft-lib.html">Hugging Face PEFT库</a> <a class="chip hue" style="--h:288" href="../n/t2i-adapter.html">T2I-Adapter</a> <a class="chip hue" style="--h:0" href="../n/chatglm.html">ChatGLM-6B</a> <a class="chip hue" style="--h:240" href="../n/mplug-owl.html">mPLUG-Owl</a> <a class="chip hue" style="--h:30" href="../n/no-moat-memo.html">“我们没有护城河”备忘录</a> <a class="chip hue" style="--h:288" href="../n/animatediff.html">AnimateDiff</a> <a class="chip hue" style="--h:240" href="../n/seed-tokenizer.html">SEED视觉分词器</a> <a class="chip hue" style="--h:288" href="../n/ip-adapter.html">IP-Adapter图像提示</a> <a class="chip hue" style="--h:240" href="../n/next-gpt.html">NExT-GPT任意模态</a> <a class="chip hue" style="--h:312" href="../n/finetuning-breaks-safety.html">微调破坏安全对齐</a> <a class="chip hue" style="--h:192" href="../n/s-lora.html">S-LoRA多适配器服务</a> <a class="chip hue" style="--h:192" href="../n/unsloth.html">Unsloth</a> <a class="chip hue" style="--h:192" href="../n/dora.html">DoRA</a> <a class="chip hue" style="--h:192" href="../n/galore.html">GaLore梯度低秩投影</a> <a class="chip hue" style="--h:192" href="../n/llama-factory.html">LlamaFactory</a> <a class="chip hue" style="--h:192" href="../n/apple-foundation-models.html">Apple端侧基础模型</a> <a class="chip hue" style="--h:336" href="../n/arc-ttt.html">测试时训练解ARC</a> <a class="chip hue" style="--h:96" href="../n/smolvla.html">SmolVLA</a> <a class="chip hue" style="--h:192" href="../n/lora-without-regret.html">LoRA Without Regret</a> <a class="chip hue" style="--h:192" href="../n/tinker.html">Tinker微调API</a> <a class="chip hue" style="--h:336" href="../n/ttt-discover.html">TTT-Discover测试时发现</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

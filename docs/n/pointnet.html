@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PointNet（2016） · AI脉络</title>
+<meta name="description" content="激光雷达和深度相机给出的是一堆无序的三维点。卷积只能吃规整网格，大家只好先转成体素或多视角图片，数据量暴涨、细节丢失。 每个点用同一个小MLP独立编码，再对所有点做逐维最大池化。最大值与点的顺序无关，网络因此天然对点的排列不敏感，可以直接吃原始点云。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/pointnet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PointNet（2016）">
+<meta property="og:description" content="激光雷达和深度相机给出的是一堆无序的三维点。卷积只能吃规整网格，大家只好先转成体素或多视角图片，数据量暴涨、细节丢失。 每个点用同一个小MLP独立编码，再对所有点做逐维最大池化。最大值与点的顺序无关，网络因此天然对点的排列不敏感，可以直接吃原始点云。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/pointnet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/pointnet">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 三维表示与神经渲染</div>
+<h1>PointNet</h1>
+<div class="full">PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation</div>
+<div class="meta"><span>2016.12</span><span>论文</span><span>重要</span><span>CVPR 2017</span><span>Charles R. Qi, Hao Su, Kaichun Mo, Leonidas J. Guibas · Stanford University</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1612.00593" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/charlesq34/pointnet" rel="noopener">官方代码 ↗</a><a class="btn sm" href="../index.html#/n/pointnet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>激光雷达和深度相机给出的是一堆无序的三维点。卷积只能吃规整网格，大家只好先转成体素或多视角图片，数据量暴涨、细节丢失。</p></div><div><h4>方法</h4><p>每个点用同一个小MLP独立编码，再对所有点做逐维最大池化。最大值与点的顺序无关，网络因此天然对点的排列不敏感，可以直接吃原始点云。</p></div><div><h4>影响</h4><p>第一个直接处理原始点云的通用深度网络，结构极简、计算量小，成为三维分类、分割、检测里点云骨干的起点，PointNet++等后续工作都由它展开。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>三维数据有几种存法（见<a class="lc" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a>）：体素网格、网格面片、多视角图片、点云。传感器（激光雷达、深度相机）直接给出的是点云——几千到几十万个<code>(x, y, z)</code>坐标，没有固定顺序，也不在规整网格上。</p><p>2016年前后，深度学习处理三维数据的办法是绕开点云：<a class="ln" href="../n/voxnet.html">VoxNet</a>等方法把空间切成小立方体（体素）后做三维卷积，内存随分辨率的立方增长，只能用32³这样的粗网格；多视角方法把物体渲染成十几张图片后用图像CNN，精度高但计算重。直接把点当成一个序列喂给网络也不行：同一个物体的1024个点有1024!种排法，网络输出却必须完全相同。问题是要设计一个对输入顺序<b>天生不敏感</b>的网络。</p><h2>方法</h2><p><b>对称函数</b>。如果<code>g(x₁,…,xₙ)</code>无论怎样打乱输入都输出一样的结果，就叫对称函数，加法、取最大值都是。PointNet把整个网络写成</p><p class="formula"><code>f({x₁,…,xₙ}) ≈ γ( MAX_i h(x_i) )</code></p><p>其中<code>h</code>是所有点共享的同一个多层感知机（<a class="lc" href="../c/mlp.html">多层感知机</a>），把每个点的3维坐标映射成1024维特征；<code>MAX</code>在每一维上分别取所有点中的最大值，得到一个1024维的全局特征；<code>γ</code>是最后的几层全连接，输出类别。因为<code>MAX</code>不管点的顺序，整个网络对排列不变。论文证明：只要中间维度足够大，这种结构可以任意逼近任何连续的集合函数。</p><p><b>分割</b>：把全局特征拼回每个点自己的特征上，再用MLP给每个点分类，这样每个点既知道自己在哪，也知道整体是什么。</p><p><b>对齐网络T-Net</b>：一个小PointNet预测一个3×3矩阵，先把输入点云旋转到规范姿态；特征层再加一个64×64的变换，配一个让它接近正交矩阵的正则项。</p><p><b>关键点</b>：真正决定全局特征的只是在某一维上取到最大值的那些点（最多1024个），论文称为临界点集，可视化后大致是物体的骨架。删掉其余的点，输出完全不变，这解释了它对缺点和噪声的鲁棒性。</p><h2>结果</h2><p>ModelNet40（40类、12311个CAD模型、每个物体采样1024点）上总体准确率89.2%，与3D卷积方法Subvolume持平、高于VoxNet的85.9%，但仍低于多视角的MVCNN（90.1%）。计算量方面，论文给出的每样本FLOPs比MVCNN少约141倍、比Subvolume少约8倍，参数量比MVCNN少约17倍。ShapeNet部件分割mIoU 83.7%。消融实验中最大池化明显优于平均池化和注意力加权求和，也远好于在排序或乱序点上用MLP、RNN。</p><h2>后来的发展</h2><p>PointNet的缺陷是每个点被独立处理，只在最后一步汇总，看不到局部邻域。半年后同一作者的<a class="ln" href="../n/pointnet2.html">PointNet++</a>在不同半径的局部邻域里递归地套用PointNet，补上了局部结构。此后点云网络分化出图卷积、稀疏卷积、点云Transformer等路线，直到<a class="ln" href="../n/point-transformer-v3.html">Point Transformer V3</a>。“共享MLP + 对称池化”的思路也被用于集合数据的一般理论（与<a class="ln" href="../n/deep-sets.html">Deep Sets</a>同时期），并被激光雷达检测、机器人抓取等系统当作点云编码器。</p><h2>容易误解的地方</h2><ul><li>排列不变不等于旋转不变。PointNet靠T-Net和训练时绕竖直轴的随机旋转来应对姿态变化，任意三维旋转下性能仍会下降。</li><li>最大池化只看每一维的最大值，局部的几何关系（相邻点的距离、曲率）没有被显式建模，这是它在复杂场景上弱的主因。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每个点独立编码后一步全局汇总，不建模局部邻域，细粒度几何和复杂场景表现差。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/pointnet2.html">PointNet++</a> <a class="chip hue" style="--h:216" href="../n/point-transformer-v3.html">Point Transformer V3</a></div></li><li>在单个物体（1024–4096点）上验证，大规模室外激光雷达点云需要切块处理，效率和精度都不够。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/point-transformer-v3.html">Point Transformer V3</a></div></li><li>对任意三维旋转不具有不变性，依赖T-Net和数据增强。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/stn.html">空间变换网络STN</a><span class="yr">2015.06 · 视觉</span><div class=nt>T-Net借用空间变换网络的思路，让网络自己预测一个变换矩阵把输入对齐。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/voxnet.html">VoxNet</a><span class="yr">2015.09 · 视觉</span><div class=nt>不再把点云转成体素网格，避免了立方级的内存开销，对缺点也更鲁棒（论文附录专门与VoxNet对比）。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/shapenet.html">ShapeNet</a><span class="yr">2015.12 · 数据·评测</span><div class=nt>部件分割在ShapeNet的16类、约1.7万个形状上评测。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/dp3.html">DP3三维扩散策略</a><span class="yr">2024.03 · 具身·世界模型</span><div class=nt>论文比较了PointNet系编码器，发现更简单的三层MLP加最大池化效果更好。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/deep-sets.html">Deep Sets</a><span class="yr">2017.03 · 基础</span><div class=nt>PointNet用对称函数（最大池化）处理点云，Deep Sets从理论上刻画了排列不变函数的形式</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/pointnet2.html">PointNet++</a><span class="yr">2017.06 · 视觉</span><div class=nt>把PointNet作为局部小网络递归使用，补上它缺少的局部结构。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/voxelnet.html">VoxelNet点云检测</a><span class="yr">2017.11 · 具身·世界模型</span><div class=nt>把PointNet式的逐点网络加汇聚用作体素内的特征编码。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/pointpillars.html">PointPillars</a><span class="yr">2018.12 · 具身·世界模型</span><div class=nt>用PointNet学习每根柱子的特征。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/occupancy-networks.html">占据网络</a><span class="yr">2018.12 · 视觉</span><div class=nt>点云输入的条件编码器采用PointNet式网络。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/point-transformer-v3.html">Point Transformer V3</a><span class="yr">2023.12 · 视觉</span><div class=nt>每个点独立编码后一步全局汇总，不建模局部邻域，细粒度几何和复杂场景表现差。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/mlp.html">多层感知机</a> <a class="chip c" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a> <a class="chip c" href="../c/equivariance.html">不变性与等变性</a> <a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/iou-map.html">IoU与mAP</a></p>
+<h2>本篇术语</h2><ul><li><b>点云</b>　一组三维坐标点（可附带颜色、强度），没有固定顺序和网格结构，激光雷达和深度相机的原始输出就是点云。</li><li><b>对称函数</b>　输入任意打乱后输出不变的函数，例如求和、取最大值。PointNet用逐维最大值实现排列不变。</li><li><b>临界点集</b>　在全局特征某一维上取到最大值的那些点。全局特征只由它们决定，删掉其他点输出不变。</li></ul>
+<h2>怎么学</h2><p>先确认理解<a class="lc" href="../c/mlp.html">多层感知机</a>和<a class="lc" href="../c/equivariance.html">不变性与等变性</a>里“不变性”的含义。读原文第4.2节（三个模块）和图2结构图，再看第5.3节的临界点可视化。动手：用PyTorch写一个只有共享MLP和最大池化的PointNet，在ModelNet40上跑分类，然后把输入点的顺序打乱，验证输出完全一致。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1612.00593" rel="noopener">https://arxiv.org/abs/1612.00593</a>（标题、4位作者、arXiv v1提交于2016-12-02、CVPR 2017；正文表1中PointNet 89.2%、VoxNet 85.9%、MVCNN 90.1%，部件分割mIoU 83.7%，FLOPs比MVCNN/Subvolume少141倍/8倍、参数少17倍，ModelNet40规模12311个模型。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20PointNet%EF%BC%88pointnet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Apointnet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/pointnet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="pspnet.html"><small>本分支上一个 · 2016.12</small><b>PSPNet</b></a><a class="r" href="deformable-conv.html"><small>本分支下一个 · 2017.03</small><b>可变形卷积</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

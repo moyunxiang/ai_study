@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conv-TasNet（2018） · AI脉络</title>
+<meta name="description" content="多人同时说话的分离方法都在频谱上估计掩码：相位丢掉不管、频谱不一定是最适合分离的表示，而且STFT窗口至少32毫秒，延迟太大。 直接在波形上做：用一层可学习的一维卷积代替STFT当编码器，用层层空洞的一维卷积网络（TCN）为每个说话人估计掩码，再用转置卷积解码回波形。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/conv-tasnet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Conv-TasNet（2018）">
+<meta property="og:description" content="多人同时说话的分离方法都在频谱上估计掩码：相位丢掉不管、频谱不一定是最适合分离的表示，而且STFT窗口至少32毫秒，延迟太大。 直接在波形上做：用一层可学习的一维卷积代替STFT当编码器，用层层空洞的一维卷积网络（TCN）为每个说话人估计掩码，再用转置卷积解码回波形。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/conv-tasnet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/conv-tasnet">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:168"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/speech.html">语音与音频</a> › 说话人与声音分析</div>
+<h1>Conv-TasNet</h1>
+<div class="full">Conv-TasNet: Surpassing Ideal Time-Frequency Magnitude Masking for Speech Separation</div>
+<div class="meta"><span>2018.09</span><span>论文</span><span>重要</span><span>IEEE/ACM TASLP 2019</span><span>Yi Luo, Nima Mesgarani · 哥伦比亚大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1809.07454" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/conv-tasnet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>多人同时说话的分离方法都在频谱上估计掩码：相位丢掉不管、频谱不一定是最适合分离的表示，而且STFT窗口至少32毫秒，延迟太大。</p></div><div><h4>方法</h4><p>直接在波形上做：用一层可学习的一维卷积代替STFT当编码器，用层层空洞的一维卷积网络（TCN）为每个说话人估计掩码，再用转置卷积解码回波形。</p></div><div><h4>影响</h4><p>在WSJ0-2mix上SI-SNR提升15.3dB，第一次超过了用真实答案算出的理想频谱掩码，模型只有510万参数且可做到实时，使时域分离成为主流。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>“鸡尾酒会问题”指从一段多人混合的单通道录音里把每个人的声音分开。<a class="ln" href="../n/deep-clustering.html">深度聚类语音分离</a>等深度方法已经取得很大进步，但几乎都在时频域工作：先做短时傅里叶变换得到频谱（见<a class="lc" href="../c/waveform-spectrogram.html">波形、频谱与梅尔谱</a>），网络为每个说话人估计一个掩码乘在混合频谱的幅度上，再用混合信号的相位做逆变换还原。这有三个问题：相位没有被处理，误差直接留在结果里；为分离而设计的表示不一定是傅里叶频谱；要有足够的频率分辨率，STFT窗口通常不少于32毫秒，助听器、通话等实时设备无法接受。作者此前的TasNet已改在时域做，但分离模块是深层LSTM，参数多、只能逐帧串行处理，且对从哪一帧开始处理很敏感。</p><h2>方法</h2><p><b>编码器</b>。把波形切成长度L的短段（8kHz下2毫秒，即16个采样点），用N个可学习的一维卷积核与它相乘，得到N维表示<code>w</code>，相当于一个为分离任务学出来的“频谱”。</p><p><b>分离模块（TCN）</b>。由一维卷积块堆成，跳距（dilation）为1、2、4、…、2^(M−1)，这样一组M块重复R次，感受野指数增长；每个块用深度可分离卷积减少参数，带残差和跳跃连接，这一设计借鉴自<a class="ln" href="../n/wavenet.html">WaveNet</a>。最后用1×1卷积为C个说话人各输出一个掩码<code>m_i</code>。非因果版本用全局层归一化（gLN），因果版本用只看过去的累积层归一化（cLN）。</p><p><b>解码器</b>。第i个说话人的表示是<code>d_i = w ⊙ m_i</code>，再用一层转置卷积<code>ŝ_i = d_i·V</code>变回波形段，重叠相加得到完整信号。</p><p><b>训练目标</b>。直接最大化尺度不变信噪比SI-SNR；由于不知道网络的第1个输出对应哪个说话人，使用排列不变训练（PIT）：对所有输出与目标的配对方式都算一次损失，取最小的那个。</p><h2>结果</h2><p>WSJ0-2mix（两人混合，8kHz）上，非因果Conv-TasNet的SI-SNR提升15.3dB、SDR提升15.6dB，参数510万；此前最好的BLSTM-TasNet为13.2dB（2360万参数），深度聚类DPCL++为10.8dB；用真实答案计算的理想比例掩码（IRM）为12.2dB，理想维纳滤波掩码为13.4dB。三人混合上为12.7dB，同样高于IRM的12.5dB。主观测试中40名听者给Conv-TasNet的MOS是4.03，IRM为3.51；但客观指标PESQ上IRM更高（3.74对3.24）。因果版本在CPU上每2毫秒帧的处理时间为0.4毫秒，LSTM-TasNet为4.3毫秒。</p><h2>后来的发展</h2><p>Conv-TasNet之后，语音分离的主流转向时域的“编码器—掩码网络—解码器”框架，后续工作主要替换中间的分离模块（双路径RNN、Transformer等）。同一设计被<a class="ln" href="../n/demucs.html">Demucs音乐分离</a>等搬到音乐分离上。它的可学习编码器、SI-SNR损失和PIT训练也成为语音增强、目标说话人提取的常用组件。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>主要在WSJ0-2mix这种干净、无混响、8kHz的合成混合上评测，在真实带噪带混响录音上效果明显下降。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>说话人数C必须事先固定，网络输出几路就只能分几路。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/eend.html">端到端说话人日志</a></div></li><li>编码器帧长只有2毫秒，一句话会变成非常长的帧序列，TCN的感受野仍有限，对长句建模不足。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/lstm.html">LSTM</a><span class="yr">1997 · 基础</span><div class=nt>作者先前的TasNet用深层LSTM做分离，参数多、只能串行；换成卷积后参数减到约五分之一、可并行，效果更好。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:168" href="../n/wavenet.html">WaveNet</a><span class="yr">2016.09 · 语音</span><div class=nt>分离模块的空洞一维卷积栈、残差和跳跃连接直接借鉴WaveNet及由它发展而来的时序卷积网络。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/layernorm.html">Layer Normalization</a><span class="yr">2016.07 · 基础</span><div class=nt>提出在通道和时间两维上一起归一化的全局层归一化（gLN），以及用于因果版本的累积层归一化。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/deep-clustering.html">深度聚类语音分离</a><span class="yr">2015.08 · 语音</span><div class=nt>深度聚类在频谱上估计掩码、借用混合相位；Conv-TasNet改为时域处理，SI-SNR提升从10.8dB提高到15.3dB。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/rnnoise.html">RNNoise实时降噪</a><span class="yr">2017.09 · 语音</span><div class=nt>只做降噪，不做去混响、也不区分说话人；对非平稳或类语音噪声效果有限。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/eend.html">端到端说话人日志</a><span class="yr">2019.09 · 语音</span><div class=nt>说话人数C必须事先固定，网络输出几路就只能分几路。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:168" href="../n/demucs.html">Demucs音乐分离</a><span class="yr">2019.11 · 语音</span><div class=nt>在Conv-TasNet基础上改进，针对音乐设计，减少其伪影。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+
+<h2>本篇术语</h2><ul><li><b>理想掩码（IRM/IBM）</b>　已知每个说话人的干净信号时直接算出的频谱掩码，代表“在频谱幅度上做掩码”方法的性能上限。超过它说明时频表示本身是瓶颈。</li><li><b>SI-SNR</b>　尺度不变信噪比。先把估计信号投影到目标信号上，再算目标成分与残差的能量比，对整体音量缩放不敏感。单位dB，越高越好。</li><li><b>排列不变训练（PIT）</b>　多个输出与多个目标之间没有固定对应关系，于是枚举所有配对方式，取损失最小的一种来训练。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1809.07454" rel="noopener">https://arxiv.org/abs/1809.07454</a>（标题、2位作者、arXiv首次提交2018-09-20；正文：2ms编码窗、8kHz、跳距1到2^(M−1)、gLN/cLN、uPIT；表IV 15.3/15.6dB、5.1M、BLSTM-TasNet 13.2/23.6M、DPCL++ 10.8、IRM 12.2、WFM 13.4；表V 12.7对12.5；表VI/VII PESQ 3.74对3.24、MOS 4.03对3.51；表VIII 0.4对4.3ms。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Conv-TasNet%EF%BC%88conv-tasnet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aconv-tasnet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/conv-tasnet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="sv2tts.html"><small>本分支上一个 · 2018.06</small><b>SV2TTS声音克隆</b></a><a class="r" href="music-transformer.html"><small>本分支下一个 · 2018.09</small><b>Music Transformer</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ZeRO与DeepSpeed（2019） · AI脉络</title>
+<meta name="description" content="数据并行里每张卡都保存完整的参数、梯度和优化器状态，大量冗余；模型并行虽省显存，但通信多、扩展差。 ZeRO把优化器状态、梯度、参数依次切分到各数据并行卡上，用时再通信取回，消除冗余，同时保持数据并行的便利。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/zero.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ZeRO与DeepSpeed（2019）">
+<meta property="og:description" content="数据并行里每张卡都保存完整的参数、梯度和优化器状态，大量冗余；模型并行虽省显存，但通信多、扩展差。 ZeRO把优化器状态、梯度、参数依次切分到各数据并行卡上，用时再通信取回，消除冗余，同时保持数据并行的便利。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/zero.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/zero">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 大模型并行训练</div>
+<h1>ZeRO与DeepSpeed</h1>
+<div class="full">ZeRO: Memory Optimizations Toward Training Trillion Parameter Models</div>
+<div class="meta"><span>2019.10</span><span>论文</span><span>延伸</span><span>SC 2020</span><span>Samyam Rajbhandari, Jeff Rasley, Olatunji Ruwase, Yuxiong He · Microsoft</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1910.02054" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/microsoft/DeepSpeed" rel="noopener">DeepSpeed ↗</a><a class="btn sm" href="../index.html#/n/zero">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>数据并行里每张卡都保存完整的参数、梯度和优化器状态，大量冗余；模型并行虽省显存，但通信多、扩展差。</p></div><div><h4>方法</h4><p>ZeRO把优化器状态、梯度、参数依次切分到各数据并行卡上，用时再通信取回，消除冗余，同时保持数据并行的便利。</p></div><div><h4>影响</h4><p>显著降低每卡显存，使训练百亿级以上模型成为可能，是DeepSpeed与PyTorch FSDP的基础。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>以Adam混合精度训练为例，一份参数还需要FP32副本、动量和方差，这些<b>状态</b>加起来比参数本身占更多显存，而数据并行的每张卡都完整存一份。ZeRO分三个阶段：切分优化器状态；再切分梯度；再切分参数本身，每张卡只保留自己负责的一片，计算某层时临时收集其余分片。这样每卡显存随卡数减少，而通信量与普通数据并行大致同量级。</p><p>摘要称其分析显示可扩展到超过1万亿参数；实验在400块GPU上训练超过100B参数的模型，吞吐15 petaflops；相对此前可训练模型规模提升8倍、性能提升10倍；不用模型并行也可训练最大13B的模型，超过<a class="ln" href="../n/megatron.html">Megatron-LM模型并行</a>的8.3B和T5的11B；并用它构建了17B的Turing-NLG。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>参数分片后每步需额外通信，网络慢时吞吐下降。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/fsdp.html">PyTorch FSDP</a></div></li><li>需要框架级集成，早期与PyTorch原生训练方式不统一。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/fsdp.html">PyTorch FSDP</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/pytorch.html">PyTorch</a><span class="yr">2017.01 · 系统·效率</span> <span class="vk">待核对</span><div class=nt>初版只提供基本的多进程与通信原语，模型大到单卡放不下时的模型并行和参数切分需要用户自己实现。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/parameter-server.html">参数服务器</a><span class="yr">2014.10 · 系统·效率</span><div class=nt>同样想突破单卡容纳极限，参数服务器集中存参数，ZeRO把状态分片到各计算卡。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:72" href="../n/v100.html">V100与Tensor Core</a><span class="yr">2017.05 · 硬件</span><div class=nt>单卡显存只有几十GB，几十亿参数以上的模型放不进一张卡，需要另行发明模型切分方法。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/large-batch-sgd.html">学习率预热与大批量SGD</a><span class="yr">2017.06 · 基础</span><div class=nt>依赖256块GPU和高速网络，梯度同步的通信开销随规模上升，需要专门的通信与显存优化。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/gpipe.html">GPipe流水线并行</a><span class="yr">2018.11 · 系统·效率</span><div class=nt>只能按层切分，单层的参数或计算本身超过一个设备时无能为力。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/hf-transformers.html">Hugging Face Transformers</a><span class="yr">2018.11 · 系统·效率</span><div class=nt>为可读性设计的逐模型实现不包含大规模分布式训练所需的切分与显存优化，训练数十亿参数以上的模型要依赖外部工具。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/grad-checkpointing.html">梯度检查点</a><span class="yr">2016.04 · 系统·效率</span><div class=nt>只减少激活内存，参数、梯度与优化器状态的内存仍需另外处理。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/ring-allreduce.html">Ring All-Reduce</a><span class="yr">2017.02 · 系统·效率</span><div class=nt>仍是同步数据并行，每张卡必须放得下完整模型，模型变大后不再适用。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/horovod.html">Horovod</a><span class="yr">2018.02 · 系统·效率</span><div class=nt>仍是同步数据并行，模型要放得进单卡显存。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/megatron.html">Megatron-LM模型并行</a><span class="yr">2019.09 · 系统·效率</span><div class=nt>Megatron的张量并行仍让数据并行组内冗余存储，ZeRO用分片消除冗余，可与之组合。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/opt.html">OPT-175B</a><span class="yr">2022.05 · LLM</span><div class=nt>全分片数据并行与ZeRO同属把参数和优化器状态切分到所有卡上的做法。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/bloom.html">BLOOM</a><span class="yr">2022.07 · LLM</span><div class=nt>用ZeRO第一阶段切分优化器状态，以便在384张卡上放下176B模型的训练状态。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/megatron-3d.html">Megatron 3D并行</a><span class="yr">2021.04 · 系统·效率</span><div class=nt>ZeRO靠切分优化器状态省显存，本文靠多维并行省显存，两者后来常被组合使用。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/mt-nlg.html">MT-NLG 530B</a><span class="yr">2022.01 · LLM</span><div class=nt>使用DeepSpeed的ZeRO优化器分片降低内存占用。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/fsdp.html">PyTorch FSDP</a><span class="yr">2023.04 · 系统·效率</span><div class=nt>把ZeRO的分片思想落成PyTorch原生实现并补上工程细节。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/adaptive-optimizer.html">自适应学习率优化器</a></p>
+
+<h2>怎么学</h2><p>读论文第3节的显存公式，估算7B模型用Adam混合精度时每卡显存，在不同ZeRO阶段如何变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1910.02054" rel="noopener">https://arxiv.org/abs/1910.02054</a>（标题、4位作者、v1提交2019-10-04；摘要：超万亿参数、400 GPU超100B、15 petaflops、8倍与10倍、13B对8.3B与11B、Turing-NLG 17B。SC 2020与三阶段细节为常识，未核对。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ZeRO%E4%B8%8EDeepSpeed%EF%BC%88zero%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Azero%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/zero.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="distilbert.html"><small>本分支上一个 · 2019.10</small><b>DistilBERT</b></a><a class="r" href="hf-hub.html"><small>本分支下一个 · 2020</small><b>Hugging Face Hub与Datasets</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

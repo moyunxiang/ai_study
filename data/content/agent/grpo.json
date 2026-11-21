@@ -8,21 +8,22 @@
       "url": "https://arxiv.org/abs/2402.03300"
     }
   ],
-  "problem": "PPO要同时训练策略和一个与策略同样大的价值网络，显存和计算开销大，对数学推理这类稀疏的结果奖励也不稳定。",
-  "idea": "GRPO（Group Relative Policy Optimization）去掉价值网络，对同一道题采样一组回答，用组内奖励的均值和标准差当基线。",
-  "impact": "成为推理模型强化学习的标准算法，DeepSeek-R1即用它训练，之后大量开源推理模型沿用或改进。",
-  "method": "这是DeepSeekMath论文中提出的一个训练方法。论文主体是数学模型DeepSeekMath 7B：在DeepSeek-Coder-Base-v1.5 7B上继续预训练，用了1200亿个来自Common Crawl的数学相关token。摘要称它在竞赛级MATH上达到51.7%（不借助外部工具和投票），对64个样本做自洽性后为60.9%。\n\n其中GRPO的做法是：对每个问题从旧策略采样G个回答，得到各自的奖励，把每个回答的奖励减去组内均值、再除以组内标准差，作为它的优势，然后沿用[[ppo]]的裁剪目标更新策略，并加一个对参考模型的KL惩罚。省掉价值网络后显存明显减少，而“组内相对”正适合只有最终对错的数学题。上述公式细节来自对论文的了解，摘要只提到它是PPO的变体且节省显存。",
+  "problem": "PPO要同时训练策略和一个与策略同样大的价值网络，显存和计算开销大；而奖励通常只给在回答的最后一个token上，逐token准确的价值网络也难训练。",
+  "idea": "GRPO（Group Relative Policy Optimization）去掉价值网络，对同一道题采样一组回答，用组内平均奖励作基线、再除以组内标准差，得到每个回答的优势。",
+  "impact": "DeepSeek-R1用它训练；之后Qwen3等模型的推理RL沿用了它，DAPO、Dr. GRPO、GSPO等工作在它基础上修改。",
+  "method": "这是DeepSeekMath论文中提出的一个训练方法。论文主体是数学模型DeepSeekMath 7B：在DeepSeek-Coder-Base-v1.5 7B上继续预训练，用了1200亿个来自Common Crawl的数学相关token。摘要称它在竞赛级MATH上达到51.7%（不借助外部工具和投票），对64个样本做自洽性后为60.9%。\n\n其中GRPO的做法是：对每个问题从旧策略采样G个回答（论文的RL设置为每题64个），用奖励模型给每个回答打分，把每个回答的奖励减去组内均值、再除以组内标准差，作为这个回答所有token的优势；然后沿用[[ppo]]的裁剪目标更新策略，并在损失里直接加一项对参考模型的KL惩罚（系数0.04）。省掉价值网络减轻了显存和计算负担；论文还认为，“组内相对”的优势与奖励模型本身靠比较数据训练出来的性质相契合。论文也给出了按推理步骤打分的过程监督版本。\n\nRL只用了SFT数据中与GSM8K、MATH相关的约14.4万道题。DeepSeekMath-Instruct 7B经GRPO训练后，GSM8K从82.9%升到88.2%，MATH从46.8%升到51.7%。论文还把SFT、拒绝采样微调、DPO、PPO放进同一个框架比较，并发现RL提升了Maj@K（多数投票）而没有提升Pass@K。",
   "limits": [
     {
       "text": "要对每题采样一组回答，若全组答对或全错则优势为零，没有学习信号；采样本身也很耗算力。",
       "solved_by": [
-        "deepseek-r1"
+        "dapo"
       ]
     },
     {
-      "text": "奖励仍依赖可自动验证的答案，难以直接用于开放式任务。",
+      "text": "RL提升了多数投票（Maj@K）而没有提升Pass@K，作者认为它主要让输出分布更稳，而不是增强了基础能力。",
+      "stated": true,
       "solved_by": [
-        "deepseek-r1"
+        "prorl"
       ]
     }
   ],
@@ -41,6 +42,6 @@
   ],
   "check": {
     "source": "https://arxiv.org/abs/2402.03300",
-    "confirmed": "标题、作者、arXiv首次提交2024-02-05；摘要中DeepSeekMath 7B继续预训练1200亿数学token、MATH 51.7%、64样本自洽60.9%、GRPO为节省显存的PPO变体。组内标准化等具体公式未在摘要中，来自对论文的了解，未逐字核对。"
+    "confirmed": "标题、作者、arXiv首次提交2024-02-05；摘要中DeepSeekMath 7B继续预训练1200亿数学token、MATH 51.7%、64样本自洽60.9%、GRPO为节省显存的PPO变体；正文v3（arxiv.org/html/2402.03300v3）第4节的组内标准化优势、裁剪目标、KL项与超参数，以及RL前后GSM8K/MATH成绩。"
   }
 }

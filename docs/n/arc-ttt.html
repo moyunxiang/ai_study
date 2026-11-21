@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>测试时训练解ARC（2024） · AI脉络</title>
+<meta name="description" content="语言模型遇到结构上全新的任务（如ARC的图形谜题）时，只把几个例子放进提示里（上下文学习）往往学不会。 推理时先用这道题给出的几个示例临时微调模型：把示例做留一法和几何变换造出小训练集，为每道题训练一个LoRA适配器，再作答并投票。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/arc-ttt.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="测试时训练解ARC（2024）">
+<meta property="og:description" content="语言模型遇到结构上全新的任务（如ARC的图形谜题）时，只把几个例子放进提示里（上下文学习）往往学不会。 推理时先用这道题给出的几个示例临时微调模型：把示例做留一法和几何变换造出小训练集，为每道题训练一个LoRA适配器，再作答并投票。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/arc-ttt.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/arc-ttt">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:336"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/agent.html">推理、检索与智能体</a> › 推理模型</div>
+<h1>测试时训练解ARC</h1>
+<div class="full">The Surprising Effectiveness of Test-Time Training for Few-Shot Learning</div>
+<div class="meta"><span>2024.11</span><span>论文</span><span>延伸</span><span>Ekin Akyürek, Mehul Damani, Adam Zweiger, Linlu Qiu, Han Guo, Jyothish Pari, Yoon Kim, Jacob Andreas · MIT</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2411.07279" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/arc-ttt">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>语言模型遇到结构上全新的任务（如ARC的图形谜题）时，只把几个例子放进提示里（上下文学习）往往学不会。</p></div><div><h4>方法</h4><p>推理时先用这道题给出的几个示例临时微调模型：把示例做留一法和几何变换造出小训练集，为每道题训练一个LoRA适配器，再作答并投票。</p></div><div><h4>影响</h4><p>8B模型在ARC公开验证集上达到53.0%，与程序合成方法集成后61.9%，与人类平均水平相当，让「测试时训练」成为2024年底ARC竞赛和推理研究的热词。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>测试时训练（TTT）指在推理阶段用从输入本身构造的损失临时更新参数。ARC每道题给出两三个「输入网格→输出网格」示例，要求推出规律并作答（见<a class="ln" href="../n/arc-agi.html">ARC-AGI</a>）。</p><p>做法分三步。<b>造数据</b>：每次把一个示例当作「测试」，其余当作示范（留一法），再对网格做旋转、翻转、换颜色等可逆变换，得到最多250条小样本。<b>训练</b>：为这一道题单独训练一个<a class="ln" href="../n/lora.html">LoRA</a>适配器（见<a class="lc" href="../c/peft-concept.html">参数高效微调</a>），训练2轮，损失同时算在示范和测试输出上，用完即丢。<b>推理</b>：对题目做多种变换分别解码，再把答案变换回来做分层投票。</p><p>结果：在<a class="ln" href="../n/llama-3.html">Llama 3</a>系8B模型上，ARC公开验证集达到53.0%（pass@2），与程序合成方法集成后61.9%，论文给出的人类平均为60.2%。在BIG-Bench Hard的10样本设置中，TTT把准确率从50.5%提到57.8%。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每道题都要单独做一次微调，推理成本和时延远高于直接作答。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>依赖题目自带的示例来构造训练损失；没有示例、也没有标准答案的问题无从下手。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:336" href="../n/ttrl.html">TTRL测试时强化学习</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/lora.html">LoRA</a><span class="yr">2021.06 · 系统·效率</span><div class=nt>每道题训练一个独立的LoRA适配器，避免改动全部参数。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/arc-agi.html">ARC-AGI</a><span class="yr">2019.11 · 数据·评测</span><div class=nt>以ARC为主要评测，把每道题的示例变成测试时的训练数据。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/llama-3.html">Llama 3</a><span class="yr">2024.04 · LLM</span><div class=nt>主要结果基于Llama 3系列8B模型。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/ttt.html">测试时训练层TTT</a><span class="yr">2024.07 · 基础</span><div class=nt>同属「推理时更新参数」的测试时训练思路；TTT层把它做进序列模型的隐状态，本文直接在推理时微调整个模型的LoRA。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/ttrl.html">TTRL测试时强化学习</a><span class="yr">2025.04 · 推理·智能体</span><div class=nt>同为测试时训练：前者用题目示例做监督微调，TTRL在完全无标签的题上做强化学习。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/in-context-learning.html">上下文学习与提示</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/peft-concept.html">参数高效微调</a> <a class="chip c" href="../c/data-augmentation.html">数据增强</a></p>
+
+<h2>怎么学</h2><p>先了解<a class="ln" href="../n/arc-agi.html">ARC-AGI</a>的题目形式 → 读原文第3节TTT数据构造和第5节增强推理与投票 → 动手：选一个小模型和几道ARC题，用留一法加旋转造数据训练LoRA，比较训练前后的正确率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2411.07279" rel="noopener">https://arxiv.org/abs/2411.07279</a>（标题、作者、v1提交于2024-11-11；摘要中53.0%、61.9%、BBH 50.5%→57.8%；正文（arxiv.org/html/2411.07279v2）核对留一法与几何变换、每题LoRA训练2轮最多250例、分层投票、人类平均60.2%、作者单位MIT。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%B5%8B%E8%AF%95%E6%97%B6%E8%AE%AD%E7%BB%83%E8%A7%A3ARC%EF%BC%88arc-ttt%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aarc-ttt%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/arc-ttt.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="browser-use.html"><small>本分支上一个 · 2024.11</small><b>Browser Use</b></a><a class="r" href="mcp.html"><small>本分支下一个 · 2024.11</small><b>模型上下文协议MCP</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

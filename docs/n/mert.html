@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>最小错误率训练MERT（2003） · AI脉络</title>
+<meta name="description" content="对数线性翻译模型要给十几个特征（翻译概率、语言模型、调序惩罚……）定权重，当时按最大似然或最大互信息来训，但这些目标与最终用BLEU衡量的翻译质量只有松散的关系。 直接在开发集上最小化评测指标的错误数：每轮用解码器生成n-best候选，沿一条直线搜索权重时利用“得分是权重的分段线性函数”精确找出最…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/mert.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="最小错误率训练MERT（2003）">
+<meta property="og:description" content="对数线性翻译模型要给十几个特征（翻译概率、语言模型、调序惩罚……）定权重，当时按最大似然或最大互信息来训，但这些目标与最终用BLEU衡量的翻译质量只有松散的关系。 直接在开发集上最小化评测指标的错误数：每轮用解码器生成n-best候选，沿一条直线搜索权重时利用“得分是权重的分段线性函数”精确找出最…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/mert.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/mert">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 规则与统计翻译</div>
+<h1>最小错误率训练MERT</h1>
+<div class="full">Minimum Error Rate Training in Statistical Machine Translation</div>
+<div class="meta"><span>2003.07</span><span>论文</span><span>重要</span><span>ACL 2003</span><span>Franz Josef Och · 南加州大学信息科学研究所（ISI）</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://aclanthology.org/P03-1021/" rel="noopener">ACL Anthology ↗</a><a class="btn sm" href="../index.html#/n/mert">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>对数线性翻译模型要给十几个特征（翻译概率、语言模型、调序惩罚……）定权重，当时按最大似然或最大互信息来训，但这些目标与最终用BLEU衡量的翻译质量只有松散的关系。</p></div><div><h4>方法</h4><p>直接在开发集上最小化评测指标的错误数：每轮用解码器生成n-best候选，沿一条直线搜索权重时利用“得分是权重的分段线性函数”精确找出最优点，迭代到候选列表不再变化。</p></div><div><h4>影响</h4><p>“训练用什么指标，就在那个指标上最好”成为共识。MERT作为调参步骤内置进Moses，此后约十年几乎所有统计翻译系统都用它来定特征权重。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/log-linear-smt.html">对数线性翻译模型</a>把翻译写成<code>e_best = argmax_e Σ_m λ_m · h_m(e, f)</code>：每个<code>h_m</code>是一个特征（短语翻译概率的对数、语言模型的对数、译文长度、调序距离等），<code>λ_m</code>是它的权重。特征本身各自从数据中估计好了，剩下的问题是这十来个权重怎么定。</p><p>Och和Ney在2002年用的是最大互信息（MMI，类似<a class="ln" href="../n/maxent-nlp.html">最大熵模型</a>的训练）：让参考译文的条件概率尽量高。可是评测时看的是<a class="ln" href="../n/bleu.html">BLEU</a>或词错误率这类指标，它们是在离散的最优译文上计算的，与“参考译文的概率”只是间接相关。更麻烦的是，解码时有剪枝，参考译文往往根本不在系统能产出的候选里，MMI只能临时挑一个与参考最接近的候选当“伪参考”。</p><h2>方法</h2><p><b>目标</b>。设开发集有S个句子，<code>Ê(f_s; λ)</code>是当前权重下解码出的最优译文，<code>E(r_s, e)</code>是与参考<code>r_s</code>比较的错误数（或BLEU所需的n-gram统计量）。直接求<code>λ̂ = argmin_λ Σ_s E(r_s, Ê(f_s; λ))</code>。这个函数里有argmax，对λ是分段常数，到处梯度为零，不能用梯度下降。</p><p><b>n-best近似</b>。对每个句子先让解码器输出约200个候选，只在这些候选里求argmax。</p><p><b>精确的线搜索</b>。每次只沿一个方向<code>λ + γ·d</code>移动。对某个候选e，模型得分<code>Σ λ_m h_m + γ · Σ d_m h_m</code>是γ的一次函数，即一条直线。一个句子的所有候选对应一组直线，最优译文就是这组直线的上包络——它是分段线性的，只在少数几个交点处换人。算出所有句子的交点，按γ排序扫一遍，累加每个交点处错误数（或BLEU统计量）的变化，就能精确找到这一维上的最优γ。外层用Powell式的多方向搜索，配合随机起点。</p><p><b>迭代</b>。用新权重重新解码，把新的n-best并入旧列表，再优化，直到列表不再变化，论文中约5到7轮收敛。</p><h2>结果</h2><p>在2002年TIDES汉英小数据评测上（训练5,109句对，开发集640句，测试集878句），用不同目标训练同一个系统，再用各指标在测试集上评估：用BLEU训练时测试集BLEU为17.2%，用词错误率（mWER）训练为13.5%，用MMI训练只有11.3%。总体规律是“用哪个指标训练，在哪个指标上最好”，且直接优化指标的各方案都明显优于MMI。一个重要原因是译文长度：mWER和MMI偏好短译文，而BLEU有长度惩罚。平滑版和不平滑版的错误数结果几乎相同。</p><h2>后来的发展</h2><p><a class="ln" href="../n/moses.html">Moses</a>把MERT作为标准调参步骤，<a class="ln" href="../n/phrase-smt.html">短语统计机器翻译</a>、<a class="ln" href="../n/hiero.html">层次短语翻译Hiero</a>一类系统都靠它在开发集上定权重。MERT的问题也很快暴露：特征一多就过拟合、结果随随机起点波动，后来出现了MIRA、PRO等能处理成千上万个特征的调参方法。</p><p>它更深远的影响是思路：模型最终按什么指标被评判，就直接朝那个指标优化。神经翻译时代，<a class="ln" href="../n/mixer.html">MIXER序列级训练</a>用<a class="ln" href="../n/reinforce.html">REINFORCE策略梯度</a>直接优化BLEU；再往后，用人类偏好作为奖励来微调语言模型（<a class="ln" href="../n/rlhf-lm.html">用人类偏好微调语言模型</a>、<a class="ln" href="../n/instructgpt.html">InstructGPT与RLHF</a>）也是同一个想法，只是把BLEU换成了更接近人类判断的信号。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只能可靠地调十几个权重：论文自己就担心参数一多就会在几百句的开发集上严重过拟合，无法用于成千上万个稀疏特征。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>目标函数非凸、分段常数，结果依赖随机起点，同一系统重复调参的BLEU会有明显波动。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>完全依赖自动指标的好坏；论文观察到不同指标给出的结论差别很大，直接优化某个指标可能利用指标的缺陷，而不是真正提高译文质量。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/rlhf-lm.html">用人类偏好微调语言模型</a> <a class="chip hue" style="--h:0" href="../n/instructgpt.html">InstructGPT与RLHF</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/statistical-mt-1990.html">噪声信道翻译模型</a><span class="yr">1990.06 · NLP</span><div class=nt>只有语言模型和翻译模型两个因子，无法加入其他有用的信息，也无法直接按翻译质量调参。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/maxent-nlp.html">最大熵模型</a><span class="yr">1996 · NLP</span><div class=nt>最大熵/最大互信息训练追求参考译文的高概率，MERT追求低错误数；在同一系统上MERT的BLEU明显更高。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/bleu.html">BLEU</a><span class="yr">2002.07 · 数据·评测</span><div class=nt>把BLEU（以及NIST、词错误率）直接当作训练目标，按句累积n-gram统计量以便在线搜索中快速更新。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/log-linear-smt.html">对数线性翻译模型</a><span class="yr">2002.07 · NLP</span><div class=nt>对数线性模型的特征权重原来用最大互信息训练，与翻译质量关系松散，MERT改为直接最小化开发集上的评测错误。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/instructgpt.html">InstructGPT与RLHF</a><span class="yr">2022.03 · LLM</span><div class=nt>完全依赖自动指标的好坏；论文观察到不同指标给出的结论差别很大，直接优化某个指标可能利用指标的缺陷，而不是真正提高译文质量。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/hiero.html">层次短语翻译Hiero</a><span class="yr">2005.06 · NLP</span><div class=nt>规则特征、语言模型和惩罚项的权重用最小错误率训练在NIST 2002开发集上调到BLEU最优。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/moses.html">Moses</a><span class="yr">2007.06 · NLP</span><div class=nt>内置最小错误率训练，用开发集上的BLEU调各特征的权重。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/cho-encdec.html">RNN编码器-解码器与GRU</a><span class="yr">2014.06 · NLP</span><div class=nt>新特征的权重与其他特征一起用最小错误率训练在开发集上调到BLEU最优。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/rlhf-lm.html">用人类偏好微调语言模型</a><span class="yr">2019.09 · LLM</span><div class=nt>完全依赖自动指标的好坏；论文观察到不同指标给出的结论差别很大，直接优化某个指标可能利用指标的缺陷，而不是真正提高译文质量。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/text-metrics.html">文本生成的自动指标</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/train-val-test.html">训练集、验证集与测试集</a> <a class="chip c" href="../c/logistic-regression.html">逻辑回归</a></p>
+<h2>本篇术语</h2><ul><li><b>n-best列表</b>　解码器对一个输入按模型得分排出的前n个候选译文；MERT只在这个有限集合里重新挑最优译文，避免每改一次权重就重新解码。</li><li><b>上包络</b>　一组直线在每个横坐标处取最高的那一条所构成的折线；它说明了随着权重变化，最优候选只在有限的几个点上发生变化。</li><li><b>开发集调参</b>　特征从训练集上学好后，用一个独立的小开发集来定组合权重，再到测试集上报告结果。</li></ul>
+<h2>怎么学</h2><p>先理解<a class="ln" href="../n/log-linear-smt.html">对数线性翻译模型</a>的打分公式和<a class="ln" href="../n/bleu.html">BLEU</a>的计算方法。读原文第2节（对数线性模型）、第4节（直接优化错误数为何难）、第5节（线搜索算法）和表3。动手：写一个小程序，给3个句子各10个候选、每个候选2维特征和一个错误数，画出沿某一方向γ变化时每句最优候选的上包络，并扫描交点找到最优γ。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://aclanthology.org/P03-1021.pdf" rel="noopener">https://aclanthology.org/P03-1021.pdf</a>（标题、唯一作者Och与USC ISI，ACL 2003；分段线性线搜索、每轮约200个候选、5–7轮收敛；2002 TIDES汉英小数据任务，训练5,109句对、开发640句、测试878句；表3测试集BLEU：BLEU训练17.2%、mWER训练13.5%、MMI训练11.3%；平滑与不平滑结果几乎相同；结论中对多参数过拟合的担忧。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%9C%80%E5%B0%8F%E9%94%99%E8%AF%AF%E7%8E%87%E8%AE%AD%E7%BB%83MERT%EF%BC%88mert%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amert%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/mert.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="phrase-smt.html"><small>本分支上一个 · 2003.05</small><b>短语统计机器翻译</b></a><a class="r" href="klein-manning-parser.html"><small>本分支下一个 · 2003.07</small><b>非词汇化句法分析</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

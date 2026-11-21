@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>随机森林（2001） · AI脉络</title>
+<meta name="description" content="单棵决策树方差大、容易过拟合；Bagging把多棵树平均后有所改善，但各棵树长得太像，平均的效果有限；AdaBoost更准，却对标签噪声敏感。 每棵树用自助采样的数据训练，并且每个结点只在随机抽出的少数几个特征里挑最佳切分，故意让树彼此不同，再投票或取平均。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/random-forest.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="随机森林（2001）">
+<meta property="og:description" content="单棵决策树方差大、容易过拟合；Bagging把多棵树平均后有所改善，但各棵树长得太像，平均的效果有限；AdaBoost更准，却对标签噪声敏感。 每棵树用自助采样的数据训练，并且每个结点只在随机抽出的少数几个特征里挑最佳切分，故意让树彼此不同，再投票或取平均。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/random-forest.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/random-forest">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 决策树与集成</div>
+<h1>随机森林</h1>
+<div class="full">Random Forests</div>
+<div class="meta"><span>2001</span><span>论文</span><span>重要</span><span>Machine Learning 45(1), 2001</span><span>Leo Breiman · UC Berkeley</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://link.springer.com/article/10.1023/A:1010933404324" rel="noopener">Springer ↗</a><a class="btn sm" href="https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf" rel="noopener">作者PDF ↗</a><a class="btn sm" href="../index.html#/n/random-forest">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>单棵决策树方差大、容易过拟合；Bagging把多棵树平均后有所改善，但各棵树长得太像，平均的效果有限；AdaBoost更准，却对标签噪声敏感。</p></div><div><h4>方法</h4><p>每棵树用自助采样的数据训练，并且每个结点只在随机抽出的少数几个特征里挑最佳切分，故意让树彼此不同，再投票或取平均。</p></div><div><h4>影响</h4><p>几乎不用调参、不怕加树过拟合、自带误差估计和特征重要性，成为表格数据上最常用的基线之一，至今仍是sklearn里的默认选择之一。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/cart.html">决策树CART</a>决策树容易读懂，但很不稳定：训练数据稍有变化，树的结构就可能大变，属于低偏差、高方差的模型（见<a class="lc" href="../c/bias-variance.html">偏差-方差权衡</a>）。<a class="ln" href="../n/bagging.html">Bagging</a>的办法是从训练集有放回地抽很多份自助样本，各训一棵树，再投票，用平均压低方差。</p><p>问题在于，如果数据里有一两个特别强的特征，几乎每棵树的顶层都会用它们切分，各棵树高度相关。n个完全相关的模型平均起来等于一个模型，所以Bagging的收益很快到顶。另一边，<a class="ln" href="../n/adaboost.html">AdaBoost与集成学习</a>通过反复加权难样本，准确率更高，但遇到标错的样本会不断加大它们的权重，对噪声很敏感。</p><h2>方法</h2><p>随机森林在Bagging之上再加一层随机性。对每棵树：</p><ul><li>从训练集有放回地抽一份同样大小的自助样本；</li><li>生长CART树时，每个结点<b>只从随机抽出的F个特征里</b>找最佳切分（论文试了F=1和F取不超过<code>log₂M+1</code>的整数，M是特征总数）；</li><li>树长到最大，不剪枝。</li></ul><p>预测时分类取多数票，回归取平均。</p><p>论文给出两条理论结果。第一，由大数定律，树越多，泛化误差几乎必然收敛到一个极限，所以<b>加树不会过拟合</b>。第二，泛化误差有上界<code>PE* ≤ ρ̄(1 − s²)/s²</code>，其中<code>s</code>是单棵树的“强度”（平均间隔），<code>ρ̄</code>是树之间的平均相关。随机选特征就是在牺牲一点强度的同时大幅压低相关。</p><p><b>袋外估计</b>：每份自助样本大约漏掉三分之一的原始样本。对每个样本，只用没见过它的那些树投票，得到的错误率就是泛化误差的估计，不必另留验证集。把某个特征在袋外数据里随机打乱、看误差上升多少，就得到这个特征的重要性。</p><h2>结果</h2><p>在13个UCI小数据集、3个较大数据集和4个合成数据集上，错误率与AdaBoost相当或更好；在人为加入标签噪声时，随机森林的退化明显小于AdaBoost（摘要原话为“对噪声更稳健”）。</p><h2>后来的发展</h2><p>随机森林与<a class="ln" href="../n/gradient-boosting.html">梯度提升机GBM</a>成为此后十多年表格数据的两大主力，后者经<a class="ln" href="../n/xgboost.html">XGBoost</a>工程化后在竞赛中更常拿第一，但随机森林因几乎不用调参仍是首选基线。论文中的置换特征重要性启发了后来的模型解释方法。同年Breiman发表<a class="ln" href="../n/two-cultures.html">Breiman：两种文化</a>，用随机森林为例主张“算法建模”文化。在图像、语音、文本这类原始高维信号上，它很快被深度网络取代。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每棵树独立地拟合原始标签，无法像提升法那样逐轮纠正前面的错误，在多数表格基准上精度略低于精心调参的梯度提升。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/xgboost.html">XGBoost</a></div></li><li>只能在给定的特征上切分，不会从像素、波形、文字这类原始输入中学出特征，在感知任务上远不如深度网络。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/alexnet.html">AlexNet</a></div></li><li>几百棵深树的整体难以解释，置换重要性在特征相关时会产生偏差。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:312" href="../n/shap.html">SHAP</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:30" href="../n/expert-systems.html">专家系统的商业化</a><span class="yr">1980 · 事件</span><div class=nt>知识获取瓶颈：每条规则都要从专家那里手工提炼，规模越大、维护越难，XCON每年约一半规则需要修改。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/cart.html">决策树CART</a><span class="yr">1984 · 基础</span><div class=nt>每棵树按CART的方式生长，只是切分时的候选特征被随机限制，并且不剪枝。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/svm.html">支持向量机</a><span class="yr">1995 · 基础</span><div class=nt>同一时期表格与中等维度分类的另一条主流路线；随机森林不需要选核、对特征尺度不敏感。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/bagging.html">Bagging</a><span class="yr">1996 · 基础</span><div class=nt>保留自助采样加投票，再在每个结点随机抽特征，进一步降低树之间的相关性。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/adaboost.html">AdaBoost与集成学习</a><span class="yr">1997 · 基础</span><div class=nt>同为树的集成：AdaBoost顺序加权纠错，随机森林并行随机化；论文显示精度相当而随机森林对标签噪声更稳健。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/alexnet.html">AlexNet</a><span class="yr">2012.09 · 视觉</span><div class=nt>只能在给定的特征上切分，不会从像素、波形、文字这类原始输入中学出特征，在感知任务上远不如深度网络。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/gradient-boosting.html">梯度提升机GBM</a><span class="yr">2001 · 基础</span><div class=nt>同年的另一种树集成：随机森林并行随机化以降方差，梯度提升顺序纠错以降偏差；精度上后者经XGBoost调优后通常更高。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/scikit-learn.html">scikit-learn</a><span class="yr">2010.02 · 系统·效率</span><div class=nt>提供随机森林等集成方法的高效实现，成为表格数据上的常用基线。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:312" href="../n/lime.html">LIME</a><span class="yr">2016.02 · 安全·可解释</span><div class=nt>主要解释对象之一，论文用它展示对上千棵树的模型也能几秒内给出解释。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/xgboost.html">XGBoost</a><span class="yr">2016.03 · 基础</span><div class=nt>借用随机森林的列（特征）采样来防过拟合并加速训练。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:312" href="../n/shap.html">SHAP</a><span class="yr">2017.05 · 安全·可解释</span><div class=nt>几百棵深树的整体难以解释，置换重要性在特征相关时会产生偏差。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/decision-tree.html">决策树</a> <a class="chip c" href="../c/ensemble.html">集成学习</a> <a class="chip c" href="../c/bias-variance.html">偏差-方差权衡</a> <a class="chip c" href="../c/generalization.html">泛化与过拟合</a> <a class="chip c" href="../c/train-val-test.html">训练集、验证集与测试集</a></p>
+<h2>本篇术语</h2><ul><li><b>自助采样（bootstrap）</b>　从n个样本里有放回地抽n次，得到一份同样大小、但有重复也有遗漏的新数据集。</li><li><b>袋外估计（out-of-bag）</b>　用没见过某个样本的那些树来预测它，得到的错误率可以当作验证误差用。</li></ul>
+<h2>怎么学</h2><p>先读<a class="lc" href="../c/decision-tree.html">决策树</a>和<a class="lc" href="../c/ensemble.html">集成学习</a>，弄懂<a class="ln" href="../n/bagging.html">Bagging</a>为什么能降方差。然后读原文第1–4节和第10节（特征重要性）。动手：用scikit-learn的RandomForestClassifier在一个表格数据集上画出袋外误差随树的数量变化的曲线，并比较max_features取1、√M和M时的差别。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://link.springer.com/article/10.1023/A:1010933404324" rel="noopener">https://link.springer.com/article/10.1023/A:1010933404324</a>（标题、作者Breiman、Machine Learning第45卷第5–32页、2001年10月；摘要中误差随树数收敛、强度与相关、与AdaBoost相比对噪声更稳健。作者PDF中核对了F=1与log₂M+1、上界ρ̄(1−s²)/s²、约三分之一袋外样本、13个UCI数据集、第10节置换重要性。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E9%9A%8F%E6%9C%BA%E6%A3%AE%E6%9E%97%EF%BC%88random-forest%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Arandom-forest%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/random-forest.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="manifold-learning.html"><small>本分支上一个 · 2000.12</small><b>流形学习Isomap/LLE</b></a><a class="r" href="gradient-boosting.html"><small>本分支下一个 · 2001</small><b>梯度提升机GBM</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DiffusionNFT前向过程RL（2025） · AI脉络</title>
+<meta name="description" content="Flow-GRPO这类方法要把反向采样离散成SDE来算似然，因此被绑定在特定采样器上，正反过程不一致，还和CFG纠缠在一起。 不在反向采样上做策略梯度，而是在前向加噪过程上做流匹配回归：按奖励把样本分成“偏正”与“偏负”，用对比得到隐式的策略改进方向。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/diffusionnft.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DiffusionNFT前向过程RL（2025）">
+<meta property="og:description" content="Flow-GRPO这类方法要把反向采样离散成SDE来算似然，因此被绑定在特定采样器上，正反过程不一致，还和CFG纠缠在一起。 不在反向采样上做策略梯度，而是在前向加噪过程上做流匹配回归：按奖励把样本分成“偏正”与“偏负”，用对比得到隐式的策略改进方向。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/diffusionnft.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/diffusionnft">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 可控生成与编辑</div>
+<h1>DiffusionNFT前向过程RL</h1>
+<div class="full">DiffusionNFT: Online Diffusion Reinforcement with Forward Process</div>
+<div class="meta"><span>2025.09</span><span>论文</span><span>延伸</span><span>ICLR 2026</span><span>Kaiwen Zheng, Huayu Chen, Haotian Ye, Haoxiang Wang, Qinsheng Zhang, Kai Jiang, Hang Su, Stefano Ermon, Jun Zhu, Ming-Yu Liu · NVIDIA / 清华大学 / 斯坦福大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2509.16117" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/diffusionnft">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Flow-GRPO这类方法要把反向采样离散成SDE来算似然，因此被绑定在特定采样器上，正反过程不一致，还和CFG纠缠在一起。</p></div><div><h4>方法</h4><p>不在反向采样上做策略梯度，而是在前向加噪过程上做流匹配回归：按奖励把样本分成“偏正”与“偏负”，用对比得到隐式的策略改进方向。</p></div><div><h4>影响</h4><p>官方称比Flow-GRPO效率高至多25倍；SD3.5-Medium的GenEval在约1千步内从0.24升到0.98，而且不需要CFG。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>流模型做强化学习的难点是似然算不出来。<a class="ln" href="../n/flow-grpo.html">Flow-GRPO</a>、<a class="ln" href="../n/dancegrpo.html">DanceGRPO</a>的办法是把采样改成SDE，逐步记录转移概率。DiffusionNFT换了个方向：直接在<a class="ln" href="../n/flow-matching.html">Flow Matching</a>的训练目标上做文章。</p><p>每个提示词生成K张图并打分，组内标准化后映射为“最优概率”r∈[0,1]，每张图按r算正样本、按1−r算负样本。用旧模型v_old和待训模型v_θ构造两个隐式策略：正策略 <code>v⁺ = (1−β)v_old + βv_θ</code>，负策略 <code>v⁻ = (1+β)v_old − βv_θ</code>；损失为 <code>r·‖v⁺−v‖² + (1−r)·‖v⁻−v‖²</code>，v是普通流匹配目标。论文证明其最优解等于旧模型沿“正负分布差”方向前进一步。</p><p>因为只需要干净的最终图像，训练与采样解耦，可用任意黑箱采样器；作者把<a class="ln" href="../n/cfg.html">无分类器引导CFG</a>看作一种离线的强化引导，训练后模型不再需要CFG。实验在<a class="ln" href="../n/sd3.html">Stable Diffusion 3</a>系列的SD3.5-Medium上进行。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>依赖旧模型的指数滑动平均等离策略设置，后续工作指出训练对这些超参数敏感、不够稳定。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>和其他视觉RL一样受奖励模型偏差影响，多奖励之间存在此消彼长。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/cfg.html">无分类器引导CFG</a><span class="yr">2022.07 · 生成</span><div class=nt>把CFG视为离线强化引导，训练后无需CFG也能达到或超过带CFG的效果。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/flow-matching.html">Flow Matching</a><span class="yr">2022.10 · 生成</span><div class=nt>强化信号直接写进流匹配的回归损失。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/sd3.html">Stable Diffusion 3</a><span class="yr">2024.03 · 生成</span><div class=nt>以SD3.5-Medium作为后训练的基础模型。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/flow-grpo.html">Flow-GRPO</a><span class="yr">2025.05 · 生成</span><div class=nt>去掉对SDE似然和特定采样器的依赖，消除正反过程不一致，同等效果下训练效率高3–25倍。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/dancegrpo.html">DanceGRPO</a><span class="yr">2025.05 · 生成</span><div class=nt>训练必须沿SDE多步采样并记录轨迹，算力开销大，也限制了可用的采样器。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/normalizing-flow.html">可逆流与流匹配</a> <a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/guidance.html">条件生成与引导</a> <a class="chip c" href="../c/rlhf-concept.html">人类反馈强化学习</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2509.16117" rel="noopener">https://arxiv.org/abs/2509.16117</a>（核对标题、作者与NVIDIA/清华/斯坦福署名、v1日期2025-09-19、ICLR 2026；正文中正负隐式策略与损失公式、无需似然与CFG；GenEval 0.24→0.98（约1k步）、Flow-GRPO需5k步达0.95、至多25倍效率、SD3.5-Medium。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DiffusionNFT%E5%89%8D%E5%90%91%E8%BF%87%E7%A8%8BRL%EF%BC%88diffusionnft%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adiffusionnft%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/diffusionnft.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="video-zero-shot.html"><small>本分支上一个 · 2025.09</small><b>视频模型零样本推理</b></a><a class="r" href="longlive.html"><small>本分支下一个 · 2025.09</small><b>LongLive实时长视频</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

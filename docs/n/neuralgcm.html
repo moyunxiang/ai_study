@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NeuralGCM混合气候模型（2023） · AI脉络</title>
+<meta name="description" content="纯机器学习的天气模型预报准但不稳定、无法做长期气候模拟；传统大气环流模型（GCM）物理一致，却依赖手工调参的小尺度过程参数化，且很慢。 把可微的大气动力学求解器与学习到的神经网络小尺度物理混合在一起，端到端训练，使模型既能做天气预报，也能跑几十年的气候模拟。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/neuralgcm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="NeuralGCM混合气候模型（2023）">
+<meta property="og:description" content="纯机器学习的天气模型预报准但不稳定、无法做长期气候模拟；传统大气环流模型（GCM）物理一致，却依赖手工调参的小尺度过程参数化，且很慢。 把可微的大气动力学求解器与学习到的神经网络小尺度物理混合在一起，端到端训练，使模型既能做天气预报，也能跑几十年的气候模拟。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/neuralgcm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/neuralgcm">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:144"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/sci.html">AI for Science</a> › 天气与气候预报</div>
+<h1>NeuralGCM混合气候模型</h1>
+<div class="full">Neural General Circulation Models for Weather and Climate</div>
+<div class="meta"><span>2023.11</span><span>论文</span><span>重要</span><span>Nature 2024</span><span>Kochkov, Yuval, Langmore, Norgaard, Smith, Mooers, Klöwer, Lottes, Hoyer, Battaglia et al. · Google Research / MIT / ECMWF 等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2311.07222" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/neuralgcm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>纯机器学习的天气模型预报准但不稳定、无法做长期气候模拟；传统大气环流模型（GCM）物理一致，却依赖手工调参的小尺度过程参数化，且很慢。</p></div><div><h4>方法</h4><p>把可微的大气动力学求解器与学习到的神经网络小尺度物理混合在一起，端到端训练，使模型既能做天气预报，也能跑几十年的气候模拟。</p></div><div><h4>影响</h4><p>首个把可微物理求解器与神经网络参数化结合、同时在天气、集合预报和多年气候上与最好方法持平的模型。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>环流模型（GCM）把大气分成格点，用数值方法求解大尺度动力学（风、温度、气压的演化），而云、对流、辐射等小于格距的过程只能用经验公式表示，称为参数化，这些参数化是气候模型误差的主要来源。<a class="ln" href="../n/graphcast.html">GraphCast与AI天气预报</a>、<a class="ln" href="../n/pangu-weather.html">盘古天气</a>这类纯数据驱动模型在1至10天预报上超过了业务模型，但没有展示过合格的集合预报，滚动到长时间后会数值发散，因此无法用于气候。</p><h2>方法</h2><p>NeuralGCM由两部分组成：<b>可微动力核心</b>，用JAX实现的大气原始方程求解器，负责大尺度流体动力学；<b>学习到的物理模块</b>，一个神经网络，输入局部大气柱的状态，输出温度、湿度、风等的变化趋势，代替传统的手工参数化。两部分在每个时间步串联，整个模拟可对参数求梯度（见<a class="lc" href="../c/autodiff.html">自动微分与计算图</a>），因此能用多步滚动的预报误差端到端训练。训练数据是ERA5再分析，并通过模型对随机性的处理产生集合成员。</p><h2>结果</h2><p>摘要报告：在1至10天预报上与最好的机器学习模型相当，在1至15天集合预报上与ECMWF集合预报系统ENS相当；在给定海表温度的条件下，可以多年稳定追踪全球平均温度等气候指标，140公里分辨率的气候模拟还能出现真实的热带气旋频率与路径；计算开销比传统GCM低几个数量级。</p><h2>后来的发展</h2><p>NeuralGCM开启了「混合」路线：保留物理求解器、用学习替代最不确定的部分。<a class="ln" href="../n/aifs-operational.html">ECMWF AIFS业务化</a>仍沿用纯数据驱动，二者代表了业务气象的两条路。后续还出现了NeuralGCM的降水、大气化学等扩展工作（未核对）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要给定海表温度，没有耦合海洋、冰和陆面，不是完整的气候系统模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/aurora.html">Aurora地球系统基础模型</a></div></li><li>气候模拟只验证了数十年的大尺度指标，对百年尺度的气候变化和强迫响应没有验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>训练与评估基于ERA5，存在对再分析的偏差，对未来变暖背景下分布外气候的泛化未知。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>分辨率仅140公里，难以直接表示小尺度极端事件。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:144" href="../n/gencast.html">GenCast扩散集合预报</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:144" href="../n/fourcastnet.html">FourCastNet</a><span class="yr">2022.02 · 科学</span><div class=nt>纯数据驱动的天气预报路线。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/pangu-weather.html">盘古天气</a><span class="yr">2022.11 · 科学</span><div class=nt>纯数据驱动，不保证物理一致性，也不能做长期气候模拟。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/graphcast.html">GraphCast与AI天气预报</a><span class="yr">2022.12 · 科学</span><div class=nt>纯数据驱动模型无法做集合预报与长期稳定模拟；NeuralGCM用物理核心约束动力学。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:144" href="../n/pinn.html">物理信息神经网络PINN</a><span class="yr">2017.11 · 科学</span><div class=nt>同属把物理知识放进学习的路线，但NeuralGCM保留完整的数值求解器而不是把方程写进损失。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:144" href="../n/weatherbench2.html">WeatherBench 2</a><span class="yr">2023.08 · 科学</span><div class=nt>用WeatherBench 2的指标与基线评估预报技能。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:144" href="../n/gencast.html">GenCast扩散集合预报</a><span class="yr">2023.12 · 科学</span><div class=nt>同月提出的概率预报路线：NeuralGCM靠可微物理核心，GenCast完全靠扩散模型。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:144" href="../n/aurora.html">Aurora地球系统基础模型</a><span class="yr">2024.05 · 科学</span><div class=nt>需要给定海表温度，没有耦合海洋、冰和陆面，不是完整的气候系统模型。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autodiff.html">自动微分与计算图</a> <a class="chip c" href="../c/ode-sde.html">常微分方程与随机微分方程</a> <a class="chip c" href="../c/derivative-gradient.html">导数、偏导与梯度</a> <a class="chip c" href="../c/generalization.html">泛化与过拟合</a> <a class="chip c" href="../c/distribution-shift.html">分布偏移</a></p>
+<h2>本篇术语</h2><ul><li><b>参数化</b>　在数值模型里，对小于网格尺度的物理过程（如云、对流）用经验公式近似表示。</li><li><b>可微模拟器</b>　整个模拟计算可以对参数求导，使物理求解器和神经网络可以一起用梯度训练。</li></ul>
+<h2>怎么学</h2><p>先学<a class="lc" href="../c/autodiff.html">自动微分与计算图</a>与<a class="lc" href="../c/ode-sde.html">常微分方程与随机微分方程</a>。读原文对混合结构和气候实验两节；用开源NeuralGCM包跑一次短期预报。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2311.07222" rel="noopener">https://arxiv.org/abs/2311.07222</a>（标题、作者、v1日期2023-11-13；摘要中可微动力求解器加ML组件、1至10天、1至15天对ENS、多年气候指标、140公里热带气旋、数量级节省。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20NeuralGCM%E6%B7%B7%E5%90%88%E6%B0%94%E5%80%99%E6%A8%A1%E5%9E%8B%EF%BC%88neuralgcm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aneuralgcm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/neuralgcm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="a-lab.html"><small>本分支上一个 · 2023.11</small><b>A-Lab自主实验室</b></a><a class="r" href="gnome.html"><small>本分支下一个 · 2023.11</small><b>GNoME材料发现</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

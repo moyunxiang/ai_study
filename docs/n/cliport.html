@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CLIPort（2021） · AI脉络</title>
+<meta name="description" content="Transporter能精确地“在哪里拿、放到哪里”，但每个网络从零学视觉，不懂“红色”“鞋子”这些概念，换个目标就得重采示范；CLIP懂语义却缺少精细操作需要的空间精度。 双流网络：语义流用冻结的CLIP图像和文本编码器理解“是什么”，空间流沿用Transporter理解“在哪里”，两路逐层横向…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/cliport.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CLIPort（2021）">
+<meta property="og:description" content="Transporter能精确地“在哪里拿、放到哪里”，但每个网络从零学视觉，不懂“红色”“鞋子”这些概念，换个目标就得重采示范；CLIP懂语义却缺少精细操作需要的空间精度。 双流网络：语义流用冻结的CLIP图像和文本编码器理解“是什么”，空间流沿用Transporter理解“在哪里”，两路逐层横向…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/cliport.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/cliport">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 操作技能学习</div>
+<h1>CLIPort</h1>
+<div class="full">CLIPort: What and Where Pathways for Robotic Manipulation</div>
+<div class="meta"><span>2021.09</span><span>论文</span><span>重要</span><span>CoRL 2021</span><span>Mohit Shridhar, Lucas Manuelli, Dieter Fox · 华盛顿大学 / NVIDIA</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2109.12098" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://cliport.github.io" rel="noopener">项目主页与代码 ↗</a><a class="btn sm" href="../index.html#/n/cliport">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Transporter能精确地“在哪里拿、放到哪里”，但每个网络从零学视觉，不懂“红色”“鞋子”这些概念，换个目标就得重采示范；CLIP懂语义却缺少精细操作需要的空间精度。</p></div><div><h4>方法</h4><p>双流网络：语义流用冻结的CLIP图像和文本编码器理解“是什么”，空间流沿用Transporter理解“在哪里”，两路逐层横向融合，输出由语言指令决定的逐像素拿取与放置热力图。</p></div><div><h4>影响</h4><p>第一次把网络规模预训练的视觉语言模型接进端到端操作策略，一个多任务模型听懂语言完成10个仿真和9个真机任务；“冻结的视觉语言模型+机器人专用头”成为语言条件操作的常见做法。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/transporter.html">Transporter Networks</a>把“拿起放下”表示成俯视图上的逐像素打分，示范效率极高。但它是“白纸”网络：所有视觉表示都从这几条示范里学，不知道颜色、形状、物体类别这些概念。想让它把蓝笔而不是红笔放进盒子，就得重新采一套示范，或者给它一张目标状态的图片。</p><p>另一边，<a class="ln" href="../n/clip.html">CLIP</a>用海量网络图文训练，知道“粉色方块”“球鞋”长什么样，并且图像和文字在同一个空间里。但CLIP的特征是为整图分类设计的，空间精度很粗，直接拿来定位一个要放进几厘米宽槽里的物体是不够的。能不能把两者合起来？</p><h2>方法</h2><p><b>任务形式</b>。和Transporter一样，每一步输出一个拿取位置和一个带旋转的放置位置；区别是多了一句语言指令 <code>l</code>，比如“把粉色方块放进灰色碗里”。拿取和放置的打分网络都换成下面的双流结构。</p><p><b>语义流（what）</b>。用冻结的CLIP ResNet50编码RGB图像；用CLIP的文本编码器把指令编码成一个向量，在解码器的每一层把这个向量平铺到所有像素位置、与图像特征逐元素相乘，让语言去“调制”视觉特征。</p><p><b>空间流（where）</b>。与Transporter相同的<a class="ln" href="../n/fcn.html">全卷积网络FCN</a>沙漏型编解码网络，输入RGB-D，从零训练，负责精确定位。</p><p><b>横向融合</b>。把空间流每层的特征与语义流拼接，再用1×1卷积压缩通道。最终输出逐像素的拿取热力图；放置时仍用Transporter的“模板互相关”，只是模板和搜索图的特征都来自双流网络。</p><p><b>训练</b>。纯<a class="lc" href="../c/imitation-learning.html">模仿学习与行为克隆</a>，示范给出正确像素，热力图做<a class="lc" href="../c/softmax.html">Softmax与logits</a>后用交叉熵训练。</p><h2>结果</h2><p>在扩展的Ravens仿真基准（10个任务，多数分“见过”和“没见过”的颜色、物体两个版本）上，CLIPort在少样本（10条示范起）时明显优于只用空间流的Transporter和用ImageNet ResNet50加BERT的替代方案。一个多任务模型训练10个任务，效果优于或接近10个单任务模型，还能把别的任务里见过的“粉色”等概念迁移过来。真机上，一个多任务模型只用179对图像—动作样本学会9个任务，例如叠方块70%、叠布57%、按文字取物55%。</p><h2>后来的发展</h2><p><a class="ln" href="../n/peract.html">PerAct</a>把CLIPort的二维俯视热力图推广到三维体素和6自由度动作，用Transformer处理语言与体素。“冻结的大规模预训练视觉语言模型负责语义、机器人数据只训练小部分”的思路，在<a class="ln" href="../n/saycan.html">SayCan</a>、<a class="ln" href="../n/rt-1.html">RT-1</a>（用预训练图像编码器和语言嵌入）中继续出现，并最终演变为<a class="ln" href="../n/rt-2.html">RT-2与VLA</a>那样直接微调整个视觉语言模型的VLA。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>动作仍是Transporter式的一次“拿起—放下”，不能做连续轨迹和需要实时反馈的动作。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/rt-1.html">RT-1</a> <a class="chip hue" style="--h:96" href="../n/diffusion-policy.html">Diffusion Policy</a></div></li><li>依赖校准好的俯视RGB-D视图，只能在桌面二维平面上操作，6自由度任务做不了。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/peract.html">PerAct</a></div></li><li>只理解单步、具体的指令，不会把“把桌子收拾干净”这样的长期目标拆成多步。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/saycan.html">SayCan</a> <a class="chip hue" style="--h:96" href="../n/code-as-policies.html">Code as Policies</a></div></li><li>真机每个任务只有几条示范、几次测试，成功率在55%–75%之间，论文自己估计需要50–100条示范才能稳定。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/bert.html">BERT</a><span class="yr">2018.10 · LLM</span><div class=nt>论文对比用ImageNet ResNet50加BERT编码指令的方案，发现在少样本时明显不如CLIP，说明图文对齐的预训练才是关键。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:240" href="../n/clip.html">CLIP</a><span class="yr">2021.01 · 多模态</span><div class=nt>用冻结的CLIP ResNet50和文本编码器作语义流，提供颜色、形状、类别等网络规模的语义知识。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/transporter.html">Transporter Networks</a><span class="yr">2020.10 · 具身·世界模型</span><div class=nt>完整保留Transporter的拿取—放置打分和模板互相关框架作为“在哪里”的空间流，加上语言条件。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/fcn.html">全卷积网络FCN</a><span class="yr">2014.11 · 视觉</span><div class=nt>空间流和整体输出都是全卷积的逐像素热力图。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/saycan.html">SayCan</a><span class="yr">2022.04 · 具身·世界模型</span><div class=nt>只理解单步、具体的指令，不会把“把桌子收拾干净”这样的长期目标拆成多步。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/code-as-policies.html">Code as Policies</a><span class="yr">2022.09 · 具身·世界模型</span><div class=nt>与用3万条示范训练的语言条件策略CLIPort对比：没见过的属性和指令下CaP为80%，CLIPort为0。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/rt-1.html">RT-1</a><span class="yr">2022.12 · 具身·世界模型</span><div class=nt>动作仍是Transporter式的一次“拿起—放下”，不能做连续轨迹和需要实时反馈的动作。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/diffusion-policy.html">Diffusion Policy</a><span class="yr">2023.03 · 具身·世界模型</span><div class=nt>动作仍是Transporter式的一次“拿起—放下”，不能做连续轨迹和需要实时反馈的动作。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/peract.html">PerAct</a><span class="yr">2022.09 · 具身·世界模型</span><div class=nt>把CLIPort的二维像素级语言条件动作推广到三维体素的6自由度动作。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/contrastive-learning.html">对比学习</a> <a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a> <a class="chip c" href="../c/zero-few-shot.html">零样本与少样本</a> <a class="chip c" href="../c/transfer-learning.html">迁移学习</a></p>
+<h2>本篇术语</h2><ul><li><b>双流架构</b>　两条并行的网络分别处理不同方面的信息（这里是语义和空间），中间不断交换特征，最后合并输出；名字借自人脑视觉的“what/where”两条通路。</li><li><b>语言条件策略</b>　动作的输出不仅取决于看到的画面，还取决于输入的一句指令；同一场景换一句话，策略做的事就不同。</li><li><b>可供性（affordance）热力图</b>　图像上每个位置“适合在这里做某个动作”的程度，越亮越适合，比如适合抓取或适合放置。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/transporter.html">Transporter Networks</a>和<a class="ln" href="../n/clip.html">CLIP</a> → 读原文第3节和图2（双流结构） → 动手：用开源代码在一个Ravens语言任务上分别训练只用空间流和完整CLIPort，比较在“没见过的颜色”版本上的成功率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2109.12098" rel="noopener">https://arxiv.org/abs/2109.12098</a>、<a href="https://arxiv.org/html/2109.12098" rel="noopener">https://arxiv.org/html/2109.12098</a>（标题、作者、2021-09-24首次提交；冻结CLIP ResNet50语义流、Transporter空间流、横向1×1卷积融合；10个仿真任务、seen/unseen划分；真机Franka Panda上一个多任务模型、179对样本、9个任务，叠方块70%、叠布57%、读字55%；论文估计需50–100条示范。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20CLIPort%EF%BC%88cliport%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acliport%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/cliport.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ibc.html"><small>本分支上一个 · 2021.09</small><b>隐式行为克隆</b></a><a class="r" href="walk-in-minutes.html"><small>本分支下一个 · 2021.09</small><b>几分钟学会走路</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

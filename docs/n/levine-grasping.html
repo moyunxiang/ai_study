@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>机械臂农场抓取（2016） · AI脉络</title>
+<meta name="description" content="抓取系统通常要先标定相机与机械臂的相对位置，再一次性算出抓取点、闭眼执行；标定稍有误差、物体被碰动，抓取就失败，而学习方法的数据量又太小。 让6到14台机械臂两个月里自己试抓80万次，训练一个CNN预测“从当前图像出发、手爪这样移动能否抓成功”，执行时每一步都重新选最优动作，实现无需标定的连续视觉…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/levine-grasping.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="机械臂农场抓取（2016）">
+<meta property="og:description" content="抓取系统通常要先标定相机与机械臂的相对位置，再一次性算出抓取点、闭眼执行；标定稍有误差、物体被碰动，抓取就失败，而学习方法的数据量又太小。 让6到14台机械臂两个月里自己试抓80万次，训练一个CNN预测“从当前图像出发、手爪这样移动能否抓成功”，执行时每一步都重新选最优动作，实现无需标定的连续视觉…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/levine-grasping.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/levine-grasping">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 操作技能学习</div>
+<h1>机械臂农场抓取</h1>
+<div class="full">Learning Hand-Eye Coordination for Robotic Grasping with Deep Learning and Large-Scale Data Collection</div>
+<div class="meta"><span>2016.03</span><span>论文</span><span>重要</span><span>Sergey Levine, Peter Pastor, Alex Krizhevsky, Deirdre Quillen · Google</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1603.02199" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://research.google/blog/deep-learning-for-robots-learning-from-large-scale-interaction/" rel="noopener">Google Research博客：Deep Learning for Robots ↗</a><a class="btn sm" href="../index.html#/n/levine-grasping">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>抓取系统通常要先标定相机与机械臂的相对位置，再一次性算出抓取点、闭眼执行；标定稍有误差、物体被碰动，抓取就失败，而学习方法的数据量又太小。</p></div><div><h4>方法</h4><p>让6到14台机械臂两个月里自己试抓80万次，训练一个CNN预测“从当前图像出发、手爪这样移动能否抓成功”，执行时每一步都重新选最优动作，实现无需标定的连续视觉伺服。</p></div><div><h4>影响</h4><p>第一次用工业级规模的真机数据训练机器人技能，展示了“数据越多越好”在机器人上同样成立，开启了谷歌“机械臂农场”和此后大规模机器人数据集的路线。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/pinto-gupta.html">5万次抓取自监督</a>（2015）用一台机器人700小时自主试抓5万次，把自监督抓取数据提高了40倍，但它的方法是开环的：先看一眼，预测抓取位置，然后执行，过程中不再看。<a class="ln" href="../n/e2e-visuomotor.html">端到端视觉运动策略</a>能闭环地从图像输出动作，但每个任务只用了几小时数据、只在少数位置有效。</p><p>传统的手工抓取系统则依赖深度相机和精确的手眼标定：知道相机在机械臂坐标系里的确切位置，才能把图像中的物体坐标换算成手爪目标。一旦相机被碰歪、机械臂磨损，精度就下降。</p><h2>方法</h2><p><b>数据收集</b>。两个月内同时使用6到14台机械臂，每台面前放一箱随机杂物，相机位置和硬件各有差异，手爪也因磨损而形状不同。每次抓取分若干步：每步记录图像和接下来要执行的手爪运动，最后自动判断是否抓起物体，作为整次尝试的标签。共收集约80万次尝试，早期随机动作的成功率只有10%到30%。</p><p><b>预测网络</b>。CNN的输入是当前图像<code>I_t</code>（以及抓取开始前的图像）和一个候选运动指令<code>v_t</code>（手爪在任务空间中的平移和绕竖直轴的旋转）。<code>v_t</code>经过全连接层后被复制到卷积特征图的每个位置、与图像特征拼接，再经卷积和全连接层输出抓取成功概率<code>g(I_t, v_t)</code>，用交叉熵训练。网络从不被告知相机在哪，必须自己从图像里看出手爪与物体的空间关系，也就是学会“手眼协调”。</p><p><b>连续伺服</b>。执行时，每一步用交叉熵方法（CEM）在动作空间里搜索：采样64个候选<code>v_t</code>，用网络打分，取最好的6个拟合高斯，再从中采样，迭代3次，执行得分最高的动作，然后拍下新图像重来，控制频率约2–5Hz。这与<a class="ln" href="../n/mpc.html">模型预测控制MPC</a>的“每步重新规划、只执行一步”同构。若当前不动就抓的成功概率已接近最优，就闭合手爪。</p><h2>结果</h2><p>在测试集物体（包括重的、扁的、软的、透明的）上与三种方法比较失败率。物体抓起后放回的条件下（100次尝试），本方法失败率20%，手工设计的深度相机抓取系统35%，开环基线43%，随机69%。不放回、逐个清空箱子的条件下，前10次失败率10%（手工系统32.5%、开环27.5%），前30次17.5%；4次重复中有1次在30次内清空了箱子。系统还自己摸索出非常规策略：硬物体要把两指放在两侧，而纸巾、海绵这类软物体则是一指插进中间、一指在旁边直接捏住。</p><h2>后来的发展</h2><p>作者团队随后用同一批机械臂做了<a class="ln" href="../n/qt-opt.html">QT-Opt</a>：把“预测一步能否成功”换成真正的Q学习，考虑多步决策，抓取成功率进一步提高。<a class="ln" href="../n/cdna.html">物理交互视频预测</a>和<a class="ln" href="../n/visual-foresight.html">Visual Foresight</a>则沿着另一个方向，用大规模真机交互数据学习预测“动作会让画面怎样变化”。更长远的影响是观念上的：机器人学习需要大规模数据，这条线一直延伸到多机构汇集的<a class="ln" href="../n/open-x.html">Open X-Embodiment</a>和<a class="ln" href="../n/droid.html">DROID</a>。另一条路则是用仿真绕开真机数据的成本（<a class="ln" href="../n/domain-randomization.html">域随机化与Sim2Real</a>）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只做从上往下的二指捏取，而且是“随便抓起箱子里一个东西”，不能指定抓哪个物体，也不涉及抓起之后的操作。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/qt-opt.html">QT-Opt</a> <a class="chip hue" style="--h:96" href="../n/rt-1.html">RT-1</a></div></li><li>网络只评估单步动作的成功概率，伺服过程是贪心的，不会为长远目标先做铺垫动作。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/qt-opt.html">QT-Opt</a></div></li><li>一项技能就用了14台机械臂、两个月的真机时间，数据成本高到很少有实验室能复制。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/domain-randomization.html">域随机化与Sim2Real</a> <a class="chip hue" style="--h:96" href="../n/open-x.html">Open X-Embodiment</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/mpc.html">模型预测控制MPC</a><span class="yr">1980 · 具身·世界模型</span><div class=nt>执行时每步用CEM优化动作、只执行一步再重新观察，是以学习到的打分网络为模型的滚动时域控制。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/alexnet.html">AlexNet</a><span class="yr">2012.09 · 视觉</span><div class=nt>以深度卷积网络作为抓取成功预测器，AlexNet作者Krizhevsky是合著者。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/e2e-visuomotor.html">端到端视觉运动策略</a><span class="yr">2015.04 · 具身·世界模型</span><div class=nt>同样从图像闭环输出动作，但把数据从每任务几小时扩大到80万次尝试，换来对新物体的泛化。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/pinto-gupta.html">5万次抓取自监督</a><span class="yr">2015.09 · 具身·世界模型</span><div class=nt>Pinto与Gupta的开环预测执行中不再看，无法应对物体被碰动和手爪差异；这里改为每步重新观察的连续伺服，数据量也大一个数量级以上。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/visual-foresight.html">Visual Foresight</a><span class="yr">2016.10 · 具身·世界模型</span><div class=nt>同样用大规模自主真机数据和CEM选动作，但抓取网络只预测“能否成功”这一种结果，这里预测完整的未来画面，可服务于不同目标。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/domain-randomization.html">域随机化与Sim2Real</a><span class="yr">2017.03 · 具身·世界模型</span><div class=nt>大规模真机数据采集代价极高；这里完全不用真实训练图像，只靠随机化仿真数据就让抓取在真实杂乱场景中成功。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/qt-opt.html">QT-Opt</a><span class="yr">2018.06 · 具身·世界模型</span><div class=nt>同一个团队的同一个任务：把只预测单步后果的监督学习，换成考虑整段抓取过程的多步Q学习，未见物体成功率从78%升到96%。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/rt-1.html">RT-1</a><span class="yr">2022.12 · 具身·世界模型</span><div class=nt>只做从上往下的二指捏取，而且是“随便抓起箱子里一个东西”，不能指定抓哪个物体，也不涉及抓起之后的操作。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/open-x.html">Open X-Embodiment</a><span class="yr">2023.10 · 具身·世界模型</span><div class=nt>一项技能就用了14台机械臂、两个月的真机时间，数据成本高到很少有实验室能复制。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/cdna.html">物理交互视频预测</a><span class="yr">2016.05 · 具身·世界模型</span><div class=nt>沿用同一批机械臂大规模自主采集数据的思路，但把目标从抓取成败换成预测未来画面。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/dex-net.html">Dex-Net 2.0</a><span class="yr">2017.03 · 具身·世界模型</span><div class=nt>同期两条路线：这里用仿真合成数据加解析标签，那里用多台真机并行试错。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/cross-entropy.html">交叉熵</a> <a class="chip c" href="../c/self-supervised.html">自监督学习</a> <a class="chip c" href="../c/control-loop.html">控制回路与控制频率</a> <a class="chip c" href="../c/state-action-observation.html">状态、观测与动作</a></p>
+<h2>本篇术语</h2><ul><li><b>视觉伺服</b>　根据摄像头看到的画面不断修正机械臂运动，直到手爪到达目标，而不是事先算好一条轨迹闭眼执行。</li><li><b>交叉熵方法（CEM）</b>　一种不需要梯度的优化方法：随机采样一批候选，挑出得分最高的几个，用它们的均值和方差重新采样，反复几轮逐步逼近最优。</li><li><b>手眼标定</b>　精确测量相机相对于机械臂的位置和朝向，以便把图像坐标换算成机械臂坐标。这篇工作的方法不需要它。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/pinto-gupta.html">5万次抓取自监督</a>和<a class="ln" href="../n/e2e-visuomotor.html">端到端视觉运动策略</a>节点。读论文第4节（预测网络与CEM伺服）和第6节（实验），重点理解为什么“预测动作的成功率”就隐含了手眼协调。动手：在PyBullet里搭一个桌面抓取环境，随机采集几千次抓取，训练一个小CNN预测成功率，再用CEM选择动作，观察成功率随数据量的变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1603.02199" rel="noopener">https://arxiv.org/abs/1603.02199</a>（arXiv记录：标题、四位作者、v1提交于2016-03-07、摘要中80万次尝试、两个月、6到14台机械臂。正文（v4 PDF）：CEM参数N=64、M=6、3次迭代、2–5Hz；早期成功率10%–30%；512×512输入；表1失败率（放回条件本方法20%、手工35%、开环43%、随机69%；不放回前10次10.0%/32.5%/27.5%/67.5%，前30次17.5%）；数据比Pinto与Gupta大一个数量级以上。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%9C%BA%E6%A2%B0%E8%87%82%E5%86%9C%E5%9C%BA%E6%8A%93%E5%8F%96%EF%BC%88levine-grasping%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Alevine-grasping%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/levine-grasping.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="pinto-gupta.html"><small>本分支上一个 · 2015.09</small><b>5万次抓取自监督</b></a><a class="r" href="e2e-driving.html"><small>本分支下一个 · 2016.04</small><b>端到端自动驾驶</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

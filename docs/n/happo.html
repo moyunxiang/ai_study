@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HATRPO/HAPPO（2021） · AI脉络</title>
+<meta name="description" content="把TRPO/PPO直接用到多智能体时，各智能体同时更新可能方向互相冲突，单调改进的保证失效；MAPPO等又依赖参数共享，不适合角色不同的异构团队。 证明联合优势可以按顺序拆成每个智能体在前面队友已更新基础上的优势之和，于是让智能体按随机顺序逐个做信赖域更新。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/happo.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="HATRPO/HAPPO（2021）">
+<meta property="og:description" content="把TRPO/PPO直接用到多智能体时，各智能体同时更新可能方向互相冲突，单调改进的保证失效；MAPPO等又依赖参数共享，不适合角色不同的异构团队。 证明联合优势可以按顺序拆成每个智能体在前面队友已更新基础上的优势之和，于是让智能体按随机顺序逐个做信赖域更新。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/happo.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231c1a16'/%3E%3Cpath d='M18 14v36M18 26c14 0 14 10 28 10M18 38c10 0 10 8 20 8' fill='none' stroke='%23f3efe6' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=202611220158">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html">AI脉络</a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/happo">交互版</a>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 多智能体与电子游戏</div>
+<h1>HATRPO/HAPPO</h1>
+<div class="full">Trust Region Policy Optimisation in Multi-Agent Reinforcement Learning</div>
+<div class="meta"><span>2021.09</span><span>论文</span><span>延伸</span><span>Jakub Grudzien Kuba, Ruiqing Chen, Muning Wen, Ying Wen, Fanglei Sun, Jun Wang, Yaodong Yang · 牛津大学 / 上海科技大学 / 上海交通大学 / 伦敦大学学院 / 北京大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2109.11251" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/happo">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>把TRPO/PPO直接用到多智能体时，各智能体同时更新可能方向互相冲突，单调改进的保证失效；MAPPO等又依赖参数共享，不适合角色不同的异构团队。</p></div><div><h4>方法</h4><p>证明联合优势可以按顺序拆成每个智能体在前面队友已更新基础上的优势之和，于是让智能体按随机顺序逐个做信赖域更新。</p></div><div><h4>影响</h4><p>给合作MARL带来了有单调改进理论保证的信赖域方法，不需参数共享；它的优势分解引理直接催生了多智能体Transformer（MAT）。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>核心是<b>多智能体优势分解引理</b>：对任意一组智能体i₁…iₘ，<code>A^{i₁:ₘ}(s,a^{i₁:ₘ}) = Σⱼ A^{iⱼ}(s,a^{i₁:ⱼ₋₁},a^{iⱼ})</code>。意思是团队的联合优势，等于第一个智能体的优势，加上“在第一个已选定动作的条件下”第二个的优势，依此类推。</p><p>据此设计<b>顺序更新</b>：每轮随机抽一个排列，智能体逐个更新；第m个智能体优化的替代目标会考虑前m−1个已经更新过的策略，并加一个KL惩罚。作者证明这样联合策略单调改进，随机顺序还有助于收敛到纳什均衡。HATRPO用KL约束（同<a class="ln" href="../n/trpo.html">TRPO</a>），HAPPO把约束换成<a class="ln" href="../n/ppo.html">PPO</a>式的截断目标，只需一阶优化。各智能体不必共享参数，论文还给出例子说明强制参数共享可能离最优很远。</p><p>在多智能体MuJoCo（如把一个Ant或HalfCheetah的各条腿交给不同智能体控制）和星际SMAC上测试：MuJoCo各任务中HATRPO与HAPPO均超过IPPO、<a class="ln" href="../n/mappo.html">MAPPO</a>和<a class="ln" href="../n/maddpg.html">MADDPG</a>，且智能体越多差距越大；SMAC上多数方法都接近100%胜率，作者认为它已难以区分算法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>顺序更新使每轮训练时间随智能体数线性增加，大团队下计算开销明显。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/mat.html">多智能体Transformer MAT</a> <a class="chip hue" style="--h:120" href="../n/sable.html">Sable千智能体序列模型</a></div></li><li>仍是on-policy方法，样本效率不高。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/ppo.html">PPO</a><span class="yr">2017.07 · RL</span><div class=nt>HAPPO用PPO式的截断替代目标实现顺序更新。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/mean-field-marl.html">平均场多智能体RL</a><span class="yr">2018.02 · RL</span><div class=nt>假设邻居同质、可互换且只有平均效应重要，智能体角色差异大或需要精细分工时近似失效。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/trpo.html">TRPO</a><span class="yr">2015.02 · RL</span><div class=nt>把信赖域的单调改进理论从单智能体推广到多智能体联合策略。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/smac.html">星际多智能体挑战SMAC</a><span class="yr">2019.02 · RL</span><div class=nt>评测平台之一，作者也指出它已接近饱和。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/mappo.html">MAPPO</a><span class="yr">2021.03 · RL</span><div class=nt>MAPPO依赖参数共享、同时更新且无单调改进保证；HAPPO用顺序更新给出保证并支持异构智能体。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/mat.html">多智能体Transformer MAT</a><span class="yr">2022.05 · RL</span><div class=nt>直接利用HAPPO的优势分解引理，把顺序更新改造成自回归的动作生成。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/sable.html">Sable千智能体序列模型</a><span class="yr">2024.10 · RL</span><div class=nt>顺序更新使每轮训练时间随智能体数线性增加，大团队下计算开销明显。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/nash-equilibrium.html">博弈论基础与纳什均衡</a></p>
+
+<h2>怎么学</h2><p>先学TRPO与PPO；读原文的优势分解引理和顺序更新算法部分，再读<a class="ln" href="../n/mat.html">多智能体Transformer MAT</a>看它如何把同一引理变成自回归Transformer。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2109.11251" rel="noopener">https://arxiv.org/abs/2109.11251</a>（标题、7位作者及机构、arXiv v1于2021-09-23；正文中的优势分解引理公式、随机排列顺序更新与KL惩罚、HAPPO截断目标、多智能体MuJoCo与SMAC实验结论及对IPPO/MAPPO/MADDPG的比较。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20HATRPO/HAPPO%EF%BC%88happo%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ahappo%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/happo.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="rliable.html"><small>本分支上一个 · 2021.08</small><b>统计悬崖边的深度RL评测</b></a><a class="r" href="quadswarm.html"><small>本分支下一个 · 2021.09</small><b>四旋翼集群端到端RL</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>
