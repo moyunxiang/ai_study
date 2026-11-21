@@ -1,0 +1,34 @@
+{
+ "id": "on-policy-distill",
+ "who": "Kevin Lu et al. · Thinking Machines Lab",
+ "aka": ["OPD", "on-policy distillation", "在线策略蒸馏", "同策略蒸馏", "策略内蒸馏", "逐token反向KL蒸馏", "Thinking Machines蒸馏博客"],
+ "links": [
+  {"label": "Thinking Machines博客", "url": "https://thinkingmachines.ai/blog/on-policy-distillation/"},
+  {"label": "Tinker Cookbook蒸馏示例", "url": "https://github.com/thinking-machines-lab/tinker-cookbook"}
+ ],
+ "problem": "训小模型有两条路：SFT模仿老师的完整答案（离策略，学生没见过自己会犯的错），或RL自己试错（每条轨迹只得到一个对错分数，反馈太稀疏）。",
+ "idea": "让学生自己生成答案，再让老师对学生写下的每个token打分：逐token最小化学生与老师分布的反向KL，兼得在策略采样和稠密监督。",
+ "impact": "用远低于RL的算力复现推理能力，并用于持续学习中找回被冲掉的指令遵循能力；带动了一批在策略蒸馏与自蒸馏的后续工作。",
+ "background": "2025年训练推理小模型的常见做法分两步：先用大模型生成的推理轨迹做[[c:knowledge-distillation]]式的SFT（如[[deepseek-r1]]蒸馏出的小模型），再用[[grpo]]一类RL继续提升。\n\nSFT是离策略的：学生只看老师走过的路，一旦自己在第3步走偏，就进入训练里从没见过的状态，错误越积越多——这正是模仿学习里[[dagger]]要解决的问题。RL是在策略的，但一条几千token的轨迹最后只换来一个对或错，学生不知道错在哪一步。[[gkd]]早在2023年就提出让学生在自己生成的序列上向老师靠拢，但当时主要在摘要、翻译等小任务上验证。",
+ "method": "做法只有三步：学生对一道题采样完整回答；把这条回答送给老师，取老师在每个位置上对学生所选token的对数概率；以每个token的负反向KL作为奖励，即 `r_t = −(log π_学生(x_t) − log π_老师(x_t))`，用普通的策略梯度更新学生，折扣因子取0，每一步只管下一个token。\n\n反向KL是“寻找众数”的：学生被推向老师最有把握的那种写法，而不是去覆盖老师所有可能的写法；它也很难被钻空子，因为分数直接来自老师的概率，没有单独的奖励模型。工程上，它只是把RL脚本里KL正则项的参考模型换成老师，老师只需算对数概率、不必生成，所以很便宜。作者在自家[[tinker]]平台上实现。",
+ "results": "推理实验以Qwen3-8B-Base为学生。只用40万条提示做SFT，AIME'24约60%；在此检查点上做约150步在策略蒸馏即到约70%。博客复述[[qwen3]]技术报告的对比：在离策略蒸馏之后，继续RL得到67.6%、耗17,920 GPU小时；改用在策略蒸馏得到74.4%、耗1,800 GPU小时。博客估算相对把SFT数据扩到200万条，算力省9–30倍。\n\n个性化实验中，Qwen3-8B在内部文档上继续训练后，知识问答从18%升到36%，但IF-eval从85%掉到79%；再做一轮在策略蒸馏（老师是训练前的自己）后IF-eval回到83%，知识问答为41%。",
+ "legacy": "这篇博客让“在策略蒸馏”从一个小众技巧变成后训练里的常用词：它被当作RL之外更省算力的选择，也被用来解决持续学习中的遗忘问题。之后出现了一串变体，最直接的是让模型自己当老师的[[opsd]]（老师多看到参考答案），以及扩散语言模型上的[[dopsd]]。",
+ "limits": [
+  {"text": "需要一个更强、且与学生共享词表的老师；学生不可能超过老师，也不适合老师本身就答不好的任务。", "solved_by": ["opsd"]},
+  {"text": "证据主要来自数学推理与一个内部助手的案例，在代码、智能体等长程任务上的效果尚缺系统比较。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "gkd", "type": "extends", "note": "GKD最早提出在学生自生成序列上蒸馏；本文把它用到长推理和持续学习，并给出算力对比。"},
+  {"to": "distillation", "type": "extends", "note": "仍是让学生匹配老师的输出分布，但样本由学生自己产生，散度改用反向KL。"},
+  {"to": "dagger", "type": "solves", "note": "与DAgger同理：在学生自己会走到的状态上请老师纠正，缓解离策略模仿的误差累积。"},
+  {"to": "qwen3", "type": "uses", "note": "实验以Qwen3系列为学生和老师，并复述Qwen3技术报告中在策略蒸馏优于RL的数字。"},
+  {"to": "grpo", "type": "rivals", "note": "同为在策略后训练：GRPO每条轨迹一个稀疏奖励，在策略蒸馏每个token都有老师给的稠密信号。"}
+ ],
+ "prereq": ["knowledge-distillation", "kl-divergence", "on-off-policy", "policy-gradient-concept", "imitation-learning"],
+ "terms": [
+  {"t": "反向KL", "d": "`KL(学生‖老师)`，在学生自己的样本上计算；它惩罚学生把概率放在老师认为不可能的地方，因此倾向于抓住老师最主要的一种答法。"},
+  {"t": "在策略（on-policy）", "d": "训练用的样本由当前正在训练的模型自己生成，而不是来自别人写好的数据。"}
+ ],
+ "learn": "先补KL散度与在策略/离策略的区别 → 读博客的“Loss function: reverse KL”与“Distillation for reasoning”两节 → 用Tinker Cookbook的distillation示例或自写脚本，在小模型上对比SFT与在策略蒸馏。",
+ "check": {"source": "https://thinkingmachines.ai/blog/on-policy-distillation/", "confirmed": "标题、作者Kevin Lu、发布日期2025-10-27；逐token反向KL、折扣因子0、在Tinker上实现；AIME'24 60%→约70%（约150步）、Qwen3报告中67.6%/17,920 GPU小时与74.4%/1,800 GPU小时、9–30倍；个性化表格18%/85%、36%/79%、41%/83%。引用GKD、MiniLLM、DAgger。"}
+}

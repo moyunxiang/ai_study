@@ -1,0 +1,36 @@
+{
+ "id": "flashinfer",
+ "who": "Zihao Ye, Lequn Chen, Ruihang Lai, Wuwei Lin, Yineng Zhang, Stephanie Wang, Tianqi Chen, Baris Kasikci et al. · 华盛顿大学, NVIDIA, Perplexity AI, 卡内基梅隆大学",
+ "venue": "MLSys 2025（Outstanding Paper）",
+ "aka": ["FlashInfer库", "flashinfer-ai", "LLM推理注意力内核库", "attention engine"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2501.01005"},
+  {"label": "GitHub", "url": "https://github.com/flashinfer-ai/flashinfer"},
+  {"label": "UW新闻：MLSys 2025获奖", "url": "https://news.cs.washington.edu/2025/07/01/allen-school-researchers-receive-best-paper-award-for-speeding-up-llm-performance-with-flashinfer"}
+ ],
+ "problem": "推理引擎里KV缓存的存法五花八门（分页、前缀共享、稀疏），注意力变体也越来越多，每种组合都要手写一份高性能内核。",
+ "idea": "用统一的块稀疏格式描述各种KV缓存布局，再用JIT模板把注意力变体编译成内核，配合负载均衡调度兼容CUDAGraph。",
+ "impact": "成为vLLM、SGLang、MLC-Engine共用的注意力与采样内核层，获MLSys 2025杰出论文奖。",
+ "background": "[[flashattention]]和[[flashattention-2]]解决的是训练时的注意力：一批序列长度整齐、KV连续存放。到了推理服务里情况完全不同：[[vllm]]把KV缓存切成页（PagedAttention），[[sglang]]用基数树让多个请求共享前缀，长上下文又引入稀疏注意力。每个请求长短不一，有的在预填充、有的在逐词解码，批次每一步都在变。\n\n结果是每个推理引擎都在维护自己的一套注意力内核，加一个新变体（滑动窗口、带软上限的logits、MLA）就要改一遍CUDA代码，而且很难同时做到灵活和快。",
+ "method": "FlashInfer把问题拆成三层。\n\n**存储格式**：把任何KV缓存布局都看成一个块稀疏矩阵（BSR格式）——行是查询，列是KV块，有值的块表示这个查询要看这块KV。分页缓存、前缀共享、树形推测解码的掩码都能写成这种形式；多种块大小还能组合使用，例如共享前缀用大块存一次，各请求私有的部分用小块。\n\n**可定制模板**：用户只描述注意力变体在哪一步不同（如何变换logits、如何加掩码），框架在运行时用JIT编译把它填进一个高性能的FlashAttention式模板。\n\n**调度**：CPU端先根据本批次每个请求的长度算出一份均衡的分工计划，GPU上的持久化内核照计划执行。这样每一步批次形状再怎么变，内核配置都固定，可以被CUDAGraph整段录制回放，省掉反复启动内核的开销。",
+ "results": "论文称在推理服务基准上，相对编译器后端（Triton）的逐token延迟降低29%–69%；长上下文推理延迟降低28%–30%；并行生成场景提速13%–17%。",
+ "legacy": "FlashInfer已集成进[[sglang]]、[[vllm]]、MLC-Engine等主流引擎，NVIDIA也把自家的推理内核通过它发布，事实上成为开源推理栈里的公共内核层。它代表了一个趋势：推理引擎负责调度和缓存管理，内核交给专门的库；同期的[[sageattention]]等量化注意力也走类似的即插即用路线。",
+ "limits": [
+  {"text": "主要面向NVIDIA GPU，其他硬件上的支持和性能明显落后。", "solved_by": []},
+  {"text": "调度计划在CPU端计算，批次极小、步数极多时这部分开销占比上升。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "flashattention-2", "type": "extends", "note": "沿用FlashAttention的分块与在线softmax，把它从训练场景推广到格式多样的推理KV缓存。"},
+  {"to": "vllm", "type": "solves", "note": "vLLM的分页KV缓存需要专门内核，FlashInfer用统一的块稀疏格式承接分页布局，成为其可选注意力后端。"},
+  {"to": "sglang", "type": "uses", "note": "SGLang的前缀共享是FlashInfer组合格式的典型用例，SGLang也默认采用其内核。"},
+  {"to": "tvm", "type": "extends", "note": "作者团队来自TVM/MLC，把编译器式的模板与JIT思想用到注意力内核上。"}
+ ],
+ "prereq": ["self-attention", "kv-cache", "cpu-gpu", "memory-bandwidth", "throughput-latency"],
+ "terms": [
+  {"t": "块稀疏格式（BSR）", "d": "把矩阵切成固定大小的块，只记录非零块的位置和内容；这里用来描述每个查询要读哪些KV块。"},
+  {"t": "CUDAGraph", "d": "把一串GPU内核调用录制成一张图后整体回放，省掉每次从CPU逐个发起内核的开销，但要求每次的形状配置固定。"},
+  {"t": "JIT编译", "d": "程序运行时才把代码编译成机器码，这里用来按用户描述的注意力变体即时生成内核。"}
+ ],
+ "learn": "先懂[[flashattention]]的分块计算和[[vllm]]的分页KV缓存 → 读论文第3节块稀疏格式与第4节调度 → 在SGLang里切换注意力后端对比延迟。",
+ "check": {"source": "https://arxiv.org/abs/2501.01005", "confirmed": "标题、作者与机构（UW、NVIDIA、Perplexity AI、CMU）、v1日期2025-01-02、MLSys 2025收录；摘要中29–69%、28–30%、13–17%三组数字；BSR格式、JIT模板、CUDAGraph兼容调度见arXiv HTML正文。获奖信息来自UW新闻与MLSys 2025奖项页（Outstanding Paper Award）。NVIDIA通过FlashInfer发布推理内核一事依据NVIDIA开发者博客标题“Run High-Performance LLM Inference Kernels from NVIDIA Using FlashInfer”。"}
+}

@@ -1,0 +1,26 @@
+{
+ "id": "ties-merging",
+ "who": "Prateek Yadav, Derek Tam, Leshem Choshen, Colin Raffel, Mohit Bansal · 北卡罗来纳大学教堂山分校, IBM Research, MIT",
+ "venue": "NeurIPS 2023",
+ "aka": ["TIES", "TIES合并", "Trim Elect Sign Merge", "符号冲突合并", "模型合并", "model merging"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2306.01708"},
+  {"label": "GitHub", "url": "https://github.com/prateeky2806/ties-merging"}
+ ],
+ "problem": "把多个各自微调过的模型直接加权平均，任务一多性能就明显下降：大量微小改动互相稀释，不同模型对同一参数改动的方向还彼此抵消。",
+ "idea": "合并前先修剪：每个任务向量只留改动最大的20%；对每个参数按总幅度投票选出符号；只对符号一致的值求平均。",
+ "impact": "成为开源社区合并LLM的标准方法之一，被MergeKit等工具内置，常与DARE组合使用。",
+ "method": "[[task-arithmetic]]把“微调后权重减去预训练权重”叫作任务向量`τ`，多个任务向量相加就能把多种能力合到一个模型里。但作者发现两种干扰：一是每个任务向量里大量参数只变了一点点，这些冗余值在求和时淹没了真正重要的改动；二是对同一个参数，A任务往正方向改、B任务往负方向改，直接平均会互相抵消。\n\nTIES-Merging分三步：**Trim**，每个任务向量只保留幅度最大的前k%（默认20%），其余置零；**Elect Sign**，对每个参数把各任务修剪后的值相加，取和的符号作为这个参数“该往哪边改”；**Disjoint Merge**，只对与选出符号一致的那些非零值取平均，得到合并向量`τ_m`。最后`θ = θ_预训练 + λ·τ_m`。\n\n论文表1中，T5-Large合并多个任务时平均分76.9，对比任务算术73.3；ViT-B/32上73.6对70.1。",
+ "limits": [
+  {"text": "只适用于从同一个预训练模型出发微调的模型；修剪比例和缩放系数λ仍需调，不用验证集调参时有的设置反而不如任务算术。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "task-arithmetic", "type": "solves", "note": "任务算术直接相加任务向量，冗余值和符号冲突造成干扰；TIES用修剪与符号投票消除这两种干扰。"},
+  {"to": "model-soups", "type": "extends", "note": "Model Soups平均同一任务的多次微调，TIES把权重合并推广到多任务，并处理任务间冲突。"}
+ ],
+ "prereq": ["pretrain-finetune", "transfer-learning", "vector-matrix"],
+ "terms": [
+  {"t": "任务向量", "d": "微调后的权重减去预训练权重，记录了这次微调把每个参数改了多少。"}
+ ],
+ "check": {"source": "https://arxiv.org/abs/2306.01708", "confirmed": "标题、作者、v1日期2023-06-02；摘要中两类干扰与三步方法；arXiv HTML v2：k=20%、按总幅度选符号、只对一致值平均、θ=θ_init+λ·τ_m、机构、表1中T5-Large 76.9对73.3与ViT-B/32 73.6对70.1、无验证集时T5-Base低于任务算术。NeurIPS 2023来自OpenAlex。被MergeKit内置依据MergeKit项目文档的常识性描述，未单独核对。"}
+}

@@ -1,0 +1,172 @@
+[
+  {
+    "key": "vision-foundation-model",
+    "name": "视觉基础模型",
+    "en": "Vision Foundation Model",
+    "aka": ["VFM", "视觉大模型", "通用视觉骨干", "视觉编码器", "vision encoder", "visual foundation model", "通用视觉特征", "冻结特征", "frozen features", "视觉基座模型"],
+    "blurb": "在海量图像上预训练一个通用模型，不再为每个任务从头训练，冻结特征或轻量微调就能用于分类、分割、深度、三维等多种任务。",
+    "body": "过去每个视觉任务各训一个网络，最多共享一个ImageNet预训练骨干（[[bit]]）。视觉基础模型的思路是把预训练做到足够大、足够通用，使下游只需加一个小头甚至不训练。\n\n路线大致有三条：一是自监督特征，如[[dinov2]]、[[dinov3]]，不用任何标注，特征冻结后直接做分割、深度都很强；二是任务型基础模型，在单一任务上用海量数据训练出零样本能力，如可提示分割[[sam]]、单目深度[[depth-anything]]、三维几何[[vggt]]、人体视觉[[sapiens]]；三是图文对齐的编码器，如[[perception-encoder]]、[[siglip-2]]（这一条更多归多模态）。[[am-radio]]则把几个基础模型蒸馏进一个骨干。\n\n当前的争论在于：语言监督是否必要（[[web-ssl]]认为纯视觉自监督放大后可追平CLIP类模型），以及“一个骨干通吃”与“各任务专用基础模型”哪个更划算。",
+    "origin": "dinov2",
+    "nodes": ["dinov2", "dinov3", "sam", "depth-anything", "vggt", "sapiens", "am-radio", "eva", "web-ssl", "perception-encoder", "siglip-2", "bit"]
+  },
+  {
+    "key": "open-vocabulary-detection",
+    "name": "开放词表检测",
+    "en": "Open-Vocabulary Object Detection",
+    "aka": ["OVD", "OVOD", "开放集检测", "open-set detection", "开放世界检测", "open-world detection", "零样本检测", "zero-shot detection", "文本提示检测", "grounding检测", "phrase grounding", "开集检测"],
+    "blurb": "检测器不再只认训练时固定的几十类，而是根据用户输入的任意文字（如“红色雨伞”）找出图中对应物体。",
+    "body": "传统检测器（[[faster-rcnn]]、[[yolo]]）的类别在训练时就写死了，比如COCO的80类，想加一类就得重新标注训练。开放词表检测把分类头换成与文本嵌入的相似度：只要能把类别名编码成向量，就能检测它。\n\n早期做法是把[[clip]]的图文对齐知识蒸馏或迁移到检测器，如[[vild]]、[[owl-vit]]；[[glip]]把检测和短语定位统一成同一种预训练；[[grounding-dino]]把这一思路接到DINO式检测Transformer上，成为最常用的开集检测器；[[yolo-world]]把它做到实时。2025年的[[sam-3]]把文本概念提示扩展到检测、分割与视频跟踪一体。\n\n争论点：开放词表模型在COCO等常见类上很强，但对真实业务里的冷门类别泛化仍差，[[rf-detr]]等工作认为在目标数据上微调专用小模型往往更实用。",
+    "origin": "vild",
+    "nodes": ["vild", "owl-vit", "glip", "grounding-dino", "yolo-world", "sam-3", "clip"]
+  },
+  {
+    "key": "promptable-segmentation",
+    "name": "可提示分割",
+    "en": "Promptable Segmentation",
+    "aka": ["分割一切", "Segment Anything", "SAM系列", "交互式分割", "interactive segmentation", "点提示分割", "框提示分割", "概念分割", "concept segmentation", "视频目标分割", "VOS", "零样本分割", "SAM 3.1"],
+    "blurb": "用点、框、涂抹或文字作为“提示”告诉模型要哪个物体，模型即时给出掩码，不受固定类别限制。",
+    "body": "传统分割要事先定义类别并大量标注。[[sam]]把分割改成“给提示出掩码”：用户点一下或画个框，模型就输出该物体的掩码，并用模型辅助标注的数据引擎攒出10亿级掩码数据，得到零样本泛化。\n\n这一范式随后扩展：[[sam-2]]加入记忆模块，把可提示分割推广到视频，点一下就能在整段视频里跟住物体；[[sam-3]]支持用名词短语或示例图作为概念提示，一次找出所有符合的实例；[[sam-3d]]把单张图中提示的物体重建成三维。多模态方向的[[lisa]]用大语言模型理解复杂指令后再调用分割。\n\n开放问题：提示有歧义时如何选择粒度（整体还是部件）；以及在医学、遥感等分布差异大的领域，零样本质量仍明显下降。",
+    "origin": "sam",
+    "nodes": ["sam", "sam-2", "sam-3", "sam-3d", "lisa", "mask2former"]
+  },
+  {
+    "key": "feed-forward-3d-reconstruction",
+    "name": "前馈三维重建",
+    "en": "Feed-forward 3D Reconstruction",
+    "aka": ["前馈重建", "feed-forward reconstruction", "端到端三维重建", "3D基础模型", "3D foundation model", "几何基础模型", "pointmap回归", "点图回归", "DUSt3R系列", "*3R", "无位姿重建", "pose-free reconstruction", "learned SfM"],
+    "blurb": "训练一个网络，输入若干张没有相机参数的照片，一次前向直接输出三维点云和相机位姿，取代传统的SfM加MVS多步流水线。",
+    "body": "传统三维重建（[[colmap]]）要经过特征提取、匹配、增量式SfM估计相机、再做稠密MVS，步骤多、遇到弱纹理和少视图就容易失败。\n\n[[dust3r]]提出直接回归“点图”：网络为每张图的每个像素输出一个统一坐标系下的三维点，相机参数可从点图反推。随后一系列“3R”工作补齐短板：[[mast3r]]加强匹配，[[fast3r]]和[[vggt]]把成对推理改为多视图一次前向，[[cut3r]]、[[streamvggt]]做流式在线重建，[[pi3]]去掉对参考视图的依赖，[[mapanything]]输出度量尺度，[[depth-anything-3]]用极简目标统一深度与位姿，[[d4rt]]扩展到动态4D场景。它们的预训练基础常来自[[croco]]。\n\n争论点：前馈模型在大场景、上千张图时精度仍不及精心调优的传统流水线；以及它们大量依赖少数几个合成与扫描数据集，泛化边界还不清楚。",
+    "origin": "dust3r",
+    "nodes": ["dust3r", "mast3r", "fast3r", "vggt", "cut3r", "streamvggt", "pi3", "mapanything", "depth-anything-3", "d4rt", "croco", "colmap"]
+  },
+  {
+    "key": "gaussian-splatting-family",
+    "name": "高斯泼溅",
+    "en": "Gaussian Splatting",
+    "aka": ["3DGS", "3D Gaussian Splatting", "高斯溅射", "3D高斯", "高斯喷溅", "高斯点云渲染", "splatting", "2DGS", "4DGS", "GS", "可微光栅化", "实时神经渲染"],
+    "blurb": "用成千上万个带颜色和透明度的三维高斯椭球表示场景，投影到屏幕上叠加成图像，比NeRF快得多，可实时渲染。",
+    "body": "[[nerf]]用神经网络表示场景，渲染每个像素都要沿光线查询网络上百次，很慢。[[3dgs]]改用显式的三维高斯集合：每个高斯有位置、形状、透明度和颜色，渲染时直接投影成二维椭圆按深度混合（[[c:volume-rendering]]的离散近似），在GPU上可达实时，并能通过梯度下降逐场景优化。\n\n此后的改进沿几条线展开：抗锯齿与多尺度（[[mip-splatting]]）、更准的表面几何（[[2dgs]]）、动态场景（[[4dgs]]）、以及不再逐场景优化的前馈高斯（[[pixelsplat]]、[[gs-lrm]]、[[anysplat]]）。三维生成方向（[[lrm]]、[[trellis]]）也常把高斯当作输出表示。\n\n开放问题：高斯数量动辄百万，存储与传输开销大；从高斯中提取干净网格仍不方便；对训练视图之外的区域缺乏合理补全。",
+    "origin": "3dgs",
+    "nodes": ["3dgs", "mip-splatting", "2dgs", "4dgs", "pixelsplat", "gs-lrm", "anysplat", "nerf", "trellis"]
+  },
+  {
+    "key": "feed-forward-gaussian-splatting",
+    "name": "前馈高斯泼溅",
+    "en": "Feed-forward Gaussian Splatting",
+    "aka": ["前馈3DGS", "feed-forward 3DGS", "generalizable Gaussian Splatting", "泛化高斯", "无位姿高斯", "pose-free 3DGS", "稀疏视图高斯", "sparse-view 3DGS", "大重建模型", "LRM"],
+    "blurb": "不再为每个场景迭代优化十分钟，而是训练一个网络，看几张照片一次前向就直接预测出整个场景的三维高斯。",
+    "body": "原始[[3dgs]]需要已知相机位姿，并对每个场景优化数千步。前馈高斯把这个过程摊销到训练阶段：网络在大量场景上学会“照片到高斯”的映射，推理时秒级出结果，也能处理只有两三张图的稀疏视图。\n\n[[pixelsplat]]从一对已知位姿的图像为每个像素预测高斯；[[gs-lrm]]把[[lrm]]式的大Transformer用于高斯输出；[[anysplat]]借助[[vggt]]的几何先验，连相机位姿也一并预测，能处理无标定的随手拍照片。2025–2026年这一方向的论文数量增长很快，重点在去掉位姿依赖、控制逐像素高斯带来的数量爆炸，以及扩展到更多视图。\n\n局限：质量仍普遍低于逐场景优化的3DGS，且受训练数据场景类型限制。",
+    "origin": "pixelsplat",
+    "nodes": ["pixelsplat", "gs-lrm", "anysplat", "lrm", "vggt", "3dgs"]
+  },
+  {
+    "key": "zero-shot-monocular-depth",
+    "name": "零样本单目深度",
+    "en": "Zero-shot Monocular Depth Estimation",
+    "aka": ["单目深度基础模型", "depth foundation model", "相对深度", "relative depth", "度量深度", "metric depth", "仿射不变深度", "affine-invariant depth", "单目几何", "Depth Anything系列", "DA2", "DA3", "视频深度", "MDE", "深度估计大模型"],
+    "blurb": "训练一个能对任意没见过的照片估计深度的通用模型，不需要针对某个数据集或某台相机重新训练。",
+    "body": "早期单目深度（[[eigen-depth]]、[[monodepth]]）只在单一数据集（如[[kitti]]室外驾驶）上训练，换个场景就失效。[[midas]]的关键一步是用尺度和平移不变的损失混合多个标注方式不同的数据集训练，得到可跨场景的相对深度；[[dpt]]把骨干换成ViT。\n\n之后有两条路线：判别式路线靠更大的数据和骨干，如[[depth-anything]]用大规模无标签图像自训练、[[depth-anything-v2]]改用合成数据精标；生成式路线借扩散模型先验，如[[marigold]]。再往后，目标从相对深度扩展到度量深度与完整几何：[[depth-pro]]输出绝对尺度和焦距，[[moge]]直接预测点图，[[video-depth-anything]]解决视频闪烁，[[depth-anything-3]]把单目与多视图几何统一。\n\n争论点：度量尺度本质上从单张图难以确定，模型的“米数”在陌生相机上可靠性存疑；评测基准也相对陈旧。",
+    "origin": "midas",
+    "nodes": ["midas", "dpt", "depth-anything", "depth-anything-v2", "marigold", "depth-pro", "moge", "video-depth-anything", "depth-anything-3", "eigen-depth"]
+  },
+  {
+    "key": "point-tracking",
+    "name": "任意点跟踪",
+    "en": "Tracking Any Point",
+    "aka": ["TAP", "点跟踪", "point tracking", "稠密点跟踪", "dense tracking", "长程光流", "long-range optical flow", "particle tracking", "像素跟踪", "TAP-Vid", "CoTracker系列"],
+    "blurb": "在视频第一帧上任选一个点，模型输出它在之后每一帧的位置以及是否被遮挡，比只看相邻两帧的光流更长程。",
+    "body": "光流（[[raft]]）只估计相邻两帧之间每个像素的位移，串联起来跟长视频会累积误差，也无法处理遮挡后重新出现。点跟踪直接对整段视频建模：给定查询点，一次预测它的完整轨迹和每帧可见性。\n\n[[tapir]]先做全局匹配再逐帧细化；[[cotracker]]用Transformer同时跟踪多个点，利用点与点之间的相关性提高遮挡时的鲁棒性；[[cotracker3]]用合成数据训好的老师给真实视频打伪标签，以少得多的数据超过此前方法。点跟踪的输出被大量用于动态三维重建（[[d4rt]]）、视频生成控制和机器人从人类视频学习。\n\n开放问题：真实视频缺少精确轨迹标注，评测依赖少量人工标注基准；跟踪结果仍是二维的，与三维运动的结合正在推进。",
+    "origin": "tapir",
+    "nodes": ["tapir", "cotracker", "cotracker3", "raft", "d4rt"]
+  },
+  {
+    "key": "dino-style-self-distillation",
+    "name": "视觉自蒸馏自监督",
+    "en": "Self-Distillation for Visual SSL",
+    "aka": ["DINO式自监督", "DINO系列", "教师-学生自监督", "teacher-student SSL", "EMA教师", "动量教师", "momentum teacher", "联合嵌入", "joint-embedding", "无负样本自监督", "non-contrastive SSL", "视觉自监督", "visual SSL"],
+    "blurb": "让同一网络的“学生”去匹配它自己缓慢更新的“老师”对另一视角图像的输出，不用标签、也不用负样本就能学到好特征。",
+    "body": "对比学习（[[c:contrastive-learning]]，如[[simclr]]、[[moco]]）要把不同图片推开，依赖大量负样本。[[byol]]发现只要有一个按指数滑动平均更新的老师网络，学生去预测老师对同一图片另一增强视图的输出，就能学到有用特征而不坍缩；[[simsiam]]进一步说明连滑动平均都可省，关键在停止梯度。\n\n[[dino]]把这一思路用到ViT上，用老师输出的软分布做[[c:knowledge-distillation]]，并发现注意力图自动对准物体轮廓；[[ibot]]加入掩码token预测；[[dinov2]]和[[dinov3]]把数据整理和规模做大，成为当前最强的通用自监督视觉特征。[[web-ssl]]表明这一路线放大后可在多模态任务上追平语言监督模型。\n\n与之并列的另一路线是掩码重建（[[mae]]），两者常被结合使用。争论点：自蒸馏训练稳定性依赖大量技巧，[[lejepa]]等工作试图给出有理论依据的替代。",
+    "origin": "byol",
+    "nodes": ["byol", "simsiam", "dino", "ibot", "dinov2", "dinov3", "web-ssl", "mae", "lejepa"]
+  },
+  {
+    "key": "plain-vit-dense-prediction",
+    "name": "朴素ViT做密集预测",
+    "en": "Plain ViT for Dense Prediction",
+    "aka": ["plain ViT", "非分层ViT", "non-hierarchical ViT", "encoder-only", "简单基线", "simple baseline", "ViT适配器", "ViT密集预测", "less is more"],
+    "blurb": "不为检测、分割、姿态等任务专门设计多尺度骨干和解码器，只用一个大的朴素ViT加强预训练，再接极简的头。",
+    "body": "ViT最初只输出单一尺度的特征，被认为不适合检测、分割这类需要多尺度细节的密集预测任务，于是出现了[[swin]]、[[pvt]]等分层设计和各种适配器。\n\n另一条路线认为瓶颈不在结构而在规模和预训练：[[dpt]]用朴素ViT做深度和分割；[[vitdet]]证明只需从最后一层特征构造简单金字塔就能做好检测；[[vitpose]]用朴素ViT加两层反卷积做姿态；[[sapiens]]把它放大到2B参数覆盖多个人体任务；[[eomt]]连分割解码器都去掉，把查询token直接放进ViT最后几层。它们的共同前提是[[mae]]、[[dinov2]]这类强预训练。\n\n争论点：在小模型和有限预训练的条件下，专用结构仍有优势；“去设计化”能走多远取决于基础模型本身的进步。",
+    "origin": "dpt",
+    "nodes": ["dpt", "vitdet", "vitpose", "sapiens", "eomt", "vit", "mae", "dinov2"]
+  },
+  {
+    "key": "real-time-object-detection",
+    "name": "实时目标检测",
+    "en": "Real-time Object Detection",
+    "aka": ["YOLO系列", "YOLOv8", "YOLO11", "YOLO26", "YOLOv5", "实时DETR", "real-time DETR", "单阶段检测", "one-stage detector", "端侧检测", "NMS-free", "免NMS检测", "工业检测"],
+    "blurb": "在普通GPU或边缘设备上以每秒几十到上百帧运行的检测器，追求速度与精度的最佳折中，是工业界用得最多的视觉模型。",
+    "body": "两阶段检测器（[[faster-rcnn]]）精度高但慢。[[yolo]]把检测变成一次前向的网格回归，开启了单阶段实时检测；此后[[ssd]]、[[yolov3]]、[[yolov4]]、[[ultralytics-yolo]]（YOLOv5/v8/11/26等）不断在骨干、特征融合、标签分配和数据增强上打磨，成为部署最广的一族。\n\n2023年后出现两个变化：一是DETR路线做到实时，[[rt-detr]]、[[d-fine]]、[[rf-detr]]用Transformer解码器直接输出不重复的框，省去[[c:anchor-nms]]后处理；二是YOLO自身也走向免NMS和注意力化，如[[yolov10]]的一对一匹配、[[yolov12]]的区域注意力。\n\n争论点：各家报告的速度依赖不同硬件与推理引擎，横向比较常不公平；在COCO上的提升是否能迁移到真实小数据集也被质疑（[[rf-detr]]专门针对这一点）。",
+    "origin": "yolo",
+    "nodes": ["yolo", "ssd", "yolov3", "yolov4", "ultralytics-yolo", "yolov7", "rt-detr", "yolov10", "d-fine", "yolov12", "rf-detr"]
+  },
+  {
+    "key": "detection-transformer",
+    "name": "检测Transformer（DETR家族）",
+    "en": "Detection Transformer",
+    "aka": ["DETR系列", "DETR家族", "query-based detection", "基于查询的检测", "集合预测", "set prediction", "匈牙利匹配", "Hungarian matching", "端到端检测", "end-to-end detection", "DINO检测"],
+    "blurb": "用一组可学习的查询向量，经Transformer解码器直接输出一组物体框，用一对一匹配训练，不再需要锚框和NMS。",
+    "body": "传统检测器先铺大量锚框或候选，再用NMS去掉重复框，有很多手工设计。[[detr]]把检测看作集合预测：固定数量的查询经Transformer解码器各输出一个框或“无物体”，训练时用匈牙利算法把预测与真值一对一匹配。它简洁但收敛极慢、小物体差。\n\n[[deformable-detr]]用只关注少量采样点的可变形注意力解决收敛和多尺度问题；[[dino-detr]]加入去噪训练与查询初始化，把精度推到当时最好；[[rt-detr]]、[[d-fine]]、[[rf-detr]]把这一路线做成实时；[[grounding-dino]]把它扩展到开放词表。分割方向的[[maskformer]]、[[mask2former]]也采用同样的查询式设计。\n\n开放问题：一对一匹配监督稀疏，训练仍比YOLO类方法慢；在边缘设备上Transformer算子的部署效率也不如卷积。",
+    "origin": "detr",
+    "nodes": ["detr", "deformable-detr", "dino-detr", "rt-detr", "d-fine", "rf-detr", "grounding-dino", "mask2former"]
+  },
+  {
+    "key": "dynamic-4d-reconstruction",
+    "name": "动态场景4D重建",
+    "en": "Dynamic 4D Reconstruction",
+    "aka": ["4D重建", "4D reconstruction", "动态重建", "dynamic scene reconstruction", "动态SfM", "视频几何", "video geometry", "非刚性重建", "4D高斯", "动态NeRF", "随手拍视频重建", "casual video"],
+    "blurb": "从普通单目视频里同时恢复相机运动、每一帧的三维几何以及场景中物体的运动，即三维空间加时间的“4D”。",
+    "body": "经典SfM和SLAM都假设场景静止，人在走、车在开的视频会让它们把物体运动误当相机运动。动态4D重建要把两者分开，并给出随时间变化的几何。\n\n优化式路线：[[4dgs]]用随时间变形的高斯表示动态场景，需要逐场景优化；[[megasam]]在深度SLAM上加入运动掩码和单目深度先验，能从随手拍视频稳定恢复位姿和深度。前馈路线：[[monst3r]]把[[dust3r]]的点图扩展到动态场景，[[cut3r]]、[[streamvggt]]以流式方式逐帧更新，[[d4rt]]用一个统一网络同时查询任意像素在任意时刻的三维位置（CVPR 2026最佳论文）。点跟踪模型（[[cotracker3]]）常作为运动线索。\n\n开放问题：单目视频对动态物体的深度本质上欠约束；长视频的一致性与计算开销仍是难点。",
+    "origin": "4dgs",
+    "nodes": ["4dgs", "megasam", "monst3r", "cut3r", "streamvggt", "d4rt", "cotracker3", "dust3r"]
+  },
+  {
+    "key": "learned-feature-matching",
+    "name": "学习式特征匹配",
+    "en": "Learned Feature Matching",
+    "aka": ["特征匹配", "feature matching", "图像匹配", "image matching", "关键点检测与描述", "keypoint detection and description", "局部特征", "local features", "稠密匹配", "dense matching", "无检测器匹配", "detector-free matching"],
+    "blurb": "用神经网络找出两张图中对应同一三维点的像素，替代SIFT等手工特征，是三维重建、定位和SLAM的基础步骤。",
+    "body": "手工特征时代，[[sift]]、[[orb]]先检测关键点再算描述子，用最近邻匹配，在光照、视角变化大时容易失败。\n\n学习式路线分几步走：[[superpoint]]用自监督训练同时学关键点和描述子；[[superglue]]用图神经网络加注意力在两组关键点之间做全局推理式匹配；[[lightglue]]让它更快且可提前停止；[[loftr]]不再检测关键点，用Transformer直接在稠密特征上建立对应，弱纹理区域表现更好；[[mast3r]]把匹配建立在三维点图之上。这些匹配器常接入[[colmap]]等流水线。\n\n当前趋势是前馈三维重建模型把匹配隐式地包含在网络里，独立匹配器的角色正在变化，但在大规模定位与高精度重建中仍是主力。",
+    "origin": "superpoint",
+    "nodes": ["sift", "orb", "superpoint", "superglue", "lightglue", "loftr", "mast3r", "colmap"]
+  },
+  {
+    "key": "visual-slam",
+    "name": "视觉SLAM",
+    "en": "Visual SLAM",
+    "aka": ["SLAM", "同时定位与建图", "Simultaneous Localization and Mapping", "单目SLAM", "monocular SLAM", "视觉里程计", "visual odometry", "VO", "深度SLAM", "deep SLAM", "稠密SLAM", "dense SLAM"],
+    "blurb": "相机边移动边实时估计自己的位置，同时构建周围环境的三维地图，用于机器人、AR和自动驾驶。",
+    "body": "SLAM要在线解决两个互相依赖的问题：知道地图才能定位，知道位置才能建图。[[monoslam]]首次用单个相机实时做到这一点，基于扩展卡尔曼滤波；[[ptam]]把跟踪与建图拆成两个并行线程，并用关键帧束调整代替滤波，这一结构沿用至今；[[orb-slam]]整合[[orb]]特征、回环检测和重定位，成为最常用的特征点法系统；[[kinectfusion]]则用深度相机做稠密实时重建。\n\n深度学习时代，学习式方法进入SLAM：[[megasam]]所基于的深度SLAM用网络估计稠密对应，[[mast3r-slam]]把前馈三维重建模型的点图预测作为SLAM前端，[[streamvggt]]、[[cut3r]]等流式重建模型也在模糊SLAM与前馈重建的界限。\n\n开放问题：动态场景、长时间运行的漂移与回环，以及学习式方法在资源受限设备上的实时性。",
+    "origin": "monoslam",
+    "nodes": ["monoslam", "ptam", "orb-slam", "kinectfusion", "mast3r-slam", "megasam", "cut3r", "streamvggt"]
+  },
+  {
+    "key": "efficient-cnn",
+    "name": "轻量化卷积网络",
+    "en": "Efficient / Mobile CNN",
+    "aka": ["轻量网络", "lightweight network", "移动端网络", "mobile network", "深度可分离卷积", "depthwise separable convolution", "分组卷积", "group convolution", "端侧视觉模型", "efficient architecture", "神经架构搜索", "NAS", "复合缩放", "compound scaling"],
+    "blurb": "在手机、摄像头等算力有限的设备上，用更少的参数和计算量达到接近大网络的精度。",
+    "body": "[[vgg]]、[[resnet]]这类网络动辄几十亿次乘加运算，无法在手机上实时运行。轻量化设计的核心手段是拆分卷积：[[xception]]和[[mobilenet]]把标准卷积拆成逐通道卷积加1×1卷积（深度可分离卷积），计算量降到原来的几分之一；[[shufflenet]]用分组卷积加通道重排；[[mobilenetv2]]提出倒残差和线性瓶颈。\n\n此后自动化方法登场：[[nasnet]]用神经架构搜索找结构，[[efficientnet]]提出同时按比例放大深度、宽度和分辨率的复合缩放，[[regnet]]从设计空间统计规律中总结出简单规则。这些思想也影响了检测（[[efficientdet]]）和后来的高效ViT设计。\n\n注意：参数量和FLOPs少不等于实际延迟低（[[c:params-flops]]），真实速度强依赖硬件与算子实现。",
+    "origin": "mobilenet",
+    "nodes": ["xception", "mobilenet", "shufflenet", "mobilenetv2", "nasnet", "efficientnet", "regnet", "efficientdet"]
+  },
+  {
+    "key": "tracking-by-detection",
+    "name": "检测跟踪范式",
+    "en": "Tracking-by-Detection",
+    "aka": ["多目标跟踪", "MOT", "multi-object tracking", "检测后跟踪", "数据关联", "data association", "卡尔曼滤波跟踪", "行人跟踪", "车辆跟踪", "SORT系列", "DeepSORT"],
+    "blurb": "先在每一帧用检测器找出所有目标，再把相邻帧的检测框按位置和外观关联起来，形成每个目标的轨迹。",
+    "body": "多目标跟踪要回答“这一帧的这个人是不是上一帧的那个人”。检测跟踪范式把问题拆成两步：检测交给强检测器（如[[yolo]]、[[faster-rcnn]]），跟踪只做数据关联。[[sort]]用卡尔曼滤波预测每条轨迹的下一位置，再用IoU和匈牙利算法匹配，极简但很快；[[bytetrack]]发现低置信度的检测框里藏着被遮挡的目标，把它们也拿来做二次关联，显著减少断轨。\n\n与之相对的是单目标跟踪（[[siamfc]]，给定初始框跟住一个目标）以及基于分割的跟踪（[[sam-2]]、[[sam-3]]用记忆模块在视频中持续分割提示的物体）。\n\n开放问题：长时间遮挡后的身份保持、外观相似目标的区分，以及检测器与跟踪器联合优化。",
+    "origin": "sort",
+    "nodes": ["sort", "bytetrack", "siamfc", "sam-2", "yolo"]
+  }
+]

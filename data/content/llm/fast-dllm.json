@@ -1,0 +1,24 @@
+{
+ "id": "fast-dllm",
+ "who": "Chengyue Wu, Hao Zhang, Shuchen Xue, Zhijian Liu, Shizhe Diao, Ligeng Zhu, Ping Luo, Song Han, Enze Xie · NVIDIA / 香港大学 / MIT",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2505.22618"},
+  {"label": "GitHub", "url": "https://github.com/NVlabs/Fast-dLLM"}
+ ],
+ "aka": ["DualCache", "dLLM加速", "扩散LLM KV缓存", "置信度并行解码", "confidence-aware parallel decoding"],
+ "problem": "开源扩散大模型号称能并行，实际却比自回归模型慢：双向注意力用不了KV缓存，一步解多个词质量又会崩。",
+ "idea": "不重新训练：按块做近似KV缓存，并且每步只解码置信度超过阈值的位置，避免同时写出互相冲突的词。",
+ "impact": "让LLaDA、Dream这类模型吞吐最高提升27.6倍，它的缓存和阈值解码在后续dLLM加速工作中被反复沿用和比较。",
+ "method": "[[llada]]这类掩码扩散模型每一步都要对整段序列做双向注意力，前面已经确定的词也得重算，[[c:kv-cache]]无从谈起；而且如果一步同时揭开很多个掩码位置，模型是假设这些位置条件独立地各自取最可能的词，容易拼出“前后不搭”的句子，所以实际只能一步解一两个词，速度反而不如自回归。\n\nFast-dLLM给了两个免训练的办法。一是**分块近似KV缓存**：借鉴[[block-diffusion]]的分块生成，把序列切块，块内去噪时前缀（以及DualCache版本里的后缀掩码部分）的键值在若干步内复用，只在块结束时刷新。双向注意力下这些键值其实会微变，但作者发现相邻步之间差异很小，近似带来的损失可以忽略。二是**置信度感知的并行解码**：作者把质量下降归因于条件独立假设破坏了词间依赖，于是每步只揭开预测概率超过阈值的位置，置信度高时一次解很多个，置信度低时退回一次一个。\n\n在LLaDA和Dream上的多项基准中，论文报告吞吐最多提高27.6倍，精度损失很小。",
+ "limits": [
+  {"text": "KV缓存是近似的，模型本身没有为分块缓存训练过，块长和刷新频率要手调，长生成时误差会累积。", "solved_by": ["sdar", "llada-2"]},
+  {"text": "阈值解码只是绕开而非解决条件独立问题：已经写错的词无法修改，速度和质量仍需折中。", "solved_by": ["llada-2", "diffusiongemma"]}
+ ],
+ "relations": [
+  {"to": "llada", "type": "solves", "note": "LLaDA推理慢、无法缓存的问题，用免训练的缓存和并行解码策略大幅缓解。"},
+  {"to": "block-diffusion", "type": "uses", "note": "借用块扩散的分块思想来组织近似KV缓存。"},
+  {"to": "mdlm", "type": "extends", "note": "针对掩码扩散的采样过程设计新的解码规则。"}
+ ],
+ "prereq": ["kv-cache", "masked-modeling", "self-attention", "throughput-latency", "decoding-sampling"],
+ "check": {"source": "https://arxiv.org/abs/2505.22618", "confirmed": "标题、9位作者、v1提交于2025-05-28；摘要中分块近似KV缓存、条件独立假设导致质量下降、置信度阈值并行解码、在LLaDA和Dream上吞吐最高27.6倍。"}
+}

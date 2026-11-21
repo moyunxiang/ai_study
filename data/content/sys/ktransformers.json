@@ -1,0 +1,24 @@
+{
+ "id": "ktransformers",
+ "who": "Hongtao Chen, Weiyu Xie, Boxin Zhang, Jingqi Tang, Jiahao Wang, Jianwei Dong, Shaoyuan Chen, Ziwei Yuan et al. · 清华大学MADSys实验室, 趋境科技（Approaching.AI）",
+ "venue": "SOSP 2025",
+ "aka": ["KT", "kt-kernel", "CPU/GPU混合推理", "CPU-GPU异构推理", "MoE专家卸载", "expert offloading", "单卡跑DeepSeek-R1", "本地部署满血DeepSeek"],
+ "links": [
+  {"label": "GitHub", "url": "https://github.com/kvcache-ai/ktransformers"},
+  {"label": "SOSP 2025论文", "url": "https://doi.org/10.1145/3731569.3764843"}
+ ],
+ "problem": "DeepSeek-V3/R1这类数百B参数的MoE模型权重远超单张消费级显卡的显存，纯GPU部署需要多卡服务器，纯CPU又太慢。",
+ "idea": "利用MoE的稀疏性：注意力和常用专家放在GPU上，绝大多数专家权重放进便宜的大容量内存由CPU计算，再用AMX/AVX-512优化内核和调度减少CPU算力与同步瓶颈。",
+ "impact": "2025年2月起让DeepSeek-R1/V3能在单张24GB显卡加大内存的工作站上本地运行，成为“本地部署满血大模型”讨论的焦点之一，后集成进SGLang。",
+ "method": "[[mixtral]]、[[deepseek-v2]]以来的MoE模型每个token只激活少数专家，总参数巨大但单步计算量不大。这正适合混合部署：显存小但带宽高的GPU负责每步都要用的注意力和共享部分，内存大但算力弱的CPU负责存放并计算被选中的路由专家。\n\n难点在于CPU算不过来、CPU与GPU之间来回同步太频繁。KTransformers为Intel AMX和AVX-512/AVX2写了针对INT4/INT8量化专家的矩阵乘内核，按NUMA布局管理内存，并把热门专家放在GPU、冷门专家放在CPU，让两边并行而不是互相等待。项目2024年7月开源，与[[llama-cpp]]相比更专注于大型MoE模型。\n\n项目公告称2025年2月10日起支持在单卡24GB显存加382GB内存上运行DeepSeek-R1/V3，提速3到28倍；之后上下文在24GB显存下扩到139K。2025年10月论文发表于SOSP，同月宣布集成进SGLang。",
+ "limits": [
+  {"text": "速度高度依赖CPU型号（是否有AMX）和内存带宽，并发高时远不如多卡GPU服务器，主要适合个人或低并发场景。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "llama-cpp", "type": "rivals", "note": "同为让大模型跑在个人机器上：llama.cpp通用、覆盖面广，KTransformers专攻大型MoE的CPU-GPU分工。"},
+  {"to": "deepseek-v2", "type": "uses", "note": "主要服务DeepSeek系列MoE模型，后扩展到V3/R1及其他开源MoE。"},
+  {"to": "mixtral", "type": "uses", "note": "MoE稀疏激活使大部分专家可以放在CPU侧，Mixtral是这类开源MoE的起点。"}
+ ],
+ "prereq": ["mixture-of-experts", "cpu-gpu", "memory-bandwidth", "quantization-concept"],
+ "check": {"source": "https://github.com/kvcache-ai/ktransformers", "confirmed": "GitHub仓库创建于2024-07-26（gh api）；README：MADSys@清华与Approaching.AI维护、2025-02-10支持DeepSeek-R1/V3单卡24GB显存加382GB内存、最高3–28倍、2025-03-05上下文139K、AMX与AVX512/AVX2的INT4/INT8内核、NUMA感知、热专家放GPU冷专家放CPU、2025-10-10集成SGLang。SOSP 2025论文标题与作者来自OpenAlex。3–28倍的对比基线README未写明。"}
+}

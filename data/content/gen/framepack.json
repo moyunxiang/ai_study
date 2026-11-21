@@ -1,0 +1,28 @@
+{
+  "id": "framepack",
+  "who": "Lvmin Zhang, Shengqu Cai, Muyang Li, Gordon Wetzstein, Maneesh Agrawala · 斯坦福大学",
+  "venue": "NeurIPS 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2504.12626"},
+    {"label": "GitHub", "url": "https://github.com/lllyasviel/FramePack"}
+  ],
+  "aka": ["FramePack", "帧打包", "Packing Input Frame Context", "防漂移", "anti-drifting", "下一帧预测视频", "Next-Frame Prediction"],
+  "problem": "逐段生成长视频时有两难：保留的历史帧越多，上下文越长、算不动（遗忘）；历史一短，误差逐段累积、画面越来越崩（漂移）。",
+  "idea": "按重要性压缩历史帧：越近的帧用越小的patch保留越多token，越远的帧压得越狠，总上下文长度收敛到常数；再用先定首尾、倒序生成等采样方式防漂移。",
+  "impact": "让13B视频模型能以固定显存生成上千帧的长视频，开源后迅速流行，“遗忘与漂移”也成为长视频生成的标准提法。",
+  "method": "FramePack把视频生成写成“下一帧（段）预测”：每次根据已有帧生成接下来的一段。难点是历史帧数随视频变长线性增长。\n\n**打包**：按时间远近给历史帧排名，第i名的帧用更大的patchify核编码，token数约为单帧的1/λ^i。取λ=2时，无论历史多长，总上下文都收敛到约3倍单帧长度；480p单帧约1560个token，总量约4680个。不同压缩率配不同的输入投影层。\n\n**防漂移**：单向因果生成会让误差一路累积。论文的做法是先生成首尾两段作为锚点再填中间，或者**倒序**生成，让每一段都朝一张已知的高质量帧（如用户给的首帧）靠拢，这对图生视频尤其有效；消融中倒序防漂移在全部漂移指标上最好。\n\n实现上以修改过的[[hunyuanvideo]]为默认底模（也支持[[wan]]），13B模型在单台8×A100上以480p、batch 64训练。作者Lvmin Zhang也是[[controlnet]]的作者。",
+  "limits": [
+    {"text": "远处历史被大幅压缩，长视频中较早出现的细节和场景仍可能被遗忘。", "solved_by": []},
+    {"text": "倒序与锚点采样适合图生视频，对需要随时改提示词的实时交互生成不适用。", "solved_by": ["longlive"]}
+  ],
+  "relations": [
+    {"to": "hunyuanvideo", "type": "uses", "note": "以去掉多模态LLM依赖、加入SigLIP编码器的HunyuanVideo为默认底模。"},
+    {"to": "wan", "type": "uses", "note": "同样在Wan上实现并验证。"},
+    {"to": "diffusion-forcing", "type": "rivals", "note": "都处理长视频的误差累积：Diffusion Forcing靠逐帧噪声等级，FramePack靠上下文压缩与采样顺序。"}
+  ],
+  "prereq": ["diffusion-process", "image-patch", "context-window", "autoregressive"],
+  "check": {
+    "source": "https://arxiv.org/abs/2504.12626",
+    "confirmed": "核对当前标题（v1原题Packing Input Frame Context in Next-Frame Prediction Models for Video Generation）、作者、v1日期2025-04-17；正文中λ^i压缩、总长度约3倍单帧、480p约1560 token、倒序防漂移消融、HunyuanVideo默认底模、13B模型8×A100 batch 64；NeurIPS 2025发表记录。"
+  }
+}

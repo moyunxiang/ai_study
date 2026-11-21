@@ -1,0 +1,24 @@
+{
+ "id": "h2o",
+ "who": "Zhenyu Zhang, Ying Sheng, Tianyi Zhou, Tianlong Chen, Lianmin Zheng, Ruisi Cai, Zhao Song, Yuandong Tian et al. · 德州大学奥斯汀分校, 斯坦福, UC San Diego, UC Berkeley, Adobe Research, Meta AI, CMU",
+ "venue": "NeurIPS 2023",
+ "aka": ["Heavy-Hitter Oracle", "重击者", "KV缓存淘汰", "KV cache eviction", "KV缓存压缩", "KV cache compression", "token驱逐"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2306.14048"},
+  {"label": "GitHub", "url": "https://github.com/FMInference/H2O"}
+ ],
+ "problem": "生成时KV缓存随序列长度和批大小线性增长，长文本生成里它比模型权重还占显存，直接限制了批大小和吞吐。",
+ "idea": "注意力其实很稀疏：少数“重击者”token承担了大部分注意力分数。只保留最近的token加上累计注意力分最高的token，其余KV直接丢掉。",
+ "impact": "开创了按注意力分数淘汰KV缓存的路线，SnapKV、PyramidKV等大批KV压缩工作都以它为基线。",
+ "method": "[[c:kv-cache]]让解码时不必重算前文，但要为每个已生成的token存下每层的Key和Value。作者在OPT上观察到，推理时注意力矩阵超过95%是稀疏的（大多数权重小到可以忽略），而且每个token累计获得的注意力分数呈幂律分布：少数token被反复关注，作者称之为Heavy Hitters（H₂）。\n\nH2O据此给KV缓存设一个固定预算k：一半留给最近的若干token（保证局部连贯），一半留给累计注意力分最高的重击者；每生成一步，若超出预算，就淘汰一个累计分最低的旧token。累计分只用已经算过的注意力，不需要预知未来。论文把它形式化为动态子模优化问题并给出理论保证。\n\n论文称保留20%重击者时，在OPT-6.7B和OPT-30B上吞吐比DeepSpeed Zero-Inference、Hugging Face Accelerate、FlexGen最多高29倍、29倍、3倍。",
+ "limits": [
+  {"text": "被丢掉的token永远找不回来，后面如果突然需要早先的细节（如长文档问答、大海捞针），答案会出错。", "solved_by": []},
+  {"text": "需要拿到每步的注意力分数，与FlashAttention这类不显式写出注意力矩阵的内核不好结合。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "efficient-inference", "type": "solves", "note": "该文指出KV缓存是大模型推理的显存瓶颈，H2O直接减少要存的KV条目。"},
+  {"to": "opt", "type": "uses", "note": "稀疏性观察与主要实验都在OPT系列模型上完成。"}
+ ],
+ "prereq": ["kv-cache", "self-attention", "memory-bandwidth", "throughput-latency"],
+ "check": {"source": "https://arxiv.org/abs/2306.14048", "confirmed": "标题、作者、v1日期2023-06-24；摘要中KV缓存线性增长、重击者、20%重击者时29倍/29倍/3倍、动态子模问题；arXiv HTML v3：注意力超过95%稀疏（OPT、WikiText-103）、累计注意力幂律分布、预算平分给重击者与最近token、作者机构。NeurIPS 2023来自OpenAlex。“SnapKV等以它为基线”为对后续文献的概括。"}
+}

@@ -1,0 +1,26 @@
+{
+  "id": "ttt-discover",
+  "who": "Mert Yuksekgonul, Daniel Koceja, Xinhao Li, Federico Bianchi, Jed McCaleb, Xiaolong Wang, Jan Kautz, Yejin Choi et al. · 斯坦福 / UCSD / Together AI / NVIDIA等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2601.16175"}
+  ],
+  "aka": ["TTT-Discover", "test-time training to discover", "测试时训练", "测试时强化学习", "learning to discover"],
+  "problem": "AlphaEvolve这类科学发现方法只是反复提示一个冻结的大模型做搜索，模型本身不会从这道题的失败尝试里学到东西，而且往往依赖闭源前沿模型。",
+  "idea": "针对单个科学问题在测试时做强化学习：目标函数偏向「最好的那一个解」而不是平均表现，并从历史解的缓冲区里挑有希望的解继续改进。",
+  "impact": "用开源的gpt-oss-120b、每题几百美元，在Erdős最小重叠问题、GPU内核竞赛等多个问题上刷新最好结果，把测试时训练推到科学发现场景。",
+  "method": "普通强化学习追求平均回报、希望泛化到别的题；而科学发现只关心这一道题、只要一个最好的解。TTT-Discover据此改了两处：\n\n**目标**：用熵化目标 `J = E_s[log E_a[exp(β·R)]]`，β越大越偏向高回报的尝试，β按每个起点自适应设定并以KL约束控制。**复用**：维护一个历史解缓冲区，用类似PUCT（[[alphazero]]式树搜索的选择规则）的打分挑下一轮从哪个解出发，价值取子节点的最大回报而不是平均。\n\n模型是[[gpt-oss]]-120b，用秩32的LoRA在[[tinker]]上训练50步，每步512条rollout，论文估计每次运行约500美元。结果：Erdős最小重叠问题得到0.380876（越小越好），[[alphaevolve]]为0.380924；GPUMode TriMul内核在A100上2198.2微秒，最好的人类提交为4531.5微秒；两道AtCoder启发式赛题略超人类最好成绩；单细胞去噪也超过已有方法。也有没超过的，例如第二个自相关不等式。",
+  "limits": [
+    {"text": "只适用于有自动评分器、回报连续的问题；每个问题都要单独训练一次。", "solved_by": []},
+    {"text": "并非每题都赢：第二个自相关不等式低于AlphaEvolve，MI300X上的MLA解码内核未显著超过人类最好提交。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "alphaevolve", "type": "rivals", "note": "AlphaEvolve提示冻结模型做进化搜索，TTT-Discover让模型在这道题上边搜边训练，并在Erdős问题上给出更小的值。"},
+    {"to": "ttt", "type": "extends", "note": "把「测试时更新参数」从语言建模推广到针对单个科学问题的强化学习。"},
+    {"to": "tinker", "type": "uses", "note": "测试时训练通过Thinking Machines的Tinker接口完成。"},
+    {"to": "gpt-oss", "type": "uses", "note": "全部结果基于开源的gpt-oss-120b，可复现。"},
+    {"to": "ttrl", "type": "extends", "note": "TTRL在测试题上用伪标签训练以提高平均正确率，TTT-Discover只追求单题上的最好解。"}
+  ],
+  "prereq": ["policy-gradient-concept", "exploration-exploitation", "tree-search", "peft-concept"],
+  "learn": "先读[[alphaevolve]]和[[ttrl]] → 读原文第2节熵化目标与PUCT复用、表1和表2 → 动手：在一个可打分的小优化问题上，比较「冻结模型反复采样」与「每轮用最好样本微调」的最好得分曲线。",
+  "check": {"source": "https://arxiv.org/abs/2601.16175", "confirmed": "标题、作者、v1提交于2026-01-22；正文（arxiv.org/html/2601.16175v2）核对熵化目标、PUCT缓冲区、gpt-oss-120b与秩32 LoRA、50步×512 rollout、约500美元、Erdős 0.380876对AlphaEvolve 0.380924、TriMul A100 2198.2对4531.5微秒、未超过的题目、作者单位。"}
+}

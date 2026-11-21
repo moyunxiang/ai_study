@@ -36,7 +36,7 @@ REQUIRED = {1: ["who", "links", "problem", "idea", "impact", "background", "meth
             2: ["who", "links", "problem", "idea", "impact", "background", "method", "legacy", "limits", "check"],
             3: ["who", "links", "problem", "idea", "impact", "method", "check"]}
 MIN_LEN = {1: 500, 2: 280, 3: 110}   # background+method+results+legacy 的最少汉字数
-ALLOWED = {"id", "who", "venue", "links", *SHORT, *LONG, "limits", "relations", "prereq", "terms", "check"}
+ALLOWED = {"id", "who", "venue", "links", *SHORT, *LONG, "limits", "relations", "prereq", "terms", "check", "aka"}
 
 errors, warnings = [], []
 
@@ -199,7 +199,7 @@ def load_content(nodes):
     return content
 
 
-AREAS = {"math", "prob", "opt", "ml", "nn", "seq", "gen", "rl", "vis", "aud", "emb", "sys", "eval"}
+AREAS = {"idea", "math", "prob", "opt", "ml", "nn", "seq", "gen", "rl", "vis", "aud", "emb", "sys", "eval"}
 LINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
 
 
@@ -237,7 +237,7 @@ def load_concepts():
             err(rel, f"key {key!r} 与文件名不一致，或不在 data/concepts.txt 登记表里")
             continue
         for k in c:
-            if k not in {"key", "short", "body", "example", "pitfalls", "needs"}:
+            if k not in {"key", "short", "body", "example", "pitfalls", "needs", "aka", "origin", "nodes"}:
                 err(rel, f"未知字段 {k!r}")
         for k in ("short", "body"):
             if not c.get(k):
@@ -247,9 +247,119 @@ def load_concepts():
         for d in c.get("needs") or []:
             if d not in reg:
                 err(rel, f"needs 引用了未登记的概念 {d!r}")
-        reg[key].update({k: c[k] for k in ("short", "body", "example", "pitfalls", "needs") if c.get(k)})
+        reg[key].update({k: c[k] for k in ("short", "body", "example", "pitfalls", "needs", "aka", "origin", "nodes") if c.get(k)})
         reg[key]["has"] = True
+    # 基础概念的别名和出处节点集中放在一个文件里：{概念key: {"aka": [...], "origin": 节点id}}
+    p = DATA / "concepts.aka.json"
+    if p.exists():
+        try:
+            meta = json.loads(p.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            err("data/concepts.aka.json", f"不是合法JSON：{e}")
+            meta = {}
+        for key, m in meta.items():
+            if key not in reg:
+                err("data/concepts.aka.json", f"概念 {key!r} 未登记")
+            elif not isinstance(m, dict) or not isinstance(m.get("aka", []), list):
+                err("data/concepts.aka.json", f"{key}: 应为 {{aka: [...], origin: 节点id}}")
+            else:
+                reg[key]["aka"] = [str(x).strip() for x in list(reg[key].get("aka") or []) + m.get("aka", []) if str(x).strip()]
+                if m.get("origin"):
+                    reg[key]["origin"] = m["origin"]
     return reg
+
+
+def load_ideas(nodes, concepts, track_keys):
+    """研究思路与话题：data/ideas/<track>.json，一个列表，每项 {key, name, en, aka, blurb, body, origin, nodes}。
+    并入概念表（area='idea'），和基础概念一样可以搜、可以链接、可以在树上看它的节点。"""
+    n_ok = 0
+    for k in track_keys:
+        p = DATA / "ideas" / f"{k}.json"
+        if not p.exists():
+            continue
+        where = f"data/ideas/{k}.json"
+        try:
+            items = json.loads(p.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            err(where, f"不是合法JSON：{e}")
+            continue
+        if not isinstance(items, list):
+            err(where, "应为一个列表")
+            continue
+        for it in items:
+            key = it.get("key") if isinstance(it, dict) else None
+            if not key or not ID_RE.match(key):
+                err(where, f"思路 key {key!r} 只能用小写字母、数字、连字符")
+                continue
+            if key in concepts:
+                err(where, f"思路 key {key!r} 与已有的概念或思路重复（已有：{concepts[key]['name']}）")
+                continue
+            for f in it:
+                if f not in {"key", "name", "en", "aka", "blurb", "body", "origin", "nodes"}:
+                    err(where, f"{key}: 未知字段 {f!r}")
+            name, blurb = (it.get("name") or "").strip(), (it.get("blurb") or "").strip()
+            if not name or not blurb:
+                err(where, f"{key}: 缺少 name 或 blurb")
+                continue
+            ids = [i for i in it.get("nodes") or []]
+            for i in ids + ([it["origin"]] if it.get("origin") else []):
+                if i not in nodes:
+                    err(where, f"{key}: 节点 {i!r} 未登记")
+            ids = [i for i in ids if i in nodes]
+            if len(ids) < 2:
+                err(where, f"{key}: nodes 至少要有2个已登记的节点（只对应一个节点的叫法请写成该节点的别名）")
+                continue
+            if len(blurb) > 90:
+                warn(where, f"{key}: blurb 过长（{len(blurb)} 字，限80字左右）")
+            for m in LINK_RE.finditer(it.get("body") or ""):
+                ref = m.group(1).strip()
+                if (ref[2:] not in concepts and ref[2:] != key) if ref.startswith("c:") else ref not in nodes:
+                    err(where, f"{key}: body 里的 [[{ref}]] 无法解析")
+            aka = [str(x).strip() for x in it.get("aka") or [] if str(x).strip()]
+            origin = it.get("origin") if it.get("origin") in nodes else min(ids, key=lambda i: date_key(nodes[i]["date"]))
+            concepts[key] = {"key": key, "name": name, "en": (it.get("en") or "").strip(), "area": "idea", "level": 2, "has": True,
+                             "short": blurb, "body": (it.get("body") or "").strip(), "aka": aka, "origin": origin, "nodes": ids, "track": k}
+            n_ok += 1
+    return n_ok
+
+
+def load_aliases(nodes, content, track_keys):
+    """搜索用的别名和缩写：新节点写在讲解文件的 aka 字段里，已有节点写在 data/aliases/<track>.json（{节点id: [别名…]}）。"""
+    aka = defaultdict(list)
+    for nid, c in content.items():
+        a = c.get("aka")
+        if a is not None and not (isinstance(a, list) and all(isinstance(x, str) for x in a)):
+            err(f"data/content/{nodes[nid]['track']}/{nid}.json", "aka 应为字符串列表")
+            continue
+        aka[nid] += a or []
+    for k in track_keys:
+        p = DATA / "aliases" / f"{k}.json"
+        if not p.exists():
+            continue
+        where = f"data/aliases/{k}.json"
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            err(where, f"不是合法JSON：{e}")
+            continue
+        for nid, a in (d.items() if isinstance(d, dict) else []):
+            if nid not in nodes:
+                err(where, f"节点 {nid!r} 未登记")
+            elif not (isinstance(a, list) and all(isinstance(x, str) for x in a)):
+                err(where, f"{nid}: 别名应为字符串列表")
+            else:
+                aka[nid] += a
+    out = {}
+    for nid, a in aka.items():
+        seen, keep = set(), []
+        for x in a:
+            x = x.strip()
+            if x and x.lower() not in seen:
+                seen.add(x.lower())
+                keep.append(x)
+        if keep:
+            out[nid] = keep
+    return out
 
 
 def check_links(nodes, content, concepts):
@@ -364,6 +474,9 @@ def load_tree(nodes, order, track_keys):
             else:
                 good.append({"key": key, "name": t["name"].strip(), "blurb": (t.get("blurb") or "").strip(),
                              "from": t.get("from") or None, "via": t.get("via") or None})
+                aka = [str(x).strip() for x in (t.get("aka") or []) if str(x).strip()]
+                if aka:
+                    good[-1]["aka"] = aka      # 搜索用的别名和缩写，不显示
         if not good:
             good, assign = [{"key": "all", "name": "全部", "blurb": "", "from": None, "via": None}], {}
         elif not 5 <= len(good) <= 13:
@@ -446,6 +559,12 @@ def main():
     tree, threads = load_tree(nodes, order, track_keys)
     content = load_content(nodes)
     concepts = load_concepts()
+    n_ideas = load_ideas(nodes, concepts, track_keys)
+    aliases = load_aliases(nodes, content, track_keys)
+    for key, c in concepts.items():
+        for i in [c.get("origin")] + list(c.get("nodes") or []) if c["area"] != "idea" else []:
+            if i and i not in nodes:
+                err(f"data/concepts/{key}.json", f"节点 {i!r} 未登记")
     check_links(nodes, content, concepts)
     edges = build_edges(nodes, order, content)
 
@@ -458,7 +577,7 @@ def main():
         by_track[nodes[nid]["track"]][0] += 1
         by_track[nodes[nid]["track"]][1] += nid in content
     print(f"\n节点 {len(order)}（tier1 {sum(nodes[i]['tier'] == 1 for i in order)} / tier2 {sum(nodes[i]['tier'] == 2 for i in order)} / tier3 {sum(nodes[i]['tier'] == 3 for i in order)}）"
-          f"，已有讲解 {len(content)}，边 {len(edges)}，概念 {sum(c['has'] for c in concepts.values())}/{len(concepts)}，错误 {len(errors)}，警告 {len(warnings)}")
+          f"，已有讲解 {len(content)}，边 {len(edges)}，概念 {sum(c['has'] for c in concepts.values()) - n_ideas}/{len(concepts) - n_ideas}，思路 {n_ideas}，错误 {len(errors)}，警告 {len(warnings)}")
     if "--stats" in sys.argv or not check_only:
         for k in track_keys:
             print(f"  {k:8s} {by_track[k][1]:4d} / {by_track[k][0]:4d}   主题线 {len(threads[k]):2d}：" + "、".join(f"{t['name']}{t['n']}" for t in threads[k]))
@@ -478,6 +597,8 @@ def main():
         for k in SHORT:
             g[k] = c.get(k, "")
         g["has"] = nid in content
+        if aliases.get(nid):
+            g["aka"] = aliases[nid]
         g_nodes.append(g)
         if c:
             long_by_track[n["track"]][nid] = {k: c[k] for k in ("venue", "links", *LONG, "limits", "prereq", "terms", "check") if c.get(k)}
@@ -495,12 +616,21 @@ def main():
                              if isinstance(lim, dict) and lim.get("text") and not lim.get("solved_by")])
     for k in track_keys:
         dump(OUT / "content" / f"{k}.json", long_by_track.get(k, {}))
-    used = defaultdict(list)
+    # 每个概念/思路落在树上的哪些节点：列为前置的、正文里链接到它的、以及手工指定的
+    used = defaultdict(set)
     for nid, c in content.items():
         for p in c.get("prereq") or []:
-            used[p].append(nid)
+            used[p].add(nid)
+        for v in c.values():
+            for txt in ([v] if isinstance(v, str) else [x.get("text", "") + x.get("d", "") for x in v if isinstance(x, dict)] if isinstance(v, list) else []):
+                for m in LINK_RE.finditer(txt):
+                    if m.group(1).strip().startswith("c:"):
+                        used[m.group(1).strip()[2:]].add(nid)
     for key, c in concepts.items():
-        c["nodes"] = used.get(key, [])
+        ids = (used.get(key, set()) | set(c.get("nodes") or [])) & set(nodes)
+        c["nodes"] = sorted(ids, key=lambda i: (date_key(nodes[i]["date"]), i))
+        if c.get("origin") not in nodes:
+            c.pop("origin", None)
     dump(OUT / "concepts.json", {"concepts": list(concepts.values()), "terms": sorted(terms.values(), key=lambda x: x["t"])})
     # 版本戳：让浏览器和CDN在每次构建后取到新的数据与脚本
     import re, time

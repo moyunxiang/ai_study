@@ -1,0 +1,31 @@
+{
+ "id": "eagle-3",
+ "who": "Yuhui Li, Fangyun Wei, Chao Zhang, Hongyang Zhang · 北京大学, 微软研究院, 滑铁卢大学",
+ "venue": "NeurIPS 2025",
+ "aka": ["EAGLE3", "EAGLE v3", "训练时测试", "TTT草稿"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2503.01840"},
+  {"label": "GitHub", "url": "https://github.com/SafeAILab/EAGLE"}
+ ],
+ "problem": "EAGLE类草稿器给它喂再多训练数据也涨得很少，原因是它被要求先预测目标模型的顶层特征，这个约束卡住了上限。",
+ "idea": "去掉特征预测，改为直接预测token；输入改用目标模型低、中、高多层特征的融合，并在训练时模拟多步草稿（训练时测试）。",
+ "impact": "加速比随训练数据增加而继续上升，SGLang、vLLM等引擎都支持加载EAGLE-3草稿器。",
+ "method": "[[speculative-decoding]]的速度取决于草稿器每轮能被目标模型接受几个词。[[eagle]]的草稿器读目标模型顶层特征，先预测下一位置的特征，再转成词；作者发现这一特征预测损失限制了草稿器的表达力，扩大数据后收益很小。\n\nEAGLE-3做了两处改动。一是放弃特征预测，草稿器直接以预测token为目标。二是输入不再只用顶层特征，而是把目标模型低层、中层、高层的特征拼接融合。问题在于：推理时草稿器第二步以后读到的是自己上一步的输出，而不是目标模型的真实特征，训练与测试不一致。为此作者在训练中就让草稿器把自己的输出接回来连续预测多步，称为“训练时测试”（training-time test），让训练条件贴近实际草稿过程。",
+ "results": "论文称在对话模型与推理模型、五类任务上加速比最高6.5倍，比EAGLE-2约高1.4倍；在SGLang中批大小64时吞吐提升1.38倍。",
+ "legacy": "EAGLE-3之后，为每个开源模型训练一个专门草稿器成为常规操作；2026年的[[dflash]]把草稿器换成块扩散模型并直接以EAGLE-3为基线。",
+ "limits": [
+  {"text": "草稿器仍是自回归逐词生成，草稿越长串行开销越大，大批量时收益缩小。", "solved_by": ["dflash"]},
+  {"text": "每个目标模型都要单独训练草稿器，模型更新后需重训。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "eagle", "type": "extends", "note": "同一团队的第三代：去掉EAGLE的顶层特征预测，改为多层特征融合加直接预测token。"},
+  {"to": "speculative-decoding", "type": "uses", "note": "沿用推测采样的验证规则，保证输出分布与目标模型一致。"},
+  {"to": "medusa", "type": "rivals", "note": "同为不依赖独立小模型的草稿方案：Medusa用并行多头，EAGLE-3用轻量自回归草稿层，后者接受长度更长。"}
+ ],
+ "prereq": ["autoregressive", "decoding-sampling", "kv-cache", "throughput-latency"],
+ "terms": [
+  {"t": "接受长度", "d": "每轮草稿里平均有几个词被目标模型验证通过；越长，目标模型需要做的前向次数越少。"}
+ ],
+ "learn": "先读[[speculative-decoding]]和[[eagle]]的讲解 → 读论文第3节两处改动 → 在SGLang里给开源模型加载EAGLE-3草稿器，测接受长度和加速比。",
+ "check": {"source": "https://arxiv.org/abs/2503.01840", "confirmed": "标题、作者、v1日期2025-03-03；摘要中放弃特征预测、多层特征融合、training-time test、最高6.5倍、比EAGLE-2约1.4倍、SGLang批64吞吐1.38倍。NeurIPS 2025来自OpenAlex记录。机构沿用EAGLE已有讲解。"}
+}

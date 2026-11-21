@@ -1,0 +1,25 @@
+{
+ "id": "lmcache",
+ "who": "Yuhan Liu, Yihua Cheng, Jiayi Yao, Yuwei An, Xiaokun Chen, Shaoting Feng, Yuyang Huang, Samuel Shen et al. · 芝加哥大学, Tensormesh",
+ "aka": ["KV缓存层", "KV cache layer", "KV缓存卸载", "KV cache offloading", "KV连接器", "KV connector", "分层KV缓存", "跨请求KV复用"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2510.09665"},
+  {"label": "GitHub", "url": "https://github.com/LMCache/LMCache"}
+ ],
+ "problem": "用户累积的KV缓存早已远超GPU显存，推理引擎只能把它留在显存里、用完即丢，同一段长文档或多轮对话被反复重新预填充。",
+ "idea": "在推理引擎之外做一个独立的KV缓存层：把vLLM、SGLang算出的KV搬到CPU内存、本地盘、远端存储里，再在不同请求、不同引擎之间按需取回。",
+ "impact": "论文称是首个开源的KV缓存层，其连接器接口被NVIDIA Dynamo、llm-d、vLLM production stack等采用。",
+ "method": "[[prompt-caching]]和[[sglang]]的前缀缓存都把KV留在GPU显存里，显存一满就要淘汰；[[distserve]]式的预填充-解码分离又需要把KV从一台机器传到另一台。LMCache把这两件事统一成“KV缓存的存储与搬运”问题。\n\n它做了三件事：一是高度优化的数据搬运，批量拷贝、计算与I/O流水线并行，逐层边算边存边取；二是一个模块化的**KV连接器**接口，分成调度器侧（查询已有多少token命中缓存）和执行侧（加载、保存KV）两组钩子，让LMCache不必跟着[[vllm]]内部实现的快速变化反复重写；三是一套控制API，可在GPU、CPU内存、本地盘、远端存储（Redis、S3、[[mooncake]]存储等）之间编排缓存。\n\n论文称与vLLM组合时，在多轮问答、文档分析等负载上吞吐最多提升15倍。企业部署中还观察到：业界常用的“截断上下文只保留最新部分”会让前缀缓存命中率从约85%降到约45%。",
+ "limits": [
+  {"text": "远端取回KV要占网络带宽，带宽不足时可能比重新预填充还慢，何时取、何时重算仍需按负载调。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "vllm", "type": "extends", "note": "把vLLM显存内的分页KV缓存扩展到CPU、磁盘和远端存储组成的多级缓存。"},
+  {"to": "sglang", "type": "uses", "note": "同时支持SGLang作为上游引擎，跨引擎共享KV。"},
+  {"to": "prompt-caching", "type": "extends", "note": "前缀缓存只在单机显存内复用，LMCache让复用跨请求、跨机器、跨引擎。"},
+  {"to": "distserve", "type": "uses", "note": "为预填充-解码分离提供跨GPU、跨引擎的KV传输。"},
+  {"to": "mooncake", "type": "rivals", "note": "都以KV缓存为中心设计推理系统；Mooncake是Kimi的内部架构，LMCache是可插入开源引擎的独立层，且支持把Mooncake存储作为后端。"}
+ ],
+ "prereq": ["kv-cache", "memory-bandwidth", "throughput-latency", "cpu-gpu"],
+ "check": {"source": "https://arxiv.org/abs/2510.09665", "confirmed": "标题、作者、v1日期2025-10-08；摘要中卸载与PD分离、连接器、控制API、最多15倍吞吐、截断上下文使命中率约减半；arXiv HTML v2：Tensormesh与芝加哥大学、2024年5月设计原型、连接器被NVIDIA Dynamo、llm-d、AIBrix、vLLM production stack采用、85%→45%、存储后端含Redis、S3、Mooncake Store。"}
+}

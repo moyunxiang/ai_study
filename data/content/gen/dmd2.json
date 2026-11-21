@@ -1,0 +1,28 @@
+{
+  "id": "dmd2",
+  "who": "Tianwei Yin, Michaël Gharbi, Taesung Park, Richard Zhang, Eli Shechtman, Frédo Durand, William T. Freeman · MIT / Adobe Research",
+  "venue": "NeurIPS 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2405.14867"}
+  ],
+  "aka": ["DMD2", "DMD v2", "改进版分布匹配蒸馏", "Improved DMD", "两时间尺度更新"],
+  "problem": "DMD要靠教师多步采样预先生成大量噪声-图像对来算回归损失，大模型上成本高，学生也被绑死在教师的采样轨迹上。",
+  "idea": "去掉回归损失，改用两时间尺度更新稳住“假分数”网络；再加GAN损失让学生直接看真实图像；并支持多步采样。",
+  "impact": "一步生成在ImageNet-64上FID 1.28，超过教师；可把SDXL蒸成几步出百万像素图，成为后来视频蒸馏常用的配方。",
+  "method": "[[dmd]]的思路是让一步生成器的输出在**分布层面**接近教师：用两个扩散网络分别估计真实分布和生成分布的分数（[[c:score-function]]），二者之差就是降低KL散度的梯度方向。但它还需要一项回归损失来稳定训练，而准备回归用的数据要让教师跑大量确定性多步采样。\n\nDMD2做了三处改动。第一，**去掉回归损失**；作者发现由此带来的不稳定，是因为估计生成分布的“假”评论网络跟不上生成器，于是让它比生成器更新得更频繁（两时间尺度更新规则）。第二，在蒸馏中加入**GAN损失**，判别器区分生成样本与真实图像，学生因此能从真实数据学习，弥补教师分数估计的误差。第三，支持**多步**生成，并在训练时模拟推理时的输入，消除训练与推理的不一致。\n\n摘要称，一步生成在ImageNet 64×64上FID 1.28、零样本COCO 2014上FID 8.35，推理成本降低500倍仍超过教师；还能蒸馏[[sdxl]]生成百万像素图像。此后[[causvid]]、[[self-forcing]]等视频工作都沿用了这类分布匹配蒸馏。",
+  "limits": [
+    {"text": "仍要同时训练生成器、假分数网络和判别器三个网络，显存占用大、超参数敏感。", "solved_by": []},
+    {"text": "分布匹配偏向“求众数”，一步模型的多样性通常低于教师多步采样。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "dmd", "type": "solves", "note": "去掉DMD昂贵的回归损失与配对数据构造，用两时间尺度更新解决随之而来的不稳定。"},
+    {"to": "add", "type": "extends", "note": "像ADD一样把GAN损失并入扩散蒸馏，但以分布匹配为主、GAN为辅。"},
+    {"to": "sdxl", "type": "uses", "note": "以SDXL为教师，蒸馏出几步生成百万像素图像的模型。"},
+    {"to": "ladd", "type": "rivals", "note": "同期都在大模型上做少步蒸馏：LADD在潜空间纯对抗蒸馏，DMD2以分数差为主梯度。"}
+  ],
+  "prereq": ["diffusion-process", "score-function", "kl-divergence", "adversarial-training", "few-step-sampling"],
+  "check": {
+    "source": "https://arxiv.org/abs/2405.14867",
+    "confirmed": "核对标题、作者、v1日期2024-05-23；摘要中去掉回归损失、两时间尺度更新、GAN损失、多步训练，ImageNet-64 FID 1.28、COCO 2014 FID 8.35、推理成本降低500倍、蒸馏SDXL。"
+  }
+}

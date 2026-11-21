@@ -1,0 +1,23 @@
+{
+ "id": "min-p",
+ "who": "Minh Nhat Nguyen, Andrew Baker, Clement Neo, Allen Roush, Andreas Kirsch, Ravid Shwartz-Ziv",
+ "venue": "ICLR 2025",
+ "aka": ["min_p", "minp", "min-p sampling", "最小概率采样", "动态截断采样"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2407.01082"},
+  {"label": "ICLR 2025", "url": "https://proceedings.iclr.cc/paper_files/paper/2025/hash/afa5f124e36bed5cc2125067005d43f5-Abstract-Conference.html"}
+ ],
+ "problem": "top-p采样在高温度下会把一大片低概率的怪词放进候选池，文本要么乱码要么重复，想要多样性就得牺牲连贯性。",
+ "idea": "候选门槛随模型的把握动态变化：只保留概率不低于“最高概率×p_base”的词，模型越确定，门槛越高。",
+ "impact": "先在开源社区流行，后被Hugging Face Transformers、vLLM、SGLang等框架内置，成为top-p之外常见的采样选项。",
+ "method": "每一步生成时，模型给出词表上的概率分布（先按[[c:decoding-sampling]]里的温度缩放）。[[nucleus-sampling]]的做法是保留累计概率达到p的最小一组词；问题是温度一高，分布被压平，凑够p要纳入大量本不该出现的词。\n\nmin-p只看最高的那个概率`p_max`：门槛`p_scaled = p_base × p_max`，概率低于门槛的词全部丢掉，剩下的重新归一化后再采样。比如`p_base=0.1`：模型很确定、首选词概率0.9时，门槛是0.09，几乎只剩首选；模型拿不准、首选只有0.2时，门槛降到0.02，留出很多选择。论文建议`p_base`取0.05–0.1。\n\n论文表2中，Mistral 7B在温度2.0下做GPQA，min-p得26.34%，top-p只有6.47%。这个想法最初由作者之一在开源社区提出并分享给爱好者测试，后来才写成论文。",
+ "limits": [
+  {"text": "收益主要出现在高温度；在常用的低温度设置下与top-p差别不大，温度极高时（如GSM8K在温度3.0）两者都会失效。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "nucleus-sampling", "type": "solves", "note": "top-p的固定累计阈值在高温下放入太多低概率词，min-p改用随首选概率缩放的阈值。"},
+  {"to": "mistral-7b", "type": "uses", "note": "主要实验以Mistral 7B为基础模型，也测了Llama 3与Mistral Large。"}
+ ],
+ "prereq": ["softmax", "decoding-sampling", "language-model", "probability-basics"],
+ "check": {"source": "https://arxiv.org/abs/2407.01082", "confirmed": "标题、作者、v1日期2024-07-01；摘要中的方法与被Transformers、vLLM采用；arXiv HTML v8：公式p_scaled = p_base × p_max、建议0.05–0.1、先做温度缩放、表2 GPQA温度2.0下26.34%对6.47%、GSM8K温度3.0两者均为0、想法源自作者在开源社区的分享。ICLR 2025来自OpenAlex与ICLR proceedings页。"}
+}

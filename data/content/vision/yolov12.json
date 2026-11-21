@@ -1,0 +1,29 @@
+{
+  "id": "yolov12",
+  "who": "Yunjie Tian, Qixiang Ye, David Doermann · 布法罗大学 / 中国科学院大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2502.12524"},
+    {"label": "代码", "url": "https://github.com/sunsmarterjie/yolov12"}
+  ],
+  "aka": ["YOLO12", "YOLO v12", "注意力YOLO", "Area Attention", "R-ELAN"],
+  "problem": "YOLO系列一直靠改进卷积结构提速提点，注意力建模能力更强但太慢，进不了实时检测器的主干。",
+  "idea": "设计计算更省的区域注意力和带残差的R-ELAN聚合模块，配合FlashAttention，让以注意力为核心的YOLO跑到卷积YOLO的速度。",
+  "impact": "把YOLO的核心从卷积换成注意力且保持实时速度，在多个尺度上超过YOLOv10、YOLO11和RT-DETR。",
+  "method": "YOLOv12仍是单阶段YOLO框架，主要改骨干和颈部。核心是区域注意力（Area Attention）：把特征图沿水平或垂直方向等分成4段，每段内做[[c:self-attention]]，只需一次reshape，不用像Swin那样显式划窗；感受野缩到原来的四分之一但仍很大，计算量显著下降。其次是R-ELAN：在ELAN特征聚合模块上加一条从输入到输出的残差连接并乘一个小缩放系数（大模型默认0.01），作者报告这是L、X这类大模型稳定训练所必需的。注意力的访存开销直接交给[[flashattention]]处理。\n\n摘要报告YOLOv12-N在T4上1.64 ms延迟下达到40.6% mAP，比YOLOv10-N和YOLO11-N分别高2.1和1.2个点；YOLOv12-S在精度超过RT-DETR-R18的同时快42%，计算量只有36%。正文表格中YOLOv12-X为55.2% mAP。",
+  "limits": [
+    {"text": "依赖FlashAttention，论文自述只支持Turing、Ampere、Ada Lovelace、Hopper等架构的GPU，在更老的显卡和很多端侧芯片上难以部署。", "solved_by": []},
+    {"text": "仍需NMS后处理；同期免NMS的端到端检测路线在部署上更简单。", "solved_by": ["rf-detr"]}
+  ],
+  "relations": [
+    {"to": "ultralytics-yolo", "type": "extends", "note": "沿用YOLO单阶段框架与训练流程，把骨干核心从卷积换成区域注意力。"},
+    {"to": "yolov10", "type": "rivals", "note": "论文以YOLOv10、YOLO11为主要对照，在相近速度下精度更高。"},
+    {"to": "rt-detr", "type": "rivals", "note": "RT-DETR把DETR做成实时，YOLOv12把注意力放进YOLO，两条路线争夺同一速度-精度区间。"},
+    {"to": "flashattention", "type": "uses", "note": "用FlashAttention解决注意力的显存访问开销。"}
+  ],
+  "prereq": ["vision-tasks", "anchor-nms", "self-attention", "efficient-attention", "throughput-latency"],
+  "terms": [
+    {"t": "ELAN", "d": "YOLOv7系列使用的高效层聚合模块，把多条不同深度的卷积分支的输出拼接起来。"}
+  ],
+  "learn": "先了解YOLO基本结构与NMS，再读YOLOv12第3节区域注意力与R-ELAN；在支持FlashAttention的GPU上跑官方模型对比YOLO11延迟。",
+  "check": {"source": "https://arxiv.org/abs/2502.12524", "confirmed": "核对了arXiv记录：标题、三位作者、v1提交于2025-02-18、摘要中的40.6% mAP/1.64 ms、比YOLOv10-N/YOLO11-N高2.1/1.2、比RT-DETR-R18快42%且计算量36%；HTML正文确认区域注意力分4段、R-ELAN缩放0.01、FlashAttention的GPU限制、YOLOv12-X 55.2%。"}
+}

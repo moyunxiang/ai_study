@@ -1,0 +1,26 @@
+{
+ "id": "calm",
+ "who": "Chenze Shao, Darren Li, Fandong Meng, Jie Zhou · 腾讯微信AI等",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2510.27688"},
+  {"label": "作者博客", "url": "https://shaochenze.github.io/blog/2025/CALM"},
+  {"label": "GitHub", "url": "https://github.com/shaochenze/calm"}
+ ],
+ "aka": ["CALM", "next-vector prediction", "下一向量预测", "连续语言模型", "BrierLM"],
+ "problem": "语言模型每一步只生成一个离散token，信息量只有十几比特，生成步数和成本被词表粒度锁死。",
+ "idea": "先用自编码器把每K个token压成一个连续向量，再让Transformer自回归地预测下一个向量，生成步数减为1/K。",
+ "impact": "把“提高每一步的语义带宽”提成一个新的扩展方向，为连续空间语言建模给出了训练、评测和采样的一整套工具。",
+ "method": "提高生成效率的常见做法是[[multi-token-prediction]]或投机解码，但它们仍在离散token上工作。CALM走得更远：训练一个高保真[[vae]]式自编码器，把K个token压成一个连续向量，重建准确率超过99.9%。语言于是变成一串连续向量，Transformer只需自回归地预测“下一个向量”，主实验取K=4，生成步数减为四分之一。\n\n连续空间里没有softmax，也算不出似然，所以作者搭了一套无似然的工具：生成头是一个轻量的能量模型，输入隐藏状态和随机噪声，经几层残差MLP一步输出向量，用能量分数（一种严格适当评分规则）训练；评测用他们提出的**BrierLM**，只靠模型采样就能估计，与交叉熵高度相关；还给出可控温度的采样算法。\n\n论文报告：CALM-M（371M）的BrierLM与Transformer-S（281M）接近（5.72对6.05），训练FLOPs少44%、推理FLOPs少34%。",
+ "limits": [
+  {"text": "实验规模最大约1.8B参数，在同等算力下质量仍略低于离散基线，放大后能否保持优势未知。", "solved_by": []},
+  {"text": "依赖单独训练的自编码器，连续向量的鲁棒性和对下游指令微调、推理的适配尚未研究。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "multi-token-prediction", "type": "rivals", "note": "MTP一次预测多个离散token；CALM把多个token压成一个连续向量再预测，彻底离开离散词表。"},
+  {"to": "vae", "type": "uses", "note": "用变分自编码器式的压缩器把K个token编码成连续向量。"},
+  {"to": "transformer", "type": "uses", "note": "主干仍是自回归Transformer，只是输入输出换成连续向量。"},
+  {"to": "blt", "type": "rivals", "note": "BLT在字节上动态分块以提高效率；CALM固定K个token成块并转到连续空间。"}
+ ],
+ "prereq": ["autoregressive", "autoencoder", "latent-space", "energy-based", "params-flops", "tokenization"],
+ "check": {"source": "https://arxiv.org/abs/2510.27688", "confirmed": "标题、4位作者、v1提交于2025-10-31；摘要中K个token压缩为一个向量、重建超99.9%、无似然框架；正文中K=4、能量分数训练的生成头、BrierLM定义、CALM-M 371M对Transformer-S 281M的5.72对6.05、训练FLOPs少44%与推理少34%。"}
+}

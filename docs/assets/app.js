@@ -7,7 +7,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&
 const app = $('#app');
 const KIND = {paper: '论文', model: '模型', system: '系统', hardware: '硬件', dataset: '数据集', event: '事件', concept: '思想'};
 const REL = {solves: '解决', extends: '延续', uses: '使用', rivals: '竞争'};
-const AREA = {math: '数学预备', prob: '概率统计与信息论', opt: '优化与训练', ml: '机器学习基础', nn: '神经网络组件', seq: '序列与语言模型',
+const AREA = {idea: '研究思路与话题', math: '数学预备', prob: '概率统计与信息论', opt: '优化与训练', ml: '机器学习基础', nn: '神经网络组件', seq: '序列与语言模型',
   gen: '生成模型', rl: '强化学习', vis: '视觉', aud: '语音', emb: '具身与控制', sys: '系统与硬件', eval: '评测与实验方法'};
 const LEVEL = ['预备', '入门', '进阶'];
 
@@ -155,7 +155,7 @@ function home() {
       <div class="eyebrow">1943 — ${G.eras[G.eras.length - 1].to} · 一棵按时间生长的树</div>
       <h1>AI脉络</h1>
       <p class="lead">每个阶段大家在攻克什么，谁解决了它，又留下了什么给后来的人。${G.tracks.length}条分支、${G.nodes.length}个节点——论文、模型、芯片、数据集和关键事件——每一个都有讲解，彼此用“解决 / 延续 / 使用 / 竞争”连起来。只需要基本的编程和大一数学就能从头读起。</p>
-      <div class="stats"><span><b>${G.nodes.length}</b>节点</span><span><b>${G.edges.length}</b>连接</span><span><b>${t1.length}</b>主干必读</span><span><b>${Object.keys(concepts).length}</b>基础概念</span><span><b>${written}</b>已有讲解</span></div>
+      <div class="stats"><span><b>${G.nodes.length}</b>节点</span><span><b>${G.edges.length}</b>连接</span><span><b>${t1.length}</b>主干必读</span><span><b>${Object.keys(concepts).length}</b>概念与思路</span><span><b>${written}</b>已有讲解</span></div>
       <div class="acts" style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap">
         <a class="btn fill" href="#/path">开始学习</a><a class="btn" href="#/guide">怎么用这个网站</a>
         ${byId[store.get('last')] ? `<a class="btn" href="#/n/${store.get('last')}">继续上次：${esc(byId[store.get('last')].title)}</a>` : ''}</div>
@@ -185,7 +185,7 @@ function home() {
       <div class="grid tools">
         <a class="card" href="#/map"><h3>全景树</h3><p>整个领域画成一棵树：先看16条分支谁从谁长出来，点一条展开成主题线，再点节点看讲解和它的来龙去脉。</p></a>
         <a class="card" href="#/link"><h3>演进路径</h3><p>任选两个工作，找出连接它们的最短一条线，例如从感知机到Transformer中间隔着什么。</p></a>
-        <a class="card" href="#/concepts"><h3>概念词条</h3><p>${Object.keys(concepts).length}个基础概念，讲解里带虚线的词都能点过来。</p></a>
+        <a class="card" href="#/concepts"><h3>概念与思路</h3><p>${Object.values(concepts).filter(c => c.area !== 'idea').length}个基础概念和${Object.values(concepts).filter(c => c.area === 'idea').length}个研究思路，每一条都能看到它长在树上的哪里。</p></a>
         <a class="card" href="#/open"><h3>开放问题</h3><p>近几年的工作留下、还没有后续工作解决的问题，适合找研究方向。</p></a>
         <a class="card" href="#/quiz"><h3>自测卡片</h3><p>合上书讲一遍：先自己回忆，再翻面对照，没答上的下次优先出现。</p></a>
         <a class="card" href="#/me"><h3>我的进度</h3><p>已读、在读、收藏和笔记，只存在这台设备的浏览器里，可以导出。</p></a>
@@ -329,7 +329,10 @@ async function viewNode(id) {
   const after = [...out[id]].sort((a, b) => (a.type === 'solves' ? 0 : 1) - (b.type === 'solves' ? 0 : 1) || (byId[a.to].date < byId[b.to].date ? -1 : 1));
   const ord = order[n.track], k = ord.indexOf(id), prev = byId[ord[k - 1]], next = byId[ord[k + 1]];
   const trunk = G.nodes.filter(x => x.tier === 1), tk = trunk.indexOf(n), nextTrunk = tk >= 0 ? trunk[tk + 1] : trunk.find(x => x.date > n.date);
-  app.innerHTML = `<div class="page narrow hue" ${hue(n.track)}>
+  const mine = Object.values(concepts).filter(x => x.area === 'idea' && (x.nodes || []).includes(id));
+  const thIds = (thBy[t.key][n.th] || {ids: []}).ids, near = [...before.map(x => x.from), ...after.map(x => x.to)];
+  const treeIds = [...new Set([id, ...near.slice(0, 60), ...(thIds.length <= 40 ? thIds : thIds.filter(i => byId[i].tier <= 2 || Math.abs(byId[i].y - n.y) <= 1).slice(0, 40))])];
+  app.innerHTML = `<div class="page hue" ${hue(n.track)}><div class="narrow" style="margin:0 auto">
     <div class="article-head">
       <div class="eyebrow">${t.g ? `${esc(t.g.name)} › ` : ''}<a href="#/track/${t.key}">${esc(t.name)}</a>${thBy[t.key][n.th] && n.th !== 'all' ? ` › <a href="#/track/${t.key}?th=${n.th}">${esc(thBy[t.key][n.th].name)}</a>` : ''} · <a href="#/era/${e.id}">${esc(e.name)}</a></div>
       <h1>${esc(n.title)}</h1>
@@ -344,7 +347,11 @@ async function viewNode(id) {
         ${(c.links || []).map(l => `<a class="btn sm" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)} ↗</a>`).join('')}</div>
     </div>
     ${n.has ? `<div class="gist"><div><h4>当时卡在哪</h4><p>${inline(n.problem)}</p></div><div><h4>它怎么解决</h4><p>${inline(n.idea)}</p></div><div><h4>改变了什么</h4><p>${inline(n.impact)}</p></div></div>` : `<div class="empty">这个节点的讲解还在整理中。下面是它在图上的连接。</div>`}
-    <div class="prose">
+    </div>
+    <section class="sec ntree"><div class="sec-h"><h2>它长在树上的哪里</h2><span class="muted">它所在的主题线“${esc((thBy[t.key][n.th] || {}).name || t.short)}”、它直接建立其上的工作和直接接着它做的工作。连线是继承关系</span></div>
+      <div class="toolbar"><a class="btn sm" href="#/map?at=${encodeURIComponent(id)}">在全景树里打开</a><a class="btn sm" href="#/map?focus=${encodeURIComponent(id)}">只看它的来龙去脉</a>${mine.length ? `<span class="muted" style="margin-left:6px">所属思路：</span>${mine.map(x => cchip(x.key)).join(' ')}` : ''}</div>
+      <div class="tscroll" id="ntree"></div></section>
+    <div class="narrow" style="margin:0 auto"><div class="prose">
       ${(c.prereq || []).length ? `<h2>先要会的概念</h2><p class="tags">${c.prereq.map(cchip).join(' ')}</p>` : ''}
       ${sec('背景', c.background)}${sec('方法', c.method)}${sec('结果', c.results)}${sec('后续', c.legacy)}${sec('常见误解', c.pitfalls)}
       ${(c.terms || []).length ? `<h2>本篇术语</h2><ul>${c.terms.map(x => `<li><b>${esc(x.t)}</b>　${inline(x.d)}</li>`).join('')}</ul>` : ''}
@@ -355,12 +362,14 @@ async function viewNode(id) {
       ${(() => { const same = G.nodes.filter(x => x.y === n.y && x.track !== n.track && x.tier <= 2).sort((a, b) => a.tier - b.tier).slice(0, 10); return same.length ? `<h2>同一年，别的分支在做什么</h2><p class="tags">${same.map(x => chip(x.id)).join(' ')} <a class="btn sm" href="#/year/${n.y}">${n.y}年全貌</a></p>` : ''; })()}
       <h2>我的笔记</h2><textarea class="note-box" id="note" placeholder="读完写两句：它解决了什么？我哪里没懂？（只保存在这台设备的浏览器里，可在“我的”页导出）">${esc(notes[id] || '')}</textarea>
     </div>
-    ${c.check ? `<div class="check">核对出处：<a href="${esc(c.check.source)}" target="_blank" rel="noopener">${esc(c.check.source)}</a>　${esc(c.check.confirmed)}</div>` : ''}
+    </div>
+    <div class="narrow" style="margin:0 auto">${c.check ? `<div class="check">核对出处：<a href="${esc(c.check.source)}" target="_blank" rel="noopener">${esc(c.check.source)}</a>　${esc(c.check.confirmed)}</div>` : ''}
     <div class="pn">${prev ? `<a href="#/n/${prev.id}"><small>本分支上一个 · ${fmtDate(prev.date)}</small><b>${esc(prev.title)}</b></a>` : '<span></span>'}
       ${next ? `<a class="r" href="#/n/${next.id}"><small>本分支下一个 · ${fmtDate(next.date)}</small><b>${esc(next.title)}</b></a>` : '<span></span>'}</div>
-    ${nextTrunk ? `<div class="pn" style="margin-top:12px"><span></span><a class="r" href="#/n/${nextTrunk.id}"><small>主干下一站 · ${fmtDate(nextTrunk.date)} · ${esc(trackBy[nextTrunk.track].short)}</small><b>${esc(nextTrunk.title)}</b></a></div>` : ''}
+    ${nextTrunk ? `<div class="pn" style="margin-top:12px"><span></span><a class="r" href="#/n/${nextTrunk.id}"><small>主干下一站 · ${fmtDate(nextTrunk.date)} · ${esc(trackBy[nextTrunk.track].short)}</small><b>${esc(nextTrunk.title)}</b></a></div>` : ''}</div>
     ${foot()}</div>`;
   document.title = `${n.title} · AI脉络`;
+  setTree($('#ntree'), treeIds, [id], id);
   store.set('last', id);
   const nb = $('#note');
   nb.oninput = () => { if (nb.value.trim()) notes[id] = nb.value; else delete notes[id]; store.set('notes', notes); };
@@ -375,9 +384,11 @@ document.addEventListener('keydown', e => {
 /* ——— 概念 ——— */
 function viewConcepts() {
   const all = Object.values(concepts);
-  app.innerHTML = `<div class="page"><div class="mast"><div class="eyebrow">基础概念 · ${all.length} 条</div><h1>先补这些</h1>
-    <p class="lead">节点讲解里用到的概念都在这里。方块里的数字是难度：0 进入AI之前就该会的，1 入门必备，2 读前沿论文时需要。不必一次看完，读到哪补到哪。</p></div>
-    ${Object.entries(AREA).map(([a, name]) => { const list = all.filter(c => c.area === a); return list.length ? `<section class="sec"><div class="sec-h"><h2>${name}</h2><span class="muted">${list.length} 条</span></div>
+  app.innerHTML = `<div class="page"><div class="mast"><div class="eyebrow">概念与思路 · ${all.length} 条</div><h1>概念与思路</h1>
+    <p class="lead">两类东西都在这里，每一条点进去都能看到它长在树上的哪些节点上。<b>基础概念</b>是读讲解要先会的知识，方块里的数字是难度：0 进入AI之前就该会的，1 入门必备，2 读前沿论文时需要。<b>研究思路</b>是大家讨论时挂在嘴边的做法和话题，例如“在策略自蒸馏”“扩散语言模型”，它不是某一篇论文，而是一串论文共同在做的事。</p></div>
+    ${(() => { const ideas = all.filter(c => c.area === 'idea'); return ideas.length ? `<section class="sec"><div class="sec-h"><h2>研究思路与话题</h2><span class="muted">${ideas.length} 条，按所在分支排列</span></div>
+      ${G.tracks.map(t => { const l = ideas.filter(c => c.track === t.key); return l.length ? `<div class="divider"><b>${esc(t.name)}</b></div><div class="cgrid">${l.map(c => `<a href="#/c/${c.key}" class="hue" ${hue(t.key)}><span class="lv">${(c.nodes || []).length}</span><span>${esc(c.name)}<small>${esc(c.en || '')}</small></span></a>`).join('')}</div>` : ''; }).join('')}</section>` : ''; })()}
+    ${Object.entries(AREA).filter(([a]) => a !== 'idea').map(([a, name]) => { const list = all.filter(c => c.area === a); return list.length ? `<section class="sec"><div class="sec-h"><h2>${name}</h2><span class="muted">${list.length} 条</span></div>
       <div class="cgrid">${list.map(c => `<a href="#/c/${c.key}" class="${c.has ? '' : 'todo-c'}"><span class="lv">${c.level}</span><span>${esc(c.name)}<small>${esc(c.en)}</small></span></a>`).join('')}</div></section>` : ''; }).join('')}
     ${terms.length ? `<section class="sec"><div class="sec-h"><h2>术语表</h2><span class="muted">${terms.length} 条，来自各篇讲解</span></div><ul class="rows">${terms.map(t => `<li class="row" style="grid-template-columns:1fr"><div><b>${esc(t.t)}</b>　${inline(t.d)}<div class="f">${t.nodes.slice(0, 6).map(chip).join(' ')}</div></div></li>`).join('')}</ul></section>` : ''}
     ${foot()}</div>`;
@@ -385,20 +396,26 @@ function viewConcepts() {
 function viewConcept(key) {
   const c = concepts[key];
   if (!c) { app.innerHTML = `<div class="page"><div class="empty">没有这个概念：${esc(key)}</div></div>`; return; }
-  const neededBy = Object.values(concepts).filter(x => (x.needs || []).includes(key));
-  app.innerHTML = `<div class="page narrow"><div class="article-head"><div class="eyebrow"><a href="#/concepts">基础概念</a> · ${AREA[c.area]} · ${LEVEL[c.level]}</div>
-      <h1>${esc(c.name)}</h1><div class="full">${esc(c.en)}</div>
+  const idea = c.area === 'idea', neededBy = Object.values(concepts).filter(x => (x.needs || []).includes(key));
+  const ns = (c.nodes || []).map(i => byId[i]).filter(Boolean), origin = byId[c.origin] || null;
+  const show = ns.length <= 90 ? ns : [...ns].sort((a, b) => a.tier - b.tier || (a.date < b.date ? -1 : 1)).slice(0, 90);
+  const ids = [...new Set([...(origin ? [origin.id] : []), ...show.map(n => n.id)])];
+  app.innerHTML = `<div class="page"><div class="narrow" style="margin:0 auto"><div class="article-head"><div class="eyebrow"><a href="#/concepts">概念与思路</a> · ${AREA[c.area]}${idea ? (trackBy[c.track] ? ` · <a href="#/track/${c.track}">${esc(trackBy[c.track].name)}</a>` : '') : ' · ' + LEVEL[c.level]}</div>
+      <h1>${esc(c.name)}</h1><div class="full">${esc(c.en || '')}</div>
+      ${(c.aka || []).length ? `<p class="tags muted" style="font-size:13px">也叫：${c.aka.map(esc).join('　')}</p>` : ''}
       <div class="acts">${stBtn('c:' + key)}<span class="muted" style="font-size:12.5px">标记学习状态</span></div></div>
     ${c.has ? `<div class="prose"><p style="font-size:18px;margin-top:22px"><b>${inline(c.short)}</b></p>
-      ${(c.needs || []).length ? `<p class="tags">先要会：${c.needs.map(cchip).join(' ')}</p>` : ''}
-      ${rich(c.body)}${c.example ? `<div class="example"><h4>例子</h4>${rich(c.example)}</div>` : ''}${c.pitfalls ? `<h2>常见误解</h2>${rich(c.pitfalls)}` : ''}</div>` : `<div class="empty">这个词条还在整理中。</div>`}
-    <div class="prose">${neededBy.length ? `<h2>学完它可以接着看</h2><p class="tags">${neededBy.map(x => cchip(x.key)).join(' ')}</p>` : ''}
-      ${(c.nodes || []).length ? `<h2>用到它的工作</h2><p class="tags">${c.nodes.map(i => byId[i]).filter(Boolean).sort((a, b) => a.tier - b.tier || (a.date < b.date ? -1 : 1)).slice(0, 60).map(n => chip(n.id)).join(' ')}</p>` : ''}</div>
+      ${(c.needs || []).length ? `<p class="tags">先要会：${c.needs.map(cchip).join(' ')}</p>` : ''}</div>` : `<div class="empty">这个词条还在整理中。</div>`}</div>
+    ${ids.length ? `<section class="sec ntree"><div class="sec-h"><h2>它长在树上的哪里</h2><span class="muted">${origin ? `从 ${esc(origin.title)}（${origin.date.slice(0, 4)}）开始 · ` : ''}${ns.length} 个节点${idea ? '属于这个思路' : '用到它'}${ns.length > show.length ? `，这里画出最重要的 ${show.length} 个` : ''}。一行是一条主题线${ids.length <= 90 ? '，连线是继承关系' : ''}</span></div>
+      <div class="toolbar"><a class="btn sm" href="#/map?c=${key}">在全景树里打开</a>${origin ? `<a class="btn sm" href="#/n/${encodeURIComponent(origin.id)}">读它的出处：${esc(origin.title)}</a>` : ''}</div>
+      <div class="tscroll" id="ctree" style="max-height:60vh"></div></section>` : ''}
+    <div class="narrow" style="margin:0 auto"><div class="prose">${c.has ? `${rich(c.body || '')}${c.example ? `<div class="example"><h4>例子</h4>${rich(c.example)}</div>` : ''}${c.pitfalls ? `<h2>常见误解</h2>${rich(c.pitfalls)}` : ''}` : ''}
+      ${neededBy.length ? `<h2>学完它可以接着看</h2><p class="tags">${neededBy.map(x => cchip(x.key)).join(' ')}</p>` : ''}
+      ${ns.length ? `<h2>${idea ? '属于这个思路的工作' : '用到它的工作'}</h2><p class="tags">${[...ns].sort((a, b) => idea ? (a.date < b.date ? -1 : 1) : a.tier - b.tier || (a.date < b.date ? -1 : 1)).slice(0, 60).map(n => chip(n.id)).join(' ')}</p>` : ''}</div></div>
     ${foot()}</div>`;
   document.title = `${c.name} · AI脉络`;
+  setTree($('#ctree'), ids, origin ? [origin.id] : []);
 }
-
-/* ——— 使用指南 ——— */
 function viewGuide() {
   store.set('seenGuide', 1);
   const t1n = G.nodes.filter(n => n.tier === 1).length, t2n = G.nodes.filter(n => n.tier === 2).length, t3n = G.nodes.filter(n => n.tier === 3).length;
@@ -458,10 +475,10 @@ function viewGuide() {
         <li><a class="ln" href="#/eras">时代</a>　九个时代，每个时代当时的条件、各方向在攻克什么、什么热了什么退潮了。</li>
         <li><a class="ln" href="#/tracks">分支</a>　六个大方向、${G.tracks.length}条分支和每条下面的主题线，以及每条分支从哪里长出来。想知道“这个领域由哪些部分组成”看这里。</li>
         <li><a class="ln" href="#/map">全景树</a>　整棵树画在一张图上，先看总览，再点分支展开成主题线。想知道“谁从谁长出来、什么时候发生的”看这里。</li>
-        <li><a class="ln" href="#/concepts">概念</a>　${Object.keys(concepts).length}个基础概念词条，分预备、入门、进阶三级。</li>
+        <li><a class="ln" href="#/concepts">概念</a>　${Object.values(concepts).filter(c => c.area !== 'idea').length}个基础概念（分预备、入门、进阶三级）和${Object.values(concepts).filter(c => c.area === 'idea').length}个研究思路（“在策略自蒸馏”“扩散语言模型”这类不是某一篇论文、而是一串论文共同在做的事）。每一条都画出了它在树上的位置：从哪个节点开始，后来长到了哪些主题线上。</li>
         <li><a class="ln" href="#/open">开放问题</a>　还没有后续工作解决的遗留问题，可以按分支和年份筛。</li>
         <li><a class="ln" href="#/me">我的</a>　学习进度、收藏、笔记、导出导入；里面还有自测卡片和统计。</li>
-        <li><b>搜索</b>　右上角，按 <code>/</code> 聚焦。可以搜标题、英文原题、作者、机构、概念和术语；结果页里可以切换到搜索讲解全文。</li>
+        <li><b>搜索</b>　右上角，按 <code>/</code> 聚焦。可以搜论文和模型的名字、英文原题、缩写（DLM、OPSD、RAG）、别名、作者、机构，也可以直接搜一个概念或思路（自回归、测试时训练、swarm）。中英文的常见叫法互通，多个词之间用空格。结果页最上面会把命中的东西画成一棵树，告诉你它长在哪几条主题线上；标题里找到的太少时会自动连讲解全文一起找。</li>
       </ul>
 
       <h2>五、几个建议</h2>
@@ -514,31 +531,134 @@ function viewPath(_, q = {}) {
 
 /* ——— 搜索 ——— */
 let index;
+// 同义词组：搜其中任何一个，等于同时搜这一组（可以是多词短语）。只放“同一个东西的不同叫法”
+const SYN = [
+  ['rl', '强化学习', 'reinforcement learning'], ['marl', '多智能体强化学习', 'multi-agent rl', 'multi-agent reinforcement learning'], ['llm', '大语言模型', '大模型', 'large language model'],
+  ['vlm', '视觉语言模型', 'vision-language model', 'vision language model'], ['vla', '视觉-语言-动作', 'vision-language-action'], ['ssl', '自监督', 'self-supervised'],
+  ['kd', '蒸馏', 'distillation', 'distill'], ['swarm', '群体智能', '智能体群'], ['agent', '智能体', 'agents'], ['multi-agent', '多智能体', 'multiagent'], ['diffusion', '扩散'],
+  ['autoregressive', '自回归', 'auto-regressive'], ['gnn', '图神经网络', 'graph neural network'], ['cv', '计算机视觉', 'computer vision'], ['nlp', '自然语言处理', 'natural language processing'],
+  ['tts', '语音合成', 'text-to-speech', 'text to speech'], ['asr', '语音识别', 'speech recognition'], ['rag', '检索增强', 'retrieval-augmented', 'retrieval augmented'],
+  ['cot', '思维链', 'chain-of-thought', 'chain of thought'], ['moe', '混合专家', 'mixture of experts', 'mixture-of-experts'], ['peft', '参数高效微调', 'parameter-efficient'],
+  ['world model', '世界模型', 'world models'], ['icl', '上下文学习', 'in-context learning'], ['ttt', '测试时训练', 'test-time training', 'test time training'], ['tta', '测试时适应', 'test-time adaptation'],
+  ['sae', '稀疏自编码器', 'sparse autoencoder'], ['interpretability', '可解释性', 'interp'], ['finetune', '微调', 'fine-tuning', 'fine-tune', 'finetuning'], ['quantization', '量化'],
+  ['benchmark', '基准', '评测'], ['robot', '机器人', 'robotics'], ['reasoning', '推理'], ['alignment', '对齐'], ['embedding', '嵌入', '向量表示'], ['attention', '注意力'],
+  ['pretraining', '预训练', 'pre-training', 'pretrain'], ['multimodal', '多模态', 'multi-modal'], ['video', '视频'], ['image', '图像'], ['speech', '语音'], ['tokenizer', '分词器', 'tokenization'],
+  ['memory', '记忆'], ['tool use', '工具调用', 'tool calling', 'function calling'], ['planning', '规划'], ['imitation learning', '模仿学习', 'imitation'], ['offline rl', '离线强化学习', '离线rl'],
+  ['self-play', '自我对弈', '自博弈'], ['gan', '生成对抗网络', '生成对抗'], ['vae', '变分自编码器'], ['flow matching', '流匹配'], ['3d', '三维'], ['detection', '检测'], ['segmentation', '分割'],
+  ['safety', '安全'], ['jailbreak', '越狱'], ['hallucination', '幻觉'], ['compression', '压缩'], ['pruning', '剪枝'], ['scaling law', '规模定律', 'scaling laws'], ['on-policy', '在策略', '同策略'],
+  ['off-policy', '离策略', '异策略'], ['self-distillation', '自蒸馏'], ['continual learning', '持续学习', 'lifelong learning', '终身学习'], ['meta-learning', '元学习', 'meta learning'],
+  ['contrastive', '对比学习'], ['few-shot', '少样本'], ['zero-shot', '零样本'], ['transfer learning', '迁移学习'], ['curriculum', '课程学习'], ['prompt', '提示'], ['context engineering', '上下文工程'],
+  ['humanoid', '人形机器人', '人形'], ['autonomous driving', '自动驾驶', 'self-driving'], ['protein', '蛋白质'], ['theorem proving', '定理证明'], ['code', '代码', 'coding'], ['long context', '长上下文'],
+  ['inference', '推理服务'], ['kv cache', 'kv缓存'], ['gpu', '显卡'], ['dataset', '数据集'], ['evaluation', '评测'], ['optimizer', '优化器'], ['normalization', '归一化'], ['regularization', '正则化'],
+  ['generalization', '泛化'], ['adversarial', '对抗'], ['backdoor', '后门'], ['privacy', '隐私'], ['governance', '治理'], ['open source', '开源', 'open-source'], ['synthetic data', '合成数据']
+].map(g => g.map(x => x.toLowerCase()));
+const synOf = {};
+SYN.forEach(g => g.forEach(w => { synOf[w] = synOf[w] ? [...new Set([...synOf[w], ...g])] : g; }));
+const synPhrases = Object.keys(synOf).filter(w => w.includes(' ')).sort((a, b) => b.length - a.length);
+// 英文原题各词的首字母连起来，用来按缩写找：搜“dlm”能命中“… Diffusion Language Models”
+const initials = s => (s || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(w => w[0]).join('');
+const low = a => (a || []).map(x => x.toLowerCase());
 function buildIndex() {
   if (index) return index;
   index = [];
-  for (const n of G.nodes) index.push({k: 'n', id: n.id, t: n.title, s: [n.full, n.who].filter(Boolean).join(' · ') || trackBy[n.track].name,
-    hay: [n.title, n.id, n.full, n.who, n.date].join('\n').toLowerCase(), hay2: [n.problem, n.idea, n.impact, trackBy[n.track].name].join('\n').toLowerCase(), w: 4 - n.tier, n});
-  for (const c of Object.values(concepts)) index.push({k: 'c', id: c.key, t: c.name, s: '概念 · ' + c.en, hay: [c.name, c.en, c.key].join('\n').toLowerCase(), hay2: (c.short || '').toLowerCase(), w: 2.5});
+  for (const n of G.nodes) index.push({k: 'n', id: n.id, t: n.title, s: [n.full, n.who].filter(Boolean).join(' · ') || trackBy[n.track].name, aka: low(n.aka),
+    hay: [n.title, n.id, n.full, n.who, n.date, ...(n.aka || [])].join('\n').toLowerCase(), hay2: [n.problem, n.idea, n.impact, trackBy[n.track].name, trackBy[n.track].short, n.track].join('\n').toLowerCase(), ac: initials(n.full), w: 4 - n.tier, n});
+  for (const tr of G.tracks) for (const th of G.threads[tr.key]) index.push({k: 'th', id: `${tr.key}?th=${th.key}`, t: th.name, s: `主题线 · ${tr.name} · ${th.n}个节点`, tr: tr.key, th,
+    hay: [th.name, th.key, ...(th.aka || [])].join('\n').toLowerCase(), hay2: [th.blurb, tr.name, tr.short, tr.key].join('\n').toLowerCase(), aka: low(th.aka), w: 3.5});
+  for (const c of Object.values(concepts)) index.push({k: 'c', id: c.key, t: c.name, s: (c.area === 'idea' ? '思路 · ' : '概念 · ') + (c.en || c.short || ''), aka: [...low(c.aka), (c.en || '').toLowerCase()],
+    hay: [c.name, c.en, c.key, ...(c.aka || [])].join('\n').toLowerCase(), hay2: (c.short || '').toLowerCase(), ac: initials(c.en), w: c.area === 'idea' ? 3.2 : 2.5});
   for (const t of terms) index.push({k: 't', id: t.nodes[0], t: t.t, s: '术语 · ' + t.d, hay: t.t.toLowerCase(), hay2: t.d.toLowerCase(), w: 1});
+  for (const it of index) { it.tl = it.t.toLowerCase(); it.tk = new Set(it.tl.match(/[a-z0-9]+/g) || []); }      // 标题里的英文词，整词命中排在子串命中前面
   return index;
 }
-function search(q, limit = 200) {
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!words.length) return [];
-  const res = [];
-  for (const it of buildIndex()) {
-    let score = 0, ok = true;
-    for (const w of words) {
-      const t = it.t.toLowerCase();
-      if (t === w) score += 100; else if (t.startsWith(w)) score += 60; else if (t.includes(w)) score += 40;
-      else if (it.hay.includes(w)) score += 20; else if (it.hay2.includes(w)) score += 6; else { ok = false; break; }
-    }
-    if (ok) res.push([score + it.w, it]);
-  }
-  return res.sort((a, b) => b[0] - a[0]).slice(0, limit).map(x => x[1]);
+function queryTerms(q) {      // 拆成词；同义词表里的多词短语算一个词
+  let s = ' ' + q.toLowerCase().replace(/\s+/g, ' ').trim() + ' ';
+  const out = [];
+  for (const p of synPhrases) if (s.includes(' ' + p + ' ')) { out.push(p); s = s.replace(' ' + p + ' ', ' '); }
+  return [...out, ...s.trim().split(' ').filter(Boolean)];
 }
-const hrefOf = it => it.k === 'c' ? `#/c/${it.id}` : `#/n/${it.id}`;
+// 短的英文词（≤4个字母）在英文原题、作者、id里必须从词头开始匹配，否则“marl”会命中作者 Hammarling
+const inHay = (hay, w) => /^[a-z0-9]{1,4}$/.test(w) ? new RegExp('(^|[^a-z0-9])' + w).test(hay) : hay.includes(w);
+function scoreWord(it, w, lit) {
+  if (it.tl === w) return 100;
+  if (it.aka && it.aka.includes(w)) return 80;
+  if (it.tk.has(w)) return 70;
+  if (it.tl.startsWith(w)) return 60;
+  if (it.tl.includes(w)) return 40;
+  if (inHay(it.hay, w)) return 20;
+  if (lit && it.ac && /^[a-z0-9]{3,8}$/.test(w) && it.ac.includes(w)) return 14;      // 按首字母缩写找，只对用户原样输入的词做
+  return inHay(it.hay2, w) ? 6 : 0;
+}
+function scoreTerm(it, w) {
+  let s = scoreWord(it, w, true);
+  if (synOf[w]) for (const a of synOf[w]) if (a !== w) s = Math.max(s, scoreWord(it, a) * .8);
+  if (w.includes(' ')) s = Math.max(s, .9 * Math.min(...w.split(' ').map(x => scoreTerm(it, x))));      // 短语没有原样出现时，退回到每个词都出现
+  return s + (s && it.id === w ? 30 : 0);
+}
+/* 返回按相关度排好的结果。每项带 sc（每个词的平均得分）和 partial（只匹配了一部分词）。
+   全部词都匹配的结果太少时，补上只匹配一部分的：少见的词权重大，所以“swarm rl”会先给出含 swarm 的。 */
+function search(q, limit = 200) {
+  const ws = queryTerms(q);
+  if (!ws.length) return [];
+  const N = buildIndex().length, whole = q.toLowerCase().replace(/\s+/g, ' ').trim();
+  const run = ws => {
+    const full = [], part = [], df = ws.map(() => 0);
+    for (const it of index) {
+      let sc = ws.map(w => scoreTerm(it, w));
+      if (ws.length > 1 && (it.tl === whole || (it.aka && it.aka.includes(whole)))) sc = sc.map(() => 100);      // 整个查询就是它的名字或别名
+      const hit = sc.filter(Boolean).length;
+      sc.forEach((x, i) => { if (x) df[i]++; });
+      if (hit === ws.length) { const sum = sc.reduce((a, b) => a + b, 0); full.push([sum + it.w, it, sum / ws.length]); }
+      else if (hit) part.push([sc, it]);
+    }
+    // 只匹配一部分词的：必须包含最少见的那个词（“swarm rl”里是 swarm），按“词越少见越重要”排
+    const rare = df.reduce((m, d, i) => d && (m < 0 || d < df[m]) ? i : m, -1), idf = df.map(d => Math.log(1 + N / (1 + d)));
+    const loose = rare < 0 ? [] : part.filter(([sc]) => sc[rare] >= 6).map(([sc, it]) => [sc.reduce((a, x, i) => a + x * idf[i], 0) + it.w, it, Math.max(...sc) / 2]);
+    return {full, loose};
+  };
+  let {full, loose} = run(ws);
+  if (!full.length && ws.length === 1 && /^[一-鿿]{4,}$/.test(ws[0])) {      // 一整串中文没命中：试着从中间切成两个词
+    const f = new Map(), l = new Map(), keep = (m, r, k) => { if (!m.has(r[1]) || m.get(r[1])[0] < r[0] * k) m.set(r[1], [r[0] * k, r[1], r[2] * k]); };
+    for (let i = 2; i <= ws[0].length - 2; i++) { const r = run([ws[0].slice(0, i), ws[0].slice(i)]); r.full.forEach(x => keep(f, x, .5)); r.loose.filter(x => x[2] >= 20).forEach(x => keep(l, x, 1)); }
+    full = [...f.values()]; loose = [...l.values()].filter(x => !f.has(x[1]));
+  }
+  const wrap = (it, sc, partial) => Object.assign(Object.create(it), {sc, partial});
+  const res = full.sort((a, b) => b[0] - a[0]).slice(0, limit).map(x => wrap(x[1], x[2], false));
+  if (res.length < 8) for (const x of loose.sort((a, b) => b[0] - a[0]).slice(0, 40)) res.push(wrap(x[1], x[2], true));
+  return res;
+}
+/* 一个搜索词对应树上的哪些节点：名字或别名对得上的主题线、概念、思路的全部成员，加上标题直接命中的节点 */
+function memberIds(it, cap = 80) {
+  const ids = it.k === 'th' ? it.th.ids : it.k === 'c' ? (concepts[it.id].nodes || []) : it.k === 'n' ? [it.id] : [];
+  return ids.length <= cap ? ids : ids.map(i => byId[i]).filter(Boolean).sort((a, b) => a.tier - b.tier || (a.date < b.date ? -1 : 1)).slice(0, cap).map(n => n.id);
+}
+function topicSet(q, res) {
+  res = res || search(q, 400);
+  const set = new Set(), from = [];
+  for (const it of res.filter(x => !x.partial && x.sc >= 70 && (x.k === 'th' || x.k === 'c')).slice(0, 3)) { const ids = memberIds(it); if (ids.length) { ids.forEach(i => set.add(i)); from.push(it); } }
+  const ns = res.filter(x => x.k === 'n');
+  ns.filter(x => !x.partial && x.sc >= 40).slice(0, 60).forEach(x => set.add(x.id));
+  if (set.size < 3) ns.slice(0, 30).forEach(x => set.add(x.id));
+  return {ids: [...set].filter(i => byId[i]), from};
+}
+/* 把一组节点画成一棵嵌在页面里的小树：按分支和主题线分行、按时间排列，连线是它们之间的继承关系。mark：要圈出来的节点 */
+function setTree(box, ids, mark = [], only = null) {
+  const set = new Set(ids.filter(i => byId[i]));
+  if (!box || !set.size) { if (box) box.hidden = true; return; }
+  let first = 9999; set.forEach(i => { first = Math.min(first, byId[i].y); });
+  // only：只画和这个节点直接相连的线（节点页用，免得同一条线上的工作互相连成一团）
+  const edges = only ? G.edges.filter(e => (e.from === only || e.to === only) && set.has(e.from) && set.has(e.to)) : set.size <= 90 ? G.edges.filter(e => set.has(e.from) && set.has(e.to)) : null;
+  const lay = fit => treeLayout({dir: 'h', nodes: set, tier: 3, fit, y0: first - 1});
+  const avail = box.clientWidth - 168 - 4;
+  let L = lay(avail - 62 - 96);
+  if (L.T > avail && L.z > .2) L = lay(avail - 62 - 96 - (L.T - avail));
+  const D = treeDraw(L, {edges});
+  box.innerHTML = `<div class="tcanvas plane" style="width:${D.W}px;height:${D.H}px">${D.html}</div>`;
+  let el = null;
+  for (const id of mark) { const x = box.querySelector(`.nd[data-id="${CSS.escape(id)}"]`); if (x) { x.classList.add('sel'); el = el || x; } }
+  if (el) box.scrollTo(Math.max(0, el.offsetLeft - box.clientWidth / 2), Math.max(0, el.offsetTop - 120));
+}
+const hrefOf = it => it.k === 'c' ? `#/c/${it.id}` : it.k === 'th' ? `#/track/${it.id}` : `#/n/${it.id}`;
 function initSearch() {
   const inp = $('#q'), drop = $('#drop');
   let sel = -1, items = [];
@@ -547,7 +667,7 @@ function initSearch() {
     const q = inp.value.trim();
     if (!q) return close();
     items = search(q, 9);
-    drop.innerHTML = (items.length ? items.map((it, i) => `<a href="${hrefOf(it)}" class="${i === sel ? 'sel' : ''}"><div class="t">${esc(it.t)}${it.k === 'n' ? ` <span class="muted" style="font-weight:400;font-size:12px">${it.n.date.slice(0, 4)} · ${esc(trackBy[it.n.track].short)}</span>` : ''}</div><div class="s">${esc(it.s)}</div></a>`).join('') : '<div class="more">没有匹配</div>')
+    drop.innerHTML = (items.length ? items.map((it, i) => `<a href="${hrefOf(it)}" class="${i === sel ? 'sel' : ''}"><div class="t">${esc(it.t)}${it.k === 'n' ? ` <span class="muted" style="font-weight:400;font-size:12px">${it.n.date.slice(0, 4)} · ${esc(trackBy[it.n.track].short)}${it.partial ? ' · 部分匹配' : ''}</span>` : ''}</div><div class="s">${esc(it.s)}</div></a>`).join('') : '<div class="more">没有匹配</div>')
       + `<a class="more" href="#/search?q=${encodeURIComponent(q)}">查看全部结果 ↵</a>`;
     drop.hidden = false;
   };
@@ -572,28 +692,44 @@ async function loadFullText() {
 async function viewSearch(_, q) {
   const query = (q.q || '').trim();
   let res = search(query, 400);
-  const ft = q.full === '1';
+  const strict = res.filter(x => x.k === 'n' && !x.partial).length;
+  const ft = q.full === '1' || (query && q.full !== '0' && strict < 6);      // 标题里找到的太少时，自动连讲解全文一起找
+  let inText = [];
   if (ft && query) {
     app.innerHTML = '<p class="loading">正在载入全部讲解正文…</p>';
-    const txt = await loadFullText(), words = query.toLowerCase().split(/\s+/).filter(Boolean), have = new Set(res.filter(x => x.k === 'n').map(x => x.id));
-    for (const n of G.nodes) if (!have.has(n.id) && txt[n.id] && words.every(w => txt[n.id].includes(w))) res.push(buildIndex().find(x => x.k === 'n' && x.id === n.id));
+    const txt = await loadFullText(), words = queryTerms(query), have = new Set(res.filter(x => x.k === 'n' && !x.partial).map(x => x.id));
+    const hit = (t, w) => t.includes(w) || (synOf[w] || []).some(a => t.includes(a));
+    for (const n of G.nodes) if (!have.has(n.id) && txt[n.id] && words.every(w => hit(txt[n.id], w))) inText.push(Object.assign(Object.create(buildIndex().find(x => x.k === 'n' && x.id === n.id)), {sc: 5, partial: false, deep: true}));
+    inText.sort((a, b) => a.n.tier - b.n.tier || (a.n.date < b.n.date ? 1 : -1));
+    const deep = new Set(inText.map(x => x.id));
+    res = [...res.filter(x => !(x.partial && deep.has(x.id))), ...inText];
+    if (decodeURIComponent(location.hash).indexOf(query) < 0) return;
   }
-  let ns = res.filter(x => x.k === 'n'); const cs = res.filter(x => x.k !== 'n');
-  const tracksHit = G.tracks.filter(t => ns.some(x => x.n.track === t.key));
+  const all = res.filter(x => x.k === 'n'), cs = res.filter(x => x.k !== 'n' && !x.partial);
+  const tracksHit = G.tracks.filter(t => all.some(x => x.n.track === t.key));
+  let ns = all;
   if (q.track) ns = ns.filter(x => x.n.track === q.track);
   if (q.tier) ns = ns.filter(x => x.n.tier <= +q.tier);
   if (q.kind) ns = ns.filter(x => x.n.kind === q.kind);
-  if (q.sort === 'date') ns = [...ns].sort((a, b) => a.n.date < b.n.date ? -1 : 1);
+  const byDate = l => q.sort === 'date' ? [...l].sort((a, b) => a.n.date < b.n.date ? -1 : 1) : l;
+  const exact = byDate(ns.filter(x => !x.partial && !x.deep)), deepHits = byDate(ns.filter(x => x.deep)), part = byDate(ns.filter(x => x.partial));
   const link = o => { const p = new URLSearchParams({...q, ...o}); for (const [k, v] of [...p]) if (!v) p.delete(k); return '#/search?' + p; };
+  const topic = query ? topicSet(query, res) : {ids: [], from: []};
+  const rows = (title, list, note) => list.length ? `<section class="sec"><div class="sec-h"><h2>${title}</h2><span class="muted">${list.length} 个${list.length > 200 ? '，只显示前200个' : ''}${note ? ' · ' + note : ''}</span></div><ul class="rows">${list.slice(0, 200).map(it => row(it.n, {track: true})).join('')}</ul></section>` : '';
+  const kindOf = it => it.k === 'th' ? '线' : it.k === 'c' ? (concepts[it.id].area === 'idea' ? '思' : concepts[it.id].level) : '术';
   $('#q').value = query;
-  app.innerHTML = `<div class="page"><div class="mast"><div class="eyebrow">搜索</div><h1>${esc(query) || '搜索'}</h1><p class="lead">${res.length ? `${ns.length} 个节点，${cs.length} 个概念或术语` : '没有匹配。可以试试英文原名、作者姓氏、机构名，或打开“搜索讲解全文”。'}</p>
-    <div class="toolbar"><label>范围</label><a class="btn sm ${ft ? '' : 'on'}" href="${link({full: ''})}">标题与摘要</a><a class="btn sm ${ft ? 'on' : ''}" href="${link({full: '1'})}">搜索讲解全文</a>
-      <label>档位</label>${[['', '全部'], ['1', '主干'], ['2', '主干+重要']].map(([v, l]) => `<a class="btn sm ${(q.tier || '') === v ? 'on' : ''}" href="${link({tier: v})}">${l}</a>`).join('')}
-      <label>排序</label><a class="btn sm ${q.sort === 'date' ? '' : 'on'}" href="${link({sort: ''})}">相关度</a><a class="btn sm ${q.sort === 'date' ? 'on' : ''}" href="${link({sort: 'date'})}">时间</a></div>
+  app.innerHTML = `<div class="page"><div class="mast"><div class="eyebrow">搜索</div><h1>${esc(query) || '搜索'}</h1>
+    <p class="lead">${res.length ? `${exact.length + deepHits.length} 个节点${part.length ? `，另有 ${part.length} 个只匹配了部分关键词` : ''}；${cs.length} 条主题线、概念、思路或术语` : '没有匹配。可以试试英文原名或缩写、作者姓氏、机构名。库里收了约三千个节点，太新或太细的工作可能还没收录。'}</p>
+    <div class="toolbar"><label>档位</label>${[['', '全部'], ['1', '主干'], ['2', '主干+重要']].map(([v, l]) => `<a class="btn sm ${(q.tier || '') === v ? 'on' : ''}" href="${link({tier: v})}">${l}</a>`).join('')}
+      <label>排序</label><a class="btn sm ${q.sort === 'date' ? '' : 'on'}" href="${link({sort: ''})}">相关度</a><a class="btn sm ${q.sort === 'date' ? 'on' : ''}" href="${link({sort: 'date'})}">时间</a>
+      <label>范围</label><a class="btn sm ${ft ? '' : 'on'}" href="${link({full: '0'})}">只搜标题与摘要</a><a class="btn sm ${ft ? 'on' : ''}" href="${link({full: '1'})}">连讲解全文一起搜</a></div>
     ${tracksHit.length > 1 ? `<div class="toolbar"><label>分支</label><a class="btn sm ${q.track ? '' : 'on'}" href="${link({track: ''})}">全部</a>${tracksHit.map(t => `<a class="btn sm ${q.track === t.key ? 'on' : ''}" href="${link({track: t.key})}">${esc(t.short)}</a>`).join('')}</div>` : ''}
     <div class="toolbar"><label>类型</label><a class="btn sm ${q.kind ? '' : 'on'}" href="${link({kind: ''})}">全部</a>${Object.entries(KIND).map(([k, l]) => `<a class="btn sm ${q.kind === k ? 'on' : ''}" href="${link({kind: k})}">${l}</a>`).join('')}</div></div>
-    ${cs.length ? `<section class="sec"><div class="sec-h"><h2>概念与术语</h2></div><div class="cgrid">${cs.slice(0, 40).map(it => `<a href="${hrefOf(it)}"><span class="lv">${it.k === 'c' ? concepts[it.id].level : '术'}</span><span>${esc(it.t)}<small>${esc(it.s.slice(0, 46))}</small></span></a>`).join('')}</div></section>` : ''}
-    ${ns.length ? `<section class="sec"><div class="sec-h"><h2>节点</h2><span class="muted">${ns.length > 200 ? '只显示前200条' : ''}</span></div><ul class="rows">${ns.slice(0, 200).map(it => row(it.n, {track: true})).join('')}</ul></section>` : ''}${foot()}</div>`;
+    ${cs.length ? `<section class="sec"><div class="sec-h"><h2>主题线、概念、思路与术语</h2></div><div class="cgrid">${cs.slice(0, 40).map(it => `<a href="${hrefOf(it)}"><span class="lv">${kindOf(it)}</span><span>${esc(it.t)}<small>${esc(it.s.slice(0, 46))}</small></span></a>`).join('')}</div></section>` : ''}
+    ${topic.ids.length ? `<section class="sec"><div class="sec-h"><h2>它在树上的位置</h2><span class="muted">${topic.ids.length} 个节点${topic.from.length ? `：${topic.from.map(x => `“${esc(x.t)}”`).join('、')}的成员，加上标题直接命中的` : ''}。一行是一条主题线，连线是继承关系</span></div>
+      <div class="toolbar"><a class="btn sm" href="#/map?q=${encodeURIComponent(query)}">在全景树里打开</a></div><div class="tscroll" id="stree"></div></section>` : ''}
+    ${rows('节点', exact)}${rows('讲解正文里提到', deepHits, '标题里没有这个词，正文里有')}${rows('只匹配了部分关键词', part, '没有同时包含所有词的结果时作为补充')}${foot()}</div>`;
+  setTree($('#stree'), topic.ids);
 }
 
 /* ——— 学习链：从零读懂某个节点需要先读哪些 ——— */
@@ -1006,6 +1142,11 @@ function treeDraw(L, o = {}) {
     if (l.active) s += `<path class="tarrow hue" ${hv(l.k)} d="M${P(l.b + 8, c)}L${P(l.b, c - 4)}L${P(l.b, c + 4)}Z"/>`;
     else if (!mini) s += `<path class="${cls}" ${hv(l.k)} d="M${P(l.b, c - 5)}L${P(l.b, c + 5)}"/><text class="tend" x="${(X(l.b, c) + (Hz ? 6 : 7)).toFixed(1)}" y="${(Y(l.b, c) + (Hz ? 4 : -4)).toFixed(1)}">止于${l.endY}</text>`;
   }
+  if (L.flt) for (const l of L.lanes) {      // 过滤后的树：每条主题线画一根细枝，从它最早的节点连到最晚的节点
+    if (l.type !== 'thread' || l.nodes.length < 2) continue;
+    const ts = l.nodes.map(n => L.pos[n.id].t), c = l.c + l.rail;
+    s += `<path class="trail thread hue" ${hv(l.k)} d="M${P(Math.min(...ts) - 10, c)}L${P(Math.max(...ts), c)}"/>`;
+  }
   const anchor = id => {
     const n = byId[id]; if (!n) return null;
     if (L.pos[id]) return L.pos[id];
@@ -1101,6 +1242,17 @@ function viewMap(_, q) {
     if (!depth) depth = lineage(focus, 2).set.size > 160 ? 1 : 2;      // 没指定层数时：连接太多的枢纽节点默认只看一层
     const lin = lineage(focus, depth); flt = lin.set; tree = lin.tree;
   }
+  // 话题模式：只画某个概念/思路的节点，或某个搜索词对应的节点
+  let topic = null;
+  const cq = !focus && concepts[q.c] ? concepts[q.c] : null, sq = !focus && !cq ? (q.q || '').trim() : '';
+  if (cq || sq) {
+    const ids = cq ? [...new Set([...(byId[cq.origin] ? [cq.origin] : []), ...memberIds({k: 'c', id: cq.key}, 300)])] : topicSet(sq).ids;
+    if (ids.length) {
+      flt = new Set(ids);
+      tree = ids.length <= 220 ? G.edges.filter(e => flt.has(e.from) && flt.has(e.to)) : null;
+      topic = {label: cq ? cq.name : `“${sq}”`, back: cq ? `#/c/${cq.key}` : `#/search?q=${encodeURIComponent(sq)}`, y0: Math.min(...ids.map(i => byId[i].y)) - 1, mark: cq && byId[cq.origin] ? cq.origin : null};
+    }
+  }
   app.innerHTML = `<div class="mapwrap"><div class="mapbar" id="tbar"></div>
     <div class="mapbody"><div class="scroller" id="scroller"><div class="tcanvas plane" id="tcanvas"></div></div><aside class="panel" id="panel" hidden></aside></div></div>`;
   document.title = '全景树 · AI脉络';
@@ -1116,6 +1268,8 @@ function viewMap(_, q) {
       ? `<span class="chip hue" ${hue(byId[focus].track)}>${esc(byId[focus].title)} 的来龙去脉</span><label>往前往后各</label>${[1, 2, 3, 9].map(x => `<a class="btn sm ${depth === x ? 'on' : ''}" href="#/map?focus=${encodeURIComponent(focus)}&depth=${x}">${x === 9 ? '全部' : x + ' 层'}</a>`).join('')}
          ${common}<a class="btn sm" href="#/map">← 回到全景树</a><span class="sp"></span>
          <span class="legend"><span><i class="solves"></i>解决</span><span><i></i>延续</span><span><i class="uses"></i>使用</span><span><i class="rivals"></i>竞争</span></span><span class="muted">${n} 个节点</span>`
+      : topic ? `<span class="chip c">${esc(topic.label)} 在树上</span>${common}<a class="btn sm" href="${topic.back}">← 回到它的页面</a><a class="btn sm" href="#/map">← 回到全景树</a><span class="sp"></span>
+         <span class="legend"><span><i class="solves"></i>解决</span><span><i></i>延续</span><span><i class="uses"></i>使用</span><span><i class="rivals"></i>竞争</span></span><span class="muted">${n} 个节点 · 一行是一条主题线</span>`
       : `${common}<label>展开后显示</label>${[[1, '主干'], [2, '+ 重要'], [3, '全部']].map(([v, l]) => btn('tier', v, l, st.tier === v)).join('')}
          ${btn('all', 1, '全部展开', false)}${st.open.length ? btn('all', 0, '全部收起', false) : ''}
          ${btn('joins', 1, '跨分支汇流', st.joins, '虚线：一条分支的成果被另一条分支拿去用的关键时刻，鼠标停在线上看说明')}
@@ -1130,11 +1284,11 @@ function viewMap(_, q) {
   };
   const draw = keep => {
     const Hz = dir() === 'h';
-    const lay = fit => treeLayout({dir: dir(), zoom: st.zoom, tier: st.tier, open: st.open, nodes: flt, fit});
+    const lay = fit => treeLayout({dir: dir(), zoom: st.zoom, tier: st.tier, open: st.open, nodes: flt, fit, y0: topic ? topic.y0 : 0});
     const avail = sc.clientWidth - 168 - 4;
     L = lay(avail - 62 - 96);
     if (Hz && !st.zoom && L.T > avail && L.z > .2) L = lay(avail - 62 - 96 - (L.T - avail));
-    D = treeDraw(L, {joins: st.joins && !focus, edges: tree});
+    D = treeDraw(L, {joins: st.joins && !focus && !topic, edges: tree});
     cv.style.cssText = `width:${D.W}px;height:${D.H}px`;
     cv.innerHTML = D.html;
     cv.classList.remove('focus');
@@ -1207,6 +1361,7 @@ function viewMap(_, q) {
   const era = G.eras.find(e => e.id === q.era), sp = era && L.spans.find(s => s.e === era);
   if (focus) { select(focus); const p = L.pos[focus]; if (p) reveal(p.t, p.c); }
   else if (at && L.pos[at]) { select(at); reveal(L.pos[at].t, L.pos[at].c); }
+  else if (topic && topic.mark && ndEls[topic.mark]) ndEls[topic.mark].classList.add('sel');
   else if (sp) { if (L.Hz) sc.scrollTo(Math.max(0, sp.a - 16), 0); else sc.scrollTo(sc.scrollLeft, Math.max(0, L.T - sp.b - 20)); }
   else if (trackBy[q.only] && L.laneOf[q.only]) { const l = L.laneOf[q.only]; if (L.Hz) sc.scrollTo(Math.max(0, l.a - 60), Math.max(0, l.c - 30)); else sc.scrollTo(Math.max(0, l.c - 40), Math.max(0, L.T - l.a - sc.clientHeight + 160)); }
   let rz; const onResize = () => { clearTimeout(rz); rz = setTimeout(() => { if (document.body.contains(cv)) draw(snap()); else removeEventListener('resize', onResize); }, 180); };

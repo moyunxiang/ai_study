@@ -1,0 +1,40 @@
+{
+  "id": "opsd",
+  "who": "Siyan Zhao, Zhihui Xie, Mengchen Liu, Jing Huang, Guan Pang, Feiyu Chen, Aditya Grover · UCLA / 香港大学 / Meta Superintelligence Labs",
+  "venue": "ICML 2026",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2601.18734"},
+    {"label": "代码", "url": "https://github.com/siyan-zhao/OPSD"},
+    {"label": "综述：A Brief Overview: On-Policy Self-Distillation in LLMs", "url": "https://arxiv.org/abs/2605.18141"}
+  ],
+  "problem": "推理模型的后训练主要靠GRPO这类强化学习：每题采8条长回答只换来0/1对错分，全对或全错时没有梯度；在策略蒸馏信号密，但需要另一个更大的老师模型。",
+  "idea": "同一个模型扮演两个角色：老师在提示里额外看到参考解答，学生只看题目。学生自己写出回答，再在每个token上让学生的下一词分布向“看过解答的自己”靠拢。",
+  "impact": "在Qwen3 1.7B–8B的竞赛数学上与GRPO持平或更好，每题只采1条1024 token的回答、100步内收敛；把“在策略自蒸馏”变成一条被迅速跟进的后训练路线。",
+  "background": "推理后训练当时有三条路。一是SFT：直接在参考解答上做最大似然。它是off-policy的（见[[c:on-off-policy]]）：训练时的前缀都来自标准答案，推理时模型却要接着自己写出的前缀往下写，早期一步写偏就进入从没练过的状态，即[[c:teacher-forcing]]里说的曝光偏差。\n\n二是强化学习，如[[grpo]]（[[deepseek-r1]]即用它训练）：在模型自己的回答上训练，是on-policy的，但一整条回答只得一个0/1奖励，所有token共享同一个优势；一组8条若全对或全错，优势全为0，采样白费。\n\n三是在策略蒸馏[[gkd]]：学生自己生成，老师在每个位置给出完整的下一词分布，信号又密又在策略上，代价是要另备一个更强的老师，且不利用数据里现成的参考解答。",
+  "method": "**一套参数，两个角色**。数据是题目x和参考解答y*。学生 `p_S(·|x)` 只看题目，和推理时一致；老师 `p_T(·|x, y*)` 是同一个模型，只是提示里多放了y*，并要求“理解参考解答后用自己的方法解题”。老师多知道的就是y*，论文称为特权信息；直觉是看着答案讲道理比从零想出答案容易。实现中老师固定为训练前的初始模型。\n\n**在学生的轨迹上算损失**。学生先采样一条回答ŷ，再把ŷ同时交给两个角色：老师不生成任何token，只对同一段文字做一次前向。在每个位置n比较两者的下一词分布：\n\n`L = E_{ŷ~p_S} [ (1/|ŷ|) Σ_n D( p_T(·|x,y*,ŷ<n) ‖ p_S(·|x,ŷ<n) ) ]`\n\nD在整个词表上计算，实验中正向[[c:kl-divergence]] `KL(p_T‖p_S)` 最好，梯度只流过学生。比如学生在某一步把导数写错，看过 `f'(x)=6x+2` 的老师在那个位置会把概率放在正确的token上，学生恰好在自己会犯错的地方被纠正。\n\n**逐点截断**。“wait”“so”这类风格词的KL远高于数学token，会主导训练，于是把每个词表项的贡献截到 `min(ℓ, τ)`。若只在采样token上用 `log p_T − log p_S` 作优势，它等价于每个token都有奖励的[[c:policy-gradient-concept]]。",
+  "results": "Qwen3 1.7B/4B/8B指令版，在OpenThoughts数学子集（至多3万题）上用LoRA训练，评测AIME24/25与HMMT25（每题12次采样平均）。三项平均：8B为基座61.8、SFT 59.8、GRPO 64.0、OPSD 64.8；1.7B为37.1、35.8、37.7、43.4。OPSD每题1条、上限1024 token、100步；GRPO每题8条、上限16k token、500步取峰值，且100步内超过一半批次组内奖励无差异。AIME25（1.7B）上正向KL把36.7提到43.9，反向KL只到37.5。",
+  "legacy": "OPSD把“老师掌握学生没有的信息”从上下文蒸馏、[[star]]式的看答案写解释，推进到在策略、逐token的软蒸馏。几个月内出现了专门的综述（arXiv 2605.18141）。[[dopsd]]援引的分析认为学生只能学到各题解答平均后的弱共识，在扩散语言模型上几乎无效，转而用模型自己去噪轨迹的后续步骤充当特权信息。",
+  "pitfalls": "- 自蒸馏不是凭空变强：老师的优势完全来自参考解答，题目难到模型看了解答也不懂时就教不了。\n- 老师是固定的初始模型，不随训练更新。\n- 与GRPO的对比中两者生成长度上限不同（1024对16k），评测时都放开到约38k token。",
+  "limits": [
+    {"text": "只在至多8B的Qwen3和竞赛数学上验证，更大模型、其他任务上是否成立未知（作者自述）。", "solved_by": []},
+    {"text": "依赖每题一份参考解答；题目超出模型理解能力时，看了解答的老师也给不出有效信号（作者自述）。", "solved_by": []},
+    {"text": "没有利用答案对错的验证信号；后续分析认为学生只能学到对各题解答平均后的弱共识，搬到扩散语言模型上几乎没有提升。", "solved_by": ["dopsd"]},
+    {"text": "全词表蒸馏要在每个位置保存整张词表的logits，显存峰值高于只看采样token的做法（作者自述）。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "gkd", "type": "extends", "note": "沿用GKD的在策略、全词表逐token蒸馏目标，把独立的大老师换成看过参考解答的模型自己。"},
+    {"to": "grpo", "type": "solves", "note": "GRPO每题8条16k回答只得0/1奖励、组内同分即无梯度；OPSD每个token都有信号，每题1条1024 token，在三个尺寸上持平或超过GRPO。"},
+    {"to": "deepseek-r1", "type": "rivals", "note": "R1路线用可验证奖励做大规模RL激发推理；OPSD用同类带答案数据改做逐token自蒸馏，作为更省采样的替代。"},
+    {"to": "star", "type": "extends", "note": "STaR让模型看答案写解释再做SFT，是离线的硬标签、整条0/1信号；OPSD改成在策略、逐token的软分布匹配。"},
+    {"to": "dagger", "type": "uses", "note": "在学生实际走到的状态上请“专家”给标签，这一在策略模仿学习思想来自DAgger。"},
+    {"to": "qwen3", "type": "uses", "note": "实验基座是Qwen3 1.7B/4B/8B，并利用其思考模式开关：学生关闭思考、老师开启思考时数学token上的信号最强。"}
+  ],
+  "prereq": ["knowledge-distillation", "kl-divergence", "on-off-policy", "autoregressive", "teacher-forcing", "policy-gradient-concept", "reasoning-tokens"],
+  "terms": [
+    {"t": "特权信息", "d": "训练时能拿到、推理时拿不到的额外信息，比如题目的参考解答。OPSD只给老师角色看它。"},
+    {"t": "在策略蒸馏", "d": "学生先自己生成一段输出，老师在这段输出的每个位置给出下一词分布，学生向它靠拢；练的是学生自己真会走到的前缀。"},
+    {"t": "Avg@12", "d": "每道题独立采样12次，取12次正确率的平均，用来减小单次采样的随机波动。"}
+  ],
+  "learn": "先补[[c:kl-divergence]]、[[c:on-off-policy]]和[[c:knowledge-distillation]]，读[[gkd]]理解在策略蒸馏的目标。原文读第2节（对比SFT、在策略蒸馏与GRPO的公式）、3.2节、表2与表3，再看附录D与STaR的对比。动手：取一个小的开源指令模型和GSM8K，写两套提示（学生只有题目，老师多一段参考解答），对学生的采样结果做两次前向，用正向KL训练几十步，与直接SFT比较。",
+  "check": {"source": "https://arxiv.org/html/2601.18734v3", "confirmed": "abs页标题、7位作者、v1提交于2026-01-26（v3为2026-03-20）；HTML正文中的机构（UCLA、HKU、Meta Superintelligence Labs）、损失公式1与6、老师固定为初始模型、老师只做前向不生成、逐点截断、表2中8B/4B/1.7B各方法平均分、表6中OPSD 1条/1024 token/100步与GRPO 8条/16k/500步、图3中超过一半批次奖励标准差为0、表3中正向KL 36.7→43.9与反向KL 37.5、附录A局限（≤8B、未用正确性验证、题目难度）、4.3.5节全词表logits显存更高。发表处据OpenReview（venueid为ICML.cc/2026/Conference，另有ICLR 2026 LLA workshop海报）。综述2605.18141的标题与作者经arXiv记录核对。"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "repa-e",
+  "who": "Xingjian Leng, Jaskirat Singh, Yunzhong Hou, Zhenchang Xing, Saining Xie, Liang Zheng · 澳大利亚国立大学 / CSIRO Data61 / 纽约大学",
+  "venue": "ICCV 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2504.10483"},
+    {"label": "项目页", "url": "https://end2end-diffusion.github.io"}
+  ],
+  "aka": ["REPA-E", "REPA End-to-End", "端到端潜扩散", "VAE与扩散联合训练", "E2E-VAE"],
+  "problem": "潜扩散模型一直是两阶段：先训好VAE再冻结，只训扩散网络。直接用扩散损失把两者一起训，潜空间会坍塌、效果反而变差。",
+  "idea": "端到端训练时，VAE只接收REPA表征对齐损失的梯度（扩散损失对VAE停梯度），让VAE和扩散Transformer一起调。",
+  "impact": "训练比REPA快17倍以上、比原始做法快45倍；ImageNet 256上FID 1.12（有CFG）/1.69（无CFG），调完的VAE本身也更好用。",
+  "method": "[[ldm]]以来，VAE一旦训好就被冻结。原因是：如果让扩散损失也更新VAE，最省事的办法就是把潜变量压得极其简单（比如方差趋近于零），去噪任务变容易，但图像信息丢了——即潜空间坍塌。\n\nREPA-E发现，[[repa]]的表征对齐损失可以充当安全的端到端信号：它要求扩散网络中间层与[[dinov2]]特征对齐，这个目标不会因为潜空间变简单而被“骗过”。做法是VAE与[[sit]]一起训练，扩散损失对VAE停梯度，只让对齐损失回传到VAE；同时保留VAE自身的重建损失。\n\n作者观察到，端到端调整会自动改善潜空间结构：SD-VAE潜变量里的高频噪声被抹平，过度平滑的VAE则补回细节。最终版本在ImageNet 256×256上FID 1.12（有CFG）和1.69（无CFG）。它与[[va-vae]]、[[rae]]一起，把“VAE该学什么样的潜空间”变成2025年的热点问题。",
+  "limits": [
+    {"text": "仍依赖外部预训练表征模型（DINOv2等）提供对齐目标，只在ImageNet类条件生成上系统验证。", "solved_by": []},
+    {"text": "仍保留VAE这一环，没有回答“潜空间是否必要”。", "solved_by": ["rae", "pmf"]}
+  ],
+  "relations": [
+    {"to": "repa", "type": "extends", "note": "把REPA的对齐损失从只训扩散网络扩展为同时更新VAE。"},
+    {"to": "va-vae", "type": "rivals", "note": "VA-VAE在训VAE时就对齐视觉基础模型，REPA-E则在扩散训练中端到端调VAE。"},
+    {"to": "sit", "type": "uses", "note": "以SiT作为潜空间扩散骨干。"},
+    {"to": "ldm", "type": "solves", "note": "打破潜扩散“VAE必须冻结”的两阶段限制，用对齐损失避免端到端训练时的潜空间坍塌。"}
+  ],
+  "prereq": ["latent-space", "autoencoder", "diffusion-process", "self-supervised"],
+  "check": {
+    "source": "https://arxiv.org/abs/2504.10483",
+    "confirmed": "核对标题、作者与ANU/CSIRO/NYU署名、v1日期2025-04-14；摘要中扩散损失端到端无效、REPA损失解锁联合训练、比REPA快17倍、比原始快45倍；最终版FID 1.12/1.69（v1为1.26/1.83），ICCV 2025。"
+  }
+}

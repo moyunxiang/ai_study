@@ -1,0 +1,24 @@
+{
+ "id": "sageattention",
+ "who": "Jintao Zhang, Jia Wei, Haofeng Huang, Pengle Zhang, Jun Zhu, Jianfei Chen · 清华大学",
+ "venue": "ICLR 2025",
+ "aka": ["SageAttention2", "SageAttention3", "Sage Attention", "量化注意力", "8比特注意力", "INT8 attention", "注意力量化"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2410.02367"},
+  {"label": "GitHub", "url": "https://github.com/thu-ml/SageAttention"}
+ ],
+ "problem": "量化方法多只压线性层，长序列时真正耗时的注意力仍用16位计算；直接把注意力量化到8比特，K里的离群值会让精度明显下降。",
+ "idea": "把Q、K量化成INT8做矩阵乘，量化前先减去K在所有token上的均值来去掉离群偏移；P·V保留FP16并用FP16累加器，即插即用替换FlashAttention。",
+ "impact": "在消费级显卡上把注意力提速约2倍且几乎不掉点，在视频生成等长序列模型的社区部署中被大量使用，后续出了SageAttention2/3。",
+ "method": "注意力的计算量随序列长度平方增长，视频生成模型动辄几万token，注意力是主要耗时。[[flashattention-2]]已经把访存优化到很好，再提速就只能用更低精度的算力。\n\nSageAttention的关键观察是：K矩阵在各token之间有一个共同的大偏移（通道方向的离群），直接量化误差很大。因为同一个查询对所有键都加上同一个常数后softmax结果不变，所以可以先从K中减去它在token维上的均值，再量化，几乎没有额外开销。之后Q、K按块（与FlashAttention的分块对齐）量化到INT8做`Q·Kᵀ`；softmax之后的`P·V`保持FP16，但用FP16累加器代替FP32，在RTX 4090/3090上矩阵乘快约一倍且没有精度损失。量化操作还融进了前面的RoPE算子。\n\n论文称每秒运算数比FlashAttention2高约2.1倍、比xformers高约2.7倍，在语言、图像、视频生成模型上端到端指标几乎无损。",
+ "limits": [
+  {"text": "收益主要来自消费级与上一代GPU的INT8/FP16算力，在支持FP8的新卡上需要重新设计。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "flashattention-2", "type": "extends", "note": "沿用FlashAttention的分块与在线softmax框架，把块内矩阵乘换成INT8和FP16累加。"},
+  {"to": "smoothquant", "type": "extends", "note": "与SmoothQuant一样先处理离群值再量化，这里通过减去K的均值，且利用softmax的平移不变性保证结果不变。"},
+  {"to": "integer-quant", "type": "uses", "note": "采用对称INT8量化与整数矩阵乘的基本做法。"}
+ ],
+ "prereq": ["self-attention", "softmax", "quantization-concept", "floating-point", "memory-bandwidth"],
+ "check": {"source": "https://arxiv.org/abs/2410.02367", "confirmed": "标题、作者、v1日期2024-10-03；摘要中比FlashAttention2快约2.1倍、比xformers快约2.7倍、语言/图像/视频模型几乎无损；arXiv HTML：Q、K量化为INT8、减去K的token均值、P·V用FP16与FP16累加器、按块量化与FlashAttention分块对齐、量化融合进RoPE。ICLR 2025来自OpenAlex。机构按作者所在清华大学组概括；“在视频生成社区大量使用”为概括性判断。"}
+}

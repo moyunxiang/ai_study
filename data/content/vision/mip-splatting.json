@@ -1,0 +1,30 @@
+{
+  "id": "mip-splatting",
+  "who": "Zehao Yu, Anpei Chen, Binbin Huang, Torsten Sattler, Andreas Geiger · 图宾根大学 / 上海科技大学 / 捷克理工大学",
+  "venue": "CVPR 2024（最佳学生论文）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2311.16493"},
+    {"label": "项目页", "url": "https://niujinshuchong.github.io/mip-splatting"}
+  ],
+  "aka": ["Mip Splatting", "抗锯齿高斯泼溅", "alias-free 3DGS", "3D平滑滤波", "Mip滤波"],
+  "problem": "3D高斯泼溅在训练时的相机距离和焦距下很好看，一旦拉近或拉远（改变采样率），就会出现明显的锯齿、发虚或物体变粗的伪影。",
+  "idea": "按输入视图能提供的最高采样频率，给每个三维高斯加一个3D平滑滤波限制最小尺寸；渲染时用模拟盒式滤波的2D Mip滤波替换原来的2D膨胀。",
+  "impact": "获CVPR 2024最佳学生论文；让3DGS可以在任意缩放下稳定渲染，其滤波设计被后续大量高斯泼溅系统默认采用。",
+  "method": "[[3dgs]]把场景表示成上百万个带颜色和透明度的三维高斯，投影到屏幕后叠加成图像。原方法为了数值稳定，在投影后的二维高斯上统一加一个固定大小的膨胀，这在训练分辨率下无害，但换个缩放就出问题：放大时高斯过细，出现高频伪影；缩小时膨胀把细节糊在一起，看起来物体变粗。\n\nMip-Splatting把原因归结为两点：三维表示缺少频率约束，以及二维膨胀滤波不对。对应两处修改：一是3D平滑滤波，根据每个高斯被训练视图观察时的最大采样频率（离相机多近、焦距多长）约束它的最小尺寸，避免出现训练视图根本看不清的高频细节；二是2D Mip滤波，用近似像素盒式积分的二维高斯滤波替换膨胀，这一思路来自[[mip-nerf]]的抗锯齿处理。\n\n作者在单尺度训练、多尺度测试的设定上验证了两项修改都能明显缓解伪影。",
+  "limits": [
+    {"text": "只处理缩放带来的采样率变化，对训练视图之外的大视角外推、未观测区域仍无能为力。", "solved_by": []},
+    {"text": "仍需逐场景优化和已知相机位姿，不能前馈直接从照片得到高斯。", "solved_by": ["pixelsplat", "anysplat"]}
+  ],
+  "relations": [
+    {"to": "3dgs", "type": "solves", "note": "解决3DGS改变焦距或相机距离时的锯齿与膨胀伪影。"},
+    {"to": "mip-nerf", "type": "extends", "note": "把Mip-NeRF按像素覆盖范围做抗锯齿的思路搬到显式高斯表示上。"},
+    {"to": "mip-nerf-360", "type": "rivals", "note": "Mip-NeRF 360等抗锯齿NeRF靠体渲染逐点积分，质量高但渲染慢；Mip-Splatting在实时的高斯光栅化里实现了类似的多尺度抗锯齿。"}
+  ],
+  "prereq": ["3d-representation", "volume-rendering", "camera-geometry", "gaussian", "fourier-transform"],
+  "terms": [
+    {"t": "锯齿（aliasing）", "d": "信号的细节频率超过采样能力时出现的伪影，例如斜线变成台阶、细纹理闪烁。"},
+    {"t": "采样率", "d": "单位长度内的像素数；相机离物体越近或焦距越长，同一块表面被更多像素覆盖，采样率越高。"}
+  ],
+  "learn": "先读3DGS的投影与光栅化部分，再读Mip-Splatting第4节两个滤波的推导；在官方代码上对比放大与缩小渲染的效果。",
+  "check": {"source": "https://arxiv.org/abs/2311.16493", "confirmed": "核对了arXiv记录：标题、五位作者、v1提交于2023-11-27、摘要中的3D平滑滤波和2D Mip滤波；CVPR 2024最佳学生论文经CVPR官方奖项页与CIIRC新闻确认。"}
+}

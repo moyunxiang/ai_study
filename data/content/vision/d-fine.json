@@ -1,0 +1,30 @@
+{
+  "id": "d-fine",
+  "who": "Yansong Peng, Hebei Li, Peixi Wu, Yueyi Zhang, Xiaoyan Sun, Feng Wu · 中国科学技术大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2410.13842"},
+    {"label": "代码", "url": "https://github.com/Peterande/D-FINE"}
+  ],
+  "aka": ["DFINE", "细粒度分布细化", "FDR", "GO-LSD", "实时DETR"],
+  "problem": "实时DETR检测器直接回归框的四个坐标，定位精度受限，而且深层解码器学到的精确定位无法回传给浅层。",
+  "idea": "把框回归改成对每条边偏移量的概率分布做逐层细化，并让最深层的精细分布通过自蒸馏教给浅层。",
+  "impact": "在T4 GPU实时速度下把COCO精度推到新高，与后续的DEIM一起成为2025年实时检测的主要基线，RF-DETR等工作都以它为对照。",
+  "method": "[[detr]]式检测器的解码器有多层，每层都输出一组框，后一层在前一层基础上修正。D-FINE认为直接预测固定坐标太粗：坐标值本身没有表达“这条边大概在哪、有多确定”。\n\n它有两个部件。一是细粒度分布细化（FDR）：每条边（上下左右）不再输出一个数，而是输出一组离散偏移量上的概率分布，每层解码器在上一层分布的基础上做残差式细化，最终位置取分布的期望。二是全局最优定位自蒸馏（GO-LSD）：把最后一层细化好的分布当作老师，用[[c:knowledge-distillation]]的方式监督浅层的分布，浅层学好后深层只需修正更小的残差。此外还对计算密集的模块做了轻量化。\n\n摘要报告D-FINE-L/X在COCO上达到54.0%/55.8% AP，T4上分别124/78 FPS；先在Objects365上预训练后为57.1%/59.3% AP。把FDR和GO-LSD装到其他DETR上可提升最多5.3% AP，额外参数和训练成本几乎为零。",
+  "limits": [
+    {"text": "只能检测训练时定义好的固定类别，换数据集需要重新标注和微调。", "solved_by": ["rf-detr", "sam-3"]},
+    {"text": "DETR式一对一匹配训练收敛仍慢，小数据集上需要较长训练。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "rt-detr", "type": "extends", "note": "在RT-DETR的实时DETR框架上改造回归头和训练目标。"},
+    {"to": "dino-detr", "type": "extends", "note": "沿用DINO检测器逐层细化框的解码器设计，把每层输出从坐标换成分布。"},
+    {"to": "deformable-detr", "type": "uses", "note": "解码器采用可变形注意力。"},
+    {"to": "yolov10", "type": "rivals", "note": "同为免NMS的实时检测器，YOLOv10走卷积YOLO路线，D-FINE走DETR路线并在同等速度下精度更高。"}
+  ],
+  "prereq": ["vision-tasks", "iou-map", "knowledge-distillation", "probability-basics", "transformer-block"],
+  "terms": [
+    {"t": "边界框回归", "d": "预测物体外接矩形的位置，通常是中心点加宽高或四条边到参考点的距离。"},
+    {"t": "自蒸馏", "d": "老师和学生是同一个网络的不同部分（这里是深层教浅层），不需要另外训练一个老师模型。"}
+  ],
+  "learn": "先读DETR和RT-DETR，再读D-FINE第3节FDR与GO-LSD的公式；用官方代码在小数据集上微调D-FINE-S对比RT-DETR。",
+  "check": {"source": "https://arxiv.org/abs/2410.13842", "confirmed": "核对了arXiv记录：标题、六位作者（中国科大）、v1提交于2024-10-17、摘要中的54.0/55.8 AP、124/78 FPS、Objects365预训练后57.1/59.3 AP、最多提升5.3 AP。"}
+}

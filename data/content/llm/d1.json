@@ -1,0 +1,25 @@
+{
+ "id": "d1",
+ "who": "Siyan Zhao, Devaansh Gupta, Qinqing Zheng, Aditya Grover · UCLA / Meta AI",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2504.12216"},
+  {"label": "项目页", "url": "https://dllm-reasoning.github.io/"}
+ ],
+ "aka": ["diffu-GRPO", "dLLM推理强化学习", "扩散语言模型RL", "RL for dLLM"],
+ "problem": "推理模型靠在线强化学习变强，但GRPO这类算法要算整条回答的对数概率，扩散语言模型没有逐词的链式分解，算不出来。",
+ "idea": "先用s1K做掩码SFT，再提出diffu-GRPO：用一次前向的近似估计每个词的对数概率，并随机掩去提示词当作正则。",
+ "impact": "第一次把策略梯度强化学习用到掩码扩散大模型上，开启了dLLM强化学习后训练这条线，此后的coupled-GRPO、wd1、SPG等方法都接着它做。",
+ "method": "[[deepseek-r1]]之后，用在线强化学习（[[grpo]]）训练推理成了标准做法，但这些方法都默认模型是从左到右写的：一条回答的概率等于每个词条件概率的乘积。[[llada]]这类掩码扩散模型没有这种分解，原论文要用约128次蒙特卡洛采样才能估计一次似然，放进RL训练里代价太高。\n\nd1分两步。第一步是**掩码SFT**：在[[s1]]的s1K推理数据上，用扩散模型自己的掩码目标做监督微调。第二步是**diffu-GRPO**：序列的对数概率用平均场近似，直接把各位置的对数概率相加；每个词的对数概率只做一次前向——把回答全部掩住、提示词按15%的概率随机掩去，一步去噪得到估计。每次梯度更新换一种提示掩码，相当于数据增强，于是同一批采样可以多做几次更新，减少昂贵的在线生成。\n\n以LLaDA-8B-Instruct为底座、生成长度256时，GSM8K从76.7升到81.1，MATH500从32.4到38.6，Countdown从19.5到32.0，4×4数独从6.7到16.7。",
+ "limits": [
+  {"text": "一步前向加平均场的似然估计偏差和方差都大，训练信号噪声高，规模一大就不稳定。", "solved_by": ["diffucoder", "llada-2"]},
+  {"text": "只在8B模型和数学、规划类小基准上验证，扩散模型做长推理的上限没有回答。", "solved_by": ["mercury-2", "dopsd"]}
+ ],
+ "relations": [
+  {"to": "grpo", "type": "extends", "note": "把GRPO的组内相对优势搬到扩散模型上，核心改动是对数概率的估计方式。"},
+  {"to": "llada", "type": "uses", "note": "以LLaDA-8B-Instruct为底座做SFT和RL。"},
+  {"to": "deepseek-r1", "type": "extends", "note": "沿用R1“SFT+可验证奖励RL”的推理训练配方，换到非自回归模型上。"},
+  {"to": "s1", "type": "uses", "note": "掩码SFT阶段使用s1K推理数据。"}
+ ],
+ "prereq": ["policy-gradient-concept", "masked-modeling", "diffusion-process", "monte-carlo", "reasoning-tokens"],
+ "check": {"source": "https://arxiv.org/abs/2504.12216", "confirmed": "标题、4位作者、v1提交于2025-04-16；摘要中masked SFT与diffu-GRPO；正文中LLaDA-8B-Instruct底座、s1K、p_mask=0.15、长度256时GSM8K 76.7→81.1等四项数字。"}
+}

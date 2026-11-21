@@ -1,0 +1,24 @@
+{
+ "id": "areal",
+ "who": "Wei Fu, Jiaxuan Gao, Xujie Shen, Chen Zhu, Zhiyu Mei, Chuyi He, Shusheng Xu, Guo Wei et al. · 蚂蚁集团, 清华大学交叉信息研究院, 香港科技大学",
+ "venue": "NeurIPS 2025",
+ "aka": ["异步强化学习", "asynchronous RL", "异步RL", "rollout与训练解耦", "陈旧度", "staleness"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2505.24298"},
+  {"label": "GitHub", "url": "https://github.com/areal-project/AReaL"}
+ ],
+ "problem": "推理模型的RL训练多是同步的：一批里所有回答都生成完才更新模型，最长的那条拖住整批，GPU大量空等。",
+ "idea": "让生成和训练完全解耦：生成端不停地出新样本，训练端攒够一批就更新；用陈旧度上限和改写过的PPO目标来对付“样本来自旧模型”的问题。",
+ "impact": "官方称同等GPU下训练最多快2.77倍且效果持平或更好，是大模型异步RL训练系统的代表。",
+ "method": "在[[verl]]这类同步系统里，每一轮先用当前模型对一批题目生成回答，再用这批回答做[[ppo]]式更新。推理模型的回答长短差距极大，批里最长的那条决定了这一轮的时间。\n\nAReaL把生成端和训练端拆成两组独立的GPU。生成端持续采样；训练端一凑满一批就更新，并把新权重推给生成端——正在生成的回答会被打断，丢掉旧权重算出的KV缓存、用新权重重算后接着往下写，所以一条轨迹里可能混着几个版本的策略。为了不让数据太旧，系统设一个最大陈旧度`η`（训练用的样本最多落后几个版本，`η=0`就退化为同步RL），论文在数学上取8、代码上取4。损失函数把“采样时用的行为策略”和“作为信赖域中心的近端策略”分开，使PPO在样本来自旧策略时仍然稳定。\n\n实验用从[[deepseek-r1]]蒸馏出的1.5B到32B模型做数学与代码推理，最多提速2.77倍。",
+ "limits": [
+  {"text": "异步带来的离策略程度要靠超参数η手动权衡：太小回到同步的低效，太大训练可能不稳。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "verl", "type": "solves", "note": "verl等同步系统要等整批最长回答生成完才更新，AReaL把生成与训练解耦，消除这段空等。"},
+  {"to": "ppo", "type": "extends", "note": "把PPO的行为策略与近端策略拆开，得到能容忍陈旧样本的变体。"},
+  {"to": "deepseek-r1", "type": "uses", "note": "实验的起点模型是DeepSeek-R1蒸馏出的Qwen2系列小模型。"}
+ ],
+ "prereq": ["policy-gradient-concept", "on-off-policy", "distributed-training", "kv-cache", "throughput-latency"],
+ "check": {"source": "https://arxiv.org/abs/2505.24298", "confirmed": "标题、作者、v1日期2025-05-30；摘要中完全异步、陈旧度控制、staleness-enhanced PPO、最多2.77倍；arXiv HTML v5：机构（蚂蚁集团、清华IIIS、HKUST）、η在数学取8代码取4、η=0退化为同步、行为策略与近端策略解耦、可中断rollout重算KV缓存、1.5B–32B的R1蒸馏模型。NeurIPS 2025来自OpenAlex。“主流讨论方向”为概括性判断。"}
+}

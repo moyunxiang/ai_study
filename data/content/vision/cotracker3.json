@@ -1,0 +1,30 @@
+{
+  "id": "cotracker3",
+  "who": "Nikita Karaev, Iurii Makarov, Jianyuan Wang, Natalia Neverova, Andrea Vedaldi, Christian Rupprecht · Meta AI / 牛津大学VGG",
+  "venue": "ICCV 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2410.11831"},
+    {"label": "ICCV 2025", "url": "https://openaccess.thecvf.com/content/ICCV2025/html/Karaev_CoTracker3_Simpler_and_Better_Point_Tracking_by_Pseudo-Labelling_Real_Videos_ICCV_2025_paper.html"}
+  ],
+  "aka": ["CoTracker 3", "点跟踪伪标签", "point tracking pseudo-labelling"],
+  "problem": "点跟踪器几乎都在合成视频上训练，因为真实视频的逐点轨迹无法人工标注；合成与真实的差距限制了精度，而BootsTAPIR这类自训练方案要用1500万条视频。",
+  "idea": "用几个只在合成数据上训好的跟踪器当老师，给无标注真实视频生成伪标签来训练学生；同时把跟踪器结构大幅简化。",
+  "impact": "只用约1.5万条真实视频（少1000倍数据）就超过BootsTAPIR，成为2025年点跟踪最常用的开源基线之一。",
+  "method": "点跟踪（Tracking Any Point）的任务是：给定视频第一帧上任意一个点，输出它在之后每一帧的位置以及是否被遮挡。[[cotracker]]和[[tapir]]是这一方向的代表，但都受限于只能用Kubric这类合成数据训练。\n\nCoTracker3的训练配方很简单：收集无标注的真实视频，每个批次随机挑一位老师（CoTracker3在线版、离线版、CoTracker、TAPIR，均只在合成数据上训练且训练中不更新），用老师的预测轨迹作为伪标签训练学生。模型本身也做了减法：去掉了TAPIR等方法的全局匹配阶段，用一个简单的MLP处理4D相关特征，可见性在迭代中一并更新，参数比CoTracker少约一半。\n\n论文报告在TAP-Vid平均上，离线版（Kubric加1.5万真实视频）AJ 64.4、δavg 76.9，高于用1500万视频的BootsTAPIR的61.4、73.6；对遮挡点的跟踪提升尤其明显。",
+  "limits": [
+    {"text": "伪标签来自老师模型，老师共同的系统性错误（如无纹理区域漂移）会被学生继承。", "solved_by": []},
+    {"text": "输出的是二维像素轨迹，不直接给出点的三维运动与相机运动，需要与深度或重建模型组合。", "solved_by": ["d4rt"]}
+  ],
+  "relations": [
+    {"to": "cotracker", "type": "extends", "note": "同一团队的第三代，保留联合跟踪多点的Transformer思路并简化结构。"},
+    {"to": "tapir", "type": "uses", "note": "TAPIR是生成伪标签的老师之一；CoTracker3去掉了TAPIR式的全局匹配阶段。"},
+    {"to": "raft", "type": "extends", "note": "沿用RAFT以来基于相关特征迭代细化位置的做法。"}
+  ],
+  "prereq": ["vision-tasks", "self-attention", "knowledge-distillation", "semi-supervised", "distribution-shift"],
+  "terms": [
+    {"t": "伪标签", "d": "用已有模型对无标注数据做出的预测，当作近似的标注来训练新模型。"},
+    {"t": "AJ（平均Jaccard）", "d": "TAP-Vid基准的主指标，同时考察位置误差是否在阈值内和遮挡判断是否正确。"}
+  ],
+  "learn": "先读CoTracker了解多点联合跟踪，再读CoTracker3第3节伪标签训练流程；用官方在线版在一段手机视频上跟踪网格点。",
+  "check": {"source": "https://arxiv.org/abs/2410.11831", "confirmed": "核对了arXiv记录：标题、六位作者、v1提交于2024-10-15、摘要中的少1000倍数据；HTML正文确认1.5万真实视频、四位老师、TAP-Vid平均AJ 64.4/δavg 76.9对BootsTAPIR 61.4/73.6；ICCV 2025见CVF开放获取页。"}
+}

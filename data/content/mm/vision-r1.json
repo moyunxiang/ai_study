@@ -1,0 +1,26 @@
+{
+ "id": "vision-r1",
+ "aka": ["多模态R1", "Multimodal R1", "PTST", "渐进式思考抑制", "Vision-R1-cold", "R1-V", "多模态推理强化学习"],
+ "who": "Wenxuan Huang, Bohan Jia, Zijie Zhai, Shaosheng Cao, Zheyu Ye, Fei Zhao, Zhe Xu, Xu Tang et al. · 华东师范大学、小红书",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2503.06749"},
+  {"label": "GitHub", "url": "https://github.com/Osilly/Vision-R1"}
+ ],
+ "problem": "直接对多模态模型做R1-Zero式强化学习，很难激发提问、反思这类复杂推理，因为缺少高质量的多模态长思维链数据。",
+ "idea": "先借DeepSeek-R1生成20万条多模态思维链做冷启动，再用GRPO强化学习，并逐步放宽输出长度上限，避免冷启动后“想太多”。",
+ "impact": "给出“冷启动数据+分阶段RL”的多模态推理配方，7B模型在MathVista上接近o1，成为多模态R1热潮中被广泛引用的工作。",
+ "method": "难点在于[[deepseek-r1]]只能读文字。作者用“模态桥接”造数据：先让一个VLM根据图、问题和答案写出带描述和推理步骤的伪思维链，再让它据此写出详细的图像描述，最后把描述交给DeepSeek-R1生成完整推理。过滤掉答错的样本，与原图配对，得到20万条的Vision-R1-cold数据，用于对[[qwen2.5-vl]]做监督冷启动。\n\n冷启动后模型容易过度思考、推理越写越长却不对。为此提出渐进式思考抑制训练（PTST）：用[[grpo]]和严格的格式-结果奖励在1万道多模态数学题上训练，第一阶段输出上限4K token、每题采样16个，第二阶段放宽到8K、每题采样8个。论文报告多个多模态数学推理基准平均提升约6%；Vision-R1-7B在[[mathvista]]上达到73.5%，只比o1低0.4个百分点；扩大数据后32B和72B分别达到76.4%和78.2%。",
+ "limits": [
+  {"text": "训练集中在数学类题目，对通用视觉理解、感知任务的推理收益不明确。", "solved_by": []},
+  {"text": "推理过程全是文字，模型看完图后不能再回头放大、裁剪图像。", "solved_by": ["deepeyes"]}
+ ],
+ "relations": [
+  {"to": "deepseek-r1", "type": "extends", "note": "沿用R1“冷启动+RL”流程，并借DeepSeek-R1生成多模态思维链数据。"},
+  {"to": "grpo", "type": "uses", "note": "强化学习阶段用GRPO。"},
+  {"to": "qwen2.5-vl", "type": "uses", "note": "以Qwen2.5-VL为基础模型。"},
+  {"to": "mathvista", "type": "uses", "note": "以MathVista等多模态数学基准为主要评测。"},
+  {"to": "llava-cot", "type": "solves", "note": "LLaVA-CoT只做蒸馏数据的监督微调，Vision-R1加入强化学习让模型自我提升推理。"}
+ ],
+ "prereq": ["policy-gradient-concept", "reward-design", "reasoning-tokens", "knowledge-distillation"],
+ "check": {"source": "https://arxiv.org/html/2503.06749v4", "confirmed": "标题、作者、2025-03-09 v1；摘要中200K冷启动数据、PTST、10K数学题、约6%提升、MathVista 73.5%/76.4%/78.2%；正文中模态桥接流程、PTST两阶段4K/16样本与8K/8样本、Qwen2.5-VL基础模型、作者单位"}
+}

@@ -1,0 +1,30 @@
+{
+  "id": "eomt",
+  "who": "Tommie Kerssies, Niccolò Cavagnero, Alexander Hermans, Narges Norouzi, Giuseppe Averta, Bastian Leibe, Gijs Dubbelman, Daan de Geus · 埃因霍温理工大学 / 都灵理工大学 / 亚琛工业大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2503.19108"},
+    {"label": "项目页", "url": "https://www.tue-mps.org/eomt/"}
+  ],
+  "aka": ["Encoder-only Mask Transformer", "Your ViT is Secretly an Image Segmentation Model", "纯编码器分割", "ViT分割"],
+  "problem": "用ViT做分割要再叠卷积适配器、像素解码器和Transformer解码器（如ViT-Adapter加Mask2Former），结构复杂、推理慢。",
+  "idea": "只在ViT最后几层的输入里拼上可学习的查询token，让ViT自己同时完成特征提取和掩码预测，去掉所有任务专用模块。",
+  "impact": "证明大模型加大规模预训练足以替代分割专用结构，在接近的精度下快约4倍，成为“少设计、多放大骨干”思路的代表。",
+  "method": "主流通用分割模型[[mask2former]]让一组查询向量各自代表一个物体或一类区域，再用解码器为每个查询输出一张掩码。把单尺度的[[vit]]接进来时，还得先用适配器造出多尺度特征。\n\nEoMT（Encoder-only Mask Transformer）的做法：ViT的前L₁层只处理图像块；之后把一组可学习的查询token拼到图像token后面，剩下的L₂层（ViT-L默认4层）联合处理两者，最后直接用查询与图像token算出掩码和类别。训练时为帮助收敛仍用masked attention，但施加的概率从1逐渐退火到0，所以推理时完全不需要掩码，结构就是一个朴素ViT。\n\n正文报告在COCO全景分割上，ViT-L的EoMT为56.0 PQ、128 FPS，ViT-Adapter加Mask2Former为57.1 PQ、29 FPS，速度约4.4倍，代价1.1 PQ。默认骨干是[[dinov2]]预训练的ViT-L；作者发现掩码图像建模类预训练（DINOv2、EVA-02）最能缩小与专用结构的差距。",
+  "limits": [
+    {"text": "优势依赖大模型和强预训练，小ViT或预训练较弱时精度明显低于专用结构。", "solved_by": []},
+    {"text": "仍是固定类别的闭集分割，不能按文字描述分割新概念。", "solved_by": ["sam-3"]}
+  ],
+  "relations": [
+    {"to": "mask2former", "type": "solves", "note": "解决Mask2Former接ViT时需要适配器和双解码器、推理慢的问题，把它们并入ViT本身。"},
+    {"to": "vit", "type": "uses", "note": "整个模型就是一个朴素ViT，只多了查询token。"},
+    {"to": "dinov2", "type": "uses", "note": "默认使用DINOv2预训练的ViT-L作为骨干。"},
+    {"to": "vitdet", "type": "extends", "note": "延续ViTDet“朴素ViT也能做密集预测”的思路，并进一步去掉解码器。"}
+  ],
+  "prereq": ["self-attention", "image-patch", "vision-tasks", "pretrain-finetune", "masked-modeling"],
+  "terms": [
+    {"t": "全景分割PQ", "d": "Panoptic Quality，同时衡量分割区域与真值的重叠程度和识别是否正确的综合指标，0到100。"},
+    {"t": "查询token", "d": "一组可学习的向量，每个负责“认领”图中一个物体或一类区域，最终各输出一张掩码。"}
+  ],
+  "learn": "先读Mask2Former理解查询式分割，再读EoMT第3节的查询插入与掩码退火；用官方代码对比EoMT与Mask2Former的推理速度。",
+  "check": {"source": "https://arxiv.org/abs/2503.19108", "confirmed": "核对了arXiv记录：标题、八位作者、v1提交于2025-03-24、摘要中ViT-L最多快4倍；HTML正文确认L₂=4、掩码退火、默认DINOv2-L、COCO 56.0 PQ/128 FPS对57.1 PQ/29 FPS。"}
+}

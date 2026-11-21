@@ -1,0 +1,30 @@
+{
+  "id": "gkd",
+  "who": "Rishabh Agarwal, Nino Vieillard, Yongchao Zhou, Piotr Stanczyk, Sabela Ramos, Matthieu Geist, Olivier Bachem · Google DeepMind / Mila / 多伦多大学",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2306.13649"},
+    {"label": "ICLR 2024论文页", "url": "https://proceedings.iclr.cc/paper_files/paper/2024/hash/5be69a584901a26c521c2b51e40a4c20-Abstract-Conference.html"}
+  ],
+  "problem": "蒸馏生成式语言模型时，学生只在固定的标准答案或老师生成的句子上模仿老师；推理时它要接着自己写出的前缀往下写，训练与推理的前缀分布不一致，错误层层累积。",
+  "idea": "让学生自己生成输出，老师在这段输出的每个位置给出完整的下一词分布，学生向它靠拢；并允许把正向KL换成反向KL或广义JSD，也可与RL奖励一起优化。",
+  "impact": "在摘要、翻译、数学推理上明显超过常规蒸馏，确立了“在策略蒸馏”的标准目标，后来的大模型蒸馏和自蒸馏方法（如OPSD）直接沿用。",
+  "method": "常规[[distillation]]让学生在固定序列上模仿老师每个位置的下一词分布，序列来自标准答案或老师生成的句子。学生推理时却接着自己写出的前缀往下写，早期写错就进入训练中从未见过的状态——这是模仿学习里的分布偏移，[[dagger]]的解法是让学生自己跑、请专家在学生到过的状态上打标签。\n\nGKD把这一思路用到语言模型：学生对输入采样一段输出y，老师在y的每个位置给出下一词分布，学生最小化两者差异，不对采样过程反传梯度。总目标是 `L = (1−λ)·E_固定数据[D] + λ·E_{y~学生}[D]`，λ=1为纯在策略，λ=0即普通监督蒸馏；D可选正向KL、反向KL或广义JSD(β)。学生容量小时，只追老师高概率词的反向KL能少生成老师认为不太可能的内容。它还能与RL奖励加权组合。\n\n实验以约3B的T5-XL为老师、77M至800M的T5为学生。论文称在策略GKD相对初始学生的提升，平均是基线蒸馏方法的2.1倍（XSum摘要）、1.7倍（WMT英德翻译）、1.9倍（GSM8K）；最优散度随任务而变。",
+  "limits": [
+    {"text": "需要一个另行训练好的、更大的老师模型，训练中每步都要对学生样本跑老师前向；数据集里现成的参考答案不能直接成为老师信号。", "solved_by": ["opsd"]},
+    {"text": "只在T5系列（老师约3B、学生最大800M）上验证，且假设学生已经过SFT、能生成像样的样本，从头训练的学生不适用（作者说明）。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "distillation", "type": "extends", "note": "保留Hinton蒸馏的软分布匹配，但把训练序列从固定数据换成学生自己生成的，并推广到任意散度。"},
+    {"to": "dagger", "type": "extends", "note": "把DAgger“学生自己跑、专家在学生访问的状态上标注”的在策略模仿学习，推广到自回归语言模型的蒸馏。"},
+    {"to": "t5", "type": "uses", "note": "老师和学生都是T5（含Flan-T5）不同尺寸的模型，在同一预训练数据上训练。"},
+    {"to": "instructgpt", "type": "extends", "note": "借用RLHF“先SFT、再在模型自己的样本上在线训练”的两阶段流程，并能把蒸馏项与RL奖励直接相加。"}
+  ],
+  "prereq": ["knowledge-distillation", "kl-divergence", "autoregressive", "teacher-forcing", "imitation-learning", "on-off-policy"],
+  "terms": [
+    {"t": "广义JSD(β)", "d": "用权重β在两个分布之间取混合m，再分别计算两边到m的KL并加权求和；β接近0时行为像正向KL，接近1时像反向KL，且总是有界。"},
+    {"t": "学生数据比例λ", "d": "每个训练批次来自学生自己生成样本的概率；1表示完全在策略，0表示只用固定数据集。"}
+  ],
+  "learn": "先补[[c:kl-divergence]]（尤其正向与反向KL的区别）和[[c:imitation-learning]]，了解[[dagger]]。原文读第3节的算法1与总目标，再看图4关于散度与多样性的权衡。动手：用一个小老师和更小的学生，在同一批题目上分别做固定数据蒸馏和在策略蒸馏，比较学生的生成质量。",
+  "check": {"source": "https://arxiv.org/html/2306.13649v3", "confirmed": "abs页标题、7位作者、v1提交于2023-06-23，comments注明Accepted at ICLR 2024；正文中的机构（Google DeepMind、Mila、多伦多大学）、公式4在策略损失与GKD总目标、λ与散度的取值、不对采样反传、T5-XL约3B与T5-small/base/large 77M/250M/800M、2.1×/1.7×/1.9×相对提升、最优散度随任务而变、需从SFT过的学生出发的说明、与RL组合的公式5。"}
+}

@@ -1,0 +1,142 @@
+[
+ {
+  "key": "diffusion-language-model",
+  "name": "扩散语言模型",
+  "en": "Diffusion Language Models",
+  "aka": ["DLM", "DLMs", "dLLM", "dLLMs", "Diffusion LLM", "扩散大语言模型", "扩散LLM", "MDM", "Masked Diffusion Model", "掩码扩散模型", "masked diffusion", "离散扩散", "discrete diffusion", "文本扩散", "text diffusion", "非自回归语言模型", "并行解码", "LLaDA", "Mercury", "Gemini Diffusion"],
+  "blurb": "不再从左到右一个词一个词地写，而是先把整段文字遮住，再一步步并行“去噪”还原，一次能写出多个词、还能回头修改。",
+  "body": "自回归模型（[[c:autoregressive]]）每步只写一个词，延迟随长度线性增长，也不能改已写的内容。扩散语言模型把图像扩散（[[c:diffusion-process]]）的思路搬到离散文本上：训练时随机把一部分词替换成掩码，让模型还原；生成时从全掩码出发，每步并行揭开一批最有把握的位置。\n\n路线源自[[d3pm]]的离散扩散和[[diffusion-lm]]的连续扩散，[[sedd]]、[[mdlm]]把掩码扩散的训练目标简化到能和自回归比困惑度。2025年[[llada]]把它做到8B，[[block-diffusion]]用“块间自回归、块内扩散”找回KV缓存；[[diffullama]]开创的“从自回归模型转换”让规模迅速放大到[[llada-2]]的100B和[[diffusiongemma]]。商用侧有[[mercury]]、[[gemini-diffusion]]、[[mercury-2]]。推理加速（[[fast-dllm]]）、强化学习后训练（[[d1]]、[[dopsd]]）和数据效率（[[diffusion-beats-ar]]）是当前三条主要研究线，综述见[[dlm-survey]]。\n\n争论集中在：质量是否真能追平同规模自回归模型、并行带来的加速在大批量服务中还剩多少、条件独立假设导致的“前后不搭”如何根治。",
+  "origin": "d3pm",
+  "nodes": ["d3pm", "diffusion-lm", "sedd", "mdlm", "llada", "block-diffusion", "diffullama", "fast-dllm", "d1", "mercury", "gemini-diffusion", "dream-7b", "llada-2", "mercury-2", "diffusiongemma", "dlm-survey", "dopsd"]
+ },
+ {
+  "key": "ar-to-diffusion-adaptation",
+  "name": "自回归模型转扩散",
+  "en": "Adapting Autoregressive Models into Diffusion Models",
+  "aka": ["AR-to-diffusion", "AR转扩散", "AR2Diff", "diffusion adaptation", "扩散化微调", "继承自回归权重", "块扩散转换", "AR初始化扩散模型"],
+  "blurb": "不从头训扩散语言模型，而是拿训好的自回归大模型继续训练，把它“改造”成能并行去噪的扩散模型。",
+  "body": "从头训练扩散语言模型代价高、数据效率低。[[diffullama]]首先证明：把[[llama-2]]的因果掩码换成双向注意力、保留输出右移，用不到200B token继续训练，就能得到7B扩散模型。此后这几乎成为放大扩散模型的默认路线：[[dream-7b]]从Qwen2.5初始化，[[diffucoder]]从[[qwen2.5-coder]]转换，[[sdar]]把Qwen3规格的模型转成块扩散，[[llada-2]]用块长先增后减的三阶段训练转出100B模型，[[diffusiongemma]]用不到原训练量10%的token把[[gemma-4]]改成扩散模型。\n\n好处是继承了自回归模型的知识和指令能力；代价是转换后质量通常略低于原模型，而且最终形态多是块扩散，扩散“整段规划”的优势只在块内体现。",
+  "origin": "diffullama",
+  "nodes": ["diffullama", "dream-7b", "diffucoder", "sdar", "llada-2", "diffusiongemma"]
+ },
+ {
+  "key": "hybrid-linear-attention",
+  "name": "混合线性注意力架构",
+  "en": "Hybrid Linear-Attention / SSM Architectures",
+  "aka": ["混合架构", "hybrid architecture", "混合注意力", "hybrid attention", "线性注意力混合", "Mamba-Transformer混合", "hybrid Mamba", "Gated DeltaNet混合", "3:1混合", "Lightning Attention"],
+  "blurb": "大部分层用开销随长度线性增长的线性注意力或状态空间层，只保留少量全注意力层，兼顾长上下文效率和精确回忆。",
+  "body": "全注意力的计算随长度平方增长、KV缓存随长度线性增长，长上下文和智能体场景越来越吃不消；纯线性注意力或[[c:state-space-model]]又在精确检索长距离细节上吃亏。折中办法是混合：[[jamba]]最早在大模型上把[[mamba]]层和注意力层按比例交替，[[minimax-01]]用闪电注意力（线性注意力）配少量softmax注意力做到百万上下文，[[qwen3-next]]和[[kimi-linear]]把[[gated-deltanet]]类层与全注意力按约3:1混合，[[nemotron-3]]则是Mamba加注意力再加MoE。\n\n当前讨论的焦点是混合比例、全注意力层放在哪里，以及线性层在长程推理和检索类任务上到底损失多少；与它竞争的是保留全注意力、只做稀疏化的路线（[[nsa]]、[[deepseek-v3.2]]）。",
+  "origin": "jamba",
+  "nodes": ["jamba", "minimax-01", "qwen3-next", "kimi-linear", "nemotron-3", "gated-deltanet", "mamba-2", "retnet", "gla"]
+ },
+ {
+  "key": "rope-context-extension",
+  "name": "位置编码外推与上下文扩展",
+  "en": "RoPE Scaling and Context-Window Extension",
+  "aka": ["RoPE scaling", "RoPE外推", "长度外推", "length extrapolation", "length generalization", "位置插值", "PI", "NTK-aware", "NTK插值", "YaRN", "LongRoPE", "上下文窗口扩展", "context extension"],
+  "blurb": "模型在4K长度上训练，怎样只用少量继续训练（甚至不训练）就能读懂32K、128K乃至百万token的输入。",
+  "body": "[[rope]]把位置编码成旋转角度，超出训练长度后角度落在没见过的区域，困惑度会暴涨。[[alibi]]和[[nope-length-gen]]从位置编码设计本身讨论外推能力；更常用的是事后扩展：[[position-interpolation]]把新位置按比例压回训练范围，社区随后提出按频率区别对待的NTK-aware插值，[[yarn]]把它系统化并加上注意力温度，[[longrope]]用搜索找每个频率的最佳缩放，把窗口推到200万token。实际的长上下文模型（[[gemini-1.5]]、Qwen、Llama 3.1等）通常把这些方法与长文本继续预训练结合。\n\n“能放进窗口”不等于“能用好”：[[lost-in-the-middle]]和[[context-rot]]显示长输入中间的信息常被忽略，性能随长度下降。",
+  "origin": "position-interpolation",
+  "nodes": ["rope", "alibi", "nope-length-gen", "position-interpolation", "yarn", "longrope", "gemini-1.5", "lost-in-the-middle", "context-rot"]
+ },
+ {
+  "key": "looped-transformer",
+  "name": "循环与递归Transformer",
+  "en": "Looped / Recursive Transformers and Adaptive Depth",
+  "aka": ["Looped Transformer", "LoopLM", "循环语言模型", "Recursive Transformer", "递归Transformer", "depth recurrence", "深度循环", "权重共享", "parameter sharing", "自适应计算", "adaptive computation", "ACT", "动态深度", "early exit"],
+  "blurb": "同一组层反复调用多次，让模型在不增加参数的情况下“多想几轮”，并按输入难度决定循环或计算的次数。",
+  "body": "标准Transformer每个token都走完固定的L层。[[universal-transformer]]最早提出把同一层循环使用并自适应决定步数，[[albert]]用层间共享省参数；[[mixture-of-depths]]让路由器决定每个token是否参与某层计算，[[mixture-of-recursions]]把共享层循环和按token的递归深度合在一起；[[ouro]]把循环语言模型预训练到7.7T token，小模型追平大得多的普通模型。智能体分支里的[[hrm]]、[[trm]]用很小的递归网络在谜题推理上取得强结果，也属于这一思路。\n\n它常和“潜在推理”一起讨论：在隐藏状态里迭代，而不是写出思维链（[[cot]]）。开放问题是循环次数一多训练就不稳定，以及推理成本与同等算力的大模型相比是否真的划算。",
+  "origin": "universal-transformer",
+  "nodes": ["universal-transformer", "albert", "mixture-of-depths", "mixture-of-recursions", "ouro", "hrm", "trm"]
+ },
+ {
+  "key": "beyond-next-token-prediction",
+  "name": "超越下一词预测",
+  "en": "Beyond Next-Token Prediction",
+  "aka": ["超越NTP", "beyond NTP", "next-token prediction的替代", "多token预测", "multi-token prediction", "MTP", "下一向量预测", "next-vector prediction", "下一词推理", "next-token reasoning", "新的预训练目标"],
+  "blurb": "质疑“一次预测一个离散token”这个默认设定：一次预测多个词、预测连续向量、先推理再预测，或者干脆并行去噪。",
+  "body": "从[[gpt-1]]到今天，大模型的预训练目标几乎都是预测下一个token。近两年有几条路线试图改掉它：[[multi-token-prediction]]让模型同时预测后面几个词，被[[deepseek-v3]]、[[nemotron-3]]用来加速生成；[[calm]]用自编码器把4个token压成一个连续向量，改为预测下一个向量；[[rpt]]让模型先思考再预测下一个词，用是否猜中作为强化学习奖励；扩散语言模型（[[llada]]等）则完全放弃从左到右；[[blt]]、[[h-net]]从另一头入手，改变“token”本身的粒度。\n\n这些方法各自在效率或数据利用上报告了收益，但到2026年，前沿模型的主干仍是下一词预测，替代路线多作为辅助目标或特定场景方案。",
+  "origin": "multi-token-prediction",
+  "nodes": ["multi-token-prediction", "calm", "rpt", "llada", "blt", "h-net", "deepseek-v3"]
+ },
+ {
+  "key": "tokenizer-free-lm",
+  "name": "去分词器与字节级语言模型",
+  "en": "Tokenizer-Free and Byte-Level Language Models",
+  "aka": ["tokenizer-free", "无分词器", "去分词器", "byte-level LM", "字节级模型", "byte-level", "字节潜变量", "动态分块", "dynamic chunking", "patch-based LM", "token-free"],
+  "blurb": "不再用固定的BPE词表切词，而是直接读字节，并让模型自己学怎样把字节分组，以避开分词带来的拼写、数字和多语言问题。",
+  "body": "[[c:tokenization]]把文本切成子词后，模型看不到单词内部的字母，数数、拼写、罕见语言和噪声文本都容易出错，词表也要人工设计。[[byt5]]证明直接在字节上训练是可行的，但序列变长好几倍、计算更贵；[[megabyte]]用“全局模型处理字节块、局部模型处理块内字节”的两级结构缓解开销；[[blt]]按下一个字节的熵动态决定块边界，在到8B参数的按算力对齐缩放实验中表现出优于分词模型的缩放趋势；[[h-net]]把分块也做成端到端可学习的层级结构。\n\n这条线与[[calm]]这类把多个token压成一个向量的方法互为镜像：一个把粒度做细并让模型自己分组，一个把粒度做粗。尚未解决的是在前沿规模上的训练效率和推理成本。",
+  "origin": "byt5",
+  "nodes": ["byt5", "megabyte", "blt", "h-net"]
+ },
+ {
+  "key": "preference-optimization",
+  "name": "直接偏好优化家族",
+  "en": "Direct Preference Optimization and Variants",
+  "aka": ["DPO", "xPO", "DPO变体", "DPO家族", "离线偏好优化", "offline preference optimization", "偏好对齐", "preference alignment", "IPO", "KTO", "SimPO", "无奖励模型对齐", "reward-free alignment"],
+  "blurb": "不训练单独的奖励模型、也不跑强化学习，直接用“这个回答比那个好”的偏好对数据微调语言模型。",
+  "body": "经典的[[c:rlhf-concept]]流程（[[instructgpt]]）要先训练奖励模型，再用PPO在线优化，工程复杂且不稳定。[[dpo]]推导出最优策略与奖励之间的闭式关系，把对齐变成一个类似分类的损失，只需偏好对数据即可离线训练，迅速成为开源后训练的默认步骤（如[[zephyr]]、[[tulu-3]]、[[llama-3.1]]）。之后出现了一串变体：[[ipo]]修正DPO在偏好近乎确定时的过拟合，[[kto]]只需“好/坏”单点标签，[[simpo]]去掉参考模型、用长度归一化的奖励。\n\n争论在于离线偏好优化与在线RL孰优：DPO简单便宜，但容易被分布外样本和长度偏好利用；推理模型时代，可验证奖励的在线强化学习（[[grpo]]）又重新成为主流。",
+  "origin": "dpo",
+  "nodes": ["dpo", "ipo", "kto", "simpo", "zephyr", "tulu-3", "instructgpt", "rm-overoptimization"]
+ },
+ {
+  "key": "llm-synthetic-data",
+  "name": "大模型合成数据",
+  "en": "Synthetic Data for LLM Training",
+  "aka": ["合成数据", "synthetic data", "数据合成", "模型生成数据", "蒸馏数据", "distillation data", "Self-Instruct式", "教科书级数据", "textbook-quality data", "合成指令", "数据蒸馏"],
+  "blurb": "用大模型自己生成指令、对话、解题过程甚至教科书式文章，作为训练另一个（或同一个）模型的数据。",
+  "body": "人工写指令和标注偏好又贵又慢。[[self-instruct]]让模型从少量种子任务自举出大量指令，[[alpaca]]用它花几百美元做出类ChatGPT模型，[[vicuna]]、[[wizardlm]]、[[orca]]分别用真实对话、指令进化和带解释的答案扩充数据。预训练侧，[[tinystories]]和[[textbooks]]证明精心合成的“教科书级”数据能让小模型以少得多的token取得强性能，并贯穿了Phi系列（[[phi-4]]）。\n\n风险同样被反复讨论：[[false-promise-imitation]]指出模仿闭源模型主要学到风格而非能力；[[model-collapse]]显示在模型生成数据上递归训练会让分布尾部逐渐消失。今天的主流做法是用强模型合成、再用验证器或奖励模型过滤。",
+  "origin": "self-instruct",
+  "nodes": ["self-instruct", "alpaca", "vicuna", "wizardlm", "orca", "tinystories", "textbooks", "phi-4", "false-promise-imitation", "model-collapse"]
+ },
+ {
+  "key": "small-language-models",
+  "name": "小语言模型",
+  "en": "Small Language Models",
+  "aka": ["SLM", "SLMs", "小模型", "小参数模型", "端侧模型", "on-device LLM", "轻量级大模型", "tiny LM", "Phi系列", "Gemma系列", "百亿以下模型"],
+  "blurb": "参数从几亿到十几亿、能在手机或单卡上运行的语言模型，靠更好的数据和蒸馏追赶大模型。",
+  "body": "规模定律（[[scaling-laws]]、[[chinchilla]]）讲的是训练最省算力的配比，但部署时推理成本更重要，[[beyond-chinchilla]]因此主张把小模型训练远超“最优”的token数。小模型路线的关键工作包括：[[tinystories]]和[[textbooks]]用高质量合成数据训练极小模型；Phi系列（[[phi-2]]、[[phi-3]]、[[phi-4]]）把这一思路做到可与大得多的模型比较；[[mistral-7b]]和[[gemma]]系列成为开放小模型的常用底座；[[gpt-oss]]也提供了能在单卡运行的较小版本。\n\n小模型常与[[c:knowledge-distillation]]、[[c:quantization-concept]]一起讨论。争论点是小模型在基准上的分数是否靠数据污染和刷题，以及它的知识容量上限。",
+  "origin": "tinystories",
+  "nodes": ["tinystories", "textbooks", "phi-1.5", "phi-2", "phi-3", "phi-4", "mistral-7b", "gemma", "gemma-3", "beyond-chinchilla"]
+ },
+ {
+  "key": "emergence-debate",
+  "name": "涌现能力之争",
+  "en": "The Emergent Abilities Debate",
+  "aka": ["涌现", "emergence", "涌现能力", "emergent abilities", "涌现是幻象", "emergence mirage", "相变", "phase transition", "能力突现", "顿悟", "grokking"],
+  "blurb": "模型变大到某个规模时，某些能力会不会突然从无到有地“涌现”出来，还是这只是评测指标造成的错觉。",
+  "body": "[[gpt-3]]显示大模型只靠提示就能做新任务，[[emergent-abilities]]汇总了一批“小模型接近随机、超过某个规模后突然变好”的任务，把它称为涌现，并成为“继续放大规模”的重要论据。[[emergence-mirage]]反驳说：很多突变来自精确匹配这类不连续指标，换成连续指标后性能其实随规模平滑提升。训练过程中的类似现象——[[grokking]]（训练很久后测试准确率突然上升）和[[induction-heads]]（ICL能力在训练中突然形成）——则提供了机制层面的线索。\n\n这场争论关系到能否从小模型预测大模型的能力，因此也影响安全评估：如果能力会不可预测地突现，就需要更频繁的危险能力评测。",
+  "origin": "emergent-abilities",
+  "nodes": ["emergent-abilities", "emergence-mirage", "scaling-laws", "gpt-3", "grokking", "induction-heads"]
+ },
+ {
+  "key": "icl-mechanism",
+  "name": "上下文学习的机理",
+  "en": "Mechanisms of In-Context Learning",
+  "aka": ["ICL机理", "ICL理论", "ICL as gradient descent", "隐式梯度下降", "隐式贝叶斯推断", "mesa-optimization", "元优化", "归纳头", "induction heads", "示例敏感性", "few-shot机理"],
+  "blurb": "模型参数不变，只看提示里的几个例子就能学会新任务——它在内部到底做了什么。",
+  "body": "[[c:in-context-learning]]是[[gpt-3]]带来的意外能力，围绕它的研究分两类。一类问“它有多可靠”：[[calibrate-before-use]]、[[prompt-order-sensitivity]]、[[good-icl-examples]]发现结果对示例选择、顺序和格式极其敏感；[[icl-demonstrations]]发现示例标签随机打乱影响不大，[[icl-larger-differently]]则发现大模型能被翻转的标签覆盖先验，[[many-shot-icl]]把示例加到上千个。另一类问“它是什么算法”：[[icl-bayesian]]把它看成隐式贝叶斯推断，[[icl-function-classes]]、[[icl-learning-algorithm]]用可控的线性回归任务研究，[[icl-gradient-descent]]和[[icl-meta-optimizer]]论证注意力在前向中实现了类似梯度下降的更新，[[induction-heads]]从电路层面找到“复制前文模式”的注意力头。\n\n这些解释各自在玩具设定中成立，真实大模型里ICL究竟由哪种机制主导仍无定论。",
+  "origin": "icl-bayesian",
+  "nodes": ["calibrate-before-use", "icl-demonstrations", "icl-bayesian", "induction-heads", "icl-function-classes", "icl-learning-algorithm", "icl-gradient-descent", "icl-meta-optimizer", "icl-larger-differently", "many-shot-icl"]
+ },
+ {
+  "key": "knowledge-editing",
+  "name": "知识编辑",
+  "en": "Knowledge / Model Editing",
+  "aka": ["model editing", "模型编辑", "知识编辑", "事实编辑", "locate-then-edit", "定位后编辑", "ROME", "MEMIT", "知识定位", "参数化知识"],
+  "blurb": "不重新训练，直接改动模型里少量参数，让它记住一条新事实或忘掉一条错误事实。",
+  "body": "语言模型把大量事实存在参数里：[[lama-probe]]表明不微调就能用填空把知识问出来，[[knowledge-in-params]]测量了闭卷问答能装多少知识。但事实会过时或出错，整体重训太贵。[[rome]]用因果追踪定位到中间层MLP在“主语最后一个词”处存储事实关联，再对该层做秩一更新改写一条事实；[[memit]]把它推广到一次修改成千上万条。\n\n后续研究发现编辑常常“改了表面、没改推理”：改完“A的首都是B”，模型在多跳问题里仍按旧知识回答；[[reversal-curse]]也说明模型学到的知识是有方向的。编辑的副作用、可扩展性以及与检索增强的取舍，至今仍是开放问题。",
+  "origin": "rome",
+  "nodes": ["lama-probe", "knowledge-in-params", "rome", "memit", "reversal-curse"]
+ },
+ {
+  "key": "data-wall",
+  "name": "数据墙与数据受限训练",
+  "en": "The Data Wall and Data-Constrained Training",
+  "aka": ["data wall", "数据墙", "数据耗尽", "running out of data", "token危机", "token crisis", "多轮训练", "multi-epoch training", "重复数据", "data repetition", "数据受限规模定律"],
+  "blurb": "互联网高质量文本即将被用完，算力还在涨，模型该怎样在数据不够的情况下继续变强。",
+  "body": "[[chinchilla]]式的配比要求数据随模型同步增长，但公开高质量文本是有限的。[[data-constrained-scaling]]系统研究了重复训练：自回归模型重复约4轮还接近新数据，之后收益迅速衰减；[[dedup-training-data]]说明重复的样本本身会损害泛化。应对思路有几类：用合成数据补充（[[textbooks]]，但要警惕[[model-collapse]]）；改训练目标以更好地榨取重复数据——[[diffusion-beats-ar]]发现掩码扩散模型可以有效重复上百轮，在算力充足、数据稀缺时反超自回归；以及把算力转移到后训练和推理时扩展。\n\n“数据墙”是否真的存在、何时到来，以及合成数据能否无限替代真实数据，是2025–2026年反复出现的争论。",
+  "origin": "data-constrained-scaling",
+  "nodes": ["chinchilla", "data-constrained-scaling", "dedup-training-data", "model-collapse", "textbooks", "diffusion-beats-ar"]
+ }
+]

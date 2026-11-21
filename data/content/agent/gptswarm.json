@@ -1,0 +1,30 @@
+{
+  "id": "gptswarm",
+  "who": "Mingchen Zhuge, Wenyi Wang, Louis Kirsch, Francesco Faccio, Dmitrii Khizbullin, Jürgen Schmidhuber · KAUST / IDSIA",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2402.16823"},
+    {"label": "GitHub", "url": "https://github.com/metauto-ai/gptswarm"}
+  ],
+  "aka": ["GPTSwarm", "智能体图", "可优化的智能体图", "agent graph optimization", "智能体群"],
+  "problem": "思维链、反思、多智能体辩论等提示技巧各有一套代码，多个智能体之间谁把结果传给谁也全靠人手工设计，没法自动比较和改进。",
+  "idea": "把任何LLM智能体都写成一张计算图：节点是一次LLM或工具调用，边是信息流向；再分别自动优化每个节点的提示和整张图的连边。",
+  "impact": "较早把多智能体之间的连接结构当作可学习的参数来优化，是后来自动设计智能体系统、用RL学编排拓扑这条线的常见起点。",
+  "method": "GPTSwarm先做统一表示：一个智能体是一张图，节点实现「处理输入」「调用LLM」等函数，边表示数据从哪个操作流向哪个操作；多张图可以再拼成更大的复合图，节点之间跨智能体的边就代表协作关系（见[[c:graph-basics]]）。\n\n在此之上有两种优化。**边优化**：给每条可能的边一个0到1之间的概率θ，每次按这些概率随机采样出一张无环图去跑任务，把任务得分当作回报，用[[reinforce]]式的[[c:policy-gradient-concept]]更新θ，相当于学习「哪些智能体应该互相连接」。**节点优化**：沿用[[opro]]让LLM改写提示的思路，根据节点过去的输入输出改进它的提示。\n\n论文报告：在Mini Crosswords上用GPT-3.5-Turbo，优化后的连边分布得分0.575，初始分布为0.465；HumanEval在线优化从0.76升到0.88。另一个实验里一半智能体被设定为故意给错答案，边优化学会切断它们的连接，使群体准确率回到接近单个诚实智能体的水平。",
+  "limits": [
+    {"text": "优化出的是每个任务一张固定的图，所有问题都用同一种协作结构，不会根据具体问题或中间状态临时调整。", "solved_by": ["puppeteer", "conductor"]},
+    {"text": "采样时只保留无环图，智能体之间不能来回迭代检查；每次更新都要采样并完整运行多张图，评测成本高。", "solved_by": ["puppeteer"]}
+  ],
+  "relations": [
+    {"to": "autogen", "type": "rivals", "note": "AutoGen让开发者手写智能体之间的对话流程，GPTSwarm主张把这种结构表示成图并自动优化。"},
+    {"to": "opro", "type": "uses", "note": "节点优化沿用OPRO「让LLM根据历史结果改写提示」的做法。"},
+    {"to": "reinforce", "type": "uses", "note": "把每条边的存在概率当作策略参数，用REINFORCE估计梯度。"},
+    {"to": "tot", "type": "extends", "note": "思维树等提示方法可以看作特定形状的图；GPTSwarm在Mini Crosswords上与思维树做了对比。"},
+    {"to": "multiagent-debate", "type": "extends", "note": "多智能体辩论、投票等固定的协作方式都能表示成图上的一种连接，GPTSwarm把它们放进同一个可优化空间。"}
+  ],
+  "prereq": ["agent-loop", "graph-basics", "policy-gradient-concept", "in-context-learning"],
+  "terms": [
+    {"t": "边优化", "d": "把智能体之间每条连接是否存在当作一个概率参数，按任务得分用强化学习调整，学的是协作结构而不是模型权重。"}
+  ],
+  "learn": "先读[[autogen]]了解手写多智能体流程的样子 → 读原文第3节（图表示）和第4节（边优化与节点优化） → 动手：给3个LLM智能体之间的6条可能连边设概率，用REINFORCE在一个小问答集上学连边。",
+  "check": {"source": "https://arxiv.org/abs/2402.16823", "confirmed": "标题、作者、v1提交于2024-02-26；正文（arxiv.org/html/2402.16823v3）核对边概率θ与REINFORCE、只采样无环图、Mini Crosswords 0.465→0.575、HumanEval 0.76→0.88、对抗智能体实验、作者单位KAUST与IDSIA。"}
+}

@@ -1,0 +1,28 @@
+{
+ "id": "dflash",
+ "who": "Jian Chen, Yesheng Liang, Zhijian Liu · 加州大学圣地亚哥分校",
+ "venue": "ICML 2026",
+ "aka": ["DFlash推测解码", "块扩散草稿器", "扩散草稿模型", "diffusion drafter", "扩散推测解码"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2602.06036"},
+  {"label": "GitHub", "url": "https://github.com/z-lab/dflash"}
+ ],
+ "problem": "推测解码的草稿器本身也是逐词自回归生成，草稿越长越慢；扩散语言模型能并行出词，但单独使用时质量不如自回归模型。",
+ "idea": "只让扩散模型当草稿器：一个小型块扩散模型一次前向就猜出整块16个词，并读取目标模型的中间特征来提高命中率，最后仍由目标模型逐一验证。",
+ "impact": "官方称在多种模型和任务上无损加速超过6倍，比EAGLE-3高最多2.5倍；是把扩散语言模型用来加速自回归模型的代表做法之一。",
+ "method": "[[speculative-decoding]]的验证保证输出与目标模型完全一致，所以草稿器可以用任何方法生成，只要猜得准、猜得快。DFlash的草稿器是一个[[block-diffusion]]式的小模型（Qwen3上只有5层）：给定已确认的前文，它把接下来一整块位置都设为掩码，一次前向同时填出这一块的所有词，而不是像[[eagle-3]]那样一个一个猜。\n\n为了让小模型猜得准，DFlash从目标模型均匀选取5层的隐藏特征，拼接压缩后注入草稿器每一层的Key和Value里，相当于草稿器直接“看到”目标模型对上下文的理解。草稿器与目标模型共用词嵌入和输出头（冻结），只训练中间几层。",
+ "results": "论文表1：Qwen3-8B、关闭思考、温度0时，DFlash平均加速4.86倍、每轮平均接受6.49个词；EAGLE-3（草稿16）为1.76倍、2.96个词。在SGLang中单张B200、并发1时，Qwen3-8B在Math500上吞吐从230升到1175 token/s（5.1倍），并发32时降到2.8倍。",
+ "limits": [
+  {"text": "并发升高后加速比明显下降（并发1为5.1倍，并发32为2.8倍），高负载服务中优势收窄。", "solved_by": []},
+  {"text": "每个目标模型要单独训练草稿器，训练依赖目标模型自己生成的约80万条回答。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "eagle-3", "type": "solves", "note": "EAGLE-3草稿器仍逐词自回归，DFlash用块扩散一次前向出整块草稿，并作为主要对比基线。"},
+  {"to": "block-diffusion", "type": "uses", "note": "草稿器采用块扩散的生成方式：块内并行去掩码，块间按顺序推进。"},
+  {"to": "speculative-decoding", "type": "uses", "note": "沿用推测解码的验证流程，因此输出与目标模型逐词解码一致。"},
+  {"to": "eagle", "type": "extends", "note": "继承EAGLE系列读取目标模型特征的思路，但注入到草稿器每层的KV中而不只是输入。"}
+ ],
+ "prereq": ["autoregressive", "masked-modeling", "diffusion-process", "kv-cache", "throughput-latency"],
+ "learn": "先读[[speculative-decoding]]、[[eagle-3]]和[[block-diffusion]] → 读论文第3节草稿器结构与训练 → 用官方仓库的SGLang示例测不同并发下的加速比。",
+ "check": {"source": "https://arxiv.org/abs/2602.06036", "confirmed": "标题、作者、v1日期2026-02-05；摘要中6倍、比EAGLE-3高2.5倍；arXiv HTML v2：UCSD、5层草稿器、块大小16、5层目标特征注入每层KV、共用冻结的嵌入与输出头、约80万训练样本；表1的4.86倍/6.49与1.76倍/2.96；SGLang表3的230→1175 token/s与并发32时2.8倍。ICML 2026来自ICML 2026海报页与PMLR v306。"}
+}

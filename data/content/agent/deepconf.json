@@ -1,0 +1,24 @@
+{
+  "id": "deepconf",
+  "who": "Yichao Fu, Xuewei Wang, Yuandong Tian, Jiawei Zhao · Meta AI / UCSD",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2508.15260"}
+  ],
+  "aka": ["DeepConf", "Deep Think with Confidence", "置信度加权投票", "置信度早停", "并行思考", "parallel thinking"],
+  "problem": "并行生成几百条推理再多数投票（自洽性）能提高正确率，但收益递减、token开销巨大，而且低质量的推理和高质量的推理票数一样。",
+  "idea": "用模型自己的逐词置信度给每条推理打分：离线时只让高置信的推理参与加权投票，在线时一旦某条推理的局部置信度跌破阈值就提前停掉。",
+  "impact": "不需要训练，GPT-OSS-120B在AIME 2025上达到99.9%，在线模式最多省下84.7%的token，是2025年下半年讨论最多的推理时省算力方法之一。",
+  "method": "DeepConf先定义一组置信度。**词置信度**：某位置上前k个候选词对数概率均值的相反数，分布越尖锐值越高。**组置信度**：在长度约1024或2048个词的滑动窗口内对词置信度求平均。一条推理的分数可以取组置信度的最小值、最低10%的平均，或最后一段的尾部置信度——关键是抓住推理中间「卡壳」的局部低谷，而不是整条平均。\n\n**离线模式**：生成全部推理，只保留置信度最高的η%（10%或90%），再按置信度加权投票，而不是[[self-consistency]]的一条一票。**在线模式**：先生成16条预热推理，用它们的置信度分布定一个阈值；之后每条推理在生成中途组置信度跌破阈值就截断；当领先答案的加权票占比达到0.95时整体停止采样。\n\nGPT-OSS-120B在AIME 2025上，DeepConf@512为99.9%，普通多数投票cons@512为97.0%，单次pass@1为91.8%。",
+  "limits": [
+    {"text": "需要拿到逐词概率，很多闭源接口不提供；模型对错误推理也可能高度自信，置信度不等于正确。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "self-consistency", "type": "extends", "note": "把一条一票的多数投票改为按置信度筛选和加权，并能提前截断低质量推理。"},
+    {"to": "deep-think", "type": "extends", "note": "针对Deep Think式的大规模并行思考，降低它的token开销。"},
+    {"to": "gpt-oss", "type": "uses", "note": "主要结果在GPT-OSS和Qwen3系列开源模型上得到。"},
+    {"to": "tts-compute", "type": "extends", "note": "属于测试时扩展中「怎样更省地花推理算力」的方法。"}
+  ],
+  "prereq": ["reasoning-tokens", "decoding-sampling", "ensemble", "calibration-concept"],
+  "learn": "先读[[self-consistency]]和[[tts-compute]] → 读原文第3节置信度定义与算法 → 动手：对一道题采64条推理，分别按多数投票和最低组置信度加权投票，比较结果与token用量。",
+  "check": {"source": "https://arxiv.org/abs/2508.15260", "confirmed": "标题、作者、v1提交于2025-08-21；正文（arxiv.org/html/2508.15260v1）核对词置信度与组置信度定义、窗口长度、离线保留η%、在线16条预热与0.95停止阈值、AIME 2025上99.9%对cons@512 97.0%对pass@1 91.8%、84.7%token节省、作者单位。"}
+}

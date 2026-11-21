@@ -1,0 +1,23 @@
+{
+ "id": "minitron",
+ "who": "Saurav Muralidharan, Sharath Turuvekere Sreenivas, Raviraj Joshi, Marcin Chochowski, Mostofa Patwary, Mohammad Shoeybi, Bryan Catanzaro, Jan Kautz et al. · NVIDIA",
+ "aka": ["Minitron-8B", "Minitron-4B", "剪枝+蒸馏", "pruning and distillation", "结构化剪枝蒸馏", "Llama-3.1-Minitron", "Mistral-NeMo-Minitron"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2407.14679"},
+  {"label": "GitHub", "url": "https://github.com/NVlabs/Minitron"}
+ ],
+ "problem": "同一家族要出15B、8B、4B等多个尺寸时，通常每个都从头预训练，算力成本成倍增加。",
+ "idea": "只训一个大模型，再按重要性剪掉层、神经元、注意力头和嵌入通道，用原模型当老师做蒸馏，只花原训练数据不到3%就恢复能力。",
+ "impact": "给出大模型“先剪再蒸”的实用配方，NVIDIA随后用它从Llama 3.1、Mistral NeMo等模型压出一系列小模型。",
+ "method": "从头训练一个小模型要消耗与大模型同量级的数据。Minitron的做法是从已训好的Nemotron-4 15B出发，分两步。\n\n**剪枝**：只用1024条样本做前向传播，统计每个MLP神经元、注意力头、嵌入通道的激活大小作为重要性（不需要算梯度），层的重要性则用去掉它后困惑度的变化来衡量，然后按目标尺寸剪掉最不重要的部分。论文的一条经验是：在15B以下的规模，剪宽度（神经元、头、通道）比剪深度（整层）好。\n\n**蒸馏恢复**：剪完的模型以未剪的原模型为老师，只用输出logits上的KL散度训练（[[distillation]]），比用普通的下一词交叉熵效果更好。\n\n最终的Minitron 8B和4B各用约940亿token重训，官方称每个模型比从头训练少用最多40倍的token，MMLU比从头训练的同尺寸模型最多高16%。",
+ "limits": [
+  {"text": "需要一个已训好的大老师和它的原始数据分布；剪枝策略的经验结论是在15B以下得到的，更大规模未验证。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "distillation", "type": "uses", "note": "剪枝后的恢复训练只用对原模型logits的KL蒸馏损失。"},
+  {"to": "sparsegpt", "type": "rivals", "note": "SparseGPT做免重训的非结构化剪枝，Minitron做结构化剪枝再蒸馏重训，得到真正变小、能直接加速的稠密模型。"},
+  {"to": "minilm", "type": "extends", "note": "延续用大模型蒸馏出小模型的路线，但先用剪枝从老师本身继承结构和权重。"}
+ ],
+ "prereq": ["knowledge-distillation", "kl-divergence", "params-flops", "pretrain-finetune"],
+ "check": {"source": "https://arxiv.org/abs/2407.14679", "confirmed": "标题、作者、v1日期2024-07-19、NVIDIA；摘要中不到3%数据、2–4倍压缩、最多40倍少token、MMLU最多+16%；arXiv HTML v2：1024条校准样本的激活重要性、宽度剪枝优于深度剪枝、只用logits KL蒸馏、最终模型重训94B token。后续工作arXiv 2408.11796（2024-08-21，LLM Pruning and Distillation in Practice: The Minitron Approach）把Llama 3.1 8B压到4B、Mistral NeMo 12B压到8B（MN-Minitron-8B）。"}
+}

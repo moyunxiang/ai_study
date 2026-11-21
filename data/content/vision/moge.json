@@ -1,0 +1,29 @@
+{
+  "id": "moge",
+  "who": "Ruicheng Wang, Sicheng Xu, Cassie Dai, Jianfeng Xiang, Yu Deng, Xin Tong, Jiaolong Yang · 微软亚洲研究院 / 中国科大 / 清华大学 / 哈佛大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2410.19115"}
+  ],
+  "aka": ["MoGe-2", "单目几何估计", "monocular geometry estimation", "单图点云", "仿射不变点图"],
+  "problem": "单目深度模型只给深度图，不知道相机视场角就无法还原真实三维形状；直接监督三维点又会被尺度和平移的歧义搅乱。",
+  "idea": "让网络直接从一张图预测仿射不变的三维点图（只差一个全局尺度和平移），并配上最优对齐求解器和多尺度局部几何损失来监督。",
+  "impact": "一次前馈同时给出点云、深度和视场角，成为单图三维几何的常用基础模型，后续MoGe-2加入了度量尺度。",
+  "method": "常见的单目深度（如[[midas]]）只预测相对深度，要还原成点云还得知道相机焦距。MoGe改为直接预测点图：每个像素对应一个三维点坐标（借鉴[[dust3r]]的点图表示），而且是仿射不变的，即允许与真值差一个全局尺度和平移。这样训练时不会因为“这张照片到底拍得多远”这种无法从图像确定的量而得到互相矛盾的监督。\n\n监督分两部分：全局上用作者提出的鲁棒、最优且高效的对齐求解器（ROE），先求出让预测与真值最贴合的尺度和平移（对离群点做截断），再算误差；局部上用多尺度的局部几何损失约束细节形状。焦距和深度都能从点图反推出来。网络是[[dinov2]]预训练的ViT编码器加轻量卷积上采样解码器，训练数据来自21个公开数据集约900万帧。摘要称在多个未见数据集上，点图、深度和视场角估计都明显超过此前方法。",
+  "limits": [
+    {"text": "输出缺少绝对尺度，无法直接给出以米为单位的距离。", "solved_by": ["depth-pro", "depth-anything-3"]},
+    {"text": "逐帧独立预测，用在视频上会出现帧间闪烁和不一致。", "solved_by": ["video-depth-anything"]}
+  ],
+  "relations": [
+    {"to": "dust3r", "type": "extends", "note": "借用逐像素三维点图的表示，把它用在单张图上并去掉尺度歧义。"},
+    {"to": "midas", "type": "extends", "note": "继承MiDaS用尺度/平移不变损失混合多数据集训练的思路，从深度推广到三维点。"},
+    {"to": "dinov2", "type": "uses", "note": "编码器是DINOv2预训练的ViT。"},
+    {"to": "depth-anything-v2", "type": "rivals", "note": "Depth Anything V2只输出相对深度，MoGe直接给出几何与视场角。"}
+  ],
+  "prereq": ["camera-geometry", "3d-representation", "loss-function", "pretrain-finetune", "vision-tasks"],
+  "terms": [
+    {"t": "点图（point map）", "d": "与图像同尺寸的数组，每个像素存一个三维坐标(x, y, z)，等价于一张逐像素对齐的点云。"},
+    {"t": "仿射不变", "d": "预测结果只在整体缩放和平移意义下正确，评估或监督前要先把这两个量对齐。"}
+  ],
+  "learn": "先补相机针孔模型和MiDaS的尺度不变损失，再读MoGe第3节的ROE求解器；用官方模型把一张照片转成点云在Open3D里查看。",
+  "check": {"source": "https://arxiv.org/abs/2410.19115", "confirmed": "核对了arXiv记录：标题、七位作者、v1提交于2024-10-24、摘要中的仿射不变点图与ROE求解器；HTML正文确认DINOv2 ViT编码器、21个数据集约900万帧、作者单位。"}
+}

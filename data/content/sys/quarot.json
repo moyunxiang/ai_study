@@ -1,0 +1,28 @@
+{
+ "id": "quarot",
+ "who": "Saleh Ashkboos, Amirkeivan Mohtashami, Maximilian L. Croci, Bo Li, Pashmina Cameron, Martin Jaggi, Dan Alistarh, Torsten Hoefler, James Hensman · ETH Zurich, EPFL, 微软研究院, IST Austria",
+ "venue": "NeurIPS 2024",
+ "aka": ["旋转量化", "rotation-based quantization", "Hadamard旋转量化", "W4A4", "W4A4KV4", "全4比特推理"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2404.00456"},
+  {"label": "GitHub", "url": "https://github.com/spcl/QuaRot"}
+ ],
+ "problem": "大模型激活里有少数数值极大的离群通道，权重好量化，激活和KV缓存一压到4比特就严重掉点，只能把离群通道留成高精度。",
+ "idea": "先用正交旋转（Hadamard变换）把隐藏状态“搅匀”：离群值被摊到所有通道上，模型输出数学上不变，之后权重、激活、KV缓存都能直接压到4比特。",
+ "impact": "开启了“先旋转再量化”的路线（SpinQuant等跟进），让W4A4这类权重激活全低比特推理变得可行。",
+ "method": "[[llm-int8]]发现大模型激活中少数通道的数值比其余大得多，均匀量化时这些离群值会把刻度撑大、把其余数值都压成0。[[smoothquant]]的办法是把激活的尺度部分挪到权重上，但到4比特仍不够。\n\nQuaRot利用一个性质：对隐藏状态乘一个正交矩阵`Q`、再对下一层权重乘`Qᵀ`，网络输出不变（计算不变性）。选`Q`为随机化的Hadamard矩阵，它会把一个向量的能量均匀分散到所有坐标上，于是原来集中在几个通道的离群值被抹平，整个分布接近高斯、没有尖峰。大部分旋转可以提前融进权重，少数位置（如前馈层输入、KV缓存）在推理时在线做一次快速Hadamard变换，开销很小。旋转后权重用[[gptq]]量化，激活和KV缓存用简单的就近取整。\n\n论文称4比特量化的LLaMa2-70B在WikiText-2上困惑度最多上升0.47，保留99%的零样本性能。",
+ "limits": [
+  {"text": "随机旋转不是最优的，不同随机矩阵结果有波动；后续工作改为学习旋转矩阵。", "solved_by": []},
+  {"text": "真正的提速依赖硬件和内核对INT4矩阵乘的支持，在线Hadamard变换也需要专门内核。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "llm-int8", "type": "solves", "note": "LLM.int8()把离群通道单独留成16位；QuaRot通过旋转消除离群值，无需保留高精度通道。"},
+  {"to": "smoothquant", "type": "rivals", "note": "同为处理激活离群值：SmoothQuant在权重与激活间迁移尺度，QuaRot用正交旋转把离群值摊平，到4比特时后者更稳。"},
+  {"to": "gptq", "type": "uses", "note": "旋转后的权重仍用GPTQ做训练后量化。"}
+ ],
+ "prereq": ["quantization-concept", "floating-point", "vector-matrix", "kv-cache"],
+ "terms": [
+  {"t": "Hadamard矩阵", "d": "元素只有+1和−1（再乘一个归一化系数）的正交矩阵，可以像快速傅里叶变换一样在`O(n log n)`时间内乘到向量上。"}
+ ],
+ "check": {"source": "https://arxiv.org/abs/2404.00456", "confirmed": "标题、作者、v1日期2024-03-30；摘要中权重/激活/KV缓存全4比特、基于旋转的计算不变性、LLaMa2-70B困惑度最多+0.47且保留99%零样本性能、6/8比特无需校准数据。NeurIPS 2024来自OpenAlex。arXiv HTML v2第3节：使用随机化Hadamard矩阵、前馈层down-projection前与注意力头处做在线Hadamard、权重默认用GPTQ；作者机构ETH Zurich、EPFL、Microsoft Research、IST Austria。正文提速数字前后不一致（3.33倍与2.16倍），故未引用。"}
+}

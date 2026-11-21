@@ -1,0 +1,81 @@
+{
+ "id": "ecot",
+ "who": "Michał Zawalski, William Chen, Karl Pertsch, Oier Mees, Chelsea Finn, Sergey Levine · UC Berkeley、Stanford",
+ "venue": "CoRL 2024",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2407.08693"
+  }
+ ],
+ "aka": [
+  "Embodied CoT",
+  "具身CoT",
+  "具身推理链",
+  "Embodied Chain-of-Thought",
+  "ECoT-VLA"
+ ],
+ "problem": "VLA直接从图像和指令映射到动作，遇到训练分布外的物体和场景就失灵；直接套用思维链提示对小规模机器人数据训练出的VLA几乎没用。",
+ "idea": "训练VLA在输出动作前先写一串与画面绑定的推理：改写任务、计划、当前子任务、移动方向、夹爪像素位置、物体框，再给动作。",
+ "impact": "在不加机器人数据的前提下把OpenVLA的泛化任务成功率绝对提升28%，开启了“先推理再动作”的具身推理VLA路线。",
+ "background": "[[openvla]]等VLA把互联网预训练的视觉语言模型拿来当策略骨干，泛化比从头训练的策略好，但它们仍是“看一眼就出动作”。大语言模型里，[[cot]]（思维链）让模型先写中间步骤再回答，复杂问题上提升明显。问题是：机器人训练数据里的指令都很简单，直接提示VLA“一步步想”效果很差；而且纯语言层面的子任务拆解，不知道物体在画面哪里、夹爪现在在哪，对控制帮助有限。",
+ "method": "ECoT规定了一条固定顺序的推理链，每一步都输出成文本token：TASK（改写指令）→ PLAN（高层步骤）→ SUBTASK（当前要做的子任务）→ MOVE（如“向左移”这类低层移动描述）→ GRIPPER（夹爪在图像里的像素坐标）→ OBJECTS（物体名称和边界框），最后才输出动作token。\n\n难点在训练数据：Bridge V2里没有这些标注。作者搭了一条全自动标注流水线——用Prismatic VLM写场景描述，用Grounding DINO框物体，把本体感知数据转成模板化的移动原语，用OWLv2和SAM定位夹爪，再让Gemini把指令、场景和动作串成计划与子任务。整套流程在250多万条转移上跑了约7天。然后在这些数据上微调OpenVLA 7B，让它学会先推理后行动。",
+ "results": "在真实WidowX机械臂上每种方法评测314次，ECoT在困难泛化任务上把OpenVLA的绝对成功率提高28%；人类用自然语言纠正推理链后，最难任务的成功率又提高48%。代价是每步输出的token从7个涨到约350个，控制频率明显下降；论文试了“推理每5步才更新一次”和异步执行两种办法，分别提速24%和40%。",
+ "legacy": "ECoT让“具身推理”成为VLA的一个独立设计维度：后来的[[molmoact]]把推理换成深度token和可编辑的二维轨迹，[[gemini-robotics-1.5]]等闭源模型也把“先想再动”作为卖点。推理带来的延迟、推理内容与实际动作不一致，仍是这条路线争论的焦点。",
+ "limits": [
+  {
+   "text": "每步要先生成约350个推理token，控制频率大幅下降，难以用于高频控制。",
+   "solved_by": []
+  },
+  {
+   "text": "推理结构是人为固定的模板，与任务无关；推理链和动作只是相关，不保证动作照着推理执行。",
+   "solved_by": [
+    "molmoact"
+   ]
+  },
+  {
+   "text": "只在Bridge V2一种机器人数据上训练，跨机器人迁移和仿真环境（SIMPLER）里没有提升。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "openvla",
+   "type": "extends",
+   "note": "直接以OpenVLA 7B为底座，在其动作输出前插入推理token。"
+  },
+  {
+   "to": "cot",
+   "type": "extends",
+   "note": "把语言模型的思维链迁移到机器人控制，并要求每一步都落到画面和机器人状态上。"
+  },
+  {
+   "to": "rt-2",
+   "type": "extends",
+   "note": "沿用RT-2把动作写成token、由VLM自回归输出的VLA框架。"
+  },
+  {
+   "to": "bridgedata-v2",
+   "type": "uses",
+   "note": "训练数据和自动标注都基于Bridge V2。"
+  }
+ ],
+ "prereq": [
+  "vla-concept",
+  "reasoning-tokens",
+  "autoregressive",
+  "state-action-observation",
+  "pretrain-finetune"
+ ],
+ "terms": [
+  {
+   "t": "具身推理",
+   "d": "推理内容不只是语言上的计划，还包括物体在画面里的位置、机械手该往哪移等与身体和环境直接相关的信息。"
+  }
+ ],
+ "learn": "先读[[openvla]]的讲解了解VLA如何输出动作token → 读论文第3节的推理步骤和第4节的标注流水线 → 对比第5节有无推理的失败案例。",
+ "check": {
+  "source": "https://arxiv.org/abs/2407.08693",
+  "confirmed": "标题、作者、v1日期2024-07-11、摘要中28%；HTML正文中的推理步骤列表、标注流水线组件、314次评测、48%、7→350 token、24%/40%提速。"
+ }
+}

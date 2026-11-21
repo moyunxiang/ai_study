@@ -1,0 +1,92 @@
+{
+ "id": "shallow-safety-alignment",
+ "who": "Xiangyu Qi, Ashwinee Panda, Kaifeng Lyu, Xiao Ma, Subhrajit Roy, Ahmad Beirami, Prateek Mittal, Peter Henderson · Princeton / Google DeepMind",
+ "venue": "ICLR 2025（杰出论文奖）",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2406.05946"
+  },
+  {
+   "label": "ICLR 2025获奖公告",
+   "url": "https://blog.iclr.cc/2025/04/22/announcing-the-outstanding-paper-awards-at-iclr-2025/"
+  }
+ ],
+ "aka": [
+  "shallow safety alignment",
+  "浅层对齐",
+  "安全对齐只有几个token深",
+  "few tokens deep",
+  "深度安全对齐",
+  "deep safety alignment",
+  "预填充攻击",
+  "prefilling attack"
+ ],
+ "problem": "对抗后缀、预填充、改解码参数、少量样本微调都能轻易越狱已对齐模型，这些看似不同的攻击缺少统一解释。",
+ "idea": "指出安全对齐主要只改变了输出前几个词元的分布；用“先出错再刹车”的数据增强和约束开头词元的微调目标把对齐做深。",
+ "impact": "给多种越狱提供了统一的机制解释，“对齐有多深”成为分析安全训练脆弱性的常用视角。",
+ "background": "2023年后，对齐过的聊天模型被发现很容易被绕过：[[gcg]]用优化出的乱码后缀让模型以“Sure, here is”开头；有API允许预先填好回答开头（预填充）；改采样温度也能撬开；[[finetuning-breaks-safety]]更显示十来条样本的微调就能抹掉对齐。大家在逐个打补丁，但不清楚它们为何都有效。",
+ "method": "论文提出“浅层安全对齐”。第一个证据：给未对齐的基座模型（Llama-2-7B、Gemma-7B）强制以“I cannot fulfill”这类拒答前缀开头，它的有害率就接近对齐版本——说明只要管住开头，就能拿到大部分“安全分”，这是一条优化捷径。第二个证据：在一批有害回答上逐个位置计算对齐模型和基座模型的[[c:kl-divergence]]，差异集中在头几个词元，之后很快趋近于零。\n\n这解释了各种攻击：它们都在想办法让回答以非拒绝的方式开头，一旦越过前几个词元，模型后面的行为就和没对齐的基座模型差不多。\n\n两个对策：一是数据增强，构造“安全恢复样本”——回答先以几句有害内容开头，随后转为拒绝，让模型学会在更深的位置也能刹车（作者用256条这类样本加上Alpaca良性数据继续微调Llama-2-7B-Chat）；二是一个带约束的微调目标，限制对开头词元分布的改动，让对齐在后续微调中更难被冲掉。",
+ "results": "加深后的模型对预填充、对抗后缀等常见攻击明显更鲁棒，约束微调目标也让安全性在微调攻击下保持得更久。论文获ICLR 2025杰出论文奖。",
+ "legacy": "同一时期，[[circuit-breakers]]和[[refusal-direction]]从模型内部表示入手研究拒答，与本文从输出分布入手形成互补。后来[[attacker-moves-second]]提醒：这类训练式防御面对专门针对它设计的自适应攻击仍会被突破。",
+ "limits": [
+  {
+   "text": "数据增强只覆盖训练中出现过的有害开头模式，面对专门设计的自适应攻击未必守得住。",
+   "solved_by": []
+  },
+  {
+   "text": "约束微调目标要求防御者掌控微调过程，对被他人任意微调的开放权重模型无效。",
+   "solved_by": []
+  }
+ ],
+ "relations": [
+  {
+   "to": "finetuning-breaks-safety",
+   "type": "solves",
+   "note": "同一团队前作发现少量微调即可破坏对齐，本文解释其原因并给出更抗微调的训练目标。"
+  },
+  {
+   "to": "gcg",
+   "type": "solves",
+   "note": "解释对抗后缀为何有效（让回答以肯定开头），并通过加深对齐缓解这类攻击。"
+  },
+  {
+   "to": "llama-2",
+   "type": "uses",
+   "note": "以Llama-2-7B及其Chat版本为主要实验对象。"
+  },
+  {
+   "to": "circuit-breakers",
+   "type": "rivals",
+   "note": "同期工作，电路断路器在表示层面打断有害生成，本文在输出分布层面加深拒答。"
+  },
+  {
+   "to": "refusal-direction",
+   "type": "rivals",
+   "note": "后者在激活空间里找到单一拒答方向，本文从逐词元分布的角度解释拒答为何脆弱。"
+  }
+ ],
+ "prereq": [
+  "autoregressive",
+  "kl-divergence",
+  "instruction-tuning",
+  "rlhf-concept",
+  "decoding-sampling",
+  "pretrain-finetune"
+ ],
+ "terms": [
+  {
+   "t": "预填充攻击",
+   "d": "攻击者替模型写好回答的开头（如“好的，步骤如下”），模型接着往下写，往往就绕过了拒答。"
+  },
+  {
+   "t": "安全恢复样本",
+   "d": "回答先以有害内容开头、几句后转为拒绝的训练样本，用来教模型在回答中途也能刹车。"
+  }
+ ],
+ "learn": "先了解[[gcg]]和[[finetuning-breaks-safety]] → 读原文第2节（KL随位置的分布图）和第3节数据增强 → 动手：用开源Chat模型对比有无预填充前缀时的回答。",
+ "check": {
+  "source": "https://arxiv.org/abs/2406.05946",
+  "confirmed": "arXiv abs与HTML核对：标题、8位作者、2024-06-10 v1；Llama-2-7B/Gemma-7B、拒答前缀实验、逐词元KL、256条安全恢复样本；ICLR博客与Princeton报道核对杰出论文奖。"
+ }
+}

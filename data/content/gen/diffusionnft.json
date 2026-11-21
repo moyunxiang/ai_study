@@ -1,0 +1,28 @@
+{
+  "id": "diffusionnft",
+  "who": "Kaiwen Zheng, Huayu Chen, Haotian Ye, Haoxiang Wang, Qinsheng Zhang, Kai Jiang, Hang Su, Stefano Ermon, Jun Zhu, Ming-Yu Liu · NVIDIA / 清华大学 / 斯坦福大学",
+  "venue": "ICLR 2026",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2509.16117"}
+  ],
+  "aka": ["DiffusionNFT", "NFT", "Negative-aware FineTuning", "负样本感知微调", "前向过程强化学习", "Forward-process RL"],
+  "problem": "Flow-GRPO这类方法要把反向采样离散成SDE来算似然，因此被绑定在特定采样器上，正反过程不一致，还和CFG纠缠在一起。",
+  "idea": "不在反向采样上做策略梯度，而是在前向加噪过程上做流匹配回归：按奖励把样本分成“偏正”与“偏负”，用对比得到隐式的策略改进方向。",
+  "impact": "官方称比Flow-GRPO效率高至多25倍；SD3.5-Medium的GenEval在约1千步内从0.24升到0.98，而且不需要CFG。",
+  "method": "流模型做强化学习的难点是似然算不出来。[[flow-grpo]]、[[dancegrpo]]的办法是把采样改成SDE，逐步记录转移概率。DiffusionNFT换了个方向：直接在[[flow-matching]]的训练目标上做文章。\n\n每个提示词生成K张图并打分，组内标准化后映射为“最优概率”r∈[0,1]，每张图按r算正样本、按1−r算负样本。用旧模型v_old和待训模型v_θ构造两个隐式策略：正策略 `v⁺ = (1−β)v_old + βv_θ`，负策略 `v⁻ = (1+β)v_old − βv_θ`；损失为 `r·‖v⁺−v‖² + (1−r)·‖v⁻−v‖²`，v是普通流匹配目标。论文证明其最优解等于旧模型沿“正负分布差”方向前进一步。\n\n因为只需要干净的最终图像，训练与采样解耦，可用任意黑箱采样器；作者把[[cfg]]看作一种离线的强化引导，训练后模型不再需要CFG。实验在[[sd3]]系列的SD3.5-Medium上进行。",
+  "limits": [
+    {"text": "依赖旧模型的指数滑动平均等离策略设置，后续工作指出训练对这些超参数敏感、不够稳定。", "solved_by": []},
+    {"text": "和其他视觉RL一样受奖励模型偏差影响，多奖励之间存在此消彼长。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "flow-grpo", "type": "solves", "note": "去掉对SDE似然和特定采样器的依赖，消除正反过程不一致，同等效果下训练效率高3–25倍。"},
+    {"to": "flow-matching", "type": "uses", "note": "强化信号直接写进流匹配的回归损失。"},
+    {"to": "cfg", "type": "solves", "note": "把CFG视为离线强化引导，训练后无需CFG也能达到或超过带CFG的效果。"},
+    {"to": "sd3", "type": "uses", "note": "以SD3.5-Medium作为后训练的基础模型。"}
+  ],
+  "prereq": ["normalizing-flow", "diffusion-process", "policy-gradient-concept", "guidance", "rlhf-concept"],
+  "check": {
+    "source": "https://arxiv.org/abs/2509.16117",
+    "confirmed": "核对标题、作者与NVIDIA/清华/斯坦福署名、v1日期2025-09-19、ICLR 2026；正文中正负隐式策略与损失公式、无需似然与CFG；GenEval 0.24→0.98（约1k步）、Flow-GRPO需5k步达0.95、至多25倍效率、SD3.5-Medium。"
+  }
+}

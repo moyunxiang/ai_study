@@ -1,0 +1,25 @@
+{
+ "id": "spatial-mllm",
+ "aka": ["空间智能", "Spatial Intelligence", "空间推理", "Spatial Reasoning", "几何编码器", "双编码器VLM", "3D空间理解"],
+ "who": "Diankun Wu, Fangfu Liu, Yi-Hsin Hung, Yueqi Duan · 清华大学",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2505.23747"},
+  {"label": "项目主页", "url": "https://diankun-wu.github.io/Spatial-MLLM/"}
+ ],
+ "problem": "多模态模型用CLIP类编码器，擅长认出“是什么”，却不擅长判断距离、大小、方位；已有3D模型又要额外的深度或点云输入。",
+ "idea": "只用普通视频，加一个由三维几何基础模型VGGT初始化的空间编码器，与原来的语义编码器并联，把两路特征融合成视觉token。",
+ "impact": "开启了“给VLM接几何编码器”这一空间智能路线，后续一串工作沿着语义+几何双编码器的思路继续推进。",
+ "method": "[[clip]]式编码器为语义识别而训练，丢掉了大量三维结构信息，因此VLM在[[vsi-bench]]这类空间推理题上普遍很弱。Spatial-MLLM的关键想法是借用前馈三维重建模型[[vggt]]学到的结构先验。\n\n它采用双编码器：2D编码器沿用[[qwen2.5-vl]]的视觉编码器提取语义特征；3D空间编码器用VGGT的主干初始化，提取三维结构特征；一个连接器把两者融合成统一的视觉token，基础模型是Qwen2.5-VL-3B（总参数约4.9B）。推理时用“空间感知帧采样”：先均匀取128帧，用空间编码器估计每帧覆盖的体素，再贪心选出覆盖最多不同体素的16帧。训练用约12万条三维空间问答，经监督微调和GRPO。在VSI-Bench上平均48.4，高于Gemini-1.5 Pro的45.4和GPT-4o的34.0。",
+ "limits": [
+  {"text": "训练数据主要来自ScanNet室内场景，对室外和大尺度场景的泛化未验证。", "solved_by": []},
+  {"text": "多了一个几何编码器，计算与显存开销增加。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "vggt", "type": "uses", "note": "用VGGT的主干初始化3D空间编码器，引入几何先验。"},
+  {"to": "qwen2.5-vl", "type": "uses", "note": "以Qwen2.5-VL-3B为基础模型，并沿用其视觉编码器作语义分支。"},
+  {"to": "vsi-bench", "type": "solves", "note": "针对VSI-Bench暴露的空间推理短板，3B级模型超过GPT-4o和Gemini-1.5 Pro。"},
+  {"to": "spatialvlm", "type": "rivals", "note": "SpatialVLM靠合成空间问答数据，Spatial-MLLM改结构、引入几何编码器。"}
+ ],
+ "prereq": ["camera-geometry", "3d-representation", "embedding", "reward-design"],
+ "check": {"source": "https://arxiv.org/html/2505.23747v2", "confirmed": "标题、作者（清华大学）、2025-05-29 v1；正文中Qwen2.5-VL-3B、约4.9B参数、VGGT初始化、128帧选16帧、约12万问答、SFT+GRPO；VSI-Bench 48.4对Gemini-1.5 Pro 45.4、GPT-4o 34.0"}
+}

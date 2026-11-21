@@ -1,0 +1,27 @@
+{
+  "id": "coma",
+  "who": "Jakob Foerster, Gregory Farquhar, Triantafyllos Afouras, Nantas Nardelli, Shimon Whiteson · 牛津大学",
+  "venue": "AAAI 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1705.08926"}
+  ],
+  "aka": ["COMA", "反事实基线", "counterfactual baseline", "反事实多智能体策略梯度", "多智能体信用分配"],
+  "problem": "团队只拿到一个共同奖励时，每个智能体不知道这份奖励里有多少是自己的功劳，策略梯度的信号被队友的行为淹没。",
+  "idea": "用一个看全局的集中式评论家估计联合Q值，再算“如果只有我换成别的动作、队友不变，团队会怎样”的反事实基线，二者之差就是我的优势。",
+  "impact": "成为多智能体信用分配的标准思路之一，“集中式评论家+分散式演员”在之后的合作MARL里几乎成了默认结构。",
+  "method": "合作多智能体任务里所有人共享一个奖励r。如果每个智能体直接拿r做[[c:policy-gradient-concept]]，队友做得好或差都会被算到我头上，梯度方差很大，这就是多智能体的[[c:credit-assignment]]问题。\n\nCOMA的做法是[[c:actor-critic]]：每个智能体的演员（策略网络，128单元GRU）只看自己的观测历史，训练时有一个集中式评论家看全局状态。关键在优势函数：`A^a(s,u) = Q(s,u) − Σ_{u'} π^a(u'|τ^a) Q(s,(u^{−a},u'))`，即固定其他智能体的动作u^{−a}，把我自己的动作按我的策略取平均，得到“我换个动作时团队的期望价值”作为基线。实际动作比这个基线好多少，才算我的贡献。评论家一次前向就输出我所有动作的Q值，所以基线计算很便宜。\n\n在星际争霸微操（部分可观测、分散执行）上，COMA在3m、5m、5w、2d_3z四张图的平均胜率分别为87%、81%、82%、47%，都高于独立actor-critic和其他集中式评论家变体。",
+  "limits": [
+    {"text": "集中式评论家的输入随智能体数量增长，智能体一多就难以训练和扩展。", "solved_by": ["mean-field-marl", "mappo"]},
+    {"text": "on-policy的策略梯度样本效率偏低，后来在SMAC上常被值分解方法超过。", "solved_by": ["qmix"]}
+  ],
+  "relations": [
+    {"to": "pg-theorem", "type": "extends", "note": "在策略梯度定理上为每个智能体构造专属的反事实优势。"},
+    {"to": "dial", "type": "extends", "note": "同一团队把“集中训练、分散执行”从通信推广到策略梯度的评论家。"},
+    {"to": "independent-q", "type": "solves", "note": "独立学习者把队友当环境噪声；COMA用集中式评论家和反事实基线给出每个智能体自己的学习信号。"}  ],
+  "prereq": ["policy-gradient-concept", "actor-critic", "credit-assignment", "mdp"],
+  "terms": [
+    {"t": "反事实基线", "d": "假设只有我换动作、其他人照旧时团队的期望价值，用来衡量我这一步的真实贡献。"}
+  ],
+  "learn": "先学actor-critic和优势函数；读原文第4节的公式(4)与评论家结构，再对照表1各基线的胜率。",
+  "check": {"source": "https://arxiv.org/abs/1705.08926", "confirmed": "标题、5位作者、arXiv v1于2017-05-24、发表于AAAI 2018（OpenAlex记录）；正文中的反事实优势公式、128单元GRU演员、四张星际地图的COMA胜率87/81/82/47。"}
+}

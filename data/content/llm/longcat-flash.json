@@ -1,0 +1,24 @@
+{
+ "id": "longcat-flash",
+ "who": "Meituan LongCat Team · 美团",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2509.01322"}
+ ],
+ "aka": ["LongCat", "美团龙猫", "龙猫大模型", "LongCat-Flash-Chat", "零计算专家", "Zero-computation Experts", "ScMoE"],
+ "problem": "MoE模型每个token激活的专家数固定，简单token和困难token花一样多的算力；大规模专家并行时通信又经常卡住计算。",
+ "idea": "加入什么都不算、原样输出的“零计算专家”，让路由器给每个token动态分配算力；再用跨层捷径让通信和计算重叠。",
+ "impact": "美团开源的560B总参MoE模型、按token动态激活18.6B–31.3B，以“零计算专家”在MoE设计上提出了新做法。",
+ "method": "[[deepseekmoe]]和[[deepseek-v3]]确立了细粒度专家加共享专家的MoE配方，但每个token激活的专家数是固定的。LongCat-Flash在每层的512个普通FFN专家之外加了256个**零计算专家**：选中它就等于把输入原样传过去，不消耗计算。每个token从两类专家里共选12个，选中的零计算专家越多，实际算力越少，于是激活参数在18.6B到31.3B之间浮动，平均约27B。为了让分配稳定在目标比例，路由偏置用PID控制器按专家近期负载调节，思路接近[[aux-loss-free]]。\n\n第二个设计是**捷径连接MoE（ScMoE）**：从第一个注意力输出直接连一条跨层捷径到MoE块，使前面的稠密FFN能和MoE的分发/汇总通信并行执行，扩大了通信计算重叠的窗口。注意力用MLA，共28层。\n\n技术报告称模型在30天内训完20T以上token，推理在H800上超过每秒100 token、每百万输出token约0.7美元；后训练面向智能体，TerminalBench 39.51、τ²-Bench 67.7、SWE-bench Verified 60.4。",
+ "limits": [
+  {"text": "零计算专家让每个token计算量不一，批处理和推理框架中的负载预测更复杂，需要专门的工程适配。", "solved_by": []},
+  {"text": "技术报告的对比多为厂商自测，动态算力分配相对固定激活到底带来多少质量收益缺少独立消融。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "deepseekmoe", "type": "extends", "note": "在细粒度专家MoE的基础上加入零计算专家，让激活量随token变化。"},
+  {"to": "deepseek-v3", "type": "uses", "note": "沿用MLA注意力和MTP等DeepSeek-V3的架构组件。"},
+  {"to": "mixture-of-depths", "type": "extends", "note": "与MoD让token跳层的思路相通，LongCat把“可以不算”做成MoE里的一类专家。"},
+  {"to": "aux-loss-free", "type": "extends", "note": "用PID控制器调节路由偏置，延续无辅助损失的负载均衡思路。"}
+ ],
+ "prereq": ["mixture-of-experts", "params-flops", "distributed-training", "throughput-latency", "residual-connection"],
+ "check": {"source": "https://arxiv.org/abs/2509.01322", "confirmed": "标题、v1提交于2025-09-01；摘要中560B、零计算专家、18.6B–31.3B（平均27B）、ScMoE、20T token 30天、100 TPS、0.7美元；正文中512+256专家各选12、PID调节偏置、MLA、28层、TerminalBench 39.51、τ²-Bench 67.7、SWE-bench Verified 60.4。"}
+}

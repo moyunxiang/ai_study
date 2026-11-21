@@ -1,0 +1,25 @@
+{
+  "id": "conductor",
+  "who": "Stefan Nielsen, Edoardo Cetin, Peter Schwendeman, Qi Sun, Jinglue Xu, Yujin Tang · Sakana AI / 密歇根大学 / 东京科学大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2512.04388"}
+  ],
+  "aka": ["Conductor", "RL Conductor", "指挥家", "指挥模型", "learned orchestration", "学习式编排"],
+  "problem": "不同厂商的强模型各有所长，但怎样让它们分工协作——谁做哪一步、谁能看到谁的结果——一直靠人手工设计固定的流程。",
+  "idea": "训练一个7B的指挥模型，用自然语言为每个问题写出协作方案：分几步、每步交给哪个模型、给它什么指令、它能看到之前哪些结果；只按最终答对与否做RL。",
+  "impact": "7B指挥模型调度GPT-5、Gemini 2.5 Pro等工人模型，在多个推理基准上超过池中任何单个模型，被视为「协调策略可以纯靠RL学出来」的代表工作。",
+  "method": "指挥模型从Qwen2.5-7B初始化。面对一个问题，它先推理，然后输出三个并列的列表：每一步用哪个工人模型、给这个工人的自然语言子任务、这个工人能看到之前哪些步骤的回答（访问列表）。访问列表决定了智能体之间的通信拓扑，最多5步，训练后平均约3步。工人池有7个，包括GPT-5、Gemini 2.5 Pro、Claude Sonnet 4、Qwen3-32B等。\n\n训练用[[grpo]]、不加KL约束，只在960道数学、知识和编程题上跑200轮；奖励极简：输出无法解析得0，最终答案正确得1，否则0.5。训练时随机抽取不同的工人组合，所以指挥模型能适应任意给定的模型池。\n\n不限制工人时，指挥模型在LiveCodeBench上83.93（最好的单个工人GPT-5为82.90），GPQA-Diamond上87.5（Gemini 2.5 Pro为84.8），七项平均77.27对74.78。如果允许指挥模型把自己也列为工人，就能递归地对自己的方案再规划一轮，形成一种新的测试时扩展。",
+  "limits": [
+    {"text": "只学了最多5步、几个工人的短流程；智能体数量增多后的通信开销和协调问题没有处理。", "solved_by": ["orchestra-rl"]},
+    {"text": "性能高度依赖调用昂贵的闭源工人模型，每道题的总花费远高于单次调用。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "grpo", "type": "uses", "note": "用GRPO按最终答对与否训练指挥模型的协作方案。"},
+    {"to": "mixture-of-agents", "type": "rivals", "note": "MoA用固定的分层结构，Conductor为每题学出拓扑和指令；在受限设置下四项平均72.35对MoA的62.13。"},
+    {"to": "puppeteer", "type": "extends", "note": "Puppeteer每步只选下一个智能体，Conductor一次写出包含子任务指令和可见范围的完整方案。"},
+    {"to": "aflow", "type": "rivals", "note": "AFlow为整个任务离线搜索固定工作流，Conductor针对每个问题现场生成工作流。"}
+  ],
+  "prereq": ["agent-loop", "policy-gradient-concept", "in-context-learning", "reward-design"],
+  "learn": "先读[[mixture-of-agents]]和[[puppeteer]] → 读原文第3节输出格式和奖励设计、表1结果 → 动手：让一个小模型输出「工人、子任务、可见步骤」三列表，接两三个API模型执行，记录哪些方案答对。",
+  "check": {"source": "https://arxiv.org/abs/2512.04388", "confirmed": "标题、作者、v1提交于2025-12-04；正文（arxiv.org/html/2512.04388v5）核对Qwen2.5-7B初始化、GRPO无KL、960题200轮、三列表输出与访问列表、最多5步、奖励0/0.5/1、工人池、表1中LiveCodeBench 83.93对82.90、GPQA 87.5对84.8、平均77.27对74.78、受限设置72.35对MoA 62.13、递归调用，以及Sakana AI等单位。"}
+}

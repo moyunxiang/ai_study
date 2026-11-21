@@ -1,0 +1,24 @@
+{
+ "id": "diffucoder",
+ "who": "Shansan Gong, Ruixiang Zhang, Huangjie Zheng, Jiatao Gu, Navdeep Jaitly, Lingpeng Kong, Yizhe Zhang · Apple / 香港大学",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2506.20639"}
+ ],
+ "aka": ["coupled-GRPO", "Apple扩散代码模型", "代码dLLM", "AR-ness"],
+ "problem": "代码需要全局规划和反复修改，看起来适合扩散模型，但扩散模型写代码时到底怎么解码、怎么做强化学习，几乎没人系统研究过。",
+ "idea": "从Qwen2.5-Coder转换出7B代码扩散模型，用它分析解码有多“像自回归”，并提出用互补掩码降低方差的coupled-GRPO。",
+ "impact": "给出了扩散模型写代码的第一份系统剖析和一个开源7B模型，coupled-GRPO是此后dLLM强化学习里常被提到的一种降方差做法。",
+ "method": "作者沿用[[diffullama]]的思路，从[[qwen2.5-coder]]的7B权重出发，在代码语料上继续预训练、退火和指令微调，有效训练量约130B token，得到DiffuCoder。\n\n分析部分定义了**AR-ness**指标：每一步新揭开的词是否紧接在已生成内容之后、是否总是最靠左的掩码位置。结论有两条：扩散模型能自己决定生成多“因果”，不必硬套半自回归解码；而提高采样温度不仅让选词更多样，也让**生成顺序**更多样，这给强化学习的采样提供了更丰富的搜索空间。\n\n强化学习部分针对[[d1]]似然估计方差大的问题提出**coupled-GRPO**：对同一个回答构造一对互补的掩码，两次前向合起来恰好覆盖每个位置一次，用它估计逐词对数概率，方差更小且计算量可控。在EvalPlus上，coupled-GRPO让指令版从63.6提高到67.9（+4.4），并减少了解码时对从左到右顺序的依赖。",
+ "limits": [
+  {"text": "只在7B规模和代码任务上验证，扩散代码模型放大到百亿参数后能否保住质量和速度没有回答。", "solved_by": ["llada-2"]},
+  {"text": "继续预训练用到700B token时下游反而变差，作者在65B处提前停止，转换过程对数据量敏感的原因没有解释清楚。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "diffullama", "type": "extends", "note": "同一作者团队，把自回归转扩散的配方用到代码领域。"},
+  {"to": "d1", "type": "solves", "note": "d1的一步似然估计方差大；coupled-GRPO用互补掩码对降低方差。"},
+  {"to": "qwen2.5-coder", "type": "uses", "note": "以Qwen2.5-Coder的7B权重为转换起点。"},
+  {"to": "grpo", "type": "extends", "note": "在GRPO框架内改变采样与对数概率估计方式。"}
+ ],
+ "prereq": ["masked-modeling", "diffusion-process", "policy-gradient-concept", "expectation-variance", "decoding-sampling"],
+ "check": {"source": "https://arxiv.org/abs/2506.20639", "confirmed": "标题、7位作者、v1提交于2025-06-25；摘要中7B、130B代码token、coupled-GRPO、EvalPlus +4.4%；正文中Qwen2.5-Coder底座、65B处提前停止、AR-ness定义、EvalPlus 63.6→67.9。"}
+}

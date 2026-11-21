@@ -1,0 +1,26 @@
+{
+  "id": "puppeteer",
+  "who": "Yufan Dang, Chen Qian, Xueheng Luo, Jingru Fan, Zihao Xie, Ruijie Shi, Weize Chen, Cheng Yang et al. · ChatDev团队（OpenBMB）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2505.19591"},
+    {"label": "GitHub", "url": "https://github.com/OpenBMB/ChatDev/tree/puppeteer"}
+  ],
+  "aka": ["Puppeteer", "木偶师", "提线木偶式编排", "中心化编排器", "evolving orchestration", "演化式编排"],
+  "problem": "多智能体系统大多用固定的组织结构（流水线、辩论、固定拓扑），任务一复杂、智能体一多，协调开销就上去，效率反而下降。",
+  "idea": "设一个中心编排器（木偶师），每一步根据当前任务状态决定激活哪个智能体（木偶），并用强化学习按「答对得分减去计算成本」训练这个编排器。",
+  "impact": "把「用RL训练编排器、底下的智能体保持不动」这一做法讲清楚并开源，训练后出现更紧凑、带循环的协作结构，是swarm RL讨论中常被引用的早期工作。",
+  "method": "每一步，编排器看到问题和到目前为止的全局状态，从一池智能体中选出下一个要调用的；被选中的智能体（可以是不同的LLM，或同一LLM的不同角色与工具）完成自己那一步，结果写回状态。选到专门的终止智能体或预算耗尽时停止，最终答案多数投票得出。\n\n训练用[[reinforce]]：终止时的回报是任务得分减去折扣后的成本，成本随步数按 `C_t = F·log(1 + t/φ)` 增长，F是算力或token开销，φ是最大步数；成本权重λ取0.1。编排器从Llama-3.1系列的一个70B变体初始化，木偶分「大模型池」（GPT-4-Turbo、Claude-3-Sonnet、Llama-3.1-405B等）和「小模型池」（7B到14B的开源模型）。\n\n在GSM-Hard、MMLU-Pro、SRDD、CommonGen-Hard四个基准上，大模型池的平均分从训练前0.6893升到0.7731，最好的基线[[aflow]]为0.6899，同时token消耗下降。分析发现训练后协作图变得更密、通信集中到少数核心智能体，并出现更多循环——智能体会回头找之前的合作者互相核对。",
+  "limits": [
+    {"text": "只训练编排器，被调度的智能体本身完全冻结，不会为了配合彼此而改进。", "solved_by": ["magrpo"]},
+    {"text": "小模型池上训练带来的提升很小（0.6273到0.6324），方法对底层智能体能力依赖很大。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "chatdev", "type": "extends", "note": "同一团队的ChatDev用固定的瀑布式角色分工，Puppeteer改为按任务状态动态调度。"},
+    {"to": "reinforce", "type": "uses", "note": "用REINFORCE优化编排器在整条协作轨迹上的期望回报。"},
+    {"to": "gptswarm", "type": "rivals", "note": "GPTSwarm为每个任务学一张固定的无环图，Puppeteer逐步决策，允许出现循环。"},
+    {"to": "aflow", "type": "rivals", "note": "AFlow离线搜索固定工作流，是本文最强的基线；Puppeteer在大模型池上平均分0.7731对0.6899。"}
+  ],
+  "prereq": ["agent-loop", "policy-gradient-concept", "reward-design", "mdp"],
+  "learn": "先读[[chatdev]]或[[metagpt]]了解固定分工的多智能体系统 → 读原文第2节的编排器建模与奖励公式 → 动手：用一个小模型当编排器，在3个工具智能体之间按REINFORCE学调度顺序。",
+  "check": {"source": "https://arxiv.org/abs/2505.19591", "confirmed": "标题、作者、v1提交于2025-05-26；正文（arxiv.org/html/2505.19591v2）核对REINFORCE、成本公式与λ=0.1、编排器初始化、两个模型池、四个基准、0.6893→0.7731与AFlow 0.6899、紧凑化与循环化现象。"}
+}

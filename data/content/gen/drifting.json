@@ -1,0 +1,29 @@
+{
+  "id": "drifting",
+  "who": "Mingyang Deng, He Li, Tianhong Li, Yilun Du, Kaiming He · MIT / 哈佛大学",
+  "venue": "NeurIPS 2026（oral）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2602.04770"},
+    {"label": "项目页", "url": "https://lambertae.github.io/projects/drifting"}
+  ],
+  "aka": ["Drifting Models", "Drifting Model", "漂移模型", "漂移场", "drifting field", "训练时推前"],
+  "problem": "扩散和流模型把“噪声到数据”的推前映射拆成推理时的许多小步，所以生成慢；一步方法大多还要蒸馏或复杂的自洽约束。",
+  "idea": "把“分布逐步演化”挪到训练时：定义一个漂移场，样本被真实数据吸引、被其他生成样本排斥，两分布相等时漂移为零；网络每次更新就朝漂移后的位置回归。",
+  "impact": "一步生成在ImageNet 256上潜空间FID 1.54、像素空间1.61，超过此前所有一步方法，与多步模型相当。",
+  "method": "生成建模可以看成学一个映射f，使噪声经f推前后的分布等于数据分布。[[ddpm]]、[[flow-matching]]是在**推理时**一步步推；Drifting Models注意到训练本身就是迭代过程，每次更新f，生成分布q都在变，于是让分布在**训练时**演化，推理只需一次前向。\n\n驱动演化的是漂移场 `V(x) = V⁺(x) − V⁻(x)`：V⁺是按核函数加权的、指向真实样本的位移平均（吸引），V⁻是指向同批其他生成样本的位移平均（排斥）。q=p时二者抵消，V=0。损失为 `‖f(ε) − stopgrad(f(ε)+V(f(ε)))‖²`，即让输出朝漂移后的位置移动。V在预训练特征空间（默认是在潜变量上训练的[[mae]]式编码器）里计算，作者说没有特征编码器在ImageNet上训不起来。\n\n论文报告，L/2模型一步FID 1.54（潜空间）、L/16像素模型1.61；B/2仅1.33亿参数就与此前XL级一步模型相当。它与[[meanflow]]、[[gan]]同属“一步推前”，但既无判别器也无ODE。",
+  "limits": [
+    {"text": "理论上只证明了“两分布相等则漂移为零”，反过来“漂移为零则分布相等”的条件仍不清楚。", "solved_by": []},
+    {"text": "强依赖预训练特征编码器，核函数在样本相距很远时会变平；文生图与视频尚未验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "meanflow", "type": "rivals", "note": "同为从零训练的一步生成：MeanFlow学平均速度场，漂移模型完全去掉ODE，在训练时演化分布；论文中一步FID更低。"},
+    {"to": "mae", "type": "uses", "note": "漂移场在MAE式自监督编码器的特征空间中计算，特征质量决定效果。"},
+    {"to": "dit", "type": "uses", "note": "生成器采用带adaLN-zero条件的DiT结构。"},
+    {"to": "gan", "type": "rivals", "note": "同样是一次前向的推前生成器，但不训练判别器，而用吸引-排斥的核均值场直接给出移动方向。"}
+  ],
+  "prereq": ["generative-modeling", "kernel-trick", "self-supervised", "loss-function", "few-step-sampling"],
+  "check": {
+    "source": "https://arxiv.org/html/2602.04770v2",
+    "confirmed": "核对标题、作者与MIT/哈佛署名、v1日期2026-02-04；正文中漂移场吸引/排斥定义、stop-gradient损失、特征编码器（Latent-MAE）及无编码器训不起来；L/2 FID 1.54、L/16像素FID 1.61、B/2 133M参数；NeurIPS 2026 oral页面。"
+  }
+}

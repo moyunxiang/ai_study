@@ -1,0 +1,30 @@
+{
+  "id": "anysplat",
+  "who": "Lihan Jiang, Yucheng Mao, Linning Xu, Tao Lu, Kerui Ren, Yichen Jin, Xudong Xu, Mulin Yu et al. · 上海人工智能实验室 / 中国科大 / 香港中文大学等",
+  "venue": "ACM TOG 44(6), 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2505.23716"},
+    {"label": "项目页", "url": "https://city-super.github.io/anysplat/"}
+  ],
+  "aka": ["Any Splat", "无位姿前馈高斯", "pose-free feed-forward 3DGS", "前馈高斯泼溅", "feed-forward Gaussian Splatting"],
+  "problem": "3DGS需要先跑SfM得到相机位姿，再逐场景优化约十分钟；已有前馈高斯方法要么要已知位姿，要么在视图一多时算不动。",
+  "idea": "在VGGT的几何Transformer上加高斯参数头和相机头，一次前向从无标定照片同时输出三维高斯和每张图的相机参数，并用可微体素化合并冗余高斯。",
+  "impact": "把前馈高斯泼溅推到无需位姿、可处理稠密多视图的随手拍场景，几秒内出可实时渲染的场景。",
+  "method": "[[pixelsplat]]等前馈方法可以直接从照片预测[[3dgs]]，但需要已知相机位姿，且为每个像素生成一个高斯，视图一多就数量爆炸。\n\nAnySplat沿用[[vggt]]的做法把每张图切块成token，用VGGT权重初始化的交替注意力几何Transformer处理全部视图，之后接三个头：DPT深度头输出深度与置信度，高斯头输出每个高斯的不透明度、旋转、尺度和球谐颜色，相机头输出内外参。逐像素高斯会经过可微体素化：同一体素内的高斯按置信度做softmax加权合并，正文称可去掉30–70%的冗余高斯而渲染质量相当。\n\n训练不需要任何三维标注或SfM结果：用渲染图与输入图之间的颜色损失，加上从VGGT蒸馏的相机与几何伪标签，以及渲染深度与预测深度之间的几何一致性损失。正文表格中16视图的Mip-NeRF 360场景重建约0.77秒，而逐场景优化的3DGS约需10分钟。",
+  "limits": [
+    {"text": "几何与位姿质量受VGGT老师上限约束，老师失败的场景（弱纹理、大范围）学生也难以弥补。", "solved_by": []},
+    {"text": "只重建静态场景，处理不了运动物体。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "vggt", "type": "uses", "note": "几何Transformer与深度头用VGGT权重初始化，并从VGGT蒸馏相机与几何伪标签。"},
+    {"to": "pixelsplat", "type": "solves", "note": "解决pixelSplat等前馈高斯方法依赖已知相机位姿、难以扩展到多视图的问题。"},
+    {"to": "3dgs", "type": "solves", "note": "免去3DGS的SfM预处理与逐场景优化，前馈几秒得到高斯场景。"}
+  ],
+  "prereq": ["3d-representation", "camera-geometry", "volume-rendering", "knowledge-distillation", "self-attention"],
+  "terms": [
+    {"t": "前馈重建", "d": "训练好的网络一次前向直接输出三维结果，不需要针对每个场景再做迭代优化。"},
+    {"t": "体素化", "d": "把三维空间划成小立方格，落在同一格里的元素合并处理，用来控制数量。"}
+  ],
+  "learn": "先读3DGS与VGGT，再读AnySplat第3节的高斯头与可微体素化；用官方代码对一组手机照片直接生成高斯并实时浏览。",
+  "check": {"source": "https://arxiv.org/abs/2505.23716", "confirmed": "核对了arXiv记录：标题、作者列表、v1提交于2025-05-29；HTML正文确认TOG 44(6)发表信息、VGGT初始化与蒸馏、可微体素化去掉30–70%冗余高斯、无3D监督、16视图0.767秒对3DGS约10分钟。"}
+}

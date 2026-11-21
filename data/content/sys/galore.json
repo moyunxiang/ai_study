@@ -1,0 +1,24 @@
+{
+ "id": "galore",
+ "who": "Jiawei Zhao, Zhenyu Zhang, Beidi Chen, Zhangyang Wang, Anima Anandkumar, Yuandong Tian · 加州理工, Meta AI, 德州大学奥斯汀分校, 卡内基梅隆大学",
+ "venue": "ICML 2024",
+ "aka": ["梯度低秩投影", "Gradient Low-Rank Projection", "低秩梯度", "GaLore优化器", "低显存全参训练"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2403.03507"},
+  {"label": "GitHub", "url": "https://github.com/jiaweizzhao/GaLore"}
+ ],
+ "problem": "训练大模型时，Adam的两份优化器状态比权重本身还占显存；LoRA能省，但只在低秩子空间里更新，预训练和较难的微调会掉点。",
+ "idea": "权重仍做全秩更新，但把梯度投影到低秩子空间里再交给Adam：优化器状态只存低秩的那一小份，隔一段时间再换一个子空间。",
+ "impact": "首次演示在24GB的RTX 4090上不靠模型并行、检查点或卸载就能预训练7B模型，引出一串低秩/子空间优化器的后续工作。",
+ "method": "[[lora]]省显存的方式是冻结原权重、只训练两个小矩阵`B·A`，这样可训练参数和Adam状态都很小，但更新被限制在一个固定的低秩子空间里。\n\nGaLore换了个角度：大模型训练时梯度矩阵本身就接近低秩。于是对每个权重矩阵，每隔`T`步（论文取200）对当前梯度做一次奇异值分解，取前`r`个左奇异向量组成投影矩阵`P`；此后每一步把梯度`G`压成`Pᵀ·G`，Adam的一阶、二阶矩都只在这个小矩阵上维护，算出的更新再乘`P`投回原尺寸加到权重上。因为子空间定期更换，权重累积起来的变化不受低秩限制，等于做全参数训练。\n\n论文称优化器状态显存最多降65.5%；配合[[8bit-optimizers]]的8比特版本，优化器显存降82.5%、总训练显存比BF16基线降63.3%，预训练LLaMA 7B只需22.0GB。",
+ "limits": [
+  {"text": "每隔T步要对每个权重矩阵做一次SVD，大模型上这部分计算不便宜，子空间切换时训练也可能出现波动。", "solved_by": []},
+  {"text": "只省优化器状态，激活值显存不变，序列长、批次大时仍需检查点等手段。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "lora", "type": "rivals", "note": "同为省显存的训练方法：LoRA限制权重更新为低秩，GaLore限制梯度和优化器状态为低秩，权重仍全秩更新。"},
+  {"to": "8bit-optimizers", "type": "uses", "note": "8比特GaLore把低秩优化器状态再用bitsandbytes的8比特优化器存储，进一步省显存。"}
+ ],
+ "prereq": ["low-rank", "eigen-svd", "adaptive-optimizer", "peft-concept", "memory-bandwidth"],
+ "check": {"source": "https://arxiv.org/abs/2403.03507", "confirmed": "标题、作者、v1日期2024-03-06；摘要中优化器状态降65.5%、8比特版优化器降82.5%与总显存降63.3%、单张RTX 4090预训练7B；arXiv HTML：SVD求投影矩阵、T=200、Adam矩保存在低秩空间、22.0GB、作者机构。ICML 2024按会议录信息，未单独核对是否为oral。"}
+}

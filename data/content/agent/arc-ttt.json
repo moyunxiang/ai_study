@@ -1,0 +1,25 @@
+{
+  "id": "arc-ttt",
+  "who": "Ekin Akyürek, Mehul Damani, Adam Zweiger, Linlu Qiu, Han Guo, Jyothish Pari, Yoon Kim, Jacob Andreas · MIT",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2411.07279"}
+  ],
+  "aka": ["TTT", "test-time training", "测试时训练", "ARC测试时训练", "测试时微调", "test-time fine-tuning"],
+  "problem": "语言模型遇到结构上全新的任务（如ARC的图形谜题）时，只把几个例子放进提示里（上下文学习）往往学不会。",
+  "idea": "推理时先用这道题给出的几个示例临时微调模型：把示例做留一法和几何变换造出小训练集，为每道题训练一个LoRA适配器，再作答并投票。",
+  "impact": "8B模型在ARC公开验证集上达到53.0%，与程序合成方法集成后61.9%，与人类平均水平相当，让「测试时训练」成为2024年底ARC竞赛和推理研究的热词。",
+  "method": "测试时训练（TTT）指在推理阶段用从输入本身构造的损失临时更新参数。ARC每道题给出两三个「输入网格→输出网格」示例，要求推出规律并作答（见[[arc-agi]]）。\n\n做法分三步。**造数据**：每次把一个示例当作「测试」，其余当作示范（留一法），再对网格做旋转、翻转、换颜色等可逆变换，得到最多250条小样本。**训练**：为这一道题单独训练一个[[lora]]适配器（见[[c:peft-concept]]），训练2轮，损失同时算在示范和测试输出上，用完即丢。**推理**：对题目做多种变换分别解码，再把答案变换回来做分层投票。\n\n结果：在[[llama-3]]系8B模型上，ARC公开验证集达到53.0%（pass@2），与程序合成方法集成后61.9%，论文给出的人类平均为60.2%。在BIG-Bench Hard的10样本设置中，TTT把准确率从50.5%提到57.8%。",
+  "limits": [
+    {"text": "每道题都要单独做一次微调，推理成本和时延远高于直接作答。", "solved_by": []},
+    {"text": "依赖题目自带的示例来构造训练损失；没有示例、也没有标准答案的问题无从下手。", "solved_by": ["ttrl"]}
+  ],
+  "relations": [
+    {"to": "ttt", "type": "extends", "note": "同属「推理时更新参数」的测试时训练思路；TTT层把它做进序列模型的隐状态，本文直接在推理时微调整个模型的LoRA。"},
+    {"to": "arc-agi", "type": "uses", "note": "以ARC为主要评测，把每道题的示例变成测试时的训练数据。"},
+    {"to": "lora", "type": "uses", "note": "每道题训练一个独立的LoRA适配器，避免改动全部参数。"},
+    {"to": "llama-3", "type": "uses", "note": "主要结果基于Llama 3系列8B模型。"}
+  ],
+  "prereq": ["in-context-learning", "pretrain-finetune", "peft-concept", "data-augmentation"],
+  "learn": "先了解[[arc-agi]]的题目形式 → 读原文第3节TTT数据构造和第5节增强推理与投票 → 动手：选一个小模型和几道ARC题，用留一法加旋转造数据训练LoRA，比较训练前后的正确率。",
+  "check": {"source": "https://arxiv.org/abs/2411.07279", "confirmed": "标题、作者、v1提交于2024-11-11；摘要中53.0%、61.9%、BBH 50.5%→57.8%；正文（arxiv.org/html/2411.07279v2）核对留一法与几何变换、每题LoRA训练2轮最多250例、分层投票、人类平均60.2%、作者单位MIT。"}
+}

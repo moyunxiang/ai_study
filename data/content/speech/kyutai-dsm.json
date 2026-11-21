@@ -1,0 +1,71 @@
+{
+  "id": "kyutai-dsm",
+  "who": "Neil Zeghidour, Eugene Kharitonov, Manu Orsini, Václav Volhejn, Gabriel de Marmiesse, Edouard Grave, Patrick Pérez, Laurent Mazaré et al. · Kyutai",
+  "venue": "arXiv 2025",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2509.08753"
+    },
+    {
+      "label": "GitHub",
+      "url": "https://github.com/kyutai-labs/delayed-streams-modeling"
+    }
+  ],
+  "problem": "流式序列到序列（边听边识别、边读边说）要么等完整输入才输出，要么得额外学一个「何时读、何时写」的策略，复杂又难训。",
+  "idea": "预处理时把文本和音频对齐到同一时间网格，只让输出流比输入流晚固定几百毫秒到几秒，用一个仅解码器模型同时建模多条流。",
+  "impact": "同一框架既做流式识别（文本流延迟）又做流式合成（音频流延迟），以Kyutai STT/TTS开源，并用于语音对话应用Unmute。",
+  "method": "DSM来自做[[moshi]]和[[hibiki]]的Kyutai。核心想法：既然对齐难学，就**在训练前把对齐做好**。音频用Moshi的Mimi编解码器切成12.5Hz的帧，文本按词的时间戳放到同一帧网格上（空位填PAD），于是语音和文字变成两条时间对齐的并行流，用一个仅解码器Transformer逐帧同时生成。\n\n关键只有一个超参数：**延迟**。让文本流比音频流晚约2.5秒，模型每一帧都已「听到」足够的上下文才写字，这就是流式识别；反过来让音频流晚于文本流，就是流式TTS。延迟越大越准、越小越快，推理时延迟基本稳定在目标值附近。\n\n结果：2.6B的DSM-ASR在约250万小时用Whisper伪标注的英法语音上预训练，短音频平均错字率6.4%，低于其教师[[whisper]] medium.en的8.1%；长音频7.9%，略好于流式Whisper large-v3。DSM-TTS英文长文本错字率1.72%（ElevenLabs Multilingual v2为2.01%），单路首包延迟约150ms。",
+  "limits": [
+    {
+      "text": "训练前需要词级时间戳，依赖现有识别系统打伪标签，对齐误差会传给模型。",
+      "solved_by": []
+    },
+    {
+      "text": "效果最好的TTS所用说话人编码器未开源，只发布了预先计算的说话人嵌入，开放克隆受限。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "moshi",
+      "type": "extends",
+      "note": "沿用Moshi的多流建模和Mimi编解码器，把双工对话的多流结构推广到一般的流式序列转换。"
+    },
+    {
+      "to": "hibiki",
+      "type": "extends",
+      "note": "Hibiki用对齐加延迟做同声传译，DSM把这种做法统一到识别和合成。"
+    },
+    {
+      "to": "whisper",
+      "type": "uses",
+      "note": "预训练数据用带时间戳的Whisper伪标注，也是主要比较对象。"
+    },
+    {
+      "to": "rnn-t",
+      "type": "rivals",
+      "note": "RNN-T等流式识别要学对齐；DSM把对齐移到预处理，直接用语言模型解码。"
+    }
+  ],
+  "prereq": [
+    "sequence-alignment",
+    "vocoder-codec",
+    "tokenization"
+  ],
+  "aka": [
+    "DSM",
+    "Delayed Streams Modeling",
+    "Kyutai STT",
+    "Kyutai TTS",
+    "Unmute",
+    "流式语音识别",
+    "流式TTS",
+    "streaming ASR",
+    "streaming TTS"
+  ],
+  "check": {
+    "source": "https://arxiv.org/abs/2509.08753",
+    "confirmed": "标题、9位作者、v1 2025-09-10；HTML正文：Mimi 12.5Hz、ASR默认2.5秒延迟、2.6B、约250万小时伪标注、短音频6.4%对8.1%、长音频7.9%、TTS 1.72%对2.01%、约150ms、Unmute与说话人编码器未开源；GitHub仓库描述「Kyutai's Speech-To-Text and Text-To-Speech models」，创建于2025-06-16。"
+  }
+}

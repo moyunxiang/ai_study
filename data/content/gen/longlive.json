@@ -1,0 +1,30 @@
+{
+  "id": "longlive",
+  "who": "Shuai Yang, Wei Huang, Ruihang Chu, Yicheng Xiao, Yuyang Zhao, Xianbang Wang, Muyang Li, Enze Xie, et al.（含Song Han、Yukang Chen） · NVIDIA / MIT / 港科大（广州）/ 港大 / 清华",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2509.22622"},
+    {"label": "GitHub", "url": "https://github.com/NVlabs/LongLive"}
+  ],
+  "aka": ["LongLive", "实时长视频", "交互式长视频生成", "Interactive Video Generation", "KV重缓存", "KV-recache", "帧注意力汇聚", "Frame Sink", "流式视频生成", "Streaming Video Generation"],
+  "problem": "因果自回归视频模型可用KV缓存加速，但视频一长质量就下降；用户中途换提示词时，旧提示的语义残留在缓存里，画面要么不听话要么突变。",
+  "idea": "换提示时用新提示和已生成帧重算KV缓存；训练时就按长视频滚动生成（训长测长）；注意力只看短窗口，外加永久保留首段作为“汇聚帧”。",
+  "impact": "单张H100上20.7帧/秒、最长240秒，且支持边生成边改提示；32个GPU日即把1.3B短片模型调成分钟级生成器。",
+  "method": "LongLive建立在[[self-forcing]]的思路上：用[[causvid]]式的分布匹配蒸馏把双向视频扩散模型变成逐帧因果生成器，底模为[[wan]]2.1-T2V-1.3B。在此基础上解决长度与交互两个问题。\n\n- **KV重缓存**：用户切换提示词时，用已生成的帧和新提示重新计算KV缓存，清掉旧提示的语义，同时保留运动与画面连续性。\n- **流式长调优**：训练时也一段段（每段5秒）滚动生成长视频、复用缓存，由14B教师监督新段，早先的帧断开梯度，显存只随段长而非总长增长，从而对齐训练与推理。\n- **短窗口注意力+帧汇聚**：注意力只看最近一小段，再把第一段永久保留为所有层都能看到的汇聚token，这借鉴了LLM的[[streamingllm]]，以较低算力恢复长程一致性。\n\n论文报告，LongLive的速度是SkyReels-V2的41倍以上（20.7 vs 0.49帧/秒），短片VBench总分84.87，60秒交互生成得分84.38，高于Self-Forcing的82.46。",
+  "limits": [
+    {"text": "基于1.3B小模型，画质和复杂运动不及大规模双向模型。", "solved_by": []},
+    {"text": "短窗口加汇聚帧只保留开头与最近的信息，中间出现过的物体或场景回访时仍可能不一致。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "self-forcing", "type": "extends", "note": "沿用Self-Forcing的自展开训练与DMD蒸馏流程，把它推广到分钟级和多提示交互。"},
+    {"to": "causvid", "type": "solves", "note": "CausVid类因果模型在长视频上质量衰减，LongLive用训长测长和帧汇聚缓解。"},
+    {"to": "wan", "type": "uses", "note": "以Wan2.1-T2V-1.3B为学生、14B为教师。"},
+    {"to": "streamingllm", "type": "uses", "note": "把LLM的注意力汇聚思想移植为视频的帧级汇聚。"},
+    {"to": "skyreels-v2", "type": "solves", "note": "扩散强迫式长视频慢到不足1帧/秒，LongLive以因果KV缓存做到实时。"}
+  ],
+  "prereq": ["autoregressive", "kv-cache", "attention-concept", "few-step-sampling", "teacher-forcing"],
+  "check": {
+    "source": "https://arxiv.org/abs/2509.22622",
+    "confirmed": "核对标题、作者与机构、v1日期2025-09-26；正文中Wan2.1-T2V-1.3B底模与14B教师、KV重缓存、流式长调优、短窗口+帧汇聚、20.7 FPS、240秒、32 GPU日、VBench 84.87、60秒交互84.38 vs Self-Forcing 82.46、SkyReels-V2 0.49 FPS。"
+  }
+}

@@ -1,0 +1,30 @@
+{
+ "id": "superbpe",
+ "who": "Alisa Liu, Jonathan Hayase, Valentin Hofmann, Sewoong Oh, Noah A. Smith, Yejin Choi · 华盛顿大学、NVIDIA、Allen Institute for AI",
+ "venue": "COLM 2025",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2503.13423"}
+ ],
+ "aka": ["SuperBPE", "超词", "superword tokenizer", "跨空格分词", "多词token"],
+ "problem": "几乎所有语言模型分词器都假设token不跨越空格，只能是子词；但「by the way」这类多词表达本身就是一个意义单位，空格也不是可靠的意义边界。",
+ "idea": "在[[bpe]]训练中加一个预切分课程：前半段照常在空格内学子词，后半段放开空格限制，学会跨空格的「超词」。",
+ "impact": "在固定词表大小、模型大小和训练算力的对照实验里，只换分词算法就让下游平均提升4.0个百分点、推理计算减少27%，重新引起对分词器设计的重视。",
+ "method": "标准做法里，[[gpt-2]]以来的字节级BPE会先用空格和标点把文本预切成词，再在每个词内部合并字节对，因此token永远不会跨越空格。作者指出这个归纳偏置未必合理：多词表达（by the way）、德语复合词（一个词对应英语几个词）以及中文这种根本不用空格的语言，都说明空格不是意义的可靠边界。\n\nSuperBPE的改动很小：BPE训练分两个阶段，先在空格切分的前提下学到一定数量的子词合并，然后取消空格预切分，继续合并，使高频的多词组合变成一个token。词表固定为20万时，编码同一段文本平均最多可比BPE少用33%的token。作者从零预训练80亿参数的Transformer，只改变词表学习算法、其他全部固定，SuperBPE模型在30个下游任务上平均绝对提升4.0%（MMLU提升8.2%），推理所需计算减少27%。分析发现，它切出的token在预测难度上更均匀。",
+ "limits": [
+  {"text": "需要从头预训练才能换分词器，已有模型无法直接受益；超词也让词表更偏向训练语料的高频搭配。", "solved_by": []},
+  {"text": "仍是基于频率的静态切分，无法根据上下文动态决定切多大的块。", "solved_by": ["h-net"]}
+ ],
+ "relations": [
+  {"to": "bpe", "type": "extends", "note": "保留BPE的合并算法，只在训练后半段取消空格限制，从子词推广到超词。"},
+  {"to": "gpt-2", "type": "solves", "note": "GPT-2式字节级BPE的空格预切分让token无法跨词，SuperBPE去掉这一限制并显著提高编码效率。"},
+  {"to": "sentencepiece", "type": "rivals", "note": "SentencePiece把空格当普通字符处理，但实际使用中通常仍不跨词合并；SuperBPE明确地分阶段学习跨词token。"},
+  {"to": "blt", "type": "rivals", "note": "BLT放弃固定词表改为动态字节块，SuperBPE保留词表、只改合并规则。"}
+ ],
+ "prereq": ["tokenization", "language-model", "one-hot", "pretrain-finetune"],
+ "terms": [
+  {"t": "预切分（pretokenization）", "d": "在学子词之前先用空格、标点等规则把文本切成小段，之后的合并只在段内进行。"},
+  {"t": "超词（superword）", "d": "跨越空格、包含多个词的token，如把of the或by the way整体当作一个token。"}
+ ],
+ "learn": "先读[[bpe]]理解合并过程；再读本文第2节算法和第4节对照实验设计；动手用HuggingFace tokenizers训练一个普通BPE和一个去掉空格预切分的版本，比较同一段文本的token数。",
+ "check": {"source": "https://arxiv.org/abs/2503.13423", "confirmed": "标题、作者、2025-03-17提交；两阶段预切分课程、20万词表下最多少33% token、8B模型对照、30个任务平均+4.0%、MMLU +8.2%、推理计算少27%均来自摘要；COLM 2025与作者机构来自搜索结果。"}
+}

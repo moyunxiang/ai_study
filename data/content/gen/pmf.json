@@ -1,0 +1,27 @@
+{
+  "id": "pmf",
+  "who": "Yiyang Lu, Susie Lu, Qiao Sun, Hanhong Zhao, Zhicheng Jiang, Xianbang Wang, Tianhong Li, Zhengyang Geng, Kaiming He · MIT / CMU",
+  "venue": "ICML 2026",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2601.22158"}
+  ],
+  "aka": ["pMF", "pixel MeanFlow", "像素MeanFlow", "无潜空间一步生成", "latent-free one-step"],
+  "problem": "一步生成（如MeanFlow）和像素空间生成（如JiT）各自都有进展，但二者合起来——不用VAE、一步出图——仍是空白。",
+  "idea": "网络输出“去噪后的图像”x（落在低维图像流形上，好学），损失仍用MeanFlow在速度空间定义；两者用 `u = (z_t − x)/t` 互相换算。",
+  "impact": "ImageNet 256上一步、无潜空间FID 2.22，512上2.48；省掉VAE解码器后总算力低于潜空间一步模型。",
+  "method": "当时的扩散/流模型有两个默认配置：多步采样、在VAE的潜空间（[[c:latent-space]]）里生成。[[meanflow]]解决了前者，[[jit]]说明了不用潜空间、直接在像素上预测干净图像也能训好。pMF把两者合在一起。\n\n核心原则是**把网络输出空间和损失空间分开**。MeanFlow要学平均速度u，但u本质是“带噪图像”，维度高、难拟合；pMF让网络输出 `x = z_t − t·u`，它更像干净或略模糊的图像，作者假设它落在低维流形上、更容易被网络逼近。损失仍是MeanFlow的速度空间目标，再在低噪声段加感知损失。\n\n论文报告，pMF-H/16（9.56亿参数）在ImageNet 256×256一步FID 2.22，512×512为2.48，明显好于此前一步像素模型，接近需要200次函数评估的多步像素模型。作者指出，潜空间一步模型还要付SD-VAE解码器约310 GFLOPs的开销，已超过pMF整个生成器。",
+  "limits": [
+    {"text": "仍依赖感知损失（VGG/ConvNeXt特征）才能把FID压低，并非纯粹的“无外部网络”方案。", "solved_by": []},
+    {"text": "只在ImageNet类条件生成上验证，文生图与高分辨率开放场景尚无结果。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "meanflow", "type": "extends", "note": "沿用平均速度与MeanFlow恒等式作为训练目标，把它从潜空间搬到像素空间。"},
+    {"to": "jit", "type": "extends", "note": "继承JiT的x预测思想：让网络输出干净图像而非噪声或速度。"},
+    {"to": "ldm", "type": "rivals", "note": "挑战“必须在VAE潜空间生成”的默认做法，去掉编码器和解码器。"}
+  ],
+  "prereq": ["diffusion-process", "normalizing-flow", "latent-space", "few-step-sampling", "ode-sde"],
+  "check": {
+    "source": "https://arxiv.org/abs/2601.22158",
+    "confirmed": "核对标题、作者与MIT/CMU署名、v1日期2026-01-29、ICML 2026；正文中x与u的换算、输出空间与损失空间分离、感知损失；pMF-H/16 956M参数、256 FID 2.22、512 FID 2.48，SD-VAE解码器约310 GFLOPs。"
+  }
+}

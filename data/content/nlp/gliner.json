@@ -1,0 +1,30 @@
+{
+ "id": "gliner",
+ "who": "Urchade Zaratiana, Nadi Tomeh, Pierre Holat, Thierry Charnois · LIPN（CNRS）、FI Group",
+ "venue": "NAACL 2024",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2311.08526"},
+  {"label": "GitHub", "url": "https://github.com/urchade/GLiNER"}
+ ],
+ "aka": ["GLiNER", "GLiNER2", "开放域NER", "零样本NER", "zero-shot NER", "open NER", "通用实体识别"],
+ "problem": "传统NER模型只能识别训练时定好的几种实体类型；大语言模型能按指令抽任意类型，但又大又贵，还要逐词生成。",
+ "idea": "用一个小型双向编码器同时读入实体类型名和句子，把NER变成「文本片段与类型名在向量空间里匹配」，所有实体并行打分。",
+ "impact": "以几亿参数在零样本NER上超过ChatGPT和微调过的大模型，成为开放类型实体抽取的常用轻量方案，并衍生出关系抽取和多任务版本。",
+ "method": "经典NER（如[[lample-ner]]）把实体识别做成序列标注，每个词的标签集合在训练时固定，比如人名、地名、机构名。要新增「药物名」就得重新标注。GLiNER换了一个问法：给定一组任意的类型名和一段文本，判断每个文本片段是否属于某个类型。\n\n具体做法：把类型名（如Person、Drug）用学到的特殊标记[ENT]隔开，拼在句子前面，一起送进双向编码器（主要用[[deberta]]-v3）。类型名的输出向量经过前馈网络变成类型向量；句子中每个可能的片段（起止位置对）由首尾词表示拼成片段向量。片段与类型的匹配分数是两者点积再过sigmoid，超过阈值即判为该类型实体。因为是编码器一次前向就给所有片段打分，比大模型逐词生成快得多。训练数据是UniNER发布的Pile-NER，约4.5万段文本、24万个实体片段、1.3万种实体类型。\n\n三个规模分别约5000万、9000万和3亿参数。在7个领域外NER基准的零样本测试中，GLiNER-L平均F1为60.9，ChatGPT为47.5，130亿参数的UniNER为55.6。",
+ "limits": [
+  {"text": "只做实体识别，不直接抽取实体间的关系或填结构化模板，需要另外的模型。", "solved_by": []},
+  {"text": "片段枚举有最大长度限制，很长的实体名和需要跨句推理的实体难以处理。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "lample-ner", "type": "solves", "note": "经典神经NER的类型集合在训练时固定，GLiNER把类型名当作输入，识别训练中没见过的类型。"},
+  {"to": "deberta", "type": "uses", "note": "以DeBERTa-v3作为双向编码器骨干。"},
+  {"to": "chatgpt", "type": "rivals", "note": "同样能按类型名做开放类型NER；GLiNER用小编码器并行打分，零样本平均F1高于ChatGPT。"}
+ ],
+ "prereq": ["embedding", "dot-product", "zero-few-shot", "pretrain-finetune", "classification-metrics"],
+ "terms": [
+  {"t": "命名实体识别（NER）", "d": "从文本中找出人名、地名、机构名等专有名称，并标出各自的类型。"},
+  {"t": "片段（span）", "d": "句子里一段连续的词，由起点和终点位置确定，候选实体就是这些片段。"}
+ ],
+ "learn": "先读[[lample-ner]]了解序列标注式NER；再读本文第2节模型结构；动手用gliner库给一段医学或金融文本自定义几个实体类型，看零样本效果。",
+ "check": {"source": "https://arxiv.org/html/2311.08526v1", "confirmed": "标题、作者与机构、2023-11-14提交；[ENT]分隔、片段表示、点积加sigmoid匹配；DeBERTa-v3骨干、Pile-NER训练数据规模、50M/90M/0.3B三种规模、零样本平均F1 60.9对ChatGPT 47.5、UniNER-13B 55.6。NAACL 2024出处来自搜索结果中的引用信息，未在原页核对。"}
+}

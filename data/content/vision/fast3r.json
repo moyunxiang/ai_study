@@ -1,0 +1,28 @@
+{
+  "id": "fast3r",
+  "who": "Jianing Yang, Alexander Sax, Kevin J. Liang, Mikael Henaff, Hao Tang, Ang Cao, Joyce Chai, Franziska Meier, Matt Feiszli · Meta FAIR / 密歇根大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2501.13928"},
+    {"label": "项目页", "url": "https://fast3r-3d.github.io"}
+  ],
+  "aka": ["Fast 3D Reconstruction", "多视图DUSt3R", "千图前馈重建"],
+  "problem": "DUSt3R一次只处理两张图，多视图重建要对所有图像对做推理再全局对齐，图一多就又慢又爆显存。",
+  "idea": "把所有视图的图像token放进同一个融合Transformer做全对全注意力，一次前向直接输出每张图在统一坐标系下的点图。",
+  "impact": "和同期的VGGT一起把前馈重建从成对推理推向多视图并行，单次前向可处理上千张图。",
+  "method": "[[dust3r]]把两张图映射成同一坐标系下的点图，但N张图要处理约N²对再做全局对齐。Fast3R把它推广为多视图：每张图先用[[croco]]预训练的ViT编码器（以DUSt3R权重初始化）独立编码，然后所有视图的图像块token一起送进一个24层融合Transformer做全对全[[c:self-attention]]，最后两个DPT头为每张图输出局部点图、全局点图及置信度。\n\n关键技巧是图像序号位置编码：告诉融合Transformer哪些token来自同一张图。训练时只用20个视图，但序号是从1000个可选位置里随机抽的，所以推理时能处理远超训练时的视图数。\n\n论文表格（A100，512×384输入）显示：8张图Fast3R约0.12秒，DUSt3R约8.4秒；32张图0.51秒对129秒；1000张图约138秒、峰值显存63 GiB，而DUSt3R在48张以上就显存溢出。",
+  "limits": [
+    {"text": "全对全注意力的计算量随视图数平方增长，上千张图时仍需大显存。", "solved_by": []},
+    {"text": "只输出点图，相机内外参需从点图事后求解，位姿精度不如同时直接预测相机的模型。", "solved_by": ["vggt"]}
+  ],
+  "relations": [
+    {"to": "dust3r", "type": "solves", "note": "解决DUSt3R成对处理加全局对齐、视图一多就慢且爆显存的问题。"},
+    {"to": "croco", "type": "uses", "note": "图像编码器沿用CroCo预训练的ViT（经DUSt3R权重初始化）。"},
+    {"to": "mast3r", "type": "rivals", "note": "MASt3R在成对框架内改进匹配，Fast3R放弃成对，改为所有视图一次前向。"}
+  ],
+  "prereq": ["camera-geometry", "3d-representation", "self-attention", "positional-encoding", "image-patch"],
+  "terms": [
+    {"t": "全局对齐", "d": "把多组成对预测的点图通过优化拼到同一坐标系，DUSt3R多视图时的必需后处理，开销随图对数增长。"}
+  ],
+  "learn": "先读DUSt3R理解点图，再读Fast3R第3节融合Transformer与序号编码；对比同期的VGGT看两者设计差别。",
+  "check": {"source": "https://arxiv.org/abs/2501.13928", "confirmed": "核对了arXiv记录：标题、九位作者、v1提交于2025-01-23；HTML正文确认CroCo ViT编码器、24层融合Transformer、序号编码从1000中抽取、训练20视图、Table 2的耗时与显存数字。"}
+}

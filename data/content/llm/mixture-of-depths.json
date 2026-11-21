@@ -1,0 +1,23 @@
+{
+ "id": "mixture-of-depths",
+ "who": "David Raposo, Sam Ritter, Blake Richards, Timothy Lillicrap, Peter Conway Humphreys, Adam Santoro · Google DeepMind / McGill大学 / Mila",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2404.02258"}
+ ],
+ "aka": ["MoD", "Mixture of Depths", "深度路由", "token级动态计算", "条件计算"],
+ "problem": "Transformer给每个token分配完全相同的计算量，可“的”“了”这样的词和关键推理步骤显然不需要一样多的算力。",
+ "idea": "每一层用一个路由器只挑出top-k个token走注意力和MLP，其余token经残差直接跳过这一层；k事先固定，计算图是静态的。",
+ "impact": "把MoE“按token路由”的思想从宽度搬到深度，成为后来递归混合MoR、零计算专家等“自适应计算”设计的直接参照。",
+ "method": "[[switch-transformer]]这类MoE让每个token只用一部分专家，节省的是“宽度”上的计算；[[universal-transformer]]等自适应计算时间的方法想让不同token计算不同层数，但计算量不可预测、难以高效实现。\n\nMoD的做法：在某些层前放一个打分路由器，序列里得分最高的k个token进入这一层的自注意力和MLP，其余token什么都不做、沿残差连接直接传到下一层。因为k是预先定好的（论文发现每隔一层放一个、容量只取12.5%的设置最好），每层张量形状固定，可以用静态计算图高效实现；但哪些token被选中是由内容决定的，所以计算在token和深度两个维度上都是动态分配的。\n\n论文报告：在同等训练FLOPs和训练时间下，MoD模型能追平基线性能，而每次前向只需一部分FLOPs，采样时每步可以快50%以上。top-k选择在自回归采样时会用到未来token的信息，作者用一个辅助损失或一个小MLP预测器（预测某个token是否会进入top-k，准确率97%以上）来解决这个因果性问题，评测时性能损失很小。",
+ "limits": [
+  {"text": "top-k路由在训练时依赖整段序列，自回归推理时需要额外的预测器近似，增加了实现复杂度。", "solved_by": ["mixture-of-recursions"]},
+  {"text": "只在较小规模上验证，与MoE、KV缓存和大规模推理框架怎样结合没有给出成熟方案。", "solved_by": ["longcat-flash"]}
+ ],
+ "relations": [
+  {"to": "switch-transformer", "type": "extends", "note": "把MoE式的按token路由从选专家改成选“算不算这一层”。"},
+  {"to": "universal-transformer", "type": "solves", "note": "自适应计算时间计算量不可预测；MoD用固定容量的top-k路由让总计算量可预测。"},
+  {"to": "sparse-moe", "type": "uses", "note": "沿用稀疏门控的top-k路由机制。"}
+ ],
+ "prereq": ["transformer-block", "residual-connection", "mixture-of-experts", "params-flops", "self-attention"],
+ "check": {"source": "https://arxiv.org/abs/2404.02258", "confirmed": "标题、6位作者、v1提交于2024-04-02；摘要中top-k路由、k预先固定、静态计算图、同等FLOPs追平基线、采样时快50%以上。"}
+}

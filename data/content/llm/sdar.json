@@ -1,0 +1,26 @@
+{
+ "id": "sdar",
+ "who": "Shuang Cheng, Yihan Bian, Dawei Liu, Linfeng Zhang, Qian Yao, Zhongbo Tian, Wenhai Wang, Qipeng Guo et al. · 上海人工智能实验室等",
+ "venue": "Findings of ACL 2026",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2510.06303"},
+  {"label": "ACL Anthology", "url": "https://doi.org/10.18653/v1/2026.findings-acl.1110"}
+ ],
+ "aka": ["SDAR-1.7B", "SDAR-30B", "自回归转块扩散", "AR-to-block-diffusion"],
+ "problem": "从头训练扩散模型训练效率低、推理要整段反复去噪；而自回归模型虽然好训好部署，却只能一个词一个词写。",
+ "idea": "保留自回归的训练和块间顺序，只用少量数据把现成自回归模型改成块扩散：块与块之间自回归，块内并行解码。",
+ "impact": "提供了一套1.7B到30B的开源块扩散模型和转换配方，与LLaDA、Dream并列成为开源dLLM研究中常用的底座之一。",
+ "method": "[[block-diffusion]]已经说明块扩散能兼顾自回归的KV缓存和扩散的并行，但那是从头训练的小模型。SDAR的做法是：先按普通[[c:autoregressive]]方式训练（实践中直接拿[[qwen3]]这类现成模型），再用一段简短、数据高效的适配，把它变成块扩散模型。推理时块与块之间仍按顺序生成，保证全局连贯并能复用KV缓存；块内的若干个词并行去噪。\n\n正式版论文在算力和规模匹配的对照实验中发现，做块混合模型时，自回归比掩码扩散目标更适合作骨干；并观察到一个良性循环：模型越大，越能承受更大的块长和更激进的置信度阈值，加速越多而精度不掉。论文报告理论加速超过5倍、在H200上实测延迟加速2.3倍；摘要还称30B的MoE版本在GPQA和ChemBench等科学推理任务上超过对应的自回归模型。",
+ "limits": [
+  {"text": "块内并行仍依赖置信度阈值，块长和阈值需要按模型规模调，实测加速远低于理论加速。", "solved_by": ["llada-2"]},
+  {"text": "转换后的模型本质上仍是“块级自回归”，扩散模型整段规划、任意顺序修改的优势只在块内局部体现。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "block-diffusion", "type": "extends", "note": "把块扩散从小规模从头训练推进到用现成自回归模型低成本转换，规模到30B。"},
+  {"to": "diffullama", "type": "extends", "note": "同样走“自回归转扩散”，但转成块扩散而不是整段扩散，保住自回归式部署。"},
+  {"to": "qwen3", "type": "uses", "note": "以Qwen3规格的稠密和MoE自回归模型为转换起点，模型卡直接与同规格Qwen3对照。"},
+  {"to": "fast-dllm", "type": "solves", "note": "Fast-dLLM在整段扩散模型上做近似缓存；SDAR块间严格自回归，KV缓存是精确的。"}
+ ],
+ "prereq": ["autoregressive", "masked-modeling", "kv-cache", "mixture-of-experts", "throughput-latency"],
+ "check": {"source": "https://arxiv.org/abs/2510.06303", "confirmed": "标题、作者、v1提交于2025-10-07；v1摘要中短暂适配转换、块间自回归块内并行、30B MoE在GPQA和ChemBench上超过AR版本；ACL 2026 Findings版摘要中1.7B–30B、理论加速超5倍、H200实测2.3倍、AR更适合作骨干。"}
+}

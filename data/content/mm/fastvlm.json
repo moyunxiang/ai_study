@@ -1,0 +1,24 @@
+{
+ "id": "fastvlm",
+ "aka": ["FastViTHD", "苹果端侧VLM", "Apple FastVLM", "首token延迟TTFT", "端侧多模态"],
+ "who": "Pavan Kumar Anasosalu Vasu, Fartash Faghri, Chun-Liang Li, Cem Koc, Nate True, Albert Antony, Gokul Santhanam, James Gabriel et al. · Apple",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2412.13303"},
+  {"label": "GitHub", "url": "https://github.com/apple/ml-fastvlm"}
+ ],
+ "problem": "读文字密集的图需要高分辨率，但ViT编码器在高分辨率下token多、自注意力慢，首个回答词出来要等很久。",
+ "idea": "换成卷积与Transformer混合的编码器FastViTHD，天然输出更少的token，只靠调输入分辨率就能平衡速度和精度。",
+ "impact": "把“视觉编码器延迟”而不只是语言模型大小，变成端侧VLM设计时要先算的账，苹果开源了模型和手机端演示。",
+ "method": "VLM回答的首字延迟（TTFT）由两部分组成：视觉编码器把图编码完的时间，加上语言模型处理所有视觉token的预填充时间。分辨率越高，两部分都越慢。很多工作在编码后再剪token（如[[fastv]]），FastVLM则从编码器下手。\n\n它提出FastViTHD：共5级，前3级用卷积式的RepMixer块逐步下采样，后2级才用自注意力，论文称在336分辨率下输出token比ViT-L/14少16倍。作者系统比较了分辨率、编码延迟、token数和LLM大小的组合，发现只需放大输入分辨率即可找到最佳折中，无需额外剪枝。在[[llava-1.5]]设置下TTFT快3.2倍；与[[llava-onevision]]在1152×1152分辨率、同用0.5B语言模型相比，官方称SeedBench、MMMU、DocVQA更好，TTFT快85倍，编码器小3.4倍。",
+ "limits": [
+  {"text": "主要针对单图低延迟场景，长视频等大量帧输入时token总数仍然很大。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "llava-1.5", "type": "uses", "note": "沿用LLaVA-1.5的训练设置做公平比较。"},
+  {"to": "llava-onevision", "type": "rivals", "note": "与LLaVA-OneVision的高分辨率切块方案比较速度与精度。"},
+  {"to": "fastv", "type": "solves", "note": "FastV只减少语言模型侧的token，FastVLM直接缩短编码器本身的延迟并减少输出token。"},
+  {"to": "vit", "type": "rivals", "note": "用卷积-Transformer混合结构替代纯ViT编码器以应对高分辨率。"}
+ ],
+ "prereq": ["conv-layer", "self-attention", "throughput-latency", "image-patch"],
+ "check": {"source": "https://arxiv.org/abs/2412.13303", "confirmed": "标题、作者、2024-12-17 v1；摘要中FastViTHD、TTFT提升3.2倍、对LLaVA-OneVision 85倍TTFT与3.4倍更小编码器；HTML正文确认5级结构（前3级RepMixer、后2级自注意力）与比ViT-L/14少16倍token"}
+}
