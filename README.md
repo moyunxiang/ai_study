@@ -56,6 +56,7 @@ docs/assets/                     app.js（页面与演化树）、search.js（�
 docs/data/                       构建生成的数据，首屏只取 core.json，其余按需
 docs/n/, c/, s/, t/, *.html      构建生成的静态页面和 sitemap.xml
 docs/design.html, docs/design/   设计说明页和截图；页里 <b data-stat="…"> 的数字每次构建重写
+archive/design-v1/               2026-11视觉升级之前的设计存档（样式表、脚本、设计说明、截图），不参与构建和部署；同一时刻的整站另有 git 标签 design-v1
 ```
 
 ## 本地运行

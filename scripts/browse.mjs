@@ -7,6 +7,7 @@
 
    job.json 是一个列表，每项 {name, route, w, h, dark, full, shot, eval, click, wait, perf}：
      route  以 # 开头是交互版的路由；否则是相对站点根目录的路径（如 n/transformer.html）
+     theme  "light" 或 "auto"：截图前切到这个外观（默认外观是深色）
      eval   页面就绪后执行的表达式，结果打印出来（可以是 Promise）
      perf   true 时清空缓存后加载，报告请求数、传输字节数和就绪时间
      net    {down, up, rtt} 模拟限速网络（kbps、毫秒），例如 {"down":4000,"up":3000,"rtt":100}
@@ -73,6 +74,7 @@ async function run(job) {
   }
   await sleep(job.wait ?? 350);
   let result;
+  if (job.theme) { await ev(`document.documentElement.dataset.theme=${JSON.stringify(job.theme)}`); await sleep(450); }      // 外观：light / auto；不写就是默认的深色
   if (job.click) { await ev(`document.querySelector(${JSON.stringify(job.click)})?.click()`); await sleep(job.wait ?? 500); }
   if (job.eval) result = await ev(job.eval).catch(e => 'eval失败: ' + e.message);
   const overflow = await ev(`document.documentElement.scrollWidth - window.innerWidth`).catch(() => null);

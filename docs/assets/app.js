@@ -215,9 +215,13 @@ function initChrome() {
   document.addEventListener('click', e => { if (!e.target.closest('#more')) closeMenus(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
   const themeBtn = $('#theme');
-  const applyTheme = t => { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; themeBtn.textContent = '外观：' + ({light: '浅色', dark: '深色'}[t] || '跟随系统'); };
+  const applyTheme = t => {
+    if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+    themeBtn.textContent = '外观：' + ({light: '浅色', auto: '跟随系统'}[t] || '深色');
+    const m = $('meta[name=theme-color]'); if (m) m.content = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim() || '#0B1411';
+  };
   applyTheme(store.get('theme', ''));
-  themeBtn.onclick = e => { e.stopPropagation(); const t = {'': 'light', light: 'dark', dark: ''}[store.get('theme', '')]; store.set('theme', t); applyTheme(t); };
+  themeBtn.onclick = e => { e.stopPropagation(); const t = {light: 'auto', auto: ''}[store.get('theme', '')] ?? 'light'; store.set('theme', t); applyTheme(t); };      // 深色（默认）→ 浅色 → 跟随系统
 }
 
 /* ——— 首页 ——— */
@@ -226,25 +230,26 @@ function home() {
   const intro = (G.routes.intro || {}).steps || [], goals = (G.routes.goals || []).filter(g => storyBy[g.story]);
   const ps = doneStat(intro.map(s => s.node));
   app.innerHTML = `<div class="page">
-    <div class="mast home">
+    <div class="hero">
       <div class="eyebrow">1943 — ${G.eras[G.eras.length - 1].to} · AI研究发展地图</div>
       <h1>AI脉络</h1>
       <p class="lead">一张可以一层层点开的地图：每个阶段研究者在解决什么问题，重要的方法为什么出现、怎么工作，又引出了哪些后来的工作。写给会编程、学过大一数学、但不一定读过论文的人。</p>
+      <a class="htree" href="#/map" aria-label="打开领域地图"><div id="minibox"></div>
+        <div class="cap"><span>${G.tracks.length}条分支从1943年长到今天：每条线是一条分支，粗细是当年收录的工作量，亮点是主干节点，弯出去的地方是它从哪条分支分出来的。</span><b>打开领域地图 →</b></div></a>
     </div>
     <div class="entries">
-      <a class="entry" href="#/learn"><span class="no">1</span><h2>从头了解AI的发展</h2><p>${intro.length}站入门路线，从1958年的感知机读到今天的推理模型。每一站先看三句话：问题、方法、影响。</p><span class="go">开始读 →</span></a>
-      <a class="entry" href="#/map"><span class="no">2</span><h2>探索研究方向</h2><p>${G.groups.length}个大方向、${G.tracks.length}条分支画成一棵按时间生长的树，看它们在哪里分叉、在哪里汇合。</p><span class="go">打开领域地图 →</span></a>
-      <form class="entry" id="hs" role="search"><span class="no">3</span><h2>搜索一个概念或研究</h2><p>论文、模型、算法、缩写都可以。找到之后可以读讲解，也可以要一条从零读到它的路线。</p>
+      <a class="entry" href="#/learn"><span class="no">01</span><h2>从头了解AI的发展</h2><p>${intro.length}站入门路线，从1958年的感知机读到今天的推理模型。每一站先看三句话：问题、方法、影响。</p><span class="go">开始读 →</span></a>
+      <a class="entry" href="#/map"><span class="no">02</span><h2>探索研究方向</h2><p>${G.groups.length}个大方向、${G.tracks.length}条分支画成一棵按时间生长的树，看它们在哪里分叉、在哪里汇合。</p><span class="go">打开领域地图 →</span></a>
+      <form class="entry" id="hs" role="search"><span class="no">03</span><h2>搜索一个概念或研究</h2><p>论文、模型、算法、缩写都可以。找到之后可以读讲解，也可以要一条从零读到它的路线。</p>
         <span class="hsrow"><input class="inp" id="hq" type="search" placeholder="例如 Transformer、扩散模型、GRPO" aria-label="搜索" autocomplete="off"><button class="btn fill">搜索</button></span></form>
     </div>
     ${last ? `<p class="resume">上次读到：<a class="chip hue" ${hue(last.track)} href="#/n/${enc(last.id)}">${esc(last.title)}</a></p>` : ''}
     <section class="sec"><div class="sec-h"><h2>先看一眼：${intro.length}站走完八十年</h2><span class="muted">${ps.d ? `已读 ${ps.d} / ${ps.n} · ` : ''}<a class="u" href="#/learn">完整的入门路线 →</a></span></div>
       <ol class="strip">${intro.map(s => { const n = byId[s.node]; return n ? `<li class="hue" ${hue(n.track)}><a href="#/n/${enc(n.id)}"><span class="y">${n.y}</span><b>${esc(n.title)}</b><span class="tp">${esc(s.topic || '')}</span></a></li>` : ''; }).join('')}</ol></section>
     ${goals.length ? `<section class="sec"><div class="sec-h"><h2>带着一个问题读</h2><span class="muted">每个问题对应一篇专题，按时间把相关的工作串起来</span></div>
-      <div class="qgrid">${goals.slice(0, 6).map(g => `<a href="#/story/${g.story}"><b>${esc(g.q)}</b><span>${storyBy[g.story].nodes.length}站 · 从${byId[storyBy[g.story].nodes[0]].y}年到${byId[storyBy[g.story].nodes.at(-1)].y}年</span></a>`).join('')}</div>
+      <div class="qgrid">${goals.slice(0, 6).map(g => `<a href="#/story/${g.story}"><b>${esc(g.q)}</b><span>${storyBy[g.story].nodes.length}站 · ${byId[storyBy[g.story].nodes[0]].y} → ${byId[storyBy[g.story].nodes.at(-1)].y}</span></a>`).join('')}</div>
       ${goals.length > 6 ? `<div class="toolbar"><a class="btn sm" href="#/learn">全部${goals.length}个专题 →</a></div>` : ''}</section>` : ''}
-    <section class="sec"><div class="sec-h"><h2>整张地图</h2><span class="muted">每条线是一条分支，起伏是每年的工作量，圆点是主干节点</span></div>
-      <a class="treecard" href="#/map" id="minibox" aria-label="打开领域地图"></a>
+    <section class="sec"><div class="sec-h"><h2>六个大方向</h2><span class="muted"><a class="u" href="#/map?view=list">按分支和主题线列出来 →</a></span></div>
       <div class="glist">${GROUP_ORDER.map(k => G.groups.find(g => g.key === k)).filter(Boolean).map(g => `<div><span class="role">${esc(g.role)}</span><b>${esc(g.name)}</b>${g.tracks.map(t => `<a class="chip hue" ${hue(t)} href="#/track/${t}">${esc(trackBy[t].short)}</a>`).join('')}</div>`).join('')}</div></section>
     <section class="sec"><div class="sec-h"><h2>九个时代</h2><span class="muted"><a class="u" href="#/timeline">打开时间线 →</a></span></div>
       <ol class="eras">${G.eras.map(e => `<li><a href="#/era/${e.id}"><span class="y">${e.from}–${String(e.to).slice(2)}</span><b>${esc(e.name)}</b><span class="tg">${esc(e.tagline)}</span></a></li>`).join('')}</ol></section>
@@ -252,7 +257,7 @@ function home() {
     ${foot()}</div>`;
   document.title = 'AI脉络 · 一张可探索的AI研究发展地图';
   const mb = $('#minibox');
-  mb.innerHTML = miniTree(mb.clientWidth - 34, NARROW() ? 13 : 17);
+  mb.innerHTML = miniTree(mb.clientWidth - 30, NARROW() ? 14 : 19, true);
   $('#hs').onsubmit = ev => { ev.preventDefault(); const v = $('#hq').value.trim(); if (v) location.hash = `#/search?q=${enc(v)}`; else $('#hq').focus(); };
   suggest($('#hq'));
 }
@@ -399,12 +404,24 @@ async function viewFrom(a, q, b, ok) {
 
 /* ——— 时间线 ——— */
 function viewTimeline() {
-  app.innerHTML = `<div class="page"><div class="mast"><div class="eyebrow">时间线</div><h1>九个时代</h1><p class="lead">每个时代有自己的算力、数据和资金条件，也有自己的核心问题。上一个时代留下的问题，往往是下一个时代的起点。点一个时代，看当时在攻克什么，以及那几年的工作。</p></div>
-    <ul class="river">${G.eras.map(e => {
+  // 中间那根茎：宽度是当年收录的工作数量（开平方后），九个时代首尾相接成一根
+  const tot = {}, y1 = G.eras[G.eras.length - 1].to;
+  G.nodes.forEach(n => { const y = Math.min(y1, Math.max(G.eras[0].from, n.y)); tot[y] = (tot[y] || 0) + 1; });
+  const peak = Math.max(...Object.values(tot)), hw = y => 1 + 18 * Math.sqrt((tot[y] || 0) / peak);
+  const ribbon = (e, i) => {
+    const ys = []; for (let y = e.from; y <= e.to; y++) ys.push(y);
+    const pts = [[0, i ? (hw(e.from - 1) + hw(e.from)) / 2 : hw(e.from)], ...ys.map((y, j) => [(j + .5) / ys.length * 100, hw(y)]), [100, i < G.eras.length - 1 ? (hw(e.to) + hw(e.to + 1)) / 2 : hw(e.to)]];
+    const side = (ps, sg) => ps.map((p, j) => { if (!j) return ''; const q = ps[j - 1], m = (q[0] + p[0]) / 2; return `C${(20 + sg * q[1]).toFixed(1)} ${m.toFixed(1)} ${(20 + sg * p[1]).toFixed(1)} ${m.toFixed(1)} ${(20 + sg * p[1]).toFixed(1)} ${p[0].toFixed(1)}`; }).join('');
+    return `<svg viewBox="0 0 40 100" preserveAspectRatio="none" aria-hidden="true"><path d="M${(20 + pts[0][1]).toFixed(1)} 0${side(pts, 1)}L${(20 - pts.at(-1)[1]).toFixed(1)} 100${side(pts.slice().reverse(), -1)}Z"/></svg>`;
+  };
+  app.innerHTML = `<div class="page"><div class="mast" style="border-bottom:0"><div class="eyebrow">时间线</div><h1>九个时代</h1><p class="lead">每个时代有自己的算力、数据和资金条件，也有自己的核心问题。上一个时代留下的问题，往往是下一个时代的起点。点一个时代，看当时在攻克什么，以及那几年的工作。</p>
+      <p class="fine">中间那根茎的粗细，是当年本站收录的工作数量；它反映的是收录情况，不是领域的真实产出。</p></div>
+    <ol class="chrono">${G.eras.map((e, i) => {
       const ns = G.nodes.filter(n => eraOf(n) === e), t1 = ns.filter(n => n.tier === 1);
       return `<li><a href="#/era/${e.id}"><div class="yr">${e.from}–${String(e.to).slice(2)}<small>${ns.length}个节点 · ${t1.length}个主干</small></div>
+        <div class="stem">${ribbon(e, i)}<i></i></div>
         <div class="body"><h3>${esc(e.name)}</h3><p>${esc(e.tagline)}</p><div class="tags">${t1.slice(0, 7).map(n => `<span class="tag">${esc(n.title)}</span>`).join('')}${t1.length > 7 ? `<span class="tag">…</span>` : ''}</div></div></a></li>`;
-    }).join('')}</ul>
+    }).join('')}</ol>
     <div class="toolbar"><a class="btn sm" href="#/stats">每年有多少工作（统计图）</a></div>${foot()}</div>`;
   document.title = '时间线 · AI脉络';
 }
@@ -947,10 +964,8 @@ function viewStats() {
   const y0 = 1943, y1 = Math.max(...G.nodes.map(n => n.y)), cols = [];
   for (let y = y0; y <= y1; y++) cols.push(G.tracks.map(t => (yearCount[t.key][y] || 0)));
   const max = Math.max(...cols.map(c => c.reduce((a, b) => a + b, 0))), W = 1100, H = 300, bw = W / cols.length;
-  const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark';
-  const col = t => `hsl(${t.hue} ${t.sat != null ? t.sat : dark ? 55 : 48}% ${dark ? 62 : 46}%)`;
   let bars = '';
-  cols.forEach((c, i) => { let y = H; c.forEach((v, k) => { if (!v) return; const h = v / max * (H - 10); y -= h; bars += `<a href="#/year/${y0 + i}"><rect x="${(i * bw + 0.5).toFixed(1)}" y="${y.toFixed(1)}" width="${(bw - 1).toFixed(1)}" height="${h.toFixed(1)}" fill="${col(G.tracks[k])}"><title>${y0 + i}年 · ${G.tracks[k].name} ${v}</title></rect></a>`; }); });
+  cols.forEach((c, i) => { let y = H; c.forEach((v, k) => { if (!v) return; const h = v / max * (H - 10); y -= h; bars += `<a href="#/year/${y0 + i}"><rect x="${(i * bw + 0.5).toFixed(1)}" y="${y.toFixed(1)}" width="${(bw - 1).toFixed(1)}" height="${h.toFixed(1)}" class="sbar hue" ${hs(G.tracks[k].key)}><title>${y0 + i}年 · ${G.tracks[k].name} ${v}</title></rect></a>`; }); });
   const ticks = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020].map(y => `<text x="${((y - y0 + 0.5) * bw).toFixed(1)}" y="${H + 16}" text-anchor="middle" font-size="11" fill="currentColor" opacity=".6">${y}</text>`).join('');
   const top = (adj, n) => G.nodes.map(x => [x, adj[x.id].length]).sort((a, b) => b[1] - a[1]).slice(0, n);
   const et = {}; G.edges.forEach(e => et[e.type] = (et[e.type] || 0) + 1);
@@ -982,7 +997,7 @@ async function viewOrgs(_, q, __, ok) {
 }
 /* ——— 演化树：大方向 → 分支 → 主题线 → 节点 ———
    布局在抽象坐标里算：t 是时间轴上的位置，c 是横断方向的位置。横向（时间从左到右）和竖向（根在下、往上长）只在最后映射成像素时不同。 */
-const TREE0 = 1943, MAXW = 190;
+const TREE0 = 1943, MAXW = 196;
 const sideW = () => NARROW() ? 100 : 168;      // 行名列的宽度：手机上收窄，把地方留给树
 let treeState = Object.assign({tier: 2, dir: '', zoom: 0, open: [], joins: true}, store.get('tree', {}));
 const deg = id => inn[id].length + out[id].length;
@@ -997,7 +1012,7 @@ function textW(s, bold) {
   const key = (bold ? 'b' : 'n') + s;
   if (_tw[key]) return _tw[key];
   if (!_mc) { _mc = document.createElement('canvas').getContext('2d'); _ff = getComputedStyle(document.body).fontFamily; }
-  _mc.font = `${bold ? '700 12.5px' : '12px'} ${_ff}`;
+  _mc.font = `${bold ? '600 12.5px' : '12px'} ${_ff}`;
   return _tw[key] = Math.ceil(_mc.measureText(s).width);
 }
 function lineage(id, depth) {
@@ -1060,7 +1075,7 @@ function treeLayout(o) {
   for (let y = y0; y <= maxY; y++) total += base(y);
   const z = o.zoom || (Hz ? Math.max(mini ? 0 : .2, Math.min(1, (o.fit || 1200) / total)) : 1);
   const off = {}, ext = {};
-  let T = mini ? 6 : 28;
+  let T = mini ? 16 : 44;
   for (let y = y0; y <= maxY; y++) { off[y] = T; ext[y] = base(y) * z; T += ext[y]; }
   T += mini ? 12 : 34;
   const tD = d => { const yy = +d.slice(0, 4), y = Math.min(maxY, Math.max(y0, yy)), m = +(d.slice(5, 7) || 0); return off[y] + ext[y] * (yy < y0 ? .5 : ((m ? m - 1 : 5.5) + .5) / 12); };
@@ -1069,7 +1084,7 @@ function treeLayout(o) {
   const inv = t => { for (let y = y0; y <= maxY; y++) if (t < off[y] + ext[y]) return y + Math.max(0, (t - off[y]) / ext[y]); return maxY + .99; };
 
   // 行内装箱：标签沿时间方向占一段区间，放不下就换到下一子行，保证不重叠
-  const U = Hz ? 25 : 126, pos = {}, blocks = [];
+  const U = Hz ? 25 : 136, pos = {}, blocks = [];
   let C = mini ? 4 : 8, blk = null;
   for (const l of lanes) {
     if (blk && l.type !== 'thread') { blk.c1 = C; blk = null; }
@@ -1078,7 +1093,7 @@ function treeLayout(o) {
     if (mini) { l.size = o.lane || 15; l.rail = l.size / 2; C += l.size; continue; }
     if (l.type === 'head') { l.size = Hz ? 24 : 30; l.rail = l.size / 2; blocks.push(blk = {k: l.k, c0: C}); C += l.size; continue; }
     const pad = Hz ? (l.type === 'track' ? 6 : 4) : 6, rows = [];
-    const items = l.nodes.map(n => ({n, t: tOf(n), len: Hz ? Math.min(MAXW, 24 + textW(n.title, n.tier === 1)) : (n.tier === 1 ? 26 : 22)}))
+    const items = l.nodes.map(n => ({n, t: tOf(n), len: Hz ? Math.min(MAXW, 30 + textW(n.title, n.tier === 1)) : (n.tier === 1 ? 26 : 22)}))
       .sort((a, b) => Hz ? a.n.tier - b.n.tier || a.t - b.t : a.t - b.t);
     if (!Hz) items.forEach((it, i) => { if (i) it.t = Math.max(it.t, items[i - 1].t + (items[i - 1].len + it.len) / 2 + 2); });      // 竖向：一列里按时间往上叠，不分子列
     for (const it of items) {
@@ -1165,6 +1180,8 @@ function treeDraw(L, o = {}) {
   const rect = (t0, t1, c0, c1, cls, extra = '') => `<rect class="${cls}" x="${Math.min(X(t0, c0), X(t1, c1)).toFixed(1)}" y="${Math.min(Y(t0, c0), Y(t1, c1)).toFixed(1)}" width="${Math.abs(X(t1, c1) - X(t0, c0)).toFixed(1)}" height="${Math.abs(Y(t1, c1) - Y(t0, c0)).toFixed(1)}" ${extra}/>`;
   const hv = k => `style="--h:${trackBy[k].hue}"`;
   const curve = (t1, c1, t2, c2) => { const d = Math.max(16, Math.abs(t2 - t1) / 2); return `M${P(t1, c1)}C${P(t1 + d, c1)} ${P(t2 - d, c2)} ${P(t2, c2)}`; };
+  // 穿过一串点的平滑曲线（Catmull-Rom），用来画随年份变粗变细的枝条
+  const sm = ps => ps.map((p, i) => { if (!i) return ''; const a = ps[i - 2] || ps[i - 1], b = ps[i - 1], d = ps[i + 1] || p; return `C${P(b[0] + (p[0] - a[0]) / 6, b[1] + (p[1] - a[1]) / 6)} ${P(p[0] - (d[0] - b[0]) / 6, p[1] - (d[1] - b[1]) / 6)} ${P(p[0], p[1])}`; }).join('');
   let s = '';
   if (L.stripes) L.spans.forEach((sp, i) => { s += rect(sp.a, sp.b, 0, L.C, 'tera' + (i % 2 ? ' alt' : '')); });
   else L.spans.forEach(sp => { s += `<path class="tstage" d="M${P(sp.a, 0)}L${P(sp.a, L.C)}"/>`; });
@@ -1173,23 +1190,30 @@ function treeDraw(L, o = {}) {
     if (l.type === 'group' && Hz) s += `<path class="tgl" d="M${P(0, l.c + 4)}L${P(L.T, l.c + 4)}"/>`;
     if (l.type === 'thread' && o.hl === l.th.key) s += rect(0, L.T, l.c, l.c + l.size, 'thl hue', hv(l.k));
   }
-  for (const b of L.bands) s += `<path class="tband hue" ${hv(b.k)} d="M${b.up.map(p => P(p[0], p[1])).join('L')}L${b.dn.map(p => P(p[0], p[1])).join('L')}Z"/>`;
-  if (L.roots.length > 1) {
-    const cs = L.roots.map(l => l.c + l.rail), t0 = mini ? 3 : 10;
-    s += `<path class="troot" d="M${P(t0, Math.min(...cs))}L${P(t0, Math.max(...cs))}"/>`;
-    for (const l of L.roots) if (l.a > t0 + 2) s += `<path class="troot thin" d="M${P(t0, l.c + l.rail)}L${P(l.a, l.c + l.rail)}"/>`;
+  for (const b of L.bands) s += `<path class="tband hue" ${hv(b.k)} d="M${P(b.up[0][0], b.up[0][1])}${sm(b.up)}L${P(b.dn[0][0], b.dn[0][1])}${sm(b.dn)}Z"/>`;
+  if (L.roots.length > 1) {          // 没有母分支的几条：从同一粒“种子”像根一样散开，再各自沿时间往前
+    const t0 = mini ? 4 : 10, trunk = L.roots.find(l => l.k === 'dl') || L.roots[L.roots.length >> 1], c0 = trunk.c + trunk.rail;
+    for (const l of L.roots) {
+      const c = l.c + l.rail, t1 = Math.max(t0 + 4, Math.min(l.a, t0 + Math.max(mini ? 10 : 26, Math.abs(c - c0) * .35)));
+      s += `<path class="troot" d="M${P(t0, c0)}C${P(t0 + (t1 - t0) * .15, c0 + (c - c0) * .7)} ${P(t0 + (t1 - t0) * .45, c)} ${P(t1, c)}${l.a > t1 + 1 ? 'L' + P(l.a, c) : ''}"/>`;
+    }
+    s += `<circle class="tseed" cx="${X(t0, c0).toFixed(1)}" cy="${Y(t0, c0).toFixed(1)}" r="${mini ? 2.2 : 3}"/>`;
   }
-  for (const f of L.forks) {
-    const cp = f.p.c + f.p.rail, cc = f.l.c + f.l.rail, w = L.fw, m = f.t - w / 2, g = cc > cp ? 1 : -1, r = Math.min(Math.abs(cc - cp) / 2, w / 2);
-    s += `<path class="tfork${f.thin ? ' thin' : ''} hue" ${hv(f.k)} d="M${P(f.t - w, cp)}Q${P(m, cp)} ${P(m, cp + g * r)}L${P(m, cc - g * r)}Q${P(m, cc)} ${P(f.t, cc)}"/>`;
+  for (const f of L.forks) {          // 分叉：一根由粗到细的S形枝，终点落在子分支开始的那一刻
+    const cp = f.p.c + f.p.rail, cc = f.l.c + f.l.rail, dc = Math.abs(cc - cp);
+    const w = Math.max(6, Math.min(Math.max(L.fw, dc * .55), L.fw * 2.4, f.t - f.p.a)), t0 = f.t - w, d = w * .55;
+    const a = f.thin ? .8 : mini ? 1.3 : 2.1, b = f.thin ? .4 : mini ? .6 : .8;
+    const fk = !f.thin && G.forks[f.k], tip = fk && fk.from ? `<title>${esc(trackBy[f.k].short)} 从 ${esc(trackBy[fk.from].short)} 分出${byId[fk.at] ? `（${esc(byId[fk.at].title)}，${byId[fk.at].y}）` : ''}：${esc(fk.why || '')}</title>` : '';
+    s += `<path class="tfork${f.thin ? ' thin' : ''} hue" ${hv(f.k)} d="M${P(t0, cp - a)}C${P(t0 + d, cp - a)} ${P(f.t - d, cc - b)} ${P(f.t, cc - b)}L${P(f.t, cc + b)}C${P(f.t - d, cc + b)} ${P(t0 + d, cp + a)} ${P(t0, cp + a)}Z">${tip}</path>`;
   }
   for (const l of L.rails) {
     const c = l.c + l.rail, cls = `trail ${l.type}${trackBy[l.k].g && trackBy[l.k].g.key === 'core' ? ' core' : ''} hue`;
     const a = l.type === 'head' ? l.a - L.fw - 8 : (l.lead ?? l.a), s0 = Math.max(a, l.s);
     if (s0 > a + 1) s += `<path class="${cls} pre" ${hv(l.k)} d="M${P(a, c)}L${P(s0, c)}"/>`;
     s += `<path class="${cls}" ${hv(l.k)} d="M${P(s0, c)}L${P(l.b, c)}"/>`;
-    if (l.active) s += `<path class="tarrow hue" ${hv(l.k)} d="M${P(l.b + 8, c)}L${P(l.b, c - 4)}L${P(l.b, c + 4)}Z"/>`;
-    else if (!mini) s += `<path class="${cls}" ${hv(l.k)} d="M${P(l.b, c - 5)}L${P(l.b, c + 5)}"/><text class="tend" x="${(X(l.b, c) + (Hz ? 6 : 7)).toFixed(1)}" y="${(Y(l.b, c) + (Hz ? 4 : -4)).toFixed(1)}">止于${l.endY}</text>`;
+    const tx = X(l.b, c).toFixed(1), ty = Y(l.b, c).toFixed(1);      // 末端：还在生长的是一个发亮的芽，已经停下的是一个空心圆
+    if (l.active) s += `<circle class="ttip h hue" ${hv(l.k)} cx="${tx}" cy="${ty}" r="${mini ? 4.5 : 6.5}"/><circle class="ttip hue" ${hv(l.k)} cx="${tx}" cy="${ty}" r="${mini ? 2 : 2.8}"/>`;
+    else if (!mini) s += `<circle class="tstop hue" ${hv(l.k)} cx="${tx}" cy="${ty}" r="3"/><text class="tend" x="${(X(l.b, c) + (Hz ? 8 : 7)).toFixed(1)}" y="${(Y(l.b, c) + (Hz ? 3.5 : -6)).toFixed(1)}">止于${l.endY}</text>`;
   }
   if (L.flt) for (const l of L.lanes) {      // 过滤后的树：每条主题线画一根细枝，从它最早的节点连到最晚的节点
     if (l.type !== 'thread' || l.nodes.length < 2) continue;
@@ -1220,7 +1244,7 @@ function treeDraw(L, o = {}) {
       s += `<text class="tmn hue" ${hv(l.k)} x="${SIDE - 8}" y="${(l.c + l.rail + 4).toFixed(1)}" text-anchor="end">${esc(trackBy[l.k].short)}</text>`;
     }
     for (const k of L.ticks) if (k.y % 10 === 0 || k.y >= 2010) s += `<text class="tmy" x="${X(k.t, 0).toFixed(1)}" y="${H + 11}">${k.label}</text>`;
-    return {W, H: H + 14, svg: `<svg class="tmini" viewBox="0 0 ${W} ${H + 14}" width="${W}" height="${H + 14}" role="img" aria-label="AI各条分支从1943年到今天的总览：每条线是一条分支，圆点是主干节点">${s}</svg>`};
+    return {W, H: H + 14, svg: `<svg class="tmini${o.grow ? ' grow' : ''}" viewBox="0 0 ${W} ${H + 14}" width="${W}" height="${H + 14}" role="img" aria-label="AI各条分支从1943年到今天的总览：每条线是一条分支，圆点是主干节点">${s}</svg>`};
   }
 
   // 行名
@@ -1258,18 +1282,18 @@ function treeDraw(L, o = {}) {
   }).join('');
   const html = `<div class="tbt${Hz ? '' : ' v'}" style="width:${W}px;height:${TOP}px">${top}</div><div class="tbs${Hz ? '' : ' v'}">${side}</div>
     <svg class="tsvg" width="${W}" height="${H}" aria-hidden="true">${s}</svg><svg class="tsvg over" width="${W}" height="${H}" aria-hidden="true"></svg>${nodes}`;
-  return {W, H, html, X, Y, P, SIDE, TOP, curve};
+  return {W, H, html, X, Y, P, SIDE, TOP, curve, anchor};
 }
-function miniTree(width, lane) {
-  const side = 96, L = treeLayout({dir: 'h', mini: true, fit: Math.max(200, width - side), lane});
-  return treeDraw(L, {side, joins: false}).svg;
+function miniTree(width, lane, grow) {
+  const side = NARROW() ? 84 : 104, L = treeLayout({dir: 'h', mini: true, fit: Math.max(200, width - side), lane});
+  return treeDraw(L, {side, joins: false, grow}).svg;
 }
 
 /* 领域地图里点一个节点后，右侧（手机上是底部）出现的面板 */
 function nodePanel(id, o = {}) {
   const n = byId[id], t = trackBy[n.track], th = thBy[n.track] && thBy[n.track][n.th];
   const before = inn[id].slice().sort((a, b) => byId[a.from].date < byId[b.from].date ? 1 : -1), after = out[id].slice().sort((a, b) => byId[a.to].tier - byId[b.to].tier || (byId[a.to].date < byId[b.to].date ? -1 : 1));
-  const li = (e, x) => `<li><span class="ty ${e.type}" title="${REL_HELP[e.type]}">${REL[e.type]}</span><div><button class="chip hue" ${hue(byId[x].track)} data-go="${esc(x)}" title="在树上选中它">${esc(byId[x].title)}</button><span class="yr">${byId[x].y}</span></div></li>`;
+  const li = (e, x) => `<li><span class="ty ${e.type}" title="${REL_HELP[e.type]}">${REL[e.type]}</span><div><button class="chip hue" ${hue(byId[x].track)} data-go="${esc(x)}" title="在树上选中它">${esc(byId[x].title)}</button><span class="yr">${byId[x].y}</span>${byId[x].track !== n.track ? `<span class="xt">跨分支 · ${esc(trackBy[byId[x].track].short)}</span>` : ''}</div></li>`;
   const block = (title, es, key, open) => es.length ? `<details ${open ? 'open' : ''}><summary>${title} · ${es.length}</summary><ul class="rels">${es.slice(0, 14).map(e => li(e, e[key])).join('')}</ul>${es.length > 14 ? `<p class="fine">还有${es.length - 14}个，在讲解页里看全部。</p>` : ''}</details>` : '';
   return `<div class="ph"><span class="eyebrow">${esc(t.short)}${th && th.key !== 'all' ? ' › ' + esc(th.name) : ''}</span><button class="x" aria-label="关闭面板">×</button></div>
     ${o.back ? `<button class="btn sm back" data-back>← 回到刚才看的位置</button>` : ''}
@@ -1331,7 +1355,8 @@ function viewMap(_, q, __, ok) {
   const showHint = force => {
     if (!force && store.get('mapHint', 0)) { hint.hidden = true; return; }
     hint.hidden = false;
-    hint.innerHTML = `<ol><li><b>一行是一条分支</b>，时间从左到右。点左边的<b>分支名</b>，这一行展开成它的几条主题线。</li><li><b>点一个节点</b>，会标出它的前驱和后续，旁边出现它的摘要。</li>
+    hint.innerHTML = `<ol><li><b>一行是一条分支</b>，时间从左到右。点左边的<b>分支名</b>，这一行展开成它的几条主题线。</li><li><b>点一个节点</b>，会标出它登记的前驱和后续，旁边出现它的摘要。连到没展开的分支上的，用一个小圆点标在那条分支对应的年份上。</li>
+      <li><b>枝条的粗细</b>是那一年收录的工作量。末端发亮的分支还在长，空心圆表示它停在了那一年；弯出去的地方是它从哪条分支分出来的，鼠标停在上面能看到原因。</li>
       <li><b>时间轴不等比例</b>：节点多的年份画得宽，早期的年份被压短，看年份请以刻度为准。</li><li>${TREE_NOTE}</li></ol><button class="btn sm fill" data-hint="0">知道了</button>`;
   };
   const snap = lane => {          // 重画前记下：视口中心对应的年份，以及被点的那一行在屏幕上的位置
@@ -1350,7 +1375,7 @@ function viewMap(_, q, __, ok) {
     D = treeDraw(L, {joins: st.joins && !focus && !topic, edges: tree});
     cv.style.cssText = `width:${D.W}px;height:${D.H}px`;
     cv.innerHTML = D.html;
-    cv.classList.remove('focus');
+    cv.classList.remove('focus', 'grow', 'v');
     ndEls = {};
     cv.querySelectorAll('.nd').forEach(el => ndEls[el.dataset.id] = el);
     drawBar();
@@ -1370,21 +1395,28 @@ function viewMap(_, q, __, ok) {
   };
   const inView = id => { const el = ndEls[id]; if (!el) return false; const a = el.getBoundingClientRect(), b = sc.getBoundingClientRect(); return a.left >= b.left + D.SIDE && a.right <= b.right && a.top >= b.top + D.TOP && a.bottom <= b.bottom; };
   const over = () => cv.querySelector('.tsvg.over');
-  const clearHL = () => { cv.classList.remove('focus'); cv.querySelectorAll('.hl').forEach(x => x.classList.remove('hl')); if (over()) over().innerHTML = ''; };
+  const clearHL = () => { cv.classList.remove('focus'); cv.querySelectorAll('.hl').forEach(x => x.classList.remove('hl', 'xt')); if (over()) over().innerHTML = ''; };
   const highlight = id => {
+    // 标出它真实登记的前驱和后续。对方画在树上就连到那个节点；对方所在的分支没展开，就连到那条分支上它的年份处，用一个小圆点标出来
     clearHL();
     const A = L.pos[id]; if (!A) return;
     cv.classList.add('focus');
     ndEls[id].classList.add('hl');
-    let s = '';
+    const tk = byId[id].track, ax = D.X(A.t, A.c), ay = D.Y(A.t, A.c);
+    let s = '', dots = '', R = 80;
     for (const e of [...inn[id], ...out[id]]) {
-      const o = e.from === id ? e.to : e.from, B = L.pos[o];
-      if (!B) continue;
-      ndEls[o].classList.add('hl');
-      const [p, r] = e.from === id ? [A, B] : [B, A];
-      s += `<path class="e hl ${e.type}" d="${D.curve(p.t, p.c, r.t, r.c)}"/>`;
+      const o = e.from === id ? e.to : e.from, on = !!L.pos[o], B = L.pos[o] || D.anchor(o);
+      if (!B || (!on && NARROW())) continue;      // 手机上只连画在树上的节点，不画伸向没展开分支的线
+      if (on) { ndEls[o].classList.add('hl'); if (byId[o].track !== tk) ndEls[o].classList.add('xt'); }
+      const [p, r] = e.from === id ? [A, B] : [B, A], bx = D.X(B.t, B.c), by = D.Y(B.t, B.c);
+      s += `<path class="e hl ${e.type}${on ? '' : ' far'}" d="${D.curve(p.t, p.c, r.t, r.c)}"/>`;
+      if (!on) dots += `<circle class="efar hue" ${hs(byId[o].track)} cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="2.4"/>`;
+      R = Math.max(R, Math.hypot(bx - ax, by - ay));
     }
-    over().innerHTML = s;
+    const ov = over();
+    ov.innerHTML = s + dots;
+    ov.style.setProperty('--gx', ax.toFixed(0) + 'px'); ov.style.setProperty('--gy', ay.toFixed(0) + 'px'); ov.style.setProperty('--gr', Math.ceil(R + 40) + 'px');
+    ov.classList.remove('bloom'); void ov.getBoundingClientRect(); ov.classList.add('bloom');      // 连线从选中的节点向外长出来，只播一次
   };
   function select(id, quiet) {
     if (id && !selected && !quiet) origin = {x: sc.scrollLeft, y: sc.scrollTop};
@@ -1455,6 +1487,7 @@ function viewMap(_, q, __, ok) {
   });
   const finish = () => {
     draw();
+    cv.classList.add('grow'); if (!L.Hz) cv.classList.add('v');      // 第一次画出来时，枝条沿时间方向长出来；之后的重画不再播
     if (!focus && !topic && !at) showHint(false);
     const era = G.eras.find(e => e.id === q.era), sp = era && L.spans.find(s => s.e === era);
     if (focus) { select(focus, false); origin = null; const p = L.pos[focus]; if (p) reveal(p.t, p.c); }
