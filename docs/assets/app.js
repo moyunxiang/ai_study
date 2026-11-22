@@ -254,6 +254,7 @@ function home() {
   const mb = $('#minibox');
   mb.innerHTML = miniTree(mb.clientWidth - 34, NARROW() ? 13 : 17);
   $('#hs').onsubmit = ev => { ev.preventDefault(); const v = $('#hq').value.trim(); if (v) location.hash = `#/search?q=${enc(v)}`; else $('#hq').focus(); };
+  suggest($('#hq'));
 }
 
 /* ——— 开始学习：入门路线、专题、完整主干 ——— */
@@ -286,6 +287,7 @@ async function viewLearn(_, q, __, ok) {
     ${foot()}</div>`;
   document.title = '开始学习 · AI脉络';
   const lq = $('#lq'), hit = $('#lhit');
+  suggest(lq, {href: fromHref, keep: x => x.k === 'n' || x.k === 'c', via: false, more: '查看全部搜索结果'});
   $('#lf').onsubmit = async ev => {
     ev.preventDefault(); const v = lq.value.trim(); if (!v) return lq.focus();
     hit.innerHTML = '<span class="muted">正在找…</span>';
@@ -701,29 +703,61 @@ function setTree(box, ids, mark = [], only = null) {
   if (el) box.scrollTo(Math.max(0, el.offsetLeft - box.clientWidth / 2), Math.max(0, el.offsetTop - 120));
 }
 const LEGEND = '<span class="legend"><span><i class="solves"></i>改进</span><span><i></i>延续</span><span><i class="uses"></i>使用</span><span><i class="rivals"></i>竞争</span></span>';
-function initSearch() {
-  const inp = $('#q'), drop = $('#drop');
+/* ——— 输入时的提示栏：顶栏、首页、开始学习、搜索页共用 ———
+   o.href 点一条去哪；o.keep 留哪些种类；o.via 是否带“路线”快捷入口；o.enter 没选中任何一条时回车做什么（不给就交给表单）；o.more 底部那一行的文字 */
+let sugN = 0;
+function suggest(inp, o = {}) {
+  if (!inp || inp._sug) return; inp._sug = 1;
+  const uid = 'sg' + (++sugN), href = o.href || hrefOf, keep = o.keep || (x => x.k !== 't'), via = o.via !== false;
+  let drop = o.drop;
+  if (!drop) { drop = document.createElement('div'); drop.className = 'drop'; drop.hidden = true; inp.parentNode.classList.add('sugw'); inp.parentNode.appendChild(drop); }
+  if (!drop.id) drop.id = uid;
+  drop.setAttribute('role', 'listbox'); drop._inp = inp;
+  inp.setAttribute('role', 'combobox'); inp.setAttribute('aria-autocomplete', 'list'); inp.setAttribute('aria-controls', drop.id); inp.setAttribute('aria-expanded', 'false');
   let sel = -1, items = [], seq = 0;
-  const close = () => { drop.hidden = true; sel = -1; inp.setAttribute('aria-expanded', 'false'); };
+  const close = () => { seq++; drop.hidden = true; sel = -1; inp.setAttribute('aria-expanded', 'false'); inp.removeAttribute('aria-activedescendant'); };
+  drop._close = close;
+  const place = () => {      // 自己建的提示栏贴在输入框正下方；太窄时放宽到一行能读的宽度
+    if (o.drop) return; const par = inp.parentNode, w = Math.max(inp.offsetWidth, Math.min(340, par.clientWidth));
+    drop.style.width = w + 'px'; drop.style.right = 'auto'; drop.style.left = Math.max(0, Math.min(inp.offsetLeft, par.clientWidth - w)) + 'px'; drop.style.top = inp.offsetTop + inp.offsetHeight + 6 + 'px';
+  };
   const paint = async () => {
     const q = inp.value.trim(), my = ++seq;
     if (!q) return close();
     const s = S || await ensureSearch().catch(() => S);
-    if (my !== seq || !s) return;
-    items = s.search(q, 8).filter(x => x.k !== 't');
-    drop.innerHTML = (items.length ? items.map((it, i) => `<a href="${hrefOf(it)}" role="option" id="opt${i}" class="${i === sel ? 'sel' : ''}" aria-selected="${i === sel}"><div class="t">${esc(it.t)} <span class="k">${esc(kindLabel(it))}${it.partial ? ' · 部分匹配' : it.fuzzy ? ' · 相近的拼写' : ''}</span></div><div class="s">${esc(it.s)}</div></a>`).join('') : '<div class="more">没有直接匹配的名字</div>')
-      + `<a class="more" href="#/search?q=${enc(q)}">查看全部结果 ↵</a>`;
-    drop.hidden = false; inp.setAttribute('aria-expanded', 'true');
-    if (sel >= 0) inp.setAttribute('aria-activedescendant', 'opt' + sel); else inp.removeAttribute('aria-activedescendant');
+    if (my !== seq || !s || !inp.isConnected) return;
+    items = s.search(q, 14).filter(keep).slice(0, o.n || 7);
+    drop.innerHTML = (items.length ? items.map((it, i) => `<div class="opt${i === sel ? ' sel' : ''}" role="option" id="${uid}o${i}" aria-selected="${i === sel}"><a class="m" href="${href(it)}" tabindex="-1"><div class="t">${esc(it.t)} <span class="k">${esc(kindLabel(it))}${it.partial ? ' · 部分匹配' : it.fuzzy ? ' · 相近的拼写' : ''}</span></div><div class="s">${esc(it.s)}</div></a>${via && (it.k === 'n' || it.k === 'c') ? `<a class="via" href="${fromHref(it)}" tabindex="-1" title="从零读到它的路线" aria-label="从零读到${esc(it.t)}的路线">路线</a>` : ''}</div>`).join('') : '<div class="more">没有直接匹配的名字，换个叫法、英文名或缩写试试</div>')
+      + (o.more === false ? '' : `<a class="more" href="#/search?q=${enc(q)}" tabindex="-1">${o.more || '查看全部结果 ↵'}</a>`);
+    const was = drop.hidden; place(); drop.hidden = false; inp.setAttribute('aria-expanded', 'true');
+    if (was && !o.drop && NARROW()) inp.scrollIntoView({block: 'start'});      // 手机上把输入框顶到屏幕上方，给提示栏和键盘留地方
+    if (sel >= 0) { inp.setAttribute('aria-activedescendant', uid + 'o' + sel); const el = drop.children[sel]; if (el && el.scrollIntoView) el.scrollIntoView({block: 'nearest'}); } else inp.removeAttribute('aria-activedescendant');
   };
-  inp.addEventListener('input', () => { sel = -1; paint(); });
+  let composing = false;      // 拼音还没上屏时不提示，也不把确认候选词的回车当成提交
+  inp.addEventListener('compositionstart', () => { composing = true; });
+  inp.addEventListener('compositionend', () => { composing = false; sel = -1; paint(); });
+  inp.addEventListener('input', () => { if (composing) return; sel = -1; paint(); });
   inp.addEventListener('focus', () => { ensureSearch().catch(() => {}); paint(); });
+  inp.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== inp && !drop.contains(document.activeElement)) close(); }, 200));
+  drop.addEventListener('mousedown', e => e.preventDefault());      // 点提示栏时不让输入框失焦
   inp.addEventListener('keydown', e => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(-1, Math.min(items.length - 1, sel + (e.key === 'ArrowDown' ? 1 : -1))); paint(); }
-    else if (e.key === 'Enter') { if (!inp.value.trim()) return; location.hash = sel >= 0 ? hrefOf(items[sel]) : `#/search?q=${enc(inp.value.trim())}`; close(); inp.blur(); }
-    else if (e.key === 'Escape') { close(); inp.blur(); }
+    if (composing || e.isComposing || e.keyCode === 229) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (drop.hidden && !inp.value.trim()) return; e.preventDefault(); sel = Math.max(-1, Math.min(items.length - 1, sel + (e.key === 'ArrowDown' ? 1 : -1))); paint(); }
+    else if (e.key === 'Enter') {
+      const v = inp.value.trim();
+      if (sel >= 0 && items[sel]) { e.preventDefault(); const to = href(items[sel]); close(); inp.blur(); location.hash = to; }
+      else if (o.enter) { e.preventDefault(); if (v) { close(); inp.blur(); o.enter(v); } }
+      else close();
+    }
+    else if (e.key === 'Escape') { if (!drop.hidden) { e.preventDefault(); close(); } else if (o.drop) inp.blur(); }
   });
-  document.addEventListener('click', e => { if (!e.target.closest('#search') || e.target.closest('#drop a')) close(); });
+  if (inp.form) inp.form.addEventListener('submit', close);
+}
+function initSearch() {
+  const inp = $('#q');
+  suggest(inp, {drop: $('#drop'), n: 8, enter: v => { location.hash = `#/search?q=${enc(v)}`; }});
+  document.addEventListener('click', e => { for (const d of document.querySelectorAll('.drop:not([hidden])')) if (d._close && d._inp !== e.target && (!d.contains(e.target) || e.target.closest('a'))) d._close(); });
+  window.addEventListener('hashchange', () => { for (const d of document.querySelectorAll('.drop:not([hidden])')) d._close && d._close(); });
   document.addEventListener('keydown', e => {
     if (e.key !== '/' || /INPUT|TEXTAREA/.test(document.activeElement.tagName) || e.metaKey || e.ctrlKey) return;
     e.preventDefault(); const x = $('#sq') || (inp.offsetParent ? inp : null);
@@ -744,7 +778,7 @@ async function loadFullText(onProgress) {
 async function viewSearch(_, q, __, ok) {
   const query = (q.q || '').trim();
   const form = `<form class="sform" id="sf" role="search"><input class="inp big" id="sq" type="search" value="${esc(query)}" placeholder="论文、模型、算法、作者、概念、缩写…" aria-label="搜索" autocomplete="off" spellcheck="false"><button class="btn fill">搜索</button></form>`;
-  const wire = () => { const f = $('#sf'); if (f) f.onsubmit = ev => { ev.preventDefault(); const v = $('#sq').value.trim(); if (v) location.hash = `#/search?q=${enc(v)}`; }; };
+  const wire = () => { const f = $('#sf'); if (f) f.onsubmit = ev => { ev.preventDefault(); const v = $('#sq').value.trim(); if (v) location.hash = `#/search?q=${enc(v)}`; }; suggest($('#sq'), {n: 8}); };
   if (!query) {
     app.innerHTML = `<div class="page narrow"><div class="mast"><div class="eyebrow">搜索</div><h1>想找什么</h1>${form}
       <p class="lead s">可以搜论文和模型的名字、英文原题、缩写（RAG、GRPO、DLM）、别名、作者、机构，也可以直接搜一个概念或研究思路（自回归、测试时训练）。中英文的常见叫法互通。</p>

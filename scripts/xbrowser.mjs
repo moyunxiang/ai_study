@@ -62,6 +62,16 @@ async function flows(name, browser, w, h) {
   // 任务一：在网站里找到Transformer
   await page.goto(url('#/')); await ready(page);
   await step('首页有三个主入口', async () => (await page.locator('.entries .entry').count()) === 3);
+  await step('首页搜索框：边输入边出提示栏，带“路线”入口，方向键能选，Esc能关', async () => {
+    await page.fill('#hq', ''); await page.type('#hq', 'GRPO'); await page.waitForSelector('.hsrow .drop:not([hidden]) .opt');
+    const first = (await txt('.hsrow .drop .opt .t')).trim(), via = await page.locator('.hsrow .drop .opt .via').first().getAttribute('href');
+    await page.press('#hq', 'ArrowDown'); const sel = await page.locator('.hsrow .drop .opt.sel').count();
+    await page.press('#hq', 'Escape'); const closed = await page.locator('.hsrow .drop').isHidden();
+    return /^GRPO/.test(first) && via === '#/from/grpo' && sel === 1 && closed; });
+  await step('搜索页的输入框也有提示栏，选中一条回车直接进入', async () => {
+    await page.goto(url('#/search')); await ready(page); await page.type('#sq', '自回归'); await page.waitForSelector('#sf .drop:not([hidden]) .opt');
+    await page.press('#sq', 'ArrowDown'); await page.press('#sq', 'Enter'); await ready(page);
+    const ok = /^#\/c\/autoregressive/.test(await page.evaluate(() => location.hash)); await page.goto(url('#/')); await ready(page); return ok; });
   await step('首页搜索Transformer，最接近的结果就是它', async () => { await page.fill('#hq', 'Transformer'); await page.press('#hq', 'Enter'); await ready(page); return (await txt('.bestc h3')).trim() === 'Transformer'; });
   // 任务二：看懂它要解决的问题和前后关系
   await step('从结果进入讲解页，顶上有问题/方法/影响三格', async () => { await page.click('.bestc .btn.fill'); await ready(page); return (await txt('h1')).trim() === 'Transformer' && (await page.locator('.gist > div').count()) === 3; });
