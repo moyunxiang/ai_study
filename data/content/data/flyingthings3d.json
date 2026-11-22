@@ -1,0 +1,35 @@
+{
+  "id": "flyingthings3d",
+  "who": "Nikolaus Mayer, Eddy Ilg, Philip Häusser, Philipp Fischer, Daniel Cremers, Alexey Dosovitskiy, Thomas Brox · University of Freiburg、TU Munich",
+  "venue": "CVPR 2016",
+  "aka": ["FlyingThings", "Things3D", "FT3D", "SceneFlow数据集", "Scene Flow Datasets", "Monkaa", "Driving合成驾驶", "Flying Chairs", "FlyingChairs", "飞椅数据集", "合成光流数据"],
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1512.02134"},
+    {"label": "官方数据页", "url": "https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html"}
+  ],
+  "problem": "真实视频里逐像素的光流、视差（双目深度）真值几乎无法人工标注，Sintel、KITTI只有几百到一千多帧，喂不饱大型卷积网络；FlowNet用的Flying Chairs又只有二维运动、没有双目。",
+  "idea": "用开源三维软件Blender批量渲染：把ShapeNet里的日常物体随机贴图，沿随机三维轨迹飞过镜头，自动输出双目图像和光流、视差、视差变化等全套真值。",
+  "impact": "FlyingChairs加FlyingThings3D成为光流和双目深度网络先在合成数据上预训练、再到真实数据微调的常用流程，[[raft]]等方法都沿用这一做法。",
+  "method": "背景：[[flownet]]证明光流可以当作监督学习问题，用卷积网络直接回归，但训练靠的是自己合成的Flying Chairs，把椅子贴到背景上做二维平移旋转；论文指出它没有三维运动，当时也还没有公开。作者想把同样的思路推广到视差和场景流（三维运动），就需要带双目和三维运动真值的大数据。\n\n做法：作者修改了Blender的渲染流程，让它在输出双目彩色图像的同时，输出光流、视差、视差变化、运动边界、物体分割和相机参数。数据分三部分。FlyingThings3D是主体：每个场景从[[shapenet]]里随机抽5到20个物体，随机换纹理，沿平滑的随机三维轨迹移动，相机也在动，背景是随机贴图的地面和几何体；训练集21,818帧、测试集4,248帧。Monkaa取自同名开源动画短片，有毛发和非刚体运动；Driving是仿照[[kitti]]的街景驾驶场景。三部分合计官方称超过39,000个双目帧，分辨率都是960×540，并提供只有光照阴影的cleanpass和加了运动模糊、散焦的finalpass两种渲染。作为对照，论文表中[[sintel]]训练帧为1,064，KITTI 2015为800。\n\n用这些数据训练的视差网络DispNet，作者称精度与当时最好方法相当、速度快约1000倍；在KITTI 2015上微调后排在榜单第二。",
+  "pitfalls": "- 官方另提供去掉了一些极难样本的FlyingThings3D子集，FlowNet2和DispNet用的是它；不同论文用全集还是子集要分清。\n- 官方页面说明数据中有零星NaN像素，分割标签是随意编号、基本无意义，也没有真实米制深度尺度。",
+  "limits": [
+    {"text": "物体随机乱飞、贴图随机，与真实世界的场景结构和运动规律差别很大，必须在Sintel、KITTI等真实或更逼真的数据上微调才能用好。", "solved_by": []},
+    {"text": "仅限研究用途、禁止商用。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "flownet", "type": "extends", "note": "沿用FlowNet用合成数据训练光流网络的思路，从二维的Flying Chairs扩展到带双目、三维运动和场景流真值的大规模渲染数据。"},
+    {"to": "shapenet", "type": "uses", "note": "FlyingThings3D里飞行的物体取自ShapeNet的三维模型。"},
+    {"to": "sintel", "type": "solves", "note": "Sintel同样是渲染数据但只有1,064个训练帧，FlyingThings3D把可用于训练的帧数扩大到两万多。"},
+    {"to": "kitti", "type": "uses", "note": "Driving部分仿照KITTI的驾驶视角设计，DispNet在KITTI 2015上微调并评测。"}
+  ],
+  "prereq": ["supervised-learning", "conv-layer", "camera-geometry", "distribution-shift"],
+  "terms": [
+    {"t": "光流 / 视差 / 场景流", "d": "光流是相邻两帧之间每个像素的二维位移；视差是左右两个相机图像里同一点的水平位移，能换算成深度；场景流是每个点的三维运动。"},
+    {"t": "cleanpass / finalpass", "d": "同一场景的两种渲染：前者只有光照和阴影，后者再加上运动模糊和散焦，更接近真实相机拍到的画面。"}
+  ],
+  "learn": "先读[[flownet]]和[[sintel]]讲解；动手：下载FlyingThings3D子集里的几帧，用光流可视化工具把真值画成彩色图，再拿一个预训练的RAFT模型分别在cleanpass和finalpass上算误差。",
+  "check": {
+    "source": "https://arxiv.org/abs/1512.02134",
+    "confirmed": "arXiv记录：标题、7位作者、v1提交2015-12-07。论文PDF与ar5iv全文：修改Blender输出光流、视差、视差变化、运动边界、分割与相机参数；从ShapeNet抽5到20个物体、随机纹理、平滑随机三维轨迹；Monkaa与Driving（仿KITTI）；FlyingThings3D训练21,818、测试4,248帧；Sintel 1,064、KITTI 2015 800；960×540；Flying Chairs“没有三维运动且尚未公开”；DispNetCorr在KITTI 2015榜第二、约快1000倍。官方数据页：CVPR 2016、超过39000个双目帧、cleanpass与finalpass、FlyingThings3D子集、NaN像素与分割标签说明、仅限研究禁止商用。论文首页：作者单位为University of Freiburg与Technical University of Munich。"
+  }
+}

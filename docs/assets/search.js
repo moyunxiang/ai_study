@@ -150,7 +150,11 @@ function create(core, sd) {
     if (res.length < 8) for (const x of loose.sort((a, b) => b[0] - a[0]).slice(0, 40)) res.push(wrap(x[1], x[2], {partial: true}));
     if (ws.length >= 2 && !res.some(x => !x.partial && x.sc >= 40)) {      // 几个词没有同时出现在任何条目里：分开各找一遍（“math500 aime24”），每个词只要名字对得上的
       const seen = new Set(), exact = [], near = [];
-      for (const w of ws) for (const x of search(w, 4).filter(x => x.k !== 't' && !x.partial && (x.sc >= 92 || x.near)).slice(0, 2)) (x.near ? near : exact).push(Object.assign(x, {each: w}));
+      for (const w of ws) {
+        if (/^[\d.]+$/.test(w) || w.length < 3) continue;                                             // 版本号、单个数字不是名字（“gemini 2.0 flash”里的 2.0）
+        if (index.reduce((n, it) => n + (it.k !== 't' && scoreWord(it, w, true) >= 40 ? 1 : 0), 0) > 12) continue;      // 很多标题里都有的词是普通词，不是名字（“grok 4 fast”里的 fast）
+        for (const x of search(w, 4).filter(x => x.k !== 't' && !x.partial && (x.sc >= 92 || x.near)).slice(0, 2)) (x.near ? near : exact).push(Object.assign(x, {each: w}));
+      }
       const each = [...exact, ...near].filter(x => !seen.has(x.k + x.id) && seen.add(x.k + x.id));
       if (each.length) return [...each, ...res.filter(x => !seen.has(x.k + x.id))];
     }

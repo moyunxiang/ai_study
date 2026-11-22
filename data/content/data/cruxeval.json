@@ -1,0 +1,31 @@
+{
+  "id": "cruxeval",
+  "who": "Alex Gu, Baptiste Rozière, Hugh Leather, Armando Solar-Lezama, Gabriel Synnaeve, Sida I. Wang · Meta AI / MIT CSAIL",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2401.03065"},
+    {"label": "项目主页与排行榜", "url": "https://crux-eval.github.io"}
+  ],
+  "problem": "HumanEval、MBPP只考“看描述写函数”；模型能写出代码，不代表它能在脑子里一步步跑程序、预测结果，而一些在HumanEval上猛涨的模型可能只是学会了那类题的套路。",
+  "idea": "收集800个3–13行的短Python函数，每个配一组输入输出，出两类题：给函数和输入，预测输出（CRUXEval-O）；给函数和输出，找出能得到它的输入（CRUXEval-I），都用实际执行来判对错。",
+  "impact": "揭示在HumanEval上领先Code Llama 20多分的蒸馏模型在CRUXEval上没有相应提升；它的输出预测题型被LiveCodeBench改造成“代码执行”场景，也成为代码推理和RL训练论文检验泛化的常用指标。",
+  "method": "**出题**。让[[code-llama]] 34B随机拿一个Python标准库函数（如`str.zfill`）写一个使用它的小函数，并给出5个测试输入，执行后得到输出。再按一组规则过滤：代码长度75–300字符、能通过语法检查、运行少于2秒且不抛异常、不导入模块、结果确定、没有副作用。约1,700个候选通过过滤，从中随机取800个。\n\n**两个任务**。\n\n- 输出预测（CRUXEval-O）：给定函数`f`和输入`x`，写出`f(x)`的值。\n- 输入预测（CRUXEval-I）：给定函数和输出`y`，写出任意一个满足`f(x) == y`的输入。答案不唯一，只要执行断言通过就算对。\n\n**评分**。报告pass@1（温度0.2）和pass@5（温度0.8），开源模型每题采样100次、GPT模型10次来估计，并用自助法估计统计显著性。",
+  "results": "最强的GPT-4加思维链，输入预测约75%、输出预测约81%；Code Llama 34B按摘要设置约50%和46%，直接预测为46.5%和41.1%。对基础模型而言，HumanEval分数和CRUXEval大致正相关；但WizardCoder 34B、Phind 34B这类用强模型数据蒸馏出来的模型，在HumanEval上比Code Llama高20多分，在CRUXEval上却没有相应提升。论文还展示了GPT-4在简单程序上反复出错的例子。",
+  "legacy": "[[livecodebench]]的“代码执行”场景明确基于CRUXEval的输出预测设置，并改用更复杂、人写的竞赛题函数且持续更新。此后研究不看外部奖励的推理训练的[[intuitor]]等工作，用CRUXEval-O检验在数学上训练的模型能否迁移到代码推理。",
+  "limits": [
+    {"text": "函数全部由Code Llama 34B生成，只有3–13行、无导入、无副作用，离真实代码的规模和复杂度很远。", "solved_by": ["livecodebench"]},
+    {"text": "题目固定且公开，作者对微调数据的去污染只去掉了完全相同的字符串，后续模型可能见过原题或近似题。", "solved_by": ["livecodebench"]}
+  ],
+  "relations": [
+    {"to": "humaneval", "type": "solves", "note": "HumanEval只考生成代码，且部分模型的高分来自蒸馏套路；CRUXEval改考执行推理，显示这些模型的HumanEval涨幅没有转化为对程序行为的理解。"},
+    {"to": "code-llama", "type": "uses", "note": "800个函数和测试输入都由Code Llama 34B生成，它也是主要的开源被测模型。"},
+    {"to": "evalplus", "type": "rivals", "note": "两者都质疑HumanEval分数的含金量：EvalPlus补充测试用例让判分更严格，CRUXEval换一种任务考程序理解。"}
+  ],
+  "prereq": ["benchmark", "decoding-sampling", "language-model", "statistical-significance"],
+  "terms": [
+    {"t": "CRUXEval-O / CRUXEval-I", "d": "输出预测与输入预测两个子任务，前者给函数和输入写输出，后者给函数和输出反推一个输入。"},
+    {"t": "pass@k", "d": "每题采样k个答案、至少一个正确即算通过的比例；实际用n个样本做无偏估计。"}
+  ],
+  "learn": "先读[[humaneval]]了解pass@k和执行判分。读原文第2节（生成与过滤流程）和表2。动手：从CRUXEval里取20道输出预测题，先自己手算，再让一个小代码模型分别直接作答和先写逐行执行过程再作答，比较正确率。",
+  "aka": ["CRUXEval-O", "CRUXEval-I", "CRUX-Eval", "代码执行推理", "代码输出预测", "code execution reasoning"],
+  "check": {"source": "https://arxiv.org/abs/2401.03065", "confirmed": "arXiv记录：标题、6位作者、v1提交于2024-01-05，摘要中800个3–13行函数、输入/输出预测、HumanEval高分模型无同等提升、GPT-4+CoT 75%/81%、Code Llama 34B 50%/46%。HTML正文：Meta AI与MIT CSAIL、Code Llama 34B按标准库函数名生成函数与5个输入、过滤条件（75–300字符、2秒、无导入、确定性、无副作用）、约1,700个候选取800、pass@1温度0.2与pass@5温度0.8、开源100次与GPT 10次采样、自助法、表2直接预测46.5/41.1、WizardCoder与Phind在HumanEval高20%以上但CRUXEval无同等增益、第7节局限（去污染只去完全匹配、仅简单自包含函数）。LiveCodeBench HTML（arXiv 2403.07974v2）：代码执行场景基于CRUXEval输出预测、函数更复杂且为人写。Intuitor用CRUXEval-O见arXiv 2505.19590（本站intuitor讲解记录的正文数字）。venue本次未确认（OpenAlex仅有arXiv记录），不写。"}
+}

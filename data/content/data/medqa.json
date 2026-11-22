@@ -1,0 +1,34 @@
+{
+  "id": "medqa",
+  "who": "Di Jin, Eileen Pan, Nassim Oufattole, Wei-Hung Weng, Hanyi Fang, Peter Szolovits · MIT计算机科学与人工智能实验室 / 华中科技大学同济医学院",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2009.13081"},
+    {"label": "数据与代码（GitHub）", "url": "https://github.com/jind11/MedQA"}
+  ],
+  "problem": "开放域选择题问答数据（ARC、OpenBookQA）只需要中小学知识；要考机器能否像医生一样从教科书里找证据并做临床判断，需要专业考试级别的题目和配套知识库。",
+  "idea": "收集美国、中国大陆、中国台湾三地医师执照考试的真题与模拟题，统一成四选一，并整理对应的医学教科书作为检索语料：英文12,723题、简体中文34,251题、繁体中文14,123题。",
+  "impact": "其英文部分（常叫MedQA-USMLE）后来成为医学大模型最常报的分数：Flan-PaLM 67.6%、Med-PaLM 67.2%、Med-PaLM 2最高86.5%，常与MedMCQA、PubMedQA一起出现。",
+  "method": "**题目**。三部分分别记作USMLE（美国医师执照考试）、MCMLE（中国大陆）和TWMLE（中国台湾），包含真题和网上公开的模拟题。去重后按题目随机切成80%训练、10%开发、10%测试，USMLE测试集为1,273题。为符合合理使用，作者打乱选项顺序，并给USMLE和MCMLE每题随机删掉一个错误选项，统一成一个正确、三个错误的四选一。题干常是一段病历：年龄、症状、病史、体检和化验结果，问最可能的诊断、病原体或处置。\n\n**知识库**。为英文题准备了18本美国医学生和USMLE考生常用的英文教科书，为简体中文题准备了33本中国医学教育的官方教科书；台湾考生与美国使用相同教材，所以TWMLE与USMLE共用英文书库。专家抽查100道开发集题目，USMLE有88%、MCMLE有100%、TWMLE有87%能在书库中找到足够证据。\n\n**基线**。先检索、再阅读：用信息检索系统从书库里为每个选项找出相关段落，再交给阅读理解模型（含BERT、BioBERT、RoBERTa等预训练模型）给选项打分。",
+  "results": "最好方法的测试集准确率：英文36.7%、繁体中文42.0%、简体中文70.1%；英文题上多数预训练模型甚至没有超过纯检索基线。作者没有给人类成绩，理由是考生分数差异太大，最好的医学生接近满分，较差的不能通过。两年后，[[med-palm]]论文报告Flan-PaLM 540B在MedQA（USMLE）上67.6%，[[med-palm-2]]报告最高86.5%。",
+  "legacy": "MedQA的英文部分被[[med-palm]]收进MultiMedQA，与[[medmcqa]]、[[pubmedqa]]和MMLU临床科目组合，此后[[gpt4-medical]]、[[med-palm-2]]等医学模型工作都用它报告“能否通过执照考试”。原论文的检索加阅读框架则很少再用，大模型直接闭卷作答已远超当时的开卷系统。",
+  "pitfalls": "- 通常说的“MedQA”多指英文USMLE部分；原数据还有简体、繁体两个中文部分，难度和分数差别很大，报分时要看清是哪一个。\n- 题目包含网上公开的模拟题，“考过USMLE及格线”是在这些选择题上的准确率，不等于真实考试或临床能力。",
+  "limits": [
+    {"text": "题目来自网上公开的真题与模拟题，大模型的预训练语料可能见过原题。", "solved_by": []},
+    {"text": "只考选择题，答对选项不代表推理过程正确，也不考问诊、长文解释和处置安全性。", "solved_by": ["med-palm"]}
+  ],
+  "relations": [
+    {"to": "drqa", "type": "extends", "note": "沿用DrQA式“检索段落再阅读作答”的开放域问答框架，把知识源从维基百科换成医学教科书。"},
+    {"to": "bert", "type": "uses", "note": "阅读器基线包括BERT、BioBERT和RoBERTa等预训练模型的微调。"},
+    {"to": "ai2-arc", "type": "extends", "note": "同为需要外部知识的多选开放域问答，论文指出ARC、OpenBookQA只需中小学知识，MedQA换成专业医学考试。"},
+    {"to": "race", "type": "rivals", "note": "论文引言把RACE等给定文章的阅读理解列为预训练模型已接近做满的任务，MedQA不提供文章、要求自己检索证据。"}
+  ],
+  "prereq": ["benchmark", "retrieval", "pretrain-finetune", "data-contamination"],
+  "terms": [
+    {"t": "USMLE / MCMLE / TWMLE", "d": "MedQA的三个部分：美国医师执照考试（英文）、中国大陆医师资格考试（简体中文）、台湾医师考试（繁体中文）。"},
+    {"t": "MedQA-USMLE", "d": "MedQA英文部分，四选一，测试集1,273题，是医学大模型报告里最常见的口径。"},
+    {"t": "MultiMedQA", "d": "Med-PaLM论文组合的医学问答评测集合，包含MedQA、MedMCQA、PubMedQA、MMLU临床科目等。"}
+  ],
+  "learn": "先读[[drqa]]了解检索加阅读的开放域问答。读原文第3节（数据收集与表5的证据覆盖率）和表8。动手：从USMLE测试集里取50题，让一个开源模型闭卷作答，再给它附上检索到的教科书段落重答，比较两者准确率。",
+  "aka": ["MedQA-USMLE", "MedQA USMLE", "USMLE题库", "美国医师执照考试", "USMLE", "MCMLE", "TWMLE", "医师执照考试题", "MedQA数据集"],
+  "check": {"source": "https://arxiv.org/abs/2009.13081", "confirmed": "arXiv记录：标题、6位作者、v1提交于2020-09-28，摘要中三语言12,723/34,251/14,123题、最好方法36.7%/42.0%/70.1%。PDF正文（pdftotext提取）：MIT CSAIL与华中科大同济医学院、USMLE/MCMLE/TWMLE命名、真题与模拟题、80/10/10随机划分、删一个错误选项成四选一、USMLE测试1,273题、18本英文与33本中文教科书及TWMLE共用英文书库、表5证据覆盖88/100/87、检索加阅读框架与BERT/BioBERT/RoBERTa基线、多数预训练模型英文题未超检索基线、不给人类成绩的理由、引言中ARC/OpenBookQA只需中小学知识与RACE等已接近饱和。Flan-PaLM 67.6%来自arXiv 2212.13138摘要；Med-PaLM 67.2%与Med-PaLM 2最高86.5%来自arXiv 2305.09617摘要。是否另行发布了未删选项的版本本次未核实，正文不写。"}
+}
