@@ -727,7 +727,7 @@ function suggest(inp, o = {}) {
     const s = S || await ensureSearch().catch(() => S);
     if (my !== seq || !s || !inp.isConnected) return;
     items = s.search(q, 14).filter(keep).slice(0, o.n || 7);
-    drop.innerHTML = (items.length ? items.map((it, i) => `<div class="opt${i === sel ? ' sel' : ''}" role="option" id="${uid}o${i}" aria-selected="${i === sel}"><a class="m" href="${href(it)}" tabindex="-1"><div class="t">${esc(it.t)} <span class="k">${esc(kindLabel(it))}${it.partial ? ' · 部分匹配' : it.fuzzy ? ' · 相近的拼写' : ''}</span></div><div class="s">${esc(it.s)}</div></a>${via && (it.k === 'n' || it.k === 'c') ? `<a class="via" href="${fromHref(it)}" tabindex="-1" title="从零读到它的路线" aria-label="从零读到${esc(it.t)}的路线">路线</a>` : ''}</div>`).join('') : '<div class="more">没有直接匹配的名字，换个叫法、英文名或缩写试试</div>')
+    drop.innerHTML = (items.length ? items.map((it, i) => `<div class="opt${i === sel ? ' sel' : ''}" role="option" id="${uid}o${i}" aria-selected="${i === sel}"><a class="m" href="${href(it)}" tabindex="-1"><div class="t">${esc(it.t)} <span class="k">${esc(kindLabel(it))}${it.partial ? ' · 部分匹配' : it.near ? ' · 名字最接近' : it.fuzzy ? ' · 相近的拼写' : ''}</span></div><div class="s">${it.as ? `按“${esc(it.as)}”找到 · ` : ''}${esc(it.s)}</div></a>${via && (it.k === 'n' || it.k === 'c') ? `<a class="via" href="${fromHref(it)}" tabindex="-1" title="从零读到它的路线" aria-label="从零读到${esc(it.t)}的路线">路线</a>` : ''}</div>`).join('') : '<div class="more">没有直接匹配的名字，换个叫法、英文名或缩写试试</div>')
       + (o.more === false ? '' : `<a class="more" href="#/search?q=${enc(q)}" tabindex="-1">${o.more || '查看全部结果 ↵'}</a>`);
     const was = drop.hidden; place(); drop.hidden = false; inp.setAttribute('aria-expanded', 'true');
     if (was && !o.drop && NARROW()) inp.scrollIntoView({block: 'start'});      // 手机上把输入框顶到屏幕上方，给提示栏和键盘留地方
@@ -815,12 +815,17 @@ async function viewSearch(_, q, __, ok) {
   const byDate = l => q.sort === 'date' ? [...l].sort((a, b) => a.date < b.date ? -1 : 1) : l;
   const exact = byDate(flt(ns.filter(x => !x.partial))), part = byDate(flt(ns.filter(x => x.partial))), deepHits = byDate(flt(inText));
   const need = [...best.filter(x => x.k === 'n'), ...exact.slice(0, 20), ...part.slice(0, 8), ...deepHits.slice(0, 12)].map(x => byId[x.id]);      // 只取会直接显示出来的那些行的摘要
-  await needBrief(need); await Promise.all(best.filter(x => x.k === 'c').map(x => conceptBody(x.id))); if (!ok()) return;
+  await needBrief(need); await Promise.all(best.filter(x => x.k === 'c').map(x => conceptBody(x.id)));
+  // 按别名找到的节点（“math500”→ MATH竞赛数学）：到它的讲解里找同名的术语说明，告诉读者这个名字具体指什么
+  const asNote = {};
+  await Promise.all(best.filter(x => x.k === 'n' && x.as).map(async x => { const c = await nodeContent(x.id).catch(() => null), sq = v => s.norm(v).replace(/[\s\-_]/g, ''), k = sq(x.as), t = c && (c.terms || []).find(t => t.t.split(/[\/／、]/).some(a => sq(a) === k)); if (t) asNote[x.id] = t; }));      // 术语名常写成“A / B”，任意一半对上都算
+  if (!ok()) return;
   const link = o => { const p = new URLSearchParams({...q, ...o}); for (const [k, v] of [...p]) if (!v) p.delete(k); return '#/search?' + p; };
   const rows = (title, list, note, cap = 20) => list.length ? `<section class="sec"><div class="sec-h"><h2>${title}</h2><span class="muted">${list.length} 个${note ? ' · ' + note : ''}</span></div>
     <ul class="rows">${list.slice(0, cap).map(it => row(byId[it.id], {track: true})).join('')}</ul>${list.length > cap ? `<details class="fold in"><summary><b>再显示 ${Math.min(list.length, 200) - cap} 个</b></summary><ul class="rows">${list.slice(cap, 200).map(it => `<li class="row t${it.tier} hue" ${hue(it.track)}><div class="d">${fmtDate(it.date)}<br>${esc(trackBy[it.track].short)}</div><div class="b"><a class="t" href="#/n/${enc(it.id)}">${esc(it.t)}</a></div>${stBtn(it.id)}</li>`).join('')}</ul></details>` : ''}</section>` : '';
   const bestCard = it => {
     if (it.k === 'n') { const n = byId[it.id]; return `<div class="bestc hue" ${hue(n.track)}><div class="kd">${KIND[n.kind]} · ${fmtDate(n.date)} · ${esc(trackBy[n.track].name)} · ${TIER[n.tier]} ${revBadge(n)}</div><h3><a href="#/n/${enc(n.id)}">${esc(n.title)}</a></h3>${n.full ? `<div class="f">${esc(n.full)}</div>` : ''}
+      ${it.as ? `<p class="as"><b>${esc(asNote[n.id] ? asNote[n.id].t : it.as)}</b>　${asNote[n.id] ? inline(asNote[n.id].d) : `是这个条目的另一个叫法，或它的一个版本、子集；具体所指见讲解。`}</p>` : it.each ? `<p class="as">对应你输入的“${esc(it.each)}”</p>` : ''}
       ${n.problem ? `<p><b>问题</b>　${inline(n.problem)}</p><p><b>方法</b>　${inline(n.idea)}</p>` : ''}
       <div class="toolbar"><a class="btn fill sm" href="#/n/${enc(n.id)}">读讲解</a><a class="btn sm" href="#/from/${enc(n.id)}">从零读到它</a><a class="btn sm" href="#/map?focus=${enc(n.id)}&view=tree">看它的前后关系</a></div></div>`; }
     if (it.k === 'c') { const c = concepts[it.id]; return `<div class="bestc"><div class="kd">${c.area === 'idea' ? `研究思路 · ${c.n}个相关节点` : `概念 · ${AREA[c.area]} · ${LEVEL[c.level]}`}</div><h3><a href="#/c/${c.key}">${esc(c.name)}</a></h3><div class="f">${esc(c.en || '')}</div><p>${inline(c.short || '')}</p>
@@ -832,9 +837,9 @@ async function viewSearch(_, q, __, ok) {
   const total = best.length + exact.length + others.filter(x => !bestKeys.has(x.k + x.id)).length + deepHits.length;
   const otherList = others.filter(x => !bestKeys.has(x.k + x.id));
   app.innerHTML = `<div class="page"><div class="mast"><div class="eyebrow">搜索</div>${form}
-    <p class="lead s" role="status">${total ? `“${esc(query)}”：${best.length ? `${best.length}个最接近的，` : ''}另有${exact.length + deepHits.length}个节点、${otherList.length}条概念、思路或主题线${part.length ? `；${part.length}个只匹配了部分关键词` : ''}` : fuzzy.length ? `没有叫“${esc(query)}”的条目。` : `没有找到“${esc(query)}”。`}</p></div>
-    ${fuzzy.length ? `<section class="sec"><div class="sec-h"><h2>你是不是想找</h2><span class="muted">拼写相近</span></div><div class="toolbar">${fuzzy.slice(0, 10).map(x => `<a class="btn sm" href="${hrefOf(x)}">${esc(x.t)}<small>${esc(kindLabel(x))}</small></a>`).join('')}</div></section>` : ''}
-    ${best.length ? `<section class="sec"><div class="sec-h"><h2>${best.length > 1 ? `“${esc(query)}”可能指` : '最接近的结果'}</h2></div><div class="bests">${best.map(bestCard).join('')}</div></section>` : ''}
+    <p class="lead s" role="status">${res[0] && res[0].relaxed ? `没有和整句对得上的名字，下面是按“${esc(res[0].relaxed)}”找的。` : ''}${total ? `“${esc(query)}”：${best.length ? `${best.length}个最接近的，` : ''}另有${exact.length + deepHits.length}个节点、${otherList.length}条概念、思路或主题线${part.length ? `；${part.length}个只匹配了部分关键词` : ''}` : fuzzy.length ? `没有叫“${esc(query)}”的条目。` : `没有找到“${esc(query)}”。`}</p></div>
+    ${fuzzy.length ? `<section class="sec"><div class="sec-h"><h2>你是不是想找</h2><span class="muted">${fuzzy.some(x => x.near) ? `站内没有单独叫“${esc(query)}”的条目，下面是名字对得上“${esc(fuzzy.find(x => x.near).fuzzy)}”的` : '拼写相近'}</span></div><div class="toolbar">${fuzzy.slice(0, 10).map(x => `<a class="btn sm" href="${hrefOf(x)}">${esc(x.t)}<small>${esc(kindLabel(x))}</small></a>`).join('')}</div></section>` : ''}
+    ${best.length ? `<section class="sec"><div class="sec-h"><h2>${best.some(x => x.each) ? '这几个词没有出现在同一个条目里，分开找到的' : best.length > 1 ? `“${esc(query)}”可能指` : '最接近的结果'}</h2></div><div class="bests">${best.map(bestCard).join('')}</div></section>` : ''}
     ${otherList.length ? `<section class="sec"><div class="sec-h"><h2>概念、研究思路与主题线</h2><span class="muted">${otherList.length} 条</span></div><div class="cgrid">${otherList.slice(0, 18).map(it => `<a href="${hrefOf(it)}"><span class="lv w">${it.k === 'th' ? '线' : it.k === 'tr' ? '分支' : it.k === 's' ? '专题' : it.area === 'idea' ? '思路' : '概念'}</span><span>${esc(it.t)}<small>${esc(it.s.replace(/^[^·]+· /, '').slice(0, 40))}</small></span></a>`).join('')}</div></section>` : ''}
     ${nodesAll.length + inText.length > 8 ? `<details class="fold filt" ${q.track || q.tier || q.sort ? 'open' : ''}><summary><b>筛选和排序</b></summary>
       <div class="toolbar"><label>显示</label><span class="seg">${[['', '全部'], ['1', '主干'], ['2', '主干+重要']].map(([v, l]) => `<a class="btn sm ${(q.tier || '') === v ? 'on' : ''}" href="${link({tier: v})}">${l}</a>`).join('')}</span>

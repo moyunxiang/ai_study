@@ -64,17 +64,17 @@ function create(core, sd) {
   const trackOf = i => core.tracks[i];
   core.N.forEach((a, i) => {
     const [id, date, tier, , title, ti] = a, full = sd.full[i] || '', who = sd.who[i] || '', aka = sd.aka[i] || [], t = trackOf(ti);
-    index.push({k: 'n', id, t: title, s: [full, who].filter(Boolean).join(' · ') || t.name, aka: low(aka), full: norm(full), tier, date, track: t.key,
+    index.push({k: 'n', id, t: title, s: [full, who].filter(Boolean).join(' · ') || t.name, aka: low(aka), ak0: aka, full: norm(full), tier, date, track: t.key,
       hay: norm([title, id, full, who, date, ...aka].join('\n')), hay2: norm([t.name, t.short, t.key].join('\n')), ac: initials(full), w: 4 - tier});
   });
   for (const tr of core.tracks) for (const th of core.threads[tr.key] || []) {
     const aka = ((sd.th[tr.key] || {})[th.key]) || [];
-    index.push({k: 'th', id: `${tr.key}?th=${th.key}`, t: th.name, s: `主题线 · ${tr.name} · ${th.n}个节点`, track: tr.key, th: th.key, aka: low(aka),
+    index.push({k: 'th', id: `${tr.key}?th=${th.key}`, t: th.name, s: `主题线 · ${tr.name} · ${th.n}个节点`, track: tr.key, th: th.key, aka: low(aka), ak0: aka,
       hay: norm([th.name, th.key, ...aka].join('\n')), hay2: norm([th.blurb, tr.name, tr.short, tr.key].join('\n')), w: 2.4});
   }
   for (const c of core.C) {
-    const [key, name, en, area] = c, x = sd.c[key] || ['', []];
-    index.push({k: 'c', id: key, t: name, s: (area === 'idea' ? '研究思路 · ' : '概念 · ') + (en || x[0] || ''), area, aka: [...low(x[1]), norm(en)].filter(Boolean), full: norm(en),
+    const [key, name, en, area] = c, x = sd.c[key] || ['', []], al = [...x[1], en].filter(a => a && norm(a));
+    index.push({k: 'c', id: key, t: name, s: (area === 'idea' ? '研究思路 · ' : '概念 · ') + (en || x[0] || ''), area, aka: al.map(norm), ak0: al, full: norm(en),
       hay: norm([name, en, key, ...x[1]].join('\n')), hay2: norm(x[0]), ac: initials(en), w: area === 'idea' ? 3.2 : 2.5});
   }
   for (const tr of core.tracks) index.push({k: 'tr', id: tr.key, t: tr.name, s: '分支 · ' + tr.question, aka: [norm(tr.short)], hay: norm([tr.name, tr.short, tr.key].join('\n')), hay2: '', w: 3.4});
@@ -114,23 +114,24 @@ function create(core, sd) {
   }
 
   /* 返回按相关度排好的结果。每项带 sc（每个词的平均得分）、partial（只匹配了一部分词）、fuzzy（按相近拼写找到的）。 */
-  function search(q, limit = 200) {
+  function search0(q, limit = 200) {
     const ws = queryTerms(q);
     if (!ws.length) return [];
     const N = index.length, whole = norm(q), wc = compact(q);
+    const plus = whole.includes('+');      // 带“+”的名字（HumanEval+、MBPP+）不能和不带的混为一谈
     const run = ws => {
       const full = [], part = [], df = ws.map(() => 0);
       for (const it of index) {
-        let sc = ws.map(w => scoreTerm(it, w));
+        let sc = ws.map(w => scoreTerm(it, w)), as = null;
         if (it.tl === whole) sc = sc.map(() => 100);                                                // 整个查询就是它的名字
-        else if (it.aka && it.aka.includes(whole)) sc = sc.map(() => 96);
+        else if (it.aka && it.aka.includes(whole)) { sc = sc.map(() => 96); as = it.ak0 && it.ak0[it.aka.indexOf(whole)]; }
         else if (it.k !== 't' && whole.length >= 2 && ((it.tl.startsWith(whole) && /[\u4e00-\u9fff]/.test(whole) && /^[a-z0-9 .\-+]+$/.test(it.tl.slice(whole.length))) || (it.tl.endsWith(whole) && /^[\u4e00-\u9fff]{2,}$/.test(it.tl.slice(0, -whole.length)) && /^[a-z0-9 .\-+]+$/.test(whole)))) sc = sc.map(() => 97);      // 标题是“中文名+缩写”，搜其中一半                               // 或它的别名、缩写
-        else if (wc.length >= 3 && (it.tc === wc || it.akc.includes(wc))) sc = sc.map(x => Math.max(x, 92));      // 只是分隔符不同：gpt4 / gpt-4 / chat gpt
+        else if (wc.length >= 3 && (!plus || it.tl.includes('+')) && (it.tc === wc || it.akc.includes(wc))) { sc = sc.map(x => Math.max(x, 92)); if (it.tc !== wc) as = it.ak0 && it.ak0[it.akc.indexOf(wc)]; }      // 只是分隔符不同：gpt4 / gpt-4 / chat gpt
         else if (it.full && whole.length >= 8 && it.full === whole) sc = sc.map(() => 98);                    // 完整的英文原题
         else if (ws.length >= 3 && whole.length >= 12 && it.full && it.full.includes(whole)) sc = sc.map(x => Math.max(x, 88));      // 原题的一大段      // 完整的英文原题
         const hit = sc.filter(Boolean).length;
         sc.forEach((x, i) => { if (x) df[i]++; });
-        if (hit === ws.length) { const sum = sc.reduce((a, b) => a + b, 0), avg = sum / ws.length; full.push([avg + it.w * (avg >= 60 ? 3 : 1) + (it.tl === whole || it.tc === wc || (it.k !== 't' && it.id === whole) ? 40 : 0), it, avg]); }
+        if (hit === ws.length) { const sum = sc.reduce((a, b) => a + b, 0), avg = sum / ws.length; full.push([avg + it.w * (avg >= 60 ? 3 : 1) + (it.tl === whole || (it.tc === wc && (!plus || it.tl.includes('+'))) || (it.k !== 't' && it.id === whole) ? 40 : 0), it, avg, as]); }
         else if (hit) part.push([sc, it]);
       }
       // 只匹配一部分词的：必须包含最少见的那个词（“swarm rl”里是 swarm），按“词越少见越重要”排
@@ -145,8 +146,22 @@ function create(core, sd) {
       full = [...f.values()]; loose = [...l.values()].filter(x => !f.has(x[1]));
     }
     const wrap = (it, sc, extra) => Object.assign(Object.create(it), {sc, partial: false, fuzzy: false}, extra);
-    const res = full.sort((a, b) => b[0] - a[0]).slice(0, limit).map(x => wrap(x[1], x[2]));
+    const res = full.sort((a, b) => b[0] - a[0]).slice(0, limit).map(x => wrap(x[1], x[2], x[3] ? {as: x[3]} : null));
     if (res.length < 8) for (const x of loose.sort((a, b) => b[0] - a[0]).slice(0, 40)) res.push(wrap(x[1], x[2], {partial: true}));
+    if (ws.length >= 2 && !res.some(x => !x.partial && x.sc >= 40)) {      // 几个词没有同时出现在任何条目里：分开各找一遍（“math500 aime24”），每个词只要名字对得上的
+      const seen = new Set(), exact = [], near = [];
+      for (const w of ws) for (const x of search(w, 4).filter(x => x.k !== 't' && !x.partial && (x.sc >= 92 || x.near)).slice(0, 2)) (x.near ? near : exact).push(Object.assign(x, {each: w}));
+      const each = [...exact, ...near].filter(x => !seen.has(x.k + x.id) && seen.add(x.k + x.id));
+      if (each.length) return [...each, ...res.filter(x => !seen.has(x.k + x.id))];
+    }
+    if (!res.some(x => x.sc >= 40)) {      // “名字+数字”（math100、aime26）没有这个条目：退回到名字本身，标成“名字最接近”，不冒充精确结果
+      const m = /^([a-z][a-z.+]*?)[ \-_]?(\d{1,4}[a-z]{0,2})$/.exec(whole);
+      if (m && m[1].length >= 2) {
+        const cand = index.filter(it => it.k === 'n' || it.k === 'c').map(it => [scoreWord(it, m[1], true), it]).filter(x => x[0] >= 70), top = cand.some(x => x[0] >= 80) ? 80 : 70;      // 先要名字或别名对得上的；没有再要标题里有这个整词的
+        const nz = cand.filter(x => x[0] >= top).map(x => [x[0] + x[1].w * 3, x[1]]).sort((a, b) => b[0] - a[0]).slice(0, 6);
+        if (nz.length) { const seen = new Set(nz.map(x => x[1].k + x[1].id)); return [...nz.map(x => wrap(x[1], 30, {fuzzy: m[1], near: true})), ...res.filter(x => !seen.has(x.k + x.id))]; }
+      }
+    }
     if (!res.some(x => x.sc >= 40)) {      // 没有像样的结果：按相近拼写再找一遍（tranformer → transformer）
       const seen = new Set(res.map(x => x.k + x.id)), fz = [];
       for (const w of ws) {
@@ -161,6 +176,26 @@ function create(core, sd) {
       if (fz.length) return [...fz.sort((a, b) => b[0] - a[0]).slice(0, 12).map(x => wrap(x[1], 30, {fuzzy: x[2]})), ...res];
     }
     return res;
+  }
+  /* 口语化的问法（“bert模型”“transformer是什么”“MATH数据集”）原样找不到时，放宽了再找一遍：
+     去掉“什么是 / 是什么 / 的原理”这类问句成分，在中英文交界处断开，再丢掉“模型、算法、数据集、论文”这类泛指的词（前提是还剩别的词）。
+     放宽后找到的结果带 relaxed（实际用来找的词），页面上会告诉读者。 */
+  const ASK = /^(什么是|什么叫|啥是|啥叫|请问|介绍一下|讲讲|讲一下|解释一下|解释)|(是什么意思|是什么东西|是什么|是啥|什么意思|怎么理解|怎么工作的?|怎么用|的原理|的作用|原理|简介|介绍|详解|讲解|[?？]+)$/g;
+  const GENERIC = new Set(['模型', '大模型', '算法', '方法', '技术', '框架', '架构', '网络', '系统', '数据集', '基准', '评测', '评测集', '测试集', '榜单', '论文', '文章', '工作', '的', 'gpu', '显卡', '芯片', 'model', 'models', 'algorithm', 'method', 'dataset', 'benchmark', 'paper', 'eval']);
+  function relax(q) {
+    let s = norm(q), prev;
+    do { prev = s; s = s.replace(ASK, '').trim(); } while (s && s !== prev);
+    const ws = (s || norm(q)).replace(/([a-z0-9])([\u4e00-\u9fff])/g, '$1 $2').replace(/([\u4e00-\u9fff])([a-z0-9])/g, '$1 $2').split(' ').filter(Boolean);
+    const core = ws.filter(w => !GENERIC.has(w));
+    return (core.length ? core : ws).join(' ');
+  }
+  const good = r => r.some(x => !x.partial && !x.fuzzy && x.sc >= 40);
+  function search(q, limit = 200) {
+    const r = search0(q, limit);
+    if (good(r)) return r;
+    const q2 = relax(q);
+    if (q2 && q2 !== norm(q)) { const r2 = search0(q2, limit); if (good(r2) || (!r.length && r2.length)) return r2.map(x => Object.assign(x, {relaxed: q2})); }
+    return r;
   }
   return {search, queryTerms, synOf, size: index.length, norm};
 }
