@@ -1,5 +1,5 @@
 /* 画布舞台：拖动、滚轮和双指缩放、飞到某处、点选、悬停提示、标签避让。只管手势和坐标，画什么由各设计自己决定。
-   用法：const S = Lab.stage(canvas, {bounds:[x0,y0,x1,y1], draw(ctx,S), inset:()=>({l,r,t,b}), pick(n), tip:元素, min, max})
+   用法：const S = Lab.stage(canvas, {bounds:[x0,y0,x1,y1], draw(ctx,S), inset:()=>({l,r,t,b}), pick(n), miss(屏幕x,屏幕y), tip:元素, min, max})
    节点的世界坐标放在 n.px / n.py；draw 里用 S.put(n, 半径, 可点) 记下屏幕位置，点选和标签靠它。 */
 Lab.stage = (cv, o) => {
   const ctx = cv.getContext('2d'), D = Lab.D, B = o.bounds, S = {ctx, view: {z: .1, x: 0, y: 0}, W: 0, H: 0, fitZ: .1, dpr: 1, zr: 1};
@@ -49,7 +49,7 @@ Lab.stage = (cv, o) => {
     if (ptrs.size === 2 && pinch) { const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); S.zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, d / pinch); pinch = d; moved = 99; }
     S.req();
   });
-  const up = e => { const was = ptrs.size; ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; if (was === 1 && moved < 6 && e.type === 'pointerup') { const n = nodeAt(...loc(e)); if (n) o.pick ? o.pick(n) : (location.hash = '#/n/' + Lab.enc(n.id)); else if (o.miss) o.miss(); } };
+  const up = e => { const was = ptrs.size; ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; if (was === 1 && moved < 6 && e.type === 'pointerup') { const n = nodeAt(...loc(e)); if (n) o.pick ? o.pick(n) : (location.hash = '#/n/' + Lab.enc(n.id)); else if (o.miss) o.miss(...loc(e)); } };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
   cv.addEventListener('wheel', e => { e.preventDefault(); S.zoomAt(...loc(e), Math.exp(-e.deltaY * (e.ctrlKey ? .012 : .0016))); }, {passive: false});
   addEventListener('resize', S.resize);

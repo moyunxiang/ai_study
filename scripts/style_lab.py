@@ -10,11 +10,15 @@
   /lab/<名字>/      一套设计的原型（design_lab/<名字>/），读的是 /data/ 里线上同一份数据
 
 原型页面里的地址全是相对的，所以复制到 docs/lab/ 之后在 /ai_study/lab/ 下不用改就能跑。
-发布只复制 styles.json 里列出的设计、shared/、总览页和缩略图；README、skins/ 和 layout.mjs 不发布。
+发布只复制 styles.json 里列出的设计、shared/、skins/、总览页和缩略图；README 和 layout.mjs 不发布。
 线上现版的页面不会被改动：切换条只在本地预览时加到现版页面上。
+
+styles.json 里带 "skin" 的条目是“线上现版换一套样式”：页面是 docs/index.html 的一份副本，
+多加载一份 design_lab/skins/<skin>.css，资源地址改成相对 /lab/<目录>/ 的写法。本地预览时现做，发布时写成文件。
 """
 import json
 import mimetypes
+import re
 import shutil
 import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -26,14 +30,36 @@ DOCS, LAB = ROOT / "docs", ROOT / "design_lab"
 SWITCH = '<script src="/lab/shared/switch.js"></script>'
 
 
+def styles():
+    return json.loads((LAB / "styles.json").read_text(encoding="utf-8"))
+
+
+def skin_page(skin):
+    """线上现版的首页换一份样式：资源指回站点根目录，数据请求也指回去，页面本身留在 /lab/<目录>/ 下。"""
+    html = (DOCS / "index.html").read_text(encoding="utf-8")
+    html = re.sub(r'\b(href|src)="(?!#|https?:|data:|/|\.\./|mailto:)([^"]+)"', r'\1="../../\2"', html)
+    head = f'<meta name="robots" content="noindex">\n<link rel="stylesheet" href="../skins/{skin}.css">\n'
+    shim = ("<script>(function(f){window.fetch=function(u,o){return f(typeof u==='string'&&u.indexOf('data/')===0?'../../'+u:u,o)};"
+            "document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;var h=a.getAttribute('href');"
+            "if(/^(n\\/|c\\/|[a-z0-9_-]+\\.html)/.test(h))a.setAttribute('href','../../'+h)},true)})(window.fetch)</script>\n")
+    html = html.replace("</head>", head + "</head>", 1)
+    html = html.replace("<script>window.AIMAP_V", shim + "<script>window.AIMAP_V", 1)
+    return html.replace("</body>", '<script src="../shared/switch.js"></script>\n</body>', 1)
+
+
 def publish():
     out = DOCS / "lab"
     if out.exists():
         shutil.rmtree(out)
     out.mkdir()
-    styles = json.loads((LAB / "styles.json").read_text(encoding="utf-8"))
     skip = shutil.ignore_patterns("*.mjs", "*.md", ".DS_Store")
-    for name in [s["dir"] for s in styles if s["dir"]] + ["shared", "thumbs"]:
+    for s in styles():
+        if s.get("skin"):
+            (out / s["dir"]).mkdir()
+            (out / s["dir"] / "index.html").write_text(skin_page(s["skin"]), encoding="utf-8")
+        elif s["dir"]:
+            shutil.copytree(LAB / s["dir"], out / s["dir"], ignore=skip)
+    for name in ("shared", "thumbs", "skins"):
         shutil.copytree(LAB / name, out / name, ignore=skip)
     for name in ("index.html", "styles.json"):
         shutil.copy2(LAB / name, out / name)
@@ -63,6 +89,13 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path = unquote(urlsplit(self.path).path)
         if path == "/lab" or path.startswith("/lab/"):
+            skin = {s["dir"]: s["skin"] for s in styles() if s.get("skin")}.get(path.strip("/")[4:])
+            if skin:
+                if not path.endswith("/"):
+                    self.send_response(301)
+                    self.send_header("Location", path + "/")
+                    return self.end_headers()
+                return self._send(skin_page(skin).encode("utf-8"), "text/html; charset=utf-8")
             f = (LAB / path[len("/lab/"):]).resolve()
             if f != LAB.resolve() and LAB.resolve() not in f.parents:
                 return self.send_error(404)
