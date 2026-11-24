@@ -4,7 +4,7 @@
 (function () {
   if (/[?&]bare\b/.test(location.search)) return;
   var base = new URL('..', document.currentScript.src).href, home = new URL('..', base).href, hide = false;
-  var GROUP = {'现': '线上现版', '图': '以一张大图为主', '文': '以文字为主', '肤': '线上现版换风格'};
+  var GROUP = {'现': '线上现版', '色': '线上现版换颜色', '图': '以一张大图为主', '文': '以文字为主', '肤': '线上现版换风格'};
   try { hide = sessionStorage.getItem('aimap.labhide') === '1'; } catch (e) {}
   fetch(base + 'styles.json').then(function (r) { return r.json(); }).then(function (S) {
     S.forEach(function (s) { s.url = s.dir ? base + s.dir + '/' : home; });
