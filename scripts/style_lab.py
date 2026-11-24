@@ -5,7 +5,7 @@
     python3 scripts/style_lab.py --publish             生成 docs/lab/
 
 /lab/ 只有一个页面：它是线上现版 docs/index.html 的一份副本，资源和数据请求都指回上一级的站点根目录，
-多加载一份可以原地更换的配色样式表（design_lab/colors/<名字>.css）和页面底部的色块条（design_lab/bar.js）。
+多加载浅色、深色各一份可以原地更换的配色样式表（design_lab/colors/l-<名字>.css、d-<名字>.css）和页面底部的色块条（design_lab/bar.js）。
 配色由 scripts/lab_colors.py 生成。现版自己的页面、样式和脚本都不改；现版改了 index.html 之后要重新发布一次。
 """
 import json
@@ -28,12 +28,13 @@ def colors():
 def lab_page():
     html = (DOCS / "index.html").read_text(encoding="utf-8")
     html = re.sub(r'\b(href|src)="(?!#|https?:|data:|/|\.\./|mailto:)([^"]+)"', r'\1="../\2"', html)
-    keys = "|".join(c["key"] for c in colors() if c["key"])
+    keys = json.dumps({m: [c["key"] for c in colors()[m] if c["key"]] for m in ("l", "d")}, separators=(",", ":"))
     head = ('<meta name="robots" content="noindex">\n'
-            "<script>(function(){var k=new URLSearchParams(location.search).get('c');"
-            "if(k==null)try{k=localStorage.getItem('aimap.lab.color')}catch(e){}"
-            f"window.LAB_KEY=/^({keys})$/.test(k||'')?k:'';"
-            "document.write('<link id=\"labcss\" rel=\"stylesheet\"'+(LAB_KEY?' href=\"colors/'+LAB_KEY+'.css\"':'')+'>')})()</script>\n")
+            f"<script>(function(){{var K={keys},q=new URLSearchParams(location.search);window.LAB_KEY={{}};"
+            "['l','d'].forEach(function(m){var k=q.get(m);"
+            "if(k==null)try{k=localStorage.getItem('aimap.lab.'+m)}catch(e){}"
+            "k=K[m].indexOf(k)<0?'':k;LAB_KEY[m]=k;"
+            "document.write('<link id=\"labcss-'+m+'\" rel=\"stylesheet\"'+(k?' href=\"colors/'+m+'-'+k+'.css\"':'')+'>')})})()</script>\n")
     shim = ("<script>(function(f){window.fetch=function(u,o){return f(typeof u==='string'&&u.indexOf('data/')===0?'../'+u:u,o)};"
             "document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;var h=a.getAttribute('href');"
             "if(/^(n\\/|c\\/|[a-z0-9_-]+\\.html)/.test(h))a.setAttribute('href','../'+h)},true)})(window.fetch)</script>\n")

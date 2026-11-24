@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""线上现版“只换颜色”的备选配色。生成 design_lab/colors/<名字>.css 和 design_lab/colors.json。
+"""线上现版“只换颜色”的最终备选：浅色五套、深色五套，分开选。
+生成 design_lab/colors/l-<名字>.css、d-<名字>.css 和 design_lab/colors.json。
 
-两类：
+最终备选在 FINAL 里，每一项指向下面两类来源之一（名字为空是现版本身，不生成文件）：
   SCHEMES  照着真实网站和公开配色方案的思路定的：每套给出深色、浅色各一组“纸、字、强调色”，
            其余的中间色（次要字、线、控件边）按现版的明暗层次在纸和字之间取；不带发光和首页的光晕。
   TINTS    把现版的颜色在 OKLCH 里整体转一个色相，其他都不动（发光也保留）。
+没进 FINAL 的来源留在这里备用，不生成文件。
 
-两类都只改颜色变量，版式、字体、十六条分支各自的颜色、“已读 / 解决 / 使用”这类有含义的红绿蓝都不动；
-深色、浅色、跟随系统三档照常切换。强调色对底色的对比度不到 4.5 时，脚本会自动把它调深（或调亮）到够，
-并在输出里标出来，所以个别强调色和参考来源的原值不完全一样。
+只改颜色变量，版式、字体、十六条分支各自的颜色、“已读 / 解决 / 使用”这类有含义的红绿蓝都不动。
+浅色文件只在浅色外观下生效，深色文件只在深色外观下生效，所以两边可以各选各的。
+强调色对底色的对比度不到 4.5 时，脚本会自动把它调深（或调亮）到够，并在输出里标出来。
 
-  python3 scripts/lab_colors.py          生成全部，并打印对比度
+  python3 scripts/lab_colors.py          生成，并打印对比度
   python3 scripts/lab_colors.py --check  只打印，不写文件
 """
 import json
@@ -73,6 +75,19 @@ TINTS = {
     "amber":    ("琥珀", "现版转色相：暖黑底、琥珀黄强调色", 78, 0.9, 1.1, None, None),
     "rose":     ("玫红", "现版转色相：酒红黑底、玫瑰粉强调色", 5, 0.9, 1.4, 0.8, None),
     "graphite": ("石墨", "现版去掉颜色：黑白灰，强调色是白（浅色下是黑）", 252, 0.12, 0.0, 0.93, 0.24),
+}
+# 最终备选。每项：(来源名字, 显示名, 一句说明)；来源名字为空是现版
+FINAL = {
+    "l": [("", "原版", "现在线上的浅色：淡绿白的纸、深绿"),
+          ("mono", "黑白", "纯白纸、纯黑字，不用任何彩色"),
+          ("news", "报纸", "新闻纸的米白、黑字，全页只有一处红"),
+          ("qinghua", "青花", "米白的纸、藏青的字、钴蓝"),
+          ("salmon", "粉纸", "三文鱼粉的纸、青绿的链接")],
+    "d": [("", "原版", "现在线上的深色：墨绿黑底、薄荷绿"),
+          ("amber", "琥珀", "现版换成暖色：暖黑底、琥珀黄"),
+          ("blue", "蓝", "现版换成蓝色：深海军蓝底、天蓝"),
+          ("cyan", "青", "现版换成青色：青黑底、湖青"),
+          ("graphite", "石墨", "现版去掉颜色：近黑的灰底、白")],
 }
 # 跟着换的变量；--red / --green / --blue 有固定含义，不动
 TOKENS = ["paper", "paper-2", "card", "ink", "ink-2", "muted", "rule", "rule-2", "ctl",
@@ -222,42 +237,50 @@ def shift(tokens, hue, cn, ca, acc_l):
     return out
 
 
-def css(note, d, l, extra=""):
-    decl = lambda t: ";".join(f"--{k}:{v}" for k, v in t.items())
-    return (f"/* {note}。由 scripts/lab_colors.py 生成，不要手改。\n"
-            "   只换颜色：版式、字体、分支各自的颜色都和现版一样；深色、浅色、跟随系统三档照常切换。 */\n"
-            "@media screen{\n"
-            f"html:root{{{decl(d)}}}\n"
-            f"html:root[data-theme=light]{{{decl(l)}}}\n"
-            f"@media (prefers-color-scheme:light){{html:root[data-theme=auto]{{{decl(l)}}}}}\n"
-            f"{extra}}}\n")
+def css(note, mode, t, flat=False):
+    """只在一种外观下生效：深色是没有 data-theme（或跟随系统且系统是深色），浅色是 data-theme=light（或跟随系统且系统是浅色）。
+    flat 为真时连首页标题后面那团淡淡的光晕也去掉。"""
+    decl = ";".join(f"--{k}:{v}" for k, v in t.items())
+    if mode == "l":
+        on, media = ["html:root[data-theme=light]"], "light"
+    else:
+        on, media = ["html:root:not([data-theme])", 'html:root[data-theme=""]', "html:root[data-theme=dark]"], "dark"
+    rule = lambda sels, suffix, body: ",".join(x + suffix for x in sels) + "{" + body + "}"
+    hide = "display:none"
+    return (f"/* {note}。由 scripts/lab_colors.py 生成，不要手改。只换颜色，只在{'浅色' if mode == 'l' else '深色'}外观下生效。 */\n"
+            "@media screen{\n" + rule(on, "", decl) + "\n" + (rule(on, " .hero::before", hide) + "\n" if flat else "")
+            + f"@media (prefers-color-scheme:{media}){{" + rule(["html:root[data-theme=auto]"], "", decl)
+            + (rule(["html:root[data-theme=auto]"], " .hero::before", hide) if flat else "") + "}\n}\n")
+
+
+def tokens(src, mode, base):
+    """来源名字 → 这一档外观下的整组变量和“调过”的说明。"""
+    if not src:
+        return base, []
+    if src in SCHEMES:
+        return scheme(SCHEMES[src][2 if mode == "d" else 3], mode == "d")
+    _, _, hue, cn, ca, ld, ll = TINTS[src]
+    return shift(base, hue, cn, ca, ld if mode == "d" else ll), []
 
 
 def main():
     src = SRC.read_text(encoding="utf-8")
-    dark, light = block(src, ":root{"), block(src, ":root[data-theme=light]{")
+    base = {"d": block(src, ":root{"), "l": block(src, ":root[data-theme=light]{")}
     check = "--check" in sys.argv
     pairs = [("正文", "ink", "paper"), ("次要字", "muted", "paper"), ("控件边", "ctl", "paper"), ("强调色", "accent", "paper"), ("强调色上的字", "accent-ink", "accent")]
-    pick = lambda t: {k: t[k] for k in ("paper", "ink", "accent")}
-    rows = [("", "原版", "现在线上的样子：墨绿黑底、薄荷绿强调色", "", dark, light, [])]
-    files = {}
-    for key, (name, note, d, l) in SCHEMES.items():
-        (dt, dn), (lt, ln) = scheme(d, True), scheme(l, False)
-        rows.append((key, name, note, "仿", dt, lt, ["深色 " + x for x in dn] + ["浅色 " + x for x in ln]))
-        files[key] = css(f"{name}：{note}", dt, lt, ".hero::before{display:none}\n")
-    for key, (name, note, hue, cn, ca, ld, ll) in TINTS.items():
-        dt, lt = shift(dark, hue, cn, ca, ld), shift(light, hue, cn, ca, ll)
-        rows.append((key, name, note, "转", dt, lt, []))
-        files[key] = css(f"{name}：{note}", dt, lt)
     print("对比度（%s）：" % " / ".join(p[0] for p in pairs))
-    low = 0
-    for key, name, note, group, d, l, notes in rows:
-        f = lambda t: " / ".join("%.1f" % contrast(t[a], t[b]) for _, a, b in pairs)
-        bad = [m for m, t in (("深色", d), ("浅色", l)) for _, a, b in pairs
-               if contrast(t[a], t[b]) < (3.0 if a == "ctl" else 4.5)]
-        low += len(bad)
-        print(f"  {name:4s} 深色 {f(d)}   浅色 {f(l)}" + ("   ← 有不够的：" + "、".join(bad) if bad else "")
-              + ("   调过：" + "；".join(notes) if notes else ""))
+    low, files, listing = 0, {}, {}
+    for mode, label in (("l", "浅色"), ("d", "深色")):
+        listing[mode] = []
+        for key, name, note in FINAL[mode]:
+            t, notes = tokens(key, mode, base[mode])
+            bad = [m for m, a, b in pairs if contrast(t[a], t[b]) < (3.0 if a == "ctl" else 4.5)]
+            low += len(bad)
+            print(f"  {label} {name:4s} " + " / ".join("%.1f" % contrast(t[a], t[b]) for _, a, b in pairs)
+                  + ("   ← 有不够的：" + "、".join(bad) if bad else "") + ("   调过：" + "；".join(notes) if notes else ""))
+            if key:
+                files[f"{mode}-{key}"] = css(f"{label} · {name}：{note}", mode, t, flat=key in SCHEMES)
+            listing[mode].append({"key": key, "name": name, "note": note, **{k: t[k] for k in ("paper", "ink", "accent")}})
     if check:
         return
     OUT.mkdir(parents=True, exist_ok=True)
@@ -265,9 +288,7 @@ def main():
         old.unlink()
     for key, text in files.items():
         (OUT / f"{key}.css").write_text(text, encoding="utf-8")
-    (LAB / "colors.json").write_text(json.dumps(
-        [{"key": k, "name": n, "note": note, "group": g, "d": pick(d), "l": pick(l)} for k, n, note, g, d, l, _ in rows],
-        ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    (LAB / "colors.json").write_text(json.dumps(listing, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"已写入 {len(files)} 个文件到 {OUT.relative_to(ROOT)}/，清单 design_lab/colors.json；对比度不够的有 {low} 处")
 
 
