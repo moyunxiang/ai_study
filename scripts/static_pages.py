@@ -113,7 +113,7 @@ class Site:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0B1411">
+<meta name="theme-color" content="#111213">
 <title>{h(title)} · AI脉络</title>
 <meta name="description" content="{h(desc)}">
 <link rel="canonical" href="{url}">
@@ -125,7 +125,7 @@ class Site:
 <meta property="og:url" content="{url}">
 <meta property="og:image" content="{SITE}assets/og.png">
 <meta name="twitter:card" content="summary">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230B1411'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%238EE5B0' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%238EE5B0'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%238EE5B0'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23E5F0E8'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="{rel}assets/style.css?v={self.cssv}">
 <script>try{{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}}catch(e){{}}</script>
 </head>

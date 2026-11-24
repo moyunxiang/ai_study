@@ -218,7 +218,7 @@ function initChrome() {
   const applyTheme = t => {
     if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
     themeBtn.textContent = '外观：' + ({light: '浅色', auto: '跟随系统'}[t] || '深色');
-    const m = $('meta[name=theme-color]'); if (m) m.content = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim() || '#0B1411';
+    const m = $('meta[name=theme-color]'); if (m) m.content = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim() || '#111213';
   };
   applyTheme(store.get('theme', ''));
   themeBtn.onclick = e => { e.stopPropagation(); const t = {light: 'auto', auto: ''}[store.get('theme', '')] ?? 'light'; store.set('theme', t); applyTheme(t); };      // 深色（默认）→ 浅色 → 跟随系统
