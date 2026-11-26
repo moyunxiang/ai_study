@@ -1,0 +1,29 @@
+{
+  "id": "nemotron-h",
+  "who": "NVIDIA（Aaron Blakeman, Aarti Basant, Abhinav Khattar, Adithya Renduchintala et al.）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2504.03624"}
+  ],
+  "aka": ["Nemotron-H", "Nemotron-H-56B", "Nemotron-H-8B", "MiniPuzzle", "混合Mamba-Transformer"],
+  "problem": "推理模型靠生成长思维链提升能力，推理阶段的计算和KV缓存成了主要成本；全注意力层的每token开销随上下文变长而增大。",
+  "idea": "把常规Transformer中大部分自注意力层换成Mamba层（每生成一个token计算和显存都是常数），只保留少量注意力层，训练8B和56B的混合模型；再用剪枝加蒸馏（MiniPuzzle）压出47B版本，并给出FP8训练配方。",
+  "impact": "在与Qwen-2.5、Llama-3.1同规模的对比中做到精度相当或更好、推理最快约3倍，是“少量注意力＋大量Mamba”混合路线在数十亿参数规模上的系统验证，后续的Nemotron 3等模型沿用了这一架构。",
+  "method": "背景：[[jamba]]和[[samba]]说明了Mamba与注意力混合可行，但多在较小规模或较少数据上验证；2025年推理模型兴起后，推理效率的价值进一步上升。[[mamba-2]]提供了更快的SSM层实现。\n\n**架构**：Nemotron-H在模型中只保留约8%的自注意力层，均匀分散在网络中，其余层为Mamba-2层和前馈层（比例为一般了解，摘要只说“替换了大多数注意力层”）。Mamba层生成每个token的计算和状态大小固定，因此长输出时速度优势明显。模型规模为8B和56B。\n\n**MiniPuzzle**：一种剪枝加蒸馏的压缩方法，从56B模型得到Nemotron-H-47B-Base，精度与56B相近、推理再快20%。\n\n**FP8训练**：作者给出基于[[fp8]]的训练配方，实验显示与BF16训练结果相当，并用它训练了56B模型。\n\n结果：摘要称Nemotron-H与同规模的开源Transformer模型（Qwen-2.5-7B/72B、Llama-3.1-8B/70B）相比精度更好或相当，推理最快达3倍；基础模型权重已在Hugging Face和NeMo上发布。",
+  "limits": [
+    {"text": "保留的注意力层很少，需要精确检索长上下文中多处细节的任务仍依赖那几层注意力；论文的长上下文评测范围有限。", "solved_by": ["kimi-linear"]},
+    {"text": "Mamba层的高效推理依赖专门的内核和推理框架支持，在通用推理引擎中的部署成熟度不如纯Transformer。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mamba-2", "type": "uses", "note": "大部分层采用Mamba-2，每token计算与显存为常数。"},
+    {"to": "jamba", "type": "extends", "note": "沿用Mamba与注意力混合的思路，把注意力比例压得更低并放大到56B规模、20万亿级数据。"},
+    {"to": "samba", "type": "rivals", "note": "Samba用滑窗注意力保持严格线性，Nemotron-H保留少量全注意力层以保证检索能力。"},
+    {"to": "nemotron-4-340b", "type": "extends", "note": "同属NVIDIA Nemotron系列，训练数据与后训练流程延续自此前的Nemotron模型。"},
+    {"to": "fp8", "type": "uses", "note": "提出FP8训练配方并用于训练56B模型。"}
+  ],
+  "prereq": ["state-space-model", "self-attention", "kv-cache", "knowledge-distillation", "floating-point"],
+  "terms": [
+    {"t": "剪枝加蒸馏", "d": "先去掉模型中不重要的层、通道或头，再用原模型的输出当老师训练变小后的模型，以较少算力得到更小的模型。"}
+  ],
+  "learn": "先读[[mamba]]、[[mamba-2]]和[[jamba]]；读原文关于层排布和推理吞吐的章节；动手：在同一推理框架里对比Nemotron-H-8B与Llama-3.1-8B生成8K token时的速度和显存。",
+  "check": {"source": "https://arxiv.org/abs/2504.03624", "confirmed": "标题、作者署名NVIDIA、arXiv v1提交日2025-04-04；摘要中8B与56B/47B混合Mamba-Transformer、把大多数自注意力层换成每token计算与显存恒定的Mamba层、与Qwen-2.5-7B/72B和Llama-3.1-8B/70B精度更好或相当、推理最快3倍、MiniPuzzle从56B压出47B精度相近快20%、FP8训练与BF16相当并用于56B、发布于Hugging Face和NeMo。注意力层约占8%、训练数据规模、延续Nemotron系列为一般了解。"}
+}

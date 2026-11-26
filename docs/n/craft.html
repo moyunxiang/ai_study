@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>CRAFT字符级文字检测（2019） · AI脉络</title>
+<meta name="description" content="场景文字检测器大多用单词级的矩形或四边形框训练，遇到弯曲、变形、任意方向的文字时框不住；而真实数据集只有单词级标注，没有逐字符的标注可用。 不直接框单词，而是预测两张热力图：每个像素是不是某个字符的中心（region score），以及是不是两个相邻字符之间的连接处（affinity score）…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/craft.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CRAFT字符级文字检测（2019）">
+<meta property="og:description" content="场景文字检测器大多用单词级的矩形或四边形框训练，遇到弯曲、变形、任意方向的文字时框不住；而真实数据集只有单词级标注，没有逐字符的标注可用。 不直接框单词，而是预测两张热力图：每个像素是不是某个字符的中心（region score），以及是不是两个相邻字符之间的连接处（affinity score）…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/craft.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/craft">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 目标检测</div>
+<h1>CRAFT字符级文字检测</h1>
+<div class="full">Character Region Awareness for Text Detection</div>
+<div class="meta"><span>2019.04</span><span>论文</span><span>延伸</span><span>CVPR 2019</span><span>Youngmin Baek, Bado Lee, Dongyoon Han, Sangdoo Yun, Hwalsuk Lee · NAVER Clova AI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1904.01941" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/clovaai/CRAFT-pytorch" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/craft">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>场景文字检测器大多用单词级的矩形或四边形框训练，遇到弯曲、变形、任意方向的文字时框不住；而真实数据集只有单词级标注，没有逐字符的标注可用。</p></div><div><h4>方法</h4><p>不直接框单词，而是预测两张热力图：每个像素是不是某个字符的中心（region score），以及是不是两个相邻字符之间的连接处（affinity score），再把字符连成单词；真实图片的字符标注由模型自己在训练中逐步估计。</p></div><div><h4>影响</h4><p>字符级的检测思路特别适合弯曲文字，CRAFT因官方开源代码好用，成为EasyOCR等开源OCR工具的默认文字检测器之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>CRAFT的网络是带批归一化的<a class="ln" href="../n/vgg.html">VGG</a>-16骨干加一个类似<a class="ln" href="../n/unet.html">U-Net</a>的上采样解码器，输出半分辨率的两张图：</p><ul><li><b>字符区域分数</b>：像素离某个字符中心越近值越高，用二维高斯热力图表示；</li><li><b>字符亲和分数</b>：相邻两个字符之间的“连接区域”，同样用高斯表示。</li></ul><p>推理时把两张图阈值化后求连通域，同一个连通域里的字符就组成一个单词，再按需要输出矩形或多边形框，因此天然能处理弯曲文字。</p><p>难点是监督信号：合成数据（SynthText）有字符框，真实数据只有单词框。CRAFT采用<b>弱监督</b>：用当前的中间模型在真实图片的单词框内预测字符区域，用分水岭算法切出字符框；再按“预测出的字符数与单词真实长度的吻合程度”给这份伪标注一个置信度，不可靠的伪标注权重小。随着训练进行，伪标注越来越准。</p><p>摘要称在包括TotalText和CTW-1500（含大量弯曲文字）在内的六个基准上显著超过当时最好的检测器，能检测任意方向、弯曲或变形的文字。</p><h2>后来的发展</h2><p>CRAFT与同年的<a class="ln" href="../n/dbnet.html">DBNet可微二值化</a>是开源OCR流水线里最常见的两种检测器：前者被EasyOCR采用，后者被<a class="ln" href="../n/pp-ocr.html">PaddleOCR / PP-OCR</a>采用。识别端通常接<a class="ln" href="../n/crnn.html">CRNN文字识别</a>一类模型。之后端到端的文档与场景文字理解逐渐被多模态大模型接管。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>靠后处理把字符连成单词，字符间距大或字符粘连时容易切错；推理也比分割式检测器慢。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/dbnet.html">DBNet可微二值化</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/vgg.html">VGG</a><span class="yr">2014.09 · 视觉</span><div class=nt>以带批归一化的VGG-16作骨干提取特征。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/unet.html">U-Net</a><span class="yr">2015.05 · 视觉</span><div class=nt>用U-Net式的跳连上采样解码器输出逐像素的字符与亲和热力图。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/east.html">EAST文字检测</a><span class="yr">2017.04 · 视觉</span><div class=nt>EAST直接回归单词级的旋转框或四边形，难以处理弯曲文字；CRAFT改为自下而上检测字符再连接。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/dbnet.html">DBNet可微二值化</a><span class="yr">2019.11 · 视觉</span><div class=nt>靠后处理把字符连成单词，字符间距大或字符粘连时容易切错；推理也比分割式检测器慢。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/semi-supervised.html">半监督学习与伪标签</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a></p>
+<h2>本篇术语</h2><ul><li><b>场景文字检测</b>　在街景、招牌、商品照片等自然图像里找出文字所在区域，比扫描文档难得多。</li><li><b>亲和分数</b>　表示某个像素落在相邻两个字符之间连接区域的可能性，用来把字符串成单词。</li></ul>
+<h2>怎么学</h2><p>先看EAST这类单词级检测器的输出形式，再读CRAFT第3节的两张热力图和弱监督流程图；用开源的CRAFT-pytorch跑一张弯曲招牌照片，把两张热力图叠加在原图上看。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1904.01941" rel="noopener">https://arxiv.org/abs/1904.01941</a>（arXiv记录：标题、五位作者、v1提交于2019-04-03；摘要中探索字符与字符间亲和、合成图用字符标注而真实图用中间模型估计的字符级真值、新的亲和表示、六个基准含TotalText和CTW-1500、可检测任意方向/弯曲/变形文字。VGG-16 BN骨干、高斯热力图、分水岭切分与置信度、EasyOCR采用、CVPR 2019凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20CRAFT%E5%AD%97%E7%AC%A6%E7%BA%A7%E6%96%87%E5%AD%97%E6%A3%80%E6%B5%8B%EF%BC%88craft%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acraft%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/craft.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="yolact.html"><small>本分支上一个 · 2019.04</small><b>YOLACT实例分割</b></a><a class="r" href="minkowskinet.html"><small>本分支下一个 · 2019.04</small><b>MinkowskiNet稀疏卷积</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

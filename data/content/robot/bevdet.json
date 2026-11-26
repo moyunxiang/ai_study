@@ -1,0 +1,29 @@
+{
+ "id": "bevdet",
+ "who": "Junjie Huang, Guan Huang, Zheng Zhu, Yun Ye, Dalong Du · PhiGent Robotics",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2112.11790"},
+  {"label": "代码", "url": "https://github.com/HuangJunJie2017/BEVDet"}
+ ],
+ "aka": ["BEVDet4D", "BEV三维检测"],
+ "problem": "纯相机三维检测多在每张图像上各自预测框（如FCOS3D），多相机的结果难以统一，速度也慢；而规划本来就在鸟瞰图上做。",
+ "idea": "用现成模块搭一条“图像编码→视角变换到鸟瞰图→BEV编码→检测头”的流水线，再配上专为BEV设计的数据增强和改进的NMS。",
+ "impact": "成为纯相机BEV检测最常用的基线和代码库之一，后续BEVDepth、BEVDet4D等直接在它上面改。",
+ "method": "自动驾驶车上通常装6个环视相机。早期纯视觉三维检测把每张图当成单目问题，在图像平面里直接回归三维框，再把各相机的结果拼起来，既不统一也很难加入时序和规划。\n\nBEVDet把整个任务搬到鸟瞰图（BEV）上：先用图像骨干网提取每张图的特征，再用[[lift-splat]]的视角变换——为每个像素预测一组深度概率，把特征“抬”到三维空间再“拍平”到地面网格——得到一张统一的BEV特征图，之后用BEV编码器和类似[[centerpoint]]的检测头输出三维框。作者发现这样搭起来的模型在BEV空间里容易过拟合，于是除了图像上的增强，还在BEV空间里单独做翻转、缩放、旋转增强；并把NMS换成按类别缩放框大小后再抑制的版本。\n\n在[[nuscenes]]验证集上，BEVDet-Tiny得到31.2% mAP、39.2% NDS，与FCOS3D相当，但计算量只有它的11%，速度快9.2倍；BEVDet-Base达到39.3% mAP、47.2% NDS，比FCOS3D高9.8个百分点mAP。之后同一团队加入时序融合得到BEVDet4D，旷视的BEVDepth则用激光雷达监督深度来改进它的视角变换。",
+ "limits": [
+  {"text": "像素深度只靠图像隐式学习，深度估计不准直接拖累三维定位精度。", "solved_by": ["bevfusion"]},
+  {"text": "单帧输入，无法估计物体速度，对遮挡也不鲁棒。", "solved_by": ["bevformer"]}
+ ],
+ "relations": [
+  {"to": "lift-splat", "type": "uses", "note": "视角变换直接沿用逐像素预测深度分布再投到BEV网格的做法。"},
+  {"to": "nuscenes", "type": "uses", "note": "在nuScenes三维检测基准上训练和评测。"},
+  {"to": "centerpoint", "type": "uses", "note": "BEV上的检测头采用中心点式的三维框预测。"},
+  {"to": "detr3d", "type": "rivals", "note": "DETR3D用三维查询回投到图像取特征，BEVDet先显式生成稠密BEV特征再检测。"}
+ ],
+ "prereq": ["camera-geometry", "3d-representation", "conv-layer", "vision-tasks", "data-augmentation", "anchor-nms"],
+ "terms": [
+  {"t": "NDS", "d": "nuScenes检测分数，综合mAP与位置、尺寸、朝向、速度、属性五类误差的加权指标，越高越好。"}
+ ],
+ "learn": "先读Lift-Splat-Shoot的视角变换，再读BEVDet第3节的BEV空间增强；官方代码库可在nuScenes mini上跑通。",
+ "check": {"source": "https://arxiv.org/abs/2112.11790", "confirmed": "标题、五位作者、v1提交日期2021-12-22；摘要中BEV范式、专用数据增强与NMS改进、BEVDet-Tiny 31.2% mAP/39.2% NDS、11%计算量与9.2倍速度、BEVDet-Base 39.3% mAP/47.2% NDS、比FCOS3D高9.8% mAP与10.0% NDS。机构PhiGent、BEV空间增强与按类缩放NMS的细节、BEVDet4D与BEVDepth的关系为凭一般了解。"}
+}

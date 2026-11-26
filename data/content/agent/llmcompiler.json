@@ -1,0 +1,26 @@
+{
+  "id": "llmcompiler",
+  "who": "Sehoon Kim, Suhong Moon, Ryan Tabrizi, Nicholas Lee, Michael W. Mahoney, Kurt Keutzer, Amir Gholami · 加州大学伯克利分校",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2312.04511"},
+    {"label": "GitHub", "url": "https://github.com/SqueezeAILab/LLMCompiler"}
+  ],
+  "aka": ["LLMCompiler", "LLM Compiler", "并行函数调用", "parallel function calling", "任务DAG规划", "工具调用编排", "Planner-Executor并行"],
+  "problem": "ReAct式智能体一次只调用一个函数，调用完再想下一步；彼此独立的多个查询（比如分别查两个人的年龄）也只能排队执行，延迟和费用都随步数累加。",
+  "idea": "借鉴编译器：先让LLM把任务规划成一张函数调用的依赖图（DAG），后续步骤用$1、$2等占位符引用前面的结果；调度器把没有依赖的调用并行派发给执行器，结果回填后再继续。",
+  "impact": "在多个基准上相比ReAct最多降低延迟3.7倍、费用6.7倍，准确率最多提高约9%；并行工具调用此后成为智能体框架（如LangGraph）和模型API的常见能力。",
+  "method": "三个组件：\n- **函数调用规划器**：LLM一次写出全部任务及其依赖，例如问「微软和苹果谁的市值更高」，计划是 `1. search(微软市值)`、`2. search(苹果市值)`、`3. compare($1, $2)`。1和2互不依赖，3要等它们的结果。\n- **任务调度单元**：按依赖关系找出已就绪的任务派发出去，并把$1、$2替换成真实结果。\n- **执行器**：并行运行这些函数调用。\n\n与[[rewoo]]一样先写计划再执行，但ReWOO按顺序执行，LLMCompiler把计划看成图并行执行；对于Game of 24这类需要根据中间结果改变策略的任务，执行器的结果还可以回传给规划器做**动态重规划**。\n\n作者在[[hotpotqa]]、电影推荐、自建的ParallelQA、Game of 24和[[webshop]]上，用GPT-3.5、GPT-4和[[llama-2]] 70B实验，并与[[react]]以及OpenAI当时新推出的并行函数调用对比。以HotpotQA为例，用GPT时比ReAct快1.8倍（3.95秒对7.12秒）、费用降低3.37倍；摘要报告的跨任务最大值为延迟3.7倍、费用6.7倍、准确率约+9%。",
+  "limits": [
+    {"text": "计划质量完全依赖规划器一次性拆解任务的能力，拆错依赖关系会导致并行执行出错。", "solved_by": []},
+    {"text": "只对可预先拆成独立子任务的问题收益大，强依赖观察结果、每步都要临场决定的任务很难并行。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "react", "type": "solves", "note": "把ReAct一步一调用的串行执行改为按依赖图并行调用，降低延迟与费用。"},
+    {"to": "rewoo", "type": "extends", "note": "同样先规划后执行并用变量引用未来结果，进一步把计划变成可并行的DAG并支持重规划。"},
+    {"to": "function-calling", "type": "uses", "note": "被编排的就是标准的函数调用；也与OpenAI的并行函数调用做了对比。"},
+    {"to": "hotpotqa", "type": "uses", "note": "主要评测基准之一。"}
+  ],
+  "prereq": ["tool-calling", "agent-loop", "graph-basics", "throughput-latency"],
+  "learn": "先读[[react]]和[[rewoo]] → 读原文第3节三个组件与图2 → 动手：用asyncio实现一个最小版本，让LLM输出带$1占位符的计划，再按依赖并行执行两个搜索调用。",
+  "check": {"source": "https://arxiv.org/abs/2312.04511", "confirmed": "标题、作者、v1提交于2023-12-07；摘要中三组件、受编译器启发、最多3.7倍延迟、6.7倍费用、约9%准确率提升；正文（arxiv.org/html/2312.04511）核对DAG与$1占位符、动态重规划、五个基准、GPT-3.5/GPT-4/LLaMA-2 70B、与OpenAI并行函数调用对比、HotpotQA 1.80倍（3.95s对7.12s）与3.37倍费用降低。市值例子为说明性示例；venue未确认故未写。"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "masactrl",
+  "who": "Mingdeng Cao, Xintao Wang, Zhongang Qi, Ying Shan, Xiaohu Qie, Yinqiang Zheng · 东京大学 / 腾讯ARC Lab",
+  "venue": "ICCV 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2304.08465"},
+    {"label": "代码", "url": "https://github.com/TencentARC/MasaCtrl"}
+  ],
+  "aka": ["MasaCtrl", "互自注意力控制", "Mutual Self-Attention Control", "非刚性编辑"],
+  "problem": "[[prompt-to-prompt]]等免训练编辑能换颜色、换物体，却做不了“让坐着的猫站起来”这类改姿态的非刚性编辑；生成同一角色的不同姿势也难保持外观一致，否则就要逐图微调。",
+  "idea": "把扩散U-Net里的自注意力改成“互自注意力”：生成目标图时，查询来自目标图自己，键和值则取自源图，于是目标图可以按新的布局去源图里“取”纹理和外观；再用交叉注意力图提取的遮罩区分前景和背景。",
+  "impact": "无需训练和微调即可同时做一致的多图生成与复杂的非刚性编辑，还能直接配合[[controlnet]]、[[t2i-adapter]]按姿态生成；“共享键值注意力”成为之后一致性生成与编辑的常用技巧。",
+  "method": "关键观察是：在扩散U-Net中，自注意力的查询Q决定“这个位置该画什么结构”，键K和值V携带的是可被查询到的纹理和外观内容。\n\nMasaCtrl的流程：先对源图（真实图像经DDIM反演，或直接生成）跑一遍去噪，记下各层自注意力的K和V。生成目标图时，提示词改成新的动作（如“一只站着的猫”），前若干步正常去噪，让新的布局和姿态先形成；之后在U-Net解码器的部分层，把自注意力替换为**互自注意力**：`Attention(Q_目标, K_源, V_源)`。目标图按自己的新结构去源图里查找对应的局部内容，因而外观、纹理和身份得以保持，而姿态由新提示决定。\n\n如果前景和背景相似，查询会“认错”区域。作者从交叉注意力图里提取主体的遮罩，让前景只查询源图的前景、背景只查询背景（**遮罩引导的互自注意力**）。整个方法不需要训练，也不需要逐图微调。论文展示了它在一致多图生成与真实图像非刚性编辑上的效果，并可与姿态、草图等可控生成模块组合使用。",
+  "limits": [
+    {"text": "姿态变化很大或需要出现源图里看不到的部分（如转到背面）时，外观会出错；步数和层数的选择也需要按图调。", "solved_by": ["flux-kontext"]}
+  ],
+  "relations": [
+    {"to": "prompt-to-prompt", "type": "solves", "note": "P2P通过交叉注意力保留布局，难以做改变结构的非刚性编辑；MasaCtrl改为在自注意力里从源图取外观，让结构可以变化。"},
+    {"to": "pnp-diffusion", "type": "extends", "note": "同样操作U-Net内部特征做免训练编辑，但注入的是源图的键值而不是空间特征。"},
+    {"to": "stable-diffusion", "type": "uses", "note": "在Stable Diffusion的U-Net自注意力层上实现。"},
+    {"to": "ddim", "type": "uses", "note": "用DDIM反演把真实图像变回噪声，以便取出它的键和值。"}
+  ],
+  "prereq": ["self-attention", "attention-concept", "diffusion-process", "guidance"],
+  "terms": [
+    {"t": "非刚性编辑", "d": "改变物体的姿态、动作或形状（如抬手、转身），而不只是换颜色或替换物体。"}
+  ],
+  "learn": "先读Prompt-to-Prompt和自注意力中Q、K、V的角色 → 读本文第3节互自注意力和遮罩策略 → 用开源代码在不同起始步、不同层替换，观察结构与外观的平衡。",
+  "check": {"source": "https://arxiv.org/abs/2304.08465", "confirmed": "标题、六位作者、v1日期2023-04-17、摘要中现有方法难以生成同一对象不同姿态及做非刚性编辑、免调优、把自注意力改为互自注意力从源图查询局部内容与纹理、遮罩引导的互自注意力且遮罩来自交叉注意力图；机构、ICCV 2023、替换的步数与层、配合ControlNet/T2I-Adapter来自一般了解"}
+}

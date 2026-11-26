@@ -1,0 +1,31 @@
+{
+  "id": "seed-asr",
+  "who": "Ye Bai, Jingping Chen, Jitong Chen, Wei Chen, Zhuo Chen, Chuang Ding, Linhao Dong, Qianqian Dong et al. · 字节跳动Seed团队",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2407.04675"}
+  ],
+  "problem": "传统端到端识别模型加外部语言模型，在训练数据覆盖的场景里很好，但遇到新领域、口音方言、专有名词和需要上下文的场合就逐渐碰到瓶颈。",
+  "idea": "把一个约20亿参数的自监督语音编码器接到百亿级大语言模型上，先在近90万小时标注数据上微调，再专门训练利用上下文（对话历史、人名表等）的能力，最后用强化学习直接优化错误率。",
+  "impact": "Seed-ASR展示了「语音编码器+大语言模型」路线在工业级中英文识别上的优势，报告比当时公开大模型低10%–40%的错误率；此后FireRedASR等工作都沿这一路线做开源工业级识别。",
+  "method": "此前的大规模识别模型以[[whisper]]为代表，是专门训练的编码器-解码器；[[salmonn]]、[[qwen-audio]]等工作已经把语音编码器接进大语言模型（LLM），但主要面向音频理解，识别精度和工业场景的覆盖还不够。\n\nSeed-ASR称自己的框架为**音频条件LLM（AcLLM）**：连续的语音表示、一段指令和可选的上下文文本一起输入LLM，由LLM生成转写文字。语音编码器叫LUISE，是[[conformer]]结构、近20亿参数，用BERT式的掩码预测（见[[c:masked-modeling]]）在中文770万小时、多语言1240万小时的无标注语音上自监督预训练；编码器输出每4帧拼接后线性投影，从40毫秒一帧降到160毫秒一帧再送入LLM（一个参数超过百亿的混合专家模型）。训练分四步：编码器自监督；冻结LLM、用中文56.2万小时和多语言31.4万小时标注数据做监督微调；混入「上下文-语音-文本」三元组做上下文微调，让模型学会利用对话历史或热词；最后用以加权词错误率为奖励的强化学习（最小词错误率目标与交叉熵插值）进一步优化。\n\n摘要报告：在覆盖多领域、口音方言和多语言的综合评测集上明显优于端到端模型，在中英文公开测试集上比当时发布的大型识别模型错误率低10%–40%，而且部署到新场景时不需要额外的语言模型。",
+  "limits": [
+    {"text": "模型和训练数据都未开源，外界无法复现，只能看技术报告里的结果。", "solved_by": ["fireredasr"]},
+    {"text": "百亿级LLM解码比专用识别模型慢得多、成本高，难以端侧或大规模低成本部署。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "whisper", "type": "rivals", "note": "Whisper是专用编码器-解码器的大规模识别模型；Seed-ASR用LLM作解码器，报告在中英文公开集上错误率更低。"},
+    {"to": "salmonn", "type": "extends", "note": "同样把语音编码器接进LLM，Seed-ASR把这一路线专门做成高精度、可利用上下文的识别系统。"},
+    {"to": "qwen-audio", "type": "rivals", "note": "Qwen-Audio面向通用音频理解，Seed-ASR专攻识别并加入上下文微调和强化学习。"},
+    {"to": "conformer", "type": "uses", "note": "语音编码器LUISE采用Conformer结构。"}
+  ],
+  "prereq": ["self-supervised", "masked-modeling", "language-model", "word-error-rate", "mixture-of-experts", "policy-gradient-concept"],
+  "terms": [
+    {"t": "上下文识别", "d": "把对话历史、视频标题、通讯录人名等相关文字一起给模型，帮助它识别同音或罕见词。"},
+    {"t": "最小词错误率训练（MWER）", "d": "直接以期望词错误率为目标优化识别模型，而不只是逐词交叉熵。"}
+  ],
+  "aka": ["Seed-ASR", "豆包语音识别", "AcLLM"],
+  "check": {
+    "source": "https://arxiv.org/abs/2407.04675",
+    "confirmed": "arXiv官方记录：标题Seed-ASR: Understanding Diverse Speech and Contexts with LLM-based Speech Recognition、Ye Bai等55位作者、v1提交2024-07-05；摘要中的AcLLM、分阶段大规模训练、上下文能力、10%–40%错误率下降。arXiv HTML正文：LUISE为Conformer约20亿参数、无标注中文7.7M小时/多语言12.4M小时、4帧拼接至160ms、LLM为百亿以上参数MoE、SFT数据56.2万/31.4万小时、上下文SFT、MWER与加权WER奖励的RL。字节跳动Seed团队为一般了解。"
+  }
+}

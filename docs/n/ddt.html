@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DDT解耦扩散Transformer（2025） · AI脉络</title>
+<meta name="description" content="扩散Transformer每一步都用同一组层既提取低频语义、又解码高频细节；编码语义需要压低高频成分，解码又需要恢复高频，两者在同一组参数里互相牵制，导致训练慢。 把DiT拆成两部分：一个专门提取语义的条件编码器，和一个专门预测速度（高频细节）的解码器；并利用编码器输出在相邻步之间变化很慢的特点，…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ddt.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DDT解耦扩散Transformer（2025）">
+<meta property="og:description" content="扩散Transformer每一步都用同一组层既提取低频语义、又解码高频细节；编码语义需要压低高频成分，解码又需要恢复高频，两者在同一组参数里互相牵制，导致训练慢。 把DiT拆成两部分：一个专门提取语义的条件编码器，和一个专门预测速度（高频细节）的解码器；并利用编码器输出在相邻步之间变化很慢的特点，…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ddt.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ddt">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 潜空间与骨架网络</div>
+<h1>DDT解耦扩散Transformer</h1>
+<div class="full">DDT: Decoupled Diffusion Transformer</div>
+<div class="meta"><span>2025.04</span><span>论文</span><span>延伸</span><span>Shuai Wang, Zhi Tian, Weilin Huang, Limin Wang · 南京大学 / 字节跳动Seed</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2504.05741" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/ddt">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>扩散Transformer每一步都用同一组层既提取低频语义、又解码高频细节；编码语义需要压低高频成分，解码又需要恢复高频，两者在同一组参数里互相牵制，导致训练慢。</p></div><div><h4>方法</h4><p>把DiT拆成两部分：一个专门提取语义的条件编码器，和一个专门预测速度（高频细节）的解码器；并利用编码器输出在相邻步之间变化很慢的特点，在推理时跨步共享，以加速采样。</p></div><div><h4>影响</h4><p>论文报告DDT-XL/2在ImageNet 256上FID 1.31、512上1.28，训练收敛比此前扩散Transformer快近4倍；“编码器-解码器解耦”的DiT结构此后被一些像素与潜空间扩散工作采用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>论文从频率的角度看去噪：每一步输入是加噪的潜变量，网络先要从中读出低频的语义（图里有什么、大致布局），再据此生成高频的细节。标准<a class="ln" href="../n/dit.html">Diffusion Transformer</a>所有层一视同仁，语义编码和细节解码挤在同一组模块里，形成优化上的两难。</p><p>DDT的结构是：</p><ul><li><b>条件编码器</b>：较深的一组Transformer层，输入加噪潜变量、时间步和类别，输出一个“自条件”特征，专注于语义；训练时可配合<a class="ln" href="../n/repa.html">表征对齐REPA</a>式的表征对齐，让它与预训练视觉特征对齐。</li><li><b>速度解码器</b>：较浅的一组层，以加噪潜变量为输入、以编码器的特征为条件，预测流匹配所需的速度。</li></ul><p>实验发现，模型越大，把更多层分给编码器越有利；DDT-XL/2用22层编码器加6层解码器，总层数与DiT-XL/2相同。</p><p>推理时，相邻两步的编码器输出非常接近，因此可以只在部分步上计算编码器、其余步复用。作者用统计意义上的动态规划来决定在哪些步重算，使质量下降最小。</p><p>论文报告DDT-XL/2在ImageNet 256×256上取得FID 1.31（训练收敛比以往扩散Transformer快近4倍），在512×512上取得FID 1.28，均为当时最好。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>主要在ImageNet类别条件生成上验证，大规模文生图和视频中的收益与最佳编码器/解码器比例尚待系统研究。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/dit.html">Diffusion Transformer</a><span class="yr">2022.12 · 生成</span><div class=nt>指出DiT语义编码与高频解码共用模块造成的优化两难，并用解耦结构加速收敛。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/repa.html">表征对齐REPA</a><span class="yr">2024.10 · 生成</span><div class=nt>训练中配合REPA式的表征对齐，强化编码器的语义特征。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/sit.html">SiT插值Transformer</a><span class="yr">2024.01 · 生成</span><div class=nt>沿用SiT式流匹配/插值训练目标，解码器预测速度。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/normalizing-flow.html">可逆流与流匹配</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a> <a class="chip c" href="../c/fourier-transform.html">傅里叶变换与频域</a></p>
+<h2>本篇术语</h2><ul><li><b>速度预测</b>　流匹配模型中，网络输出的是样本在当前时刻沿生成路径移动的方向和快慢，而不是噪声本身。</li></ul>
+<h2>怎么学</h2><p>先读DiT、SiT和REPA → 读本文第3节频率视角的分析与编码器/解码器比例实验 → 尝试在推理时复用编码器特征，观察速度与FID的变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2504.05741" rel="noopener">https://arxiv.org/abs/2504.05741</a>（标题、四位作者、v1日期2025-04-08、摘要中每步编码低频语义再解码高频的两难、专门的条件编码器与速度解码器、模型越大编码器越大越好、ImageNet 256 FID 1.31（收敛快近4倍）、512 FID 1.28、相邻步共享自条件加速推理、统计动态规划确定共享策略；arXiv HTML正文确认训练采用REPA表征对齐（对齐DINOv2特征）、DDT-XL/2为22层编码器6层解码器；机构、后续采用情况来自一般了解，未查到正式会议信息）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DDT%E8%A7%A3%E8%80%A6%E6%89%A9%E6%95%A3Transformer%EF%BC%88ddt%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Addt%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ddt.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="skyreels-v2.html"><small>本分支上一个 · 2025.04</small><b>SkyReels-V2无限时长</b></a><a class="r" href="step1x-edit.html"><small>本分支下一个 · 2025.04</small><b>Step1X-Edit通用编辑</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SGD的算法稳定性（2015） · AI脉络</title>
+<meta name="description" content="VC维、Rademacher这类界只看模型族有多大，和用什么算法、训多久无关；可实践中同一个网络，训练方式不同泛化差别很大，理论上缺一个能把训练过程本身算进来的工具。 不分析模型族，而分析算法：如果把训练集里换掉一个样本，SGD输出的参数只变化很少（均匀稳定），那么它的泛化误差就小。作者证明迭代次…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sgd-stability.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SGD的算法稳定性（2015）">
+<meta property="og:description" content="VC维、Rademacher这类界只看模型族有多大，和用什么算法、训多久无关；可实践中同一个网络，训练方式不同泛化差别很大，理论上缺一个能把训练过程本身算进来的工具。 不分析模型族，而分析算法：如果把训练集里换掉一个样本，SGD输出的参数只变化很少（均匀稳定），那么它的泛化误差就小。作者证明迭代次…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sgd-stability.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sgd-stability">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 泛化与学习理论</div>
+<h1>SGD的算法稳定性</h1>
+<div class="full">Train faster, generalize better: Stability of stochastic gradient descent</div>
+<div class="meta"><span>2015.09</span><span>论文</span><span>延伸</span><span>ICML 2016</span><span>Moritz Hardt, Benjamin Recht, Yoram Singer · Google、加州大学伯克利分校</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1509.01240" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/sgd-stability">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>VC维、Rademacher这类界只看模型族有多大，和用什么算法、训多久无关；可实践中同一个网络，训练方式不同泛化差别很大，理论上缺一个能把训练过程本身算进来的工具。</p></div><div><h4>方法</h4><p>不分析模型族，而分析算法：如果把训练集里换掉一个样本，SGD输出的参数只变化很少（均匀稳定），那么它的泛化误差就小。作者证明迭代次数不多的SGD在凸和非凸光滑损失上都满足这一点。</p></div><div><h4>影响</h4><p>把Bousquet与Elisseeff的算法稳定性理论带进深度学习，给“训得快、早停、权重衰减有助于泛化”提供了一种与模型容量无关的解释，成为稳定性类泛化分析的起点之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>算法稳定性的定义是：两个只差一个样本的训练集，分别跑同一个算法，得到的两个模型在任意输入上的损失差不超过β。Bousquet与Elisseeff 2002年证明，β越小，期望泛化误差（测试损失减训练损失）就越小，且这个结论不依赖模型族的容量。</p><p>本文对随机梯度方法逐步追踪这两条训练轨迹。两条轨迹只在抽到那个不同样本的步才会被“推开”；其余各步用的是同一个样本，若损失是凸且光滑的，一步梯度更新不会放大两者的距离。由于每一步抽到那个样本的概率只有1/n，累计差距大约与<code>（各步步长之和）/n</code>成正比。于是结论是：在凸情形下，只要步长之和不太大，即使多轮遍历数据也能泛化；在非凸情形下，梯度步可能放大差距，界会随迭代次数增长更快，所以训练时间越短越稳定。作者据此论证：权重衰减、梯度裁剪、Dropout以及减少训练时间，在这种意义上都是促进稳定性的做法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>非凸情形下的界随迭代步数增长较快，对需要训练很多轮的现代深度网络，给出的数值保证依然很松。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>需要损失对参数是Lipschitz且光滑的假设，带ReLU、归一化层的实际网络并不严格满足。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/vc-dimension.html">VC维与一致收敛</a><span class="yr">1971 · 基础</span><div class=nt>VC类界只看模型族容量；稳定性界只看算法对单个样本的敏感度，与容量无关。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/dropout.html">Dropout</a><span class="yr">2012.07 · 基础</span><div class=nt>把Dropout等常用训练技巧解释为促进稳定性的做法。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/sgd.html">随机梯度下降</a><span class="yr">1951 · 基础</span><div class=nt>分析对象是随机梯度方法本身，把迭代次数和步长写进泛化界。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/weight-decay.html">权重衰减</a><span class="yr">1991 · 基础</span><div class=nt>论证权重衰减会让每步更新收缩，从而提高稳定性、减小泛化误差。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/generalization.html">泛化与过拟合</a> <a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="../c/convexity.html">凸函数与凸优化</a> <a class="chip c" href="../c/learning-rate.html">学习率与学习率调度</a> <a class="chip c" href="../c/derivative-gradient.html">导数、偏导与梯度</a></p>
+<h2>本篇术语</h2><ul><li><b>均匀稳定性</b>　训练集里任意换掉一个样本，算法输出的模型在任何输入上的损失变化都不超过β；β越小，算法越不依赖个别样本。</li></ul>
+<h2>怎么学</h2><p>先复习<a class="lc" href="../c/convexity.html">凸函数与凸优化</a>和<a class="ln" href="../n/sgd.html">随机梯度下降</a>；读论文第2节稳定性定义与第3节凸情形的证明，这一段只用到三角不等式和梯度步的非扩张性；动手：在逻辑回归上用两份只差一个样本的数据跑SGD，画出两条参数轨迹的距离随步数的变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1509.01240" rel="noopener">https://arxiv.org/abs/1509.01240</a>（标题、3位作者、arXiv v1提交于2015-09-03；摘要中迭代次数少的随机梯度方法泛化误差趋于零、在Bousquet与Elisseeff意义下算法稳定、凸与非凸在Lipschitz和光滑假设下的稳定性界、多轮SGD为何泛化、常用深度模型训练技巧是促进稳定性的。ICML 2016、机构、界与步长之和除以n成正比的形式来自一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SGD%E7%9A%84%E7%AE%97%E6%B3%95%E7%A8%B3%E5%AE%9A%E6%80%A7%EF%BC%88sgd-stability%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asgd-stability%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sgd-stability.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="vat.html"><small>本分支上一个 · 2015.07</small><b>虚拟对抗训练VAT</b></a><a class="r" href="elu.html"><small>本分支下一个 · 2015.11</small><b>ELU指数线性单元</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

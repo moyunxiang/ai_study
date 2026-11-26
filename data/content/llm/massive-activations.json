@@ -1,0 +1,31 @@
+{
+  "id": "massive-activations",
+  "who": "Mingjie Sun, Xinlei Chen, J. Zico Kolter, Zhuang Liu · 卡内基梅隆大学、Meta AI、Bosch",
+  "venue": "COLM 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2402.17762"},
+    {"label": "GitHub", "url": "https://github.com/locuslab/massive-activations"}
+  ],
+  "aka": ["Massive Activations", "巨量激活", "超大激活值", "activation outliers", "注意力汇聚的成因"],
+  "problem": "人们早就注意到大模型里有极少数数值异常大的激活（给量化带来麻烦），也发现注意力会大量集中到首个token上（注意力汇聚），但不清楚这些现象是什么、从哪来、有什么用。",
+  "idea": "系统测量多种LLM的隐藏状态，发现极少数激活比其他值大到约10万倍，它们出现在固定的维度和固定的token（如开头token、分隔符）上，数值几乎不随输入变化，实际上充当模型内部不可缺少的偏置项。",
+  "impact": "把“超大激活”和“注意力汇聚”联系起来：正是这些激活让注意力集中到对应token上、在注意力输出中形成隐式偏置。后来的门控注意力等架构改进把消除这类现象当作目标之一。",
+  "method": "背景：[[streamingllm]]发现删掉开头几个token的KV缓存会让模型崩溃，称之为注意力汇聚（attention sink）；量化研究也发现少数离群激活是低比特量化的主要障碍。两者的关系没有人讲清。\n\n**观察**：作者检查[[llama-2]]、Mixtral、[[gpt-2]]等多个模型每层的隐藏状态，发现极少数激活的绝对值比中位数大几个数量级（例如大到10万倍），作者称为**巨量激活**（massive activations）。它们有三个特点：只出现在极少数固定的特征维度上；只出现在少数token上，例如序列的第一个token、句号或换行这类分隔符；在模型前几层突然出现，之后几乎保持不变，而且数值基本不随输入内容变化。\n\n**作用**：把这些激活置零，模型性能会崩溃；把它们换成在多个输入上求得的平均值，模型几乎不受影响。说明它们起的是固定偏置的作用。进一步分析显示，巨量激活所在的token会吸走大量注意力概率，从而在自注意力输出中引入隐式的偏置项，这为注意力汇聚提供了一种解释。作者还尝试给注意力显式加上可学习的键值偏置，此时模型训练中就不再产生巨量激活。作者在视觉Transformer中也观察到类似现象。",
+  "limits": [
+    {"text": "主要是现象描述和干预实验，并没有给出在标准预训练中避免巨量激活的通用方案；显式注意力偏置只在较小规模上验证。", "solved_by": ["gated-attention"]},
+    {"text": "巨量激活对低比特量化和长上下文推理的具体影响只做了初步讨论，工程上仍需专门处理离群值。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "streamingllm", "type": "extends", "note": "StreamingLLM发现注意力汇聚，本文指出巨量激活是注意力集中到这些token上的原因，并把它解释为隐式偏置。"},
+    {"to": "llama-2", "type": "uses", "note": "主要分析对象之一，巨量激活在LLaMA2系列中被详细定位。"},
+    {"to": "gpt-2", "type": "uses", "note": "在GPT-2等多种模型中验证现象的普遍性。"},
+    {"to": "ffn-key-value", "type": "extends", "note": "同属解释Transformer内部表示的工作，本文关注的是数值上的离群激活而不是知识存储。"}
+  ],
+  "prereq": ["self-attention", "softmax", "residual-connection", "quantization-concept", "transformer-block"],
+  "terms": [
+    {"t": "注意力汇聚（attention sink）", "d": "很多注意力头把大部分注意力权重放在序列开头的token上，即使它与内容无关。"},
+    {"t": "离群激活（outlier）", "d": "数值远大于同层其他激活的少数元素，量化时会拉大数值范围，使其余值的精度变差。"}
+  ],
+  "learn": "先读[[streamingllm]]了解注意力汇聚；读原文第2节定位巨量激活、第3节置零与均值替换的干预实验；动手：用Hugging Face加载一个小LLaMA类模型，打印每层隐藏状态绝对值最大的几个元素和它们所在的token与维度。",
+  "check": {"source": "https://arxiv.org/abs/2402.17762", "confirmed": "标题、4位作者、arXiv v1提交日2024-02-27；摘要中极少数激活比其他值大很多（如10万倍）、广泛存在于各种LLM并刻画了位置、数值基本不随输入变化而作为不可缺少的偏置项、导致注意力概率集中到对应token并在自注意力输出中形成隐式偏置、ViT中也有。置零与均值替换实验、显式注意力偏置、COLM 2024、作者机构为一般了解。"}
+}

@@ -1,0 +1,26 @@
+{
+ "id": "cllm",
+ "who": "Siqi Kou, Lanxiang Hu, Zhezhi He, Zhijie Deng, Hao Zhang · 上海交通大学, 加州大学圣地亚哥分校",
+ "venue": "ICML 2024",
+ "aka": ["CLLMs", "Consistency LLM", "一致性大语言模型", "Jacobi解码", "Jacobi decoding", "雅可比解码"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2403.00835"},
+  {"label": "GitHub", "url": "https://github.com/hao-ai-lab/Consistency_LLM"}
+ ],
+ "problem": "Jacobi解码把逐词生成改写成一组可以并行迭代的方程，理论上一步能定下多个词，但实际中一次迭代很少能猜对超过一个词，几乎没有加速。",
+ "idea": "微调目标模型本身，让它从Jacobi迭代轨迹上的任意中间状态都尽快跳到最终的不动点，于是一次迭代能确定更多词。",
+ "impact": "给“不加草稿模型、靠改造模型本身来并行解码”提供了一条路线，2.4–3.4倍的加速让Jacobi类并行解码重新受到关注。",
+ "method": "贪心解码可以写成：给定前缀，未来n个词y₁…yₙ满足 `yᵢ = argmax p(· | 前缀, y₁…yᵢ₋₁)`。Jacobi解码先随便猜一串n个词，然后把这n个等式并行地同时更新一轮，反复迭代直到不再变化——这个不动点就是普通贪心解码的结果。每轮只需一次前向，若一轮能“锁定”多个词就能提速。但对普通模型，前面的词一错，后面就跟着错，通常一轮只锁定一个词，与逐词解码无异（[[lookahead-decoding]]就是想在这上面挖出更多可用的n-gram）。\n\nCLLM的做法类似[[consistency-models]]：先用目标模型跑Jacobi解码收集迭代轨迹，然后微调模型，让它输入轨迹上任何一个中间状态时，都尽量直接输出不动点（一致性损失），同时保留普通的自回归损失以免质量下降。训练后，模型在一轮迭代中能正确预测多个连续词，还会出现“提前定下后面某些固定搭配词”的现象。\n\n摘要报告：在领域专用和开放领域基准上生成速度提高2.4–3.4倍，同时保持生成质量。",
+ "limits": [
+  {"text": "需要对每个目标模型重新收集Jacobi轨迹并微调，改动了模型权重，不像外挂草稿那样可以即插即用。", "solved_by": []},
+  {"text": "只针对贪心解码的不动点，用于随机采样时难以保证与原模型分布一致。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "lookahead-decoding", "type": "rivals", "note": "两者都基于Jacobi迭代：Lookahead不改模型，靠收集n-gram候选提速；CLLM直接微调模型让迭代更快收敛。"},
+  {"to": "consistency-models", "type": "extends", "note": "借用扩散模型里“从轨迹任意点一步映射到终点”的一致性训练思想，用到语言模型的Jacobi轨迹上。"},
+  {"to": "speculative-decoding", "type": "rivals", "note": "推测解码靠额外草稿模型并保持分布不变；CLLM不需要草稿模型，但要微调目标模型本身。"}
+ ],
+ "prereq": ["autoregressive", "decoding-sampling", "pretrain-finetune", "throughput-latency"],
+ "terms": [{"t": "不动点", "d": "反复迭代一个更新规则后不再变化的状态；Jacobi解码的不动点就是贪心解码的输出。"}],
+ "check": {"source": "https://arxiv.org/abs/2403.00835", "confirmed": "标题、五位作者、v1日期2024-02-28；摘要：Jacobi解码可把逐词解码转为可并行计算、实际中很少一次预测多个词因此加速有限、微调目标模型从任意状态快速收敛到Jacobi轨迹的不动点、生成速度提高2.4–3.4倍并保持质量。损失由一致性损失和自回归损失组成、提前确定固定搭配的现象、ICML 2024与机构为一般了解。"}
+}

@@ -1,0 +1,24 @@
+{
+ "id": "hf-accelerate",
+ "who": "Sylvain Gugger等 · Hugging Face",
+ "aka": ["Accelerate", "🤗 Accelerate", "HF Accelerate", "accelerate launch", "Accelerator"],
+ "links": [
+  {"label": "GitHub", "url": "https://github.com/huggingface/accelerate"},
+  {"label": "文档", "url": "https://huggingface.co/docs/accelerate"}
+ ],
+ "problem": "想把自己写的PyTorch训练循环搬到多GPU、TPU或混合精度上，要改设备放置、分布式初始化、梯度缩放、采样器等一堆样板代码，换一种硬件又得重写。",
+ "idea": "只抽象“和多卡/TPU/fp16相关的那部分样板代码”：用一个Accelerator对象包住模型、优化器和数据加载器，其余训练循环原样保留；配合命令行启动器，同一脚本在单卡、多卡、多机上直接运行。",
+ "impact": "成为Hugging Face生态里分布式训练的底座，Transformers的Trainer、TRL、Diffusers的训练脚本都建立在它上面；它把FSDP、DeepSpeed等后端的配置收敛成一个统一入口。",
+ "method": "在[[pytorch]]里做分布式训练，需要初始化进程组、把模型包成[[pytorch-ddp]]、给数据加载器换分布式采样器、只在主进程保存和打印、混合精度下用梯度缩放器……这些代码与模型本身无关，却散落在训练循环各处。[[lightning]]的解法是让用户把训练循环交给框架，而很多研究者想保留自己写的循环。\n\nAccelerate（2021年3月发布v0.1.0）的做法更轻：用户只加几行，`accelerator = Accelerator()`，`model, optimizer, data = accelerator.prepare(model, optimizer, data)`，把 `loss.backward()` 换成 `accelerator.backward(loss)`；设备放置、数据切分、梯度同步、混合精度都在背后处理。运行时用 `accelerate config` 生成配置，再用 `accelerate launch` 启动，同一脚本即可跑在CPU、单卡、多卡、多机或TPU上。后来又加入了对[[fsdp]]与[[zero]]（DeepSpeed）的配置式支持、大模型分片加载（按设备显存自动把层放到GPU、CPU或硬盘），以及FP8混合精度等。",
+ "limits": [
+  {"text": "只是包装层，张量并行、流水线并行这类需要改模型结构的大规模并行仍要依赖Megatron等专门框架。", "solved_by": ["torchtitan"]}
+ ],
+ "relations": [
+  {"to": "hf-transformers", "type": "extends", "note": "为Transformers生态提供统一的分布式与混合精度训练底座，Trainer后来建立在它之上。"},
+  {"to": "pytorch-ddp", "type": "uses", "note": "多卡数据并行在底层调用PyTorch DDP，Accelerate只负责隐藏初始化与包装的样板代码。"},
+  {"to": "lightning", "type": "rivals", "note": "Lightning把训练循环交给框架；Accelerate让用户保留自己的循环，只接管设备与分布式相关部分。"},
+  {"to": "zero", "type": "uses", "note": "以配置方式接入DeepSpeed ZeRO，以及后来的PyTorch FSDP。"}
+ ],
+ "prereq": ["distributed-training", "floating-point", "cpu-gpu", "sgd-minibatch"],
+ "check": {"source": "https://github.com/huggingface/accelerate", "confirmed": "README：为喜欢自己写PyTorch训练循环、但不愿维护多GPU/TPU/fp16样板代码的用户而建、只抽象与多GPU/TPU/fp16相关的样板代码、Accelerator示例、支持FSDP与DeepSpeed、自动混合精度含fp8。GitHub API：仓库创建于2020-10-30，v0.1.0发布于2021-03-05。主要作者、Trainer/TRL/Diffusers基于它、大模型分片加载为一般了解。"}
+}

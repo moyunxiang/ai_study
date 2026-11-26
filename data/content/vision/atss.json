@@ -1,0 +1,30 @@
+{
+  "id": "atss",
+  "who": "Shifeng Zhang, Cheng Chi, Yongqiang Yao, Zhen Lei, Stan Z. Li · 中国科学院自动化研究所 等",
+  "venue": "CVPR 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1912.02424"},
+    {"label": "代码", "url": "https://github.com/sfzhang15/ATSS"}
+  ],
+  "aka": ["ATSS", "自适应训练样本选择", "Adaptive Training Sample Selection", "正负样本分配", "label assignment"],
+  "problem": "2019年无锚框检测器（如[[fcos]]）追上甚至超过了有锚框的[[retinanet]]，大家以为是“去掉锚框”本身带来的好处，但两者差在哪一直说不清。",
+  "idea": "用控制变量的实验说明：两者的本质区别是**怎样定义正负训练样本**；只要分配方式相同，从框回归还是从点回归几乎没有差别。于是提出按每个物体的统计量自动定阈值的正负样本选择方法ATSS。",
+  "impact": "把检测研究的注意力从“有没有锚框”转到“标签分配”上，之后的OTA、SimOTA、TOOD等标签分配方法都以它为起点或对照。",
+  "method": "论文先把RetinaNet（每个位置1个锚框）和FCOS对齐：把FCOS里的GroupNorm、GIoU损失、中心度分支等技巧逐项加给RetinaNet，剩下的差距只来自正负样本定义——RetinaNet按锚框与真值框的IoU阈值（如0.5/0.4）划分，FCOS按“点是否落在框内且尺度合适”划分。交换这两种定义后，两种检测器精度几乎一样，说明分配方式才是关键。\n\nATSS的分配规则：对每个真值框，\n\n- 在每一层特征金字塔上，取中心离真值框中心最近的k个锚框（默认k=9）作为候选；\n- 计算这些候选与真值框IoU的均值m和标准差v，阈值取 `t = m + v`；\n- IoU不低于t、且中心落在真值框内的候选当正样本，其余为负样本。\n\n阈值随物体而变：候选普遍IoU高时阈值高，只留最好的；IoU分散时阈值相对低。整个方法几乎只有k一个超参数，且对k不敏感。摘要称它显著提升有锚框与无锚框检测器、弥合二者差距，并在不增加开销的情况下把当时的最好结果推到COCO 50.7% AP；论文还讨论了每个位置铺多个锚框是否必要。",
+  "legacy": "ATSS成为mmdetection等检测库里的常用配置，后来的[[yolox]]用SimOTA、PP-YOLOE和RT-DETR一系等也都在标签分配上做文章。[[detr]]系列用匈牙利一对一匹配，是另一条把分配问题彻底重写的路线。",
+  "limits": [
+    {"text": "仍是一对多的静态分配，推理需要NMS去重，也不考虑分类得分与回归质量是否一致。", "solved_by": ["yolox", "detr"]}
+  ],
+  "relations": [
+    {"to": "retinanet", "type": "extends", "note": "在RetinaNet上做控制变量实验，证明它与FCOS的差距来自IoU阈值式的正负样本定义。"},
+    {"to": "fcos", "type": "extends", "note": "把FCOS的训练技巧拆开逐项对齐，得出“无锚框”本身不是增益来源的结论。"},
+    {"to": "fpn", "type": "uses", "note": "候选锚框在FPN的每一层上按中心距离各选k个。"},
+    {"to": "giou", "type": "uses", "note": "对齐实验中把GIoU损失作为FCOS的技巧之一加给RetinaNet。"}
+  ],
+  "prereq": ["anchor-nms", "iou-map", "expectation-variance", "ablation-baseline"],
+  "terms": [
+    {"t": "标签分配", "d": "训练检测器时决定哪些锚框或位置负责预测哪个真值物体（正样本）、哪些算背景（负样本）的规则。"}
+  ],
+  "learn": "先读RetinaNet和FCOS的正负样本定义，再读ATSS第3节的对齐实验表，最后看第4节的算法框；用mmdetection跑一次ATSS配置，打印某张图每个物体被选中的正样本。",
+  "check": {"source": "https://arxiv.org/abs/1912.02424", "confirmed": "arXiv记录：标题、五位作者、v1提交于2019-12-05；摘要中“本质区别是正负样本定义”、相同定义下性能无明显差别、ATSS按物体统计特征选样本、COCO 50.7% AP无额外开销、讨论多锚框必要性。k=9、t=均值+标准差、对齐实验细节、CVPR 2020、机构凭一般了解写。"}
+}

@@ -1,0 +1,30 @@
+{
+  "id": "aoanet",
+  "aka": ["AoANet", "AoA", "Attention on Attention", "注意力之上的注意力"],
+  "who": "Lun Huang, Wenmin Wang, Jie Chen, Xiao-Yong Wei · 北京大学、鹏城实验室等",
+  "venue": "ICCV 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1908.06954"},
+    {"label": "代码", "url": "https://github.com/husthuaan/AoANet"}
+  ],
+  "problem": "注意力总会输出一个加权平均，哪怕图里没有和当前查询相关的东西；解码器无从判断这个结果靠不靠谱，可能被误导。",
+  "idea": "在普通注意力之后再加一道门：用注意力结果和当前查询一起算出“信息向量”和“门控向量”，两者逐元素相乘，只放行真正相关的部分。",
+  "impact": "AoA模块同时用在编码器和解码器上，AoANet在COCO离线测试上达到129.8 CIDEr-D，是2019–2020年图像描述常用的强基线。",
+  "method": "图像描述的编码器-解码器里，解码每个词时都要用当前状态作为查询，对图像区域特征做一次注意力。问题在于softmax加权平均**总能**产生一个向量：即使所有区域都和查询无关，模型也会拿到一个看似正常的结果，并据此生成错误的词。\n\nAoA（Attention on Attention）在注意力结果`v̂`之后再加一步：把`v̂`和查询`q`拼接，分别经过两个线性变换，一个得到信息向量`i = W_i[v̂; q] + b_i`，另一个经sigmoid得到门`g = σ(W_g[v̂; q] + b_g)`，最终输出`i ∘ g`。门的作用是让模型自己判断“这次注意力到的东西和我要找的是否相关”，不相关时把输出压小。\n\nAoANet在编码器里用AoA精炼[[bottom-up-top-down]]的区域特征（在区域之间做自注意力后加门），在解码器里用AoA过滤每一步的注意力结果，并配合[[scst]]直接优化CIDEr。摘要报告，它在MS COCO的Karpathy离线测试划分上达到129.8 CIDEr-D，在官方在线测试服务器上达到129.6（C40）。",
+  "limits": [
+    {"text": "仍以离线检测器的区域特征为输入，检测器不参与训练，描述质量受检测器上限约束。", "solved_by": ["vinvl"]},
+    {"text": "只在COCO描述数据上训练，没有借助大规模图文预训练，对开放领域和新物体描述能力有限。", "solved_by": ["oscar", "simvlm"]}
+  ],
+  "relations": [
+    {"to": "bottom-up-top-down", "type": "uses", "note": "以BUTD的检测区域特征作为输入，并沿用其描述框架。"},
+    {"to": "scst", "type": "uses", "note": "用自批判序列训练直接优化CIDEr指标。"},
+    {"to": "transformer", "type": "extends", "note": "编码器借用多头自注意力精炼区域特征，并在其上加门控。"},
+    {"to": "show-attend-tell", "type": "solves", "note": "缓解了软注意力在没有相关区域时仍强行输出加权平均、误导解码器的问题。"}
+  ],
+  "prereq": ["attention-concept", "self-attention", "gating", "encoder-decoder", "text-metrics"],
+  "terms": [
+    {"t": "CIDEr-D", "d": "图像描述常用指标，衡量生成句与多条人工参考描述在n-gram上的加权相似度，D版本加了长度惩罚等防作弊处理。"}
+  ],
+  "learn": "先读[[bottom-up-top-down]]和[[scst]]理解当时的描述流水线，再看AoANet第3节AoA模块的两行公式，用开源代码在COCO上复现。",
+  "check": {"source": "https://arxiv.org/abs/1908.06954", "confirmed": "标题、四位作者、arXiv v1提交2019-08-19；摘要中注意力结果与查询相关性未知的问题、AoA生成信息向量和注意力门并逐元素相乘、编码器和解码器都用AoA、COCO Karpathy离线测试129.8 CIDEr-D、在线服务器129.6（C40）。具体公式写法、使用BUTD特征与SCST、机构、ICCV 2019为一般了解，未逐项核对。"}
+}

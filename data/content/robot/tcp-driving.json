@@ -1,0 +1,76 @@
+{
+ "id": "tcp-driving",
+ "who": "Penghao Wu, Xiaosong Jia, Li Chen, Junchi Yan, Hongyang Li, Yu Qiao · 上海人工智能实验室、上海交通大学",
+ "venue": "NeurIPS 2022",
+ "links": [
+  {
+   "label": "arXiv",
+   "url": "https://arxiv.org/abs/2206.08129"
+  },
+  {
+   "label": "代码",
+   "url": "https://github.com/OpenPerceptionX/TCP"
+  }
+ ],
+ "aka": [
+  "TCP",
+  "Trajectory-guided Control Prediction"
+ ],
+ "problem": "端到端驾驶有两派：先预测轨迹再交给控制器跟踪，或者直接预测油门刹车转向。两派各有短板，一直被分开研究。",
+ "idea": "一个网络里放两条分支：轨迹分支预测未来路径，控制分支做多步控制预测并在每一步接受轨迹分支的引导，最后把两路输出按情况融合。",
+ "impact": "只用一个前视相机就登上CARLA排行榜第一，成为CARLA闭环端到端驾驶里被反复比较的“简单强基线”。",
+ "method": "在[[carla]]这类闭环仿真中做端到端驾驶，一种做法是预测未来几个路点，再用PID之类的控制器去跟踪它（[[transfuser]]就是这样）；另一种像[[cil]]那样直接输出控制量。前者在转弯等场景里，路点跟踪器容易跟不准；后者只看当前一帧，难以推断现在的动作会把车带到哪里。\n\nTCP把两者放进同一个模型。共享的图像编码器之后，**轨迹分支**预测未来若干个路点；**控制分支**不是只预测当前一步的控制，而是像在“想象”中展开多步：每一步都根据上一步的隐状态预测下一步的控制和状态，并通过注意力从轨迹分支对应时刻的特征中取引导信息。这样控制预测就知道了“未来要去哪里”。部署时，两路输出按场景用简单规则融合，例如直行时更多依赖轨迹、转弯时更多依赖直接控制。\n\n论文报告，即便只用单目相机输入，TCP也在官方CARLA排行榜上排名第一，超过了许多使用多传感器和复杂融合机制的方法。",
+ "limits": [
+  {
+   "text": "两路输出的融合靠手工规则，场景一多规则就难以覆盖。",
+   "solved_by": [
+    "uniad"
+   ]
+  },
+  {
+   "text": "评测仍依赖CARLA长路线驾驶分，方差大，难以分析模型在具体交互场景上的能力。",
+   "solved_by": [
+    "bench2drive"
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "to": "transfuser",
+   "type": "rivals",
+   "note": "TransFuser用相机加激光雷达融合后预测路点；TCP只用单目相机，结合路点与直接控制两种输出。"
+  },
+  {
+   "to": "cil",
+   "type": "extends",
+   "note": "保留直接预测控制量的做法，但改成多步预测并受轨迹分支引导。"
+  },
+  {
+   "to": "carla",
+   "type": "uses",
+   "note": "在CARLA仿真中训练并在官方排行榜上闭环评测。"
+  },
+  {
+   "to": "learning-by-cheating",
+   "type": "extends",
+   "note": "沿用LBC“先训练能看到真值的特权专家，再让只看图像的学生模仿”的思路（TCP的专家是强化学习训练的Roach）。"
+  }
+ ],
+ "prereq": [
+  "end-to-end",
+  "imitation-learning",
+  "control-loop",
+  "attention-concept"
+ ],
+ "terms": [
+  {
+   "t": "路点跟踪",
+   "d": "模型只输出未来几个目标位置，再由PID等控制器把车开到这些位置。"
+  }
+ ],
+ "learn": "先看TransFuser的路点加PID结构，再读TCP第3节两分支设计和融合规则；官方代码可在CARLA中复现。",
+ "check": {
+  "source": "https://arxiv.org/abs/2206.08129",
+  "confirmed": "标题、六位作者、v1提交日期2022-06-16；摘要中两条研究路线、轨迹分支与多步控制分支、每步受轨迹引导、输出融合、单目相机登顶CARLA官方排行榜。NeurIPS 2022发表处、机构、融合规则的具体形式、训练数据来自强化学习专家Roach为凭一般了解。"
+ }
+}

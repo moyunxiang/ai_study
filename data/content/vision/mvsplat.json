@@ -1,0 +1,32 @@
+{
+  "id": "mvsplat",
+  "who": "Yuedong Chen, Haofei Xu, Chuanxia Zheng, Bohan Zhuang, Marc Pollefeys, Andreas Geiger, Tat-Jen Cham, Jianfei Cai · 莫纳什大学 / 苏黎世联邦理工 / 图宾根大学 等",
+  "venue": "ECCV 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2403.14627"},
+    {"label": "代码", "url": "https://github.com/donydchen/mvsplat"}
+  ],
+  "aka": ["MVSplat", "前馈高斯泼溅", "feed-forward 3DGS", "代价体高斯", "cost volume Gaussians"],
+  "problem": "[[pixelsplat]]能从两张图前馈预测三维高斯，但它靠网络从单张图特征里猜每个高斯的深度分布，几何不准、模型大，换个数据集泛化也差。",
+  "idea": "把多视图立体（MVS）里的**代价体**搬进来：沿若干候选深度平面把另一视图的特征扭过来，算跨视图特征相似度，相似度最高的深度就是可靠的几何线索；用它定位高斯中心，其余高斯参数一起学，只用渲染图像的光度误差监督。",
+  "impact": "MVSplat表明显式的跨视图几何匹配是前馈高斯重建的关键，以更小的模型、更快的速度超过pixelSplat，成为稀疏视图前馈3DGS的常用基线，后续DepthSplat、[[anysplat]]等都与之比较。",
+  "method": "输入两张（或几张）带相机位姿的图像：\n\n- 用CNN加跨视图Transformer提取每张图的特征。\n- **平面扫描代价体**：对参考视图，在近远范围内取D个深度候选；对每个候选深度，用相机参数把另一视图的特征扭到参考视图，与参考特征做点积，得到一个 `H×W×D` 的代价体。某像素在正确深度上，两视图看到的是同一个三维点，相似度最高。\n- 用一个U-Net细化代价体，softmax后得到每个像素的深度；把像素按深度反投影成三维点，作为高斯的中心。\n- 同一网络再预测每个高斯的不透明度、协方差和颜色（球谐系数），所有视图的高斯合在一起，用[[3dgs]]的光栅化渲染新视角。\n\n训练只用渲染图与真实图的光度损失，不需要深度真值。摘要称在RealEstate10K和ACID两个大规模基准上取得最好结果和最快的前馈推理速度（22 fps）；与pixelSplat相比，参数少10倍、推理快2倍以上，外观和几何质量更高，跨数据集泛化更好。",
+  "legacy": "代价体＋高斯的组合被后续前馈重建广泛采用；同组的DepthSplat把单目深度先验与多视图匹配结合。再往后[[anysplat]]等方法去掉了对输入位姿的依赖，与[[vggt]]这类直接回归相机和几何的模型合流。",
+  "limits": [
+    {"text": "需要已知的输入相机位姿，代价体也依赖视图之间有足够重叠。", "solved_by": ["anysplat"]},
+    {"text": "各视图的高斯直接拼接，视图多时数量线性增长并会在重叠处重复。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "pixelsplat", "type": "solves", "note": "pixelSplat从单视图特征猜深度分布，几何不准、模型大；MVSplat用跨视图代价体定位高斯中心，参数少10倍、快2倍以上。"},
+    {"to": "mvsnet", "type": "uses", "note": "借用MVSNet的平面扫描代价体来估计逐像素深度。"},
+    {"to": "3dgs", "type": "uses", "note": "输出是3D高斯，用3DGS的可微光栅化渲染新视角并反传光度损失。"},
+    {"to": "pixelnerf", "type": "extends", "note": "延续pixelNeRF从少量图像前馈预测三维表示的思路，把隐式辐射场换成显式高斯以获得实时渲染。"}
+  ],
+  "prereq": ["3d-representation", "camera-geometry", "softmax", "self-attention", "encoder-decoder"],
+  "terms": [
+    {"t": "代价体", "d": "对每个像素、每个候选深度记录两视图特征的匹配程度，形成一个三维的数组，用来找最可能的深度。"},
+    {"t": "平面扫描", "d": "假设场景位于一系列平行的深度平面上，逐个平面把另一视图扭过来比较。"}
+  ],
+  "learn": "先弄懂MVSNet的代价体和3DGS的渲染，再读MVSplat第3节的结构图；用官方代码在RealEstate10K的一对图上推理，把代价体预测的深度图和渲染结果一起导出看。",
+  "check": {"source": "https://arxiv.org/abs/2403.14627", "confirmed": "arXiv记录：标题、八位作者、v1提交于2024-03-21；摘要中从稀疏多视图前馈预测3D高斯、平面扫描代价体提供几何线索定位高斯中心、只用光度监督、RealEstate10K与ACID上最好结果与22 fps、对比pixelSplat参数少10倍推理快2倍以上、跨数据集泛化更好。跨视图Transformer、U-Net细化、球谐颜色、ECCV 2024、机构、DepthSplat凭一般了解写。"}
+}

@@ -1,0 +1,30 @@
+{
+  "id": "dn-detr",
+  "who": "Feng Li, Hao Zhang, Shilong Liu, Jian Guo, Lionel M. Ni, Lei Zhang · 香港科技大学 / IDEA研究院 / 清华大学",
+  "venue": "CVPR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2203.01305"},
+    {"label": "代码", "url": "https://github.com/FengLi-ust/DN-DETR"}
+  ],
+  "aka": ["DN-DETR", "查询去噪", "query denoising", "去噪训练", "denoising training"],
+  "problem": "[[detr]]要训练500个epoch才收敛，比Faster R-CNN慢一个数量级；之前的改进多从注意力结构入手，对“为什么慢”缺少解释。",
+  "idea": "指出慢的一个重要原因是训练早期二分图匹配不稳定，同一个查询在相邻迭代被分配给不同物体；于是额外把加了噪声的真值框喂进解码器，让模型直接学“把噪声框还原成真值框”，这部分不需要匹配。",
+  "impact": "查询去噪几乎成了DETR系检测器的标配训练技巧，紧随其后的[[dino-detr]]在它的基础上加入对比去噪，首次让DETR类方法登顶COCO。",
+  "method": "DETR用匈牙利算法把N个预测与真值做一对一匹配再算损失。训练初期预测很乱，一个查询这一步匹配到猫、下一步可能匹配到狗，优化目标前后不一致，学得很慢。\n\nDN-DETR在正常的匹配分支之外加了一个**去噪分支**：\n\n- 取每个真值框，给中心点和宽高加随机扰动（框噪声），把类别标签以一定概率随机翻成别的类（标签噪声），编码成额外的解码器查询；\n- 这些去噪查询“天生”知道自己对应哪个真值，直接用重建损失（框的L1与GIoU、类别分类）训练，绕开了匹配；\n- 用注意力掩码隔开：匹配查询看不到去噪查询，避免真值信息泄露；不同组的去噪查询之间也互相看不见。\n\n去噪分支只在训练时存在，推理时去掉，不增加推理成本。方法基于把查询表示成锚框的DAB-DETR实现，作者称只要几十行代码就能加到任何DETR类方法上。摘要报告：同等设置下提升1.9 AP，ResNet-50骨干训练12个和50个epoch分别得到43.4和48.6 AP，是当时DETR类方法里最好的；与基线相比用一半的训练轮数达到相当的精度。",
+  "legacy": "[[dino-detr]]在此基础上加入正负样本对比去噪和混合查询选择；Mask DINO、[[rt-detr]]、[[d-fine]]、[[rf-detr]]等后续DETR系检测器普遍保留了去噪训练。",
+  "limits": [
+    {"text": "只给正样本加噪声，模型没有学会对“附近没有物体”的锚框输出背景，容易出现重复预测。", "solved_by": ["dino-detr"]}
+  ],
+  "relations": [
+    {"to": "detr", "type": "solves", "note": "DETR收敛慢；DN-DETR用无需匹配的去噪分支稳定训练，用一半训练轮数即可达到基线精度。"},
+    {"to": "deformable-detr", "type": "uses", "note": "去噪训练与Deformable DETR等结构改进正交，论文在多种DETR变体上验证了即插即用。"},
+    {"to": "giou", "type": "uses", "note": "去噪分支的框重建损失沿用DETR的L1加GIoU损失。"}
+  ],
+  "prereq": ["self-attention", "encoder-decoder", "iou-map", "loss-function"],
+  "terms": [
+    {"t": "二分图匹配", "d": "把N个预测和若干真值一对一配对、使总代价最小的问题，DETR用匈牙利算法求解。"},
+    {"t": "去噪查询", "d": "由加了扰动的真值框和标签构造的解码器输入，训练模型把它们还原成真值。"}
+  ],
+  "learn": "先读DETR的匈牙利匹配损失，再读DN-DETR第3节的“匹配不稳定”分析和第4节的去噪分支与注意力掩码；在开源代码里把去噪组数设为0和非0各训几轮，对比早期损失曲线。",
+  "check": {"source": "https://arxiv.org/abs/2203.01305", "confirmed": "arXiv记录：标题、六位作者、v1提交于2022-03-02；摘要中收敛慢源于二分图匹配不稳定、把带噪真值框喂入解码器重建原框、几十行代码即插即用、+1.9 AP、ResNet-50下12/50 epoch分别为43.4/48.6 AP、50%训练轮数达到相当性能。标签噪声、注意力掩码、基于DAB-DETR、CVPR 2022、机构凭一般了解写。"}
+}

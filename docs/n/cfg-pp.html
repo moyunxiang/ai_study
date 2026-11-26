@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>CFG++流形约束引导（2024） · AI脉络</title>
+<meta name="description" content="是文生图的标配，但高引导尺度会过饱和、多样性坍塌；配合时还不可逆，做图像编辑的反演很麻烦。这些问题通常被当成扩散模型本身的局限。 论文认为问题出在CFG让采样轨迹偏离了数据流形；借鉴扩散反问题求解的思路，把文本引导重新写成一个带文本条件分数匹配损失的反问题，得到一个只改一处的CFG++更新：在DD…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/cfg-pp.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CFG++流形约束引导（2024）">
+<meta property="og:description" content="是文生图的标配，但高引导尺度会过饱和、多样性坍塌；配合时还不可逆，做图像编辑的反演很麻烦。这些问题通常被当成扩散模型本身的局限。 论文认为问题出在CFG让采样轨迹偏离了数据流形；借鉴扩散反问题求解的思路，把文本引导重新写成一个带文本条件分数匹配损失的反问题，得到一个只改一处的CFG++更新：在DD…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/cfg-pp.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/cfg-pp">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 扩散与流匹配</div>
+<h1>CFG++流形约束引导</h1>
+<div class="full">CFG++: Manifold-constrained Classifier Free Guidance for Diffusion Models</div>
+<div class="meta"><span>2024.06</span><span>论文</span><span>延伸</span><span>ICLR 2025</span><span>Hyungjin Chung, Jeongsol Kim, Geon Yeong Park, Hyelin Nam, Jong Chul Ye · KAIST</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2406.08070" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://cfgpp-diffusion.github.io/" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/cfg-pp">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/cfg.html">无分类器引导CFG</a>是文生图的标配，但高引导尺度会过饱和、多样性坍塌；配合<a class="ln" href="../n/ddim.html">DDIM</a>时还不可逆，做图像编辑的反演很麻烦。这些问题通常被当成扩散模型本身的局限。</p></div><div><h4>方法</h4><p>论文认为问题出在CFG让采样轨迹偏离了数据流形；借鉴扩散反问题求解的思路，把文本引导重新写成一个带文本条件分数匹配损失的反问题，得到一个只改一处的CFG++更新：在DDIM的“重新加噪”那一步改用无条件噪声预测。</p></div><div><h4>影响</h4><p>在更小的引导尺度下得到更好的画质和文本对齐，DDIM反演变得可逆，编辑效果变好，并能直接用在高阶求解器和蒸馏模型上；与稍后的APG等一起构成2024年后改进CFG的一类做法。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>DDIM带CFG的一步可以拆成两半：先用引导后的噪声预测<code>ε̂ = ε_∅ + w(ε_c − ε_∅)</code>估计干净图<code>x̂₀</code>，再用同一个ε̂把x̂₀“重新加噪”到下一个时间步。当w很大时（常用7.5左右），ε̂已经不像真实噪声，重新加噪得到的x_{t−1}就落到了训练时从没见过的区域——作者称之为<b>离开流形</b>，过饱和、细节崩坏和不可逆都由此而来。</p><p>CFG++受扩散反问题求解（在每步保持在数据流形附近做约束优化）的启发，把文本引导看成最小化一个文本条件的分数匹配损失，推导出的更新很简单：估计x̂₀时仍用引导后的预测，但重新加噪时改用<b>无条件</b>预测ε_∅。同时把引导尺度改成0到1之间的λ，在无条件采样和条件采样之间平滑插值。</p><p>论文报告，CFG++在各个尺度上都优于传统CFG：文生图画质和文本对齐更好、所需引导尺度更小、模式坍塌减轻；DDIM反演近乎可逆，基于反演的编辑更忠实；还能直接接入高阶求解器和蒸馏后的少步模型，也改善了用文本引导的反问题求解。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍需要每步同时算条件和无条件两次前向，引导带来的推理成本没有减少。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>主要在DDIM式采样和SD系列上分析，对流匹配模型和更复杂采样器的普适性要逐一验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/cfg.html">无分类器引导CFG</a><span class="yr">2022.07 · 生成</span><div class=nt>指出高引导尺度下过饱和、模式坍塌源自轨迹离开数据流形，并用一处修改缓解。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/ddim.html">DDIM</a><span class="yr">2020.10 · 生成</span><div class=nt>修改的正是DDIM更新中“重新加噪”所用的噪声预测，使DDIM反演近乎可逆。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/null-text-inversion.html">Null-text反演</a><span class="yr">2022.11 · 生成</span><div class=nt>Null-text反演靠逐图优化无条件嵌入来补救CFG下的反演误差，CFG++直接改采样规则让反演可逆。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/apg.html">APG自适应投影引导</a><span class="yr">2024.10 · 生成</span><div class=nt>同期改进CFG的另一条思路：CFG++改采样中的重新加噪，APG改引导更新量本身的方向与大小。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/guidance.html">条件生成与引导</a> <a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/noise-schedule.html">噪声调度与采样步数</a> <a class="chip c" href="../c/score-function.html">分数函数与分数匹配</a></p>
+<h2>本篇术语</h2><ul><li><b>离开流形</b>　采样过程中的中间结果跑到了模型在训练里从未见过的区域，网络在那里的预测不可靠，最终图像出现伪影。</li><li><b>DDIM反演</b>　把一张真实图片沿DDIM的确定性轨迹反向加噪得到对应的初始噪声，再从它重新生成，用于基于真实图片的编辑。</li></ul>
+<h2>怎么学</h2><p>先弄清DDIM一步中“估计x̂₀”和“重新加噪”两半 → 读本文第3节CFG++的推导与算法框 → 在SD上对比CFG与CFG++的DDIM反演重建误差。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2406.08070" rel="noopener">https://arxiv.org/abs/2406.08070</a>（标题、五位作者、v1日期2024-06-12、摘要中DDIM加CFG不可逆、高尺度模式坍塌、问题源于off-manifold而非扩散模型本身、受扩散反问题求解启发写成文本条件分数匹配损失的反问题、简单修复带来更好画质/可逆/更小尺度/较少坍塌、可接入高阶求解器和蒸馏模型；机构KAIST、ICLR 2025、“重新加噪改用无条件预测”与λ∈[0,1]的具体形式来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20CFG%2B%2B%E6%B5%81%E5%BD%A2%E7%BA%A6%E6%9D%9F%E5%BC%95%E5%AF%BC%EF%BC%88cfg-pp%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acfg-pp%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/cfg-pp.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="gen-3.html"><small>本分支上一个 · 2024.06</small><b>Runway Gen-3 Alpha</b></a><a class="r" href="ect.html"><small>本分支下一个 · 2024.06</small><b>ECT简易一致性微调</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

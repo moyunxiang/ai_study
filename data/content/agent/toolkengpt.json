@@ -1,0 +1,27 @@
+{
+  "id": "toolkengpt",
+  "who": "Shibo Hao, Tianyang Liu, Zhen Wang, Zhiting Hu · 加州大学圣地亚哥分校",
+  "venue": "NeurIPS 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2305.11554"},
+    {"label": "GitHub", "url": "https://github.com/Ber666/ToolkenGPT"}
+  ],
+  "aka": ["ToolkenGPT", "toolken", "工具词元", "tool embedding", "工具嵌入", "工具即词元"],
+  "problem": "让模型用工具有两条路：微调（如Toolformer）成本高、工具集一固定就不能加；上下文示例不用训练，但上下文装不下几个示例，工具一多就几乎失效。",
+  "idea": "把每个工具当成一个新词元（toolken），只给它学一个嵌入向量、模型本体冻结；模型生成时一旦「说出」某个工具词元，就切换到填参数模式调用工具，再把结果写回文本。",
+  "impact": "可以随时增加任意多的工具，每加一个只多一行嵌入；在数值计算、知识问答和具身规划上超过ReAct和上下文学习，工具数到上百时优势更明显，是「工具检索/工具表示」方向常被引用的早期方法。",
+  "method": "语言模型输出层本来对每个词有一个向量，用来算下一个词的概率。ToolkenGPT在这个词表后面追加若干行，每行对应一个工具，例如 `<add>`、`<multiply>`、`<求某人出生地>`。\n\n**推理时**分两种模式：\n- **推理模式**：模型照常一个词一个词地写，工具词元与普通词一起参与竞争；\n- **工具模式**：一旦预测出某个工具词元，就换用该工具的少量示例提示模型补全参数，例如 `<multiply>(3.5, 12)`，执行后把结果42插回原文，回到推理模式继续写。\n\n**训练时**只更新这几行新嵌入，梯度不经过模型本体，所以便宜，也可以用大量演示数据来学，而不受上下文长度限制。训练数据来自已有标注（GSM8K的算式）、ChatGPT合成的例子或领域内监督数据。\n\n实验在冻结的LLaMA 13B/33B上进行：FuncQA单跳题（13个工具）上准确率0.73，[[react]]为0.57；VirtualHome具身规划成功率0.68，上下文学习为0.20；在KAMEL知识问答上，工具数增加到上百个时上下文学习明显下降，而ToolkenGPT保持最好。",
+  "limits": [
+    {"text": "每个工具都要有演示数据来训练嵌入，新工具不能零样本直接使用；而且要访问模型的输出层，闭源API模型用不了。", "solved_by": ["toolllm"]},
+    {"text": "填参数仍靠上下文示例，复杂参数和多工具组合的正确率有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "toolformer", "type": "solves", "note": "Toolformer要微调整个模型且工具集固定，ToolkenGPT冻结模型、只学工具嵌入，可随时扩充工具。"},
+    {"to": "react", "type": "rivals", "note": "ReAct靠上下文示例教模型用工具，工具多了装不下；ToolkenGPT把工具知识存进嵌入。"},
+    {"to": "llama-1", "type": "uses", "note": "实验所用的冻结基座。"},
+    {"to": "gsm8k", "type": "uses", "note": "构造数值推理评测GSM8K-XL并提供训练算式。"}
+  ],
+  "prereq": ["tool-calling", "embedding", "softmax", "tokenization"],
+  "learn": "先读[[toolformer]]和[[react]] → 读原文第3节toolken的定义和两种模式 → 动手：给一个小模型的词表加两个工具词元，只训练这两行输出嵌入，看它能否在合适位置预测出工具。",
+  "check": {"source": "https://arxiv.org/abs/2305.11554", "confirmed": "标题、作者、v1提交于2023-05-19；摘要中每个工具表示为词元并学嵌入、可即时扩展工具、数值推理/知识问答/具身规划显著超过基线；正文（arxiv.org/html/2305.11554）核对LLaMA-13B/33B冻结、只训练toolken嵌入、两种模式、数据来源、FuncQA单跳0.73对ReAct 0.57、VirtualHome 0.68对0.20、KAMEL上工具多时上下文学习下降。乘法例子为说明性示例；venue与单位凭一般了解。"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "clip-adapter",
+  "aka": ["CLIP-Adapter", "CLIP适配器", "特征适配器", "feature adapter"],
+  "who": "Peng Gao, Shijie Geng, Renrui Zhang, Teli Ma, Rongyao Fang, Yongfeng Zhang, Hongsheng Li, Yu Qiao · 上海人工智能实验室、香港中文大学等",
+  "venue": "IJCV 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2110.04544"},
+    {"label": "代码", "url": "https://github.com/gaopengcuhk/CLIP-Adapter"}
+  ],
+  "problem": "用CLIP做少样本分类，CoOp学可调的文本提示词虽然有效，但只改输入端，训练时要让梯度穿过整个文本编码器。",
+  "idea": "不改提示，而在CLIP的视觉或文本特征后面接一个小的瓶颈层（适配器）学新特征，再按比例和原始特征残差相加。",
+  "impact": "与CoOp并列成为CLIP少样本适配的两条基本路线（改提示 vs 改特征），直接引出了免训练的Tip-Adapter等后续工作。",
+  "method": "[[clip]]的零样本分类靠人工写的提示，例如“a photo of a {类别}”。[[coop]]提出把提示里的词换成可学习的连续向量，用少量标注样本训练，明显提升少样本准确率。CLIP-Adapter的作者认为，除了在输入端改提示，还有另一条路：直接在特征端微调。\n\n做法是在CLIP的图像编码器（或文本编码器）输出之后加一个两层的瓶颈MLP——先降维再升维，这就是借自NLP的**适配器**（[[adapters]]）思想。适配器输出的新特征`A(f)`与原特征`f`按残差比例混合：`f* = α·A(f) + (1−α)·f`。训练时CLIP本身完全冻结，只更新适配器的少量参数；`α`控制新旧知识的比例——数据很少时偏向保留原始CLIP特征，避免过拟合。\n\n摘要报告，在多个视觉分类任务上CLIP-Adapter超过了CoOp，同时结构更简单；消融实验分析了适配器放在视觉侧、文本侧和残差比例的影响。",
+  "limits": [
+    {"text": "仍需要用少样本数据训练适配器，每换一个数据集都要重新训练。", "solved_by": ["tip-adapter"]},
+    {"text": "只在冻结特征之后做浅层调整，对需要细粒度区域信息的检测、分割等任务帮助有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "clip", "type": "uses", "note": "冻结CLIP的两个编码器，只在其输出特征上加适配器。"},
+    {"to": "coop", "type": "rivals", "note": "CoOp在输入端学提示，CLIP-Adapter在特征端学适配器；论文报告后者效果更好。"},
+    {"to": "adapters", "type": "uses", "note": "借用NLP里瓶颈适配器的参数高效微调结构。"}
+  ],
+  "prereq": ["zero-few-shot", "peft-concept", "residual-connection", "contrastive-learning", "transfer-learning"],
+  "terms": [
+    {"t": "适配器（adapter）", "d": "插在冻结大模型里的小瓶颈网络，只训练它就能让模型适应新任务，参数量通常只占原模型的很小一部分。"}
+  ],
+  "learn": "先读[[clip]]的零样本分类和[[coop]]的提示学习，再看CLIP-Adapter的残差混合公式，用开源代码在一个16-shot数据集上对比两者。",
+  "check": {"source": "https://arxiv.org/abs/2110.04544", "confirmed": "标题、八位作者、arXiv v1提交2021-10-09；摘要中CoOp学习连续提示、提出在视觉或语言分支上用特征适配器微调、额外的瓶颈层学新特征并与原始特征残差混合、超过CoOp且结构简单、在多种视觉分类任务上验证。残差公式写法、发表于IJCV、机构为一般了解，未逐项核对。"}
+}

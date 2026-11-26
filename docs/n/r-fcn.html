@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>R-FCN检测（2016） · AI脉络</title>
+<meta name="description" content="在每个候选框上都要单独跑一段子网络，候选框有几百个，这部分重复计算拖慢了速度；而直接把全卷积的分类网络拿来做检测又会丢掉“物体在框里哪个位置”的信息。 让几乎全部计算在整张图上共享：最后一层卷积输出k×k组“位置敏感得分图”，每组只负责物体的一个相对位置（左上、正中……），每个候选框只做一次几乎不…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/r-fcn.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="R-FCN检测（2016）">
+<meta property="og:description" content="在每个候选框上都要单独跑一段子网络，候选框有几百个，这部分重复计算拖慢了速度；而直接把全卷积的分类网络拿来做检测又会丢掉“物体在框里哪个位置”的信息。 让几乎全部计算在整张图上共享：最后一层卷积输出k×k组“位置敏感得分图”，每组只负责物体的一个相对位置（左上、正中……），每个候选框只做一次几乎不…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/r-fcn.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/r-fcn">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 目标检测</div>
+<h1>R-FCN检测</h1>
+<div class="full">R-FCN: Object Detection via Region-based Fully Convolutional Networks</div>
+<div class="meta"><span>2016.05</span><span>论文</span><span>延伸</span><span>NIPS 2016</span><span>Jifeng Dai, Yi Li, Kaiming He, Jian Sun · 微软亚洲研究院 / 清华大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1605.06409" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/daijifeng001/r-fcn" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/r-fcn">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/faster-rcnn.html">Faster R-CNN</a>在每个候选框上都要单独跑一段子网络，候选框有几百个，这部分重复计算拖慢了速度；而直接把全卷积的分类网络拿来做检测又会丢掉“物体在框里哪个位置”的信息。</p></div><div><h4>方法</h4><p>让几乎全部计算在整张图上共享：最后一层卷积输出k×k组“位置敏感得分图”，每组只负责物体的一个相对位置（左上、正中……），每个候选框只做一次几乎不花算力的池化和投票。</p></div><div><h4>影响</h4><p>把两阶段检测器的区域子网络压到几乎为零，在同等精度下比Faster R-CNN快数倍；位置敏感池化的思路后来被实例分割和可变形卷积等工作沿用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>两阶段检测器的矛盾在于：分类网络希望<b>平移不变</b>（猫往右挪一点仍是猫），检测却需要<b>平移敏感</b>（框往右挪一点就该判为不准）。Faster R-CNN的做法是把ResNet切成两半，后半段对每个候选框单独跑一遍，以此恢复位置信息，代价是几百次重复计算。</p><p>R-FCN把整个ResNet都留在共享部分，只在最后加一层卷积，为C个类别（加背景）各输出k×k张得分图（例如k=3，一共9张对应“左上、上中、右上……右下”）。对一个候选框，把它也划成k×k格，第(i,j)格只去第(i,j)组得分图上做平均池化——这就是<b>位置敏感RoI池化</b>。9个格子的得分再取平均投票，得到这个框属于各类的分数；框回归用同样的方式另开一组得分图。这样每个候选框的额外计算只剩池化和求平均。</p><p>摘要报告用101层<a class="ln" href="../n/resnet.html">ResNet</a>在PASCAL VOC 2007上取得83.6% mAP，测试时每张图170毫秒，比对应的Faster R-CNN快2.5到20倍。</p><h2>后来的发展</h2><p>R-FCN是2016–2017年两阶段检测的常用强基线；同一团队把位置敏感思想用到实例分割（FCIS）和<a class="ln" href="../n/deformable-conv.html">可变形卷积</a>的可变形PSRoI池化。随后<a class="ln" href="../n/fpn.html">特征金字塔FPN</a>、<a class="ln" href="../n/retinanet.html">Focal Loss与RetinaNet</a>等多尺度和单阶段方法成为主流，R-FCN逐渐退出一线比较。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍依赖RPN候选框和锚框，且得分图数量随类别数×k²增长，类别多时显存开销大。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/fcos.html">FCOS无锚框检测</a> <a class="chip hue" style="--h:216" href="../n/detr.html">DETR</a></div></li><li>只在单一尺度特征图上检测，小物体效果不好。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/fpn.html">特征金字塔FPN</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/resnet.html">ResNet</a><span class="yr">2015.12 · 视觉</span><div class=nt>以101层ResNet为全卷积骨干，整张网络除最后一层外都在全图共享。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/faster-rcnn.html">Faster R-CNN</a><span class="yr">2015.06 · 视觉</span><div class=nt>Faster R-CNN对每个候选框重复跑后半段网络；R-FCN用位置敏感得分图把这部分计算移到全图共享，速度快2.5–20倍。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/fcn.html">全卷积网络FCN</a><span class="yr">2014.11 · 视觉</span><div class=nt>把全卷积的思路从分割推广到区域级检测，用位置敏感得分图补回检测需要的平移敏感性。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/fpn.html">特征金字塔FPN</a><span class="yr">2016.12 · 视觉</span><div class=nt>只在单一尺度特征图上检测，小物体效果不好。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/detr.html">DETR</a><span class="yr">2020.05 · 视觉</span><div class=nt>仍依赖RPN候选框和锚框，且得分图数量随类别数×k²增长，类别多时显存开销大。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/fcos.html">FCOS无锚框检测</a><span class="yr">2019.04 · 视觉</span><div class=nt>仍依赖RPN候选框和锚框，且得分图数量随类别数×k²增长，类别多时显存开销大。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/anchor-nms.html">锚框与非极大值抑制</a> <a class="chip c" href="../c/iou-map.html">IoU与mAP</a></p>
+<h2>本篇术语</h2><ul><li><b>位置敏感得分图</b>　每张图只回答“物体的某个相对部位（如左上角）是否在这里”，k×k张合起来描述物体的空间布局。</li></ul>
+<h2>怎么学</h2><p>先理解Faster R-CNN的RPN和RoI池化，再读R-FCN第2节的位置敏感RoI池化示意图；自己用3×3格子画一个候选框，手算一次投票过程。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1605.06409" rel="noopener">https://arxiv.org/abs/1605.06409</a>（arXiv记录：标题、四位作者、v1提交于2016-05-20；摘要中的位置敏感得分图、平移不变与平移敏感的矛盾、101层ResNet、VOC 2007上83.6% mAP、170 ms每张、比Faster R-CNN快2.5–20倍。k=3示例、NIPS 2016、机构、FCIS等后续凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20R-FCN%E6%A3%80%E6%B5%8B%EF%BC%88r-fcn%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ar-fcn%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/r-fcn.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="wide-resnet.html"><small>本分支上一个 · 2016.05</small><b>Wide ResNet</b></a><a class="r" href="siamfc.html"><small>本分支下一个 · 2016.06</small><b>SiamFC孪生跟踪</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

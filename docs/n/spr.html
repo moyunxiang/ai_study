@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SPR自预测表示（2020） · AI脉络</title>
+<meta name="description" content="在只允许10万步交互的Atari 100k设定下，只靠奖励信号学像素表示太慢；、用对比学习和数据增强缓解了一部分，但没有利用「动作会让下一帧怎么变」这一序贯结构。 让智能体用一个学到的转移模型，在隐空间里预测自己未来多步的表示，预测目标由参数做指数滑动平均的目标编码器给出（类似），再加上数据增强，…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/spr.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SPR自预测表示（2020）">
+<meta property="og:description" content="在只允许10万步交互的Atari 100k设定下，只靠奖励信号学像素表示太慢；、用对比学习和数据增强缓解了一部分，但没有利用「动作会让下一帧怎么变」这一序贯结构。 让智能体用一个学到的转移模型，在隐空间里预测自己未来多步的表示，预测目标由参数做指数滑动平均的目标编码器给出（类似），再加上数据增强，…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/spr.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/spr">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 分层、表示与元学习</div>
+<h1>SPR自预测表示</h1>
+<div class="full">Data-Efficient Reinforcement Learning with Self-Predictive Representations</div>
+<div class="meta"><span>2020.07</span><span>论文</span><span>延伸</span><span>ICLR 2021</span><span>Max Schwarzer, Ankesh Anand, Rishab Goel, R Devon Hjelm, Aaron Courville, Philip Bachman · Mila / 微软研究院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2007.05929" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/mila-iqia/spr" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/spr">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>在只允许10万步交互的Atari 100k设定下，只靠奖励信号学像素表示太慢；<a class="ln" href="../n/curl.html">CURL对比表征RL</a>、<a class="ln" href="../n/drq.html">图像增强DrQ</a>用对比学习和数据增强缓解了一部分，但没有利用「动作会让下一帧怎么变」这一序贯结构。</p></div><div><h4>方法</h4><p>让智能体用一个学到的转移模型，在隐空间里预测自己未来多步的表示，预测目标由参数做指数滑动平均的目标编码器给出（类似<a class="ln" href="../n/byol.html">BYOL</a>），再加上数据增强，作为RL之外的自监督辅助损失。</p></div><div><h4>影响</h4><p>SPR把Atari 100k的人类归一化得分中位数大幅推高，「自预测表示」成为样本高效RL的标准组件，<a class="ln" href="../n/bbf.html">BBF</a>等后续Atari 100k强方法都直接建立在SPR之上。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>SPR（Self-Predictive Representations）在一个Rainbow式的DQN智能体上加一个辅助任务：</p><ul><li>在线编码器把当前帧编码成隐表示z_t；</li><li>一个转移网络接收z_t和实际执行的动作，递推地预测出未来K步的隐表示ẑ_{t+1}, …, ẑ_{t+K}；</li><li><b>目标编码器</b>的参数是在线编码器参数的指数滑动平均，它把真实的未来帧编码成目标表示；</li><li>损失是预测表示与目标表示（经投影头后）的负余弦相似度，在K步上求和。</li></ul><p>这样做不需要像对比学习那样准备负样本，也不需要重建像素——只要求「我的表示能预测我自己未来的表示」。再把随机平移、颜色抖动等数据增强加到输入上，迫使表示对同一观测的不同视图保持一致。</p><p>摘要报告：只用未来预测这一目标就超过了以前的像素输入样本高效方法；加上数据增强后，在Atari 100k（限定10万步交互）上人类归一化得分中位数达到0.415，比此前最好结果相对提高55%，并在26个游戏中的7个上超过人类专家得分。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>在更高的更新-数据比下网络会丧失可塑性，单靠自预测损失无法继续提升样本效率。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/primacy-bias.html">首因偏差与网络重置</a> <a class="chip hue" style="--h:120" href="../n/bbf.html">BBF</a></div></li><li>只预测隐表示而不预测奖励和价值，不能直接用来规划。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/efficientzero.html">EfficientZero</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/simple-atari.html">SimPLe与Atari 100k</a><span class="yr">2019.03 · RL</span><div class=nt>评测采用SimPLe提出的Atari 100k设定。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/curl.html">CURL对比表征RL</a><span class="yr">2020.04 · RL</span><div class=nt>CURL用对比学习只约束同一时刻的两个视图；SPR预测多步未来表示，利用了动作带来的时间结构，得分更高。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/drq.html">图像增强DrQ</a><span class="yr">2020.04 · RL</span><div class=nt>保留数据增强作为正则，并在其上加入未来预测目标。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/byol.html">BYOL</a><span class="yr">2020.06 · 视觉</span><div class=nt>借用BYOL的在线/滑动平均目标网络与无负样本的预测式自监督学习。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/efficientzero.html">EfficientZero</a><span class="yr">2021.10 · RL</span><div class=nt>只预测隐表示而不预测奖励和价值，不能直接用来规划。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/primacy-bias.html">首因偏差与网络重置</a><span class="yr">2022.05 · RL</span><div class=nt>在更高的更新-数据比下网络会丧失可塑性，单靠自预测损失无法继续提升样本效率。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/bbf.html">BBF</a><span class="yr">2023.05 · RL</span><div class=nt>在更高的更新-数据比下网络会丧失可塑性，单靠自预测损失无法继续提升样本效率。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-supervised.html">自监督学习</a> <a class="chip c" href="../c/data-augmentation.html">数据增强</a> <a class="chip c" href="../c/td-error.html">时序差分与自举</a> <a class="chip c" href="../c/feature-representation.html">特征与表示学习</a> <a class="chip c" href="../c/model-based-rl.html">基于模型的强化学习</a></p>
+<h2>本篇术语</h2><ul><li><b>Atari 100k</b>　每个Atari游戏只允许与环境交互10万步（约两小时游戏时间）的样本效率基准。</li><li><b>人类归一化得分</b>　（智能体得分−随机策略得分）÷（人类得分−随机策略得分），1表示达到人类水平。</li><li><b>指数滑动平均目标网络</b>　目标网络参数取在线网络参数的缓慢移动平均，提供稳定的学习目标。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/byol.html">BYOL</a>和<a class="ln" href="../n/curl.html">CURL对比表征RL</a>；读原文第2节方法图和第4节Atari 100k结果表；在开源实现上把预测步数K设为0和5对比，体会未来预测的作用。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2007.05929" rel="noopener">https://arxiv.org/abs/2007.05929</a>（标题、六位作者、arXiv v1于2020-07-12；摘要中预测自己多步未来的隐表示、目标编码器为参数的指数滑动平均、学到的转移模型、加入数据增强、Atari 100k上人类归一化得分中位数0.415、比此前最好相对提高55%、26个游戏中7个超过人类专家、代码地址。负余弦损失与Rainbow基础智能体按原文正文；ICLR 2021与机构按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SPR%E8%87%AA%E9%A2%84%E6%B5%8B%E8%A1%A8%E7%A4%BA%EF%BC%88spr%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aspr%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/spr.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="predictive-cfr-plus.html"><small>本分支上一个 · 2020.07</small><b>预测版CFR+</b></a><a class="r" href="qplex.html"><small>本分支下一个 · 2020.08</small><b>QPLEX对偶值分解</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

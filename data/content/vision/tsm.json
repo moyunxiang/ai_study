@@ -1,0 +1,29 @@
+{
+  "id": "tsm",
+  "who": "Ji Lin, Chuang Gan, Song Han · MIT / MIT-IBM沃森人工智能实验室",
+  "venue": "ICCV 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1811.08383"},
+    {"label": "代码", "url": "https://github.com/mit-han-lab/temporal-shift-module"}
+  ],
+  "aka": ["TSM", "时间移位模块", "Temporal Shift Module", "时序移位", "temporal shift"],
+  "problem": "视频识别有两难：二维卷积网络逐帧处理很便宜，却看不出帧与帧之间的关系；三维卷积（[[c3d]]、[[i3d]]）能建模时间，但计算量和参数量大得多，难以部署到手机等端侧设备。",
+  "idea": "在二维卷积网络的每个残差块里，把一小部分特征通道沿时间轴往前挪一帧、一小部分往后挪一帧，其余不动。这样一次普通的二维卷积就能同时看到相邻帧的信息，而移位本身零参数、零计算。",
+  "impact": "TSM用二维网络的代价拿到接近三维网络的精度，发表时在Something-Something榜单排第一，并被广泛用作高效视频识别和端侧在线视频理解的基线。",
+  "method": "设某一层的特征形状为 `T×C×H×W`（帧数×通道×高×宽）。TSM沿通道维把特征分成三份：例如1/8的通道整体向时间后方移一步（第t帧拿到第t−1帧的这些通道），1/8的通道向前移一步（拿到第t+1帧的），剩下3/4保持不变；移出边界的位置补零。移位后再做原来的二维卷积，相当于这个卷积在时间维上的感受野是3帧。\n\n两点设计细节：\n\n- **移多少**：移得太多会破坏每帧自身的空间特征，精度下降，所以只移一小部分通道。\n- **放哪里**：不直接在主干上移位，而是放在残差分支里（residual shift），恒等连接保留了原始特征。\n\n对在线、低延迟的场景，可以只做单向移位：每一帧只从过去帧拿特征，把上一帧的那部分通道缓存起来即可，不需要看未来帧。\n\n摘要称TSM可以插进二维CNN，以零计算、零参数实现时间建模，达到三维CNN的性能但保持二维CNN的复杂度；发表时在Something-Something榜单排第一，在Jetson Nano和Galaxy Note8上在线视频识别的延迟分别为13毫秒和35毫秒；还扩展到了视频目标检测。",
+  "legacy": "TSM之后，“在二维骨干里加廉价时间交互”成为高效视频模型的常见设计，同一时期的[[slowfast]]、[[x3d]]则从三维网络的结构和规模入手提效；2021年起视频Transformer（[[timesformer]]、[[vivit]]、[[video-swin]]）成为精度上的主流。",
+  "limits": [
+    {"text": "每层只交换相邻一帧的信息，长时间范围的依赖要靠很多层堆叠，建模长视频能力有限。", "solved_by": ["timesformer", "vivit"]}
+  ],
+  "relations": [
+    {"to": "tsn", "type": "extends", "note": "沿用TSN的稀疏帧采样和二维骨干，在其上加时间移位以建模帧间关系。"},
+    {"to": "i3d", "type": "solves", "note": "I3D等三维卷积计算量大；TSM以零额外计算达到相近精度。"},
+    {"to": "resnet", "type": "uses", "note": "把移位操作插在ResNet每个残差块的残差分支里。"}
+  ],
+  "prereq": ["conv-layer", "residual-connection", "params-flops", "vision-tasks", "throughput-latency"],
+  "terms": [
+    {"t": "时间移位", "d": "把一部分特征通道沿时间轴前后挪一帧，让当前帧的卷积能看到相邻帧的特征。"}
+  ],
+  "learn": "先了解TSN的帧采样和I3D的三维卷积，再读TSM第3节关于移位比例和残差移位的分析；用PyTorch写一个十几行的shift函数插进ResNet-50，在小视频数据集上对比加与不加的精度。",
+  "check": {"source": "https://arxiv.org/abs/1811.08383", "confirmed": "arXiv记录：标题、三位作者、v1提交于2018-11-20；摘要中二维CNN便宜但不能建模时间、三维CNN计算密集、把部分通道沿时间维移位、零计算零参数、达到三维CNN性能保持二维复杂度、在线版本、发表时Something-Something榜第一、Jetson Nano与Galaxy Note8延迟13 ms与35 ms、扩展到视频目标检测。1/8移位比例、残差移位、补零、ICCV 2019、机构凭一般了解写。"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "modelscope-t2v",
+  "who": "Jiuniu Wang, Hangjie Yuan, Dayou Chen, Yingya Zhang, Xiang Wang, Shiwei Zhang · 阿里巴巴达摩院",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2308.06571"},
+    {"label": "模型页", "url": "https://modelscope.cn/models/damo/text-to-video-synthesis/summary"}
+  ],
+  "aka": ["ModelScope T2V", "ModelScopeT2V", "魔搭文生视频", "damo-text-to-video"],
+  "problem": "2023年初，[[make-a-video]]、[[imagen-video]]等文生视频模型都不开放，社区缺少一个可以直接下载、在消费级显卡上跑的开源文生视频模型。",
+  "idea": "从[[stable-diffusion]]出发，在去噪U-Net中插入时空模块（时间卷积与时间注意力），让同一个模型既能用图文数据、也能用视频文本数据训练，并能适应不同帧数。",
+  "impact": "较早公开权重的文生视频扩散模型之一，在魔搭和Hugging Face上被大量使用，成为2023年开源文生视频研究最常用的底座和基线之一。",
+  "method": "ModelScopeT2V由三部分组成：一个把每帧压缩到潜空间的自编码器（报告中称为VQGAN）、一个文本编码器（CLIP），以及一个去噪U-Net，总计约17亿参数，其中约5亿参数专门负责时间维度。\n\n做法是把文生图U-Net“充气”成视频U-Net：在原有的空间卷积和空间注意力之后，插入**时空块**——沿时间轴的一维卷积和沿时间轴的自注意力，让每个空间位置能看到同一位置在其他帧的内容，从而生成连贯的帧序列和平滑的运动。空间部分可以继承文生图模型的能力。\n\n训练时，模型可以接受不同帧数的输入：帧数为1时就是一张图，因此可以把图文对数据（如LAION）和视频文本数据（如WebVid）混在一起训练，用大量图片补充视频数据在画面质量和概念覆盖上的不足。推理时生成数秒的短视频。报告称它在三项评测指标上优于当时的方法，并在魔搭社区提供了代码和在线演示。",
+  "limits": [
+    {"text": "主要用WebVid-10M这类低分辨率、带水印的视频训练，生成画面偏糊、常带水印，时长只有几秒。", "solved_by": ["videocrafter2"]},
+    {"text": "U-Net加时间模块的“空间-时间分离”结构难以建模大幅度运动和长时一致性。", "solved_by": ["sora", "cogvideox"]}
+  ],
+  "relations": [
+    {"to": "stable-diffusion", "type": "extends", "note": "从Stable Diffusion的潜空间U-Net出发，插入时空模块变成视频模型。"},
+    {"to": "video-ldm", "type": "rivals", "note": "同为“潜空间图像扩散+时间层”的路线，Video LDM未开放，ModelScope T2V公开了权重。"},
+    {"to": "make-a-video", "type": "extends", "note": "延续用图文数据和视频数据联合训练、在图像模型上加时间维度的思路。"},
+    {"to": "webvid", "type": "uses", "note": "视频-文本训练数据主要来自WebVid。"}
+  ],
+  "prereq": ["diffusion-process", "latent-space", "conv-layer", "self-attention"],
+  "terms": [
+    {"t": "时空块", "d": "在每个空间层之后加的一维时间卷积和时间注意力，让网络在帧与帧之间传递信息。"}
+  ],
+  "learn": "先读Stable Diffusion和Video LDM → 读本报告的模型结构部分 → 用开源权重生成一段视频，观察画质、水印和运动幅度。",
+  "check": {"source": "https://arxiv.org/abs/2308.06571", "confirmed": "标题、六位作者、v1日期2023-08-12、摘要中由Stable Diffusion演化而来、时空块保证帧一致与平滑运动、可适应训练与推理时的不同帧数以使用图文和视频文本数据、由VQGAN/文本编码器/去噪UNet组成共17亿参数其中5亿用于时间能力、三项指标优于SOTA、魔搭代码与演示；机构、模型早于报告在魔搭发布、CLIP文本编码器、LAION与WebVid数据、水印问题、社区使用情况来自一般了解"}
+}

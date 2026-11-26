@@ -1,0 +1,32 @@
+{
+  "id": "titanet",
+  "who": "Nithin Rao Koluguri, Taejin Park, Boris Ginsburg · NVIDIA",
+  "venue": "ICASSP 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2110.04410"}
+  ],
+  "problem": "ECAPA-TDNN等说话人嵌入模型效果好但参数较多；做说话人日志时要对大量短片段反复提取嵌入，需要又准又可伸缩的模型。",
+  "idea": "用一维深度可分离卷积加带全局上下文的通道注意力（SE）堆成编码器，再用基于注意力的统计池化把任意长度的语音压成固定长度的说话人向量。",
+  "impact": "TitaNet成为NVIDIA NeMo里默认的说话人嵌入模型，广泛用于NeMo的说话人验证和说话人日志流程；只有600万参数的小版本在日志任务上也接近最好结果。",
+  "method": "说话人识别的主流做法是：用神经网络把一段语音映射成一个固定长度的向量（说话人嵌入），同一个人的向量彼此接近。[[x-vector]]用时延网络做到这一点，[[ecapa-tdnn]]又加入通道注意力和多层特征聚合，成为2020年后的强基线。\n\nTitaNet沿用NVIDIA识别模型QuartzNet（见[[jasper]]）的骨架：编码器由多个块组成，每块里是**一维深度可分离卷积**（先逐通道卷积、再1×1卷积混合通道，比普通卷积省参数），配合带全局上下文的**Squeeze-and-Excitation**层（见[[senet]]）——先对整段时间求平均得到全局信息，再据此给每个通道一个权重。编码器输出经过**基于通道注意力的统计池化**：按注意力权重计算每个通道在时间上的加权均值和标准差，拼成一个向量，再经线性层得到固定长度的嵌入（论文称t-vector），用角度间隔类损失训练。\n\n摘要报告：在VoxCeleb1测试列表上等错误率0.68%；在说话人日志上AMI-MixHeadset、AMI-Lapel和CH109的日志错误率分别为1.73%、1.99%和1.11%；只有600万参数的TitaNet-S在日志任务上接近最好结果。",
+  "limits": [
+    {"text": "作为先切段、再提取嵌入、再聚类的级联日志流程的一环，处理不了多人同时说话的重叠片段，需要与端到端日志模型配合。", "solved_by": []},
+    {"text": "嵌入在跨语言、跨信道（电话与远场）条件下仍会明显退化，需要领域内数据微调。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ecapa-tdnn", "type": "rivals", "note": "同为说话人嵌入模型并都用SE通道注意力和注意力统计池化；TitaNet改用深度可分离卷积，参数更省、尺寸可伸缩。"},
+    {"to": "jasper", "type": "extends", "note": "编码器沿用QuartzNet（Jasper的轻量版）的一维深度可分离卷积块结构。"},
+    {"to": "senet", "type": "uses", "note": "每个块使用带全局上下文的Squeeze-and-Excitation通道注意力。"},
+    {"to": "x-vector", "type": "extends", "note": "延续把整段语音池化为固定长度嵌入的x-vector范式。"}
+  ],
+  "prereq": ["conv-layer", "attention-concept", "embedding", "classification-metrics", "feature-representation"],
+  "terms": [
+    {"t": "等错误率（EER）", "d": "说话人验证中把误接受率与误拒绝率调到相等时的错误率，越低越好。"},
+    {"t": "日志错误率（DER）", "d": "说话人日志中漏检、误检和说话人混淆时长之和占总时长的比例。"}
+  ],
+  "aka": ["TitaNet", "t-vector", "NeMo说话人模型"],
+  "check": {
+    "source": "https://arxiv.org/abs/2110.04410",
+    "confirmed": "arXiv官方记录：标题、作者Koluguri/Park/Ginsburg、v1提交2021-10-08；摘要中一维深度可分离卷积、带全局上下文SE层、通道注意力统计池化、t-vector、VoxCeleb1 EER 0.68%、AMI-MixHeadset 1.73%、AMI-Lapel 1.99%、CH109 1.11%、TitaNet-S 6M参数。QuartzNet骨架、角度间隔损失、NeMo默认、ICASSP 2022为一般了解。"
+  }
+}

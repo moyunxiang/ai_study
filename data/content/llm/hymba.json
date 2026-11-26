@@ -1,0 +1,30 @@
+{
+  "id": "hymba",
+  "who": "Xin Dong, Yonggan Fu, Shizhe Diao, Wonmin Byeon, Zijia Chen, Ameya Sunil Mahabaleshwarkar, Shih-Yang Liu, Matthijs Van Keirsbilck et al. · NVIDIA",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2411.13676"}
+  ],
+  "aka": ["Hymba", "混合头", "hybrid-head", "meta tokens", "元token", "Hymba-1.5B"],
+  "problem": "小模型要在端侧跑，KV缓存和吞吐量是瓶颈；Samba、Jamba等混合架构把注意力层和SSM层按层串联，一层要么只会精确回忆、要么只会压缩，信息要经过多层才能互补。",
+  "idea": "在同一层里并行放注意力头和SSM头，各自处理同一输入再合并（混合头）；在提示前加一组可学习的“元token”，再配合跨层共享KV和大部分层用滑窗注意力，压缩缓存。",
+  "impact": "Hymba-1.5B在2B以下公开模型中取得最好的平均成绩，以约1/12的缓存超过Llama-3.2-3B，展示了“层内并行混合”这一与“层间串联混合”不同的设计。",
+  "method": "背景：[[samba]]、[[jamba]]采用层间串联的混合，每层只有一种算子。[[mamba-2]]等SSM头能高效地总结上下文，但对精确回忆不如注意力。[[streamingllm]]发现注意力会被迫集中到开头token（注意力汇聚）。\n\n**混合头**：每一层把输入同时送进一组注意力头和一组SSM头，两路输出各自归一化、加权后相加。作者的比喻是：注意力头提供高分辨率的“回忆”，SSM头提供高效的“上下文总结”，放在同一层里可以并行互补。\n\n**元token**：在每个提示之前拼接一组（如128个）可学习的向量，所有输入共享。作者认为它们存储了常用的关键信息，也替代了原本被当作“注意力垃圾桶”的开头token，缓解了注意力被迫分配的负担（forced-to-attend）。\n\n**压缩缓存**：只有少数层保留全局注意力，其余层用滑动窗口注意力；相邻层之间共享KV缓存。作者在相同设置下对多种架构做了对照实验，发现这种组合优势明显。\n\n结果：摘要称Hymba-1.5B-Base超过所有2B以下的公开模型，平均准确率比Llama-3.2-3B高1.32%，缓存缩小11.67倍，吞吐量提高3.49倍。",
+  "limits": [
+    {"text": "实验集中在1.5B左右的小模型，层内并行混合在数十亿到上百亿参数规模上是否仍优于层间混合没有验证；业界大模型后来多采用层间按比例混合的方案。", "solved_by": ["nemotron-h", "qwen3-next"]},
+    {"text": "元token对所有输入固定不变，它具体存了什么、对长上下文和分布外任务的作用缺少解释。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mamba-2", "type": "uses", "note": "SSM头采用Mamba类结构，负责高效总结上下文。"},
+    {"to": "samba", "type": "rivals", "note": "Samba按层交替Mamba和滑窗注意力，Hymba在同一层内并行两种头。"},
+    {"to": "streamingllm", "type": "solves", "note": "注意力汇聚说明模型被迫把注意力放到开头token上，Hymba用可学习的元token承担这一角色。"},
+    {"to": "gqa", "type": "extends", "note": "沿着GQA等减少KV缓存的思路，进一步在相邻层之间共享KV。"}
+  ],
+  "prereq": ["state-space-model", "self-attention", "kv-cache", "efficient-attention", "throughput-latency"],
+  "terms": [
+    {"t": "元token（meta tokens）", "d": "拼在每个输入前面的一组可学习向量，对所有输入都一样，类似给模型一块固定的“草稿区”。"},
+    {"t": "跨层KV共享", "d": "相邻的几层使用同一份键值缓存，而不是每层各存一份，以减少推理显存。"}
+  ],
+  "learn": "先读[[mamba]]和[[samba]]理解SSM与混合架构；读原文第2节混合头结构图和元token的注意力图分析；动手：下载Hymba-1.5B，比较它与同规模Transformer在长提示下的显存占用。",
+  "check": {"source": "https://arxiv.org/abs/2411.13676", "confirmed": "标题、作者、arXiv v1提交日2024-11-20；摘要中混合头并行架构融合注意力与SSM、注意力头高分辨率回忆与SSM头高效总结、可学习元token缓解forced-to-attend、跨层KV共享与部分滑窗注意力、同条件对照研究、Hymba-1.5B-Base超过所有2B以下公开模型并比Llama-3.2-3B平均高1.32%、缓存小11.67倍、吞吐3.49倍。元token数量、两路输出合并方式、ICLR 2025为一般了解。"}
+}

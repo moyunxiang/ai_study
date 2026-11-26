@@ -1,0 +1,26 @@
+{
+ "id": "taso",
+ "who": "Zhihao Jia, Oded Padon, James Thomas, Todd Warszawski, Matei Zaharia, Alex Aiken · 斯坦福大学",
+ "venue": "SOSP 2019",
+ "aka": ["TASO", "Tensor Algebra SuperOptimizer", "图替换", "graph substitution", "计算图超优化", "superoptimization"],
+ "links": [
+  {"label": "ACM", "url": "https://doi.org/10.1145/3341301.3359630"},
+  {"label": "GitHub", "url": "https://github.com/jiazhihao/TASO"}
+ ],
+ "problem": "框架优化计算图靠专家手写的图替换规则（如把卷积和BN合并），TensorFlow里约5.3万行这样的规则，既会漏掉优化机会，又跟不上不断新增的算子。",
+ "idea": "只给出每个算子的数学规格，由系统自动枚举小子图、找出功能等价的替换并用定理证明器形式化验证，再用基于代价的回溯搜索在模型上应用这些替换。",
+ "impact": "把“图级优化规则可以自动生成并被证明正确”变成可行做法，后续的PET、基于等式饱和的张量程序优化等工作都以它为起点或基线。",
+ "method": "深度学习框架把模型表示成计算图，最常见的图优化是**图替换**：发现一个匹配特定模式的子图，换成功能相同但更快的子图，例如把两个共享输入的矩阵乘拼成一个大矩阵乘。[[tensorflow]]、[[tvm]]等都用贪心方式套用人写的规则，规则难写、难验证，新算子一来就要补规则。\n\nTASO分两步。离线阶段：用户提供约1400行的算子规格（每个算子在数学上做什么），TASO以这些算子为积木枚举所有不超过一定规模的小图，靠在随机输入上算指纹快速找出可能等价的子图对，再用自动定理证明器对照算子规格逐一做形式化验证，得到一批经过证明的替换规则。在线阶段：对给定模型，TASO以实测的算子耗时为代价函数做回溯搜索，允许暂时变慢的替换以跳出局部最优，同时还联合考虑每个张量的数据布局。优化后的图可以导出为ONNX，交给现有框架执行。\n\n论文在五个真实网络上报告比现有框架最多快2.8倍，而所需的人工工作量远小于手写规则。",
+ "limits": [
+  {"text": "只做图级的代数替换，不改变每个算子内部的内核实现，最终速度仍取决于底层算子库。", "solved_by": ["ansor"]},
+  {"text": "只支持完全等价的替换，回溯搜索在大图上耗时较长。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "tvm", "type": "rivals", "note": "TVM等框架用贪心套用人写的图优化规则；TASO自动生成并验证规则，再用代价搜索选择。"},
+  {"to": "tensorflow", "type": "solves", "note": "TensorFlow约5.3万行手写优化规则难以维护和扩展，TASO用约1400行算子规格自动得到替换。"},
+  {"to": "xla", "type": "rivals", "note": "XLA在编译器内部做固定的融合与图变换，TASO把图替换规则本身交给自动生成。"}
+ ],
+ "prereq": ["graph-basics", "logic-symbolic", "conv-layer", "matrix-multiplication"],
+ "terms": [{"t": "超优化", "d": "不按固定规则改写程序，而是穷举或搜索大量等价程序并挑最快的一种。"}],
+ "check": {"source": "https://doi.org/10.1145/3341301.3359630", "confirmed": "Crossref记录：SOSP 2019（2019-10-27）、六位作者均为斯坦福；论文PDF首页摘要：现有框架靠专家手工设计的图替换、TASO为首个自动生成图替换的计算图优化器、以算子规格为输入、用自动定理证明器形式化验证、基于代价的回溯搜索、五个真实网络上最多快2.8倍、TensorFlow约53,000行手写规则对比TASO约1,400行算子规格。GitHub README：可优化ONNX/TensorFlow/PyTorch模型并导出ONNX。随机指纹筛选与数据布局联合优化的细节按一般了解。"}
+}

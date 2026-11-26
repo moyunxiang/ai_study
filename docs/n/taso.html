@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>TASO自动图替换（2019） · AI脉络</title>
+<meta name="description" content="框架优化计算图靠专家手写的图替换规则（如把卷积和BN合并），TensorFlow里约5.3万行这样的规则，既会漏掉优化机会，又跟不上不断新增的算子。 只给出每个算子的数学规格，由系统自动枚举小子图、找出功能等价的替换并用定理证明器形式化验证，再用基于代价的回溯搜索在模型上应用这些替换。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/taso.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="TASO自动图替换（2019）">
+<meta property="og:description" content="框架优化计算图靠专家手写的图替换规则（如把卷积和BN合并），TensorFlow里约5.3万行这样的规则，既会漏掉优化机会，又跟不上不断新增的算子。 只给出每个算子的数学规格，由系统自动枚举小子图、找出功能等价的替换并用定理证明器形式化验证，再用基于代价的回溯搜索在模型上应用这些替换。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/taso.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/taso">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 编译器与高性能算子</div>
+<h1>TASO自动图替换</h1>
+<div class="full">TASO: Optimizing Deep Learning Computation with Automatic Generation of Graph Substitutions</div>
+<div class="meta"><span>2019.10</span><span>论文</span><span>延伸</span><span>SOSP 2019</span><span>Zhihao Jia, Oded Padon, James Thomas, Todd Warszawski, Matei Zaharia, Alex Aiken · 斯坦福大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1145/3341301.3359630" rel="noopener">ACM ↗</a><a class="btn sm" href="https://github.com/jiazhihao/TASO" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/taso">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>框架优化计算图靠专家手写的图替换规则（如把卷积和BN合并），TensorFlow里约5.3万行这样的规则，既会漏掉优化机会，又跟不上不断新增的算子。</p></div><div><h4>方法</h4><p>只给出每个算子的数学规格，由系统自动枚举小子图、找出功能等价的替换并用定理证明器形式化验证，再用基于代价的回溯搜索在模型上应用这些替换。</p></div><div><h4>影响</h4><p>把“图级优化规则可以自动生成并被证明正确”变成可行做法，后续的PET、基于等式饱和的张量程序优化等工作都以它为起点或基线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>深度学习框架把模型表示成计算图，最常见的图优化是<b>图替换</b>：发现一个匹配特定模式的子图，换成功能相同但更快的子图，例如把两个共享输入的矩阵乘拼成一个大矩阵乘。<a class="ln" href="../n/tensorflow.html">TensorFlow</a>、<a class="ln" href="../n/tvm.html">TVM深度学习编译器</a>等都用贪心方式套用人写的规则，规则难写、难验证，新算子一来就要补规则。</p><p>TASO分两步。离线阶段：用户提供约1400行的算子规格（每个算子在数学上做什么），TASO以这些算子为积木枚举所有不超过一定规模的小图，靠在随机输入上算指纹快速找出可能等价的子图对，再用自动定理证明器对照算子规格逐一做形式化验证，得到一批经过证明的替换规则。在线阶段：对给定模型，TASO以实测的算子耗时为代价函数做回溯搜索，允许暂时变慢的替换以跳出局部最优，同时还联合考虑每个张量的数据布局。优化后的图可以导出为ONNX，交给现有框架执行。</p><p>论文在五个真实网络上报告比现有框架最多快2.8倍，而所需的人工工作量远小于手写规则。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只做图级的代数替换，不改变每个算子内部的内核实现，最终速度仍取决于底层算子库。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/ansor.html">Ansor自动生成张量程序</a></div></li><li>只支持完全等价的替换，回溯搜索在大图上耗时较长。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/tensorflow.html">TensorFlow</a><span class="yr">2015.11 · 系统·效率</span><div class=nt>TensorFlow约5.3万行手写优化规则难以维护和扩展，TASO用约1400行算子规格自动得到替换。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/tvm.html">TVM深度学习编译器</a><span class="yr">2018.02 · 系统·效率</span><div class=nt>TVM等框架用贪心套用人写的图优化规则；TASO自动生成并验证规则，再用代价搜索选择。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/xla.html">XLA编译器</a><span class="yr">2017.03 · 系统·效率</span><div class=nt>XLA在编译器内部做固定的融合与图变换，TASO把图替换规则本身交给自动生成。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/ansor.html">Ansor自动生成张量程序</a><span class="yr">2020.06 · 系统·效率</span><div class=nt>只做图级的代数替换，不改变每个算子内部的内核实现，最终速度仍取决于底层算子库。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/graph-basics.html">图、树与搜索</a> <a class="chip c" href="../c/logic-symbolic.html">命题逻辑、谓词逻辑与符号推理</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/matrix-multiplication.html">矩阵乘法与线性变换</a></p>
+<h2>本篇术语</h2><ul><li><b>超优化</b>　不按固定规则改写程序，而是穷举或搜索大量等价程序并挑最快的一种。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1145/3341301.3359630" rel="noopener">https://doi.org/10.1145/3341301.3359630</a>（Crossref记录：SOSP 2019（2019-10-27）、六位作者均为斯坦福；论文PDF首页摘要：现有框架靠专家手工设计的图替换、TASO为首个自动生成图替换的计算图优化器、以算子规格为输入、用自动定理证明器形式化验证、基于代价的回溯搜索、五个真实网络上最多快2.8倍、TensorFlow约53,000行手写规则对比TASO约1,400行算子规格。GitHub README：可优化ONNX/TensorFlow/PyTorch模型并导出ONNX。随机指纹筛选与数据布局联合优化的细节按一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20TASO%E8%87%AA%E5%8A%A8%E5%9B%BE%E6%9B%BF%E6%8D%A2%EF%BC%88taso%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ataso%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/taso.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="detectron2.html"><small>本分支上一个 · 2019.10</small><b>Detectron2</b></a><a class="r" href="distilbert.html"><small>本分支下一个 · 2019.10</small><b>DistilBERT</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

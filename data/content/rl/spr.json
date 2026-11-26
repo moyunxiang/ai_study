@@ -1,0 +1,32 @@
+{
+  "id": "spr",
+  "who": "Max Schwarzer, Ankesh Anand, Rishab Goel, R Devon Hjelm, Aaron Courville, Philip Bachman · Mila / 微软研究院",
+  "venue": "ICLR 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2007.05929"},
+    {"label": "代码", "url": "https://github.com/mila-iqia/spr"}
+  ],
+  "problem": "在只允许10万步交互的Atari 100k设定下，只靠奖励信号学像素表示太慢；[[curl]]、[[drq]]用对比学习和数据增强缓解了一部分，但没有利用「动作会让下一帧怎么变」这一序贯结构。",
+  "idea": "让智能体用一个学到的转移模型，在隐空间里预测自己未来多步的表示，预测目标由参数做指数滑动平均的目标编码器给出（类似[[byol]]），再加上数据增强，作为RL之外的自监督辅助损失。",
+  "impact": "SPR把Atari 100k的人类归一化得分中位数大幅推高，「自预测表示」成为样本高效RL的标准组件，[[bbf]]等后续Atari 100k强方法都直接建立在SPR之上。",
+  "method": "SPR（Self-Predictive Representations）在一个Rainbow式的DQN智能体上加一个辅助任务：\n- 在线编码器把当前帧编码成隐表示z_t；\n- 一个转移网络接收z_t和实际执行的动作，递推地预测出未来K步的隐表示ẑ_{t+1}, …, ẑ_{t+K}；\n- **目标编码器**的参数是在线编码器参数的指数滑动平均，它把真实的未来帧编码成目标表示；\n- 损失是预测表示与目标表示（经投影头后）的负余弦相似度，在K步上求和。\n\n这样做不需要像对比学习那样准备负样本，也不需要重建像素——只要求「我的表示能预测我自己未来的表示」。再把随机平移、颜色抖动等数据增强加到输入上，迫使表示对同一观测的不同视图保持一致。\n\n摘要报告：只用未来预测这一目标就超过了以前的像素输入样本高效方法；加上数据增强后，在Atari 100k（限定10万步交互）上人类归一化得分中位数达到0.415，比此前最好结果相对提高55%，并在26个游戏中的7个上超过人类专家得分。",
+  "limits": [
+    {"text": "在更高的更新-数据比下网络会丧失可塑性，单靠自预测损失无法继续提升样本效率。", "solved_by": ["primacy-bias", "bbf"]},
+    {"text": "只预测隐表示而不预测奖励和价值，不能直接用来规划。", "solved_by": ["efficientzero"]}
+  ],
+  "relations": [
+    {"to": "byol", "type": "uses", "note": "借用BYOL的在线/滑动平均目标网络与无负样本的预测式自监督学习。"},
+    {"to": "curl", "type": "solves", "note": "CURL用对比学习只约束同一时刻的两个视图；SPR预测多步未来表示，利用了动作带来的时间结构，得分更高。"},
+    {"to": "drq", "type": "extends", "note": "保留数据增强作为正则，并在其上加入未来预测目标。"},
+    {"to": "simple-atari", "type": "uses", "note": "评测采用SimPLe提出的Atari 100k设定。"}
+  ],
+  "prereq": ["self-supervised", "data-augmentation", "td-error", "feature-representation", "model-based-rl"],
+  "terms": [
+    {"t": "Atari 100k", "d": "每个Atari游戏只允许与环境交互10万步（约两小时游戏时间）的样本效率基准。"},
+    {"t": "人类归一化得分", "d": "（智能体得分−随机策略得分）÷（人类得分−随机策略得分），1表示达到人类水平。"},
+    {"t": "指数滑动平均目标网络", "d": "目标网络参数取在线网络参数的缓慢移动平均，提供稳定的学习目标。"}
+  ],
+  "learn": "先读[[byol]]和[[curl]]；读原文第2节方法图和第4节Atari 100k结果表；在开源实现上把预测步数K设为0和5对比，体会未来预测的作用。",
+  "check": {"source": "https://arxiv.org/abs/2007.05929", "confirmed": "标题、六位作者、arXiv v1于2020-07-12；摘要中预测自己多步未来的隐表示、目标编码器为参数的指数滑动平均、学到的转移模型、加入数据增强、Atari 100k上人类归一化得分中位数0.415、比此前最好相对提高55%、26个游戏中7个超过人类专家、代码地址。负余弦损失与Rainbow基础智能体按原文正文；ICLR 2021与机构按通行引用。"},
+  "aka": ["SPR", "Self-Predictive Representations", "自预测表示", "隐空间自预测"]
+}

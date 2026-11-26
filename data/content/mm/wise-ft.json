@@ -1,0 +1,29 @@
+{
+  "id": "wise-ft",
+  "aka": ["WiSE-FT", "权重空间集成微调", "Weight-Space Ensembles for Fine-Tuning", "鲁棒微调", "零样本与微调权重插值"],
+  "who": "Mitchell Wortsman, Gabriel Ilharco, Jong Wook Kim, Mike Li, Simon Kornblith, Rebecca Roelofs, Raphael Gontijo-Lopes, Hannaneh Hajishirzi et al. · 华盛顿大学、OpenAI、Google Research等",
+  "venue": "CVPR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2109.01903"},
+    {"label": "代码", "url": "https://github.com/mlfoundations/wise-ft"}
+  ],
+  "problem": "CLIP这类零样本模型在各种分布上都比较稳，但一旦在ImageNet等目标数据上微调，目标准确率涨了，面对分布偏移时的鲁棒性却明显下降。",
+  "idea": "把零样本模型和微调后模型的权重做线性插值，`θ = (1−α)·θ_zs + α·θ_ft`，用一个混合后的模型同时保住目标准确率和分布外鲁棒性。",
+  "impact": "做法只有一行，却在ImageNet及其分布偏移版本上同时提高了两类准确率，成为微调CLIP时的常用技巧，也是后续“模型汤”和权重插值研究的起点之一。",
+  "method": "[[clip]]、[[align]]这类大规模图文对比模型做零样本推理时，在原始ImageNet和它的各种变体（素描版、对抗挑选版、[[imagenet-v2]]等）上的准确率都比较一致。但常规微调之后，ImageNet准确率提高，变体上的准确率反而可能下降——微调让模型过度适应了目标分布。\n\nWiSE-FT（权重空间集成微调）的做法很简单：先正常微调得到`θ_ft`，再与原来的零样本权重`θ_zs`按比例插值，`θ = (1−α)·θ_zs + α·θ_ft`，其中`α`在0到1之间。这不同于把两个模型的输出做平均（输出集成要跑两次模型），插值后仍是一个模型，推理成本不变。之所以能直接对权重做插值，是因为微调后的模型和原模型距离较近，两者之间的线性路径上损失不会突然变高。\n\n摘要报告：在ImageNet和五个衍生的分布偏移数据集上，WiSE-FT在分布偏移下的准确率比此前工作高4到6个百分点，同时ImageNet准确率提高1.6个百分点；在另外六种分布偏移上鲁棒性提升2到23个百分点，在七个常用迁移学习数据集上比标准微调高0.8到3.3个百分点；微调和推理都没有额外计算成本。",
+  "limits": [
+    {"text": "插值系数α需要人工选择，不同任务的最佳值不同，论文中多以固定值或在验证集上挑选。", "solved_by": []},
+    {"text": "只在两个模型之间插值，没有利用多次不同超参数微调得到的多个模型。", "solved_by": ["model-soups"]}
+  ],
+  "relations": [
+    {"to": "clip", "type": "uses", "note": "主要以CLIP的零样本权重和其微调版本做插值。"},
+    {"to": "align", "type": "uses", "note": "摘要以CLIP和ALIGN为代表说明零样本模型在多分布上的稳健性。"},
+    {"to": "imagenet-v2", "type": "uses", "note": "ImageNetV2是衡量分布偏移鲁棒性的评测集之一。"}
+  ],
+  "prereq": ["pretrain-finetune", "distribution-shift", "zero-few-shot", "ensemble", "loss-landscape"],
+  "terms": [
+    {"t": "分布偏移（distribution shift）", "d": "测试数据与训练数据的统计特性不同，例如训练用照片、测试用素描，模型准确率往往因此下降。"}
+  ],
+  "learn": "先理解[[clip]]的零样本推理，再读WiSE-FT论文的主图（α从0到1时目标准确率与偏移准确率的曲线），用开源代码在一个小数据集上复现插值曲线。",
+  "check": {"source": "https://arxiv.org/abs/2109.01903", "confirmed": "标题、作者（11位）、arXiv v1提交2021-09-04；摘要中CLIP/ALIGN零样本稳健、微调降低分布偏移鲁棒性、对零样本与微调权重做集成、ImageNet与五个衍生偏移上提升4–6个百分点且ImageNet提升1.6个百分点、另外六种偏移上2–23个百分点、七个迁移数据集上0.8–3.3个百分点、无额外计算成本。插值公式写法、线性路径上损失平滑的解释、机构与CVPR 2022为一般了解，未逐项核对。"}
+}

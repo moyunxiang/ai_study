@@ -1,0 +1,31 @@
+{
+  "id": "nerfies",
+  "who": "Keunhong Park, Utkarsh Sinha, Jonathan T. Barron, Sofien Bouaziz, Dan B Goldman, Steven M. Seitz, Ricardo Martin-Brualla · 华盛顿大学 / Google Research",
+  "venue": "ICCV 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2011.12948"},
+    {"label": "项目页", "url": "https://nerfies.github.io/"}
+  ],
+  "aka": ["Nerfies", "可变形NeRF", "Deformable NeRF", "形变场", "deformation field", "动态NeRF", "dynamic NeRF"],
+  "problem": "[[nerf]]要求拍摄期间场景完全静止。用手机绕着自己拍一段自拍视频，人总会眨眼、转头、身体晃动，静态NeRF会把这些运动糊成伪影。",
+  "idea": "为每一帧额外学一个连续的三维形变场，把该帧里观察到的点“扭回”一个共享的标准空间，在标准空间里用普通NeRF表示外观和几何；再用由粗到细的优化和弹性正则让形变场不陷入坏的局部最优。",
+  "impact": "Nerfies把“形变场＋标准空间”这一动态神经渲染的基本框架做成了可用的系统，后续HyperNeRF、动态高斯泼溅（如[[4dgs]]）等大量工作都沿着这个思路展开。",
+  "method": "设第i帧有一个可学习的形变潜码 `ω_i`。形变场是一个MLP `T(x, ω_i)`，把观察空间里的点x映射到标准空间的点x'，作者用每点的旋转加平移（SE(3)场）来表示，比单纯的位移更容易表达转动。标准空间里的NeRF照常输出密度和颜色，体渲染时沿相机射线采样的每个点都先经过形变再查询。\n\n两个让优化稳定的技巧：\n\n- **由粗到细**：NeRF用正余弦位置编码把坐标映到多种频率。形变场一开始只开放低频，训练中逐步打开高频，先学大的整体运动，再学细节，避免一开始就拟合噪声。\n- **弹性正则**：借鉴几何处理和物理仿真，惩罚形变场的雅可比矩阵偏离旋转矩阵的程度（即局部尽量刚性），并用鲁棒函数允许少数区域真正形变。另有背景正则，固定静止背景点。\n\n为了定量评测，作者用两部手机组成同步拍摄架，一部的帧训练、另一部同一时刻的帧验证。摘要称这是第一个能用手机随手拍的照片/视频以照片级真实感重建可变形场景的方法，能忠实重建非刚性运动并以高保真度复现未见视角。",
+  "legacy": "同组的HyperNeRF引入额外维度处理拓扑变化；D-NeRF等同期工作探索了类似的形变场路线。形变场＋标准空间的框架后来被移植到高斯泼溅（[[4dgs]]等），动态场景重建也逐渐转向前馈的四维模型（[[monst3r]]、[[d4rt]]）。",
+  "limits": [
+    {"text": "形变场难以表达拓扑变化，比如张嘴、手指分开时会出现撕裂和伪影。", "solved_by": []},
+    {"text": "每段视频都要单独优化数小时，且依赖较准确的相机位姿。", "solved_by": ["4dgs", "monst3r"]}
+  ],
+  "relations": [
+    {"to": "nerf", "type": "solves", "note": "NeRF只能表示静止场景；Nerfies用每帧形变场把运动的观察对齐到标准空间，处理非刚性运动。"},
+    {"to": "nerf-w", "type": "extends", "note": "沿用NeRF-W每张图一个可学习潜码的做法，把它用于描述每帧的形变而非外观。"},
+    {"to": "colmap", "type": "uses", "note": "用COLMAP估计手机视频各帧的相机位姿作为输入。"}
+  ],
+  "prereq": ["3d-representation", "volume-rendering", "positional-encoding", "jacobian-hessian", "regularization"],
+  "terms": [
+    {"t": "标准空间", "d": "一个共享的参考坐标系，每帧里运动的物体都被扭回这里，用同一个静态模型表示。"},
+    {"t": "形变场", "d": "为空间中每个点给出一个位移或刚体变换的函数，这里用神经网络表示。"}
+  ],
+  "learn": "先读懂NeRF与位置编码，再读Nerfies第3节的形变场、由粗到细和弹性正则；用官方代码或nerfstudio复现一段短自拍视频，对比关掉由粗到细时的结果。",
+  "check": {"source": "https://arxiv.org/abs/2011.12948", "confirmed": "arXiv记录：标题、七位作者、v1提交于2020-11-25；摘要中首个用手机随手拍照片/视频照片级重建可变形场景、额外的连续体积形变场扭到标准5D NeRF、形变场易陷局部最优与由粗到细优化、借鉴几何处理与物理仿真的弹性正则、两部手机同步采集验证数据。SE(3)场、雅可比正则形式、背景正则、ICCV 2021、HyperNeRF等后续凭一般了解写。"}
+}

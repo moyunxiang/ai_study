@@ -1,0 +1,32 @@
+{
+  "id": "video-swin",
+  "who": "Ze Liu, Jia Ning, Yue Cao, Yixuan Wei, Zheng Zhang, Stephen Lin, Han Hu · 微软亚洲研究院 等",
+  "venue": "CVPR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2106.13230"},
+    {"label": "代码", "url": "https://github.com/SwinTransformer/Video-Swin-Transformer"}
+  ],
+  "aka": ["Video Swin", "Video Swin Transformer", "视频Swin", "三维移位窗口", "3D shifted windows"],
+  "problem": "早期视频Transformer（[[timesformer]]、[[vivit]]）都在整段视频的时空图块之间做全局注意力，即使把空间和时间拆开，计算量仍然很大，且需要海量预训练数据。",
+  "idea": "主张视频Transformer也该有“局部性”这一归纳偏置：把图像[[swin]]的移位窗口推广到三维，只在局部的时空窗口内做自注意力，相邻层错开窗口来交换信息，并直接用预训练的图像Swin初始化。",
+  "impact": "Video Swin以更少的预训练数据和更小的模型在Kinetics和Something-Something上取得当时最好的精度，成为2021–2022年视频识别最常用的骨干之一，也常作为视频分割、检测等任务的特征提取器。",
+  "method": "输入视频先被切成 `2×4×4`（时间×高×宽）的三维小块作为token，网络与图像Swin一样分四个阶段，逐级合并相邻token、降低分辨率、加宽通道，形成层级特征。\n\n核心是**三维移位窗口自注意力**：\n\n- 把时空特征图划成互不重叠的三维窗口（例如 `8×7×7` 个token），注意力只在窗口内部计算，复杂度随视频长度线性增长，而不是平方增长。\n- 下一层把窗口在时间、高、宽三个方向各平移半个窗口，让原本不在同一窗口的token进入同一个窗口，信息就能跨窗口流动。\n- 注意力里加三维相对位置偏置。\n\n从图像模型迁移时，二维的图块嵌入沿时间维复制并缩放，相对位置偏置沿时间维复制。作者还发现骨干的学习率设为头部的0.1倍更好，因为预训练的骨干在微调时应该慢慢变。\n\n摘要报告：在Kinetics-400和Kinetics-600上分别取得84.9和86.1的top-1精度，所用预训练数据约少20倍、模型约小3倍；在需要时间建模的Something-Something v2上取得69.6的top-1精度。",
+  "legacy": "Video Swin与[[mvit]]代表了层级、局部化的视频Transformer路线；之后[[videomae]]等掩码自监督方法证明普通ViT经充分预训练也能很强，视频骨干逐渐回到朴素ViT加大规模预训练。",
+  "limits": [
+    {"text": "仍依赖大规模图像监督预训练（ImageNet-21K）才能取得最好结果。", "solved_by": ["videomae"]},
+    {"text": "窗口大小固定，覆盖的时间跨度有限，难以建模几分钟以上的长视频。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "swin", "type": "extends", "note": "把Swin的二维移位窗口推广到时空三维，并用预训练的图像Swin初始化。"},
+    {"to": "vivit", "type": "solves", "note": "ViViT等做全局时空注意力，计算量大；Video Swin只在局部三维窗口内计算，速度与精度权衡更好。"},
+    {"to": "timesformer", "type": "rivals", "note": "TimeSformer用分离的全局时空注意力，Video Swin主张局部窗口注意力，在Kinetics上精度更高。"},
+    {"to": "tsm", "type": "rivals", "note": "TSM在卷积骨干里做廉价的时间交互；Video Swin在Something-Something v2这类时间敏感任务上取得更高精度。"}
+  ],
+  "prereq": ["self-attention", "transformer-block", "image-patch", "transfer-learning", "positional-encoding"],
+  "terms": [
+    {"t": "移位窗口", "d": "相邻两层的注意力窗口错开半个窗口，使信息能在不同窗口之间传递。"},
+    {"t": "归纳偏置", "d": "模型结构里预设的假设，例如“相邻的像素关系更紧密”，能让模型用更少数据学好。"}
+  ],
+  "learn": "先读Swin Transformer的移位窗口，再读Video Swin第3节的三维窗口和初始化方法；用官方代码或mmaction2加载预训练模型，在Kinetics的几个视频上推理，再改窗口大小测精度和速度。",
+  "check": {"source": "https://arxiv.org/abs/2106.13230", "confirmed": "arXiv记录：标题、七位作者、v1提交于2021-06-24；摘要中提倡局部性归纳偏置、基于Swin并利用预训练图像模型、Kinetics-400上84.9与Kinetics-600上86.1 top-1、约少20倍预训练数据与约小3倍模型、Something-Something v2上69.6 top-1。2×4×4分块、8×7×7窗口、0.1倍骨干学习率、CVPR 2022、机构凭一般了解写。"}
+}

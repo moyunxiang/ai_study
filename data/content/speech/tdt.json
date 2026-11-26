@@ -1,0 +1,32 @@
+{
+  "id": "tdt",
+  "who": "Hainan Xu, Fei Jia, Somshubra Majumdar, He Huang, Shinji Watanabe, Boris Ginsburg · NVIDIA、CMU",
+  "venue": "ICML 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2304.06795"}
+  ],
+  "problem": "RNN-T转导器解码时必须逐帧处理编码器输出，即使大部分帧都在输出「空白」，也一帧都不能跳，推理慢。",
+  "idea": "让联合网络同时输出两样东西：下一个token是什么，以及它覆盖多少帧（时长）；解码时按预测的时长直接跳过若干帧。",
+  "impact": "TDT（Token-and-Duration Transducer）进了NVIDIA NeMo，Parakeet-TDT系列识别模型都用它，这些模型长期排在开放识别排行榜前列，以速度快著称。",
+  "method": "[[rnn-t]]的解码是一个循环：每读入一帧编码器输出，联合网络就给出「输出某个字」或「空白（这一帧没新字，往下走）」的分布。语音帧通常每10–40毫秒一帧，而字词远比帧少，所以绝大多数步都在输出空白，计算白白浪费。\n\nTDT把联合网络的输出拆成**两个各自归一化的分布**：一个是token分布（含空白），一个是时长分布，例如{0,1,2,3,4}帧。训练时把RNN-T的前向-后向算法推广到「每次可以前进d帧」的格子上，对所有可能的token和时长组合求边缘概率；推理时每步取最可能的token和时长，直接跳到第t+d帧，不再一帧一帧挪。\n\n摘要报告：语音识别上TDT比传统转导器更准、推理最多快2.82倍；在MuST-C语音翻译上BLEU提高1分以上、快2.27倍；口语意图分类和槽位填充上意图准确率最多提高1个百分点以上。代码随[[nemo]]开源，后来NVIDIA的Parakeet-TDT模型（见[[canary]]）就采用这一解码器。",
+  "limits": [
+    {"text": "时长只能从预先设定的少数几个值里选，最大跳步受限；跳得太激进时可能漏字，需要在训练中平衡两个分布。", "solved_by": []},
+    {"text": "仍是逐token的自回归解码，与一次输出整句的非自回归方法相比，长音频的总时延仍有下降空间。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "rnn-t", "type": "extends", "note": "在RNN-T的联合网络上增加时长输出，并把前向-后向训练推广到可跳帧的格子。"},
+    {"to": "conformer", "type": "uses", "note": "实验中的编码器采用Conformer类结构，TDT只替换解码部分。"},
+    {"to": "nemo", "type": "uses", "note": "在NVIDIA NeMo工具包中实现并开源。"},
+    {"to": "ctc", "type": "rivals", "note": "CTC也能快速解码但输出之间条件独立；TDT保留转导器的输出依赖，同时靠跳帧追上速度。"}
+  ],
+  "prereq": ["sequence-alignment", "dynamic-programming", "softmax", "word-error-rate", "encoder-decoder"],
+  "terms": [
+    {"t": "空白符号", "d": "CTC和RNN-T里表示「这一帧不输出新字」的特殊记号，用来处理帧数远多于字数的问题。"},
+    {"t": "联合网络", "d": "RNN-T中把声学编码器输出和已输出文字的预测网络结合起来、给出下一个输出分布的小网络。"}
+  ],
+  "aka": ["TDT", "Token-and-Duration Transducer", "Parakeet-TDT", "时长转导器"],
+  "check": {
+    "source": "https://arxiv.org/abs/2304.06795",
+    "confirmed": "arXiv官方记录：标题Efficient Sequence Transduction by Jointly Predicting Tokens and Durations、6位作者、v1提交2023-04-13；摘要中两个独立归一化的分布、按时长跳帧、ASR最多快2.82倍、MuST-C BLEU提升超过1且快2.27倍、意图准确率最多提升超1%、随NeMo开源。时长取值集合示例、Conformer编码器、ICML 2023、Parakeet-TDT采用与排行榜表现为一般了解。"
+  }
+}

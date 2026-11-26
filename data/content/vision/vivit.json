@@ -1,0 +1,31 @@
+{
+  "id": "vivit",
+  "who": "Anurag Arnab, Mostafa Dehghani, Georg Heigold, Chen Sun, Mario Lučić, Cordelia Schmid · Google Research",
+  "venue": "ICCV 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2103.15691"},
+    {"label": "代码（Scenic）", "url": "https://github.com/google-research/scenic/tree/main/scenic/projects/vivit"}
+  ],
+  "aka": ["ViViT", "视频视觉Transformer", "Video Vision Transformer", "管块嵌入", "tubelet embedding", "分解式时空注意力", "factorised attention"],
+  "problem": "[[vit]]在图像分类上成功后，直接把视频所有帧的图块都送进Transformer会产生极长的序列，注意力计算随长度平方增长；而且视频数据集远小于图像数据集，Transformer缺少归纳偏置、容易过拟合。",
+  "idea": "从视频中抽取时空“管块”作为token，并系统比较四种把空间和时间维度拆开处理的Transformer变体来控制计算量；再用预训练图像ViT初始化、配合强正则，使模型能在较小的视频数据集上训练。",
+  "impact": "ViViT与同期的[[timesformer]]一起确立了纯Transformer视频分类的做法，在Kinetics等五个基准上超过三维卷积网络，其分解式结构和初始化方法被后续视频Transformer反复沿用。",
+  "method": "**token化**：除了逐帧切二维图块，作者提出**管块嵌入**——直接切 `t×h×w` 的三维小块（如2帧×16×16像素），线性投影成一个token，相当于在嵌入时就混合了时间信息。初始化时把ViT的二维嵌入核沿时间方向“中心帧初始化”或均匀复制。\n\n**四种模型**：\n\n- 模型1：所有时空token一起做全局自注意力，最准但最贵。\n- 模型2（分解编码器）：先用空间Transformer对每帧单独编码，取每帧的表示，再用一个时间Transformer在帧之间建模，计算量最小。\n- 模型3（分解自注意力）：每个Transformer块内先做空间注意力再做时间注意力。\n- 模型4（分解点积注意力）：把注意力头一半用于空间、一半用于时间。\n\n**小数据训练**：用ImageNet-21K或JFT预训练的ViT初始化空间部分，加上随机深度、随机增强、标签平滑、mixup等正则。\n\n摘要称通过大量消融实验，在Kinetics 400和600、Epic Kitchens、Something-Something v2和Moments in Time上取得当时最好结果，超过基于深度三维卷积网络的方法。",
+  "legacy": "之后的[[video-swin]]、[[mvit]]把局部性和多尺度引入视频Transformer，[[videomae]]用掩码预训练摆脱了对大规模图像预训练的依赖；ViViT的分解编码器思路（先空间、后时间）也常见于视频-语言模型的视觉端。",
+  "limits": [
+    {"text": "全局时空注意力的计算量随帧数平方增长，处理长视频仍然昂贵。", "solved_by": ["video-swin"]},
+    {"text": "严重依赖大规模图像预训练（JFT等），从零在视频上训练效果差。", "solved_by": ["videomae"]}
+  ],
+  "relations": [
+    {"to": "vit", "type": "extends", "note": "把ViT从图像推广到视频，用预训练ViT初始化空间部分。"},
+    {"to": "timesformer", "type": "rivals", "note": "同期提出纯Transformer视频模型；TimeSformer主推分块的时空分离注意力，ViViT系统比较了四种分解方式并提出管块嵌入。"},
+    {"to": "i3d", "type": "extends", "note": "管块嵌入的初始化借鉴I3D把二维卷积核膨胀成三维的做法；实验上超过I3D一类三维卷积网络。"},
+    {"to": "kinetics", "type": "uses", "note": "在Kinetics 400/600等视频分类基准上评测。"}
+  ],
+  "prereq": ["self-attention", "transformer-block", "image-patch", "transfer-learning", "regularization"],
+  "terms": [
+    {"t": "管块", "d": "在视频里切出的一小段时空立方体（几帧×一小块画面），被当作一个token。"}
+  ],
+  "learn": "先读懂ViT的图块嵌入，再读ViViT第3节四种模型的示意图和第4节的消融表；用Scenic或开源PyTorch实现跑模型2，在小视频数据集上对比是否用ImageNet预训练初始化。",
+  "check": {"source": "https://arxiv.org/abs/2103.15691", "confirmed": "arXiv记录：标题、六位作者、v1提交于2021-03-29；摘要中提取时空token、多种分解时空维度的高效变体、有效正则与利用预训练图像模型在小数据集上训练、Kinetics 400/600、Epic Kitchens、Something-Something v2、Moments in Time上最好结果、超过深度三维卷积方法、代码在Scenic。四种模型的具体结构、管块尺寸与初始化方式、具体正则手段、ICCV 2021凭一般了解写。"}
+}

@@ -1,0 +1,32 @@
+{
+  "id": "votenet",
+  "who": "Charles R. Qi, Or Litany, Kaiming He, Leonidas J. Guibas · Facebook AI Research / 斯坦福大学",
+  "venue": "ICCV 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1904.09664"},
+    {"label": "代码", "url": "https://github.com/facebookresearch/votenet"}
+  ],
+  "aka": ["VoteNet", "深度霍夫投票", "Deep Hough Voting", "点云三维检测", "3D object detection in point clouds"],
+  "problem": "当时的三维检测大多借用二维检测器：把点云转成体素或鸟瞰图，或先在彩色图上检测再抬升到三维。直接在点云上回归框很难，因为扫描到的点都在物体表面，物体中心往往离任何一个点都很远。",
+  "idea": "借用经典的[[hough]]投票：让每个表面上的种子点用网络预测一个“我所属物体的中心在哪”的偏移，投出一张票；票会聚集在物体中心附近，再对聚在一起的票分组、生成三维框。",
+  "impact": "VoteNet只用几何信息就在ScanNet和SUN RGB-D上取得当时最好的三维检测结果，成为室内点云检测的标准基线，后续H3DNet、ImVoteNet、3DETR等都与之比较或在其上扩展。",
+  "method": "流程分三步：\n\n- **种子点**：用[[pointnet2]]骨干对输入点云下采样并提特征，得到约一千个带特征的种子点。\n- **投票**：一个共享的MLP对每个种子点输出三维偏移 `Δx` 和特征残差，种子坐标加偏移就是一张“票”。训练时，对落在某个真值物体表面上的种子，用它到该物体中心的距离监督偏移。这一步把“从表面点直接回归远处的中心”变成了“每个点只需猜一个方向和距离”，许多点的猜测可以互相平均。\n- **聚合与提议**：对所有票做最远点采样选出若干簇中心，在每个中心附近的半径内把票分组，再用一个类似PointNet的小网络对每组投票特征做聚合，输出物体分数、三维框（中心、尺寸、朝向）和语义类别，最后做三维NMS。\n\n整个网络端到端训练，结构简单、模型小。摘要称它在两个真实三维扫描数据集ScanNet和SUN RGB-D上取得最好的三维检测结果，而且只用纯几何信息、不依赖彩色图像就超过了之前的方法。",
+  "legacy": "投票机制成为点云检测的常用模块，同组的ImVoteNet把图像信息融合进投票；之后基于Transformer查询的3DETR等方法去掉了手工的分组步骤。自动驾驶场景的激光雷达检测则更多走[[voxelnet]]、[[pointpillars]]、[[centerpoint]]这条体素与鸟瞰图路线。",
+  "limits": [
+    {"text": "投票和分组需要手工设定半径与簇数，物体密集或大小差别很大时分组容易出错。", "solved_by": []},
+    {"text": "只用几何信息，对纹理和颜色才能区分的类别（如墙上的画）帮助有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "pointnet2", "type": "uses", "note": "用PointNet++作骨干生成种子点和特征，聚合模块也是PointNet式的集合抽象。"},
+    {"to": "hough", "type": "extends", "note": "把经典霍夫变换的“投票再找峰值”改造成可学习、端到端训练的深度投票。"},
+    {"to": "voxelnet", "type": "rivals", "note": "VoxelNet先把点云体素化再检测；VoteNet直接在原始点上投票，在室内场景上更有效。"},
+    {"to": "scannet", "type": "uses", "note": "在ScanNet和SUN RGB-D的真实室内扫描上评测三维检测。"}
+  ],
+  "prereq": ["3d-representation", "vision-tasks", "mlp", "anchor-nms", "clustering"],
+  "terms": [
+    {"t": "霍夫投票", "d": "让每个局部证据为它支持的目标参数（如物体中心）投一票，票数聚集的地方就是检测结果。"},
+    {"t": "最远点采样", "d": "每次挑离已选点集最远的那个点，用来从点云里选出分布均匀的代表点。"}
+  ],
+  "learn": "先了解霍夫变换和PointNet++的集合抽象层，再读VoteNet第3节的投票与聚合模块；用官方代码在SUN RGB-D上推理，把种子点和投出的票画在同一张图上，看票是否聚到物体中心。",
+  "check": {"source": "https://arxiv.org/abs/1904.09664", "confirmed": "arXiv记录：标题、四位作者、v1提交于2019-04-21；摘要中当时方法转成体素/鸟瞰图或依赖二维检测、物体中心可能远离表面点、深度点集网络与霍夫投票结合的端到端VoteNet、ScanNet与SUN RGB-D上最好结果、只用几何信息不依赖彩色图。种子数约一千、最远点采样分组、ICCV 2019、机构、后续工作名凭一般了解写。"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "giou",
+  "who": "Hamid Rezatofighi, Nathan Tsoi, JunYoung Gwak, Amir Sadeghian, Ian Reid, Silvio Savarese · 斯坦福大学 / 阿德莱德大学",
+  "venue": "CVPR 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1902.09630"},
+    {"label": "项目页", "url": "https://giou.stanford.edu/"}
+  ],
+  "aka": ["GIoU", "GIoU loss", "广义交并比", "Generalized IoU", "IoU loss", "交并比损失"],
+  "problem": "检测器用L1/L2距离回归框的坐标，但评测看的是IoU，两者并不一致；直接拿IoU当损失又有个硬伤：两个框不重叠时IoU恒为0，梯度也是0，模型不知道往哪挪。",
+  "idea": "在IoU上加一项惩罚：找能同时包住预测框和真值框的最小外接框C，扣掉C里没被两框覆盖的比例。这样即使两框不相交，离得越远值越小，仍有梯度。",
+  "impact": "GIoU既是损失也是指标，把“直接优化评测指标”带进了框回归；此后[[detr]]等检测器都把GIoU损失作为标准组件，后续又衍生出DIoU、CIoU等变体。",
+  "method": "框回归的老问题：两组预测，L2距离一样，IoU可能差很多；优化L2不等于优化IoU。对于轴对齐的二维框，IoU本身可以直接求导当损失 `L = 1 − IoU`，但两框不重叠时IoU=0，无论相隔1像素还是100像素都一样，损失是平的。\n\nGIoU的定义：设预测框A、真值框B，C是包住A和B的最小矩形，\n\n`GIoU = IoU − |C \\ (A ∪ B)| / |C|`\n\n第二项是外接框里“空着”的面积比例。两框重合时GIoU=IoU=1；两框相距很远时，C里绝大部分是空的，GIoU趋近−1。它的取值在(−1, 1]，始终是IoU的下界，并保留了IoU对尺度不敏感的性质。损失写成 `L = 1 − GIoU`，算法只需几行代码。\n\n摘要称，把GIoU损失替换进当时最先进的检测框架后（论文用的是[[yolov3]]、[[faster-rcnn]]和[[mask-rcnn]]），在PASCAL VOC和MS COCO上无论用IoU还是GIoU作评测标准都有一致的提升。",
+  "legacy": "GIoU损失成了框回归的常用选项：[[detr]]、[[deformable-detr]]把L1损失与GIoU损失组合作为框损失，单阶段检测器也普遍采用IoU类损失。后续的DIoU/CIoU在GIoU基础上加入中心点距离和长宽比项，收敛更快。",
+  "limits": [
+    {"text": "当一个框完全包含另一个框时，外接框C等于大框，惩罚项为0，GIoU退化成IoU，收敛仍然慢。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "faster-rcnn", "type": "extends", "note": "把Faster R-CNN的平滑L1框回归损失换成GIoU损失，验证了提升。"},
+    {"to": "yolov3", "type": "extends", "note": "在YOLOv3上替换回归损失，是论文的主要实验之一。"},
+    {"to": "mask-rcnn", "type": "uses", "note": "在Mask R-CNN上同样替换框回归损失做对比实验。"}
+  ],
+  "prereq": ["iou-map", "loss-function", "derivative-gradient", "vision-tasks"],
+  "terms": [
+    {"t": "最小外接框", "d": "能同时把两个矩形框都装进去的最小的轴对齐矩形。"}
+  ],
+  "learn": "先确认会算两个框的IoU，再按论文的Algorithm 1手写GIoU；在纸上画两个不相交的框，对比IoU和GIoU随距离的变化。",
+  "check": {"source": "https://arxiv.org/abs/1902.09630", "confirmed": "arXiv记录：标题、六位作者、v1提交于2019-02-25；摘要中IoU用作损失时不重叠情形的平台问题、GIoU同时作为损失与指标、在VOC和COCO上一致提升。GIoU公式与(−1,1]取值、实验所用的三种检测器、CVPR 2019、机构凭一般了解写。"}
+}

@@ -1,0 +1,30 @@
+{
+  "id": "aimv2",
+  "aka": ["AIMv2", "AIM v2", "AIMV2", "多模态自回归视觉编码器预训练"],
+  "who": "Enrico Fini, Mustafa Shukor, Xiujun Li, Philipp Dufter, Michal Klein, David Haldimann, Sai Aitharaju, Victor Guilherme Turrisi da Costa et al. · Apple",
+  "venue": "CVPR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2411.14402"},
+    {"label": "代码", "url": "https://github.com/apple/ml-aim"}
+  ],
+  "problem": "多模态大模型的视觉编码器几乎都来自CLIP、SigLIP这类对比学习，但对比学习需要大批量负样本、训练目标和下游“看图生成文字”的用法也不一致。",
+  "idea": "给视觉编码器接一个多模态解码器，让它在一个序列里先自回归地重建原始图像块，再生成对应的文本token；训练完只保留编码器。",
+  "impact": "AIMv2-3B冻结主干在ImageNet-1k上达到89.5%，并在多模态理解上持续优于CLIP、SigLIP，说明生成式目标也能训练出通用的视觉编码器。",
+  "method": "目前给多模态大模型提供“眼睛”的视觉编码器，主流是[[clip]]和[[siglip]]的图文对比学习：让匹配的图文向量靠近、不匹配的推远。这种目标需要很大的批量来提供负样本，而且和下游的用法——视觉特征接进语言模型，由语言模型逐词生成回答——并不一致。另一条路是[[coca]]这类在对比之外加描述生成目标的方法。\n\nAIMv2沿着Apple早先“自回归图像模型”（AIM）的思路，把预训练扩展到图文两种模态。视觉编码器（ViT）把图像切块编码；后面接一个因果的多模态解码器，输入序列是“图像块在前、文本在后”。解码器的任务是：对图像部分，逐块预测下一个图像块的原始像素（回归损失，类似[[mae]]重建像素但改为自回归顺序）；对文本部分，逐词预测描述文本（交叉熵损失）。预训练结束后丢掉解码器，只把编码器拿去用。这种目标每个样本自带监督，不依赖批量内负样本，训练流程简单且易于扩展。\n\n摘要报告，AIMv2编码器在多模态评测和定位、指代、分类等视觉基准上都表现出色，AIMv2-3B在冻结主干的情况下ImageNet-1k准确率达到89.5%，在多种设置下的多模态图像理解上持续优于CLIP、SigLIP等对比模型。",
+  "limits": [
+    {"text": "图像块的像素重建目标偏重低层细节，是否最适合需要高层语义的任务仍有争议，论文主要靠与对比模型的实验对比来说明。", "solved_by": []},
+    {"text": "仍需大规模高质量图文对（含合成描述）来训练，数据配方对结果的影响没有完全公开拆解。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "siglip", "type": "rivals", "note": "同为多模态大模型的视觉编码器；SigLIP用对比目标，AIMv2用自回归生成目标，并报告多模态理解上更好。"},
+    {"to": "coca", "type": "extends", "note": "CoCa在对比之外加描述生成，AIMv2完全改用生成式目标并加入图像块重建。"},
+    {"to": "mae", "type": "extends", "note": "同样以重建原始图像块为监督，但改为按顺序自回归预测，并与文本生成联合训练。"},
+    {"to": "clip", "type": "rivals", "note": "作为CLIP式对比预训练的替代方案，在多种多模态设置下比较。"}
+  ],
+  "prereq": ["autoregressive", "image-patch", "contrastive-learning", "self-supervised", "transformer-block"],
+  "terms": [
+    {"t": "冻结主干评测（frozen trunk）", "d": "预训练好的编码器参数完全不动，只在其输出上训练一个很小的分类头，用来衡量表示本身的质量。"}
+  ],
+  "learn": "先理解[[clip]]和[[siglip]]的对比目标，再读AIMv2第2节解码器的输入顺序和两种损失，比较它与[[coca]]的异同。",
+  "check": {"source": "https://arxiv.org/abs/2411.14402", "confirmed": "标题、作者（16位）、arXiv v1提交2024-11-21；摘要中把自回归预训练扩展到图文、视觉编码器配多模态解码器自回归生成原始图像块和文本token、在多模态评测以及定位、指代、分类上表现好、AIMv2-3B冻结主干ImageNet-1k 89.5%、多模态理解上持续优于CLIP与SigLIP。“图像在前文本在后”的序列顺序、只保留编码器、对比学习依赖大批量的论述、代码仓库、CVPR 2025为一般了解，未逐项核对。"}
+}

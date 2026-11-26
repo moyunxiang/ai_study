@@ -1,0 +1,25 @@
+{
+ "id": "speculative-sampling",
+ "who": "Charlie Chen, Sebastian Borgeaud, Geoffrey Irving, Jean-Baptiste Lespiau, Laurent Sifre, John Jumper · DeepMind",
+ "aka": ["推测采样", "投机采样", "speculative sampling", "SpS", "修正拒绝采样", "modified rejection sampling", "DeepMind推测采样"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2302.01318"}
+ ],
+ "problem": "700亿参数的大模型逐词采样时，每生成一个词都要把全部权重读一遍，延迟受显存带宽和跨卡通信限制，难以再压低。",
+ "idea": "让一个小而快的草稿模型先连写几个词，大模型一次并行打分；用一种修正的拒绝采样决定接受多少个，保证最终输出的分布与大模型单独采样完全一致。",
+ "impact": "与谷歌同期的推测解码一起确立了“草稿+验证”的无损加速范式，其接受/重采样规则成为后来各类推测解码实现的标准写法。",
+ "method": "自回归解码一次只出一个词，而大模型对一段短续写并行打分的耗时，与它采样一个词的耗时相差不大。论文正是利用这一点：草稿模型 `q` 先自回归地生成K个词，目标大模型 `p` 对这K个位置一次前向，得到每个位置自己的分布。\n\n接受规则是关键。对草稿给出的第i个词x，以概率 `min(1, p(x)/q(x))` 接受；一旦某个词被拒绝，就从修正分布 `norm(max(0, p − q))` 里重新采一个词并停止。可以证明这样得到的每个词都恰好服从 `p`，所以输出质量与只用大模型采样没有区别（论文的说法是在硬件数值精度范围内保持目标分布）。如果K个词全被接受，还能免费多采一个词。每一轮至少产出一个词，草稿越准，一轮产出越多。\n\n论文用[[chinchilla]]（700亿参数）做目标模型，在分布式部署下得到2–2.5倍的解码加速，且不需要修改模型本身。它与[[speculative-decoding]]几乎同时独立提出，两者的算法本质相同；后来的[[medusa]]、[[eagle]]等工作主要在“草稿从哪来”上改进，而验证与接受的规则基本沿用这一套。",
+ "limits": [
+  {"text": "需要另外训练和部署一个与目标模型词表一致的草稿模型，草稿与目标差距大时接受率低，加速随之缩水。", "solved_by": ["medusa", "eagle"]},
+  {"text": "草稿是一条线性序列，一个词被拒绝后面全部作废；后来用树状草稿一次验证多条候选。", "solved_by": ["specinfer", "eagle-2"]}
+ ],
+ "relations": [
+  {"to": "speculative-decoding", "type": "rivals", "note": "两篇工作相隔数月独立提出同一种“小模型起草、大模型并行验证、拒绝采样保分布”的方法，后来通常被一并引用。"},
+  {"to": "blockwise-decoding", "type": "extends", "note": "分块并行解码只能做贪心解码的验证；推测采样把验证推广到随机采样，并保证分布不变。"},
+  {"to": "chinchilla", "type": "uses", "note": "以700亿参数的Chinchilla为目标模型做基准，报告2–2.5倍解码加速。"}
+ ],
+ "prereq": ["autoregressive", "decoding-sampling", "importance-sampling", "memory-bandwidth", "throughput-latency"],
+ "terms": [{"t": "草稿模型", "d": "推测解码里负责先猜几个词的小模型，猜得越像大模型，被接受的词越多。"}],
+ "learn": "先弄懂自回归解码为什么受显存带宽限制 → 读论文第2–3节的修正拒绝采样和正确性证明 → 用两个大小不同的GPT-2实现一遍，统计接受率与加速比。",
+ "check": {"source": "https://arxiv.org/abs/2302.01318", "confirmed": "标题、六位作者、v1日期2023-02-02；摘要：草稿模型生成短续写、并行打分的延迟与采样单个词相当、新的修正拒绝采样在硬件数值精度内保持目标分布、Chinchilla 70B分布式设置下2–2.5倍加速、无需修改模型。接受概率公式与修正分布的写法、K个全接受时多采一词、机构为DeepMind按一般了解。"}
+}

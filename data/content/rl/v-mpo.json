@@ -1,0 +1,30 @@
+{
+  "id": "v-mpo",
+  "who": "H. Francis Song, Abbas Abdolmaleki, Jost Tobias Springenberg, Aidan Clark, Hubert Soyer, Jack W. Rae, Seb Noury, Arun Ahuja et al. · DeepMind",
+  "venue": "ICLR 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1909.12238"}
+  ],
+  "problem": "大规模同策略训练（如[[impala]]）用的是策略梯度，方差大，还要精心调熵正则防止策略塌缩；多任务时往往靠[[pbt]]在线调超参才能稳定。[[mpo]]更稳，但它是离策略、依赖Q函数的算法。",
+  "idea": "把MPO改成同策略、只用状态价值V的版本：先用优势最高的那部分样本构造一个「改进后的目标策略」，再在KL约束下让参数化策略去拟合它，等于用学到的V做近似策略迭代，不需要重要性权重和熵正则。",
+  "impact": "在Atari-57和DMLab-30多任务设定上超过此前报告的成绩，也能控制高自由度人形；后来DeepMind在[[muesli]]和若干大规模Transformer智能体里沿用了V-MPO式的「EM＋KL约束」更新。",
+  "method": "MPO系列把策略优化看成一个类似EM的两步过程。V-MPO的具体做法：\n\n**E步（构造目标分布）**：用n步回报减价值估计得到优势 `A(s,a) = G − V(s)`。在一个批次里只保留优势排在前一半的样本，并给它们权重 `ψ(s,a) ∝ exp(A(s,a)/η)`。温度η不是手调的，而是通过一个对偶损失自动学习，使这个非参数分布与当前策略的KL散度不超过一个上限ε_η。\n\n**M步（拟合参数策略）**：最小化加权的负对数似然 `−Σ ψ(s,a) log π_θ(a|s)`，同时加一个KL约束 `KL(π_old ‖ π_θ) < ε_α`（用拉格朗日乘子α实现），防止一次更新走太远。这与[[trpo]]、[[ppo]]限制步长的思路一致，但形式是「监督学习拟合一个更好的分布」，而不是对策略梯度裁剪。\n\n价值函数V用n步回报回归，并对多任务的回报尺度做[[popart]]式的归一化。摘要称，V-MPO在多任务设定下超过了Atari-57和DMLab-30此前报告的分数，而且不需要重要性权重、熵正则或基于种群的超参调整；在单个DMLab和Atari关卡上得分也大幅提高；它还能从完整状态控制22自由度的仿真人形、从像素控制56自由度的人形，在若干OpenAI Gym任务上取得明显更高的渐近分数。",
+  "limits": [
+    {"text": "同策略算法的样本效率低，文中结果依赖数十亿帧的大规模分布式训练。", "solved_by": ["muesli"]},
+    {"text": "引入了两个KL上限ε_η和ε_α以及「保留前一半样本」等新超参，只是换了一组需要设定的量。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mpo", "type": "extends", "note": "沿用MPO的EM式两步更新和KL约束，改为同策略、只学状态价值V。"},
+    {"to": "impala", "type": "rivals", "note": "IMPALA用V-trace策略梯度并配合PBT调参；V-MPO在相同的大规模多任务设定下不需要重要性权重和种群调参，分数更高。"},
+    {"to": "ppo", "type": "rivals", "note": "都用约束限制每次更新幅度；PPO裁剪概率比，V-MPO把更新写成带KL约束的加权最大似然。"},
+    {"to": "dmlab", "type": "uses", "note": "DMLab-30多任务套件是主要评测之一。"}
+  ],
+  "prereq": ["actor-critic", "kl-divergence", "lagrange-duality", "mle", "em-algorithm"],
+  "terms": [
+    {"t": "EM式策略优化", "d": "先在样本上构造一个更好的非参数动作分布（E步），再让神经网络策略用最大似然去拟合它（M步）。"},
+    {"t": "温度对偶损失", "d": "把KL上限写成约束，用拉格朗日对偶自动求出指数加权的温度，不用手调。"}
+  ],
+  "learn": "先读[[mpo]]和[[ppo]]；读原文第3节E步与M步的损失和附录伪代码；在一个连续控制任务上实现「前一半优势样本＋指数加权最大似然＋KL约束」，与PPO对比稳定性。",
+  "check": {"source": "https://arxiv.org/abs/1909.12238", "confirmed": "标题、作者列表前八位、arXiv v1于2019-09-26；摘要中策略梯度方差大、需要调熵正则防止塌缩、V-MPO是MPO的同策略版本并基于学到的状态价值做策略迭代、多任务设定下超过Atari-57和DMLab-30此前报告分数、不需要重要性权重/熵正则/种群调参、单关卡得分大幅提高、22自由度（状态）和56自由度（像素）人形、Gym任务渐近分数更高。前一半样本、温度对偶、KL约束和PopArt归一化按原文正文的通行描述；ICLR 2020按通行引用。"},
+  "aka": ["V-MPO", "同策略MPO", "On-Policy MPO"]
+}

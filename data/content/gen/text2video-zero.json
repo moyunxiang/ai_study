@@ -1,0 +1,29 @@
+{
+  "id": "text2video-zero",
+  "who": "Levon Khachatryan, Andranik Movsisyan, Vahram Tadevosyan, Roberto Henschel, Zhangyang Wang, Shant Navasardyan, Humphrey Shi · Picsart AI Research 等",
+  "venue": "ICCV 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2303.13439"},
+    {"label": "代码", "url": "https://github.com/Picsart-AI-Research/Text2Video-Zero"}
+  ],
+  "aka": ["Text2Video-Zero", "零样本文生视频", "Zero-shot Text-to-Video", "Video Instruct-Pix2Pix"],
+  "problem": "当时的文生视频方法要么像[[make-a-video]]那样需要大规模视频数据和大量算力训练，要么像[[tune-a-video]]那样要对每段视频单独微调，门槛很高。",
+  "idea": "完全不训练，直接改造文生图模型的采样过程：在各帧的初始隐变量里注入全局的运动（平移），保证场景和背景随时间一致；把每帧的自注意力改成“对第一帧做交叉注意力”，保持前景物体的外观和身份。",
+  "impact": "提出了“零样本文生视频”这一任务设定，只用[[stable-diffusion]]就能生成短视频，并可配合[[controlnet]]和InstructPix2Pix做条件视频生成和视频编辑，成为免训练视频方法的常见基线。",
+  "method": "Text2Video-Zero用的是普通的文生图模型，生成m帧视频时只做两处改动：\n- **带运动的隐变量**：如果每帧都独立采一个随机噪声，生成的各帧毫无关联。作者先采第一帧的噪声x_T，用DDIM往前走几步得到一个中间隐变量，然后对它施加一个随时间逐帧增大的全局平移（方向和速度可设定），得到各帧的隐变量，再用DDPM前向加噪回到x_T。这样各帧从“同一场景按相机运动平移后”的状态出发，背景和整体布局自然连贯。\n- **跨帧注意力**：把U-Net中每帧的自注意力换成以第一帧为参照的注意力——每帧的查询Q来自自己，键K和值V来自第一帧。于是所有帧都向第一帧“取”外观，前景物体的颜色、纹理和身份保持一致。\n\n此外还可以对前景做显著性检测，在背景区域平滑相邻帧的隐变量，进一步减少闪烁。由于方法不涉及训练，它可以直接套在其他基于SD的模块上：结合ControlNet按姿态或边缘序列生成视频；结合InstructPix2Pix对已有视频按指令逐帧编辑（Video Instruct-Pix2Pix）。论文报告其效果与需要视频数据训练的方法相当，有时更好。",
+  "limits": [
+    {"text": "运动只来自人为设定的全局平移，无法生成真正复杂、符合物理的动作；帧数短，时间上的细节闪烁仍然明显。", "solved_by": ["animatediff", "svd"]}
+  ],
+  "relations": [
+    {"to": "stable-diffusion", "type": "uses", "note": "整个方法建立在现成的Stable Diffusion上，不做任何训练。"},
+    {"to": "tune-a-video", "type": "solves", "note": "Tune-A-Video要对每段视频微调，Text2Video-Zero用跨帧注意力和带运动的隐变量完全免训练。"},
+    {"to": "controlnet", "type": "uses", "note": "配合ControlNet按姿态、边缘等条件序列生成视频。"},
+    {"to": "make-a-video", "type": "rivals", "note": "Make-A-Video靠大规模视频训练时序模块，本方法不用任何视频数据。"}
+  ],
+  "prereq": ["diffusion-process", "self-attention", "latent-space", "zero-few-shot"],
+  "terms": [
+    {"t": "跨帧注意力", "d": "让每一帧的注意力去读取另一帧（这里是第一帧）的键和值，使各帧共享外观信息。"}
+  ],
+  "learn": "先读Stable Diffusion与DDIM → 读本文第3节运动隐变量和跨帧注意力 → 用开源代码分别关掉两处改动，观察闪烁和外观漂移。",
+  "check": {"source": "https://arxiv.org/abs/2303.13439", "confirmed": "标题、七位作者、v1日期2023-03-23、摘要中提出零样本文生视频任务、无需训练或优化、利用Stable Diffusion等文生图方法、在帧隐变量中加入运动动态保持全局场景与背景一致、每帧对第一帧的跨帧注意力保持前景外观与身份、可用于条件生成与Video Instruct-Pix2Pix、性能与近期方法相当或更好；机构列表、ICCV 2023、DDIM前进再加噪的具体步骤、背景平滑来自一般了解"}
+}

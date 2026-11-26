@@ -1,0 +1,34 @@
+{
+  "id": "kitaev-klein-parser",
+  "who": "Nikita Kitaev, Dan Klein · 加州大学伯克利分校",
+  "venue": "ACL 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1805.01052"},
+    {"label": "GitHub", "url": "https://github.com/nikitakit/self-attentive-parser"}
+  ],
+  "aka": ["Berkeley Neural Parser", "benepar", "自注意力成分句法分析", "Self-Attentive Parser"],
+  "problem": "当时最强的成分句法分析器用LSTM编码句子、再对每个片段打分，但LSTM里信息如何在句子不同位置之间传递是不透明的，难以分析和改进。",
+  "idea": "保留Stern等的片段打分加CKY图表解码，把LSTM编码器换成8层自注意力编码器；分析后发现内容信息和位置信息混在一起会互相干扰，于是提出把两者分开计算注意力的「分解」版本。",
+  "impact": "在Penn Treebank上单模型不用外部数据达到93.55 F1，加上ELMo预训练表示达到95.13 F1，在SPMRL的9种语言中8种超过此前最好结果；开源的benepar成为常用的成分句法分析工具。",
+  "method": "**分析框架**沿用Stern等2017年的图表分析器：编码器为每个词位置输出一个向量，任意片段`(i, j)`的表示由两端位置的向量相减得到，再经一个MLP给每个短语标签`l`打分`s(i, j, l)`；整棵树的得分是其中所有片段得分之和，用类似[[cky-parsing]]的动态规划求最高分的树，训练用带间隔的铰链损失。\n\n**自注意力编码器**：输入是词向量、词性向量和位置向量的和，经过8层[[transformer]]式的编码层（多头自注意力加前馈网络），每层8个头。作者发现，完全关掉基于内容的注意力（只按位置注意）时，开发集F1只降0.27，说明内容注意力几乎没被用上。他们猜想原因是内容和位置混在同一个向量里，点积`q·k`里会出现「内容对位置」的交叉项相互干扰。**分解模型**把每个向量拆成内容和位置两半，查询、键、值也分开计算，注意力得分是两部分点积之和。分解后参数量约减半，F1提升近0.5。\n\n词的表示还比较了词向量、字符LSTM和ELMo等预训练表示。最终在WSJ测试集上：不用外部数据93.55 F1，用ELMo表示95.13 F1，均为单模型的最好结果；在SPMRL的9种语言里，8种超过此前最好的公开结果。",
+  "limits": [
+    {"text": "需要大量树库标注训练，低资源语言和新领域上的效果依赖预训练表示。", "solved_by": []},
+    {"text": "CKY式图表解码对句长是立方复杂度，长句分析较慢。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "uses", "note": "编码器是Transformer式的多头自注意力层，并在此基础上分离内容与位置。"},
+    {"to": "berkeley-parser", "type": "extends", "note": "同一实验室的成分句法分析路线，从隐变量PCFG走到神经图表分析器。"},
+    {"to": "cky-parsing", "type": "uses", "note": "以CKY式的动态规划在所有片段得分上找出最高分的树。"},
+    {"to": "elmo", "type": "uses", "note": "用ELMo上下文表示作为词的输入，把WSJ测试集F1从93.55提高到95.13。"}
+  ],
+  "prereq": ["self-attention", "positional-encoding", "dynamic-programming", "embedding", "loss-function"],
+  "terms": [
+    {"t": "成分句法分析", "d": "把句子分析成嵌套的短语结构树，例如名词短语NP、动词短语VP各覆盖哪些词。"},
+    {"t": "图表分析器", "d": "给所有可能的片段及其标签打分，再用动态规划找出得分之和最高的合法树。"}
+  ],
+  "learn": "先读[[cky-parsing]]和[[transformer]]的讲解 → 读原文第2节片段打分与编码器、第3节内容与位置分解的分析 → 动手：pip安装benepar分析几个长句，观察介词短语挂接是否正确。",
+  "check": {
+    "source": "https://arxiv.org/abs/1805.01052",
+    "confirmed": "arXiv：标题、作者Kitaev与Klein、2018-05-02提交、摘要（以自注意力替换LSTM编码器、分离位置与内容信息、比较词汇表示、PTB上不用外部数据93.55 F1和用预训练表示95.13 F1、SPMRL 9种语言中8种超过此前最好结果）；PDF正文：沿用Stern等2017a图表分析器、8层每层8头、CKY式解码、Hamming损失、关闭内容注意力只降0.27 F1、分解模型参数约减半且提升近0.5 F1、95.13用Peters等（ELMo）表示、字符LSTM。伯克利机构和ACL 2018出处凭一般了解。"
+  }
+}

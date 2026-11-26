@@ -1,0 +1,29 @@
+{
+ "id": "practical-black-box",
+ "who": "Nicolas Papernot, Patrick McDaniel, Ian Goodfellow, Somesh Jha, Z. Berkay Celik, Ananthram Swami · 宾夕法尼亚州立大学、OpenAI等",
+ "venue": "AsiaCCS 2017",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1602.02697"}
+ ],
+ "aka": ["替代模型攻击", "substitute model attack", "黑盒迁移攻击", "Papernot黑盒攻击", "transfer attack"],
+ "problem": "此前的对抗样本攻击都要知道模型的内部参数或训练数据，人们因此以为把模型藏在API后面、只返回标签，就不必担心对抗样本。",
+ "idea": "只向远程模型提交输入、看它返回的标签，用这些标签在本地训练一个替代模型，再在替代模型上做白盒攻击，靠对抗样本的可迁移性去骗远程模型。",
+ "impact": "把对抗样本从实验室里的白盒问题变成了真实在线服务面临的威胁，替代模型加迁移的思路成为黑盒攻击的基本路线之一。",
+ "method": "攻击者的能力只有一样：选一些输入发给目标模型，得到它预测的类别标签。流程是：\n\n- 先拿少量自己准备的样本去问目标模型，得到标签，训练一个本地的替代网络。\n- 用替代网络的雅可比矩阵（输出对输入的导数）指出“哪个方向上目标模型的决策最可能变化”，沿这些方向合成新样本，再去问目标模型要标签。这种基于雅可比的数据增广让替代模型用很少的查询就学到目标模型决策边界的大致形状。\n- 替代模型训练好之后，在它上面用[[fgsm]]等白盒方法生成对抗样本，直接拿去攻击目标模型。\n\n能成功的关键在于对抗样本的可迁移性：在一个模型上做出的扰动，常常也能骗过另一个结构不同、训练数据不同的模型。\n\n摘要报告：对MetaMind在线API托管的深度网络，用替代模型生成的对抗样本有84.24%被误分类；用逻辑回归作替代去攻击Amazon和Google托管的模型，误分类率分别为96.19%和88.94%。这种攻击还能绕过此前被认为能增加构造难度的防御策略。",
+ "limits": [
+  {"text": "依赖可迁移性，对与替代模型差异很大的目标或经过对抗训练的目标，迁移成功率会明显下降；而且需要向目标模型发出不少查询。", "solved_by": ["pgd-adversarial-training"]},
+  {"text": "展示了防御不能靠藏起梯度，但大量后续防御仍然掉进同一个陷阱，直到有人系统地检查了这类虚假的安全性。", "solved_by": ["obfuscated-gradients", "autoattack"]}
+ ],
+ "relations": [
+  {"to": "adversarial-examples", "type": "extends", "note": "利用原论文就观察到的跨模型迁移现象，把它变成不需要任何内部信息的实用攻击。"},
+  {"to": "fgsm", "type": "uses", "note": "在本地替代模型上用FGSM等快速梯度方法生成要迁移的对抗样本。"},
+  {"to": "evasion-attacks", "type": "extends", "note": "把规避攻击推广到攻击者既不知道模型也不知道训练数据的黑盒设定，并在真实的商业机器学习服务上验证。"}
+ ],
+ "prereq": ["supervised-learning", "jacobian-hessian", "transfer-learning", "classification-metrics"],
+ "terms": [
+  {"t": "黑盒攻击", "d": "攻击者只能向模型发送输入、看到输出，不知道参数也拿不到梯度。"},
+  {"t": "可迁移性", "d": "在一个模型上构造的对抗样本也能让另一个模型出错的现象。"}
+ ],
+ "learn": "先读[[adversarial-examples]]和[[fgsm]] → 读原文第3节替代模型训练与雅可比增广 → 在MNIST上训练一个目标网络，只用它的预测标签训练替代网络，比较迁移攻击成功率。",
+ "check": {"source": "https://arxiv.org/abs/1602.02697", "confirmed": "arXiv记录：标题、6位作者、2016-02-08 v1；摘要所述已有攻击都需模型内部或训练数据、只观察标签的黑盒攻击者、用对手合成并由目标标注的数据训练本地替代模型、MetaMind 84.24%、Amazon 96.19%、Google 88.94%、能规避此前的防御。雅可比增广的细节、AsiaCCS 2017与机构凭一般了解写。"}
+}

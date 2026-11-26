@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MinkowskiNet稀疏卷积（2019） · AI脉络</title>
+<meta name="description" content="三维扫描场景大部分空间是空的。把点云体素化后直接做稠密三维卷积（式）浪费巨大、分辨率上不去；逐点网络（、）在几十万点的室内场景上又很慢。 把点云存成 稀疏张量 ：只记录非空体素的坐标和特征，卷积只在这些坐标上算。作者把它推广成“广义稀疏卷积”，适用于任意维度和任意卷积核形状，并开源了自动微分库Mi…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/minkowskinet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MinkowskiNet稀疏卷积（2019）">
+<meta property="og:description" content="三维扫描场景大部分空间是空的。把点云体素化后直接做稠密三维卷积（式）浪费巨大、分辨率上不去；逐点网络（、）在几十万点的室内场景上又很慢。 把点云存成 稀疏张量 ：只记录非空体素的坐标和特征，卷积只在这些坐标上算。作者把它推广成“广义稀疏卷积”，适用于任意维度和任意卷积核形状，并开源了自动微分库Mi…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/minkowskinet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/minkowskinet">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 三维表示与神经渲染</div>
+<h1>MinkowskiNet稀疏卷积</h1>
+<div class="full">4D Spatio-Temporal ConvNets: Minkowski Convolutional Neural Networks</div>
+<div class="meta"><span>2019.04</span><span>论文</span><span>延伸</span><span>CVPR 2019</span><span>Christopher Choy, JunYoung Gwak, Silvio Savarese · 斯坦福大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1904.08755" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/NVIDIA/MinkowskiEngine" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/minkowskinet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>三维扫描场景大部分空间是空的。把点云体素化后直接做稠密三维卷积（<a class="ln" href="../n/voxnet.html">VoxNet</a>式）浪费巨大、分辨率上不去；逐点网络（<a class="ln" href="../n/pointnet2.html">PointNet++</a>、<a class="ln" href="../n/dgcnn.html">DGCNN动态图点云</a>）在几十万点的室内场景上又很慢。</p></div><div><h4>方法</h4><p>把点云存成<b>稀疏张量</b>：只记录非空体素的坐标和特征，卷积只在这些坐标上算。作者把它推广成“广义稀疏卷积”，适用于任意维度和任意卷积核形状，并开源了自动微分库Minkowski Engine，可以直接搭三维乃至四维（三维空间＋时间）卷积网络。</p></div><div><h4>影响</h4><p>Minkowski Engine与同期的SparseConvNet一起让稀疏卷积成为大规模三维场景分割、检测的主力骨干；MinkUNet长期是ScanNet等室内场景分割的标准基线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>稀疏张量用两张表表示：坐标表C（每个非空体素的整数坐标，如(x, y, z, t)）和特征表F（对应体素的特征向量）。广义稀疏卷积对每个输出坐标u计算</p><p class="formula"><code>x_u&#x27; = Σ_{i ∈ N(u, C_in)} W_i · x_{u+i}</code></p><p>只对卷积核偏移集合N里、且输入坐标确实存在的位置求和。这样可以让输出坐标与输入相同（不让稀疏区域向空处扩散，保持稀疏），也可以做带步长的下采样和转置卷积上采样，从而搭出类似<a class="ln" href="../n/unet.html">U-Net</a>的编码器－解码器。卷积核的形状可以随意定义：作者为四维时空数据提出<b>混合核</b>，空间维用立方体、时间维用十字形，避免核大小随维数指数增长。</p><p>为保证一段三维视频在空间、时间和颜色上一致，作者还提出在“空间－时间－颜色”7维空间里做条件随机场（trilateral-stationary CRF）。</p><p>摘要称只用广义三维稀疏卷积的网络在多个三维语义分割基准上大幅超过二维或二维三维混合方法；在三维视频上，四维时空卷积网络对噪声更鲁棒，优于三维网络，某些情况下还更快。</p><h2>后来的发展</h2><p>稀疏卷积骨干被广泛用于室内场景分割、三维检测和激光雷达感知（如<a class="ln" href="../n/centerpoint.html">CenterPoint</a>使用的稀疏体素骨干）；之后<a class="ln" href="../n/point-transformer-v3.html">Point Transformer V3</a>等点云Transformer借鉴了稀疏体素的序列化和分组，在多个基准上与之竞争。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>体素化会丢掉体素内部的细节，分辨率与显存之间需要权衡；卷积的感受野局部，长距离上下文要靠堆很多层。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/point-transformer-v3.html">Point Transformer V3</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/unet.html">U-Net</a><span class="yr">2015.05 · 视觉</span><div class=nt>用稀疏的带步长卷积与转置卷积搭出U-Net式的编码器－解码器（MinkUNet）。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/voxnet.html">VoxNet</a><span class="yr">2015.09 · 视觉</span><div class=nt>VoxNet在稠密体素网格上做三维卷积，计算和显存随分辨率立方增长；稀疏卷积只在非空体素上计算。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/scannet.html">ScanNet</a><span class="yr">2017.02 · 数据·评测</span><div class=nt>在ScanNet等真实室内扫描数据上做三维语义分割评测。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/pointnet2.html">PointNet++</a><span class="yr">2017.06 · 视觉</span><div class=nt>点方法直接处理点集；MinkowskiNet体素化后用稀疏卷积，在大场景分割上大幅领先。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/dgcnn.html">DGCNN动态图点云</a><span class="yr">2018.01 · 视觉</span><div class=nt>每层都要在全部点上算k近邻，复杂度随点数平方增长，难以直接处理几十万点的大场景。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/point-transformer-v3.html">Point Transformer V3</a><span class="yr">2023.12 · 视觉</span><div class=nt>体素化会丢掉体素内部的细节，分辨率与显存之间需要权衡；卷积的感受野局部，长距离上下文要靠堆很多层。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/convolution-op.html">卷积运算</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a></p>
+<h2>本篇术语</h2><ul><li><b>稀疏张量</b>　只保存非零（非空）位置的坐标和取值的张量格式，适合大部分为空的三维体素数据。</li><li><b>体素</b>　三维空间里的小立方格，相当于三维版的像素。</li></ul>
+<h2>怎么学</h2><p>先理解普通三维卷积和体素化，再读论文第3节稀疏张量与广义稀疏卷积的定义；安装MinkowskiEngine跑官方ScanNet分割示例，打印每一层的非空体素数量。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1904.08755" rel="noopener">https://arxiv.org/abs/1904.08755</a>（arXiv记录：标题、三位作者、v1提交于2019-04-18；摘要中稀疏张量、广义稀疏卷积涵盖所有离散卷积、开源自动微分库、4D时空网络、混合核、7D空间-时间-颜色的trilateral-stationary CRF、只用3D稀疏卷积的网络大幅超过2D与2D-3D混合方法、4D网络对噪声鲁棒且有时更快。卷积公式、立方体/十字形混合核细节、MinkUNet、CVPR 2019凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MinkowskiNet%E7%A8%80%E7%96%8F%E5%8D%B7%E7%A7%AF%EF%BC%88minkowskinet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aminkowskinet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/minkowskinet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="craft.html"><small>本分支上一个 · 2019.04</small><b>CRAFT字符级文字检测</b></a><a class="r" href="votenet.html"><small>本分支下一个 · 2019.04</small><b>VoteNet点云投票检测</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

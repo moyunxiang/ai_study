@@ -1,0 +1,32 @@
+{
+  "id": "emformer",
+  "who": "Yangyang Shi, Yongqiang Wang, Chunyang Wu, Ching-Feng Yeh, Julian Chan, Frank Zhang, Duc Le, Mike Seltzer · Facebook AI",
+  "venue": "ICASSP 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2010.10759"}
+  ],
+  "problem": "Transformer编码器识别准，但自注意力要看整段音频，没法边听边出字；分块处理又要反复重算历史，训练和解码都慢。",
+  "idea": "把很长的历史压缩成一个小的「记忆库」，左侧上下文的键和值缓存起来不重算，训练时按块并行，让Transformer能以几十到几百毫秒的延迟做流式识别。",
+  "impact": "Emformer成为Meta流式识别的主力编码器之一，被收入torchaudio作为标准的流式RNN-T模型，是后来流式Transformer/Conformer设计常比较的对象。",
+  "method": "流式识别要求模型只能看到「到目前为止」的声音，最多再往后偷看一点（前瞻）。LSTM天然满足这一点，[[transformer]]却默认看全句。此前的「增强记忆Transformer」（AM-TRF）把音频切成块，每块只对本块、少量左右上下文和一组记忆向量做注意力，但左侧上下文每个块都要重新计算，训练也只能一块接一块地串行做。\n\nEmformer做了三件事：一是把更早的历史蒸馏成**记忆库**，每块只产出一个摘要向量放进去，注意力的计算量不随历史变长而增长；二是**缓存**左侧上下文在自注意力中的键和值（与后来大模型推理里的[[c:kv-cache]]是同一个思路），不再重算；三是训练时用注意力掩码让所有块**并行**处理。编码器接在[[rnn-t]]框架里输出文字。\n\n摘要报告：平均延迟960毫秒时，LibriSpeech test-clean/test-other词错误率为2.50%/5.62%；相比AM-TRF训练快4.6倍、解码实时率降低18%、词错误率相对降低17%/9%；在80毫秒的低延迟设定下，相比同延迟同规模的LSTM基线，词错误率相对降低9%和16%。",
+  "limits": [
+    {"text": "块大小和前瞻长度在训练时就定死，换一个延迟目标通常要重新训练模型。", "solved_by": []},
+    {"text": "记忆库把很远的历史压得很粗，长时依赖的信息会丢失；主要在朗读语音基准上验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "extends", "note": "把全局自注意力改造成块内注意力加记忆库和键值缓存，使其能流式运行。"},
+    {"to": "rnn-t", "type": "uses", "note": "Emformer作为RNN-T的编码器，由转导器负责边听边输出文字。"},
+    {"to": "streaming-rnnt-mobile", "type": "solves", "note": "端侧流式RNN-T用LSTM编码器；Emformer在同等低延迟下用Transformer取得更低的错误率。"},
+    {"to": "transformer-transducer", "type": "rivals", "note": "同样把Transformer接进RNN-T做流式识别，Transformer Transducer靠限制注意力窗口，Emformer靠记忆库和缓存。"}
+  ],
+  "prereq": ["self-attention", "transformer-block", "kv-cache", "word-error-rate", "throughput-latency"],
+  "terms": [
+    {"t": "流式识别", "d": "一边接收音频一边输出文字，而不是等整句说完再识别。"},
+    {"t": "实时率（RTF）", "d": "处理1秒音频需要的秒数，越小越快。"}
+  ],
+  "aka": ["Emformer", "Efficient Memory Transformer", "流式Transformer"],
+  "check": {
+    "source": "https://arxiv.org/abs/2010.10759",
+    "confirmed": "arXiv官方记录：标题、8位作者、v1提交2020-10-21；摘要中的记忆库、键值缓存、并行块训练，960ms延迟2.50%/5.62%、相对AM-TRF训练提速4.6倍、RTF降低18%、WER相对降低17%/9%，80ms延迟3.01%/7.09%及相对LSTM降低9%/16%。torchaudio收录、ICASSP 2021和Facebook AI机构为一般了解。"
+  }
+}

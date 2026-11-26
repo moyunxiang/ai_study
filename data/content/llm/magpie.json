@@ -1,0 +1,31 @@
+{
+  "id": "magpie",
+  "who": "Zhangchen Xu, Fengqing Jiang, Luyao Niu, Yuntian Deng, Radha Poovendran, Yejin Choi, Bill Yuchen Lin · 华盛顿大学、Allen Institute for AI",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2406.08464"},
+    {"label": "项目页", "url": "https://magpie-align.github.io/"}
+  ],
+  "aka": ["Magpie", "喜鹊", "Magpie-Pro", "无提示指令合成", "alignment data synthesis from scratch"],
+  "problem": "开放权重模型（如Llama-3-Instruct）的对齐数据并不公开；开源的指令数据要么靠人工、成本高，要么靠预先设计的种子提示去引导生成，规模和多样性都受限。",
+  "idea": "利用对齐模型的自回归特性：只把对话模板里“用户发言开始”之前的部分喂给模型，它就会自己续写出一条像真人提问的用户指令；再把这条指令送回模型得到回答，不需要任何种子问题。",
+  "impact": "用极低成本从Llama-3-Instruct里“抽出”了数百万条对齐数据，只用其中精选的30万条做SFT就在对齐评测上接近官方指令模型，成为后来许多开源后训练数据集（如SmolTalk）的构造方法之一。",
+  "method": "背景：[[self-instruct]]、[[wizardlm]]等方法需要种子任务和精心设计的提示来引导模型出题，生成的问题容易同质化；[[ultrafeedback]]等数据集的提示来自已有数据集。与此同时，[[llama-3]]这样的开放权重对齐模型其实已经在大量私有对齐数据上训练过。\n\n**Magpie**的观察是：对齐模型的聊天模板形如“系统段 → <用户开始标记> 用户内容 <用户结束标记> → <助手开始标记> 回答”。如果只输入到<用户开始标记>为止，模型会按训练中见过的分布自己续写一段“用户的问题”，因为它学过用户通常会问什么。作者用这个办法从Llama-3-Instruct生成了400万条指令及对应回答，再用模型打分评估难度、质量和类别，筛出30万条高质量样本（Magpie-Pro等子集）。\n\n结果：用Magpie数据只做SFT微调Llama-3-8B-Base，摘要称在部分任务上可与官方Llama-3-8B-Instruct相当——后者用了约1000万条数据做SFT再加反馈学习；只用Magpie做SFT也超过了先前用于SFT加偏好优化的公开数据（如用UltraFeedback做DPO），优势体现在AlpacaEval、ArenaHard、WildBench等对齐评测上。",
+  "limits": [
+    {"text": "抽出的数据继承了源模型的能力上限、偏好和安全策略，本质上仍是一种从更强对齐模型蒸馏的方式；数学、代码等需要正确性的任务上回答质量没有保证。", "solved_by": []},
+    {"text": "主要提升的是由模型评判的对话类评测，生成的问题分布偏向源模型训练时的常见类型，长尾和多轮复杂任务较少。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "self-instruct", "type": "solves", "note": "Self-Instruct需要种子任务和设计好的提示来引导出题，Magpie直接利用模板续写，不需要种子。"},
+    {"to": "llama-3", "type": "uses", "note": "数据从Llama-3-Instruct中抽取，并在Llama-3-8B-Base上验证。"},
+    {"to": "ultrafeedback", "type": "rivals", "note": "摘要称只用Magpie做SFT就超过了用UltraFeedback做SFT加DPO的公开配方。"},
+    {"to": "wizardlm", "type": "rivals", "note": "Evol-Instruct靠提示让模型改写、加深已有指令，Magpie直接从对齐模型的提问分布中采样。"}
+  ],
+  "prereq": ["instruction-tuning", "autoregressive", "decoding-sampling", "knowledge-distillation"],
+  "terms": [
+    {"t": "聊天模板（chat template）", "d": "对话模型训练时把系统提示、用户和助手的发言用特殊标记拼成一段文本的固定格式。"},
+    {"t": "预查询模板（pre-query template）", "d": "Magpie输入的那段只到“用户发言开始”为止的模板前缀，模型会顺着它写出用户问题。"}
+  ],
+  "learn": "先读[[self-instruct]]了解指令数据合成；读原文第2节生成流程和第3节数据过滤；动手：用任意开源对话模型的聊天模板，只输入到用户标记为止，采样20次看它会写出哪些问题，再统计主题分布。",
+  "check": {"source": "https://arxiv.org/abs/2406.08464", "confirmed": "标题、7位作者、arXiv v1提交日2024-06-12；摘要中只输入到用户消息位置之前的模板即可让Llama-3-Instruct生成用户查询、生成400万条指令与回答并筛选30万条、微调Llama-3-8B-Base在部分任务上与用1000万条SFT加反馈学习的官方Instruct相当、仅SFT即超过UltraFeedback加DPO等公开数据、AlpacaEval/ArenaHard/WildBench。ICLR 2025、机构、SmolTalk采用Magpie为一般了解。"}
+}

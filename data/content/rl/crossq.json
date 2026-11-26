@@ -1,0 +1,30 @@
+{
+  "id": "crossq",
+  "who": "Aditya Bhatt, Daniel Palenicek, Boris Belousov, Max Argus, Artemij Amiranashvili, Thomas Brox, Jan Peters · 达姆施塔特工业大学 / 弗莱堡大学等",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1902.05605"}
+  ],
+  "problem": "[[redq]]、DroQ靠每采一步数据就更新评论家20次（UTD=20）把连续控制的样本效率推上去，但计算量随之暴涨；而在深度RL里直接加批归一化（BatchNorm）一向被认为会把训练搞坏。",
+  "idea": "去掉目标网络，在评论家里正确地使用BatchNorm：把当前状态-动作和下一状态-动作拼成同一批一起过网络，让归一化统计量覆盖两种分布；这样UTD保持为1，也能达到或超过高UTD方法的样本效率。",
+  "impact": "说明「网络结构与归一化」本身就能替代昂贵的高UTD与集成，和[[simba]]、[[bro]]一起推动了连续控制里「先把网络做对再谈算法」的风气，CrossQ也成了样本高效基线之一。",
+  "method": "批归一化在训练时用一个批次的均值和方差标准化特征。在TD学习里，评论家既要算当前的 `Q(s, a)`（a来自回放缓冲区里的旧策略），又要算目标里的 `Q(s', a')`（a'来自当前策略）。这两批输入的分布不同：如果分别过网络，训练时和算目标时用的归一化统计量就对不上，这被认为是BatchNorm在RL里失败的原因之一。\n\nCrossQ在[[sac]]上做了几处改动：\n- **拼接批次**：把(s, a)和(s', a')拼成一个两倍大的批次，一次前向传播，BatchNorm的统计量同时覆盖两种分布，再把输出拆开分别使用；\n- **去掉目标网络**：目标直接由当前评论家计算（对下一状态的那一半输出停止梯度），不再维护慢速更新的副本；\n- 评论家加宽，UTD保持1。\n\n摘要称，CrossQ在样本效率上达到或超过当时最好的方法，计算量比REDQ和DroQ大幅降低，而且只需在SAC上改几行代码，也不依赖复杂的偏差修正。\n\n注意它的arXiv编号很早：2019年的v1是同一团队较早的批归一化研究，现在的CrossQ算法和标题来自2023年10月的v3，正式发表于ICLR 2024，本站按v3的时间标注。",
+  "limits": [
+    {"text": "主要在MuJoCo连续控制上验证，在像素输入、离散动作或更难的高维任务上是否同样有效没有充分回答。", "solved_by": []},
+    {"text": "去掉目标网络后的稳定性依赖BatchNorm的细节，换用别的归一化或更大网络时效果可能变化。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "sac", "type": "extends", "note": "以SAC为基础算法，只改评论家的归一化方式与目标计算。"},
+    {"to": "redq", "type": "solves", "note": "REDQ靠UTD=20和Q集成获得样本效率，计算昂贵；CrossQ在UTD=1下达到相近或更好的样本效率。"},
+    {"to": "batchnorm", "type": "uses", "note": "核心部件就是批归一化，并通过拼接批次解决训练与目标分布不一致的问题。"},
+    {"to": "td3", "type": "rivals", "note": "TD3等方法依赖目标网络与双Q截断来稳定训练；CrossQ去掉目标网络，也不依赖复杂的偏差修正。"}
+  ],
+  "prereq": ["actor-critic", "td-error", "normalization-layer", "on-off-policy"],
+  "terms": [
+    {"t": "目标网络", "d": "DQN以来常用的技巧：用一个参数缓慢跟随的网络副本计算TD目标，避免目标随每次更新剧烈变化。"},
+    {"t": "UTD比", "d": "update-to-data ratio，每收集一步新数据对网络做多少次梯度更新。"}
+  ],
+  "learn": "先读[[sac]]和[[batchnorm]]；读原文第3节拼接批次的做法；在SAC实现里分别做「只加BatchNorm」和「加BatchNorm并拼接批次、去目标网络」两个版本，在Hopper或Walker上比较。",
+  "check": {"source": "https://arxiv.org/abs/1902.05605v4", "confirmed": "标题、七位作者、版本历史（v1 2019-02-14，v2 2019-10-17，v3 2023-10-09，v4 2024-03-25）、Comments注明发表于ICLR 2024；摘要中REDQ与DroQ用UTD=20、CrossQ谨慎使用BatchNorm并去掉目标网络、UTD为1、不依赖复杂偏差修正、三点贡献（样本效率、计算量大幅低于REDQ/DroQ、在SAC上几行代码）。拼接批次的细节按原文正文的通行描述；v1内容为较早研究是据版本信息推断，未逐字比对；机构按通行引用。"},
+  "aka": ["CrossQ", "BatchNorm RL", "无目标网络SAC"]
+}

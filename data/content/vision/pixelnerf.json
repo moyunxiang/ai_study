@@ -1,0 +1,31 @@
+{
+  "id": "pixelnerf",
+  "who": "Alex Yu, Vickie Ye, Matthew Tancik, Angjoo Kanazawa · 加州大学伯克利分校",
+  "venue": "CVPR 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2012.02190"},
+    {"label": "项目页", "url": "https://alexyu.net/pixelnerf"}
+  ],
+  "aka": ["pixelNeRF", "PixelNeRF", "可泛化NeRF", "generalizable NeRF", "少视角新视角合成", "few-shot view synthesis"],
+  "problem": "[[nerf]]对每个场景从头优化一个网络，需要几十到上百张标定好的照片和很长的训练时间；只给一两张照片时，它没有任何“物体大概长什么样”的先验，根本无法重建。",
+  "idea": "让NeRF以输入图像为条件：先用卷积网络把输入图像编码成特征图，查询某个三维点时，把它投影到输入图像上取对应位置的特征，和坐标一起送进NeRF的MLP。网络在许多场景上训练，学到跨场景的先验，测试时一次前向就能从一张或几张图渲染新视角。",
+  "impact": "pixelNeRF开启了“可泛化NeRF”这一方向：IBRNet、MVSNeRF等随后跟进，再往后的前馈三维重建（[[pixelsplat]]、[[mvsplat]]、[[dust3r]]）都继承了“从少量图像直接预测三维表示”的思路。",
+  "method": "流程：\n\n- 用ImageNet预训练的[[resnet]]-34编码输入图像，取多层特征拼成一张与图像对齐的特征图W。\n- 体渲染时，对射线上的每个采样点x，用已知相机参数把x投影到输入图像的像素π(x)，双线性插值得到特征 `W(π(x))`。\n- 把x（在输入相机坐标系下表示）的位置编码、视角方向和这个像素特征一起送入NeRF的MLP，输出密度和颜色，再照常体渲染。\n- 有多张输入图时，对每张图分别算出中间特征，再取平均池化后输出，所以输入视图数可以变化。\n\n训练只需要多视图图像，用渲染结果与真实图像的像素误差监督，不需要三维真值。因为采样点直接从对应像素取特征，网络是“全卷积”式地局部条件化，比用一个全局向量编码整张图保留了更多细节。\n\n摘要称在ShapeNet上做单图新视角合成，包括训练时没见过的物体和整个没见过的类别，还演示了多物体ShapeNet场景和真实的DTU数据集；在所有设置中都优于当时的新视角合成与单图三维重建基线。",
+  "legacy": "之后的可泛化辐射场方法加入代价体或跨视图注意力提升几何精度；2023年后，[[pixelsplat]]、[[mvsplat]]把输出换成三维高斯以获得实时渲染，[[dust3r]]、[[vggt]]则直接回归点图和相机，连位姿都不需要输入。",
+  "limits": [
+    {"text": "需要已知且准确的输入相机位姿。", "solved_by": ["dust3r", "anysplat"]},
+    {"text": "渲染仍要沿每条射线查询MLP上百次，速度慢；单图输入时被遮挡区域明显模糊。", "solved_by": ["pixelsplat", "mvsplat"]}
+  ],
+  "relations": [
+    {"to": "nerf", "type": "solves", "note": "NeRF逐场景优化、需要大量视角；pixelNeRF以图像特征为条件跨场景训练，可从一两张图前馈渲染。"},
+    {"to": "resnet", "type": "uses", "note": "用ImageNet预训练的ResNet-34提取与像素对齐的特征图。"},
+    {"to": "shapenet", "type": "uses", "note": "主要在ShapeNet物体上训练和评测单图新视角合成。"}
+  ],
+  "prereq": ["3d-representation", "volume-rendering", "camera-geometry", "conv-layer", "transfer-learning"],
+  "terms": [
+    {"t": "可泛化NeRF", "d": "在很多场景上训练一个共享网络，遇到新场景不再重新优化，直接根据输入图像预测辐射场。"},
+    {"t": "像素对齐特征", "d": "把三维点投影到输入图像上，取那个像素位置的卷积特征，作为这个点的条件信息。"}
+  ],
+  "learn": "先读NeRF和相机投影，再读pixelNeRF第4节的单视图与多视图条件化；用官方代码在ShapeNet椅子类上跑单图重建，换一个没见过的类别看泛化效果。",
+  "check": {"source": "https://arxiv.org/abs/2012.02190", "confirmed": "arXiv记录：标题、四位作者、v1提交于2020-12-03；摘要中以一张或几张图为条件预测连续神经场景表示、全卷积式条件化、跨场景训练学先验、前馈稀疏视图合成、无需三维监督、ShapeNet上未见物体与未见类别、多物体ShapeNet与DTU、优于基线。ResNet-34编码器、多视图平均池化、CVPR 2021凭一般了解写。"}
+}

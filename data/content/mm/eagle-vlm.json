@@ -1,0 +1,30 @@
+{
+  "id": "eagle-vlm",
+  "aka": ["Eagle", "Eagle VLM", "NVIDIA Eagle", "视觉编码器混合", "Mixture of Encoders", "Pre-Alignment"],
+  "who": "Min Shi, Fuxiao Liu, Shihao Wang, Shijia Liao, Subhashree Radhakrishnan, Yilin Zhao, De-An Huang, Hongxu Yin et al. · NVIDIA、佐治亚理工学院、马里兰大学等",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2408.15998"},
+    {"label": "代码", "url": "https://github.com/NVlabs/EAGLE"}
+  ],
+  "problem": "不少多模态大模型靠混合多个视觉编码器来提升OCR、文档等高分辨率任务，但选哪些编码器、怎么融合，缺乏系统的比较和消融。",
+  "idea": "系统比较多种视觉专家和融合方式，发现把几个互补编码器的视觉token按通道直接拼接，就和复杂的混合结构一样有效；再加一个“预对齐”阶段，让各编码器先分别与语言模型对齐。",
+  "impact": "给“多编码器混合”这一设计提供了清晰的消融结论，得到的Eagle系列模型在主要基准上超过同期开源模型，并直接演化为Eagle 2。",
+  "method": "此前[[sphinx-mllm]]等模型已经证明，同时使用多个视觉编码器（例如擅长语义的[[clip]]类模型、擅长细节的高分辨率卷积网络、擅长检测或分割的专家模型）能减少幻觉、提升文档与图表理解。但这些工作各用各的组合与融合方式，究竟哪些因素起作用并不清楚。[[cambrian-1]]做过编码器的横向比较，Eagle则专门研究“多个编码器怎么组合”。\n\n论文在统一的训练设置下，比较了不同的视觉专家选择、不同输入分辨率，以及序列拼接、通道拼接、交叉注意力等多种融合策略。主要发现是：把一组互补编码器输出的视觉token**沿通道维直接拼接**，再经投影层送入语言模型，效果与更复杂的混合架构相当甚至更好，且实现简单。另一个发现是，不同专家（尤其是不是用图文对比训练的视觉专家）的特征与语言空间差距较大，因此作者引入**预对齐**：先在冻结语言模型的情况下，分别把每个视觉专家与语言模型对齐，再合在一起联合训练。\n\n摘要报告，按这一简化设计训练出的Eagle系列模型，在主要多模态大模型基准上超过了其他领先的开源模型。",
+  "limits": [
+    {"text": "多个编码器同时运行，视觉侧计算量随专家数量成倍增加，对端侧部署不友好。", "solved_by": []},
+    {"text": "主要研究模型结构，训练数据仍沿用公开数据集，数据配方对性能的影响没有系统研究。", "solved_by": ["eagle2-vlm"]}
+  ],
+  "relations": [
+    {"to": "llava-1.5", "type": "extends", "note": "在LLaVA式视觉编码器加MLP投影的结构上研究多编码器的组合。"},
+    {"to": "sphinx-mllm", "type": "solves", "note": "SPHINX等已混合多种视觉嵌入但缺乏系统消融，Eagle给出“通道拼接即足够”的简化结论。"},
+    {"to": "cambrian-1", "type": "extends", "note": "Cambrian-1比较单个编码器，Eagle进一步研究多个编码器的选择与融合方式。"},
+    {"to": "clip", "type": "uses", "note": "CLIP类编码器是被混合的视觉专家之一。"}
+  ],
+  "prereq": ["embedding", "ablation-baseline", "instruction-tuning", "image-patch", "pretrain-finetune"],
+  "terms": [
+    {"t": "通道拼接（channel concatenation）", "d": "几个编码器在同一组空间位置上各输出一个特征向量，把这些向量首尾接成一个更长的向量，token数量不变，只是每个token更“厚”。"}
+  ],
+  "learn": "先读[[cambrian-1]]理解视觉编码器的比较方法，再读Eagle论文中融合策略对比的表格，最后看[[eagle2-vlm]]如何在其上加入分块。",
+  "check": {"source": "https://arxiv.org/abs/2408.15998", "confirmed": "标题、作者（16位）、arXiv v1提交2024-08-28；摘要中混合视觉编码器减少幻觉并提升OCR/文档等分辨率敏感任务、缺乏系统比较与消融、对专家选择与融合做设计空间探索、简单拼接互补编码器的视觉token与复杂混合策略一样有效、引入Pre-Alignment、Eagle系列超过其他领先开源模型。“按通道拼接”的具体维度、预对齐时冻结LLM、机构、ICLR 2025与代码链接为一般了解，未逐项核对。"}
+}

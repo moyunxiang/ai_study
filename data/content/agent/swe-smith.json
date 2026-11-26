@@ -1,0 +1,27 @@
+{
+  "id": "swe-smith",
+  "who": "John Yang, Kilian Lieret, Carlos E. Jimenez, Alexander Wettig, Kabir Khandpur, Yanzhe Zhang, Binyuan Hui, Ofir Press et al. · 斯坦福大学 / 普林斯顿大学 / 阿里巴巴Qwen等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2504.21798"},
+    {"label": "项目页", "url": "https://swesmith.com"}
+  ],
+  "aka": ["SWE-smith", "SWE-agent-LM-32B", "合成软件工程任务", "bug注入", "bug synthesis", "编码智能体训练数据", "一仓库一镜像"],
+  "problem": "训练编码智能体的数据太少：已有数据集最多几千个实例、来自不超过11个仓库，整理一份要数百小时人工，每个实例一套环境，存储动辄数TB。",
+  "idea": "反过来造题：给任意Python仓库搭好一个共享的运行环境，然后自动往代码里「注入」bug，只保留能让原本通过的测试失败的那些，再让模型为每个bug写一份issue描述。",
+  "impact": "用128个仓库合成了5万个任务实例，比此前所有数据集大一个数量级；用它训练的SWE-agent-LM-32B在SWE-bench Verified上单次尝试解决40.2%，是当时开源权重模型的最好成绩。",
+  "method": "**环境**：用[[swe-agent]]（Claude 3.5 Sonnet驱动）自动安装每个仓库并跑通测试，经人工核验后每个仓库只做一个Docker镜像，所有任务共享。全部环境约295GB；若按SWE-bench那样每个实例一个镜像，5万个任务估计要50–150TB。\n\n**造bug**，几种策略并用：\n- **LM修改**：把一个函数交给模型，让它加入隐蔽的逻辑错误；\n- **LM重写**：只给函数签名和文档字符串，让模型重新实现，常会自然地写错；\n- **程序化修改**：用Python的ast模块施加13种固定变换，如删掉循环或条件、颠倒if/else、换运算符；\n- **组合bug**：把同一文件或模块里的几个bug合成一个多处修改的任务；\n- **PR镜像**：让模型把某个真实PR的改动「撤销」，重现当时的bug。\n\n**筛选与描述**：应用补丁后跑测试，必须让至少一个原本通过的测试失败才保留；再把补丁、一个失败测试和报错交给模型，写成带复现代码的GitHub issue，每份约2.5美分。\n\n**训练**：用SWE-agent加[[claude-3.7-sonnet]]解这些任务，只保留成功的轨迹，最终5016条，微调[[qwen2.5-coder]] 32B，在[[swe-bench-verified]]上Pass@1为40.2%。",
+  "limits": [
+    {"text": "只覆盖Python仓库，合成的bug与真实开发中出现的问题分布可能不同。", "solved_by": []},
+    {"text": "训练轨迹仍来自闭源强模型的拒绝采样，属于蒸馏，没有用强化学习直接在环境中优化。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "swe-gym", "type": "solves", "note": "SWE-Gym只有11个仓库、每实例一套环境；SWE-smith一仓库一镜像并自动合成任务，规模扩大一个数量级。"},
+    {"to": "swe-agent", "type": "uses", "note": "既用来自动搭环境，也是采样训练轨迹和评测的智能体框架。"},
+    {"to": "swe-bench-verified", "type": "uses", "note": "主要评测集。"},
+    {"to": "qwen2.5-coder", "type": "uses", "note": "被微调的基座模型。"},
+    {"to": "claude-3.7-sonnet", "type": "uses", "note": "生成专家轨迹的教师模型。"}
+  ],
+  "prereq": ["agent-loop", "tool-calling", "instruction-tuning", "benchmark", "knowledge-distillation"],
+  "learn": "先读[[swe-bench]]和[[swe-gym]] → 读原文第2节bug合成策略和表2的规模对比 → 动手：用ast模块写一个「把 < 换成 <=」的变换，作用于一个有测试的小项目，看哪些测试会失败。",
+  "check": {"source": "https://arxiv.org/abs/2504.21798", "confirmed": "标题、作者、v1提交于2025-04-30；摘要中已有数据集至多数千实例/11个仓库、5万实例/128个仓库、SWE-agent-LM-32B 40.2%；正文（arxiv.org/html/2504.21798）核对LM修改/重写/程序化13种变换/组合/PR镜像、一仓库一镜像约295GB对50–150TB、Fail-to-Pass筛选、issue约2.54美分、Claude 3.7 Sonnet轨迹、5016条、Qwen2.5-Coder 32B。单位凭一般了解。"}
+}

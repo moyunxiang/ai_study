@@ -1,0 +1,29 @@
+{
+  "id": "hyper-sd",
+  "who": "Yuxi Ren, Xin Xia, Yanzuo Lu, Jiacheng Zhang, Jie Wu, Pan Xie, Xing Wang, Xuefeng Xiao · 字节跳动",
+  "venue": "NeurIPS 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2404.13686"}
+  ],
+  "aka": ["Hyper-SD", "Hyper-SDXL", "轨迹分段一致性蒸馏", "TSCD", "Trajectory Segmented Consistency Distillation"],
+  "problem": "扩散蒸馏分成两派：保持原ODE轨迹的（如[[lcm]]）步数一少就明显变糊；重塑轨迹的（如[[sdxl-lightning]]）画质好但风格会偏离原模型。两派在1–8步区间都有明显损失。",
+  "idea": "三管齐下：按时间段逐级做一致性蒸馏，先在小段内保持轨迹再逐步合并；在少步区间加入人类反馈学习补回画质；最后再加分数蒸馏提升一步生成，并用一个统一的LoRA支持所有步数。",
+  "impact": "以LoRA形式开源SD1.5和SDXL的1–8步加速版本，论文称在1步时CLIP分数和美学分超过SDXL-Lightning，成为2024年社区常用的少步加速插件之一。",
+  "method": "Hyper-SD是一套组合配方，目标是在把步数压到1–8步时尽量“无损”。\n\n**轨迹分段一致性蒸馏（TSCD）**：一致性蒸馏要求轨迹上任意一点都能直接跳到终点，跨度太大时很难学准。Hyper-SD先把时间轴切成若干段（例如8段），只要求每个点跳到本段起点；学好后把段数减半（8→4→2→1）继续蒸馏，逐级逼近完整的一致性。这和[[ctm]]、[[pcm]]的思路相近，都是让一次跳跃的跨度可控。\n\n**人类反馈学习**：步数很少时画质下降明显，于是用美学偏好模型和[[imagereward]]类奖励直接对少步模型做反馈微调，补偿蒸馏带来的损失。\n\n**分数蒸馏**：为了把1步生成做好，再加上[[dmd]]式的分布匹配分数蒸馏。最终训练一个统一的LoRA，同一组权重可以在1到8步之间任选步数推理。\n\n论文报告Hyper-SD在SD1.5和SDXL上的1–8步生成均达到当时最好；例如1步时Hyper-SDXL的CLIP分数比SDXL-Lightning高0.68、美学分高0.51。",
+  "limits": [
+    {"text": "人类反馈学习会把风格推向偏好模型喜欢的样子，少步结果与原模型的分布并不完全一致。", "solved_by": []},
+    {"text": "依赖多阶段蒸馏和多种损失叠加，复现与迁移到新底座（如DiT类模型）成本较高。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "lcm", "type": "solves", "note": "LCM一致性蒸馏在极少步时变糊，Hyper-SD用分段蒸馏和反馈学习补回画质。"},
+    {"to": "ctm", "type": "extends", "note": "与CTM一样不要求一步跳到终点，而是按时间段控制跳跃跨度。"},
+    {"to": "sdxl-lightning", "type": "rivals", "note": "同为SDXL的少步加速方案，论文在1步时与其对比CLIP分数和美学分。"},
+    {"to": "imagereward", "type": "uses", "note": "少步阶段用偏好奖励模型做人类反馈学习。"}
+  ],
+  "prereq": ["few-step-sampling", "knowledge-distillation", "diffusion-process", "peft-concept", "rlhf-concept"],
+  "terms": [
+    {"t": "轨迹保持与轨迹重塑", "d": "前者让学生模型沿着老师的ODE轨迹走、只是步子更大；后者不管原轨迹，直接训练学生用少步产生与老师相似分布的图。"}
+  ],
+  "learn": "先读一致性模型与LCM → 读本文第3节TSCD的分段方式 → 用开源LoRA在SDXL上比较1、2、4、8步的结果。",
+  "check": {"source": "https://arxiv.org/abs/2404.13686", "confirmed": "标题、八位作者、v1日期2024-04-21、摘要中蒸馏分为轨迹保持与轨迹重塑两派、轨迹分段一致性蒸馏、人类反馈学习补偿少步损失、分数蒸馏与统一LoRA支持所有步数、SDXL与SD1.5上1–8步SOTA、1步比SDXL-Lightning CLIP高0.68美学高0.51；机构、NeurIPS 2024、8→4→2→1的分段示例、所用奖励模型种类、DMD式分数蒸馏来自一般了解"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "muzero-unplugged",
+  "who": "Julian Schrittwieser, Thomas Hubert, Amol Mandhane, Mohammadamin Barekatain, Ioannis Antonoglou, David Silver · DeepMind",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2104.06294"}
+  ],
+  "problem": "基于模型的RL一直想用少量数据学得好，但在线RL和离线RL各有一套专门的算法：离线RL需要[[cql]]、[[bcq]]这类专门处理分布外动作的改造，没有一个统一算法能在两种设定、各种数据量下都达到最好。",
+  "idea": "Reanalyse：对已经存在的数据点，用最新的模型重新跑一遍MCTS搜索，算出改进过的策略和价值目标再拿来训练；数据可以是自己刚收集的，也可以是完全离线的示范，于是MuZero不加特殊改造就能做离线RL。",
+  "impact": "把「用规划重新标注旧数据」变成一个通用的样本效率工具，[[efficientzero]]等后续工作都沿用了Reanalyse；也说明基于搜索的策略改进本身就能处理离线RL里的分布外问题。",
+  "method": "[[muzero]]训练时，每一条数据的策略目标来自当时那次MCTS搜索给出的访问分布，价值目标来自n步回报加搜索得到的估值。数据进了回放缓冲区后，这些目标就固定了，而模型在不断变好。\n\n**Reanalyse**的做法是：从缓冲区里取出旧轨迹，用当前的网络重新在每个状态上跑一遍MCTS，得到新的、更好的策略目标和价值目标，再用这些新目标训练。这相当于把搜索当作「策略改进算子」和「价值改进算子」反复作用在已有数据上。可以调节新数据与重分析数据的比例：数据很少时几乎全部用重分析，数据充足时少用。\n\n极端情形是比例为100%且从不与环境交互：只给一批固定的离线数据，模型完全靠Reanalyse反复从中提取更好的目标，这就是**MuZero Unplugged**。与离线RL的常见做法不同，它不需要显式的行为约束或悲观惩罚，因为MCTS的改进始终围绕模型与网络在数据附近的预测进行。摘要称，MuZero Unplugged在RL Unplugged离线基准上取得新的最好结果，同时在标准的2亿帧在线Atari设定下也刷新了最好成绩。",
+  "limits": [
+    {"text": "每次重分析都要在大量旧状态上重跑MCTS，计算开销很大。", "solved_by": []},
+    {"text": "离线数据覆盖很差或质量很低时，学到的模型本身不可靠，搜索改进的效果缺乏理论保证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "muzero", "type": "extends", "note": "在MuZero上加入用当前模型重新搜索旧数据的Reanalyse，并推广到完全离线的设定。"},
+    {"to": "cql", "type": "rivals", "note": "CQL靠悲观的Q值正则处理离线RL的分布外问题；MuZero Unplugged不做专门改造，只靠基于模型的搜索改进。"},
+    {"to": "bcq", "type": "rivals", "note": "BCQ把策略约束在行为数据附近；MuZero Unplugged用同一套算法覆盖在线与离线。"}
+  ],
+  "prereq": ["model-based-rl", "tree-search", "offline-rl", "policy-value", "world-model-concept"],
+  "terms": [
+    {"t": "Reanalyse（重分析）", "d": "用当前更好的模型和搜索，为回放缓冲区里的旧数据重新计算训练目标。"},
+    {"t": "RL Unplugged", "d": "DeepMind发布的离线RL基准，包含Atari和DeepMind Control等任务上收集的固定数据集。"}
+  ],
+  "learn": "先读[[muzero]]；读原文第3节Reanalyse的定义和第5节离线实验；在一个小型MuZero实现里，给回放缓冲区的旧数据定期重跑搜索，比较样本效率的变化。",
+  "check": {"source": "https://arxiv.org/abs/2104.06294", "confirmed": "标题、六位作者、arXiv v1于2021-04-13；摘要中Reanalyse用基于模型的策略与价值改进算子为已有数据计算新目标、适用于相差几个数量级的数据预算、可完全从示范中学习即离线RL、与MuZero结合得到MuZero Unplugged、不需要针对离策略或离线的特殊改造、RL Unplugged离线基准和2亿帧在线Atari上都取得新的最好结果。新旧数据比例的调节按原文正文的通行描述；NeurIPS 2021按通行引用。"},
+  "aka": ["MuZero Unplugged", "Reanalyse", "MuZero Reanalyse", "重分析"]
+}

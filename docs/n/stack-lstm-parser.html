@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Stack-LSTM依存分析（2015） · AI脉络</title>
+<meta name="description" content="Chen和Manning的神经转移式分析器只从栈顶和缓冲区开头取固定的几个词作特征，看不到整个栈里已经建好的子树、整条缓冲区和全部历史动作，分析器状态的大部分信息被丢掉了。 设计一种栈LSTM：它像普通栈一样支持常数时间的压入和弹出，同时用LSTM为栈的当前内容维护一个连续向量。用三个栈LSTM分…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/stack-lstm-parser.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Stack-LSTM依存分析（2015）">
+<meta property="og:description" content="Chen和Manning的神经转移式分析器只从栈顶和缓冲区开头取固定的几个词作特征，看不到整个栈里已经建好的子树、整条缓冲区和全部历史动作，分析器状态的大部分信息被丢掉了。 设计一种栈LSTM：它像普通栈一样支持常数时间的压入和弹出，同时用LSTM为栈的当前内容维护一个连续向量。用三个栈LSTM分…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/stack-lstm-parser.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/stack-lstm-parser">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 句法分析</div>
+<h1>Stack-LSTM依存分析</h1>
+<div class="full">Transition-Based Dependency Parsing with Stack Long Short-Term Memory</div>
+<div class="meta"><span>2015.05</span><span>论文</span><span>延伸</span><span>ACL 2015</span><span>Chris Dyer, Miguel Ballesteros, Wang Ling, Austin Matthews, Noah A. Smith · 卡内基梅隆大学、庞培法布拉大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1505.08075" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/stack-lstm-parser">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Chen和Manning的神经转移式分析器只从栈顶和缓冲区开头取固定的几个词作特征，看不到整个栈里已经建好的子树、整条缓冲区和全部历史动作，分析器状态的大部分信息被丢掉了。</p></div><div><h4>方法</h4><p>设计一种栈LSTM：它像普通栈一样支持常数时间的压入和弹出，同时用LSTM为栈的当前内容维护一个连续向量。用三个栈LSTM分别表示缓冲区、栈（其中元素是递归组合出的子树向量）和动作历史，据此预测下一个转移动作。</p></div><div><h4>影响</h4><p>在英文斯坦福依存和中文宾州树库上都明显超过Chen-Manning神经分析器；栈LSTM后来被用于循环神经网络文法RNNG、转移式命名实体识别等结构化预测任务。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/nivre-parser.html">转移式依存分析</a>式的转移系统用一个栈和一个缓冲区，靠SHIFT、REDUCE-LEFT、REDUCE-RIGHT三类动作逐步建出依存树。<a class="ln" href="../n/chen-manning-parser.html">神经网络依存分析</a>用前馈网络对栈顶几个词的特征打分，效果和速度都好，但特征窗口是固定的。</p><p><b>栈LSTM</b>：在普通LSTM上加一个「栈指针」。压入一个元素时，从指针所指的位置出发计算新的隐状态并把指针移过去；弹出时只把指针移回上一个位置，不需要重新计算。这样任何时刻，指针处的隐状态就是对栈中全部内容的摘要。</p><p><b>分析器状态</b>由三个栈LSTM组成：缓冲区（尚未处理的词，提供无限远的前瞻）、栈（部分建好的子树）、动作历史。三者的摘要向量拼接后经一层网络，softmax预测下一个动作。当REDUCE把一个修饰词挂到中心词上时，用一个<b>组合函数</b><code>c = tanh(U·[h; d; r] + e)</code>把中心词<code>h</code>、修饰词<code>d</code>和依存关系<code>r</code>合成一个新的子树向量压回栈上，因此栈中元素包含了子树的内部结构。词的输入表示由学习的词向量、预训练词向量和词性向量拼接而成。</p><p>测试集结果：英文（斯坦福依存）UAS 93.1、LAS 90.9，Chen和Manning为91.8、89.6；中文（CTB5）UAS 87.2、LAS 85.7，对方为83.9、82.4。消融显示子树组合比只用中心词好，英文上去掉预测词性几乎没有损失；集束搜索带来的提升不超过0.3个百分点，所以用贪心解码即可。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍然是逐词贪心地做转移决策，前面的错误无法纠正，训练时只见过正确的状态。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>三个栈LSTM和递归组合计算较重，后来基于双向LSTM特征的简单分析器以更少的结构取得了相近的精度。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/kiperwasser-goldberg.html">BiLSTM特征依存分析</a> <a class="chip hue" style="--h:24" href="../n/biaffine-parser.html">双仿射依存分析</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/lstm.html">LSTM</a><span class="yr">1997 · 基础</span><div class=nt>给LSTM加上栈指针，使它能在常数时间内压入和弹出元素。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/chen-manning-parser.html">神经网络依存分析</a><span class="yr">2014.10 · NLP</span><div class=nt>Chen-Manning分析器只用栈和缓冲区顶部固定几个位置的特征；栈LSTM表示整个栈、整条缓冲区和全部动作历史，在中英文上都明显更准。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/nivre-parser.html">转移式依存分析</a><span class="yr">2003 · NLP</span><div class=nt>沿用弧标准转移系统，只改变分析器状态的表示方式。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/socher-recursive.html">递归神经网络</a><span class="yr">2011.06 · NLP</span><div class=nt>栈上子树的向量由递归组合函数自底向上得到。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/biaffine-parser.html">双仿射依存分析</a><span class="yr">2016.11 · NLP</span><div class=nt>三个栈LSTM和递归组合计算较重，后来基于双向LSTM特征的简单分析器以更少的结构取得了相近的精度。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/kiperwasser-goldberg.html">BiLSTM特征依存分析</a><span class="yr">2016.03 · NLP</span><div class=nt>三个栈LSTM和递归组合计算较重，后来基于双向LSTM特征的简单分析器以更少的结构取得了相近的精度。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a> <a class="chip c" href="../c/gating.html">门控机制</a> <a class="chip c" href="../c/embedding.html">嵌入向量</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/graph-basics.html">图、树与搜索</a></p>
+<h2>本篇术语</h2><ul><li><b>转移式分析</b>　维护栈和缓冲区，每一步选一个动作（移入下一个词，或在栈顶两个元素间建一条依存弧），动作序列决定整棵树。</li><li><b>UAS/LAS</b>　依存分析的指标：UAS是中心词预测正确的词所占比例，LAS还要求依存关系标签也正确。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/nivre-parser.html">转移式依存分析</a>和<a class="ln" href="../n/chen-manning-parser.html">神经网络依存分析</a>的讲解 → 读原文第2节栈LSTM和第3节分析器状态 → 动手：实现一个支持push和pop的栈LSTM，在一个小依存树库上训练转移式分析器，对比只用栈顶两个元素特征时的UAS。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1505.08075" rel="noopener">https://arxiv.org/abs/1505.08075</a>（arXiv：标题、五位作者、2015-05-29提交、摘要（栈LSTM可常数时间压入弹出并维护栈内容的连续表示；缓冲区无限前瞻、完整动作历史、包含内部结构的完整栈；反向传播训练；当时最好的结果）；PDF正文：英文SD与中文CTB5、表1和表2测试集S-LSTM 93.1/90.9与87.2/85.7、C&amp;M 91.8/89.6与83.9/82.4、组合优于只用中心词、英文预测词性作用很小、集束提升≤0.3%。组合函数的具体形式、作者机构和ACL 2015出处凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Stack-LSTM%E4%BE%9D%E5%AD%98%E5%88%86%E6%9E%90%EF%BC%88stack-lstm-parser%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Astack-lstm-parser%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/stack-lstm-parser.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="karpathy-rnn-blog.html"><small>本分支上一个 · 2015.05</small><b>《RNN不可思议的有效性》</b></a><a class="r" href="skip-thought.html"><small>本分支下一个 · 2015.06</small><b>Skip-Thought句向量</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

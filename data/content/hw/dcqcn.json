@@ -1,0 +1,32 @@
+{
+  "id": "dcqcn",
+  "who": "Yibo Zhu, Haggai Eran, Daniel Firestone, Chuanxiong Guo, Marina Lipshteyn, Yehonatan Liron, Jitendra Padhye, Shachar Raindel et al. · Microsoft / Mellanox / 加州大学圣塔芭芭拉分校",
+  "venue": "SIGCOMM 2015",
+  "aka": ["DCQCN", "Data Center Quantized Congestion Notification", "RoCEv2拥塞控制", "RDMA拥塞控制", "PFC", "ECN"],
+  "links": [
+    {"label": "ACM DOI", "url": "https://doi.org/10.1145/2785956.2787484"}
+  ],
+  "problem": "数据中心想用[[roce]]（以太网上的RDMA）获得高吞吐、低延迟、低CPU开销，但RoCEv2靠优先级流控（PFC）保证不丢包，PFC一触发就会造成队头阻塞和不公平，规模一大性能就塌。",
+  "idea": "给RoCEv2加一套端到端拥塞控制：交换机在队列变长时给数据包打ECN标记，接收端把拥塞通知回送给发送端，发送端网卡按规则降速、再逐步恢复，尽量不让PFC被触发。",
+  "impact": "DCQCN实现在Mellanox网卡里并部署到微软数据中心，成为大规模RoCE网络的默认拥塞控制方案；今天的AI训练集群用以太网做RDMA时，它仍是基线和讨论起点。",
+  "method": "摘要给出了需求：现代数据中心应用要求40Gbps的吞吐、每跳低于10微秒的延迟，并且CPU开销要低，标准TCP/IP协议栈做不到，RDMA可以。在IP路由的数据中心网络上，RDMA通过RoCEv2协议部署，而RoCEv2依赖PFC实现不丢包：交换机缓冲快满时，向上游发“暂停”帧。问题在于暂停是按端口和优先级整体生效的——一条拥塞的流会让同一端口上无辜的流也停下来（队头阻塞），暂停还会层层向上游扩散，造成不公平甚至死锁风险。\n\nDCQCN把拥塞控制做成端到端的：交换机根据队列长度以一定概率给数据包打上ECN（显式拥塞通知）标记；接收端网卡看到标记后发回拥塞通知包；发送端网卡收到通知就成比例地降低发送速率，没有通知时按定时器和字节计数逐步提速。整个算法在网卡硬件里运行，不占用主机CPU。作者还建立了流体模型，给出交换机缓冲阈值等参数的调优指南。\n\n在三层Clos网络测试床上，DCQCN显著提高了RoCEv2 RDMA流量的吞吐和公平性。",
+  "limits": [
+    {"text": "参数调优复杂，仍需要PFC兜底；面对AI训练中大量同步的集合通信突发流量时，拥塞反应仍不够快，后来的方案转向更精确的遥测和多路径传输。", "solved_by": ["spectrum-x", "uec"]}
+  ],
+  "relations": [
+    {"to": "roce", "type": "solves", "note": "RoCEv2依赖PFC带来队头阻塞和不公平，DCQCN用端到端拥塞控制减少PFC触发。"},
+    {"to": "fat-tree", "type": "uses", "note": "在三层Clos/胖树结构的数据中心网络上部署和评估。"},
+    {"to": "infiniband", "type": "rivals", "note": "InfiniBand在专用网络里自带基于信用的流控；DCQCN让通用以太网也能承载大规模RDMA。"}
+  ],
+  "prereq": ["interconnect", "throughput-latency", "distributed-training"],
+  "terms": [
+    {"t": "RDMA", "d": "远程直接内存访问：网卡直接读写另一台机器的内存，不经过对方CPU和操作系统内核，延迟低、CPU开销小。"},
+    {"t": "PFC（优先级流控）", "d": "交换机缓冲快满时让上游按优先级暂停发送，以保证不丢包，但会殃及同一端口上的其他流。"},
+    {"t": "ECN（显式拥塞通知）", "d": "交换机不丢包，而是在包头里打一个“拥塞了”的标记，让端点主动降速。"}
+  ],
+  "learn": "先读[[roce]]和[[c:interconnect]]，弄清RDMA为什么怕丢包；再读本文第3节的算法描述，画出发送端速率随拥塞通知变化的锯齿曲线。",
+  "check": {
+    "source": "https://doi.org/10.1145/2785956.2787484",
+    "confirmed": "Crossref核对标题、10位作者、SIGCOMM 2015（2015-08-17）与摘要：40Gbps与每跳低于10微秒的需求、RoCEv2依赖PFC、队头阻塞与不公平、DCQCN端到端拥塞控制、流体模型与参数调优指南、三层Clos测试床、实现于Mellanox网卡并部署于微软数据中心。ECN标记、发送端降速与提速的具体机制按一般了解写。"
+  }
+}

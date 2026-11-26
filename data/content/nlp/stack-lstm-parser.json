@@ -1,0 +1,33 @@
+{
+  "id": "stack-lstm-parser",
+  "who": "Chris Dyer, Miguel Ballesteros, Wang Ling, Austin Matthews, Noah A. Smith · 卡内基梅隆大学、庞培法布拉大学",
+  "venue": "ACL 2015",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1505.08075"}
+  ],
+  "aka": ["Stack-LSTM", "Stack LSTM", "栈LSTM", "S-LSTM parser"],
+  "problem": "Chen和Manning的神经转移式分析器只从栈顶和缓冲区开头取固定的几个词作特征，看不到整个栈里已经建好的子树、整条缓冲区和全部历史动作，分析器状态的大部分信息被丢掉了。",
+  "idea": "设计一种栈LSTM：它像普通栈一样支持常数时间的压入和弹出，同时用LSTM为栈的当前内容维护一个连续向量。用三个栈LSTM分别表示缓冲区、栈（其中元素是递归组合出的子树向量）和动作历史，据此预测下一个转移动作。",
+  "impact": "在英文斯坦福依存和中文宾州树库上都明显超过Chen-Manning神经分析器；栈LSTM后来被用于循环神经网络文法RNNG、转移式命名实体识别等结构化预测任务。",
+  "method": "[[nivre-parser]]式的转移系统用一个栈和一个缓冲区，靠SHIFT、REDUCE-LEFT、REDUCE-RIGHT三类动作逐步建出依存树。[[chen-manning-parser]]用前馈网络对栈顶几个词的特征打分，效果和速度都好，但特征窗口是固定的。\n\n**栈LSTM**：在普通LSTM上加一个「栈指针」。压入一个元素时，从指针所指的位置出发计算新的隐状态并把指针移过去；弹出时只把指针移回上一个位置，不需要重新计算。这样任何时刻，指针处的隐状态就是对栈中全部内容的摘要。\n\n**分析器状态**由三个栈LSTM组成：缓冲区（尚未处理的词，提供无限远的前瞻）、栈（部分建好的子树）、动作历史。三者的摘要向量拼接后经一层网络，softmax预测下一个动作。当REDUCE把一个修饰词挂到中心词上时，用一个**组合函数**`c = tanh(U·[h; d; r] + e)`把中心词`h`、修饰词`d`和依存关系`r`合成一个新的子树向量压回栈上，因此栈中元素包含了子树的内部结构。词的输入表示由学习的词向量、预训练词向量和词性向量拼接而成。\n\n测试集结果：英文（斯坦福依存）UAS 93.1、LAS 90.9，Chen和Manning为91.8、89.6；中文（CTB5）UAS 87.2、LAS 85.7，对方为83.9、82.4。消融显示子树组合比只用中心词好，英文上去掉预测词性几乎没有损失；集束搜索带来的提升不超过0.3个百分点，所以用贪心解码即可。",
+  "limits": [
+    {"text": "仍然是逐词贪心地做转移决策，前面的错误无法纠正，训练时只见过正确的状态。", "solved_by": []},
+    {"text": "三个栈LSTM和递归组合计算较重，后来基于双向LSTM特征的简单分析器以更少的结构取得了相近的精度。", "solved_by": ["kiperwasser-goldberg", "biaffine-parser"]}
+  ],
+  "relations": [
+    {"to": "chen-manning-parser", "type": "solves", "note": "Chen-Manning分析器只用栈和缓冲区顶部固定几个位置的特征；栈LSTM表示整个栈、整条缓冲区和全部动作历史，在中英文上都明显更准。"},
+    {"to": "nivre-parser", "type": "uses", "note": "沿用弧标准转移系统，只改变分析器状态的表示方式。"},
+    {"to": "lstm", "type": "extends", "note": "给LSTM加上栈指针，使它能在常数时间内压入和弹出元素。"},
+    {"to": "socher-recursive", "type": "uses", "note": "栈上子树的向量由递归组合函数自底向上得到。"}
+  ],
+  "prereq": ["recurrent-layer", "gating", "embedding", "softmax", "graph-basics"],
+  "terms": [
+    {"t": "转移式分析", "d": "维护栈和缓冲区，每一步选一个动作（移入下一个词，或在栈顶两个元素间建一条依存弧），动作序列决定整棵树。"},
+    {"t": "UAS/LAS", "d": "依存分析的指标：UAS是中心词预测正确的词所占比例，LAS还要求依存关系标签也正确。"}
+  ],
+  "learn": "先读[[nivre-parser]]和[[chen-manning-parser]]的讲解 → 读原文第2节栈LSTM和第3节分析器状态 → 动手：实现一个支持push和pop的栈LSTM，在一个小依存树库上训练转移式分析器，对比只用栈顶两个元素特征时的UAS。",
+  "check": {
+    "source": "https://arxiv.org/abs/1505.08075",
+    "confirmed": "arXiv：标题、五位作者、2015-05-29提交、摘要（栈LSTM可常数时间压入弹出并维护栈内容的连续表示；缓冲区无限前瞻、完整动作历史、包含内部结构的完整栈；反向传播训练；当时最好的结果）；PDF正文：英文SD与中文CTB5、表1和表2测试集S-LSTM 93.1/90.9与87.2/85.7、C&M 91.8/89.6与83.9/82.4、组合优于只用中心词、英文预测词性作用很小、集束提升≤0.3%。组合函数的具体形式、作者机构和ACL 2015出处凭一般了解。"
+  }
+}

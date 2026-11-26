@@ -1,0 +1,24 @@
+{
+ "id": "flash-decoding",
+ "who": "Tri Dao, Daniel Haziza, Francisco Massa, Grigory Sizov · 斯坦福CRFM, Meta xFormers团队",
+ "aka": ["Flash-Decoding", "FlashDecoding", "split-KV", "KV切分并行", "长上下文解码注意力"],
+ "links": [
+  {"label": "博客", "url": "https://crfm.stanford.edu/2023/10/12/flashdecoding.html"},
+  {"label": "GitHub", "url": "https://github.com/Dao-AILab/flash-attention"}
+ ],
+ "problem": "FlashAttention按批和查询块分配GPU线程块；解码时每次只有1个查询词，批又小，A100的108个SM大多闲着，批大小为1时用不到1%的GPU，长上下文下注意力成了解码瓶颈。",
+ "idea": "沿键值序列长度再切一刀：把KV缓存分成若干块并行算注意力，每块额外记下一个log-sum-exp，最后用一个小的归约内核把各块结果按比例合并。",
+ "impact": "“split-KV”成为长上下文解码注意力内核的标准做法，进入FlashAttention 2.2和xFormers，之后的FlashInfer、FlashMLA等解码内核都包含这一并行维度。",
+ "method": "解码阶段，模型其余部分的计算量与上下文长度无关，只有注意力要读完整个KV缓存，所以上下文一长注意力就占了大头。[[flashattention-2]]在训练时沿批和查询长度两个维度并行，可解码时查询长度为1，如果批大小又小于SM数量，绝大多数SM没有活干；改用普通矩阵乘虽能占满GPU，却要启动多个内核、反复读写中间结果。\n\nFlash-Decoding的三步：把键/值按序列长度切成若干块（只是张量视图，不产生GPU操作）；对每一块用FlashAttention的方式并行计算查询与该块的注意力，并为每行写出一个额外的标量——该块注意力分数的log-sum-exp；最后一个归约内核读取各块的部分输出，用各自的log-sum-exp重新缩放后求和。这依赖的正是[[online-softmax]]的性质：softmax可以分块计算、事后合并，Flash-Decoding在块内和块间两个层次各用一次。\n\n博客在CodeLlama-34B上从512到64k的序列长度做测试：超长序列下解码速度最多快8倍，注意力本身最多比FlashAttention快50倍；批大小为1时，序列长度增长对生成速度几乎没有影响。",
+ "limits": [
+  {"text": "切块数要按批大小、头数和长度启发式选择，归约需要额外一次内核启动；对分页KV缓存、变长批次和共享前缀等服务场景还需另外适配。", "solved_by": ["flashinfer"]}
+ ],
+ "relations": [
+  {"to": "flashattention-2", "type": "solves", "note": "FlashAttention-2在解码时只沿批和查询块并行、GPU严重闲置；Flash-Decoding沿KV长度增加并行维度，占满GPU。"},
+  {"to": "online-softmax", "type": "uses", "note": "块间合并依赖softmax可以分块计算再用log-sum-exp重新缩放的性质。"},
+  {"to": "efficient-inference", "type": "extends", "note": "接着解决长上下文、小批次下KV缓存读取成为解码瓶颈的问题，专门针对注意力内核。"}
+ ],
+ "prereq": ["self-attention", "softmax", "kv-cache", "cpu-gpu", "memory-bandwidth"],
+ "terms": [{"t": "log-sum-exp", "d": "log(Σexp(xᵢ))，softmax的归一化分母取对数；记下它就能把分块算出的softmax结果正确合并。"}, {"t": "SM", "d": "流式多处理器，GPU上能独立调度一组线程块的计算单元，A100有108个。"}],
+ "check": {"source": "https://crfm.stanford.edu/2023/10/12/flashdecoding.html", "confirmed": "标题、四位作者、发布于2023-10-12（URL日期）；正文：A100有108个SM、批大小1时FlashAttention用不到1%的GPU、沿KV序列长度新增并行维度、三步做法与每块写一个log-sum-exp标量、两个独立内核、CodeLlama-34B在512到64k长度上测试、最多8倍解码加速、注意力最多快50倍、FlashAttention 2.2与xFormers 0.0.22起可用。作者所属团队按一般了解。"}
+}

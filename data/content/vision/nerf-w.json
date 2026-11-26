@@ -1,0 +1,31 @@
+{
+  "id": "nerf-w",
+  "who": "Ricardo Martin-Brualla, Noha Radwan, Mehdi S. M. Sajjadi, Jonathan T. Barron, Alexey Dosovitskiy, Daniel Duckworth · Google Research",
+  "venue": "CVPR 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2008.02268"},
+    {"label": "项目页", "url": "https://nerf-w.github.io/"}
+  ],
+  "aka": ["NeRF-W", "NeRF in the Wild", "野外NeRF", "外观嵌入", "appearance embedding", "瞬态物体", "transient objects"],
+  "problem": "[[nerf]]假设所有照片拍的是同一时刻、同一光照下的静止场景。网上搜集的地标照片却来自不同年份、不同天气和相机，还常有游客、车辆挡在前面，直接训练会出现雾状伪影。",
+  "idea": "给每张照片学一个低维的“外观向量”，让颜色可以随照片的光照和后期处理变化；再加一个“瞬态”分支，专门解释只在某张照片里出现的遮挡物，并给出不确定度，让这些像素在训练中少算。",
+  "impact": "NeRF-W让神经辐射场第一次能用互联网照片集合重建著名地标，“每张图一个外观嵌入”的做法后来被大量NeRF与[[3dgs]]系统沿用，用来处理曝光和白平衡不一致。",
+  "method": "NeRF用一个MLP把三维位置和视角方向映射到密度和颜色，再体渲染出像素。NeRF-W在此基础上加了两处扩展：\n\n- **外观嵌入**：每张训练图i有一个可学习的向量 `ℓ_i`（类似生成式潜在优化GLO的做法），作为颜色分支的额外输入。几何（密度）对所有图共享，颜色可以随 `ℓ_i` 变化，从而吸收白天、黄昏、阴天以及相机色调的差别。渲染新视角时可以任选或插值外观向量，得到同一视角不同光照的画面。\n- **瞬态分支**：每张图还有一个瞬态向量 `τ_i`，另一个MLP头输出只属于这张图的瞬态密度、颜色和不确定度 `β`。静态场景与瞬态物体的密度、颜色一起参与体渲染；损失里用 `β` 给像素加权，不确定度高的像素（多半是游客、遮挡物）贡献小，同时加正则防止把所有东西都推给瞬态分支。测试时丢掉瞬态部分，只渲染静态场景。\n\n作者在Photo Tourism数据集的多个著名地标照片集上实验。摘要称NeRF-W能从无结构的互联网照片重建，生成时间上一致的新视角渲染，明显比之前的最好方法更接近照片真实感。",
+  "legacy": "外观嵌入成了处理多次拍摄、多台相机数据的常用手段（[[zip-nerf]]和许多大场景重建系统都有类似设计）；瞬态与不确定度建模的思想被后续“野外”高斯泼溅方法继承。城市级NeRF如Block-NeRF也在其基础上扩展。",
+  "limits": [
+    {"text": "每个场景要单独优化很久，渲染速度沿用NeRF，远达不到实时。", "solved_by": ["instant-ngp", "3dgs"]},
+    {"text": "外观向量只能解释全局的光照变化，无法真正分离材质和光照，不能做物理正确的重打光。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "nerf", "type": "solves", "note": "NeRF要求光照一致、无遮挡的照片；NeRF-W用外观嵌入和瞬态分支处理互联网照片里的光照变化与遮挡。"},
+    {"to": "photo-tourism", "type": "extends", "note": "沿用Photo Tourism用互联网游客照片重建地标的设定与数据，把稀疏点云重建推进到逼真的新视角渲染。"},
+    {"to": "colmap", "type": "uses", "note": "训练前用COLMAP等SfM工具估计每张互联网照片的相机位姿。"}
+  ],
+  "prereq": ["3d-representation", "volume-rendering", "mlp", "embedding", "latent-variable"],
+  "terms": [
+    {"t": "外观嵌入", "d": "为每张照片学习的一个小向量，用来描述这张照片特有的光照和色调。"},
+    {"t": "瞬态物体", "d": "只在部分照片里出现、不属于固定场景的东西，如游客、车辆、临时遮挡物。"}
+  ],
+  "learn": "先弄懂NeRF的体渲染，再读NeRF-W第4节两个扩展的结构图；用开源复现（如nerf_pl的nerfw分支）在一个Phototourism场景上训练，固定视角切换不同外观向量看效果。",
+  "check": {"source": "https://arxiv.org/abs/2008.02268", "confirmed": "arXiv记录：标题、六位作者、v1提交于2020-08-05；摘要中基于NeRF、无法建模光照变化与瞬态遮挡、一系列扩展、对著名地标的互联网照片集重建、时间一致的渲染明显更接近照片真实感。外观/瞬态嵌入与不确定度的具体结构、GLO、Photo Tourism数据、CVPR 2021、COLMAP位姿凭一般了解写。"}
+}

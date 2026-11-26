@@ -1,0 +1,30 @@
+{
+  "id": "popart",
+  "who": "Hado van Hasselt, Arthur Guez, Matteo Hessel, Volodymyr Mnih, David Silver · Google DeepMind",
+  "venue": "NeurIPS 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1602.07714"}
+  ],
+  "problem": "神经网络对要拟合的目标的尺度很敏感。[[dqn-nature]]为了用同一套超参玩几十个Atari游戏，把所有奖励裁剪到[−1, 1]；可这样一来，吃一个小豆子和打掉一个大BOSS在智能体看来一样重要，行为会和真实目标不同。",
+  "idea": "PopArt：对价值网络的回归目标做自适应归一化（持续估计目标的均值和标准差），并在更新统计量的同时反向修正网络最后一层的权重，让未归一化的输出保持不变。",
+  "impact": "使去掉奖励裁剪成为可能，后来成为多任务RL的标准组件：[[impala]]的多任务版本、[[v-mpo]]等都用PopArt平衡不同游戏之间相差几个数量级的回报尺度。",
+  "method": "设网络输出归一化后的值 `ŷ = W·h + b`，真实尺度上的预测是 `f(x) = σ·ŷ + μ`，其中μ、σ是对回归目标（如TD目标）均值和标准差的滑动估计。训练时网络拟合的是归一化后的目标 `(y − μ)/σ`，梯度尺度因此大致恒定，不受某个游戏回报是1还是10000的影响。\n\n问题在于：μ、σ一变，同一个网络的真实尺度输出也会跟着变，等于凭空改变了已经学到的价值。PopArt的名字就来自它的两半：\n- **ART**（Adaptively Rescaling Targets）：自适应地更新μ、σ；\n- **POP**（Preserving Outputs Precisely）：每次把μ、σ更新为μ'、σ'时，同时把最后一层改成 `W' = σW/σ'`、`b' = (σb + μ − μ')/σ'`，使得 `σ'·(W'h + b') + μ' = σ·(Wh + b) + μ` 对所有输入都精确成立。\n\n这样统计量可以随时调整，而网络已经学到的函数一点不变。摘要称，在Atari上用自适应归一化可以去掉奖励裁剪这一领域特定的启发式，整体性能不下降；作者还展示了去掉裁剪后某些游戏中行为在质上的变化。",
+  "limits": [
+    {"text": "只归一化了目标的整体尺度，奖励稀疏程度和时间尺度的差异仍会影响学习。", "solved_by": []},
+    {"text": "在单任务Atari上去掉裁剪后，有些游戏变好、有些变差，并非全面提升。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "dqn-nature", "type": "solves", "note": "DQN靠把奖励裁剪到[−1,1]统一不同游戏的尺度，改变了真实目标；PopArt用自适应归一化替代裁剪。"},
+    {"to": "double-dqn", "type": "uses", "note": "Atari实验建立在Double DQN之上，只改目标的归一化方式。"},
+    {"to": "batchnorm", "type": "extends", "note": "批归一化标准化网络内部的激活，PopArt标准化的是回归目标，并保证输出不变。"},
+    {"to": "ale", "type": "uses", "note": "在ALE的几十个回报尺度差异极大的游戏上评测。"}
+  ],
+  "prereq": ["td-error", "normalization-layer", "linear-regression", "expectation-variance"],
+  "terms": [
+    {"t": "奖励裁剪", "d": "把每一步奖励截断到固定区间（如[−1,1]），统一尺度但丢失了奖励大小的信息。"},
+    {"t": "目标归一化", "d": "回归时先把目标减均值除标准差，再让网络去拟合，保持梯度尺度稳定。"}
+  ],
+  "learn": "先读[[dqn-nature]]的奖励裁剪部分；读原文第2节POP的推导；在一个回报尺度会突然变大的回归任务上，对比直接回归、只做ART和完整PopArt三种做法。",
+  "check": {"source": "https://arxiv.org/abs/1602.07714", "confirmed": "标题、五位作者、arXiv v1于2016-02-24；摘要中学习算法对被近似函数的尺度不具不变性、自适应归一化学习目标、价值型RL中合适的价值尺度会随策略变化、Atari工作把奖励裁剪到预定范围、裁剪会导致质上不同的行为、用自适应归一化去掉这一启发式而整体性能不下降。POP的权重修正公式按原文正文；多任务中的使用和NeurIPS 2016按通行引用。"},
+  "aka": ["PopArt", "Pop-Art", "自适应目标归一化", "Preserving Outputs Precisely"]
+}

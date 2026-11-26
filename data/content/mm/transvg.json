@@ -1,0 +1,32 @@
+{
+  "id": "transvg",
+  "aka": ["TransVG", "Transformer视觉定位", "端到端视觉定位", "visual grounding with transformers"],
+  "who": "Jiajun Deng, Zhengyuan Yang, Tianlang Chen, Wengang Zhou, Houqiang Li · 中国科学技术大学、罗切斯特大学",
+  "venue": "ICCV 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2104.08541"},
+    {"label": "代码", "url": "https://github.com/djiajunustc/TransVG"}
+  ],
+  "problem": "视觉定位（给一句话框出所指物体）的主流方法要么先出候选框再打分，要么在锚框上预测，融合模块里堆满手工设计（模块化注意力、动态图、语法树），容易过拟合特定数据集。",
+  "idea": "把图像特征和文本特征拼成一个序列，用一摞普通Transformer编码器层做融合，再由一个特殊token直接回归目标框的四个坐标，不再依赖候选框或锚框。",
+  "impact": "证明简单的Transformer融合就能取代复杂的定位模块，在五个常用定位数据集上刷新纪录，成为之后Transformer式视觉定位工作的标准基线。",
+  "method": "视觉定位又叫指代表达理解：输入一张图和一句话（如“左边穿红衣服的人”），输出那个人的框。此前的方法分两类：两阶段方法先用检测器生成候选框，再逐个和句子匹配（如[[mattnet]]）；一阶段方法在密集锚框上直接预测。两类都需要精心设计的融合模块，比如把句子拆成主语/位置/关系几部分，或构建场景图。作者认为这些机制让模型对特定场景过拟合，也限制了视觉和语言上下文之间的充分交互。\n\nTransVG的结构很直接：视觉分支用[[detr]]式的CNN+Transformer编码器提取图像特征，语言分支用[[bert]]编码句子；两者投影到同一维度后，与一个可学习的[REG] token拼成一个序列，送入若干层标准Transformer编码器，让每个图像位置和每个词都能互相注意。最后取[REG] token的输出，经一个小MLP直接回归框的中心坐标与宽高，用L1损失和GIoU损失训练。\n\n摘要报告，在五个常用数据集（RefCOCO系列、ReferItGame、Flickr30k Entities）上取得一系列最好成绩。",
+  "limits": [
+    {"text": "每句话只输出一个框，无法处理一句话对应多个物体或句中提到多个物体的情况。", "solved_by": ["mdetr", "grounding-dino"]},
+    {"text": "只在定位数据集上有监督训练，缺少大规模图文预训练，开放词表和长尾物体的泛化有限。", "solved_by": ["glip", "kosmos-2"]}
+  ],
+  "relations": [
+    {"to": "detr", "type": "uses", "note": "视觉分支沿用DETR的CNN加Transformer编码器，并用它的权重初始化。"},
+    {"to": "bert", "type": "uses", "note": "语言分支用BERT编码指代表达。"},
+    {"to": "mattnet", "type": "solves", "note": "以一摞通用Transformer层取代MAttNet一类按主语/位置/关系拆分的模块化融合设计。"},
+    {"to": "refcoco", "type": "uses", "note": "在RefCOCO等指代表达数据集上训练与评测。"},
+    {"to": "mdetr", "type": "rivals", "note": "同期都用Transformer做文本条件定位；MDETR做大规模预训练并能输出多个框，TransVG专注单目标回归、结构更简单。"}
+  ],
+  "prereq": ["self-attention", "transformer-block", "iou-map", "vision-tasks", "embedding"],
+  "terms": [
+    {"t": "指代表达理解（REC）", "d": "给一句描述某个具体物体的话，在图中找出它的边界框；和目标检测不同，同类物体可能有多个，要靠描述里的属性和位置关系区分。"},
+    {"t": "GIoU损失", "d": "在IoU基础上考虑两框的最小外接框，让不重叠的框也有梯度，常与L1损失一起用于框回归。"}
+  ],
+  "learn": "先懂[[detr]]的集合预测和[[bert]]的文本编码，再读TransVG第3节的融合模块和[REG] token，对照代码在RefCOCO上训练一次。",
+  "check": {"source": "https://arxiv.org/abs/2104.08541", "confirmed": "标题、五位作者、arXiv v1提交2021-04-17；摘要中两阶段/一阶段方法依赖复杂融合模块（模块化注意力、动态图、多模态树）、用一摞Transformer编码器层替代、把定位改写为直接坐标回归、五个常用数据集上取得最好。DETR初始化与BERT分支、[REG] token、L1与GIoU损失、具体数据集名、机构与ICCV 2021为一般了解，未逐项核对。"}
+}

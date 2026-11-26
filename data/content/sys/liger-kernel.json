@@ -1,0 +1,24 @@
+{
+ "id": "liger-kernel",
+ "who": "Pin-Lun Hsu, Yun Dai, Vignesh Kothapalli, Qingquan Song, Shao Tang, Siyu Zhu, Steven Shimizu, Shivam Sahni et al. · LinkedIn",
+ "aka": ["Liger", "Liger-Kernel", "融合线性交叉熵", "FusedLinearCrossEntropy", "FLCE", "Triton训练内核"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2410.10989"},
+  {"label": "GitHub", "url": "https://github.com/linkedin/Liger-Kernel"}
+ ],
+ "problem": "用Hugging Face的标准实现训练LLM时，RMSNorm、RoPE、SwiGLU、交叉熵等都是一串零碎的小算子，反复读写显存；词表十几万时，最后一层输出的logits张量本身就能吃掉大量显存。",
+ "idea": "用Triton把这些常见层各自写成融合内核，并把“输出投影+交叉熵”合成一个按输入分块计算的内核，不再一次性生成完整的logits；接口上只需一行替换就能打补丁到现有模型。",
+ "impact": "成为开源微调与后训练栈里常见的“开关式”加速件，被Hugging Face训练工具、Axolotl、LLaMA-Factory等集成；融合线性交叉熵的分块做法被许多训练框架采用。",
+ "method": "LLM训练里除了大矩阵乘，还有很多逐元素或按行的运算：归一化、旋转位置编码、门控激活、softmax和交叉熵。按框架默认写法，每个小算子都要从显存读入、写回一次，中间结果还要为反向传播保存。把它们融合成一个内核，就能只读写一次，并在反向时重算而非保存。\n\nLiger Kernel用[[triton-lang]]实现了RMSNorm、LayerNorm、RoPE、SwiGLU、GeGLU、交叉熵等内核。最省显存的是**融合线性交叉熵（FLCE）**：最后一层要把隐状态乘以输出矩阵得到长度为词表大小V的logits，V达到十几万时，`批×序列×V` 的logits张量往往比模型其余激活还大。FLCE把输入按序列切块，每块算出logits后立即用[[online-softmax]]求损失和梯度，梯度公式 `∇ₓL = y − t` 可以就地写回，算完就丢，从不同时持有完整的logits；分块近似带来的梯度缩放问题用额外的缩放因子修正。库还内置了正确性、性能和收敛性测试。\n\n摘要报告：与Hugging Face实现相比，对常见LLM平均提高约20%训练吞吐、减少约60%显存。",
+ "limits": [
+  {"text": "只覆盖固定几类层的手写内核，新架构要逐个适配；与torch.compile等编译器自动融合的收益存在重叠。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "triton-lang", "type": "uses", "note": "全部内核用Triton编写，比CUDA手写更易读、易修改。"},
+  {"to": "hf-transformers", "type": "solves", "note": "Hugging Face的标准实现由零碎算子拼成、logits占用大量显存；Liger以补丁方式替换，平均省约60%显存。"},
+  {"to": "flashattention", "type": "extends", "note": "把FlashAttention式的融合与在线softmax分块思路，推广到注意力以外的归一化、激活和损失层。"},
+  {"to": "online-softmax", "type": "uses", "note": "融合交叉熵内核用在线softmax逐块计算损失与梯度。"}
+ ],
+ "prereq": ["softmax", "cross-entropy", "backpropagation", "memory-bandwidth", "cpu-gpu"],
+ "check": {"source": "https://arxiv.org/abs/2410.10989", "confirmed": "标题、作者（Hsu等十位）、v1日期2024-10-14；摘要：面向LLM训练的开源Triton内核、内核融合与输入分块、相对HF实现平均20%吞吐提升和60%显存减少。HTML正文：机构LinkedIn、内核列表RMSNorm/LayerNorm/RoPE/SwiGLU/GeGLU/CrossEntropy/FusedLinearCrossEntropy、交叉熵用在线softmax计算梯度、FLCE分块与额外缩放因子。被Axolotl、LLaMA-Factory等集成为一般了解。"}
+}

@@ -1,0 +1,30 @@
+{
+  "id": "dgcnn",
+  "who": "Yue Wang, Yongbin Sun, Ziwei Liu, Sanjay E. Sarma, Michael M. Bronstein, Justin M. Solomon · MIT / 伯克利 / 帝国理工",
+  "venue": "ACM TOG 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1801.07829"},
+    {"label": "代码", "url": "https://github.com/WangYueFt/dgcnn"}
+  ],
+  "aka": ["DGCNN", "EdgeConv", "动态图卷积", "Dynamic Graph CNN", "边卷积"],
+  "problem": "点云是一堆没有顺序、没有连接关系的三维点。[[pointnet]]对每个点独立提特征再全局池化，看不到局部邻域；[[pointnet2]]用固定的球形邻域分组，邻域关系也是事先在原始坐标里定死的。",
+  "idea": "提出EdgeConv：在每一层用当前特征重新找每个点的k个最近邻，把“中心点特征”与“邻居与中心的差”拼起来过一个共享MLP，再对邻居取最大值。图在每层动态重建，所以深层的“邻居”可以是语义相近、但空间上很远的点。",
+  "impact": "EdgeConv成为点云分类和分割最常用的模块与基线之一，也让“在点云上动态建图做图神经网络”成为一条研究路线。",
+  "method": "设第l层第i个点的特征为 `x_i`，在特征空间里找它的k个最近邻（默认k=20）。对每条边 `(i, j)` 计算边特征\n\n`e_ij = h(x_i, x_j − x_i)`\n\n其中h是一个共享的MLP；输入既有点本身 `x_i`（全局形状信息），又有相对差 `x_j − x_i`（局部几何）。然后对所有邻居做对称聚合（取最大值）得到新特征 `x_i' = max_j e_ij`。取最大值与点的顺序无关，所以满足点云的置换不变要求。\n\n关键在“动态”：每一层都用上一层输出的特征重新计算k近邻图，而不是只在三维坐标上建一次图。第一层的邻居是空间上挨着的点；越往后，飞机两侧机翼这种空间上分开、但形状相似的部分会被连成邻居，感受野在语义上扩展。EdgeConv可以像卷积层一样堆叠，也可以插进已有架构。论文在ModelNet40分类、ShapeNetPart部件分割和S3DIS室内场景分割上做了评测。",
+  "legacy": "DGCNN与[[pointnet2]]一起成为点云网络的两大常用基线，后续的点云Transformer（如[[point-transformer-v3]]）也延续了“在局部邻域上做可学习聚合”的思路；稀疏卷积路线（[[minkowskinet]]）则在大规模场景上更占优势。",
+  "limits": [
+    {"text": "每层都要在全部点上算k近邻，复杂度随点数平方增长，难以直接处理几十万点的大场景。", "solved_by": ["minkowskinet", "point-transformer-v3"]}
+  ],
+  "relations": [
+    {"to": "pointnet", "type": "solves", "note": "PointNet逐点独立处理、缺少局部结构；EdgeConv用k近邻边特征引入局部几何。"},
+    {"to": "pointnet2", "type": "rivals", "note": "PointNet++在原始坐标上固定分组；DGCNN在特征空间逐层动态重建邻域图。"},
+    {"to": "gcn", "type": "extends", "note": "把图卷积的“沿边聚合邻居信息”用到点云上，并让图本身随层变化。"}
+  ],
+  "prereq": ["3d-representation", "mlp", "graph-basics", "message-passing", "k-nearest-neighbors"],
+  "terms": [
+    {"t": "点云", "d": "激光雷达或深度相机输出的一组三维点坐标（可附带颜色），点之间没有顺序也没有连接关系。"},
+    {"t": "置换不变", "d": "把输入点的顺序打乱，网络输出不变；对称函数如求和、取最大值能保证这一点。"}
+  ],
+  "learn": "先读PointNet理解为什么要用对称函数，再读DGCNN第3节EdgeConv的定义；用PyTorch写一个EdgeConv层（knn＋gather＋MLP＋max），在ModelNet40上训练并可视化深层的k近邻。",
+  "check": {"source": "https://arxiv.org/abs/1801.07829", "confirmed": "arXiv记录：标题、六位作者、v1提交于2018-01-24；摘要中EdgeConv模块、在每层动态计算的图上操作、可微并可插入已有架构、包含局部邻域信息、特征空间中的亲和捕捉长距离语义、ModelNet40/ShapeNetPart/S3DIS评测。边特征公式、k=20、TOG 2019、机构凭一般了解写。"}
+}

@@ -1,0 +1,30 @@
+{
+  "id": "humpback",
+  "who": "Xian Li, Ping Yu, Chunting Zhou, Timo Schick, Omer Levy, Luke Zettlemoyer, Jason Weston, Mike Lewis · Meta AI",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2308.06259"}
+  ],
+  "aka": ["Humpback", "指令回译", "Instruction Backtranslation", "自我对齐", "self-augmentation", "self-curation"],
+  "problem": "高质量指令数据要么靠人工写、成本高，要么从ChatGPT等更强模型蒸馏、受许可和能力上限约束；网上大量人写的优质文本却没有对应的“指令”。",
+  "idea": "借用机器翻译里的回译：用少量种子数据训练一个“由回答猜指令”的模型，给网页文档反向生成指令（自增广），再让模型自己给这些候选打分、只留高质量的（自筛选），迭代两轮。",
+  "impact": "给出一条不依赖更强模型蒸馏的指令数据扩充路线，“让模型自己生成并筛选训练数据”的做法后来在自奖励模型等工作中继续发展。",
+  "method": "背景：[[self-instruct]]和[[alpaca]]让模型凭空编指令和回答，质量受生成模型限制；[[lima]]说明少量精选数据就够，但精选要靠人。作者注意到网上已有海量人写的高质量文本，缺的只是“这段文字是在回答什么问题”。\n\n**指令回译**分两步。第一步自增广（self-augmentation）：用约3200条人工种子对话（Open Assistant数据）微调[[llama-1]]，得到一个反向模型 `p(指令 | 回答)`，把ClueWeb网页语料中的段落当作“回答”，为每段生成一条可能的指令。第二步自筛选（self-curation）：用种子数据训练的正向模型，按5分制给每个（指令，回答）对打分，只保留高分样本。用筛出的数据和种子数据一起训练出更强的模型，再用它重新打分筛选，共迭代两轮。名字Humpback（座头鲸）取自和Alpaca、Camel等动物名并列的玩笑。\n\n结果：摘要称，对LLaMA做两轮迭代后的模型，在Alpaca排行榜上超过所有不依赖蒸馏数据的LLaMA系模型。作者的消融显示，不经过筛选直接用全部回译数据反而效果变差，说明自筛选这一步是关键。",
+  "limits": [
+    {"text": "网页段落本身并非为回答某个问题而写，回译出的指令和回答常常对不齐；筛选依赖模型自己打分，可能放大模型自身的偏好与盲区。", "solved_by": []},
+    {"text": "只做了监督微调，没有利用偏好信号；后续把“模型自己打分”接到偏好优化上的是自奖励模型。", "solved_by": ["self-rewarding"]}
+  ],
+  "relations": [
+    {"to": "self-instruct", "type": "rivals", "note": "Self-Instruct让模型凭空生成指令和回答，Humpback改为给人写的现成文本反向生成指令，回答质量更有保证。"},
+    {"to": "llama-1", "type": "uses", "note": "种子模型、反向模型和最终模型都基于LLaMA微调。"},
+    {"to": "lima", "type": "extends", "note": "LIMA说明少量高质量数据就够，Humpback用模型自筛选来自动获得大量高质量样本。"},
+    {"to": "alpaca", "type": "solves", "note": "Alpaca的数据从更强模型蒸馏而来，Humpback不依赖蒸馏数据就在Alpaca排行榜上胜过同类模型。"}
+  ],
+  "prereq": ["instruction-tuning", "language-model", "pretrain-finetune", "self-supervised"],
+  "terms": [
+    {"t": "回译（backtranslation）", "d": "机器翻译里的数据增广技巧：用反向翻译模型把目标语言的单语文本翻回源语言，构造出新的平行句对。"},
+    {"t": "自筛选（self-curation）", "d": "让模型自己给候选训练样本打分，只保留高分样本再拿来训练自己。"}
+  ],
+  "learn": "先读[[self-instruct]]和[[lima]]理解指令数据从哪来；读原文第2节两步流程和第4节消融（筛选阈值、数据量）；动手：拿一个小指令模型，给几十段维基百科文本生成指令，再用同一模型按5分制打分，看看高分和低分样本的差别。",
+  "check": {"source": "https://arxiv.org/abs/2308.06259", "confirmed": "标题、8位作者、arXiv v1提交日2023-08-11；摘要中指令回译的定义、种子模型给网页文档生成指令的自增广与挑选高质量样本的自筛选、对LLaMA两轮迭代后在Alpaca排行榜上胜过所有不依赖蒸馏数据的LLaMA系模型。种子数据约3200条Open Assistant、ClueWeb语料、5分制打分、不筛选反而变差的消融、ICLR 2024为一般了解。"}
+}

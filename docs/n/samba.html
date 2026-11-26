@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Samba混合SSM（2024） · AI脉络</title>
+<meta name="description" content="全注意力的计算随长度平方增长、训练长度之外外推能力差；纯状态空间模型（如Mamba）是线性时间的，但把历史压进固定大小的状态后，难以精确回忆很久之前的具体内容。 逐层交替堆叠Mamba层和滑动窗口注意力（SWA）层（中间配MLP）：Mamba负责把整段历史压缩成循环状态，SWA只看最近一段窗口、负…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/samba.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Samba混合SSM（2024）">
+<meta property="og:description" content="全注意力的计算随长度平方增长、训练长度之外外推能力差；纯状态空间模型（如Mamba）是线性时间的，但把历史压进固定大小的状态后，难以精确回忆很久之前的具体内容。 逐层交替堆叠Mamba层和滑动窗口注意力（SWA）层（中间配MLP）：Mamba负责把整段历史压缩成循环状态，SWA只看最近一段窗口、负…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/samba.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/samba">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 长上下文与高效注意力</div>
+<h1>Samba混合SSM</h1>
+<div class="full">Samba: Simple Hybrid State Space Models for Efficient Unlimited Context Language Modeling</div>
+<div class="meta"><span>2024.06</span><span>论文</span><span>延伸</span><span>ICLR 2025</span><span>Liliang Ren, Yang Liu, Yadong Lu, Yelong Shen, Chen Liang, Weizhu Chen · 微软、伊利诺伊大学厄巴纳-香槟分校</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2406.07522" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/microsoft/Samba" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/samba">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>全注意力的计算随长度平方增长、训练长度之外外推能力差；纯状态空间模型（如Mamba）是线性时间的，但把历史压进固定大小的状态后，难以精确回忆很久之前的具体内容。</p></div><div><h4>方法</h4><p>逐层交替堆叠Mamba层和滑动窗口注意力（SWA）层（中间配MLP）：Mamba负责把整段历史压缩成循环状态，SWA只看最近一段窗口、负责精确回忆近处内容，整体保持线性时间。</p></div><div><h4>影响</h4><p>以3.8B参数、3.2万亿token的规模说明这种简单的层间混合在常规基准和长上下文外推上都能胜过同规模Transformer，是2024年“SSM＋局部注意力”混合架构的代表之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/mamba.html">Mamba状态空间模型</a>用输入相关的选择性状态空间做到线性时间序列建模，但它的状态大小固定，长距离的精确检索（如在长文中找一串密码）不如注意力；<a class="ln" href="../n/longformer.html">Longformer滑窗注意力</a>、<a class="ln" href="../n/mistral-7b.html">Mistral 7B</a>用的滑动窗口注意力只看最近的若干token，也是线性的，但看不到窗口外。<a class="ln" href="../n/jamba.html">Jamba混合架构</a>则把Mamba和全注意力层混合。</p><p><b>Samba</b>的结构很简单：按“Mamba → MLP → SWA → MLP”的模式逐层重复。Mamba层提供对整个历史的压缩记忆和隐式位置信息，SWA层（窗口2048）在局部做精确的内容寻址，两者互补。因为没有任何全注意力层，计算和显存都随长度线性增长，推理时状态大小固定，可以无限流式生成。</p><p>结果：作者把Samba扩展到38亿参数、3.2万亿训练token，摘要称在多种基准上显著超过当时最好的同规模模型。只在4K长度上预训练，零样本困惑度在长达100万token时仍持续改善；只用4K长度的数据微调后，就能外推到256K长度并在密码检索（Passkey Retrieval）任务上完全召回，在更难的电话簿检索任务上也优于全注意力模型。对128K长度的提示，吞吐量是使用GQA的Transformer的3.73倍；流式生成64K token时提速3.64倍。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>没有全局注意力层，需要在很长距离上精确比对多处内容的任务（多跳检索、长文多处引用）仍受限于固定大小的状态；窗口外的信息只能靠Mamba的压缩记忆。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/qwen3-next.html">Qwen3-Next混合注意力</a> <a class="chip hue" style="--h:0" href="../n/kimi-linear.html">Kimi Linear</a></div></li><li>层的排列方式和混合比例靠经验搜索，什么样的混合在更大规模上最优没有统一答案。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/longformer.html">Longformer滑窗注意力</a><span class="yr">2020.04 · LLM</span><div class=nt>滑动窗口注意力的思路来自Longformer等局部注意力工作，负责精确回忆最近内容。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/mamba.html">Mamba状态空间模型</a><span class="yr">2023.12 · 基础</span><div class=nt>Mamba层负责把整段历史压缩成循环状态。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/jamba.html">Jamba混合架构</a><span class="yr">2024.03 · LLM</span><div class=nt>Jamba混合Mamba与全注意力，Samba只用滑窗注意力，保持严格线性复杂度并强调长度外推。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/phi-3.html">Phi-3</a><span class="yr">2024.04 · LLM</span><div class=nt>同属微软团队，训练数据和评测设置与Phi-3系列一致（3.8B规模、3.2T token）。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/kimi-linear.html">Kimi Linear</a><span class="yr">2025.10 · LLM</span><div class=nt>没有全局注意力层，需要在很长距离上精确比对多处内容的任务（多跳检索、长文多处引用）仍受限于固定大小的状态；窗口外的信息只能靠Mamba的压缩记忆。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/qwen3-next.html">Qwen3-Next混合注意力</a><span class="yr">2025.09 · LLM</span><div class=nt>没有全局注意力层，需要在很长距离上精确比对多处内容的任务（多跳检索、长文多处引用）仍受限于固定大小的状态；窗口外的信息只能靠Mamba的压缩记忆。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/state-space-model.html">状态空间模型与线性RNN</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/efficient-attention.html">稀疏注意力与高效注意力</a> <a class="chip c" href="../c/context-window.html">上下文窗口</a> <a class="chip c" href="../c/perplexity.html">困惑度</a></p>
+<h2>本篇术语</h2><ul><li><b>滑动窗口注意力（SWA）</b>　每个token只关注它之前固定长度窗口内的token，计算量随长度线性增长。</li><li><b>密码检索（Passkey Retrieval）</b>　在一大段无关文字里藏一串数字，测试模型能否在长上下文中准确找回它。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/mamba.html">Mamba状态空间模型</a>和<a class="ln" href="../n/longformer.html">Longformer滑窗注意力</a>；读原文第2节结构图和第4节长度外推实验；动手：用开源代码训练一个小Samba和同规模Transformer，在训练长度的4倍处比较困惑度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2406.07522" rel="noopener">https://arxiv.org/abs/2406.07522</a>（标题、6位作者、arXiv v1提交日2024-06-11；摘要中逐层混合Mamba与滑窗注意力、3.8B参数3.2T token、4K预训练零样本困惑度到1M仍改善、4K微调外推到256K且密码检索完美召回、电话簿任务优于全注意力、128K提示吞吐3.73倍于GQA Transformer、64K流式生成提速3.64倍。层排列顺序、窗口2048、与Phi-3数据一致、ICLR 2025为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Samba%E6%B7%B7%E5%90%88SSM%EF%BC%88samba%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asamba%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/samba.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="glm-4.html"><small>本分支上一个 · 2024.06</small><b>ChatGLM家族与GLM-4</b></a><a class="r" href="mdlm.html"><small>本分支下一个 · 2024.06</small><b>掩码扩散语言模型MDLM</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

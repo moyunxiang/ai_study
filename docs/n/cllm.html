@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>CLLM一致性并行解码（2024） · AI脉络</title>
+<meta name="description" content="Jacobi解码把逐词生成改写成一组可以并行迭代的方程，理论上一步能定下多个词，但实际中一次迭代很少能猜对超过一个词，几乎没有加速。 微调目标模型本身，让它从Jacobi迭代轨迹上的任意中间状态都尽快跳到最终的不动点，于是一次迭代能确定更多词。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/cllm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CLLM一致性并行解码（2024）">
+<meta property="og:description" content="Jacobi解码把逐词生成改写成一组可以并行迭代的方程，理论上一步能定下多个词，但实际中一次迭代很少能猜对超过一个词，几乎没有加速。 微调目标模型本身，让它从Jacobi迭代轨迹上的任意中间状态都尽快跳到最终的不动点，于是一次迭代能确定更多词。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/cllm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/cllm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 解码与生成控制</div>
+<h1>CLLM一致性并行解码</h1>
+<div class="full">CLLMs: Consistency Large Language Models</div>
+<div class="meta"><span>2024.02</span><span>论文</span><span>延伸</span><span>ICML 2024</span><span>Siqi Kou, Lanxiang Hu, Zhezhi He, Zhijie Deng, Hao Zhang · 上海交通大学, 加州大学圣地亚哥分校</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2403.00835" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/hao-ai-lab/Consistency_LLM" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/cllm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Jacobi解码把逐词生成改写成一组可以并行迭代的方程，理论上一步能定下多个词，但实际中一次迭代很少能猜对超过一个词，几乎没有加速。</p></div><div><h4>方法</h4><p>微调目标模型本身，让它从Jacobi迭代轨迹上的任意中间状态都尽快跳到最终的不动点，于是一次迭代能确定更多词。</p></div><div><h4>影响</h4><p>给“不加草稿模型、靠改造模型本身来并行解码”提供了一条路线，2.4–3.4倍的加速让Jacobi类并行解码重新受到关注。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>贪心解码可以写成：给定前缀，未来n个词y₁…yₙ满足 <code>yᵢ = argmax p(· | 前缀, y₁…yᵢ₋₁)</code>。Jacobi解码先随便猜一串n个词，然后把这n个等式并行地同时更新一轮，反复迭代直到不再变化——这个不动点就是普通贪心解码的结果。每轮只需一次前向，若一轮能“锁定”多个词就能提速。但对普通模型，前面的词一错，后面就跟着错，通常一轮只锁定一个词，与逐词解码无异（<a class="ln" href="../n/lookahead-decoding.html">Lookahead前瞻解码</a>就是想在这上面挖出更多可用的n-gram）。</p><p>CLLM的做法类似<a class="ln" href="../n/consistency-models.html">一致性模型</a>：先用目标模型跑Jacobi解码收集迭代轨迹，然后微调模型，让它输入轨迹上任何一个中间状态时，都尽量直接输出不动点（一致性损失），同时保留普通的自回归损失以免质量下降。训练后，模型在一轮迭代中能正确预测多个连续词，还会出现“提前定下后面某些固定搭配词”的现象。</p><p>摘要报告：在领域专用和开放领域基准上生成速度提高2.4–3.4倍，同时保持生成质量。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要对每个目标模型重新收集Jacobi轨迹并微调，改动了模型权重，不像外挂草稿那样可以即插即用。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只针对贪心解码的不动点，用于随机采样时难以保证与原模型分布一致。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/speculative-decoding.html">推测解码</a><span class="yr">2022.11 · 系统·效率</span><div class=nt>推测解码靠额外草稿模型并保持分布不变；CLLM不需要草稿模型，但要微调目标模型本身。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/consistency-models.html">一致性模型</a><span class="yr">2023.03 · 生成</span><div class=nt>借用扩散模型里“从轨迹任意点一步映射到终点”的一致性训练思想，用到语言模型的Jacobi轨迹上。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/lookahead-decoding.html">Lookahead前瞻解码</a><span class="yr">2024.02 · 系统·效率</span><div class=nt>两者都基于Jacobi迭代：Lookahead不改模型，靠收集n-gram候选提速；CLLM直接微调模型让迭代更快收敛。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+<h2>本篇术语</h2><ul><li><b>不动点</b>　反复迭代一个更新规则后不再变化的状态；Jacobi解码的不动点就是贪心解码的输出。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2403.00835" rel="noopener">https://arxiv.org/abs/2403.00835</a>（标题、五位作者、v1日期2024-02-28；摘要：Jacobi解码可把逐词解码转为可并行计算、实际中很少一次预测多个词因此加速有限、微调目标模型从任意状态快速收敛到Jacobi轨迹的不动点、生成速度提高2.4–3.4倍并保持质量。损失由一致性损失和自回归损失组成、提前确定固定搭配的现象、ICML 2024与机构为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20CLLM%E4%B8%80%E8%87%B4%E6%80%A7%E5%B9%B6%E8%A1%8C%E8%A7%A3%E7%A0%81%EF%BC%88cllm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acllm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/cllm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="hydra-heads.html"><small>本分支上一个 · 2024.02</small><b>Hydra顺序依赖草稿头</b></a><a class="r" href="bitnet.html"><small>本分支下一个 · 2024.02</small><b>1.58比特模型BitNet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

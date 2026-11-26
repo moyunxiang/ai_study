@@ -1,0 +1,28 @@
+{
+  "id": "ect",
+  "who": "Zhengyang Geng, Ashwini Pokle, William Luo, Justin Lin, J. Zico Kolter · 卡内基梅隆大学",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2406.14548"},
+    {"label": "代码", "url": "https://github.com/locuslab/ect"}
+  ],
+  "aka": ["ECT", "Easy Consistency Tuning", "简易一致性微调", "Consistency Models Made Easy"],
+  "problem": "[[consistency-models]]采样快，但训练非常费资源：论文举例，2024年在CIFAR-10上训一个最好的一致性模型要8块GPU跑一周。",
+  "idea": "用一个微分方程描述一致性模型的轨迹后，扩散模型可以看成一致性条件最弱的特例；于是直接从预训练扩散模型初始化，在训练中逐步把一致性条件收紧，微调成一致性模型。",
+  "impact": "论文报告在单块A100上1小时内就把CIFAR-10两步FID做到2.73，与花费数百GPU小时的一致性蒸馏相当，并据此研究了一致性模型的规模定律。",
+  "method": "一致性模型要学一个函数f(x_t, t)，让同一条ODE轨迹上所有点都映射到同一个干净图。训练时通常取轨迹上相邻的两个时刻t和r < t，要求`f(x_t, t) ≈ f(x_r, r)`（右边停止梯度），并在训练中逐步把间隔`Δt = t − r`缩小。\n\nECT的关键观察是：当Δt等于t、即r = 0时，`f(x_r, r)`就是干净图本身，这个条件正好是扩散模型的去噪训练目标。也就是说，扩散模型是“Δt最大”的一致性模型。于是不必从零训练：先拿一个预训练好的[[edm]]式扩散模型作为初始化，然后按调度让Δt从t逐渐缩小到很小，一致性条件一点点变强，模型平滑地从扩散模型过渡到一致性模型。作者还把训练写成一个微分方程的离散化，并改进了损失加权与Δt调度。\n\n由于起点已经很好，微调只需很少的计算。论文报告ECT在CIFAR-10上单块A100训练1小时即可达到两步FID 2.73，追平训练数百GPU小时的一致性蒸馏；并在这个高效设定下研究规模定律，发现一致性模型同样服从经典的幂律缩放。",
+  "limits": [
+    {"text": "主要在CIFAR-10和ImageNet等像素或小规模设定上验证，直接用于大规模文生图潜空间模型时稳定性尚待证明。", "solved_by": ["scm"]}
+  ],
+  "relations": [
+    {"to": "consistency-models", "type": "solves", "note": "大幅降低一致性模型的训练成本：从预训练扩散模型出发逐步收紧一致性条件。"},
+    {"to": "edm", "type": "uses", "note": "用EDM式预训练扩散模型初始化，并沿用其参数化与噪声设置。"},
+    {"to": "progressive-distillation", "type": "rivals", "note": "同样从预训练扩散模型出发做少步生成，但ECT不需要老师生成目标，而是直接微调成一致性模型。"}
+  ],
+  "prereq": ["few-step-sampling", "ode-sde", "pretrain-finetune", "diffusion-process", "scaling-law-concept"],
+  "terms": [
+    {"t": "一致性训练与一致性蒸馏", "d": "前者不借助老师模型、只用数据训练一致性模型；后者用预训练扩散模型的ODE求解结果作为监督。"}
+  ],
+  "learn": "先读一致性模型的训练目标 → 读本文第3节“扩散模型是Δt最大的一致性模型”的推导 → 用官方代码在CIFAR-10上复现一小时微调。",
+  "check": {"source": "https://arxiv.org/abs/2406.14548", "confirmed": "标题、五位作者、v1日期2024-06-20、摘要中SOTA一致性模型在CIFAR-10上需8块GPU训练一周、用微分方程表达轨迹、扩散模型可视为一致性模型特例、从预训练扩散模型微调并逐步收紧一致性条件、单块A100一小时两步FID 2.73、追平数百GPU小时的一致性蒸馏、服从幂律缩放、代码公开；机构CMU、ICLR 2025、Δt调度与r=0的推导形式来自一般了解"}
+}

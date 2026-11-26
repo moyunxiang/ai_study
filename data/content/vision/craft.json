@@ -1,0 +1,30 @@
+{
+  "id": "craft",
+  "who": "Youngmin Baek, Bado Lee, Dongyoon Han, Sangdoo Yun, Hwalsuk Lee · NAVER Clova AI",
+  "venue": "CVPR 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1904.01941"},
+    {"label": "代码", "url": "https://github.com/clovaai/CRAFT-pytorch"}
+  ],
+  "aka": ["CRAFT", "字符区域感知", "Character Region Awareness", "字符级文字检测", "character-level text detection", "EasyOCR检测器"],
+  "problem": "场景文字检测器大多用单词级的矩形或四边形框训练，遇到弯曲、变形、任意方向的文字时框不住；而真实数据集只有单词级标注，没有逐字符的标注可用。",
+  "idea": "不直接框单词，而是预测两张热力图：每个像素是不是某个字符的中心（region score），以及是不是两个相邻字符之间的连接处（affinity score），再把字符连成单词；真实图片的字符标注由模型自己在训练中逐步估计。",
+  "impact": "字符级的检测思路特别适合弯曲文字，CRAFT因官方开源代码好用，成为EasyOCR等开源OCR工具的默认文字检测器之一。",
+  "method": "CRAFT的网络是带批归一化的[[vgg]]-16骨干加一个类似[[unet]]的上采样解码器，输出半分辨率的两张图：\n\n- **字符区域分数**：像素离某个字符中心越近值越高，用二维高斯热力图表示；\n- **字符亲和分数**：相邻两个字符之间的“连接区域”，同样用高斯表示。\n\n推理时把两张图阈值化后求连通域，同一个连通域里的字符就组成一个单词，再按需要输出矩形或多边形框，因此天然能处理弯曲文字。\n\n难点是监督信号：合成数据（SynthText）有字符框，真实数据只有单词框。CRAFT采用**弱监督**：用当前的中间模型在真实图片的单词框内预测字符区域，用分水岭算法切出字符框；再按“预测出的字符数与单词真实长度的吻合程度”给这份伪标注一个置信度，不可靠的伪标注权重小。随着训练进行，伪标注越来越准。\n\n摘要称在包括TotalText和CTW-1500（含大量弯曲文字）在内的六个基准上显著超过当时最好的检测器，能检测任意方向、弯曲或变形的文字。",
+  "legacy": "CRAFT与同年的[[dbnet]]是开源OCR流水线里最常见的两种检测器：前者被EasyOCR采用，后者被[[pp-ocr]]采用。识别端通常接[[crnn]]一类模型。之后端到端的文档与场景文字理解逐渐被多模态大模型接管。",
+  "limits": [
+    {"text": "靠后处理把字符连成单词，字符间距大或字符粘连时容易切错；推理也比分割式检测器慢。", "solved_by": ["dbnet"]}
+  ],
+  "relations": [
+    {"to": "east", "type": "rivals", "note": "EAST直接回归单词级的旋转框或四边形，难以处理弯曲文字；CRAFT改为自下而上检测字符再连接。"},
+    {"to": "vgg", "type": "uses", "note": "以带批归一化的VGG-16作骨干提取特征。"},
+    {"to": "unet", "type": "uses", "note": "用U-Net式的跳连上采样解码器输出逐像素的字符与亲和热力图。"}
+  ],
+  "prereq": ["vision-tasks", "conv-layer", "semi-supervised", "encoder-decoder"],
+  "terms": [
+    {"t": "场景文字检测", "d": "在街景、招牌、商品照片等自然图像里找出文字所在区域，比扫描文档难得多。"},
+    {"t": "亲和分数", "d": "表示某个像素落在相邻两个字符之间连接区域的可能性，用来把字符串成单词。"}
+  ],
+  "learn": "先看EAST这类单词级检测器的输出形式，再读CRAFT第3节的两张热力图和弱监督流程图；用开源的CRAFT-pytorch跑一张弯曲招牌照片，把两张热力图叠加在原图上看。",
+  "check": {"source": "https://arxiv.org/abs/1904.01941", "confirmed": "arXiv记录：标题、五位作者、v1提交于2019-04-03；摘要中探索字符与字符间亲和、合成图用字符标注而真实图用中间模型估计的字符级真值、新的亲和表示、六个基准含TotalText和CTW-1500、可检测任意方向/弯曲/变形文字。VGG-16 BN骨干、高斯热力图、分水岭切分与置信度、EasyOCR采用、CVPR 2019凭一般了解写。"}
+}

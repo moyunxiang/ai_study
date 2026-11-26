@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DeepMind推测采样（2023） · AI脉络</title>
+<meta name="description" content="700亿参数的大模型逐词采样时，每生成一个词都要把全部权重读一遍，延迟受显存带宽和跨卡通信限制，难以再压低。 让一个小而快的草稿模型先连写几个词，大模型一次并行打分；用一种修正的拒绝采样决定接受多少个，保证最终输出的分布与大模型单独采样完全一致。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/speculative-sampling.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DeepMind推测采样（2023）">
+<meta property="og:description" content="700亿参数的大模型逐词采样时，每生成一个词都要把全部权重读一遍，延迟受显存带宽和跨卡通信限制，难以再压低。 让一个小而快的草稿模型先连写几个词，大模型一次并行打分；用一种修正的拒绝采样决定接受多少个，保证最终输出的分布与大模型单独采样完全一致。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/speculative-sampling.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/speculative-sampling">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 解码与生成控制</div>
+<h1>DeepMind推测采样</h1>
+<div class="full">Accelerating Large Language Model Decoding with Speculative Sampling</div>
+<div class="meta"><span>2023.02</span><span>论文</span><span>延伸</span><span>Charlie Chen, Sebastian Borgeaud, Geoffrey Irving, Jean-Baptiste Lespiau, Laurent Sifre, John Jumper · DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2302.01318" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/speculative-sampling">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>700亿参数的大模型逐词采样时，每生成一个词都要把全部权重读一遍，延迟受显存带宽和跨卡通信限制，难以再压低。</p></div><div><h4>方法</h4><p>让一个小而快的草稿模型先连写几个词，大模型一次并行打分；用一种修正的拒绝采样决定接受多少个，保证最终输出的分布与大模型单独采样完全一致。</p></div><div><h4>影响</h4><p>与谷歌同期的推测解码一起确立了“草稿+验证”的无损加速范式，其接受/重采样规则成为后来各类推测解码实现的标准写法。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>自回归解码一次只出一个词，而大模型对一段短续写并行打分的耗时，与它采样一个词的耗时相差不大。论文正是利用这一点：草稿模型 <code>q</code> 先自回归地生成K个词，目标大模型 <code>p</code> 对这K个位置一次前向，得到每个位置自己的分布。</p><p>接受规则是关键。对草稿给出的第i个词x，以概率 <code>min(1, p(x)/q(x))</code> 接受；一旦某个词被拒绝，就从修正分布 <code>norm(max(0, p − q))</code> 里重新采一个词并停止。可以证明这样得到的每个词都恰好服从 <code>p</code>，所以输出质量与只用大模型采样没有区别（论文的说法是在硬件数值精度范围内保持目标分布）。如果K个词全被接受，还能免费多采一个词。每一轮至少产出一个词，草稿越准，一轮产出越多。</p><p>论文用<a class="ln" href="../n/chinchilla.html">Chinchilla</a>（700亿参数）做目标模型，在分布式部署下得到2–2.5倍的解码加速，且不需要修改模型本身。它与<a class="ln" href="../n/speculative-decoding.html">推测解码</a>几乎同时独立提出，两者的算法本质相同；后来的<a class="ln" href="../n/medusa.html">Medusa多解码头</a>、<a class="ln" href="../n/eagle.html">EAGLE特征级推测解码</a>等工作主要在“草稿从哪来”上改进，而验证与接受的规则基本沿用这一套。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要另外训练和部署一个与目标模型词表一致的草稿模型，草稿与目标差距大时接受率低，加速随之缩水。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/medusa.html">Medusa多解码头</a> <a class="chip hue" style="--h:192" href="../n/eagle.html">EAGLE特征级推测解码</a></div></li><li>草稿是一条线性序列，一个词被拒绝后面全部作废；后来用树状草稿一次验证多条候选。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/specinfer.html">SpecInfer树状推测解码</a> <a class="chip hue" style="--h:192" href="../n/eagle-2.html">EAGLE-2动态草稿树</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/chinchilla.html">Chinchilla</a><span class="yr">2022.03 · LLM</span><div class=nt>以700亿参数的Chinchilla为目标模型做基准，报告2–2.5倍解码加速。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/blockwise-decoding.html">分块并行解码</a><span class="yr">2018.11 · 系统·效率</span><div class=nt>分块并行解码只能做贪心解码的验证；推测采样把验证推广到随机采样，并保证分布不变。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/speculative-decoding.html">推测解码</a><span class="yr">2022.11 · 系统·效率</span><div class=nt>两篇工作相隔数月独立提出同一种“小模型起草、大模型并行验证、拒绝采样保分布”的方法，后来通常被一并引用。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/specinfer.html">SpecInfer树状推测解码</a><span class="yr">2023.05 · 系统·效率</span><div class=nt>草稿是一条线性序列，一个词被拒绝后面全部作废；后来用树状草稿一次验证多条候选。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/medusa.html">Medusa多解码头</a><span class="yr">2024.01 · 系统·效率</span><div class=nt>需要另外训练和部署一个与目标模型词表一致的草稿模型，草稿与目标差距大时接受率低，加速随之缩水。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/eagle.html">EAGLE特征级推测解码</a><span class="yr">2024.01 · 系统·效率</span><div class=nt>需要另外训练和部署一个与目标模型词表一致的草稿模型，草稿与目标差距大时接受率低，加速随之缩水。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/eagle-2.html">EAGLE-2动态草稿树</a><span class="yr">2024.06 · 系统·效率</span><div class=nt>草稿是一条线性序列，一个词被拒绝后面全部作废；后来用树状草稿一次验证多条候选。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/importance-sampling.html">重要性采样</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+<h2>本篇术语</h2><ul><li><b>草稿模型</b>　推测解码里负责先猜几个词的小模型，猜得越像大模型，被接受的词越多。</li></ul>
+<h2>怎么学</h2><p>先弄懂自回归解码为什么受显存带宽限制 → 读论文第2–3节的修正拒绝采样和正确性证明 → 用两个大小不同的GPT-2实现一遍，统计接受率与加速比。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2302.01318" rel="noopener">https://arxiv.org/abs/2302.01318</a>（标题、六位作者、v1日期2023-02-02；摘要：草稿模型生成短续写、并行打分的延迟与采样单个词相当、新的修正拒绝采样在硬件数值精度内保持目标分布、Chinchilla 70B分布式设置下2–2.5倍加速、无需修改模型。接受概率公式与修正分布的写法、K个全接受时多采一词、机构为DeepMind按一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DeepMind%E6%8E%A8%E6%B5%8B%E9%87%87%E6%A0%B7%EF%BC%88speculative-sampling%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aspeculative-sampling%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/speculative-sampling.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="peft-lib.html"><small>本分支上一个 · 2023.02</small><b>Hugging Face PEFT库</b></a><a class="r" href="pytorch-2.html"><small>本分支下一个 · 2023.03</small><b>PyTorch 2与torch.compile</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

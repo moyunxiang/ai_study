@@ -1,0 +1,31 @@
+{
+  "id": "kcf",
+  "who": "João F. Henriques, Rui Caseiro, Pedro Martins, Jorge Batista · 科英布拉大学",
+  "venue": "TPAMI 2015",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1404.7584"},
+    {"label": "作者主页", "url": "https://www.robots.ox.ac.uk/~joao/circulant/"}
+  ],
+  "aka": ["KCF", "核相关滤波", "Kernelized Correlation Filters", "DCF", "相关滤波跟踪", "correlation filter tracking", "循环矩阵"],
+  "problem": "单目标跟踪器要在线训练一个分类器区分目标和背景，样本越多越准，但把目标周围成千上万个平移后的图块都当训练样本，存储和计算都吃不消，只能随机抽一小部分。",
+  "idea": "注意到目标图块的所有循环平移版本组成一个**循环矩阵**，而循环矩阵能被离散傅里叶变换对角化。于是“用全部平移样本训练岭回归”可以在频域里逐元素完成，核化之后复杂度也不变。",
+  "impact": "KCF以几百帧每秒的速度超过当时排名靠前的跟踪器，让相关滤波在2014–2017年成为单目标跟踪的主流路线，直到[[siamfc]]等孪生网络方法接棒。",
+  "method": "设目标图块为向量x，把它循环平移所有可能的位移，堆成矩阵X，每一行是一个训练样本；标签y是以目标中心为峰的高斯，越偏离中心越接近0。岭回归的解是 `w = (XᵀX + λI)⁻¹ Xᵀ y`。\n\n关键观察：X是循环矩阵，`X = F diag(x̂) Fᴴ`，其中F是DFT矩阵、x̂是x的傅里叶变换。代入后矩阵求逆变成逐元素除法：\n\n`ŵ = (x̂* ⊙ ŷ) / (x̂* ⊙ x̂ + λ)`\n\n复杂度从 `O(n³)` 降到FFT的 `O(n log n)`。作者指出这时的线性回归恰好等价于MOSSE等快速跟踪器使用的相关滤波器。\n\n对核岭回归，只要核函数（如高斯核）对循环平移保持不变，核矩阵同样是循环矩阵，对偶系数 `α̂ = ŷ / (k̂^{xx} + λ)`，复杂度与线性版本完全相同，这就是**KCF**。用线性核并支持多通道特征（如[[hog]]）的快速版本称为**DCF**。检测时在新帧的搜索区域上算一次响应图，峰值位置就是目标的新位置，然后用新样本以滑动平均更新模型。\n\n摘要称KCF和DCF在50个视频的基准上都超过了Struck、TLD等排名靠前的跟踪器，速度达每秒数百帧，核心算法只要几行代码。",
+  "legacy": "之后的SAMF、DSST加入尺度估计，SRDCF、C-COT、ECO用空间正则化和深度特征进一步提高精度；2016年起[[siamfc]]等离线训练的孪生网络在速度和精度上逐渐取代了在线学习的相关滤波。",
+  "limits": [
+    {"text": "循环平移会在图块边界产生不真实的拼接样本（边界效应），目标快速运动或出视野时容易丢。", "solved_by": ["siamfc"]},
+    {"text": "模型只在线学习单一目标的外观，难以处理尺度剧烈变化、长期遮挡和外观大变化。", "solved_by": ["siamfc", "cotracker"]}
+  ],
+  "relations": [
+    {"to": "kernel-trick", "type": "uses", "note": "用核岭回归代替线性回归，并证明在循环结构下核化不增加复杂度。"},
+    {"to": "hog", "type": "uses", "note": "DCF/KCF的多通道版本用HOG特征代替原始像素，精度明显提高。"},
+    {"to": "lucas-kanade", "type": "rivals", "note": "Lucas–Kanade式跟踪靠局部梯度做图像对齐；KCF转为在线判别式学习，用目标与背景的分类来定位。"}
+  ],
+  "prereq": ["fourier-transform", "linear-regression", "kernel-trick", "regularization", "vector-matrix"],
+  "terms": [
+    {"t": "循环矩阵", "d": "每一行都是上一行向右循环移一位得到的矩阵，可以被傅里叶变换对角化。"},
+    {"t": "相关滤波", "d": "学一个模板，与图像做相关运算后在目标位置产生最大响应的跟踪方法。"}
+  ],
+  "learn": "先复习岭回归和离散傅里叶变换，再读论文第3–5节从循环矩阵推到KCF的过程；照着Algorithm 1用NumPy写一个几十行的跟踪器，在一段视频上跑。",
+  "check": {"source": "https://arxiv.org/abs/1404.7584", "confirmed": "arXiv记录：标题、四位作者、v1提交于2014-04-30；摘要中平移样本的冗余、数据矩阵是循环矩阵可用DFT对角化、线性回归等价于相关滤波、核化的KCF与线性版复杂度相同、多通道线性核版DCF、在50视频基准上超过Struck和TLD、每秒数百帧、Algorithm 1几行代码。频域闭式解公式、TPAMI 2015、机构、后续方法名凭一般了解写。"}
+}

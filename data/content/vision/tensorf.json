@@ -1,0 +1,31 @@
+{
+  "id": "tensorf",
+  "who": "Anpei Chen, Zexiang Xu, Andreas Geiger, Jingyi Yu, Hao Su · 上海科技大学 / Adobe Research / 图宾根大学 / 加州大学圣地亚哥分校",
+  "venue": "ECCV 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2203.09517"},
+    {"label": "项目页", "url": "https://apchenstu.github.io/TensoRF/"}
+  ],
+  "aka": ["TensoRF", "张量辐射场", "Tensorial Radiance Fields", "VM分解", "vector-matrix decomposition", "CP分解"],
+  "problem": "[[nerf]]用一个大MLP表示整个场景，训练要一两天；[[plenoxels]]等直接优化体素网格的方法快得多，但每个体素都存特征，显存和模型体积随分辨率立方增长。",
+  "idea": "把场景看成一个4D张量（三维体素网格×每格多通道特征），用低秩张量分解把它压缩成若干个向量和矩阵的乘积。查询一个点时只需在几条一维向量和二维矩阵上插值再相乘，既快又省内存。",
+  "impact": "TensoRF把经典的张量分解引入辐射场，几分钟到半小时就能重建、模型只有几到几十MB；“三平面/平面分解”的思路后来在K-Planes、动态场景表示和三维生成里被广泛使用。",
+  "method": "体素网格的特征张量记为 `T ∈ R^{X×Y×Z×C}`。直接存它要 `XYZC` 个数。TensoRF给出两种分解：\n\n- **CP分解**：`T ≈ Σ_r v_r^X ∘ v_r^Y ∘ v_r^Z ∘ b_r`，每个分量是三条长度为X、Y、Z的向量和一条通道向量的外积。存储从立方级降到线性级。\n- **VM（向量－矩阵）分解**：作者新提出的形式，每个分量是“一条轴上的向量 × 另两条轴组成的平面矩阵”，例如 `v_r^Z ∘ M_r^{X,Y}`，三个方向轮流。它放宽了两个维度的低秩约束，表达力比CP强，存储仍远小于稠密网格。\n\n查询点(x, y, z)时，在各向量上做一维线性插值、在各矩阵上做二维双线性插值，按分解公式组合得到密度和外观特征；外观特征再经一个很小的MLP或球谐函数解码成与视角相关的颜色，然后照常体渲染。训练中从低分辨率网格开始逐步上采样。\n\n摘要报告：CP版本重建不到30分钟、模型小于4 MB，渲染质量就优于原始NeRF；VM版本质量进一步提升、超过之前的最好方法，重建时间不到10分钟、模型小于75 MB。",
+  "legacy": "TensoRF与[[instant-ngp]]的哈希编码、[[plenoxels]]的稀疏体素一起，代表了2022年“显式或混合表示加速辐射场”的三条路线；之后[[3dgs]]用显式高斯取得实时渲染，成为主流。平面分解被EG3D之后的三平面三维生成和K-Planes等动态表示继承。",
+  "limits": [
+    {"text": "分解基于固定的轴对齐包围盒，处理无边界的大场景需要额外的空间变换。", "solved_by": ["zip-nerf"]},
+    {"text": "仍需沿射线密集采样体渲染，渲染远达不到实时。", "solved_by": ["3dgs"]}
+  ],
+  "relations": [
+    {"to": "nerf", "type": "solves", "note": "NeRF的大MLP训练慢；TensoRF用分解后的张量网格存特征，重建时间从一两天降到十分钟级。"},
+    {"to": "plenoxels", "type": "solves", "note": "Plenoxels直接存每个体素的特征，内存随分辨率立方增长；低秩分解把模型压到几到几十MB。"},
+    {"to": "instant-ngp", "type": "rivals", "note": "同期都用显式结构加速辐射场：Instant-NGP用多分辨率哈希表，TensoRF用张量分解。"}
+  ],
+  "prereq": ["3d-representation", "volume-rendering", "low-rank", "eigen-svd", "mlp"],
+  "terms": [
+    {"t": "张量分解", "d": "把一个高维数组写成若干个低维向量或矩阵乘积之和，就像矩阵的低秩分解推广到多维。"},
+    {"t": "CP分解", "d": "把张量表示为多个“每个维度一条向量”的外积之和，是最经典的张量分解形式。"}
+  ],
+  "learn": "先复习矩阵的SVD和低秩近似，再读TensoRF第4节CP与VM分解的示意图；用官方代码在NeRF合成数据集上训练一个场景，比较CP与VM的训练时间和模型大小。",
+  "check": {"source": "https://arxiv.org/abs/2203.09517", "confirmed": "arXiv记录：标题、五位作者、v1提交于2022-03-17；摘要中4D场景张量、低秩分解、CP分解、新提出的VM分解、内存占用显著更低、CP版本<30分钟与<4 MB且优于NeRF、VM版本<10分钟与<75 MB并超过之前最好方法。分解公式写法、插值与上采样策略、ECCV 2022、机构、K-Planes/EG3D等后续凭一般了解写。"}
+}

@@ -1,0 +1,32 @@
+{
+  "id": "e-branchformer",
+  "who": "Kwangyoun Kim, Felix Wu, Yifan Peng, Jing Pan, Prashant Sridhar, Kyu J. Han, Shinji Watanabe · ASAPP、CMU",
+  "venue": "SLT 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2210.00077"},
+    {"label": "Branchformer (arXiv)", "url": "https://arxiv.org/abs/2207.02971"}
+  ],
+  "problem": "Conformer把卷积和自注意力串起来，是识别编码器的事实标准；各种并联两者的替代结构一直追不上它。",
+  "idea": "沿用Branchformer的双分支（一支自注意力看全局，一支卷积门控MLP看局部），把两支的合并从简单加权改成带深度卷积的合并模块，并在前后各加一个前馈层。",
+  "impact": "E-Branchformer在不用外部数据的LibriSpeech上报出当时最低词错误率，随后成为ESPnet里与Conformer并列的常用编码器，开放复现Whisper的OWSM v3.1也改用它。",
+  "method": "[[conformer]]的每一层按顺序做「前馈→自注意力→卷积→前馈」。同一实验室几个月前提出的Branchformer换了个思路：每层分成两个**并联分支**，一支用自注意力（见[[c:self-attention]]）捕捉长距离依赖，另一支用带卷积门控的MLP（cgMLP）提取局部模式，最后把两支的输出加权求和。并联的好处是结构可解释（看合并权重就知道每层偏向局部还是全局），也方便推理时裁掉一支省算力；但精度只是与Conformer打平。\n\nE-Branchformer做了两处改动。一是**增强合并**：不再只做线性加权，而是把两支输出拼接后先过一个深度可分离卷积，再投影回原维度，让局部和全局信息在合并时还能再交互一次。二是仿照Conformer的「马卡龙」结构，在双分支模块前后各加一个逐点前馈模块。\n\n摘要报告，不用任何外部训练数据时，E-Branchformer在LibriSpeech test-clean和test-other上的词错误率（见[[c:word-error-rate]]）为1.81%和3.65%，是当时的新纪录。它被直接集成进[[espnet]]，后来卡内基梅隆大学的开放Whisper式模型（[[owsm]]的v3.1版）也换成了E-Branchformer编码器。",
+  "limits": [
+    {"text": "和Conformer一样依赖全局自注意力，长音频的计算量随长度平方增长，流式部署需要额外改造。", "solved_by": ["zipformer"]},
+    {"text": "比Conformer多了合并卷积和额外前馈层，参数和计算量在同等层数下更大，主要收益集中在中小规模有监督训练。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "conformer", "type": "rivals", "note": "同样融合卷积与自注意力，Conformer是串联，E-Branchformer是并联加增强合并，在LibriSpeech上首次明显超过前者。"},
+    {"to": "espnet", "type": "uses", "note": "在ESPnet工具包里实现和发布，成为其中常用的编码器选项。"},
+    {"to": "transformer", "type": "extends", "note": "保留Transformer的自注意力分支，再并联一个专管局部模式的卷积分支。"}
+  ],
+  "prereq": ["self-attention", "conv-layer", "transformer-block", "word-error-rate", "waveform-spectrogram"],
+  "terms": [
+    {"t": "cgMLP", "d": "卷积门控MLP：把特征分两半，一半经过深度卷积后作为门去乘另一半，用很少的参数提取局部上下文。"},
+    {"t": "深度可分离卷积", "d": "先对每个通道单独做卷积、再用1×1卷积混合通道，比普通卷积便宜很多。"}
+  ],
+  "aka": ["E-Branchformer", "Branchformer", "EBF", "增强合并Branchformer"],
+  "check": {
+    "source": "https://arxiv.org/abs/2210.00077",
+    "confirmed": "arXiv官方记录：标题E-Branchformer: Branchformer with Enhanced merging for speech recognition，作者Kim/Wu/Peng/Pan/Sridhar/Han/Watanabe，v1提交2022-09-30；摘要中的增强合并、额外逐点模块、LibriSpeech 1.81%/3.65%。Branchformer（2207.02971，2022-07-06，Peng/Dalmia/Lane/Watanabe）的双分支与cgMLP、合并权重可解释见其摘要。合并模块内部细节、SLT 2022和机构为一般了解；OWSM v3.1改用E-Branchformer见下一轮核对的标题。"
+  }
+}

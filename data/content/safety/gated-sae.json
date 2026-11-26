@@ -1,0 +1,26 @@
+{
+ "id": "gated-sae",
+ "who": "Senthooran Rajamanoharan, Arthur Conmy, Lewis Smith, Tom Lieberum, Vikrant Varma, János Kramár, Rohin Shah, Neel Nanda · Google DeepMind",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2404.16014"}
+ ],
+ "aka": ["Gated SAE", "门控稀疏自编码器", "门控SAE", "shrinkage", "特征收缩"],
+ "problem": "[[sae-features]]和[[monosemanticity]]用L1惩罚让稀疏自编码器的特征尽量稀疏，但L1同时会把激活值整体往零压，系统性地低估特征强度（称为收缩），重建质量因此打折。",
+ "idea": "把编码器拆成两条路：一条“门”只决定哪些特征被激活，另一条只估计激活多大；L1惩罚只加在门上，大小的估计就不再被压低。",
+ "impact": "在同样的稀疏度下明显改善重建，是标准L1稀疏自编码器之后最早被广泛采用的改进之一，随后的[[jumprelu-sae]]沿同一思路继续简化。",
+ "method": "标准稀疏自编码器对激活x做`f = ReLU(W_enc x + b)`、`x̂ = W_dec f`，损失是重建误差加`λ‖f‖₁`。问题在于：为了降低L1，模型会让所有激活值都偏小，即便某个特征明明该强烈激活。\n\nGated SAE把编码分成两部分：\n\n- 门控：`π_gate = W_gate x + b_gate`，只用它的符号决定特征i是否打开（`π_gate > 0`）。\n- 幅度：`π_mag = W_mag x + b_mag`，经过ReLU得到打开时的大小。\n- 输出`f = 1[π_gate > 0] ⊙ ReLU(π_mag)`。\n\n为了减少参数，W_mag与W_gate共享方向，只是每个特征多一个缩放系数。L1惩罚只加在门控路径（经ReLU后）上；由于阶跃函数没有梯度，训练时再加一个辅助重建损失，让门控路径本身也能学到有意义的方向。\n\n作者在最大70亿参数的语言模型上训练，摘要称在常见超参数范围内，Gated SAE解决了收缩问题，可解释性与原方法相当，而达到相近重建质量时被激活的特征数只需一半，相对当时主流训练方法构成帕累托改进。",
+ "limits": [
+  {"text": "需要额外的辅助损失和更多参数，训练比标准SAE复杂；更好的重建与稀疏度并不等于学到的特征对下游理解或干预更有用。", "solved_by": ["jumprelu-sae", "sae-negative-results"]}
+ ],
+ "relations": [
+  {"to": "monosemanticity", "type": "solves", "note": "缓解了用L1训练稀疏自编码器时特征激活被系统性低估的收缩问题。"},
+  {"to": "sae-features", "type": "extends", "note": "沿用以稀疏字典学习分解语言模型激活的框架，只改编码器结构与惩罚方式。"}
+ ],
+ "prereq": ["autoencoder", "regularization", "neuron-activation", "feature-representation"],
+ "terms": [
+  {"t": "收缩", "d": "L1惩罚让模型倾向于把所有激活值都压小，导致特征强度被系统性低估。"},
+  {"t": "帕累托改进", "d": "在两个互相牵制的指标（这里是稀疏度和重建误差）上，至少一个更好而另一个不变差。"}
+ ],
+ "learn": "先读[[monosemanticity]]了解标准SAE → 读原文第3节Gated SAE结构与辅助损失 → 在小模型的某层激活上分别训练标准SAE和门控SAE，比较同一L0下的重建误差与激活值大小。",
+ "check": {"source": "https://arxiv.org/abs/2404.16014", "confirmed": "arXiv记录：标题、8位作者、2024-04-24 v1；摘要所述SAE做稀疏线性重建、L1带来收缩等偏差、把“选哪些方向”和“估计大小”分开、L1只作用于前者、在最大7B参数的模型上训练、解决收缩、可解释性相近、达到相近重建只需一半激活特征、帕累托改进。门控与幅度的公式、权重共享与辅助损失、机构凭一般了解写。"}
+}

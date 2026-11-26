@@ -1,0 +1,31 @@
+{
+  "id": "minkowskinet",
+  "who": "Christopher Choy, JunYoung Gwak, Silvio Savarese · 斯坦福大学",
+  "venue": "CVPR 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1904.08755"},
+    {"label": "代码", "url": "https://github.com/NVIDIA/MinkowskiEngine"}
+  ],
+  "aka": ["MinkowskiNet", "Minkowski Engine", "MinkowskiEngine", "广义稀疏卷积", "generalized sparse convolution", "稀疏卷积", "sparse convolution", "4D时空卷积"],
+  "problem": "三维扫描场景大部分空间是空的。把点云体素化后直接做稠密三维卷积（[[voxnet]]式）浪费巨大、分辨率上不去；逐点网络（[[pointnet2]]、[[dgcnn]]）在几十万点的室内场景上又很慢。",
+  "idea": "把点云存成**稀疏张量**：只记录非空体素的坐标和特征，卷积只在这些坐标上算。作者把它推广成“广义稀疏卷积”，适用于任意维度和任意卷积核形状，并开源了自动微分库Minkowski Engine，可以直接搭三维乃至四维（三维空间＋时间）卷积网络。",
+  "impact": "Minkowski Engine与同期的SparseConvNet一起让稀疏卷积成为大规模三维场景分割、检测的主力骨干；MinkUNet长期是ScanNet等室内场景分割的标准基线。",
+  "method": "稀疏张量用两张表表示：坐标表C（每个非空体素的整数坐标，如(x, y, z, t)）和特征表F（对应体素的特征向量）。广义稀疏卷积对每个输出坐标u计算\n\n`x_u' = Σ_{i ∈ N(u, C_in)} W_i · x_{u+i}`\n\n只对卷积核偏移集合N里、且输入坐标确实存在的位置求和。这样可以让输出坐标与输入相同（不让稀疏区域向空处扩散，保持稀疏），也可以做带步长的下采样和转置卷积上采样，从而搭出类似[[unet]]的编码器－解码器。卷积核的形状可以随意定义：作者为四维时空数据提出**混合核**，空间维用立方体、时间维用十字形，避免核大小随维数指数增长。\n\n为保证一段三维视频在空间、时间和颜色上一致，作者还提出在“空间－时间－颜色”7维空间里做条件随机场（trilateral-stationary CRF）。\n\n摘要称只用广义三维稀疏卷积的网络在多个三维语义分割基准上大幅超过二维或二维三维混合方法；在三维视频上，四维时空卷积网络对噪声更鲁棒，优于三维网络，某些情况下还更快。",
+  "legacy": "稀疏卷积骨干被广泛用于室内场景分割、三维检测和激光雷达感知（如[[centerpoint]]使用的稀疏体素骨干）；之后[[point-transformer-v3]]等点云Transformer借鉴了稀疏体素的序列化和分组，在多个基准上与之竞争。",
+  "limits": [
+    {"text": "体素化会丢掉体素内部的细节，分辨率与显存之间需要权衡；卷积的感受野局部，长距离上下文要靠堆很多层。", "solved_by": ["point-transformer-v3"]}
+  ],
+  "relations": [
+    {"to": "voxnet", "type": "solves", "note": "VoxNet在稠密体素网格上做三维卷积，计算和显存随分辨率立方增长；稀疏卷积只在非空体素上计算。"},
+    {"to": "pointnet2", "type": "rivals", "note": "点方法直接处理点集；MinkowskiNet体素化后用稀疏卷积，在大场景分割上大幅领先。"},
+    {"to": "scannet", "type": "uses", "note": "在ScanNet等真实室内扫描数据上做三维语义分割评测。"},
+    {"to": "unet", "type": "uses", "note": "用稀疏的带步长卷积与转置卷积搭出U-Net式的编码器－解码器（MinkUNet）。"}
+  ],
+  "prereq": ["3d-representation", "conv-layer", "convolution-op", "encoder-decoder"],
+  "terms": [
+    {"t": "稀疏张量", "d": "只保存非零（非空）位置的坐标和取值的张量格式，适合大部分为空的三维体素数据。"},
+    {"t": "体素", "d": "三维空间里的小立方格，相当于三维版的像素。"}
+  ],
+  "learn": "先理解普通三维卷积和体素化，再读论文第3节稀疏张量与广义稀疏卷积的定义；安装MinkowskiEngine跑官方ScanNet分割示例，打印每一层的非空体素数量。",
+  "check": {"source": "https://arxiv.org/abs/1904.08755", "confirmed": "arXiv记录：标题、三位作者、v1提交于2019-04-18；摘要中稀疏张量、广义稀疏卷积涵盖所有离散卷积、开源自动微分库、4D时空网络、混合核、7D空间-时间-颜色的trilateral-stationary CRF、只用3D稀疏卷积的网络大幅超过2D与2D-3D混合方法、4D网络对噪声鲁棒且有时更快。卷积公式、立方体/十字形混合核细节、MinkUNet、CVPR 2019凭一般了解写。"}
+}

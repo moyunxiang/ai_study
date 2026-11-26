@@ -1,0 +1,29 @@
+{
+  "id": "paint-by-example",
+  "who": "Binxin Yang, Shuyang Gu, Bo Zhang, Ting Zhang, Xuejin Chen, Xiaoyan Sun, Dong Chen, Fang Wen · 中国科学技术大学 / 微软亚洲研究院",
+  "venue": "CVPR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2211.13227"},
+    {"label": "代码", "url": "https://github.com/Fantasy-Studio/Paint-by-Example"}
+  ],
+  "aka": ["Paint by Example", "Paint-by-Example", "示例引导编辑", "Exemplar-based Image Editing", "以图换物"],
+  "problem": "用文字描述做局部编辑（如[[blended-diffusion]]）不够精确：“一只狗”可以是任何狗，用户常常想把某张参考图里的那个具体物体放进自己的图里。",
+  "idea": "用自监督方式训练：从图里抠出一个物体当“示例”，把原位置遮掉，训练模型根据示例把它画回去；为防止模型直接复制粘贴，只用示例的压缩语义特征（信息瓶颈）并对示例做强数据增强。",
+  "impact": "论文称首次研究示例引导的图像编辑，只需一次扩散前向、无需逐图优化；“参考图换物/虚拟试穿”类工作此后大量以它为基线。",
+  "method": "Paint by Example在[[stable-diffusion]]上改造出一个修补（inpainting）模型，条件从文本换成一张示例图。\n\n**自监督训练数据**：不需要人工标注。取一张图，用检测框选出一个物体，把框里的内容裁出来作为示例，原图的框区域遮掉作为待编辑图，目标就是原图。\n\n**避免复制粘贴**：如果直接这样训练，模型会学会把示例原样贴回去，推理时换成别的示例就会产生明显的拼接痕迹。作者用两招：一是**信息瓶颈**——示例图只经[[clip]]图像编码器取一个全局特征（再经几层可学习的映射），丢掉像素级细节，模型只能理解“这是什么”，再按场景的光照、角度重新画；二是**强增强**——对示例做翻转、旋转、模糊、颜色变化等，对遮罩形状也做随机变形，让训练分布更接近真实使用时“示例与场景不匹配”的情况。\n\n推理时用户画一个任意形状的遮罩并给一张示例图，模型一次扩散采样即可完成编辑；作者还对示例条件使用[[cfg]]，以调节结果与示例的相似程度。",
+  "limits": [
+    {"text": "信息瓶颈让模型只保留示例的大致语义，具体物体的纹理、文字和身份细节常常丢失，难以做到“同一个物体”。", "solved_by": ["flux-kontext"]}
+  ],
+  "relations": [
+    {"to": "stable-diffusion", "type": "uses", "note": "以Stable Diffusion为底座改造成以示例图为条件的修补模型。"},
+    {"to": "clip", "type": "uses", "note": "用CLIP图像编码器的全局特征表示示例，形成信息瓶颈。"},
+    {"to": "blended-diffusion", "type": "solves", "note": "文本引导的局部编辑难以指定具体物体，改用示例图来精确控制编辑内容。"},
+    {"to": "cfg", "type": "uses", "note": "对示例条件使用无分类器引导，调节与示例的相似度。"}
+  ],
+  "prereq": ["diffusion-process", "guidance", "self-supervised", "data-augmentation", "latent-space"],
+  "terms": [
+    {"t": "信息瓶颈", "d": "故意只给模型一个压缩过的特征，让它拿不到可以直接照抄的细节，只能学习更高层的语义。"}
+  ],
+  "learn": "先读Stable Diffusion的修补模型 → 读本文第3节自监督数据构造、信息瓶颈与增强 → 用开源代码换不同示例，观察物体细节保留了多少。",
+  "check": {"source": "https://arxiv.org/abs/2211.13227", "confirmed": "标题、八位作者、v1日期2022-11-23、摘要中首次研究示例引导编辑、自监督训练解耦并重组源图与示例、朴素做法产生融合伪影、信息瓶颈与强增强避免复制粘贴、任意形状遮罩、对示例使用无分类器引导、单次前向无需迭代优化；机构、CVPR 2023、CLIP全局特征、检测框构造数据的细节来自一般了解"}
+}

@@ -1,0 +1,31 @@
+{
+  "id": "groma",
+  "aka": ["Groma", "局部化视觉分词", "Localized Visual Tokenization", "区域token", "Groma Instruct"],
+  "who": "Chuofan Ma, Yi Jiang, Jiannan Wu, Zehuan Yuan, Xiaojuan Qi · 香港大学、字节跳动",
+  "venue": "ECCV 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2404.13013"},
+    {"label": "项目页", "url": "https://groma-mllm.github.io/"}
+  ],
+  "problem": "多模态大模型做指代和定位，要么让语言模型逐字吐出框坐标（不擅长精确数值），要么外接检测模块；定位能力和模型结构结合得不自然。",
+  "idea": "在视觉分词阶段就先把图像拆成一组候选区域，每个区域编码成一个区域token；用户提到或模型回答里引用某个区域时，直接用这个token，定位就变成“选token”。",
+  "impact": "提出“把定位放进图像分词”的思路，在标准指代与定位基准上优于让语言模型输出坐标或依赖外部模块的方法。",
+  "method": "当时让多模态大模型具备定位能力主要有两条路：[[shikra]]、[[kosmos-2]]、[[ferret]]等把框坐标写成文本或位置token，让语言模型逐个生成数字；另一些方法把语言模型的输出交给外接检测或分割模块。前者要求语言模型精确输出数值，后者则让系统变得拼凑。\n\nGroma的做法是**局部化视觉分词**：图像先经视觉编码器，再由一个区域提议器找出图中可能的物体区域（感兴趣区域），每个区域的特征被编码成一个区域token，和整图token一起送进语言模型。用户问“<region_3>里的人在做什么”时，区域token直接出现在指令里；模型回答“那只猫<region_7>”时，引用一个区域token就等于给出了它的框。这样，定位精度主要由区域提议器负责，语言模型只需要学会挑选。\n\n为了训练有依据的对话能力，作者借助[[gpt-4v]]和视觉提示技术整理了一个带区域对应的指令数据集。摘要报告，Groma在标准指代与定位基准上一致优于依赖语言模型或外部模块定位的多模态大模型。",
+  "limits": [
+    {"text": "能定位的范围取决于区域提议器给出的候选框，提议器漏掉的物体就无法被引用。", "solved_by": []},
+    {"text": "区域token只给出框，不能直接输出像素级掩码，需要分割时还得另外接解码器。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ferret", "type": "rivals", "note": "Ferret用混合区域表示并让语言模型输出坐标；Groma把区域放进分词阶段，回答时引用区域token。"},
+    {"to": "shikra", "type": "solves", "note": "避免了Shikra让语言模型逐字输出坐标数字导致的定位不精确。"},
+    {"to": "kosmos-2", "type": "rivals", "note": "Kosmos-2把坐标量化为位置token，Groma则以检测出的区域本身为token。"},
+    {"to": "gpt-4v", "type": "uses", "note": "借助GPT-4V和视觉提示生成带区域对应的指令数据。"},
+    {"to": "deformable-detr", "type": "uses", "note": "区域提议器采用Deformable DETR式的检测结构（一般了解）。"}
+  ],
+  "prereq": ["vision-tasks", "iou-map", "tokenization", "instruction-tuning", "embedding"],
+  "terms": [
+    {"t": "区域token", "d": "把图像中一个候选物体区域的特征压成一个token放进语言模型的序列里，用户和模型都可以用它指代该区域。"}
+  ],
+  "learn": "先对比[[shikra]]和[[kosmos-2]]两种“把坐标变成文本”的做法，再读Groma第3节的区域分词和引用机制。",
+  "check": {"source": "https://arxiv.org/abs/2404.13013", "confirmed": "标题、五位作者、arXiv v1提交2024-04-19；摘要中区域描述与视觉定位能力、局部化视觉分词把图像分解为感兴趣区域并编码为区域token、区域token进入指令与回答、借助GPT-4V与视觉提示整理定位指令数据、在标准指代与定位基准上优于依赖语言模型或外部模块的MLLM。Deformable DETR式提议器、机构、ECCV 2024为一般了解，未逐项核对。"}
+}

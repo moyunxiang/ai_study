@@ -1,0 +1,30 @@
+{
+  "id": "r-fcn",
+  "who": "Jifeng Dai, Yi Li, Kaiming He, Jian Sun · 微软亚洲研究院 / 清华大学",
+  "venue": "NIPS 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1605.06409"},
+    {"label": "代码", "url": "https://github.com/daijifeng001/r-fcn"}
+  ],
+  "aka": ["R-FCN", "位置敏感得分图", "position-sensitive score maps", "PSRoI池化", "position-sensitive RoI pooling"],
+  "problem": "[[faster-rcnn]]在每个候选框上都要单独跑一段子网络，候选框有几百个，这部分重复计算拖慢了速度；而直接把全卷积的分类网络拿来做检测又会丢掉“物体在框里哪个位置”的信息。",
+  "idea": "让几乎全部计算在整张图上共享：最后一层卷积输出k×k组“位置敏感得分图”，每组只负责物体的一个相对位置（左上、正中……），每个候选框只做一次几乎不花算力的池化和投票。",
+  "impact": "把两阶段检测器的区域子网络压到几乎为零，在同等精度下比Faster R-CNN快数倍；位置敏感池化的思路后来被实例分割和可变形卷积等工作沿用。",
+  "method": "两阶段检测器的矛盾在于：分类网络希望**平移不变**（猫往右挪一点仍是猫），检测却需要**平移敏感**（框往右挪一点就该判为不准）。Faster R-CNN的做法是把ResNet切成两半，后半段对每个候选框单独跑一遍，以此恢复位置信息，代价是几百次重复计算。\n\nR-FCN把整个ResNet都留在共享部分，只在最后加一层卷积，为C个类别（加背景）各输出k×k张得分图（例如k=3，一共9张对应“左上、上中、右上……右下”）。对一个候选框，把它也划成k×k格，第(i,j)格只去第(i,j)组得分图上做平均池化——这就是**位置敏感RoI池化**。9个格子的得分再取平均投票，得到这个框属于各类的分数；框回归用同样的方式另开一组得分图。这样每个候选框的额外计算只剩池化和求平均。\n\n摘要报告用101层[[resnet]]在PASCAL VOC 2007上取得83.6% mAP，测试时每张图170毫秒，比对应的Faster R-CNN快2.5到20倍。",
+  "legacy": "R-FCN是2016–2017年两阶段检测的常用强基线；同一团队把位置敏感思想用到实例分割（FCIS）和[[deformable-conv]]的可变形PSRoI池化。随后[[fpn]]、[[retinanet]]等多尺度和单阶段方法成为主流，R-FCN逐渐退出一线比较。",
+  "limits": [
+    {"text": "仍依赖RPN候选框和锚框，且得分图数量随类别数×k²增长，类别多时显存开销大。", "solved_by": ["fcos", "detr"]},
+    {"text": "只在单一尺度特征图上检测，小物体效果不好。", "solved_by": ["fpn"]}
+  ],
+  "relations": [
+    {"to": "faster-rcnn", "type": "solves", "note": "Faster R-CNN对每个候选框重复跑后半段网络；R-FCN用位置敏感得分图把这部分计算移到全图共享，速度快2.5–20倍。"},
+    {"to": "resnet", "type": "uses", "note": "以101层ResNet为全卷积骨干，整张网络除最后一层外都在全图共享。"},
+    {"to": "fcn", "type": "extends", "note": "把全卷积的思路从分割推广到区域级检测，用位置敏感得分图补回检测需要的平移敏感性。"}
+  ],
+  "prereq": ["vision-tasks", "conv-layer", "anchor-nms", "iou-map"],
+  "terms": [
+    {"t": "位置敏感得分图", "d": "每张图只回答“物体的某个相对部位（如左上角）是否在这里”，k×k张合起来描述物体的空间布局。"}
+  ],
+  "learn": "先理解Faster R-CNN的RPN和RoI池化，再读R-FCN第2节的位置敏感RoI池化示意图；自己用3×3格子画一个候选框，手算一次投票过程。",
+  "check": {"source": "https://arxiv.org/abs/1605.06409", "confirmed": "arXiv记录：标题、四位作者、v1提交于2016-05-20；摘要中的位置敏感得分图、平移不变与平移敏感的矛盾、101层ResNet、VOC 2007上83.6% mAP、170 ms每张、比Faster R-CNN快2.5–20倍。k=3示例、NIPS 2016、机构、FCIS等后续凭一般了解写。"}
+}

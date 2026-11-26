@@ -1,0 +1,31 @@
+{
+  "id": "samba",
+  "who": "Liliang Ren, Yang Liu, Yadong Lu, Yelong Shen, Chen Liang, Weizhu Chen · 微软、伊利诺伊大学厄巴纳-香槟分校",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2406.07522"},
+    {"label": "GitHub", "url": "https://github.com/microsoft/Samba"}
+  ],
+  "aka": ["Samba", "Mamba+滑窗注意力", "SWA混合", "Samba-3.8B"],
+  "problem": "全注意力的计算随长度平方增长、训练长度之外外推能力差；纯状态空间模型（如Mamba）是线性时间的，但把历史压进固定大小的状态后，难以精确回忆很久之前的具体内容。",
+  "idea": "逐层交替堆叠Mamba层和滑动窗口注意力（SWA）层（中间配MLP）：Mamba负责把整段历史压缩成循环状态，SWA只看最近一段窗口、负责精确回忆近处内容，整体保持线性时间。",
+  "impact": "以3.8B参数、3.2万亿token的规模说明这种简单的层间混合在常规基准和长上下文外推上都能胜过同规模Transformer，是2024年“SSM＋局部注意力”混合架构的代表之一。",
+  "method": "背景：[[mamba]]用输入相关的选择性状态空间做到线性时间序列建模，但它的状态大小固定，长距离的精确检索（如在长文中找一串密码）不如注意力；[[longformer]]、[[mistral-7b]]用的滑动窗口注意力只看最近的若干token，也是线性的，但看不到窗口外。[[jamba]]则把Mamba和全注意力层混合。\n\n**Samba**的结构很简单：按“Mamba → MLP → SWA → MLP”的模式逐层重复。Mamba层提供对整个历史的压缩记忆和隐式位置信息，SWA层（窗口2048）在局部做精确的内容寻址，两者互补。因为没有任何全注意力层，计算和显存都随长度线性增长，推理时状态大小固定，可以无限流式生成。\n\n结果：作者把Samba扩展到38亿参数、3.2万亿训练token，摘要称在多种基准上显著超过当时最好的同规模模型。只在4K长度上预训练，零样本困惑度在长达100万token时仍持续改善；只用4K长度的数据微调后，就能外推到256K长度并在密码检索（Passkey Retrieval）任务上完全召回，在更难的电话簿检索任务上也优于全注意力模型。对128K长度的提示，吞吐量是使用GQA的Transformer的3.73倍；流式生成64K token时提速3.64倍。",
+  "limits": [
+    {"text": "没有全局注意力层，需要在很长距离上精确比对多处内容的任务（多跳检索、长文多处引用）仍受限于固定大小的状态；窗口外的信息只能靠Mamba的压缩记忆。", "solved_by": ["qwen3-next", "kimi-linear"]},
+    {"text": "层的排列方式和混合比例靠经验搜索，什么样的混合在更大规模上最优没有统一答案。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mamba", "type": "uses", "note": "Mamba层负责把整段历史压缩成循环状态。"},
+    {"to": "longformer", "type": "uses", "note": "滑动窗口注意力的思路来自Longformer等局部注意力工作，负责精确回忆最近内容。"},
+    {"to": "jamba", "type": "rivals", "note": "Jamba混合Mamba与全注意力，Samba只用滑窗注意力，保持严格线性复杂度并强调长度外推。"},
+    {"to": "phi-3", "type": "uses", "note": "同属微软团队，训练数据和评测设置与Phi-3系列一致（3.8B规模、3.2T token）。"}
+  ],
+  "prereq": ["state-space-model", "self-attention", "efficient-attention", "context-window", "perplexity"],
+  "terms": [
+    {"t": "滑动窗口注意力（SWA）", "d": "每个token只关注它之前固定长度窗口内的token，计算量随长度线性增长。"},
+    {"t": "密码检索（Passkey Retrieval）", "d": "在一大段无关文字里藏一串数字，测试模型能否在长上下文中准确找回它。"}
+  ],
+  "learn": "先读[[mamba]]和[[longformer]]；读原文第2节结构图和第4节长度外推实验；动手：用开源代码训练一个小Samba和同规模Transformer，在训练长度的4倍处比较困惑度。",
+  "check": {"source": "https://arxiv.org/abs/2406.07522", "confirmed": "标题、6位作者、arXiv v1提交日2024-06-11；摘要中逐层混合Mamba与滑窗注意力、3.8B参数3.2T token、4K预训练零样本困惑度到1M仍改善、4K微调外推到256K且密码检索完美召回、电话簿任务优于全注意力、128K提示吞吐3.73倍于GQA Transformer、64K流式生成提速3.64倍。层排列顺序、窗口2048、与Phi-3数据一致、ICLR 2025为一般了解。"}
+}
