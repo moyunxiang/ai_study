@@ -1,0 +1,32 @@
+{
+  "id": "zoedepth",
+  "who": "Shariq Farooq Bhat, Reiner Birkl, Diana Wofk, Peter Wonka, Matthias Müller · KAUST / 英特尔",
+  "venue": "arXiv 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2302.12288"},
+    {"label": "代码", "url": "https://github.com/isl-org/ZoeDepth"}
+  ],
+  "aka": ["ZoeDepth", "ZoeD-M12-NK", "度量区间模块", "metric bins module", "相对+度量深度", "零样本度量深度"],
+  "problem": "单目深度分成两派：[[midas]]这类相对深度模型跨数据集泛化好但没有尺度；[[adabins]]这类度量深度模型有米制单位，却只在训练它的数据集上好用。",
+  "idea": "先在12个数据集上用相对深度预训练（MiDaS式），再在少量带米制真值的数据上微调，每个领域配一个轻量的度量区间头，推理时由一个分类器自动把图片路由到合适的头。",
+  "impact": "摘要称这是第一个把相对深度的泛化能力和度量尺度结合起来的方法；它成为2023年零样本度量深度的主要对照，[[depth-anything]]的度量版本也用ZoeDepth框架微调。",
+  "method": "ZoeDepth分两步：\n\n- **相对深度预训练**：骨干网络和解码器沿用[[midas]] v3.1（[[dpt]]结构），在12个数据集上用仿射不变损失训练，只学“谁远谁近”，因此能利用尺度互不兼容的大量数据。\n- **度量微调**：在室内（NYU Depth v2）和室外（KITTI）带米制真值的数据上微调，每个领域在解码器上接一个**度量区间模块**。它继承[[adabins]]的思路，把深度范围划成区间、像素深度是区间中心的加权和，但区间中心在解码器的多个层级上逐级调整（论文称bin adjustment），而不是一次预测。\n\n推理时，一个基于隐特征的小分类器判断输入更像室内还是室外，把图片送到对应的头。旗舰模型ZoeD-M12-NK即“12个数据集预训练、NYU和KITTI两个数据集微调”。摘要报告：不做预训练也已经提升NYU Depth v2上的最好结果；加上12数据集预训练再在NYU上微调，相对绝对误差（REL）共改善21%；它还能同时在NYU和KITTI上联合训练而不明显掉点，并在8个未见过的室内外数据集上取得前所未有的零样本泛化。",
+  "legacy": "之后的[[metric3d]]用标准相机空间、[[unidepth]]直接预测相机，[[depth-pro]]和[[depth-anything-v2]]把零样本度量深度做到更通用；“先学相对深度再接度量头”的两段式在不少下游工作中仍在使用。",
+  "limits": [
+    {"text": "度量尺度只来自少数几个微调数据集，按“室内/室外”二选一路由，遇到焦距或场景差异很大的照片尺度仍会偏。", "solved_by": ["metric3d", "unidepth"]},
+    {"text": "依赖相机内参与训练集相近的隐含假设，没有显式建模相机。", "solved_by": ["unidepth", "depth-pro"]}
+  ],
+  "relations": [
+    {"to": "midas", "type": "uses", "note": "以MiDaS（DPT结构）的相对深度预训练为起点，继承其跨数据集泛化能力。"},
+    {"to": "adabins", "type": "extends", "note": "度量区间模块继承AdaBins的自适应区间与软组合，并改为在解码器多个层级上逐级调整区间。"},
+    {"to": "dpt", "type": "uses", "note": "骨干与解码器采用DPT式的ViT稠密预测结构。"},
+    {"to": "nyu-depth-v2", "type": "uses", "note": "室内度量微调与评测数据。"}
+  ],
+  "prereq": ["vision-tasks", "pretrain-finetune", "zero-few-shot", "distribution-shift", "camera-geometry"],
+  "terms": [
+    {"t": "相对深度", "d": "只确定远近顺序和比例、不确定绝对尺度的深度，可能整体差一个缩放和偏移。"},
+    {"t": "REL", "d": "相对绝对误差：每个像素预测深度与真值之差的绝对值除以真值，再取平均。"}
+  ],
+  "learn": "先读MiDaS理解仿射不变损失为什么能混合数据集，再读ZoeDepth第3节度量区间模块与路由；用官方模型对一张室内图和一张街景图输出米制深度，检查尺度是否合理。",
+  "check": {"source": "https://arxiv.org/abs/2302.12288", "confirmed": "arXiv记录：标题、五位作者、v1提交于2023-02-23；摘要中的相对与度量两派、首个结合两者的方法、ZoeD-M12-NK在12个数据集上相对深度预训练并在两个数据集上度量微调、每个领域轻量头与度量区间模块、隐分类器自动路由、REL共改善21%、NYU与KITTI联合训练不明显掉点、8个未见数据集零样本泛化。MiDaS v3.1/DPT骨干、Depth Anything用其框架微调、机构凭一般了解写。"}
+}

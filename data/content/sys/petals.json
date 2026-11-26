@@ -1,0 +1,25 @@
+{
+ "id": "petals",
+ "who": "Alexander Borzunov, Dmitry Baranchuk, Tim Dettmers, Max Ryabinin, Younes Belkada, Artem Chumachenko, Pavel Samygin, Colin Raffel · Yandex, 华盛顿大学, Hugging Face等",
+ "venue": "ACL 2023 Demo",
+ "aka": ["协作推理", "collaborative inference", "分布式P2P推理", "BitTorrent式推理", "众包推理"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2209.01188"},
+  {"label": "GitHub", "url": "https://github.com/bigscience-workshop/petals"}
+ ],
+ "problem": "BLOOM-176B、OPT-175B的权重已经公开下载，但普通研究者没有能装下它们的多卡服务器；卸载到内存太慢，托管API又拿不到隐藏状态和注意力，没法做研究。",
+ "idea": "把模型按层切成若干段，分给互联网上许多志愿者的消费级GPU各自托管一段；用户的请求依次穿过这些服务器完成前向计算，像BitTorrent一样拼成一个完整模型。",
+ "impact": "展示了在普通GPU和公网上跑千亿参数模型交互推理的可行性，是“去中心化推理/训练”方向常被引用的系统。",
+ "method": "Petals把一个大模型的Transformer块分给多台服务器，每台只需装下几个块（可用8比特量化进一步省显存）。客户端本地只保存词嵌入和输出层，生成每个token时把隐藏状态依次发给持有第1段、第2段……的服务器，最后在本地算出下一个词。服务器可以随时加入或掉线，客户端会重新寻找其他持有相同块的服务器继续。\n\n与只给文本输出的推理API不同，Petals暴露每一层的隐藏状态，用户可以在本地训练[[prefix-tuning]]式的软提示或[[adapters]]这类小模块，梯度会穿过远程服务器反向传回，不改动服务器上的共享权重。\n\n摘要报告：对超大模型，这种方式比卸载到内存更快，在消费级GPU上运行[[bloom]]-176B的推理约每秒1步，足以支撑许多交互式应用。",
+ "limits": [
+  {"text": "依赖志愿者节点，延迟和可用性受公网与节点掉线影响，吞吐远低于数据中心里的推理引擎；数据要经过陌生节点，隐私也无法保证。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "bloom", "type": "uses", "note": "主要演示对象是BigScience的BLOOM-176B，Petals本身也出自BigScience社区。"},
+  {"to": "zero-infinity", "type": "rivals", "note": "卸载方案把权重放到CPU内存或硬盘，在单机上可行但交互推理太慢；Petals把权重分散到多台机器的GPU上。"},
+  {"to": "8bit-optimizers", "type": "uses", "note": "借助bitsandbytes的8比特权重压缩，减少每台服务器托管一段模型所需的显存。"},
+  {"to": "adapters", "type": "uses", "note": "用户在本地训练适配器或软提示等参数高效模块，远程共享权重保持冻结。"}
+ ],
+ "prereq": ["distributed-training", "transformer-block", "peft-concept", "throughput-latency"],
+ "check": {"source": "https://arxiv.org/abs/2209.01188", "confirmed": "标题、八位作者、v1日期2022-09-02；摘要：BLOOM-176B与OPT-175B可下载但需高端硬件、卸载对交互推理太慢、API不暴露权重与注意力、多方协作推理与微调、在消费级GPU上BLOOM-176B约每秒1步、原生暴露隐藏状态以训练共享的扩展。8比特量化、断线重连、ACL 2023 Demo、机构为一般了解。"}
+}

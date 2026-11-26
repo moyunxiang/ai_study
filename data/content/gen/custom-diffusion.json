@@ -1,0 +1,29 @@
+{
+  "id": "custom-diffusion",
+  "who": "Nupur Kumari, Bingliang Zhang, Richard Zhang, Eli Shechtman, Jun-Yan Zhu · Carnegie Mellon University / Adobe Research / 清华大学",
+  "venue": "CVPR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2212.04488"},
+    {"label": "项目页", "url": "https://www.cs.cmu.edu/~custom-diffusion/"}
+  ],
+  "aka": ["Custom Diffusion", "多概念个性化", "Multi-Concept Customization"],
+  "problem": "[[dreambooth]]要微调整个模型、存一份完整权重；[[textual-inversion]]只学一个词嵌入，保真度有限；两者都很难把“我的狗”和“我的猫”两个新概念同时放进一张图里。",
+  "idea": "只微调交叉注意力里把文本映射成键和值的那两组矩阵，再加一个新词；多个概念可以一起训练，或把分别训好的权重用一个带约束的闭式优化合并。",
+  "impact": "据论文，学一个新概念约6分钟，每个概念只需存很少的参数，并能把多个个人概念组合进同一场景；“只调交叉注意力K/V”成为轻量个性化的常用基线。",
+  "method": "作者先分析微调时各层权重的变化，发现变化最大的是交叉注意力中文本侧的投影`W_k`、`W_v`——它们决定“某个词在图像里对应什么”。于是只更新这两组矩阵（只占全部参数的一小部分），并给新概念分配一个修饰词`V*`（如“V* dog”）。为防止模型忘掉“狗”这个通用概念，训练时混入从真实图库检索的同类图像做正则。\n\n**多概念**有两种做法：\n- **联合训练**：把几个概念的数据合在一起，每个概念用自己的修饰词。\n- **闭式合并**：分别训好后，求一组新的`W_k`、`W_v`，在“对原有常用词的输出保持不变”的约束下，尽量同时满足各个概念词的输出，这是一个带约束的最小二乘，可直接求解。\n\n这样就能生成“V1*狗坐在V2*椅子上”这类组合图。",
+  "limits": [
+    {"text": "组合多个外观相近的概念（如两只同类宠物）时容易混淆属性，常出现特征串到另一个物体上。", "solved_by": []},
+    {"text": "每个新概念仍需针对性地微调几分钟，不能像编码器方法那样输入一张图就立即生成。", "solved_by": ["ip-adapter", "instantid"]}
+  ],
+  "relations": [
+    {"to": "dreambooth", "type": "rivals", "note": "同为少样本个性化，DreamBooth调全部参数，本文只调交叉注意力K/V，存储和时间更省并支持多概念。"},
+    {"to": "textual-inversion", "type": "rivals", "note": "文本反演只学词嵌入，本文在加新词之外还更新少量模型参数，保真度更高。"},
+    {"to": "stable-diffusion", "type": "uses", "note": "在Stable Diffusion上微调和评测。"}
+  ],
+  "prereq": ["attention-concept", "pretrain-finetune", "embedding", "regularization", "linear-regression"],
+  "terms": [
+    {"t": "交叉注意力K/V投影", "d": "把文本token变成注意力中的键和值的两组线性矩阵，决定每个词对图像各区域的影响。"}
+  ],
+  "learn": "先读DreamBooth与文本反演 → 读本文第3节的权重变化分析与闭式合并 → 用diffusers的Custom Diffusion训练脚本学一个自己的物体。",
+  "check": {"source": "https://arxiv.org/abs/2212.04488", "confirmed": "标题、作者、v1日期2022-12-08、摘要中只优化文本条件机制中少量参数、约6分钟、多概念联合训练或闭式约束优化合并、存储与计算高效；只调K/V与检索正则的细节、CVPR 2023与机构来自一般了解"}
+}

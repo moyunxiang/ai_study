@@ -1,0 +1,28 @@
+{
+  "id": "xpos",
+  "who": "Yutao Sun, Li Dong, Barun Patra, Shuming Ma, Shaohan Huang, Alon Benhaim, Vishrav Chaudhary, Xia Song, Furu Wei · 微软",
+  "venue": "ACL 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2212.10554"}
+  ],
+  "aka": ["xPos", "XPOS", "LeX Transformer", "Length-Extrapolatable Transformer", "注意力分辨率"],
+  "problem": "Transformer在短文本上训练、在长文本上使用时效果迅速变差；RoPE等位置编码对远处token的注意力衰减不稳定，长度外推能力弱。",
+  "idea": "提出“注意力分辨率”作为外推能力的指标，在RoPE旋转之外再乘一个随相对距离指数衰减的缩放项（xPos），推理时配合分块因果注意力。",
+  "impact": "xPos的“旋转加指数衰减”设计被同一团队的RetNet直接继承，也是讨论RoPE长度外推时常被比较的变体。",
+  "method": "背景：[[rope]]把位置编码成查询和键的旋转，注意力只依赖相对距离；[[alibi]]直接给注意力分数加一个随距离线性下降的偏置，外推更好但损失部分建模能力。作者关心的是：训练用短序列，测试用长序列（长度外推）时，模型还能不能正确区分远近。\n\n他们定义**注意力分辨率**：注意力分数随相对距离增大应当单调下降，下降得越清晰，模型越能分辨位置远近。分析发现RoPE的分数随距离振荡，远处分辨率差。xPos在RoPE的旋转之外，给查询乘 `ζ^n`、给键乘 `ζ^(−m)`（n、m是位置，ζ略小于1且随维度变化），两者相乘后得到只依赖相对距离的因子 `ζ^(n−m)`，使注意力随距离平滑地指数衰减，同时保持相对位置的性质。推理阶段再用**分块因果注意力**：每个token只看当前块和前一块，进一步避免看到训练时没见过的大距离。\n\n作者在语言建模上比较多种Transformer变体，摘要称在训练长度内（内插）和超出训练长度（外推）两种设置下都表现强。",
+  "limits": [
+    {"text": "指数衰减让远处信息本身被压低，外推稳定换来的是长距离依赖变弱；主流开源LLM最终仍用RoPE加位置插值或调整基频来扩上下文，xPos没有被广泛采用。", "solved_by": ["position-interpolation", "yarn"]}
+  ],
+  "relations": [
+    {"to": "rope", "type": "extends", "note": "在RoPE的旋转上叠加随相对距离指数衰减的缩放，改善远距离注意力的稳定性。"},
+    {"to": "alibi", "type": "rivals", "note": "两者都通过让注意力随距离衰减来获得外推能力，ALiBi用线性偏置，xPos用乘性指数衰减并保留旋转。"},
+    {"to": "transformer", "type": "extends", "note": "只修改位置编码和推理时的注意力范围，模型主体仍是标准Transformer。"}
+  ],
+  "prereq": ["positional-encoding", "self-attention", "context-window", "generalization"],
+  "terms": [
+    {"t": "长度外推", "d": "在较短的序列上训练，直接在更长的序列上测试，不再额外训练。"},
+    {"t": "注意力分辨率", "d": "注意力分数随相对距离增大而单调下降的清晰程度，用来衡量模型分辨远近位置的能力。"}
+  ],
+  "learn": "先读[[rope]]和[[alibi]]；读本文注意力分辨率的定义和xPos的推导；动手：画出RoPE与xPos在不同相对距离下的期望注意力分数曲线，对比振荡与衰减。之后读[[retnet]]看它如何继承这一设计。",
+  "check": {"source": "https://arxiv.org/abs/2212.10554", "confirmed": "标题、9位作者、arXiv首次提交2022-12-20；摘要中长度外推的定义、注意力分辨率指标、显式最大化分辨率的相对位置编码、推理时分块因果注意力、内插和外推设置下表现强。ζ缩放的具体形式、ACL 2023与RetNet继承为一般了解。"}
+}

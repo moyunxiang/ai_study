@@ -1,0 +1,24 @@
+{
+ "id": "zero-infinity",
+ "who": "Samyam Rajbhandari, Olatunji Ruwase, Jeff Rasley, Shaden Smith, Yuxiong He · 微软",
+ "venue": "SC 2021",
+ "aka": ["ZeRO-Offload", "ZeRO卸载", "offload", "NVMe卸载", "CPU卸载", "异构内存训练", "GPU显存墙"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2104.07857"},
+  {"label": "DeepSpeed", "url": "https://github.com/microsoft/DeepSpeed"}
+ ],
+ "problem": "三年里最大的稠密模型增长了1000多倍，单卡显存只从16GB涨到80GB；光是把一万亿参数的模型放进去训练就要800块V100，而且要把模型代码改成复杂的多种并行组合。",
+ "idea": "把GPU显存、CPU内存和NVMe固态硬盘当成一个分层的大内存：参数、梯度和优化器状态在ZeRO切分的基础上卸载到CPU和硬盘，用的时候再按需取回GPU，并靠预取与重叠把慢速存储的带宽藏起来。",
+ "impact": "让单台DGX-2就能微调万亿参数模型，“卸载到CPU/NVMe”成为DeepSpeed的标准选项，也是后来单卡或少卡训练、推理大模型的常见手段。",
+ "method": "[[zero]]把参数、梯度和[[adam]]优化器状态切分到所有GPU上，消除了数据并行里的冗余，但总量仍要放进所有GPU显存的总和里。前作ZeRO-Offload已把优化器状态与更新放到CPU上；ZeRO-Infinity更进一步，把三类状态都可以放到CPU内存乃至NVMe上。\n\n关键设计：**无限卸载引擎**，在GPU、CPU、NVMe之间自动搬运数据，参数在某层前向或反向即将用到时才被收集到GPU，用完即释放；**以内存为中心的分块**，单个超大算子（如一个巨大的矩阵乘）拆成小块依次执行，避免一层就放不下，因而不必为此引入张量并行、改动模型代码；**带宽优化**，把取数分散到所有GPU并行读取，并让预取与计算重叠，使训练吞吐不被CPU或NVMe的带宽卡住。激活同样可以配合[[grad-checkpointing]]卸载到CPU。\n\n摘要报告：在当时的GPU集群上可以容纳数十万亿乃至上百万亿参数的模型训练；单个DGX-2节点即可微调万亿参数模型；在512块V100上维持超过25 PFLOPS（峰值的40%），并呈现超线性扩展。",
+ "limits": [
+  {"text": "数据要在PCIe和硬盘之间反复搬运，单步迭代很慢，适合“装得下”而非“训得快”；在超大规模预训练中，主流仍是张量、流水线和数据并行的组合。", "solved_by": ["fsdp"]}
+ ],
+ "relations": [
+  {"to": "zero", "type": "extends", "note": "在ZeRO三阶段切分的基础上，把被切分的状态进一步卸载到CPU内存和NVMe。"},
+  {"to": "grad-checkpointing", "type": "uses", "note": "配合激活检查点减少激活显存，并可把检查点卸载到CPU。"},
+  {"to": "v100", "type": "uses", "note": "主要实验平台是V100集群与DGX-2节点。"}
+ ],
+ "prereq": ["distributed-training", "adaptive-optimizer", "memory-bandwidth", "cpu-gpu"],
+ "check": {"source": "https://arxiv.org/abs/2104.07857", "confirmed": "标题、五位作者、v1日期2021-04-16；摘要：模型三年增长1000多倍而显存从16GB到80GB增长5倍、万亿参数需要800块V100、利用GPU/CPU/NVMe异构内存、无需重构模型代码、可容纳数十乃至上百万亿参数、单DGX-2微调万亿模型、512块V100上超过25 PFLOPS（峰值40%）与超线性扩展。无限卸载引擎、以内存为中心的分块、ZeRO-Offload前作、SC 2021为对正文与相关工作的一般了解。"}
+}

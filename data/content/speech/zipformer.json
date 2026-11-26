@@ -1,0 +1,32 @@
+{
+  "id": "zipformer",
+  "who": "Zengwei Yao, Liyong Guo, Xiaoyu Yang, Wei Kang, Fangjun Kuang, Yifan Yang, Zengrui Jin, Long Lin, Daniel Povey · 小米（k2-fsa / icefall团队）",
+  "venue": "arXiv 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2310.11230"},
+    {"label": "icefall代码", "url": "https://github.com/k2-fsa/icefall"}
+  ],
+  "problem": "[[conformer]]是最流行的识别编码器，但每一层都在同样高的帧率上计算注意力，速度慢、显存占用大。",
+  "idea": "把编码器做成类似U-Net的形状：中间几组层在更低的帧率上运行，再配合重组的模块结构、注意力权重复用、新的归一化与激活函数，以及新的优化器ScaledAdam。",
+  "impact": "Zipformer成为新一代Kaldi（k2/icefall/sherpa）工具链的默认编码器，被多种开源中英文识别模型采用，是Conformer之后被广泛比较的识别编码器之一。",
+  "method": "语音每秒有上百帧特征，而说话的信息变化没那么快，在所有层都保持高帧率是浪费。Zipformer的主要改动（摘要列出）：\n\n- **类U-Net的编码器**：若干组层依次以不同的帧率运行，中间的组降采样到更低帧率（帧数更少，注意力更便宜），最后再升回去，与[[unet]]先压缩再还原的形状类似。\n- **重组的块结构**：每个块里放更多模块，并复用同一组注意力权重给多个模块使用，省去重复计算。\n- **BiasNorm**：一种修改过的[[layernorm]]，保留部分长度信息。\n- **SwooshR和SwooshL**：新的激活函数，论文称比[[swish]]效果更好。\n- **ScaledAdam**：按每个参数张量当前的尺度缩放更新量，让相对变化大致恒定，并显式学习参数的尺度，比[[adam]]收敛更快、效果更好。\n\n论文在LibriSpeech、Aishell-1和WenetSpeech上实验，摘要称Zipformer比其他当时最好的识别模型更快、更省显存、效果更好。",
+  "limits": [
+    {"text": "引入了很多专门设计的组件（BiasNorm、Swoosh、ScaledAdam），在其他工具链里复现和调参成本较高。", "solved_by": []},
+    {"text": "仍是在几千到上万小时有标注数据上训练的专用识别模型，没有Whisper那样的大规模多语言弱监督覆盖。", "solved_by": ["canary"]}
+  ],
+  "relations": [
+    {"to": "conformer", "type": "solves", "note": "Conformer每层都在高帧率上算注意力，又慢又耗显存；Zipformer在中间层降帧率并复用注意力权重。"},
+    {"to": "unet", "type": "uses", "note": "借用U-Net先降采样再升采样的形状组织编码器各层的帧率。"},
+    {"to": "adam", "type": "extends", "note": "提出的ScaledAdam在Adam基础上按参数尺度缩放更新，并显式学习尺度。"},
+    {"to": "layernorm", "type": "extends", "note": "BiasNorm是对LayerNorm的修改，保留部分长度信息。"}
+  ],
+  "prereq": ["transformer-block", "self-attention", "conv-layer", "normalization-layer", "adaptive-optimizer", "word-error-rate"],
+  "terms": [
+    {"t": "帧率", "d": "每秒钟有多少个特征向量；降帧率就是把相邻几帧合并成一帧，序列变短，计算变少。"}
+  ],
+  "aka": ["Zipformer", "ScaledAdam", "icefall", "新一代Kaldi编码器", "k2"],
+  "check": {
+    "source": "https://arxiv.org/abs/2310.11230",
+    "confirmed": "arXiv官方记录：标题、作者Yao/Guo/Yang/Kang/Kuang/Yang/Jin/Lin/Povey、v1提交2023-10-17；摘要列出类U-Net结构、重组块与注意力权重复用、BiasNorm、SwooshR/L、ScaledAdam、LibriSpeech/Aishell-1/WenetSpeech实验、代码在k2-fsa/icefall。机构小米与成为icefall默认编码器为一般了解。"
+  }
+}

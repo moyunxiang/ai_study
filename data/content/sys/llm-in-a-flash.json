@@ -1,0 +1,23 @@
+{
+ "id": "llm-in-a-flash",
+ "who": "Keivan Alizadeh, Iman Mirzadeh, Dmitry Belenko, Karen Khatamifard, Minsik Cho, Carlo C Del Mundo, Mohammad Rastegari, Mehrdad Farajtabar · 苹果",
+ "venue": "ACL 2024",
+ "aka": ["闪存推理", "flash memory inference", "窗口化", "windowing", "行列捆绑", "row-column bundling", "手机大模型"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2312.11514"}
+ ],
+ "problem": "手机和笔记本的内存（DRAM）有限，放不下几十亿参数的模型；模型可以放在容量大得多的闪存里，但闪存读取慢，尤其不擅长大量零碎的小块随机读取。",
+ "idea": "参数平时存在闪存，按需读进内存；为闪存的读写特性建一个代价模型，用两个办法减少读取：只读这次会被激活的神经元并复用最近几个token已经读过的（窗口化），把会一起用到的行和列连续存放、一次读大块（行列捆绑）。",
+ "impact": "说明了“模型可以超过设备内存”这一端侧方向的可行性，常被视为苹果端侧大模型部署的系统研究之一，并与PowerInfer等共同推动了利用激活稀疏的端侧推理。",
+ "method": "端侧设备的DRAM往往只有几GB到十几GB，而闪存（SSD或手机存储）容量大一个数量级以上，但带宽低得多，并且读取一次的固定开销大，只有成块连续读取才快。[[flexgen]]把卸载用于服务器上的大批量吞吐，端侧需要的是单用户低延迟。\n\n作者先为闪存推理建立代价模型，结论是优化两件事：**少读**、**读大块**。少读依赖前馈层的激活稀疏：在[[opt]]、Falcon这类ReLU模型里，每个token只有很少的前馈神经元输出非零，用一个低秩预测器提前猜出哪些会激活，只从闪存读这些神经元的权重。**窗口化**进一步利用相邻token激活的神经元高度重叠，内存里保留最近k个token用过的神经元，每来一个新token只需补读新增的那一小部分。**行列捆绑**：前馈层上投影矩阵的第i列和下投影矩阵的第i行总是同时被用到，把它们拼在一起连续存储，一次读出的数据块翻倍。注意力等稠密部分则常驻内存。\n\n摘要报告：可以运行大到可用DRAM两倍的模型，相比朴素的加载方式，在CPU上推理快4–5倍，在GPU上快20–25倍。",
+ "limits": [
+  {"text": "同样依赖ReLU式激活稀疏；对SwiGLU等稠密激活的主流模型和注意力部分收益有限，模型仍需大约一半能常驻内存。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "flexgen", "type": "extends", "note": "同样把放不下的权重放到更慢的存储里按需读取，但面向端侧单用户低延迟，并针对闪存特性设计读取方式。"},
+  {"to": "opt", "type": "uses", "note": "以OPT等ReLU激活模型的前馈层稀疏性为基础做实验。"},
+  {"to": "llama-cpp", "type": "rivals", "note": "llama.cpp的思路是把模型量化到足够小以完全放进内存；本文则允许模型超过内存，靠按需从闪存读取。"}
+ ],
+ "prereq": ["neuron-activation", "mlp", "memory-bandwidth", "low-rank", "throughput-latency"],
+ "check": {"source": "https://arxiv.org/abs/2312.11514", "confirmed": "标题、八位作者、v1日期2023-12-12；摘要：参数存于闪存按需读入DRAM、考虑闪存特性的推理代价模型、减少传输量与读取更大连续块、窗口化复用已激活神经元、行列捆绑、可运行两倍于DRAM的模型、CPU上4–5倍与GPU上20–25倍于朴素加载。苹果机构、ACL 2024、低秩预测器与上/下投影行列配对、OPT与Falcon为对正文的一般了解。"}
+}

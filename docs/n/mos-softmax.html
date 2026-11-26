@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>混合Softmax（MoS）（2017） · AI脉络</title>
+<meta name="description" content="几乎所有神经语言模型最后都用「隐状态点乘词向量再softmax」输出下一个词，这相当于用一个低秩矩阵去拟合所有上下文下的词分布，而真实语言的这个矩阵很可能是高秩的。 把语言建模写成矩阵分解问题，证明单个softmax的表达能力受隐层维度限制（Softmax瓶颈）；改用K个softmax的加权混合，…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/mos-softmax.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="混合Softmax（MoS）（2017）">
+<meta property="og:description" content="几乎所有神经语言模型最后都用「隐状态点乘词向量再softmax」输出下一个词，这相当于用一个低秩矩阵去拟合所有上下文下的词分布，而真实语言的这个矩阵很可能是高秩的。 把语言建模写成矩阵分解问题，证明单个softmax的表达能力受隐层维度限制（Softmax瓶颈）；改用K个softmax的加权混合，…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/mos-softmax.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/mos-softmax">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 语言模型</div>
+<h1>混合Softmax（MoS）</h1>
+<div class="full">Breaking the Softmax Bottleneck: A High-Rank RNN Language Model</div>
+<div class="meta"><span>2017.11</span><span>论文</span><span>延伸</span><span>ICLR 2018</span><span>Zhilin Yang, Zihang Dai, Ruslan Salakhutdinov, William W. Cohen · 卡内基梅隆大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1711.03953" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/mos-softmax">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>几乎所有神经语言模型最后都用「隐状态点乘词向量再softmax」输出下一个词，这相当于用一个低秩矩阵去拟合所有上下文下的词分布，而真实语言的这个矩阵很可能是高秩的。</p></div><div><h4>方法</h4><p>把语言建模写成矩阵分解问题，证明单个softmax的表达能力受隐层维度限制（Softmax瓶颈）；改用K个softmax的加权混合，混合后的对数概率矩阵不再受这个秩上限约束。</p></div><div><h4>影响</h4><p>把PTB和WikiText-2的困惑度刷新到47.69和40.68，「Softmax瓶颈」也成为分析输出层表达能力的常用说法，后来的大模型输出层研究常引用它。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>设想一张巨大的矩阵<code>A</code>：每行是一个上下文，每列是一个词，元素是真实的条件对数概率<code>log P(w|c)</code>。用softmax的模型给出的是<code>H·Wᵀ</code>再按行归一化，其中<code>H</code>的每行是上下文的隐状态（维度d），<code>W</code>是词向量。所以模型能表示的对数概率矩阵秩至多约为<code>d+1</code>。词表有几万个词、上下文千变万化，作者论证自然语言的<code>A</code>很可能是高秩的，那么只要<code>d</code>远小于所需的秩，再怎么训练也拟合不了——这就是<b>Softmax瓶颈</b>。这个视角与<a class="ln" href="../n/levy-goldberg-pmi.html">word2vec即隐式矩阵分解</a>把词向量看作矩阵分解是一脉相承的。</p><p>解决办法是<b>混合Softmax（MoS）</b>：从同一个隐状态投影出K个不同的上下文向量<code>h_{c,k}</code>，各做一次softmax，再用由上下文决定的权重<code>π_{c,k}</code>加权平均：</p><p class="formula"><code>P(w|c) = Σ_k π_{c,k} · softmax(h_{c,k}ᵀ w)</code></p><p>混合发生在概率空间而不是对数空间，取对数后不再是低秩矩阵，表达能力因此提高。参数只多了少量投影矩阵，代价主要是要算K次softmax。</p><p>实验以<a class="ln" href="../n/awd-lstm.html">AWD-LSTM</a>为骨干。摘要报告：在Penn Treebank和<a class="ln" href="../n/wikitext.html">WikiText</a>-2上把最好困惑度推进到47.69和40.68；在十亿词基准上也比基线低5.6以上。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每一步要计算K次完整词表的softmax，输出层计算量和显存成倍增加，大词表时代价高昂。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>仍是LSTM语言模型，长距离依赖与训练并行度的限制没有改变。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/transformer-xl.html">Transformer-XL</a> <a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/awd-lstm.html">AWD-LSTM</a><span class="yr">2017.08 · NLP</span><div class=nt>指出AWD-LSTM等模型的单一softmax输出受隐层维度的秩限制，用混合softmax突破这一瓶颈并刷新困惑度。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/levy-goldberg-pmi.html">word2vec即隐式矩阵分解</a><span class="yr">2014.12 · NLP</span><div class=nt>同样把神经语言模型看作对上下文-词矩阵的分解，进一步分析这个分解的秩上限。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/wikitext.html">WikiText</a><span class="yr">2016.09 · 数据·评测</span><div class=nt>在WikiText-2与Penn Treebank上报告困惑度。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a><span class="yr">2019.02 · LLM</span><div class=nt>仍是LSTM语言模型，长距离依赖与训练并行度的限制没有改变。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/transformer-xl.html">Transformer-XL</a><span class="yr">2019.01 · LLM</span><div class=nt>仍是LSTM语言模型，长距离依赖与训练并行度的限制没有改变。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/low-rank.html">低秩近似</a> <a class="chip c" href="../c/eigen-svd.html">特征分解与奇异值分解</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/perplexity.html">困惑度</a> <a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a></p>
+<h2>本篇术语</h2><ul><li><b>Softmax瓶颈</b>　单个softmax输出层能表示的对数概率矩阵秩不超过隐层维度加一，因而可能无法拟合高秩的真实语言分布。</li><li><b>矩阵的秩</b>　矩阵中线性无关的行（或列）的最大个数，衡量它能表达多少「独立方向」的信息。</li></ul>
+<h2>怎么学</h2><p>先复习矩阵秩与SVD → 读原文第2节（瓶颈的论证）和第3节（MoS）→ 动手：构造一个秩为50的随机对数概率矩阵，分别用d=10的单softmax和K=5的混合softmax去拟合，比较拟合误差。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1711.03953" rel="noopener">https://arxiv.org/abs/1711.03953</a>（arXiv：标题、作者Yang、Dai、Salakhutdinov、Cohen、2017-11-10提交、摘要（把语言建模表述为矩阵分解、Softmax瓶颈、PTB 47.69与WikiText-2 40.68、十亿词数据上比基线低5.6以上）。秩约为d+1的论证、MoS公式、以AWD-LSTM为骨干、ICLR 2018与CMU机构凭一般了解，未逐项对照正文。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%B7%B7%E5%90%88Softmax%EF%BC%88MoS%EF%BC%89%EF%BC%88mos-softmax%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amos-softmax%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/mos-softmax.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="artetxe-unmt.html"><small>本分支上一个 · 2017.10</small><b>无监督NMT（Artetxe）</b></a><a class="r" href="mt-human-parity.html"><small>本分支下一个 · 2018.03</small><b>中英新闻翻译“人类水平”</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

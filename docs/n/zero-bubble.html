@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>零气泡流水线并行（2023） · AI脉络</title>
+<meta name="description" content="流水线并行里，各段GPU必须等上一段把数据传过来才能开工，开头和结尾总有一段时间空转（流水线气泡）；1F1B调度减少了显存，但气泡在同步训练里一直被认为无法消除。 把反向传播拆成两半：对输入求梯度（B，下一段等着要）和对参数求梯度（W，谁也不等）；把W推迟去填补原本空闲的气泡，再绕开优化器步骤里的…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/zero-bubble.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="零气泡流水线并行（2023）">
+<meta property="og:description" content="流水线并行里，各段GPU必须等上一段把数据传过来才能开工，开头和结尾总有一段时间空转（流水线气泡）；1F1B调度减少了显存，但气泡在同步训练里一直被认为无法消除。 把反向传播拆成两半：对输入求梯度（B，下一段等着要）和对参数求梯度（W，谁也不等）；把W推迟去填补原本空闲的气泡，再绕开优化器步骤里的…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/zero-bubble.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/zero-bubble">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 大模型并行训练</div>
+<h1>零气泡流水线并行</h1>
+<div class="full">Zero Bubble Pipeline Parallelism</div>
+<div class="meta"><span>2023.11</span><span>论文</span><span>延伸</span><span>ICLR 2024</span><span>Penghui Qi, Xinyi Wan, Guangxing Huang, Min Lin · Sea AI Lab</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2401.10241" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/sail-sg/zero-bubble-pipeline-parallelism" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/zero-bubble">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>流水线并行里，各段GPU必须等上一段把数据传过来才能开工，开头和结尾总有一段时间空转（流水线气泡）；1F1B调度减少了显存，但气泡在同步训练里一直被认为无法消除。</p></div><div><h4>方法</h4><p>把反向传播拆成两半：对输入求梯度（B，下一段等着要）和对参数求梯度（W，谁也不等）；把W推迟去填补原本空闲的气泡，再绕开优化器步骤里的全局同步，在同步训练语义下做到零气泡。</p></div><div><h4>影响</h4><p>流水线调度研究的转折点之一，“B/W拆分”被后续调度广泛采用，DeepSeek-V3的DualPipe也在此思路上把前后向与通信重叠。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/gpipe.html">GPipe流水线并行</a>把一个批切成微批依次流过各段，<a class="ln" href="../n/pipedream.html">PipeDream与1F1B流水线</a>的1F1B调度让每段交替做一次前向、一次反向以控制显存，但两者在每一步的开头和结尾都有气泡：p段流水线里，气泡占比大约随 <code>(p−1)/m</code>（m为微批数）变化。</p><p>作者观察到，反向计算其实包含两件事：B算损失对本层输入的梯度，必须尽快传给前一段；W算损失对本层权重的梯度，只在优化器更新前需要。原有调度把两者绑在一起，导致前一段只能干等。拆开之后，B留在关键路径上，W可以挪到任何空闲时刻。基于此作者手工设计了ZB-H1（与1F1B显存相当、气泡约减为三分之一）和ZB-H2（显存稍多、气泡接近为零）两种调度，并给出一个按模型配置和显存上限自动搜索最优调度的算法。要真正做到零气泡，还要处理优化器步骤前的梯度范数裁剪、NaN检查等全局同步，论文用“先乐观更新、事后校验回滚”的办法绕过这些同步点。</p><p>摘要报告：在相近显存限制下吞吐比1F1B最多高23%，放宽显存限制后最多高31%；实现基于<a class="ln" href="../n/megatron-3d.html">Megatron 3D并行</a>所在的Megatron-LM代码库开源。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>推迟W需要暂存更多激活和中间梯度，零气泡版本的显存高于1F1B；调度依赖较准确的各阶段耗时估计，MoE等负载不均的模型还需要把通信也纳入重叠。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/deepseek-infra-week.html">DeepSeek开源周</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/gpipe.html">GPipe流水线并行</a><span class="yr">2018.11 · 系统·效率</span><div class=nt>沿用GPipe的同步微批流水线语义，在不改变训练结果的前提下改进调度。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/pipedream.html">PipeDream与1F1B流水线</a><span class="yr">2018.06 · 系统·效率</span><div class=nt>1F1B调度仍有固定的流水线气泡，拆分反向的B与W后可以把气泡填满。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/megatron-3d.html">Megatron 3D并行</a><span class="yr">2021.04 · 系统·效率</span><div class=nt>实现基于Megatron-LM，与其张量并行、数据并行组合使用并以其1F1B为基线。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/deepseek-infra-week.html">DeepSeek开源周</a><span class="yr">2025.02 · 系统·效率</span><div class=nt>推迟W需要暂存更多激活和中间梯度，零气泡版本的显存高于1F1B；调度依赖较准确的各阶段耗时估计，MoE等负载不均的模型还需要把通信也纳入重叠。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/backpropagation.html">反向传播</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+<h2>本篇术语</h2><ul><li><b>流水线气泡</b>　流水线并行中某些GPU因为等待上下游数据而空闲的时间，占比越大，算力浪费越多。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2401.10241" rel="noopener">https://arxiv.org/abs/2401.10241</a>（标题、四位作者、v1日期2023-11-30（arXiv编号为2401但首次提交日期为2023-11-30）；摘要：首个在同步训练语义下实现零气泡的调度、反向拆成对输入与对参数的梯度两部分、手工设计调度并给出自动搜索算法、绕过优化器步骤的同步、相近显存下比1F1B吞吐高最多23%、放宽后31%、基于Megatron-LM开源。ZB-H1/H2的具体气泡比例、优化器回滚细节、ICLR 2024、与DualPipe的关系为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E9%9B%B6%E6%B0%94%E6%B3%A1%E6%B5%81%E6%B0%B4%E7%BA%BF%E5%B9%B6%E8%A1%8C%EF%BC%88zero-bubble%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Azero-bubble%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/zero-bubble.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="splitwise.html"><small>本分支上一个 · 2023.11</small><b>Splitwise阶段拆分推理</b></a><a class="r" href="unsloth.html"><small>本分支下一个 · 2023.12</small><b>Unsloth</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

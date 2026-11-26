@@ -1,0 +1,28 @@
+{
+  "id": "flip",
+  "aka": ["FLIP", "Fast Language-Image Pre-training", "掩码CLIP", "Masked CLIP"],
+  "who": "Yanghao Li, Haoqi Fan, Ronghang Hu, Christoph Feichtenhofer, Kaiming He · Meta AI (FAIR)",
+  "venue": "CVPR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2212.00794"}
+  ],
+  "problem": "训练CLIP极其昂贵：每张图都要完整过一遍视觉编码器，而对比学习又需要很大的批次，显存和时间都是瓶颈。",
+  "idea": "借用MAE的做法，训练时随机遮掉并直接丢弃大部分图像块，只编码剩下的块；同样的时间能看更多图文对，同样的显存能放更大的批次。",
+  "impact": "证明了掩码丢块可以在不损失甚至提升精度的前提下显著加速CLIP训练，此后大规模图文对比训练常把它作为提速手段。",
+  "method": "[[clip]]的训练要在数亿图文对上做对比学习，而对比学习的效果依赖大批次（一个批次里负样本越多越好）。视觉编码器是ViT时，每张图被切成几百个图像块，全部送进Transformer，计算量和显存都很大。\n\nFLIP的想法来自同组的[[mae]]：ViT可以只处理一部分图像块。训练时随机遮掉一大部分图像块（例如50%或75%），并且像MAE一样把它们直接移出输入序列，而不是用掩码token占位，于是视觉编码器的计算量几乎按比例下降。FLIP不做像素重建，仍然只用CLIP的图文对比损失。省下的计算可以用来在相同时间内看更多图文对，省下的显存可以放更大的批次。训练结束后再用不遮挡的完整图像短暂微调一下，消除训练和测试的输入差异。\n\n摘要报告，在4亿图文对（LAION-400M）上，FLIP的精度和速度都优于不加掩码的基线，在多种下游任务上明显超过同数据训练的CLIP；借助提速，作者还考察了放大模型、数据和训练时长的扩展规律。",
+  "limits": [
+    {"text": "随机丢块会丢掉一部分细节信息，对需要细粒度定位的下游任务未必有利，且训练与测试的输入分布不一致，需要额外的无掩码微调。", "solved_by": []},
+    {"text": "只解决了视觉侧的计算瓶颈，对比学习本身对超大批次的依赖仍在。", "solved_by": ["siglip"]}
+  ],
+  "relations": [
+    {"to": "clip", "type": "extends", "note": "沿用CLIP的图文对比目标，只改训练时视觉输入的处理方式。"},
+    {"to": "mae", "type": "uses", "note": "借用MAE随机遮挡并丢弃图像块、只编码可见块的做法来省计算。"},
+    {"to": "laion-400m", "type": "uses", "note": "主要实验在LAION-400M的4亿图文对上进行。"}
+  ],
+  "prereq": ["contrastive-learning", "image-patch", "masked-modeling", "batch-size-epoch", "scaling-law-concept"],
+  "terms": [
+    {"t": "丢块（token dropping）", "d": "把被遮挡的图像块直接从输入序列中删掉，Transformer只处理剩下的块，计算量随保留比例下降。"}
+  ],
+  "learn": "先读[[mae]]理解为什么ViT可以只看部分图像块，再读FLIP的速度-精度对比图；对照[[siglip]]思考另一条降低大批次依赖的路线。",
+  "check": {"source": "https://arxiv.org/abs/2212.00794", "confirmed": "标题、五位作者、arXiv v1提交2022-12-01；摘要中训练时随机遮挡并移除大部分图像块、同等时间学更多图文对、同等显存对比更多样本、4亿图文对上精度和速度均优于无掩码基线、多种下游任务超过同数据CLIP、模型/数据/训练时长扩展研究。掩码比例50%/75%、LAION-400M、无掩码微调、Meta与CVPR 2023为一般了解，未逐项核对。"}
+}

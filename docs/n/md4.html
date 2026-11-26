@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MD4简化掩码扩散（2024） · AI脉络</title>
+<meta name="description" content="掩码（吸收态）扩散被看作自回归之外的离散生成路线，但已有表述各说各话、公式复杂，训练目标和参数化不够好，还要靠各种临时补丁。 证明掩码扩散的连续时间变分目标其实只是交叉熵损失按时间加权的积分，用这个简单形式统一各种视角，并推广到随词而异的掩码调度。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/md4.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MD4简化掩码扩散（2024）">
+<meta property="og:description" content="掩码（吸收态）扩散被看作自回归之外的离散生成路线，但已有表述各说各话、公式复杂，训练目标和参数化不够好，还要靠各种临时补丁。 证明掩码扩散的连续时间变分目标其实只是交叉熵损失按时间加权的积分，用这个简单形式统一各种视角，并推广到随词而异的掩码调度。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/md4.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/md4">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 非自回归与扩散</div>
+<h1>MD4简化掩码扩散</h1>
+<div class="full">Simplified and Generalized Masked Diffusion for Discrete Data</div>
+<div class="meta"><span>2024.06</span><span>论文</span><span>延伸</span><span>NeurIPS 2024</span><span>Jiaxin Shi, Kehang Han, Zhe Wang, Arnaud Doucet, Michalis K. Titsias · Google DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2406.04329" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/google-deepmind/md4" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/md4">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>掩码（吸收态）扩散被看作自回归之外的离散生成路线，但已有表述各说各话、公式复杂，训练目标和参数化不够好，还要靠各种临时补丁。</p></div><div><h4>方法</h4><p>证明掩码扩散的连续时间变分目标其实只是交叉熵损失按时间加权的积分，用这个简单形式统一各种视角，并推广到随词而异的掩码调度。</p></div><div><h4>影响</h4><p>与同月的MDLM一起把掩码扩散的训练目标化简成“加权的掩码语言模型损失”，成为后来LLaDA等扩散大语言模型的理论基础之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>掩码扩散的前向过程是：随时间t从0到1，每个token以一定概率被替换成特殊的[MASK]，一旦被遮住就保持不变（所以叫吸收态）；反向过程是模型从全[MASK]出发逐步把它们还原成词。<a class="ln" href="../n/d3pm.html">离散扩散D3PM</a>和<a class="ln" href="../n/sedd.html">离散扩散语言模型SEDD</a>各自给出了训练这种模型的目标，但形式复杂。</p><p>本文推导出：在连续时间极限下，负的证据下界（ELBO）等于对时间的一个积分，被积函数就是“在被遮住的位置上预测原词的交叉熵”，再乘一个只取决于掩码调度的权重 <code>w(t)</code>。换句话说，训练掩码扩散模型约等于在不同遮挡比例下训练一个<a class="ln" href="../n/bert.html">BERT</a>式的掩码语言模型，再按比例加权。在此基础上，作者还提出让掩码概率依赖于具体token的广义版本（GenMD4）。</p><p>结果：在OpenWebText上按困惑度衡量，GPT-2规模的模型超过此前的扩散语言模型，5个零样本语言建模任务中有4个更好；在像素级图像建模上，CIFAR-10和ImageNet 64×64分别达到2.75和3.40比特/维，好于同规模自回归模型。它与<a class="ln" href="../n/mdlm.html">掩码扩散语言模型MDLM</a>几乎同时独立得到类似的化简结论。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只在GPT-2规模验证，困惑度仍略逊于同规模自回归模型；采样需要多步迭代，速度优势要靠后续的并行解码和缓存技术。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/llada.html">LLaDA大语言扩散模型</a> <a class="chip hue" style="--h:0" href="../n/fast-dllm.html">Fast-dLLM免训练加速</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/sedd.html">离散扩散语言模型SEDD</a><span class="yr">2023.10 · LLM</span><div class=nt>SEDD从得分熵的角度训练离散扩散，本文用加权交叉熵统一并超过它的困惑度。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/d3pm.html">离散扩散D3PM</a><span class="yr">2021.07 · LLM</span><div class=nt>D3PM提出了吸收态离散扩散，本文给出其连续时间目标的简洁形式。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/mdlm.html">掩码扩散语言模型MDLM</a><span class="yr">2024.06 · LLM</span><div class=nt>同月独立工作，都把掩码扩散目标化简成加权的掩码语言模型损失。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/llada.html">LLaDA大语言扩散模型</a><span class="yr">2025.02 · LLM</span><div class=nt>只在GPT-2规模验证，困惑度仍略逊于同规模自回归模型；采样需要多步迭代，速度优势要靠后续的并行解码和缓存技术。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/fast-dllm.html">Fast-dLLM免训练加速</a><span class="yr">2025.05 · LLM</span><div class=nt>只在GPT-2规模验证，困惑度仍略逊于同规模自回归模型；采样需要多步迭代，速度优势要靠后续的并行解码和缓存技术。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/elbo.html">变分推断与ELBO</a> <a class="chip c" href="../c/cross-entropy.html">交叉熵</a> <a class="chip c" href="../c/perplexity.html">困惑度</a></p>
+<h2>本篇术语</h2><ul><li><b>吸收态</b>　一旦变成[MASK]就不再变回去的状态；掩码扩散的前向过程中每个词最终都被吸收到这个状态。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/d3pm.html">离散扩散D3PM</a>的离散扩散设定和<a class="ln" href="../n/mdlm.html">掩码扩散语言模型MDLM</a>；读本文推导连续时间ELBO的部分和掩码调度的对比；动手：用一个小Transformer在字符数据上实现“随机遮挡比例＋加权交叉熵”的训练，再从全掩码开始逐步采样。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2406.04329" rel="noopener">https://arxiv.org/abs/2406.04329</a>（标题、5位作者、arXiv首次提交2024-06-06；摘要中ELBO为交叉熵的加权积分、状态相关的掩码调度、OpenWebText GPT-2规模超过此前扩散LM、5个零样本任务中4个更好、CIFAR-10 2.75与ImageNet64 3.40 bpd、代码地址。机构写Google DeepMind依据代码仓库所属组织；NeurIPS 2024为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MD4%E7%AE%80%E5%8C%96%E6%8E%A9%E7%A0%81%E6%89%A9%E6%95%A3%EF%BC%88md4%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amd4%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/md4.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="qwen2.html"><small>本分支上一个 · 2024.06</small><b>Qwen2</b></a><a class="r" href="radd.html"><small>本分支下一个 · 2024.06</small><b>RADD吸收态扩散重参数化</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

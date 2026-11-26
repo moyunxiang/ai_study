@@ -1,0 +1,25 @@
+{
+ "id": "wanda",
+ "who": "Mingjie Sun, Zhuang Liu, Anna Bair, J. Zico Kolter · 卡内基梅隆大学, Meta AI Research, 博世AI中心",
+ "venue": "ICLR 2024",
+ "aka": ["Pruning by Weights and activations", "权重乘激活剪枝", "LLM剪枝", "非结构化稀疏", "2:4稀疏"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2306.11695"},
+  {"label": "GitHub", "url": "https://github.com/locuslab/wanda"}
+ ],
+ "problem": "给LLM剪枝，要么要重新训练（几十亿参数负担不起），要么像SparseGPT那样用二阶信息逐层重建权重，仍然很费计算；最简单的按权重大小剪枝在LLM上又效果很差。",
+ "idea": "打分时把输入激活也算进去：每个权重的重要性=|权重|×对应输入特征在校准数据上的L2范数，在每个输出神经元内部比较、剪掉分数最低的，剩下的权重一个都不改。",
+ "impact": "一行公式、不更新权重就接近SparseGPT的效果，成为LLM剪枝最常用的基线之一。",
+ "method": "按权重绝对值剪枝（[[deep-compression]]的做法）在小网络上很有效，但[[llm-int8]]发现LLM的激活里有少数维度数值极大：连在这些维度上的权重即使本身很小，乘上巨大的输入后对输出影响也很大，按大小剪会误删它们。[[sparsegpt]]用二阶信息解决，但要逐层解大型重建问题。\n\nWanda的打分只有一行：`S_ij = |W_ij| · ‖X_j‖₂`，`X_j`是第j个输入特征在一小批校准token上的取值，`‖X_j‖₂`就是它的L2范数。比较范围也很关键：不是全层一起排序，而是在**每个输出神经元**（权重矩阵的每一行）内部，按目标稀疏度剪掉分数最低的那些。剪完直接用，不重训、不更新剩余权重，也能改成硬件友好的N:M结构化稀疏（如每4个里留2个）。\n\n论文报告：LLaMA-7B在50%非结构化稀疏下WikiText困惑度，按大小剪为17.29，SparseGPT 7.22，Wanda 7.26（稠密模型5.68）；计算剪枝指标在LLaMA-7B上用时0.54秒，SparseGPT要203.1秒。",
+ "limits": [
+  {"text": "非结构化稀疏在普通GPU上几乎不能变成实际加速；2:4等结构化稀疏下与稠密模型的差距明显变大。", "solved_by": ["sheared-llama", "minitron"]}
+ ],
+ "relations": [
+  {"to": "sparsegpt", "type": "rivals", "note": "SparseGPT用二阶信息重建剩余权重；Wanda不更新任何权重，只换一个打分，效果接近而计算快几百倍。"},
+  {"to": "llm-int8", "type": "uses", "note": "动机来自LLM.int8()发现的大幅值离群特征：输入大的通道上的权重不能只看自身大小。"},
+  {"to": "deep-compression", "type": "extends", "note": "沿用按重要性分数剪掉权重的思路，把分数从|W|改成|W|乘输入激活范数。"},
+  {"to": "llama-1", "type": "uses", "note": "主要在LLaMA（以及后续版本加入的LLaMA-2）各尺寸上评测。"}
+ ],
+ "prereq": ["matrix-multiplication", "norm", "neuron-activation", "perplexity"],
+ "check": {"source": "https://arxiv.org/html/2306.11695v3", "confirmed": "标题、四位作者与CMU/Meta AI/博世机构、v1日期2023-06-20（abs页）、ICLR 2024（abs页注释）；正文：S_ij=|W_ij|·‖X_j‖₂、按输出比较、无需更新权重、可扩展到2:4/4:8；LLaMA-7B 50%稀疏WikiText困惑度17.29/7.22/7.26（稠密5.68）、表4剪枝指标0.54秒对203.1秒。"}
+}

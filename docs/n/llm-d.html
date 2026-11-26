@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>llm-d分布式推理（2025） · AI脉络</title>
+<meta name="description" content="Kubernetes的常规扩容是复制一模一样的副本再轮询分配请求；LLM请求长短差异极大、能否命中某个副本里的前缀缓存差别巨大，预填充和解码的资源需求也不同，这套做法在LLM推理上效率很低。 在vLLM之上做一个Kubernetes原生的分布式推理框架：网关按KV缓存命中和负载把请求路由到合适的副…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/llm-d.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="llm-d分布式推理（2025）">
+<meta property="og:description" content="Kubernetes的常规扩容是复制一模一样的副本再轮询分配请求；LLM请求长短差异极大、能否命中某个副本里的前缀缓存差别巨大，预填充和解码的资源需求也不同，这套做法在LLM推理上效率很低。 在vLLM之上做一个Kubernetes原生的分布式推理框架：网关按KV缓存命中和负载把请求路由到合适的副…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/llm-d.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/llm-d">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 推理服务引擎</div>
+<h1>llm-d分布式推理</h1>
+<div class="full">Announcing the llm-d community!</div>
+<div class="meta"><span>2025.05</span><span>系统</span><span>延伸</span><span>Red Hat发起；创始贡献者CoreWeave、Google Cloud、IBM Research、NVIDIA</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://llm-d.ai/blog/llm-d-announce" rel="noopener">llm-d发布博客 ↗</a><a class="btn sm" href="https://www.redhat.com/en/about/press-releases/red-hat-launches-llm-d-community-powering-distributed-gen-ai-inference-scale" rel="noopener">Red Hat新闻稿 ↗</a><a class="btn sm" href="https://github.com/llm-d/llm-d" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/llm-d">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Kubernetes的常规扩容是复制一模一样的副本再轮询分配请求；LLM请求长短差异极大、能否命中某个副本里的前缀缓存差别巨大，预填充和解码的资源需求也不同，这套做法在LLM推理上效率很低。</p></div><div><h4>方法</h4><p>在vLLM之上做一个Kubernetes原生的分布式推理框架：网关按KV缓存命中和负载把请求路由到合适的副本，支持预填充—解码分离部署，并把KV缓存卸载到CPU内存或网络存储。</p></div><div><h4>影响</h4><p>把此前各大厂内部的分离式推理做法整理成一个开源、可在多种加速器上部署的方案，成为K8s上部署大模型推理的主要开源选项之一，2026年10月发布1.0版。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>发布博客先指出LLM推理的特殊之处：请求的输入、输出长度差异很大（检索增强输入长、输出短，推理任务输入短、输出长），负载容易失衡；多轮对话、智能体和代码补全会反复发送相同前缀，路由到已有该前缀缓存的副本可以跳过大量预填充计算；预填充计算密集、解码访存密集（见<a class="ln" href="../n/splitwise.html">Splitwise阶段拆分推理</a>与<a class="ln" href="../n/distserve.html">预填充-解码分离部署</a>），放在同一副本里会浪费资源。</p><p>llm-d由Red Hat于2025年5月发起，新闻稿列出的创始贡献者是CoreWeave、Google Cloud、IBM Research和NVIDIA，合作方包括AMD、思科、Hugging Face、英特尔、Lambda、Mistral AI，支持者包括孕育了<a class="ln" href="../n/vllm.html">vLLM与PagedAttention</a>的UC Berkeley Sky Computing Lab和孕育了LMCache的芝加哥大学LMCache Lab。主要组件：以vLLM为推理引擎；<b>AI感知的网络路由</b>（与Kubernetes Inference Gateway集成），把请求发给最可能已缓存相关计算的服务器；<b>预填充与解码分离</b>，两阶段在不同服务器上运行并独立扩缩；基于LMCache的<b>KV缓存卸载</b>，把KV缓存从GPU移到CPU内存或网络存储；以及用于服务器间快速传输的高性能通信接口，包括NVIDIA的NIXL库。</p><p>它与<a class="ln" href="../n/mooncake.html">Mooncake以KV缓存为中心</a>、<a class="ln" href="../n/nvidia-dynamo.html">NVIDIA Dynamo</a>解决的是同一类问题，区别在于以Kubernetes为部署与调度的基础。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>部署与调优依赖Kubernetes和多组件协同，对没有K8s运维能力的小团队门槛较高；分离式部署的收益取决于负载形态，短请求场景未必划算。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/vllm.html">vLLM与PagedAttention</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>以vLLM作为每个副本的推理引擎，在其上增加集群级调度。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/distserve.html">预填充-解码分离部署</a><span class="yr">2024.01 · 系统·效率</span><div class=nt>博客以DistServe为例说明预填充—解码分离，llm-d把它做成可部署的组件。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/mooncake.html">Mooncake以KV缓存为中心</a><span class="yr">2024.06 · 系统·效率</span><div class=nt>沿着以KV缓存为中心、分离式部署的思路，做成Kubernetes原生的开源方案。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/nvidia-dynamo.html">NVIDIA Dynamo</a><span class="yr">2025.03 · 系统·效率</span><div class=nt>两者都做分布式、分离式LLM推理调度；Dynamo由NVIDIA主导，llm-d以Kubernetes生态和多厂商加速器为基础。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a> <a class="chip c" href="../c/training-vs-inference.html">训练与推理的算力差别</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a></p>
+<h2>本篇术语</h2><ul><li><b>前缀缓存</b>　把已算过的提示词前缀的KV缓存留下来；新请求如果以同样的前缀开头，就直接复用，省掉这部分预填充计算。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://www.redhat.com/en/about/press-releases/red-hat-launches-llm-d-community-powering-distributed-gen-ai-inference-scale" rel="noopener">https://www.redhat.com/en/about/press-releases/red-hat-launches-llm-d-community-powering-distributed-gen-ai-inference-scale</a>（新闻稿日期2025-05-20；创始贡献者CoreWeave、Google Cloud、IBM Research、NVIDIA；合作方AMD、Cisco、Hugging Face、Intel、Lambda、Mistral AI；支持者Berkeley Sky Computing Lab与芝加哥大学LMCache Lab；基于vLLM、AI感知路由、预填充解码分离、基于LMCache的KV缓存卸载、NIXL。llm-d.ai发布博客（2025-05-20）：Kubernetes原生、KV缓存感知路由、请求形态差异与前缀缓存、以DistServe为例。1.0版于2026-10发布来自Google News中IBM Research与Techzine的报道标题。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20llm-d%E5%88%86%E5%B8%83%E5%BC%8F%E6%8E%A8%E7%90%86%EF%BC%88llm-d%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Allm-d%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/llm-d.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="areal.html"><small>本分支上一个 · 2025.05</small><b>AReaL异步RL训练</b></a><a class="r" href="nvfp4.html"><small>本分支下一个 · 2025.09</small><b>NVFP4四比特预训练</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

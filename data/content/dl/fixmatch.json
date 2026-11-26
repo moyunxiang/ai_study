@@ -1,0 +1,34 @@
+{
+  "id": "fixmatch",
+  "who": "Kihyuk Sohn, David Berthelot, Chun-Liang Li, Zizhao Zhang, Nicholas Carlini, Ekin D. Cubuk, Alex Kurakin, Han Zhang et al. · Google Research",
+  "venue": "NeurIPS 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2001.07685"},
+    {"label": "官方代码", "url": "https://github.com/google-research/fixmatch"}
+  ],
+  "aka": ["半监督学习", "Semi-Supervised Learning", "SSL", "伪标签", "Pseudo-Labeling", "一致性正则", "Consistency Regularization"],
+  "problem": "2019年前后的半监督方法（MixMatch、UDA、ReMixMatch等）越堆越复杂，组件和超参数很多，说不清哪些部分真正起作用。",
+  "idea": "只把两种老办法组合起来：用弱增强图像上的高置信预测当伪标签，再要求模型在同一张图的强增强版本上预测出这个伪标签。",
+  "impact": "以极简的配方在多个半监督图像基准上取得当时最好成绩，每类只给4个标签也能在CIFAR-10上超过88%，成为后续半监督方法的标准基线和改进起点。",
+  "background": "半监督学习要解决的是：标签很贵，但无标签数据很多，怎样用无标签数据提升模型。深度学习时代的主流思路有两条。一条是**伪标签**（自训练）：让模型给无标签样本打标签，再把有把握的那些当作真标签继续训练，[[noisy-student]]在ImageNet上把这条路推到了很大规模。另一条是**一致性正则**：对同一个无标签样本做两种不同的扰动，要求模型给出相同的预测；[[ladder-networks]]的去噪目标、后来的Π模型和Mean Teacher都属于这一类。\n\n2019年前后，MixMatch、UDA、ReMixMatch等方法把这些想法与Mixup、分布对齐、锐化等技巧组合起来，效果不断提升，但每个方法都有一长串组件和超参数，难以复现，也难以判断哪个组件最关键。",
+  "method": "FixMatch对每个无标签图像做两种增强。弱增强只是随机翻转和平移；强增强用[[randaugment]]（或CTAugment）随机组合多种颜色与几何变换，再加上[[cutout]]挖掉一块。\n\n先把弱增强图像送进模型得到类别分布q；如果最大概率超过阈值τ（如0.95），就取 `argmax q` 作为硬伪标签，否则这个样本这一步不参与无监督损失。然后把强增强图像送进同一个模型，用交叉熵要求它预测出那个伪标签。总损失是有标签样本上的普通交叉熵加上λ倍的无标签损失。直观地说，弱增强保证伪标签比较可靠，强增强迫使模型在图像被严重扭曲时仍能认出类别，置信度阈值则把不确定的样本挡在外面，避免错误标签自我强化。",
+  "results": "摘要报告：FixMatch在多个标准半监督基准上达到当时最好水平，CIFAR-10上只用250个标签精度为94.93%，只用40个标签（每类4个）为88.61%。作者还做了大规模消融，拆解哪些实验因素对效果最关键。",
+  "legacy": "FixMatch之后，半监督图像分类的许多工作都以它为基线做改进，例如按类别动态调整置信度阈值、把它和自监督预训练结合。“弱增强出伪标签、强增强学一致性”的框架也被用到目标检测、语义分割、语音识别和医学影像等任务中。随着大规模自监督预训练和基础模型的兴起，从零训练的半监督方法不再是主流，但“用高置信伪标签扩充训练数据”的思路在模型蒸馏和数据合成中仍很常见。",
+  "limits": [
+    {"text": "固定的高置信阈值会在训练早期丢掉大量无标签数据，并对难学的类别不公平，学习慢的类别得到的伪标签更少。", "solved_by": []},
+    {"text": "强增强的设计依赖图像领域知识（颜色、几何变换），换到文本、表格等模态需要重新设计扰动。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ladder-networks", "type": "extends", "note": "继承“对扰动后的输入保持预测一致”的一致性正则思想，但去掉了逐层重建的复杂结构。"},
+    {"to": "randaugment", "type": "uses", "note": "用RandAugment作为强增强，为一致性损失提供大幅扰动。"},
+    {"to": "cutout", "type": "uses", "note": "强增强中加入Cutout随机遮挡。"},
+    {"to": "noisy-student", "type": "rivals", "note": "同为伪标签自训练：Noisy Student用教师-学生迭代和大规模无标签数据，FixMatch用单个模型和置信度阈值在小标签量下工作。"}
+  ],
+  "prereq": ["semi-supervised", "data-augmentation", "cross-entropy", "softmax", "conv-layer"],
+  "terms": [
+    {"t": "伪标签", "d": "模型自己对无标签样本给出的预测类别，被当作标签用于继续训练。"},
+    {"t": "一致性正则", "d": "要求模型对同一样本的不同扰动版本给出相同预测的训练目标。"}
+  ],
+  "learn": "先理解[[c:semi-supervised]]与数据增强，再读原文第2节的算法框图和第5节的消融；用官方代码或社区实现，在CIFAR-10上只保留40个标签训练，观察置信度阈值从0.95降到0.5时精度如何变化。",
+  "check": {"source": "https://arxiv.org/abs/2001.07685", "confirmed": "标题、作者（共9位）、arXiv v1提交于2020-01-21；摘要中一致性正则与伪标签的组合、弱增强生成伪标签、只保留高置信伪标签、强增强版本上预测伪标签、CIFAR-10上250个标签94.93%与40个标签88.61%、大规模消融。阈值0.95、CTAugment、NeurIPS 2020与后续影响来自一般了解。"}
+}

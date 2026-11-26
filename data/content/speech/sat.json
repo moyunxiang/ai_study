@@ -1,0 +1,31 @@
+{
+  "id": "sat",
+  "who": "Tasos Anastasakos, John McDonough, Richard Schwartz, John Makhoul · BBN",
+  "venue": "ICSLP 1996",
+  "links": [
+    {"label": "ISCA Archive", "url": "https://doi.org/10.21437/icslp.1996-253"}
+  ],
+  "problem": "说话人无关的声学模型用几百个人的录音混在一起训练，高斯分布被迫同时覆盖嗓音差异和音素差异，变得又宽又糊，测试时再做自适应也补不回来。",
+  "idea": "训练时就给每个训练说话人配一个线性变换，把「这个人的嗓音特点」交给变换去吸收，剩下的「规范模型」只描述音素本身；测试时只需为新说话人估一个变换。",
+  "impact": "说话人自适应训练（SAT）成为GMM-HMM时代大词汇量识别系统的标准环节，后来与约束MLLR（fMLLR）配合，写进了HTK和Kaldi的标准训练流程。",
+  "method": "在[[mllr]]出现后，大家通常先训练一个说话人无关（SI）模型，测试时再用少量新说话人的语音估一个线性变换去调整高斯均值。问题在于SI模型本身就是用许多不同嗓音混合训练的，每个高斯既要描述「这是哪个音素」，又要容纳「这是谁在说」，方差被撑大，对任何一个具体的人都不够尖锐。\n\nSAT把说话人差异显式写进训练目标：对训练集里每个说话人s估一个仿射变换 `μ_s = A_s μ + b_s`，模型参数 μ 与所有说话人的变换 {A_s, b_s} 一起用最大似然估计（见[[c:mle]]），用类似[[c:em-algorithm]]的方式交替更新：固定规范模型估每人的变换，再固定变换更新规范模型。这样得到的「规范模型」（compact model）不再需要容纳嗓音差异，测试时对新说话人照样用MLLR估一个变换即可。\n\n论文在BBN的大词汇量识别系统上报告SAT加自适应优于SI模型加自适应（具体数字未逐项核对）。后来的[[fmllr]]把变换改成作用在特征上，让SAT的训练变得便宜，SAT+fMLLR成为GMM-HMM系统的常规配置，Kaldi里的「tri3b」一类训练阶段就是它的直接后代。",
+  "limits": [
+    {"text": "每个训练说话人都要有足够多的录音才能估出可靠的变换；按均值变换的原始做法训练时计算量也大。", "solved_by": ["fmllr"]},
+    {"text": "只用线性变换描述说话人差异，表达能力有限；深度网络时代改为把说话人信息作为输入向量（如i-vector）喂给网络。", "solved_by": ["i-vector", "dnn-hmm"]}
+  ],
+  "relations": [
+    {"to": "mllr", "type": "extends", "note": "把MLLR从测试时的自适应手段，扩展为训练阶段就为每个说话人估计的变换。"},
+    {"to": "hmm-asr", "type": "uses", "note": "被改造的仍是GMM-HMM声学模型，用同样的最大似然框架训练。"},
+    {"to": "map-adaptation", "type": "rivals", "note": "MAP直接调整高斯参数，需要较多自适应数据；SAT配合线性变换在数据少时更稳。"}
+  ],
+  "prereq": ["hmm-concept", "gaussian", "mle", "em-algorithm", "phoneme-acoustic"],
+  "terms": [
+    {"t": "说话人自适应", "d": "用新用户的少量录音调整已训练好的模型，让它更适合这个人的嗓音。"},
+    {"t": "规范模型", "d": "SAT中去掉了说话人差异、只描述音素声学特征的模型。"}
+  ],
+  "aka": ["SAT", "speaker adaptive training", "说话人自适应训练"],
+  "check": {
+    "source": "https://doi.org/10.21437/icslp.1996-253",
+    "confirmed": "Crossref记录：标题A compact model for speaker-adaptive training、作者Anastasakos/McDonough/Schwartz/Makhoul、ICSLP 1996（1996-10-03）。训练流程、与fMLLR和Kaldi的关系为一般了解，未逐项对照原文；论文中的具体错误率未写。"
+  }
+}

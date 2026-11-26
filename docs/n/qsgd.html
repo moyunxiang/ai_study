@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>QSGD梯度量化（2016） · AI脉络</title>
+<meta name="description" content="并行SGD的主要障碍是节点间传梯度的通信量；已有的“只传量化梯度”的启发式方法（如1-bit SGD）实践中有效，但不保证收敛，也不知道是否最优。 把每个梯度分量随机舍入到少数几个等级上，使量化后的梯度仍是原梯度的无偏估计，再用高效的整数编码传输；等级数可调，在压缩率和收敛速度之间连续折中，并有收…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/qsgd.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="QSGD梯度量化（2016）">
+<meta property="og:description" content="并行SGD的主要障碍是节点间传梯度的通信量；已有的“只传量化梯度”的启发式方法（如1-bit SGD）实践中有效，但不保证收敛，也不知道是否最优。 把每个梯度分量随机舍入到少数几个等级上，使量化后的梯度仍是原梯度的无偏估计，再用高效的整数编码传输；等级数可调，在压缩率和收敛速度之间连续折中，并有收…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/qsgd.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/qsgd">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 分布式与数据并行</div>
+<h1>QSGD梯度量化</h1>
+<div class="full">QSGD: Communication-Efficient SGD via Gradient Quantization and Encoding</div>
+<div class="meta"><span>2016.10</span><span>论文</span><span>延伸</span><span>NeurIPS 2017</span><span>Dan Alistarh, Demjan Grubic, Jerry Li, Ryota Tomioka, Milan Vojnovic · 苏黎世联邦理工/IST Austria, MIT, 微软研究院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1610.02132" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/qsgd">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>并行SGD的主要障碍是节点间传梯度的通信量；已有的“只传量化梯度”的启发式方法（如1-bit SGD）实践中有效，但不保证收敛，也不知道是否最优。</p></div><div><h4>方法</h4><p>把每个梯度分量随机舍入到少数几个等级上，使量化后的梯度仍是原梯度的无偏估计，再用高效的整数编码传输；等级数可调，在压缩率和收敛速度之间连续折中，并有收敛证明。</p></div><div><h4>影响</h4><p>为梯度压缩提供了带理论保证的基本框架，与后来的Top-k稀疏化、PowerSGD等一起构成低通信分布式训练的主要比较对象。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/parameter-server.html">参数服务器</a>和All-Reduce式数据并行都要每步交换与模型同样大的梯度。用32位浮点传几亿个分量，网络常常比GPU算得慢。</p><p>QSGD对梯度向量<code>v</code>的每个分量做<b>随机量化</b>：先除以<code>‖v‖₂</code>归一化到[0,1]区间，再在s个等级之间随机舍入——例如落在第l级和第l+1级之间时，按与两端的距离成比例的概率取其中之一。这样期望恰好等于原值，量化后的梯度是<b>无偏</b>的，只是方差变大，论文给出方差上界，从而能沿用标准的SGD收敛分析（见<a class="lc" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a>）。传输时只需发送范数、每个分量的符号和等级，配合Elias整数编码，大部分分量为0时比特数还能进一步降低；论文称每次迭代的通信比特数可以低于模型维度的线性量级，并在渐近意义下达到最优。等级数s越大越接近原梯度、收敛越快，s越小越省带宽。</p><p>摘要报告：在16块GPU上用QSGD训练ImageNet上的ResNet-152，达到完整精度的速度快1.8倍；存在一组通用参数，在已知的各种网络结构上量化后精度保持或略有提高。实验还覆盖了语音识别。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>量化增加梯度方差，比特压得太低时需要更多步数才能收敛；与All-Reduce的环形求和结合并不直接，因为量化值相加后需要重新编码。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/diloco.html">DiLoCo低通信训练</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/resnet.html">ResNet</a><span class="yr">2015.12 · 视觉</span><div class=nt>主要实验之一是在16块GPU上训练ImageNet的ResNet-152。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/distbelief.html">DistBelief与Downpour SGD</a><span class="yr">2012.12 · 系统·效率</span><div class=nt>延续DistBelief以来的数据并行SGD，专攻其中节点间的通信瓶颈。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/parameter-server.html">参数服务器</a><span class="yr">2014.10 · 系统·效率</span><div class=nt>参数服务器式训练每步要传完整的32位梯度；QSGD把每个分量压到几个比特，直接减少通信量。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/dgc.html">深度梯度压缩DGC</a><span class="yr">2017.12 · 系统·效率</span><div class=nt>QSGD降低每个梯度的位宽，DGC只发送极少数大梯度，两者是梯度压缩的两条路线。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/diloco.html">DiLoCo低通信训练</a><span class="yr">2023.11 · 系统·效率</span><div class=nt>量化增加梯度方差，比特压得太低时需要更多步数才能收敛；与All-Reduce的环形求和结合并不直接，因为量化值相加后需要重新编码。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/expectation-variance.html">期望与方差</a> <a class="chip c" href="../c/quantization-concept.html">量化</a></p>
+<h2>本篇术语</h2><ul><li><b>无偏估计</b>　一个随机量的期望恰好等于要估计的真值。随机舍入的梯度虽然每次都有误差，但平均下来不偏不倚，所以SGD的收敛理论仍然适用。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1610.02132" rel="noopener">https://arxiv.org/abs/1610.02132</a>（标题、五位作者、v1日期2016-10-07；摘要：通信是并行SGD瓶颈、已有量化启发式不保证收敛、QSGD保证收敛、压缩与收敛可调、每次迭代亚线性比特、渐近最优通信、图像分类与语音识别实验、16 GPU上ResNet-152在ImageNet上快1.8倍、通用参数下精度保持或略升。随机舍入与Elias编码细节、NeurIPS 2017与机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20QSGD%E6%A2%AF%E5%BA%A6%E9%87%8F%E5%8C%96%EF%BC%88qsgd%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aqsgd%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/qsgd.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="paddlepaddle.html"><small>本分支上一个 · 2016.08</small><b>百度飞桨PaddlePaddle</b></a><a class="r" href="colab.html"><small>本分支下一个 · 2017</small><b>Google Colab</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

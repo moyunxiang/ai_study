@@ -1,0 +1,30 @@
+{
+  "id": "curl",
+  "who": "Aravind Srinivas, Michael Laskin, Pieter Abbeel · UC Berkeley",
+  "venue": "ICML 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2004.04136"},
+    {"label": "代码", "url": "https://github.com/MishaLaskin/curl"}
+  ],
+  "problem": "从像素学控制比从状态向量学慢得多：同样的DeepMind Control任务，用图像输入的无模型RL需要多很多交互，因为奖励信号太稀薄，学不好视觉表征。",
+  "idea": "在RL之外加一个对比学习的辅助任务：同一帧做两次随机裁剪，要求编码器把它们映射得相近、与其他帧区分开（类似[[moco]]），RL算法直接在这个编码器的特征上做离策略控制。",
+  "impact": "和几乎同时的[[drq]]一起说明：数据增强和自监督表征能让像素RL的样本效率接近状态输入，成为Atari 100k、DMControl 100k等低数据基准上的常用对比方法。",
+  "method": "CURL的训练有两个损失共享一个卷积编码器。RL部分在DeepMind Control上用[[sac]]（Atari上用数据高效版Rainbow），从编码器输出的特征上学Q函数和策略。对比部分：从回放缓冲区取一批观测（每个是几帧堆叠的图像），对每个观测做两次随机裁剪，一个作为「查询」、一个作为「正样本键」，同批次其他观测的裁剪作为负样本；查询经在线编码器，键经一个参数为在线编码器滑动平均的动量编码器（来自[[moco]]），用双线性相似度和InfoNCE损失让查询与对应的键最接近。\n\n这样编码器被迫学会对裁剪不变、能区分不同画面的特征，而这些特征往往正好包含物体位置、姿态等控制所需的信息。摘要称，在DeepMind Control Suite和Atari的10万步交互基准上，CURL分别比此前基于像素的方法（包括基于模型和无模型）有1.9倍和1.2倍的性能提升；在DMControl上，它是第一个样本效率接近使用状态特征方法的图像输入算法。",
+  "limits": [
+    {"text": "后续实验发现，很大一部分收益来自随机裁剪这种数据增强本身，而不是对比损失。", "solved_by": ["drq"]},
+    {"text": "对比目标与控制目标没有直接联系，学到的特征未必只保留与任务相关的信息，在背景干扰多的场景里会被无关细节带偏。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "sac", "type": "uses", "note": "在连续控制任务上，以SAC作为在对比特征之上运行的RL算法。"},
+    {"to": "moco", "type": "uses", "note": "借用MoCo的动量编码器和InfoNCE对比损失作为辅助任务。"},
+    {"to": "dm-control", "type": "uses", "note": "主要在DeepMind Control Suite的像素版任务上评测样本效率。"},
+    {"to": "unreal", "type": "extends", "note": "同属「给RL加自监督辅助任务来学表征」的路线，把辅助任务换成对比学习。"}
+  ],
+  "prereq": ["contrastive-learning", "data-augmentation", "actor-critic", "feature-representation", "on-off-policy"],
+  "terms": [
+    {"t": "InfoNCE", "d": "对比学习常用的损失：把正样本对的相似度当成多分类里的正确类别，与一批负样本放在一起做softmax交叉熵。"}
+  ],
+  "learn": "先读[[moco]]和[[sac]]；读原文第4节架构图；用官方代码在cheetah-run像素版上分别训练带对比损失和只带随机裁剪的两个版本，比较10万步时的分数。",
+  "check": {"source": "https://arxiv.org/abs/2004.04136", "confirmed": "标题、三位作者、arXiv v1于2020-04-08；摘要中对比学习从原始像素提取特征并在其上做离策略控制、DMControl与Atari的10万步基准上1.9倍与1.2倍提升、DMControl上首个接近状态特征样本效率的图像算法、代码地址。SAC与Rainbow的搭配、动量编码器细节按原文正文通行描述，ICML 2020按通行引用。"},
+  "aka": ["CURL", "对比无监督表征", "Contrastive Unsupervised Representations"]
+}

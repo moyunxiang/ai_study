@@ -1,0 +1,25 @@
+{
+ "id": "alpa",
+ "who": "Lianmin Zheng, Zhuohan Li, Hao Zhang, Yonghao Zhuang, Zhifeng Chen, Yanping Huang, Yida Wang, Yuanzhong Xu et al. · 加州大学伯克利分校, Google, 亚马逊等",
+ "venue": "OSDI 2022",
+ "aka": ["自动并行", "auto-parallelism", "自动模型并行", "算子间并行", "算子内并行", "inter-operator", "intra-operator"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2201.12023"},
+  {"label": "GitHub", "url": "https://github.com/alpa-projects/alpa"}
+ ],
+ "problem": "训练大模型要把数据并行、张量并行、流水线并行组合起来，Megatron式的并行方案要专家针对每种模型手工设计；已有的自动化工具只能在很小的方案空间里搜索。",
+ "idea": "把各种并行重新归为两层：切分单个算子的“算子内并行”和把计算图分段放到不同设备组的“算子间并行”；用整数线性规划和动态规划分别在两层上自动求出执行计划。",
+ "impact": "自动并行方向的代表系统，后续不少自动并行与大模型编译工作把它作为对照；它的两层划分方式成为讨论并行策略的常用框架。",
+ "method": "[[megatron-3d]]说明了三种并行的组合能高效训练千亿模型，但切法写死在模型代码里；[[mesh-tensorflow]]和GSPMD让用户标注张量如何切分，仍需人来决定。\n\nAlpa把并行方案分成两个层次：**算子内并行**，一个矩阵乘等算子沿某些维度切到多块GPU上同时算，数据并行、张量并行、ZeRO式切分都属于此类，通信量大，适合放在高速互连的同一台机器内；**算子间并行**，把计算图切成若干阶段，每段放在一组设备上，以流水线方式执行，通信少，适合跨机器。与此对应，Alpa先把集群切成若干设备网格，用动态规划决定计算图如何分段、每段分到多大的网格；在每个网格内部，再用整数线性规划为每个算子选择切分方式，使计算与通信总代价最小。它实现在[[jax]]和[[xla]]之上，由运行时协调两层的执行。\n\n摘要报告：Alpa自动生成的方案在专门手工优化的模型上能追平或超过手工并行系统，并能推广到结构异构、没有现成手工方案的模型。",
+ "limits": [
+  {"text": "搜索与编译时间较长，且依赖JAX/XLA生态；在主流大模型训练中，工程团队仍多采用手工调好的Megatron或FSDP方案，Alpa项目后来停止维护。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "megatron-3d", "type": "solves", "note": "Megatron的三维并行需要手工设计，Alpa自动搜索数据、算子与流水线并行的组合。"},
+  {"to": "mesh-tensorflow", "type": "extends", "note": "把Mesh-TensorFlow式的张量切分纳入算子内并行，并自动决定每个算子的切法。"},
+  {"to": "gpipe", "type": "extends", "note": "算子间并行即GPipe式的流水线，Alpa自动决定分段与设备分配。"},
+  {"to": "xla", "type": "uses", "note": "以XLA的计算图为编译对象，实现在JAX之上。"}
+ ],
+ "prereq": ["distributed-training", "matrix-multiplication", "dynamic-programming", "interconnect"],
+ "check": {"source": "https://arxiv.org/abs/2201.12023", "confirmed": "标题、作者（Zheng, Li, Zhang等12人）、v1日期2022-01-28；摘要：统一数据、算子、流水线并行，算子间与算子内两层层次空间，编译遍自动推导各层执行计划，运行时协调两层执行，追平或超过手工系统并推广到异构结构模型。整数线性规划与动态规划、JAX/XLA实现、OSDI 2022、项目停止维护为一般了解。"}
+}

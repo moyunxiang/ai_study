@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>UniDepth通用度量深度（2024） · AI脉络</title>
+<meta name="description" content="单目度量深度模型在训练领域内很准，换个场景就失效；等方法虽能跨相机，却要在推理时提供相机内参，网络照片往往没有。 让模型自己从图像中预测一个稠密的相机表示，再用它去“提示”深度特征；输出采用把相机方向与深度分开的伪球面坐标，并加一个几何不变损失，使深度特征对相机变化保持一致。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/unidepth.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="UniDepth通用度量深度（2024）">
+<meta property="og:description" content="单目度量深度模型在训练领域内很准，换个场景就失效；等方法虽能跨相机，却要在推理时提供相机内参，网络照片往往没有。 让模型自己从图像中预测一个稠密的相机表示，再用它去“提示”深度特征；输出采用把相机方向与深度分开的伪球面坐标，并加一个几何不变损失，使深度特征对相机变化保持一致。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/unidepth.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/unidepth">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 单目深度估计</div>
+<h1>UniDepth通用度量深度</h1>
+<div class="full">UniDepth: Universal Monocular Metric Depth Estimation</div>
+<div class="meta"><span>2024.03</span><span>论文</span><span>延伸</span><span>CVPR 2024</span><span>Luigi Piccinelli, Yung-Hsu Yang, Christos Sakaridis, Mattia Segu, Siyuan Li, Luc Van Gool, Fisher Yu · 苏黎世联邦理工学院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2403.18913" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/lpiccinelli-eth/unidepth" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/unidepth">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>单目度量深度模型在训练领域内很准，换个场景就失效；<a class="ln" href="../n/metric3d.html">Metric3D度量深度</a>等方法虽能跨相机，却要在推理时提供相机内参，网络照片往往没有。</p></div><div><h4>方法</h4><p>让模型自己从图像中预测一个稠密的相机表示，再用它去“提示”深度特征；输出采用把相机方向与深度分开的伪球面坐标，并加一个几何不变损失，使深度特征对相机变化保持一致。</p></div><div><h4>影响</h4><p>只用单张图、无需任何额外信息就直接输出度量三维点，摘要报告在10个数据集的零样本评测中持续领先，成为2024年后通用度量深度与相机估计的常用对照。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>UniDepth不再只输出深度图，而是直接输出每个像素的度量三维点。关键是把“相机”和“深度”拆开：</p><ul><li><b>相机模块（自提示）</b>：从图像特征预测一张稠密的相机表示——每个像素对应的光线方向（用方位角和仰角表示），等价于隐式估计了内参。这张相机表示再作为提示，通过注意力去调制深度特征，所以推理时不需要用户给内参。</li><li><b>伪球面输出</b>：每个点用（方位角、仰角、对数深度）表示，前两个只由相机决定，后一个只由深度决定，二者在表示层面解耦，避免了像素坐标加深度的表示中相机误差和深度误差混在一起。</li><li><b>几何不变损失</b>：对同一张图做不同的几何增强（相当于换了相机），要求在相机提示后的深度特征保持一致，促使模型学到与相机无关的场景几何。</li></ul><p>摘要称，在零样本设定下对10个数据集的全面评测中，UniDepth持续取得更好结果，甚至超过直接在测试领域训练的方法。</p><h2>后来的发展</h2><p>作者后来发布UniDepthV2继续改进；同期的<a class="ln" href="../n/depth-pro.html">Depth Pro度量深度</a>、<a class="ln" href="../n/moge.html">MoGe单目几何</a>也都选择“同时估计相机与几何”，前馈三维重建模型（<a class="ln" href="../n/vggt.html">VGGT</a>、<a class="ln" href="../n/mapanything.html">MapAnything度量重建</a>）则把相机和深度的联合预测推广到多视图。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>相机从单张图推断，画面缺少透视线索（如特写、纯纹理）时内参估计不稳，度量尺度随之偏差。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>逐帧独立预测，用在视频上会出现深度和尺度闪烁。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/video-depth-anything.html">视频深度VDA</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/dinov2.html">DINOv2</a><span class="yr">2023.04 · 视觉</span><div class=nt>采用大规模自监督预训练的ViT作为图像编码器之一。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/midas.html">MiDaS混合数据集深度</a><span class="yr">2019.07 · 视觉</span><div class=nt>延续多数据集混合训练以获得零样本泛化的路线，目标从相对深度变为度量三维点。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/zoedepth.html">ZoeDepth</a><span class="yr">2023.02 · 视觉</span><div class=nt>ZoeDepth靠少数领域的度量头与路由获得尺度，跨领域仍失效；UniDepth显式建模相机以实现通用度量深度。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/metric3d.html">Metric3D度量深度</a><span class="yr">2023.07 · 视觉</span><div class=nt>Metric3D需在推理时提供焦距；UniDepth从图像自行预测稠密相机表示，无需任何额外输入。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/video-depth-anything.html">视频深度VDA</a><span class="yr">2025.01 · 视觉</span><div class=nt>逐帧独立预测，用在视频上会出现深度和尺度闪烁。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/zero-few-shot.html">零样本与少样本</a> <a class="chip c" href="../c/attention-concept.html">注意力机制</a> <a class="chip c" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a></p>
+<h2>本篇术语</h2><ul><li><b>相机内参</b>　描述相机自身成像方式的参数，主要是焦距和主点位置，决定每个像素对应空间里哪条光线。</li><li><b>伪球面表示</b>　用光线的两个角度加上沿光线的深度来表示三维点，把相机方向和距离分离开。</li></ul>
+<h2>怎么学</h2><p>先弄清内参如何把像素映射成光线，再读UniDepth第3节相机模块和伪球面输出；用官方模型对一张无EXIF信息的网络照片预测三维点，并与给定真实内参时的结果对比。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2403.18913" rel="noopener">https://arxiv.org/abs/2403.18913</a>（arXiv记录：标题、七位作者、v1提交于2024-03-27；摘要中的现有MMDE方法局限于训练领域、仅凭单张图直接预测度量三维点无需额外信息、自提示相机模块预测稠密相机表示以调制深度特征、伪球面输出解耦相机与深度、几何不变损失、10个数据集零样本评测持续领先甚至超过在测试领域训练的方法。方位角仰角对数深度的具体形式、DINOv2编码器、UniDepthV2、CVPR 2024凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20UniDepth%E9%80%9A%E7%94%A8%E5%BA%A6%E9%87%8F%E6%B7%B1%E5%BA%A6%EF%BC%88unidepth%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aunidepth%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/unidepth.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="2dgs.html"><small>本分支上一个 · 2024.03</small><b>2D高斯泼溅</b></a><a class="r" href="yolov10.html"><small>本分支下一个 · 2024.05</small><b>YOLOv10免NMS</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>2:4结构化稀疏Tensor Core（2021） · AI脉络</title>
+<meta name="description" content="剪枝研究追求很高的稀疏度，但不规则的零分布让矩阵硬件很难真正提速，高稀疏度下精度也难以在各类模型上普遍保持。 只要求一种规整的稀疏：每连续4个权重里恰好2个为零（2:4）。硬件只存非零值和2位索引，Tensor Core据此跳过一半乘法，吞吐翻倍。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sparse-tensor-core.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="2:4结构化稀疏Tensor Core（2021）">
+<meta property="og:description" content="剪枝研究追求很高的稀疏度，但不规则的零分布让矩阵硬件很难真正提速，高稀疏度下精度也难以在各类模型上普遍保持。 只要求一种规整的稀疏：每连续4个权重里恰好2个为零（2:4）。硬件只存非零值和2位索引，Tensor Core据此跳过一半乘法，吞吐翻倍。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sparse-tensor-core.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sparse-tensor-core">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:72"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/hw.html">硬件与算力</a> › 数据中心GPU</div>
+<h1>2:4结构化稀疏Tensor Core</h1>
+<div class="full">Accelerating Sparse Deep Neural Networks</div>
+<div class="meta"><span>2021.04</span><span>论文</span><span>延伸</span><span>arXiv 2021</span><span>Asit Mishra, Jorge Albericio Latorre, Jeff Pool, Darko Stosic, Dusan Stosic, Ganesh Venkatesh, Chong Yu, Paulius Micikevicius · NVIDIA</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2104.08378" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/sparse-tensor-core">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>剪枝研究追求很高的稀疏度，但不规则的零分布让矩阵硬件很难真正提速，高稀疏度下精度也难以在各类模型上普遍保持。</p></div><div><h4>方法</h4><p>只要求一种规整的稀疏：每连续4个权重里恰好2个为零（2:4）。硬件只存非零值和2位索引，Tensor Core据此跳过一半乘法，吞吐翻倍。</p></div><div><h4>影响</h4><p>让稀疏在主流GPU上成为可直接使用的硬件特性，从A100起延续到之后几代NVIDIA GPU，也让“N:M稀疏”成为剪枝研究的一个常用设定。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/scnn.html">SCNN稀疏卷积加速器</a>、<a class="ln" href="../n/eie.html">EIE稀疏推理引擎</a>一类研究加速器追求任意位置的零，代价是复杂的索引和负载不均。NVIDIA在<a class="ln" href="../n/a100.html">A100</a>的Ampere架构里换了一个思路：牺牲一些灵活性，换取硬件实现的简单。2:4模式规定权重矩阵每一行里每4个相邻元素至多2个非零，于是压缩后数据量减半，每个非零值只需2位元数据说明它在4个位置中的哪一个；Sparse Tensor Core读到元数据后，从激活中挑出对应的两个数相乘，跳过另外两个，因此在同样的时间里完成两倍的有效运算。</p><p>论文同时给出一套简单的训练流程：先正常训练稠密网络，再在每组4个权重里剪掉绝对值最小的2个，然后用原来的超参数重新训练一轮让精度恢复。作者在视觉、检测、翻译、语言模型等多种任务和模型上验证，摘要称这套流程能在满足2:4约束的同时保持精度。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>50%稀疏度是固定的，想利用更高的稀疏度拿不到更多加速；而且只对权重稀疏有效，不利用激活的动态稀疏。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>实际端到端加速常低于理论的2倍，因为只有矩阵乘法部分受益，且需要重新训练。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:72" href="../n/a100.html">A100</a><span class="yr">2020.05 · 硬件</span><div class=nt>2:4稀疏是A100 Ampere Tensor Core引入的硬件特性，本文是其设计说明。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/deep-compression.html">剪枝与量化压缩</a><span class="yr">2015.10 · 系统·效率</span><div class=nt>沿用“剪枝后再训练”的思路，但把剪枝结果约束成硬件友好的规整模式。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:72" href="../n/scnn.html">SCNN稀疏卷积加速器</a><span class="yr">2017.05 · 硬件</span><div class=nt>非结构化稀疏加速器控制开销大、难以产品化；2:4结构化稀疏用固定模式换来简单的硬件实现。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/matrix-multiplication.html">矩阵乘法与线性变换</a> <a class="chip c" href="../c/quantization-concept.html">量化</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a></p>
+<h2>本篇术语</h2><ul><li><b>结构化稀疏</b>　零值按固定规律分布（如每4个里2个为零），硬件可以按规律跳过，比任意位置的零更容易加速。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/deep-compression.html">剪枝与量化压缩</a>了解剪枝，再读本文第2–3节的2:4格式和训练流程；动手：把一个4×8矩阵按2:4剪枝，写出压缩后的数值和索引。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2104.08378" rel="noopener">https://arxiv.org/abs/2104.08378</a>（arXiv记录核对标题、8位作者、v1日期2021-04-16与摘要：Ampere Tensor Core引入稀疏支持、2:4（50%）模式、两倍于稠密单元的运算吞吐、保持精度的训练流程。“剪掉每组绝对值最小的2个再重训”的流程细节与2位元数据按一般了解写，未逐句对照正文。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%202%3A4%E7%BB%93%E6%9E%84%E5%8C%96%E7%A8%80%E7%96%8FTensor%20Core%EF%BC%88sparse-tensor-core%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asparse-tensor-core%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sparse-tensor-core.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="grace-hopper.html"><small>本分支上一个 · 2021.04</small><b>Grace CPU与超级芯片</b></a><a class="r" href="tpu-v4.html"><small>本分支下一个 · 2021.05</small><b>TPU v4与光路交换</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

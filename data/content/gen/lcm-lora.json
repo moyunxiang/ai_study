@@ -1,0 +1,29 @@
+{
+  "id": "lcm-lora",
+  "who": "Simian Luo, Yiqin Tan, Suraj Patil, Daniel Gu, Patrick von Platen, Apolinário Passos, Longbo Huang, Jian Li et al. · 清华大学 / Hugging Face",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2311.05556"},
+    {"label": "代码", "url": "https://github.com/luosiallen/latent-consistency-model"}
+  ],
+  "aka": ["LCM-LoRA", "LCM LoRA", "加速LoRA"],
+  "problem": "[[lcm]]要对每个基础模型做全参数蒸馏才能少步出图，而社区里有成千上万个微调过的SD模型和风格LoRA，不可能逐个重新蒸馏，大模型（SDXL）的全量蒸馏还很耗显存。",
+  "idea": "把潜空间一致性蒸馏改用[[lora]]来做，只训练一组低秩参数；然后发现这组参数可以当作通用的“加速模块”，直接插到别的SD微调模型或风格LoRA上，无需再训练就能4步左右出图。",
+  "impact": "使少步生成在Stable Diffusion社区里变成“加一个LoRA文件”的操作，被diffusers、ComfyUI等工具直接支持；也让“加速能力和风格能力可以分别做成LoRA再相加”这一思路流行起来。",
+  "method": "LCM的做法是：以预训练潜扩散模型为教师，在概率流ODE轨迹上做一致性蒸馏（见[[consistency-models]]），让学生从轨迹上任一点一步跳到终点，于是2–4步就能出图。论文摘要称LCM蒸馏只需约32个A100 GPU小时。\n\nLCM-LoRA的两点贡献：\n- **用LoRA做蒸馏**：冻结原模型，只在注意力等层上训练低秩增量`ΔW = BA`（见[[c:peft-concept]]）。这样蒸馏SD-V1.5、SSD-1B、SDXL时显存占用显著降低，画质反而更好。\n- **当作通用加速器**：把蒸馏得到的`ΔW_LCM`直接加到其他由同一基础模型微调来的权重上，或与风格LoRA的`ΔW_style`线性相加，`W = W_0 + λ_1ΔW_style + λ_2ΔW_LCM`，模型就同时具备该风格和少步生成能力。作者把它类比为一个“可插拔的神经PF-ODE求解器”，与DDIM、DPM-Solver这类数值求解器相对。",
+  "limits": [
+    {"text": "2–4步画质与原模型多步结果仍有差距，细节偏软，且不太适配大的CFG系数。", "solved_by": ["add", "dmd2"]},
+    {"text": "加速模块与风格LoRA直接线性相加并无理论保证，组合效果因模型而异。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "lcm", "type": "extends", "note": "把潜空间一致性蒸馏改为LoRA形式，并推广为跨模型通用的加速模块。"},
+    {"to": "lora", "type": "uses", "note": "用低秩适配只训练少量参数完成蒸馏。"},
+    {"to": "sdxl", "type": "uses", "note": "蒸馏对象之一是SDXL，LoRA形式降低了大模型蒸馏的显存开销。"},
+    {"to": "sd-lora", "type": "extends", "note": "沿用社区用LoRA分发风格的方式，把“加速能力”也做成可分发、可叠加的LoRA。"}
+  ],
+  "prereq": ["peft-concept", "knowledge-distillation", "few-step-sampling", "latent-space", "low-rank"],
+  "terms": [
+    {"t": "一致性蒸馏", "d": "训练学生网络，使它从同一条ODE轨迹上任意两点出发都映射到同一个终点，从而一步或几步完成采样。"}
+  ],
+  "learn": "先读一致性模型与LCM → 读这篇短报告的LoRA组合公式 → 在diffusers里给一个社区风格模型加载LCM-LoRA，用4步采样对比效果。",
+  "check": {"source": "https://arxiv.org/abs/2311.05556", "confirmed": "标题、作者、v1日期2023-11-09、摘要中LCM蒸馏约32 A100 GPU小时、对SD-V1.5/SSD-1B/SDXL做LoRA蒸馏降低显存、作为通用加速模块可直接插入微调模型或LoRA、类比神经PF-ODE求解器；组合公式写法、机构与工具支持情况来自一般了解"}
+}

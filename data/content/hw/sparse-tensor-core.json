@@ -1,0 +1,31 @@
+{
+  "id": "sparse-tensor-core",
+  "who": "Asit Mishra, Jorge Albericio Latorre, Jeff Pool, Darko Stosic, Dusan Stosic, Ganesh Venkatesh, Chong Yu, Paulius Micikevicius · NVIDIA",
+  "venue": "arXiv 2021",
+  "aka": ["2:4 Sparsity", "N:M稀疏", "结构化稀疏", "Structured Sparsity", "Sparse Tensor Cores", "ASP"],
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2104.08378"}
+  ],
+  "problem": "剪枝研究追求很高的稀疏度，但不规则的零分布让矩阵硬件很难真正提速，高稀疏度下精度也难以在各类模型上普遍保持。",
+  "idea": "只要求一种规整的稀疏：每连续4个权重里恰好2个为零（2:4）。硬件只存非零值和2位索引，Tensor Core据此跳过一半乘法，吞吐翻倍。",
+  "impact": "让稀疏在主流GPU上成为可直接使用的硬件特性，从A100起延续到之后几代NVIDIA GPU，也让“N:M稀疏”成为剪枝研究的一个常用设定。",
+  "method": "[[scnn]]、[[eie]]一类研究加速器追求任意位置的零，代价是复杂的索引和负载不均。NVIDIA在[[a100]]的Ampere架构里换了一个思路：牺牲一些灵活性，换取硬件实现的简单。2:4模式规定权重矩阵每一行里每4个相邻元素至多2个非零，于是压缩后数据量减半，每个非零值只需2位元数据说明它在4个位置中的哪一个；Sparse Tensor Core读到元数据后，从激活中挑出对应的两个数相乘，跳过另外两个，因此在同样的时间里完成两倍的有效运算。\n\n论文同时给出一套简单的训练流程：先正常训练稠密网络，再在每组4个权重里剪掉绝对值最小的2个，然后用原来的超参数重新训练一轮让精度恢复。作者在视觉、检测、翻译、语言模型等多种任务和模型上验证，摘要称这套流程能在满足2:4约束的同时保持精度。",
+  "limits": [
+    {"text": "50%稀疏度是固定的，想利用更高的稀疏度拿不到更多加速；而且只对权重稀疏有效，不利用激活的动态稀疏。", "solved_by": []},
+    {"text": "实际端到端加速常低于理论的2倍，因为只有矩阵乘法部分受益，且需要重新训练。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "a100", "type": "uses", "note": "2:4稀疏是A100 Ampere Tensor Core引入的硬件特性，本文是其设计说明。"},
+    {"to": "deep-compression", "type": "extends", "note": "沿用“剪枝后再训练”的思路，但把剪枝结果约束成硬件友好的规整模式。"},
+    {"to": "scnn", "type": "solves", "note": "非结构化稀疏加速器控制开销大、难以产品化；2:4结构化稀疏用固定模式换来简单的硬件实现。"}
+  ],
+  "prereq": ["matrix-multiplication", "quantization-concept", "cpu-gpu"],
+  "terms": [
+    {"t": "结构化稀疏", "d": "零值按固定规律分布（如每4个里2个为零），硬件可以按规律跳过，比任意位置的零更容易加速。"}
+  ],
+  "learn": "先读[[deep-compression]]了解剪枝，再读本文第2–3节的2:4格式和训练流程；动手：把一个4×8矩阵按2:4剪枝，写出压缩后的数值和索引。",
+  "check": {
+    "source": "https://arxiv.org/abs/2104.08378",
+    "confirmed": "arXiv记录核对标题、8位作者、v1日期2021-04-16与摘要：Ampere Tensor Core引入稀疏支持、2:4（50%）模式、两倍于稠密单元的运算吞吐、保持精度的训练流程。“剪掉每组绝对值最小的2个再重训”的流程细节与2位元数据按一般了解写，未逐句对照正文。"
+  }
+}

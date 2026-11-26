@@ -1,0 +1,31 @@
+{
+  "id": "mixmatch",
+  "who": "David Berthelot, Nicholas Carlini, Ian Goodfellow, Nicolas Papernot, Avital Oliver, Colin Raffel · Google Research",
+  "venue": "NeurIPS 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1905.02249"},
+    {"label": "官方代码", "url": "https://github.com/google-research/mixmatch"}
+  ],
+  "aka": ["MixMatch", "ReMixMatch前作", "标签猜测", "Label Guessing", "锐化", "Sharpening"],
+  "problem": "深度半监督学习有三类有效手段——一致性正则、[[entropy-minimization]]和通用正则（如[[mixup]]）——但各方法只用其中一两种，彼此难以叠加。",
+  "idea": "把三者合成一个流程：对无标签样本做多次增强、平均预测再“锐化”得到低熵的猜测标签；然后把有标签和无标签样本混在一起做Mixup，再分别计算损失。",
+  "impact": "大幅刷新了半监督图像分类基准，CIFAR-10上250个标签的错误率从约38%降到11%，开启了Google这一系列方法（ReMixMatch、[[fixmatch]]）的迭代，也成为2019–2020年最常被比较的基线之一。",
+  "method": "每个训练步拿一批有标签样本和一批无标签样本：\n\n- **标签猜测**：对每个无标签样本做K次随机增强（如K=2），把模型在这K个版本上的预测分布取平均。\n- **锐化**：对平均分布做温度锐化 `p_i ← p_i^(1/T) / Σ_j p_j^(1/T)`，T<1时分布变尖，相当于隐式地做熵最小化。锐化后的分布就是这些无标签样本的猜测标签。\n- **Mixup**：把有标签样本（带真标签）和无标签样本（带猜测标签）合在一起打乱，两两按Beta分布抽出的比例λ做线性插值（MixMatch取 `λ′ = max(λ, 1−λ)`，让混合结果更接近原样本）。\n- **损失**：混合后来自有标签那一半的样本用交叉熵，来自无标签那一半的用预测与猜测标签之间的平方误差，后者乘以权重λ_U。\n\n测试时只用一个普通的网络。作者做了消融，拆解每个组件的贡献。\n\n摘要报告：MixMatch在多个数据集和标签数量设定下都大幅领先，例如CIFAR-10只用250个标签时错误率从38%降到11%（降为四分之一），STL-10上错误率减半；它还能在差分隐私训练里得到明显更好的精度—隐私权衡（借助[[pate]]式框架）。",
+  "limits": [
+    {"text": "组件和超参数多（K、温度T、Mixup的α、无监督损失权重），后续工作发现其中一些并非必要。", "solved_by": ["fixmatch"]},
+    {"text": "猜测标签来自弱增强的平均预测，扰动强度有限，没有用上强数据增强带来的收益。", "solved_by": ["fixmatch"]}
+  ],
+  "relations": [
+    {"to": "mixup", "type": "uses", "note": "把有标签与无标签样本混在一起做Mixup，作为通用正则。"},
+    {"to": "entropy-minimization", "type": "extends", "note": "用温度锐化猜测标签，相当于隐式地最小化无标签样本的预测熵。"},
+    {"to": "mean-teacher", "type": "rivals", "note": "同为一致性方法，MixMatch不用EMA教师，而用多次增强的平均预测当目标。"},
+    {"to": "uda", "type": "rivals", "note": "同年的半监督方法：UDA靠强增强提升扰动质量，MixMatch靠多种技巧的组合。"},
+    {"to": "pate", "type": "uses", "note": "差分隐私实验沿用PATE式的师生框架，用MixMatch训练学生。"}
+  ],
+  "prereq": ["semi-supervised", "data-augmentation", "entropy", "softmax", "regularization"],
+  "terms": [
+    {"t": "锐化", "d": "把概率分布每个值取1/T次幂再归一化，T越小分布越尖，模型对猜测的类别越有把握。"}
+  ],
+  "learn": "先读[[mixup]]和[[entropy-minimization]]；读论文第3节算法1；在CIFAR-10的250标签设定下实现MixMatch，依次去掉锐化、Mixup、多次增强，复现消融表看各组件的作用。",
+  "check": {"source": "https://arxiv.org/abs/1905.02249", "confirmed": "标题、6位作者、arXiv v1提交于2019-05-06；摘要中统一主流方法、为增强后的无标签样本猜测低熵标签、用MixUp混合有标签与无标签数据、CIFAR-10 250标签错误率由38%降到11%（4倍）、STL-10降一半、差分隐私的精度-隐私权衡更好、消融研究。算法细节（K、T、λ′）、机构、NeurIPS 2019与PATE框架来自一般了解。"}
+}

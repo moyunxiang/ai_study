@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>双向LSTM（BLSTM）（2005） · AI脉络</title>
+<meta name="description" content="只能从左往右读序列，判断当前这一帧属于哪个音素时用不到后面的上下文；能看两边，却仍受普通RNN梯度消失的限制。原始LSTM的训练还用的是截断的近似梯度。 把双向结构和LSTM单元结合成双向LSTM（BLSTM），并用完整的随时间反向传播计算LSTM的精确梯度，在TIMIT音素逐帧分类上系统比较多种…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/graves-blstm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="双向LSTM（BLSTM）（2005）">
+<meta property="og:description" content="只能从左往右读序列，判断当前这一帧属于哪个音素时用不到后面的上下文；能看两边，却仍受普通RNN梯度消失的限制。原始LSTM的训练还用的是截断的近似梯度。 把双向结构和LSTM单元结合成双向LSTM（BLSTM），并用完整的随时间反向传播计算LSTM的精确梯度，在TIMIT音素逐帧分类上系统比较多种…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/graves-blstm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/graves-blstm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 循环网络与记忆</div>
+<h1>双向LSTM（BLSTM）</h1>
+<div class="full">Framewise Phoneme Classification with Bidirectional LSTM and Other Neural Network Architectures</div>
+<div class="meta"><span>2005.07</span><span>论文</span><span>延伸</span><span>Neural Networks 18(5-6), 2005</span><span>Alex Graves, Jürgen Schmidhuber · IDSIA（瑞士）</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1016/j.neunet.2005.06.042" rel="noopener">Neural Networks（DOI） ↗</a><a class="btn sm" href="../index.html#/n/graves-blstm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/lstm.html">LSTM</a>只能从左往右读序列，判断当前这一帧属于哪个音素时用不到后面的上下文；<a class="ln" href="../n/bidirectional-rnn.html">双向RNN</a>能看两边，却仍受普通RNN梯度消失的限制。原始LSTM的训练还用的是截断的近似梯度。</p></div><div><h4>方法</h4><p>把双向结构和LSTM单元结合成双向LSTM（BLSTM），并用完整的随时间反向传播计算LSTM的精确梯度，在TIMIT音素逐帧分类上系统比较多种网络结构。</p></div><div><h4>影响</h4><p>双向LSTM此后成为语音识别、手写识别和NLP序列标注的标准编码器，直到Transformer出现前一直是最常用的序列建模组件之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>逐帧音素分类的任务是：给定一段语音的声学特征序列，对每一帧（约10毫秒）判断它属于哪个音素。一个音素的发音会受后面音素的影响（协同发音），所以只看过去不够。双向结构用两个独立的循环网络，一个从前往后读、一个从后往前读，在每一帧把两者的隐藏状态拼起来再做分类，于是每一帧都能用到整段序列的信息。</p><p>这篇论文把两个方向的循环层都换成带遗忘门的<a class="ln" href="../n/lstm.html">LSTM</a>（见<a class="ln" href="../n/lstm-forget-gate.html">LSTM遗忘门</a>），并且不再沿用原始LSTM那种只在单元内部传梯度的截断近似，而是用完整的<a class="ln" href="../n/bptt.html">随时间反向传播BPTT</a>算精确梯度，作者指出这样更易于实现和检验。论文在TIMIT语料上比较了BLSTM、单向LSTM、双向普通RNN、普通RNN和多层感知机，并考察了加入目标延迟（让单向网络等几帧再输出）的效果。结论是双向结构优于单向，LSTM优于普通RNN，BLSTM综合最好且训练更快（具体百分比本次未能核对原文）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要先拿到整段输入才能做反向那一路，不能用于逐帧实时输出的流式识别。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>逐帧分类需要每一帧都有对齐好的标签，而语音转写通常只有整句文字，没有帧级对齐。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/ctc.html">CTC</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/lstm.html">LSTM</a><span class="yr">1997 · 基础</span><div class=nt>把LSTM放进双向结构，并改用完整BPTT计算精确梯度。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/timit.html">TIMIT语音语料</a><span class="yr">1990 · 数据·评测</span><div class=nt>在TIMIT语料上做逐帧音素分类实验。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/lstm-forget-gate.html">LSTM遗忘门</a><span class="yr">1999.09 · 基础</span><div class=nt>使用带遗忘门的LSTM单元。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/bidirectional-rnn.html">双向RNN</a><span class="yr">1997 · 基础</span><div class=nt>沿用双向RNN的前后两路结构，把普通循环单元换成LSTM以缓解梯度消失。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/ctc.html">CTC</a><span class="yr">2006 · 语音</span><div class=nt>逐帧分类需要每一帧都有对齐好的标签，而语音转写通常只有整句文字，没有帧级对齐。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a> <a class="chip c" href="../c/gating.html">门控机制</a> <a class="chip c" href="../c/backpropagation.html">反向传播</a> <a class="chip c" href="../c/phoneme-acoustic.html">音素、声学模型与语言模型的分工</a> <a class="chip c" href="../c/vanishing-exploding.html">梯度消失与梯度爆炸</a></p>
+<h2>本篇术语</h2><ul><li><b>逐帧分类</b>　对语音的每一个短时间帧单独给出类别标签。</li><li><b>协同发音</b>　相邻音素在发音时相互影响，使同一音素在不同上下文中声学特征不同。</li></ul>
+<h2>怎么学</h2><p>先掌握<a class="ln" href="../n/lstm.html">LSTM</a>和<a class="ln" href="../n/bidirectional-rnn.html">双向RNN</a>，再读原文介绍BLSTM结构与完整梯度的部分；用PyTorch的nn.LSTM(bidirectional=True)在一个序列标注小数据集上对比单向与双向的效果。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://api.crossref.org/works/10.1016/j.neunet.2005.06.042" rel="noopener">https://api.crossref.org/works/10.1016/j.neunet.2005.06.042</a>（经Crossref与OpenAlex核对：标题、作者Graves与Schmidhuber、Neural Networks第18卷第5-6期602-610页、2005-07。摘要被出版方屏蔽，未能打开；比较的网络结构、完整BPTT、TIMIT实验与结论方向来自一般了解，具体数字没有写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%8F%8C%E5%90%91LSTM%EF%BC%88BLSTM%EF%BC%89%EF%BC%88graves-blstm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Agraves-blstm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/graves-blstm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="elastic-net.html"><small>本分支上一个 · 2005.03</small><b>弹性网Elastic Net</b></a><a class="r" href="energy-based.html"><small>本分支下一个 · 2006</small><b>基于能量的学习</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

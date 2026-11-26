@@ -1,0 +1,22 @@
+{
+ "id": "pact-quant",
+ "who": "Jungwook Choi, Zhuo Wang, Swagath Venkataramani, Pierce I-Jen Chuang, Vijayalakshmi Srinivasan, Kailash Gopalakrishnan · IBM研究院",
+ "aka": ["可学习截断", "learnable clipping", "激活量化", "activation quantization", "参数化截断激活"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1805.06085"}
+ ],
+ "problem": "早期量化工作大多只量化权重，激活一旦降到4比特以下精度就明显下降：ReLU的输出没有上界，量化区间取大了步长太粗，取小了又截掉大量数值。",
+ "idea": "把ReLU换成带上界α的截断激活 `y = clip(x, 0, α)`，α作为每层的可学习参数随训练一起优化，再把[0, α]均匀量化到k比特。",
+ "impact": "激活量化的经典基线，“截断阈值通过反向传播学出来”的思路被LSQ等后续量化感知训练方法继承。",
+ "method": "量化激活要先定一个范围：落在范围外的值被截断，范围内的值按 `α / (2^k − 1)` 的步长取整。[[dorefa-net]]把激活固定截到[0,1]，对每层激活大小不同的网络并不合适；用ReLU的话又没有上界。范围选择是一对矛盾：α大，截断误差小但量化步长粗；α小，步长细但截掉的值多。\n\nPACT（PArameterized Clipping acTivation）让网络自己决定这个折中。训练时每层激活写成 `y = 0.5(|x| − |x − α| + α)`，等价于把x截断到[0, α]，然后量化到k比特。量化的取整步骤用[[ste]]跳过，于是损失对α的梯度为：x ≥ α时为1，否则为0；再给α加L2正则，促使它不要无限增大。权重则沿用已有的低比特量化方法。\n\n摘要称：PACT首次让权重和激活同时量化到4比特时，在多种常见模型和数据集上精度与全精度网络相当；作者还从硬件角度说明，低比特计算单元面积大幅减小、数据可以留在片上存储，推理性能可获得超线性提升。",
+ "limits": [
+  {"text": "只学习截断阈值α，量化步长由α和位宽间接决定，梯度估计也比较粗糙；2比特等更低位宽时仍有明显精度损失。", "solved_by": ["lsq"]}
+ ],
+ "relations": [
+  {"to": "dorefa-net", "type": "solves", "note": "DoReFa-Net把激活固定截断在[0,1]，PACT改为每层学习截断上界α，减少低比特激活的精度损失。"},
+  {"to": "integer-quant", "type": "extends", "note": "同属量化感知训练，Google的整数推理方案用统计得到的范围，PACT把范围本身作为训练参数。"},
+  {"to": "ste", "type": "uses", "note": "取整不可导，用直通估计器把梯度传给激活和截断参数α。"}
+ ],
+ "prereq": ["quantization-concept", "neuron-activation", "backpropagation", "regularization"],
+ "check": {"source": "https://arxiv.org/abs/1805.06085", "confirmed": "标题、六位作者、v1日期2018-05-16；摘要：多数量化方案只关注权重、PACT在训练中优化激活截断参数α以找到合适的量化尺度、可量化到任意位宽、首次在多种模型与数据集上把权重与激活同时量化到4比特且精度与全精度相当、硬件面积减小与片上存储带来超线性推理提升。截断函数公式、α的梯度与L2正则、IBM机构为一般了解。"}
+}

@@ -1,0 +1,27 @@
+{
+  "id": "orpo",
+  "who": "Jiwoo Hong, Noah Lee, James Thorne · KAIST AI",
+  "venue": "EMNLP 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2403.07691"}
+  ],
+  "aka": ["ORPO", "Odds Ratio Preference Optimization", "几率比偏好优化", "单阶段对齐"],
+  "problem": "DPO等偏好对齐方法仍要先做一轮监督微调（SFT），偏好阶段还要保留一个冻结的参考模型算KL或对数比，流程分两段、显存翻倍。",
+  "idea": "把偏好对齐并进SFT：在普通的负对数似然损失上，加一项基于几率比（odds ratio）的惩罚，压低被拒回答相对被选回答的几率，不需要参考模型，也不需要单独的SFT阶段。",
+  "impact": "提供了“一步完成SFT和偏好对齐”的简单方案，进入TRL等常用对齐工具库，与SimPO一起代表了去掉参考模型的偏好优化方向。",
+  "method": "作者先观察到：只做SFT时，模型在提升“被选回答”概率的同时，也会把同风格的“被拒回答”概率一起抬高，所以需要一点对不良风格的惩罚。ORPO的损失是 `L = L_SFT + λ·L_OR`，其中 `L_SFT` 是对被选回答的普通负对数似然；几率定义为 `odds(y|x) = P(y|x) / (1 − P(y|x))`，`L_OR = −log σ( log( odds(y_w|x) / odds(y_l|x) ) )`，y_w和y_l分别是被选和被拒的回答。它只用当前模型自己的概率，不需要[[dpo]]那样的参考模型。作者从理论和实验上说明，几率比在对比两种风格时比概率比更温和、更稳定。\n\n实验：在125M到7B的模型上，只用[[ultrafeedback]]数据对Phi-2、Llama-2-7B和Mistral-7B做ORPO，作者称结果超过参数更多的7B和13B级对齐模型，最好的模型在AlpacaEval 2.0上达到12.20%，IFEval（指令级宽松）66.19%，MT-Bench 7.32。",
+  "limits": [
+    {"text": "惩罚强度λ需要调；没有参考模型约束，模型可能偏离原分布太远，在更大规模和推理类任务上相对DPO是否占优并不一致。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "dpo", "type": "solves", "note": "DPO需要先SFT并保留冻结的参考模型，ORPO把两阶段合成一个损失、去掉参考模型。"},
+    {"to": "ultrafeedback", "type": "uses", "note": "主要实验只用UltraFeedback偏好数据训练。"},
+    {"to": "kto", "type": "rivals", "note": "同期对DPO的简化：KTO改用单个回答的好坏标签，ORPO则去掉SFT阶段和参考模型。"}
+  ],
+  "prereq": ["rlhf-concept", "instruction-tuning", "cross-entropy", "logistic-regression", "kl-divergence"],
+  "terms": [
+    {"t": "几率（odds）", "d": "事件发生概率与不发生概率之比 `p/(1−p)`；几率比就是两个事件的几率相除。"}
+  ],
+  "learn": "先读[[dpo]]的损失推导；读本文对SFT会同时抬高被拒回答概率的分析和几率比与概率比的对比；动手：用TRL的ORPOTrainer在UltraFeedback子集上训练一个小模型，与先SFT再DPO比较。",
+  "check": {"source": "https://arxiv.org/abs/2403.07691", "confirmed": "标题、3位作者、arXiv首次提交2024-03-12；摘要中SFT的关键作用、无参考模型的单阶段几率比偏好优化、125M到7B、Phi-2/Llama-2-7B/Mistral-7B只用UltraFeedback、AlpacaEval 2.0 12.20%、IFEval 66.19%、MT-Bench 7.32。损失公式写法、机构KAIST、TRL集成与EMNLP 2024为一般了解。"}
+}

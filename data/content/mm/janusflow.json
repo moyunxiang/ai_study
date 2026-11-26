@@ -1,0 +1,30 @@
+{
+  "id": "janusflow",
+  "aka": ["JanusFlow", "自回归+整流流", "Autoregression and Rectified Flow", "统一理解生成"],
+  "who": "Yiyang Ma, Xingchao Liu, Xiaokang Chen, Wen Liu, Chengyue Wu, Zhiyu Wu, Zizheng Pan, Zhenda Xie et al. · DeepSeek-AI等",
+  "venue": "CVPR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2411.07975"},
+    {"label": "代码", "url": "https://github.com/deepseek-ai/Janus"}
+  ],
+  "problem": "统一理解与生成的模型要么外挂一个文生图模型、让LLM只生成条件，结构复杂；要么在LLM里用离散VQ token自回归画图，画质受限。",
+  "idea": "直接在大语言模型框架内训练整流流（rectified flow）做图像生成，理解时用文本自回归；同时沿用Janus的“理解与生成用两个不同视觉编码器”，并在训练中对齐两者的表示。",
+  "impact": "说明整流流可以几乎不改结构就嵌进LLM里训练，使“自回归管文字、流匹配管图像”的统一模型路线变得简洁可行，同类思路在后续统一模型中被普遍采用。",
+  "method": "论文把当时的统一模型分成两类：一类用预训练文生图模型负责画，LLM只负责生成给它的条件，这样结构复杂，也受限于两部分分离；另一类让单个LLM同时做两件事，或者接扩散模型、或者像[[chameleon]]那样把图像量化成离散token自回归生成。JanusFlow属于后一类，但用的是[[rectified-flow]]（整流流，一种[[flow-matching]]式生成方法）。\n\n结构遵循极简原则：同一个LLM里，理解任务照常做文本的下一词预测；生成任务则让LLM在潜空间里预测速度场，按整流流的方式从噪声一步步走到图像潜变量，再由解码器还原成像素（图1展示的生成分辨率为384×384）。论文的关键发现是，整流流可以直接在LLM框架内训练，不需要复杂的结构修改。为了进一步提升效果，它采用两项策略：其一，像前作[[janus]]那样**解耦**理解编码器和生成编码器，因为两种任务需要的视觉表示不同；其二，在统一训练中**对齐**两者的表示，让生成侧的中间特征向理解编码器的语义特征靠拢（与[[repa]]的思路一致）。\n\n摘要报告，JanusFlow在各自领域达到或超过专门模型，并在标准基准上明显优于已有的统一方法。",
+  "limits": [
+    {"text": "模型规模较小，生成分辨率和画质与专门的大型文生图模型仍有差距。", "solved_by": ["janus-pro", "bagel"]},
+    {"text": "理解和生成用两套编码器，表示并未真正共享，统一的程度有限。", "solved_by": ["unitok", "show-o2"]}
+  ],
+  "relations": [
+    {"to": "janus", "type": "extends", "note": "沿用Janus解耦理解与生成编码器的设计，把生成方式从离散自回归换成整流流。"},
+    {"to": "rectified-flow", "type": "uses", "note": "图像生成部分直接在LLM内部以整流流目标训练。"},
+    {"to": "transfusion", "type": "rivals", "note": "Transfusion在一个模型里混合下一词预测与扩散损失，JanusFlow用整流流并采用解耦编码器，两者同属“自回归+连续生成”路线。"},
+    {"to": "repa", "type": "uses", "note": "训练中对齐生成侧与理解编码器的表示，思路与REPA的表征对齐一致。"}
+  ],
+  "prereq": ["autoregressive", "normalizing-flow", "diffusion-process", "latent-space", "ode-sde"],
+  "terms": [
+    {"t": "整流流（rectified flow）", "d": "一种生成方法：学习一个速度场，让样本沿接近直线的路径从噪声流向数据，因此生成所需步数较少。"}
+  ],
+  "learn": "先了解[[rectified-flow]]和[[janus]]，再读JanusFlow原文第3节的结构图与表征对齐损失；对照[[transfusion]]比较两种把连续生成放进LLM的方式。",
+  "check": {"source": "https://ar5iv.org/abs/2411.07975", "confirmed": "标题、作者及DeepSeek-AI机构、arXiv v1提交2024-11-12；摘要中自回归LLM与整流流结合的极简结构、整流流可在LLM框架内直接训练、解耦理解与生成编码器并在训练中对齐表示、优于已有统一方法；引言中对两类统一方法的划分、图1的384×384生成分辨率。与REPA的对应、CVPR 2025为一般了解，未逐项核对。"}
+}

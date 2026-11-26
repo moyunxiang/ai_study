@@ -1,0 +1,29 @@
+{
+ "id": "caa",
+ "who": "Nina Panickssery, Nick Gabrieli, Julian Schulz, Meg Tong, Evan Hubinger, Alexander Matt Turner · Anthropic、MATS等",
+ "venue": "ACL 2024",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2312.06681"},
+  {"label": "代码", "url": "https://github.com/nrimsky/CAA"}
+ ],
+ "aka": ["CAA", "对比激活加法", "Contrastive Activation Addition", "steering vector", "引导向量"],
+ "problem": "[[activation-steering]]用一两对提示的激活差来引导模型，效果不稳定，也难以说清引导的是哪种行为、强度能否精确控制。",
+ "idea": "针对一种行为（如谄媚、幻觉）准备大量“正例/反例”回答对，在残差流里取两者激活差的平均作为引导向量，推理时在用户提示之后的所有位置乘以正或负系数加回去。",
+ "impact": "成为最常用的引导向量构造方法之一，后来的[[refusal-direction]]、[[persona-vectors]]等工作都沿用“对比样本求均值差”的套路。",
+ "method": "以“谄媚”为例：构造许多选择题，每题有一个谄媚选项A和一个非谄媚选项B。把题目加上答案字母A、B分别输入[[llama-2]] Chat，记录某一层残差流在答案位置的激活，两者相减，再对所有题目取平均，得到这一行为的引导向量v。\n\n推理时，在该层对用户提示之后的每个token位置加上 `α·v`：α为正就加强这种行为，为负就抑制，α的大小控制强度。作者在七种与对齐相关的行为上（如谄媚、幻觉、拒答、迎合性纠正、权力欲等）评测，既看选择题上的行为概率，也看开放式生成。\n\n摘要称，CAA能显著改变模型行为，在微调和系统提示之上叠加使用依然有效，而对能力的影响很小。作者还用投影可视化等方法分析了这些向量，发现同一行为的正反例在激活空间中可分。",
+ "limits": [
+  {"text": "需要为每种行为手工构造对比数据，引导效果因层而异，过大的系数会让输出变得不通顺；引导向量在分布外是否可靠也缺少保证。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "activation-steering", "type": "extends", "note": "把少量提示对的激活差改为大量对比样本的平均差，更稳定且可按系数控制强度。"},
+  {"to": "representation-engineering", "type": "rivals", "note": "同期都从对比样本中找行为方向；RepE多用PCA读方向，CAA直接用均值差并系统评测对齐相关行为。"},
+  {"to": "llama-2", "type": "uses", "note": "在Llama 2 Chat的多个规模上计算和测试引导向量。"}
+ ],
+ "prereq": ["residual-connection", "feature-representation", "vector-matrix", "language-model"],
+ "terms": [
+  {"t": "残差流", "d": "Transformer中逐层累加信息的主通道，每层的注意力和MLP都从它读、往它写。"},
+  {"t": "引导向量", "d": "加到模型中间激活上、用来改变某种行为倾向的一个固定方向向量。"}
+ ],
+ "learn": "先读[[activation-steering]] → 读原文第3节的向量构造与第4节的行为评测 → 用官方代码在小模型上为一种行为算引导向量并扫描系数。",
+ "check": {"source": "https://arxiv.org/abs/2312.06681", "confirmed": "arXiv记录：标题、6位作者、2023-12-09 v1；摘要所述正负样本残差流激活差取平均、在用户提示后所有位置以正负系数相加、在Llama 2 Chat上的选择题与开放生成评测、在微调和系统提示之上仍有效、对能力影响小。七种行为、ACL 2024与机构凭一般了解写。"}
+}

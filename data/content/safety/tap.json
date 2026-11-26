@@ -1,0 +1,27 @@
+{
+ "id": "tap",
+ "who": "Anay Mehrotra, Manolis Zampetakis, Paul Kassianik, Blaine Nelson, Hyrum Anderson, Yaron Singer, Amin Karbasi · 耶鲁大学、Robust Intelligence等",
+ "venue": "NeurIPS 2024",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2312.02119"}
+ ],
+ "aka": ["TAP", "攻击树", "Tree of Attacks with Pruning", "带剪枝的攻击树"],
+ "problem": "[[pair]]让一个攻击者模型逐轮改写提示来越狱黑盒模型，但它只沿一条链改写，成功率受限，而且每次改写都要真的去问目标模型，查询次数不少。",
+ "idea": "把逐轮改写扩展成树搜索：每一步让攻击者模型生成多个改写分支，先由评估模型剪掉明显跑题或没希望的分支，只把剩下的发给目标模型，再保留得分最高的继续扩展。",
+ "impact": "成为自动化红队评测里最常用的黑盒基线之一，常与[[pair]]、[[gcg]]一起出现在越狱攻防论文和[[harmbench]]等评测中。",
+ "method": "TAP使用三个角色：攻击者模型负责生成候选提示，评估模型负责打分和判断，目标模型是被测的黑盒。每一轮：\n\n- 分支：对当前保留的每个候选，攻击者模型参考此前的对话和得分，生成若干改写版本。\n- 第一次剪枝：评估模型先判断每个新提示是否仍在追求原本的测试目标，偏题的直接丢弃，这一步不消耗对目标模型的查询。\n- 查询与评分：剩下的提示发给目标模型，评估模型给回答打分。\n- 第二次剪枝：只保留得分最高的若干个，进入下一轮。\n\n摘要称，TAP对包括GPT-4 Turbo和GPT-4o在内的先进模型，在超过80%的测试请求上找到了越狱提示，比此前最好的黑盒方法有明显提升，所用查询更少；它也能攻破由[[llama-guard]]等护栏保护的模型。\n\n对防御方的意义在于：只做黑盒访问、不需要梯度，就能自动、批量地发现安全训练的漏洞，这也是红队测试要先自动化的原因。",
+ "limits": [
+  {"text": "成功判定依赖评估模型打分，可能把“看似配合、实则无用”的回答算作越狱；面对[[circuit-breakers]]、[[constitutional-classifiers]]这类表示层或分类器防御，效果明显下降。", "solved_by": ["strongreject"]}
+ ],
+ "relations": [
+  {"to": "pair", "type": "extends", "note": "把PAIR的单链迭代改写扩展为带剪枝的树搜索，提高成功率并减少对目标模型的查询。"},
+  {"to": "llama-guard", "type": "rivals", "note": "展示了这种自动黑盒攻击可以绕过Llama Guard一类的输入输出护栏。"}
+ ],
+ "prereq": ["language-model", "tree-search", "decoding-sampling", "prompt-injection-concept"],
+ "terms": [
+  {"t": "黑盒攻击", "d": "攻击者只能向模型发送输入、看到输出，不知道参数也拿不到梯度。"},
+  {"t": "剪枝", "d": "在搜索树中提前丢掉没希望的分支，节省计算或查询次数。"}
+ ],
+ "learn": "先读[[pair]] → 读原文第3节算法和查询次数对比 → 再读[[harmbench]]，了解这类攻击在标准评测中如何比较。",
+ "check": {"source": "https://arxiv.org/abs/2312.02119", "confirmed": "arXiv记录：标题、7位作者、2023-12-04 v1；摘要所述攻击者LLM迭代改写、发送前评估并剪枝以减少查询、对GPT-4 Turbo与GPT-4o超过80%的请求越狱成功、优于此前黑盒方法、可攻破LlamaGuard保护的模型。两步剪枝的流程细节、NeurIPS 2024与机构凭一般了解写。"}
+}

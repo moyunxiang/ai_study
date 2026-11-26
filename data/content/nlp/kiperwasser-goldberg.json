@@ -1,0 +1,33 @@
+{
+  "id": "kiperwasser-goldberg",
+  "who": "Eliyahu Kiperwasser, Yoav Goldberg · 巴伊兰大学",
+  "venue": "TACL 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1603.04351"}
+  ],
+  "aka": ["K&G 2016", "BiLSTM parser", "BIST parser"],
+  "problem": "依存句法分析器的效果高度依赖特征：Chen和Manning的神经分析器仍要从栈和缓冲区手工挑出十几个词、词性和弧作为输入，图模型分析器要靠复杂的高阶特征。",
+  "idea": "先用双向LSTM给句中每个词算一个上下文向量，再只拼接极少几个这样的向量交给多层感知机打分：转移式分析器看栈顶和缓冲区的4个词，图式分析器只看一条弧的中心词和修饰词2个词。",
+  "impact": "用如此简单的结构在英文和中文树库上达到接近最好的精度，确立了「BiLSTM编码+少量特征」的分析器范式，直接引出了双仿射依存分析器。",
+  "method": "[[chen-manning-parser]]用前馈网络取代了转移式分析器里的稀疏特征，但输入仍是人工挑选的一组位置。[[mstparser]]一类图模型给每条可能的弧打分再求最大生成树，效果好的版本要用二阶、三阶特征。\n\n本文的关键是把「特征」交给一个与分析器一起训练的BiLSTM：词向量和词性向量拼接后送入双向LSTM，第i个词的输出`v_i`已经包含了整句的上下文信息，因此不需要再手工组合远处的词。在此基础上做了两种分析器。\n\n**转移式**（arc-hybrid系统，同[[nivre-parser]]一脉）：每个状态只取栈顶3个词和缓冲区第1个词的BiLSTM向量，拼接后经多层感知机给每个动作打分，贪心解码，用带动态预言的合页损失训练。\n\n**图式**（一阶、按弧分解）：对每条候选弧`h→m`，拼接`v_h`和`v_m`送入多层感知机得到弧分数，用Eisner算法求最高分的投影树，以合页损失和损失增强推断训练。\n\n摘要与正文报告：只用树库数据、不用预训练词向量时，两个特征的一阶图式分析器英文93.1 UAS、中文86.6 UAS；加上预训练词向量后，贪心转移式分析器（11个特征）达到英文93.9、中文87.6 UAS，4个特征的版本为93.6和87.4。",
+  "limits": [
+    {"text": "图式分析器用多层感知机对每条弧打分，计算与参数量都偏大，且只是一阶模型。", "solved_by": ["biaffine-parser"]},
+    {"text": "BiLSTM只在树库数据上训练，词的上下文表示受标注规模限制，跨领域时下降明显。", "solved_by": ["elmo", "bert"]}
+  ],
+  "relations": [
+    {"to": "chen-manning-parser", "type": "solves", "note": "Chen和Manning的神经分析器仍需人工选择十几种特征位置，BiLSTM向量让特征缩减到4个甚至2个。"},
+    {"to": "mstparser", "type": "extends", "note": "图式版本沿用按弧分解、求最大投影树的框架，把弧特征换成两个BiLSTM向量。"},
+    {"to": "nivre-parser", "type": "extends", "note": "转移式版本沿用移进-归约式的转移系统（arc-hybrid），只改状态的表示方式。"},
+    {"to": "lstm", "type": "uses", "note": "用双向LSTM为每个词计算包含全句上下文的特征向量，并与分析器联合训练。"}
+  ],
+  "prereq": ["recurrent-layer", "mlp", "embedding", "dynamic-programming", "loss-function"],
+  "terms": [
+    {"t": "UAS", "d": "无标签依存准确率：每个词被分配到正确中心词的比例，不看依存关系标签。"},
+    {"t": "转移式与图式分析", "d": "转移式像移进-归约那样一步步做决定；图式先给所有可能的弧打分，再整体求最高分的树。"}
+  ],
+  "learn": "先读[[chen-manning-parser]]与[[nivre-parser]]的讲解 → 读原文第3–5节 → 动手：在Universal Dependencies某个小语种树库上实现图式版本（BiLSTM+MLP弧打分+Eisner解码），与只用词向量窗口的基线比较UAS。",
+  "check": {
+    "source": "https://arxiv.org/abs/1603.04351",
+    "confirmed": "arXiv：标题、作者Kiperwasser、Goldberg、2016-03-14提交、摘要（BiLSTM为每个词提供上下文向量、拼接少量BiLSTM向量作特征、用于贪心转移式与全局优化的图式分析器、英文和中文上达到或超过最好精度）；PDF正文（pdftotext）：巴伊兰大学、arc-hybrid系统、4个词索引、合页损失、Eisner算法、只用树库时英文93.1/中文86.6 UAS、加预训练词向量11特征93.9/87.6与4特征93.6/87.4。TACL 2016出处与动态预言训练细节凭一般了解。"
+  }
+}

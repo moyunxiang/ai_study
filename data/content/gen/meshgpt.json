@@ -1,0 +1,29 @@
+{
+  "id": "meshgpt",
+  "who": "Yawar Siddiqui, Antonio Alliegro, Alexey Artemov, Tatiana Tommasi, Daniele Sirigatti, Vladislav Rosov, Angela Dai, Matthias Nießner · 慕尼黑工业大学 / 都灵理工大学 / AUDI",
+  "venue": "CVPR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2311.15475"}
+  ],
+  "aka": ["MeshGPT", "自回归网格生成", "Artist-like Mesh"],
+  "problem": "多数三维生成方法先得到隐式场再用等值面提取（如Marching Cubes）转成网格，得到的是成千上万个细碎三角形，和美术师手工建模的紧凑、边缘锐利的网格相差很远，难以直接用于游戏和动画。",
+  "idea": "像语言模型写句子一样逐个生成三角形：先用图卷积编码器把每个三角形面编码并量化成离散token，学一个网格词表；再训练一个只有解码器的Transformer按顺序预测下一个token，采样出完整网格。",
+  "impact": "开启了“直接生成美术风格三角网格”的自回归路线，MeshAnything、MeshXL等后续工作都沿用“网格离散化+下一token预测”的范式。",
+  "method": "**网格词表**：把训练网格的所有三角形按固定规则排序（例如按顶点坐标从低到高），每个三角形由三个顶点的坐标描述。一个图卷积编码器在网格的面邻接图上提取每个三角形的特征，使特征里带有局部几何和拓扑信息；再用残差[[c:vector-quantization]]把特征离散化成若干个码（沿用[[vq-vae]]的思路）。一个解码器负责把码序列还原成三角形顶点坐标，训练目标是重建网格。\n\n**自回归生成**：网格被表示成一长串码，训练一个GPT式的[[transformer]]解码器，按顺序预测下一个码的索引，与[[gpt-2]]做语言建模的方式一样。生成时从开始符号逐个采样，直到结束符，再用解码器变回三角形，相邻三角形共享的顶点合并后就得到一个完整网格。\n\n因为模型直接生成三角形本身，结果天然是紧凑的、边缘锐利的网格，模仿了人工建模的三角化方式。论文在ShapeNet的椅子、桌子、台灯等类别上报告，形状覆盖率提高9%，FID改善30个点。",
+  "limits": [
+    {"text": "序列长度随面数线性增长，只能生成几百到约八百个面的简单物体，且每个模型只覆盖少数类别。", "solved_by": []},
+    {"text": "只生成几何不生成纹理，也不能直接按文字或图片条件生成开放类别的物体。", "solved_by": ["trellis", "hunyuan3d-2"]}
+  ],
+  "relations": [
+    {"to": "vq-vae", "type": "uses", "note": "用向量量化把每个三角形的特征变成离散码，构成网格词表。"},
+    {"to": "transformer", "type": "uses", "note": "以只有解码器的Transformer作为自回归生成器。"},
+    {"to": "gpt-2", "type": "extends", "note": "把语言模型的下一token预测直接搬到三角形序列上。"}
+  ],
+  "prereq": ["3d-representation", "vector-quantization", "autoregressive", "transformer-block", "message-passing"],
+  "terms": [
+    {"t": "三角网格", "d": "用很多三角形面片拼成物体表面的三维表示，是游戏与影视软件里最通用的格式。"},
+    {"t": "等值面提取", "d": "从一个三维标量场（如有符号距离场）中找出数值等于某个阈值的曲面并转成网格，代表算法是Marching Cubes。"}
+  ],
+  "learn": "先懂三角网格与VQ-VAE → 读本文第3节三角形排序与图卷积编码 → 对比GET3D等方法提取出的网格与MeshGPT输出的面数和布线。",
+  "check": {"source": "https://arxiv.org/abs/2311.15475", "confirmed": "标题、八位作者、v1日期2023-11-27、摘要中追求美术网格的紧凑性、对比神经场等值面提取的稠密网格、以三角形序列自回归生成、用图卷积学习量化嵌入词表、解码器重建三角形、Transformer预测下一个嵌入索引、形状覆盖提高9%与FID提高30个点；机构、CVPR 2024、残差量化、面数上限约800、ShapeNet类别与后续工作来自一般了解"}
+}

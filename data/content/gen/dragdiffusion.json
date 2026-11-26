@@ -1,0 +1,30 @@
+{
+  "id": "dragdiffusion",
+  "who": "Yujun Shi, Chuhui Xue, Jun Hao Liew, Jiachun Pan, Hanshu Yan, Wenqing Zhang, Vincent Y. F. Tan, Song Bai · 新加坡国立大学 / 字节跳动",
+  "venue": "CVPR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2306.14435"},
+    {"label": "代码", "url": "https://github.com/Yujun-Shi/DragDiffusion"}
+  ],
+  "aka": ["DragDiffusion", "拖拽式编辑", "Point-based Editing", "DragBench"],
+  "problem": "[[draggan]]让用户在图上点一个起点、一个终点就能把物体“拖”过去，但它依赖为特定类别训练的[[stylegan2]]，对任意真实照片和多物体场景用不了。",
+  "idea": "把拖拽编辑搬到大规模预训练的扩散模型上：先把图像反演到某一步的扩散潜变量，再用扩散U-Net的中间特征做监督，直接优化这个潜变量把控制点移到目标位置。",
+  "impact": "让点选拖拽编辑适用于各类真实图像和生成图像，并提出第一个点拖拽编辑基准DragBench；之后大量拖拽编辑工作都以它和DragBench作为对照。",
+  "method": "流程分三步：\n1. **保身份**：先用这张图对Stable Diffusion做一次快速的LoRA微调（见[[sd-lora]]），让模型能更精确地重建它。\n2. **反演到中间步**：用DDIM反演把图像变成第`t`步的潜变量`z_t`（只反演到中间某一步，而不是纯噪声）。\n3. **优化潜变量**：沿用DragGAN的两步交替。**运动监督**：取U-Net解码器的中间特征图，要求控制点周围小块的特征朝目标点方向移动一小步，以此为损失对`z_t`做梯度下降；**点跟踪**：更新后在特征图上用最近邻搜索找到控制点的新位置。反复迭代，直到控制点到达终点。最后从优化后的`z_t`去噪得到结果。\n\n作者还加入了latent-MasaCtrl：去噪时让编辑后的图像在自注意力中参考原图的键和值，进一步保持外观一致。论文观察到，只优化单一时间步的潜变量就足以完成编辑。",
+  "limits": [
+    {"text": "每次拖拽都要先LoRA微调再做几十步潜变量优化，耗时以分钟计，交互不够流畅。", "solved_by": []},
+    {"text": "大幅度拖拽或需要“生成”被遮挡部分时容易出现扭曲与伪影。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "draggan", "type": "extends", "note": "沿用运动监督与点跟踪的交替优化，把载体从StyleGAN换成预训练扩散模型。"},
+    {"to": "stable-diffusion", "type": "uses", "note": "以Stable Diffusion的U-Net特征作为运动监督与点跟踪的特征空间。"},
+    {"to": "sd-lora", "type": "uses", "note": "先对输入图像做LoRA微调以保持原图身份。"}
+  ],
+  "prereq": ["diffusion-process", "latent-space", "gradient-descent", "self-attention", "peft-concept"],
+  "terms": [
+    {"t": "运动监督", "d": "要求控制点附近的特征在下一步出现在朝目标方向偏移一点的位置，以此构造损失推动图像内容移动。"},
+    {"t": "点跟踪", "d": "每次更新后在特征图上重新寻找控制点当前所在位置，避免点“丢失”。"}
+  ],
+  "learn": "先读DragGAN → 读本文方法图与时间步消融 → 运行官方代码在一张照片上试拖拽编辑。",
+  "check": {"source": "https://arxiv.org/abs/2306.14435", "confirmed": "标题、作者、v1日期2023-06-26、摘要中DragGAN依赖GAN受限、优化扩散潜变量实现精确空间控制、以U-Net特征为监督、LoRA微调与latent-MasaCtrl、提出首个点拖拽基准DragBench；单一时间步观察、CVPR 2024与机构来自一般了解"}
+}

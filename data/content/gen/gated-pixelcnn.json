@@ -1,0 +1,28 @@
+{
+  "id": "gated-pixelcnn",
+  "who": "Aaron van den Oord, Nal Kalchbrenner, Oriol Vinyals, Lasse Espeholt, Alex Graves, Koray Kavukcuoglu · Google DeepMind",
+  "venue": "NeurIPS 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1606.05328"}
+  ],
+  "aka": ["Gated PixelCNN", "Conditional PixelCNN", "条件PixelCNN", "PixelCNN Decoders"],
+  "problem": "[[pixelrnn]]论文里的PixelCNN训练可并行、速度快，但对数似然明显不如逐行循环的PixelRNN；而且两者都只能无条件生成。",
+  "idea": "给PixelCNN的卷积加上类似LSTM的乘性门，并用垂直、水平两个卷积栈消除感受野的“盲点”；再让模型以任意向量（类别、人脸嵌入）为条件生成图像。",
+  "impact": "据论文，门控PixelCNN在ImageNet上的对数似然追平PixelRNN而计算量大减；它的门控激活与条件方式被[[wavenet]]直接采用，PixelCNN作为强解码器/先验也被[[vq-vae]]沿用。",
+  "method": "PixelCNN用带掩码的卷积保证每个像素只看左上方已生成的像素，所以训练时所有位置能同时计算（见[[c:autoregressive]]）。原版有两个问题：\n\n- **表达力不足**：PixelRNN的LSTM单元有乘性门，PixelCNN只有ReLU。本文把每层激活改为`y = tanh(W_f ∗ x) ⊙ σ(W_g ∗ x)`，一半通道做内容、一半通道做门（见[[c:gating]]）。\n- **盲点**：层层堆叠的掩码卷积会漏看当前像素右上方的一片区域。作者把网络拆成垂直栈（看上方所有行）和水平栈（看当前行左侧），并把垂直栈的信息单向传给水平栈，感受野就完整了。\n\n**条件生成**：给定条件向量`h`，在每层的两个分支里都加上`Vᵀh`这一项，即`y = tanh(W_f∗x + V_fᵀh) ⊙ σ(W_g∗x + V_gᵀh)`。若条件是ImageNet类别，模型能生成对应类别的多样场景；若条件是一张陌生人脸经网络得到的嵌入，模型能生成同一人在不同表情、姿态和光照下的肖像。论文还把条件PixelCNN作为自编码器的解码器，展示它能当强大的解码器使用。",
+  "limits": [
+    {"text": "生成仍需逐像素顺序采样，一张图要做上万次前向，速度极慢。", "solved_by": ["vq-vae-2", "maskgit"]},
+    {"text": "只在32×32、64×64等小分辨率上实用，直接在像素上建模难以放大。", "solved_by": ["vq-vae", "vqgan"]}
+  ],
+  "relations": [
+    {"to": "pixelrnn", "type": "solves", "note": "用门控激活和双卷积栈弥补PixelCNN相对PixelRNN的似然差距与感受野盲点，并加入条件输入。"},
+    {"to": "lstm", "type": "uses", "note": "借用LSTM乘性门的思想，把门控放进卷积层。"}
+  ],
+  "prereq": ["autoregressive", "conv-layer", "gating", "mle", "generative-modeling"],
+  "terms": [
+    {"t": "掩码卷积", "d": "把卷积核中对应“未来”像素的权重置零，使每个输出只依赖已经生成的像素。"},
+    {"t": "盲点", "d": "堆叠掩码卷积时，当前像素右上方有一块区域始终看不到，导致信息缺失。"}
+  ],
+  "learn": "先读PixelRNN论文中的PixelCNN部分 → 读本文第2节门控与双栈结构 → 用一个开源实现在MNIST上做类别条件生成。",
+  "check": {"source": "https://arxiv.org/abs/1606.05328", "confirmed": "标题、作者、v1日期2016-06-16、摘要中以任意向量为条件、ImageNet类别条件生成、人脸嵌入条件生成同一人不同表情姿态光照、作为自编码器解码器、门控卷积让似然追平PixelRNN且计算量大减；盲点与垂直/水平栈细节、NeurIPS 2016来自一般了解"}
+}

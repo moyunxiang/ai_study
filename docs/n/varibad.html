@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>VariBAD贝叶斯自适应（2019） · AI脉络</title>
+<meta name="description" content="在未知环境里，贝叶斯最优策略会根据自己对环境的不确定程度决定是探索还是利用，但精确计算它只在极小的问题上可行；隐式地学，用后验采样，都不是直接对不确定性做决策。 用变分自编码器从过去的轨迹推断任务的隐变量后验分布，把后验的均值和方差一起输入策略，让策略显式地根据「我还有多不确定」来行动；用元学习在…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/varibad.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="VariBAD贝叶斯自适应（2019）">
+<meta property="og:description" content="在未知环境里，贝叶斯最优策略会根据自己对环境的不确定程度决定是探索还是利用，但精确计算它只在极小的问题上可行；隐式地学，用后验采样，都不是直接对不确定性做决策。 用变分自编码器从过去的轨迹推断任务的隐变量后验分布，把后验的均值和方差一起输入策略，让策略显式地根据「我还有多不确定」来行动；用元学习在…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/varibad.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/varibad">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 分层、表示与元学习</div>
+<h1>VariBAD贝叶斯自适应</h1>
+<div class="full">VariBAD: A Very Good Method for Bayes-Adaptive Deep RL via Meta-Learning</div>
+<div class="meta"><span>2019.10</span><span>论文</span><span>延伸</span><span>ICLR 2020</span><span>Luisa Zintgraf, Kyriacos Shiarlis, Maximilian Igl, Sebastian Schulze, Yarin Gal, Katja Hofmann, Shimon Whiteson · 牛津大学 / 微软研究院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1910.08348" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/varibad">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>在未知环境里，贝叶斯最优策略会根据自己对环境的不确定程度决定是探索还是利用，但精确计算它只在极小的问题上可行；<a class="ln" href="../n/rl2.html">RL²元强化学习</a>隐式地学，<a class="ln" href="../n/pearl.html">PEARL离策略元RL</a>用后验采样，都不是直接对不确定性做决策。</p></div><div><h4>方法</h4><p>用变分自编码器从过去的轨迹推断任务的隐变量后验分布，把后验的均值和方差一起输入策略，让策略显式地根据「我还有多不确定」来行动；用元学习在一批任务上训练。</p></div><div><h4>影响</h4><p>成为元强化学习中「近似贝叶斯自适应」路线的代表方法和常用基线，后续的元探索研究普遍与它比较。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>贝叶斯自适应MDP（BAMDP）把智能体对环境的信念也当作状态的一部分：最优策略会主动去做能减少不确定性的事。VariBAD用三部分近似它：</p><ul><li>编码器：一个循环网络，读入到当前为止的状态、动作、奖励序列，输出任务隐变量m的近似后验 <code>q(m | τ:t)</code>（高斯分布的均值和方差）；</li><li>解码器：给定m，预测未来的奖励和状态转移，用来训练编码器，目标是变分下界（ELBO），而且要求在每个时刻的后验都能重建整段轨迹的过去和未来；</li><li>策略：输入当前状态和后验参数（均值、方差），用普通RL算法（如PPO）训练。</li></ul><p>因为策略看到的是整个后验而不是一次采样，它能根据不确定度决定是去试探还是直接利用。摘要称：在网格世界里，VariBAD表现出随任务不确定度变化的结构化在线探索；在元RL常用的MuJoCo任务上，它在线回报高于已有方法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>解码器要重建奖励和转移，在高维观测下难以训练；而且只学到在训练任务分布内的近似贝叶斯行为。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>探索仍受限于元训练时见过的任务，对分布外的新任务泛化差。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/ada.html">AdA人类时间尺度适应</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/vae.html">变分自编码器VAE</a><span class="yr">2013.12 · 生成</span><div class=nt>用变分自编码器的编码器-解码器和ELBO来学习任务后验。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/pomdp.html">POMDP规划</a><span class="yr">1998 · RL</span><div class=nt>把未知任务看作隐藏状态，基于信念状态决策，是POMDP思想在元RL里的应用。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/rl2.html">RL²元强化学习</a><span class="yr">2016.11 · RL</span><div class=nt>同样用循环网络在任务分布上元学习，但显式推断任务后验并把不确定度交给策略。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/pearl.html">PEARL离策略元RL</a><span class="yr">2019.03 · RL</span><div class=nt>PEARL对任务隐变量做后验采样（类似Thompson采样）；VariBAD把整个后验输入策略，逼近贝叶斯最优。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/ada.html">AdA人类时间尺度适应</a><span class="yr">2023.01 · RL</span><div class=nt>探索仍受限于元训练时见过的任务，对分布外的新任务泛化差。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/meta-learning.html">元学习</a> <a class="chip c" href="../c/elbo.html">变分推断与ELBO</a> <a class="chip c" href="../c/latent-variable.html">隐变量模型</a> <a class="chip c" href="../c/exploration-exploitation.html">探索与利用</a> <a class="chip c" href="../c/conditional-bayes.html">条件概率与贝叶斯公式</a></p>
+<h2>本篇术语</h2><ul><li><b>贝叶斯最优策略</b>　在对环境只有先验信念时，平均意义上回报最高的策略；它会在探索获得信息和利用已知之间做最优取舍。</li><li><b>BAMDP</b>　贝叶斯自适应MDP：把对环境的信念并入状态后得到的MDP，在其中求最优就得到贝叶斯最优策略。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/rl2.html">RL²元强化学习</a>和<a class="ln" href="../n/vae.html">变分自编码器VAE</a>；读原文第3–4节；用官方代码跑网格世界实验，观察后验方差随时间的变化和智能体的探索路径。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1910.08348" rel="noopener">https://arxiv.org/abs/1910.08348</a>（标题、七位作者、arXiv v1于2019-10-18；摘要中贝叶斯最优策略难以计算、变分方法元学习近似推断并把任务不确定性纳入动作选择、网格世界的结构化在线探索、MuJoCo上在线回报更高。编码器/解码器/策略的结构与ELBO目标按原文正文通行描述；ICLR 2020与机构按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20VariBAD%E8%B4%9D%E5%8F%B6%E6%96%AF%E8%87%AA%E9%80%82%E5%BA%94%EF%BC%88varibad%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Avaribad%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/varibad.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="hide-and-seek.html"><small>本分支上一个 · 2019.09</small><b>捉迷藏中的涌现工具使用</b></a><a class="r" href="alphastar.html"><small>本分支下一个 · 2019.10</small><b>AlphaStar</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

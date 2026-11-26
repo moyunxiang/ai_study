@@ -1,0 +1,24 @@
+{
+ "id": "sheared-llama",
+ "who": "Mengzhou Xia, Tianyu Gao, Zhiyuan Zeng, Danqi Chen · 普林斯顿大学, 清华大学",
+ "venue": "ICLR 2024",
+ "aka": ["Sheared-LLaMA", "结构化剪枝", "structured pruning", "定向结构化剪枝", "动态批加载", "dynamic batch loading"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2310.06694"},
+  {"label": "GitHub", "url": "https://github.com/princeton-nlp/LLM-Shearing"}
+ ],
+ "problem": "想要1–3B的小模型，从头预训练要上万亿token；把现成大模型剪小又往往得到层宽不一、跑不快的怪形状，而且剪完的模型在各领域上恢复速度不均衡。",
+ "idea": "把LLaMA2-7B按指定的目标形状（层数、隐藏维、头数、前馈维）端到端学出剪枝掩码，再继续预训练；继续预训练时按各领域损失离目标还差多少，动态调整每批数据的领域配比。",
+ "impact": "用约3%的算力得到超过同尺寸从头训练模型的1.3B和2.7B模型，确立了“从大模型剪出小模型再续训”这条做小模型的路线，后来的Minitron等沿用这一思路。",
+ "method": "[[sparsegpt]]、[[wanda]]做的是逐个权重的非结构化剪枝，GPU上难以真正提速。结构化剪枝直接删整层、整个注意力头或整段隐藏维，剪完就是一个普通的小稠密模型。\n\n**定向结构化剪枝**：给层、注意力头、前馈中间维、隐藏维各配一组可学习的掩码（服从hard concrete分布，源自L0正则化），用拉格朗日乘子把“剪完必须恰好是目标形状”写成约束，与语言模型损失一起做min-max优化。目标形状取现成的高效架构：1.3B参照Pythia-1.4B（24层、隐藏维2048），2.7B参照INCITE-3B（32层、隐藏维2560）。这一步用0.4B token。\n\n**动态批加载**：剪枝后各领域（网页、代码、书籍等）掉点程度不同。受DoReMi启发，按每个领域当前损失与参考损失的差距，在线调大落后领域的采样比例，不需要额外训练代理模型。继续预训练用50B token。\n\n摘要称，Sheared-LLaMA在多种下游与指令微调评测上超过同尺寸的Pythia、INCITE、OpenLLaMA和同期的TinyLlama，而所用算力只相当于从头训练的3%。",
+ "limits": [
+  {"text": "仍需要几十亿token的继续预训练，算力远高于一次性剪枝；剪枝阶段要为7B模型维护掩码与梯度，显存开销大。", "solved_by": ["minitron"]}
+ ],
+ "relations": [
+  {"to": "llama-2", "type": "uses", "note": "从LLaMA2-7B出发剪到1.3B与2.7B。"},
+  {"to": "pythia", "type": "rivals", "note": "以Pythia的形状为剪枝目标并与之比较，代表“从头训练同尺寸小模型”的做法。"},
+  {"to": "sparsegpt", "type": "rivals", "note": "SparseGPT做非结构化剪枝，难以实际加速；Sheared-LLaMA删整块结构，剪完就是标准稠密小模型。"}
+ ],
+ "prereq": ["pretrain-finetune", "regularization", "lagrange-duality", "params-flops"],
+ "check": {"source": "https://arxiv.org/html/2310.06694v2", "confirmed": "标题、四位作者与普林斯顿/清华、v1日期2023-10-10（abs页）；摘要：定向结构化剪枝、动态批加载、LLaMA2-7B剪到1.3B/2.7B、超过Pythia/INCITE/OpenLLaMA/TinyLlama、3%算力；正文：hard concrete掩码与L0、拉格朗日乘子约束目标形状、0.4B剪枝token与50B续训token、受DoReMi启发且无需辅助模型、目标形状参照Pythia-1.4B与INCITE-3B。ICLR 2024为一般了解。"}
+}

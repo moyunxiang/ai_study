@@ -1,0 +1,28 @@
+{
+  "id": "minigpt-v2",
+  "aka": ["MiniGPT-v2", "任务标识符", "Task Identifier", "多任务统一接口"],
+  "who": "Jun Chen, Deyao Zhu, Xiaoqian Shen, Xiang Li, Zechun Liu, Pengchuan Zhang, Raghuraman Krishnamoorthi, Vikas Chandra et al. · KAUST、Meta",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2310.09478"},
+    {"label": "项目页", "url": "https://minigpt-v2.github.io/"}
+  ],
+  "problem": "一个多模态大模型要同时做描述、问答、指代定位等任务时，同样一句指令可能对应不同任务，模型容易混淆，多任务训练效率也低。",
+  "idea": "给每类任务分配一个专门的标识符token（如[vqa]、[refer]、[grounding]），训练和使用时把它放在指令前，让模型一眼区分该做哪种任务；框坐标直接写成文字。",
+  "impact": "把定位能力和普通问答放进同一个对话式模型，“任务标识符+坐标即文本”的做法成为2023年通用型MLLM的一种常见设计。",
+  "method": "[[minigpt-4]]证明把视觉编码器接到大语言模型上就能做看图对话，但它基本只会描述和问答。[[shikra]]、[[kosmos-2]]等工作开始让模型输出框坐标，做指代表达理解和定位。问题在于，同一个模型里任务越多，指令之间越容易混淆：比如“图中的狗”既可以要求描述它，也可以要求给出它的位置。\n\nMiniGPT-v2的核心改动是**任务标识符**：每类任务一个专门的token，例如视觉问答前加 `[vqa]`，指代表达理解前加 `[refer]`，带定位的描述前加 `[grounding]`。模型看到标识符就知道输出该是一句答案还是一组坐标。框坐标被归一化成整数，用 `{<x1><y1><x2><y2>}` 这样的文本形式写进输出，不需要专门的检测头。结构上沿用视觉编码器加线性投影接入[[llama-2]]对话模型的做法，并把相邻的视觉token合并以减少输入长度；训练分三个阶段，从大量弱标注数据逐步过渡到高质量的多模态指令数据。\n\n摘要报告，MiniGPT-v2在多个视觉问答和视觉定位基准上，相对当时其他通用型视觉-语言模型取得了较强的表现。",
+  "limits": [
+    {"text": "定位只能输出矩形框，做不到像素级的分割掩码，也难以在一段对话中把多个物体和描述逐一对应。", "solved_by": ["glamm"]},
+    {"text": "任务标识符需要人为预先定义，遇到训练时没设计过的新任务类型就无法利用这一机制。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "minigpt-4", "type": "extends", "note": "同一团队的后续版本，从单纯看图对话扩展到包含定位在内的多任务统一接口。"},
+    {"to": "llama-2", "type": "uses", "note": "以LLaMA-2对话模型作为语言底座。"},
+    {"to": "shikra", "type": "extends", "note": "沿用把框坐标写成文本输出的思路，并用任务标识符区分定位与问答等任务。"}
+  ],
+  "prereq": ["instruction-tuning", "embedding", "vision-tasks", "iou-map", "tokenization"],
+  "terms": [
+    {"t": "任务标识符", "d": "加在指令前面的一个特殊token，告诉模型这次要做哪类任务，例如问答还是定位，以减少多任务之间的混淆。"}
+  ],
+  "learn": "先读[[minigpt-4]]和[[shikra]]了解看图对话与坐标即文本的做法，再读MiniGPT-v2原文第3节的任务标识符表格和三阶段训练；可在项目页的在线演示里分别用[vqa]和[refer]提问比较输出差别。",
+  "check": {"source": "https://arxiv.org/html/2310.09478", "confirmed": "标题、作者、arXiv v1提交2023-10-14；摘要中统一接口、为不同任务使用唯一标识符、三阶段训练、在VQA与视觉定位基准上表现强；正文中[vqa]标识符示例。坐标格式、相邻视觉token合并、机构（KAUST、Meta）为一般了解，未逐项核对。"}
+}

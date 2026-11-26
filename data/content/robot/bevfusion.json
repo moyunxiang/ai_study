@@ -1,0 +1,31 @@
+{
+ "id": "bevfusion",
+ "who": "Zhijian Liu, Haotian Tang, Alexander Amini, Xinyu Yang, Huizi Mao, Daniela Rus, Song Han · MIT",
+ "venue": "ICRA 2023",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2205.13542"},
+  {"label": "代码", "url": "https://github.com/mit-han-lab/bevfusion"}
+ ],
+ "aka": ["BEV融合", "多传感器BEV融合"],
+ "problem": "自动驾驶要把激光雷达和相机融合起来。当时主流是“点级融合”：把相机特征投影贴到激光雷达点上，但雷达点很稀疏，投影后相机丰富的语义信息大部分被丢掉，对语义分割一类任务尤其不利。",
+ "idea": "不往点上贴，而是把相机特征和激光雷达特征都变换到同一张鸟瞰图（BEV）上再融合；同时专门优化了相机到BEV的视角变换里最慢的池化步骤。",
+ "impact": "成为多传感器三维检测和BEV地图分割的通用基线，代码被大量后续工作直接使用。",
+ "method": "激光雷达给的是精确但稀疏的三维点，相机给的是稠密但没有深度的图像。点级融合把每个雷达点投到图像上取特征，一张图像里只有很少像素对应到雷达点，大部分语义就浪费了。\n\nBEVFusion换了一个共同空间：鸟瞰图。相机这边沿用[[lift-splat]]的思路，为每个像素预测深度分布，把特征“抬”到三维再“拍平”到BEV网格；激光雷达这边用类似[[centerpoint]]的体素骨干直接得到BEV特征。两张BEV特征图拼接后经卷积融合，再接检测头或分割头，换任务时几乎不用改结构。\n\n作者发现相机到BEV的变换里，把大量三维特征点累加到网格（BEV pooling）是主要瓶颈，通过预先计算和专用GPU内核把这一步的延迟降低了40倍以上。在[[nuscenes]]上，三维检测的mAP和NDS比此前最好方法高1.3%，BEV地图分割的mIoU高13.6%，计算量低1.9倍。",
+ "limits": [
+  {"text": "仍然依赖逐帧的BEV稠密特征，计算和显存随感知范围平方增长，远距离感知代价高。", "solved_by": ["sparsedrive"]},
+  {"text": "只做感知，不涉及预测与规划，误差仍会在模块之间累积。", "solved_by": ["uniad"]}
+ ],
+ "relations": [
+  {"to": "lift-splat", "type": "uses", "note": "相机分支沿用逐像素预测深度分布再投到BEV网格的视角变换。"},
+  {"to": "centerpoint", "type": "uses", "note": "激光雷达分支和检测头沿用体素化BEV骨干与中心点检测的做法。"},
+  {"to": "nuscenes", "type": "uses", "note": "在nuScenes的三维检测与BEV地图分割上评测。"},
+  {"to": "bevformer", "type": "rivals", "note": "BEVFormer只用相机、用注意力生成BEV；BEVFusion把相机与激光雷达在BEV上融合。"}
+ ],
+ "prereq": ["camera-geometry", "3d-representation", "conv-layer", "vision-tasks", "iou-map"],
+ "terms": [
+  {"t": "鸟瞰图（BEV）", "d": "从正上方往下看的二维网格表示，每个格子对应地面上一块区域，适合汇总不同传感器的信息。"},
+  {"t": "点级融合", "d": "把相机图像特征按投影关系附加到每个激光雷达点上的融合方式。"}
+ ],
+ "learn": "先读Lift-Splat-Shoot理解相机到BEV的变换，再读BEVFusion第3节的融合结构和BEV pooling优化；官方代码可在nuScenes mini上跑通。",
+ "check": {"source": "https://arxiv.org/abs/2205.13542", "confirmed": "标题、七位作者、v1提交日期2022-05-26；摘要中点级融合丢失语义密度、统一BEV表示、BEV pooling延迟降低40倍以上、nuScenes检测mAP与NDS高1.3%、地图分割mIoU高13.6%、计算量低1.9倍。ICRA 2023发表处与激光雷达骨干细节为凭一般了解。"}
+}

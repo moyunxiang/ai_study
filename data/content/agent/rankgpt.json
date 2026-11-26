@@ -1,0 +1,29 @@
+{
+  "id": "rankgpt",
+  "who": "Weiwei Sun, Lingyong Yan, Xinyu Ma, Shuaiqiang Wang, Pengjie Ren, Zhumin Chen, Dawei Yin, Zhaochun Ren · 山东大学 / 百度等",
+  "venue": "EMNLP 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2304.09542"},
+    {"label": "GitHub", "url": "https://github.com/sunnweiwei/RankGPT"}
+  ],
+  "aka": ["RankGPT", "LLM重排序", "LLM reranker", "listwise reranking", "列表式重排序", "permutation generation", "排列生成", "滑动窗口重排序", "NovelEval"],
+  "problem": "检索系统的第二阶段重排序一直靠在MS MARCO上监督训练的交叉编码器；对话式LLM的API不给出词元概率，以往用LLM打相关分的做法用不上。",
+  "idea": "让LLM直接读一批带编号的候选段落，输出「[2] > [3] > [1]」这样的整体排列；候选太多就用滑动窗口从后往前分批排；再把ChatGPT的排序蒸馏给小模型。",
+  "impact": "零样本的GPT-4重排序在TREC-DL和BEIR上超过了监督训练的monoT5（3B）；「列表式LLM重排序」和排列蒸馏成为后来LLM重排器的常用基线。",
+  "method": "检索通常分两步：先用[[bm25]]或稠密检索从海量文档里捞出前100篇，再用更贵的模型逐一细排，例如[[monobert]]这类交叉编码器。本文问的是：不经任何训练的[[chatgpt]]、[[gpt-4]]能不能直接当重排器？\n\n**排列生成**：给每个段落一个编号，把问题和20个段落一起放进提示，要求模型按相关性从高到低输出编号序列。它不需要模型吐出概率分数，所以适用于只给文本的对话API。\n\n**滑动窗口**：上下文放不下100段，就用窗口20、步长10从列表末尾往前滑，每次排一窗，靠前的好段落会被逐窗「冒泡」到顶部。\n\n**排列蒸馏**：用ChatGPT对1万条MS MARCO查询的候选给出排序作为标签（约40美元），以[[ranknet]]成对损失训练[[deberta]]交叉编码器。\n\n结果：nDCG@10上GPT-4在TREC-DL19为75.59（monoT5-3B为71.83），BEIR八个数据集平均53.68（monoT5为51.36）；435M的蒸馏学生在BEIR上超过3B的monoT5。为排除测试集泄露，作者还造了包含训练截止后新知识的NovelEval（21个问题、420个段落）。",
+  "limits": [
+    {"text": "每个窗口都要调用一次大模型，重排100个段落需要多轮串行调用，延迟和费用远高于交叉编码器。", "solved_by": []},
+    {"text": "排序结果对段落在提示中的初始顺序敏感，同一批候选换个顺序可能排出不同结果。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "monobert", "type": "rivals", "note": "同是第二阶段重排序；monoBERT/monoT5靠监督训练逐段打分，RankGPT零样本整体排列，在多个基准上胜出。"},
+    {"to": "chatgpt", "type": "uses", "note": "主要实验对象和蒸馏教师。"},
+    {"to": "gpt-4", "type": "uses", "note": "给出最强的零样本重排结果。"},
+    {"to": "beir", "type": "uses", "note": "零样本检索的主要评测集合。"},
+    {"to": "ranknet", "type": "uses", "note": "蒸馏学生时用的成对排序损失。"}
+  ],
+  "prereq": ["retrieval", "in-context-learning", "knowledge-distillation", "benchmark"],
+  "terms": [{"t": "nDCG@10", "d": "只看前10个结果的排序质量指标，越相关的文档排得越靠前分数越高，满分1（常乘100报告）。"}],
+  "learn": "先读[[bm25]]和[[monobert]]了解两阶段检索 → 读原文第3节排列生成与滑动窗口 → 动手：拿20个段落让任意对话模型输出排列，再把顺序打乱重排一次，比较两次结果。",
+  "check": {"source": "https://arxiv.org/abs/2304.09542", "confirmed": "标题、作者、v1提交于2023-04-19；摘要中NovelEval与排列蒸馏；正文（arxiv.org/html/2304.09542）核对窗口20步长10、TREC-DL19 75.59对71.83、BEIR平均53.68对51.36、1万条查询约40美元、RankNet损失、435M学生、NovelEval 21问420段。venue与单位凭一般了解。"}
+}

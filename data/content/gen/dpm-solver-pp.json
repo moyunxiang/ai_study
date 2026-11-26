@@ -1,0 +1,29 @@
+{
+  "id": "dpm-solver-pp",
+  "who": "Cheng Lu, Yuhao Zhou, Fan Bao, Jianfei Chen, Chongxuan Li, Jun Zhu · 清华大学 / 中国人民大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2211.01095"},
+    {"label": "代码", "url": "https://github.com/LuChengTHU/dpm-solver"}
+  ],
+  "aka": ["DPM-Solver++", "DPM++ 2M", "DPM++ 2M Karras", "DPM++ SDE"],
+  "problem": "文生图几乎都用[[cfg]]，而且引导系数很大。在这种设置下，[[dpm-solver]]等高阶采样器会变得不稳定，甚至比一阶的[[ddim]]还慢，大家只好继续跑100–250步DDIM。",
+  "idea": "改为对“数据预测”（直接预测干净图像x₀）形式的扩散ODE求解，配合截断阈值把解限制在训练数据范围内，并用多步法减小有效步长，让高阶求解器在大引导系数下也稳定。",
+  "impact": "论文称在像素空间和潜空间的引导采样中只需15–20步就能得到高质量样本；以“DPM++ 2M”等名字成为Stable Diffusion WebUI和diffusers中最常用的默认采样器之一。",
+  "method": "扩散模型采样可以看成求解一个概率流ODE。DPM-Solver利用其半线性结构，把线性部分精确积分，只对神经网络部分做高阶近似，因此无引导时10步左右就够。问题在于，加入大系数CFG后，模型输出`ε̃ = ε_uncond + w(ε_cond − ε_uncond)`被放大好几倍，对噪声预测`ε`求高阶导数的近似误差随之放大，采样轨迹发散，出现过饱和和伪影。\n\nDPM-Solver++做了三点改动：\n- **换参数化**：把ODE改写成关于数据预测`x_θ(x_t, t)`的形式求解。数据预测的取值有界（像素值在[−1,1]内），对它做近似比对无界的噪声预测稳定。\n- **动态阈值**：借用[[imagen]]的做法，每一步把预测的x₀截到合理范围，防止解跑出训练分布。\n- **多步法**：二阶的单步方法每一步要调用两次网络；多步版（即DPM-Solver++(2M)）复用前一步已算出的网络输出，相同调用次数下每步更短，稳定性更好。\n\n作者还给出了对应的随机（SDE）版本。",
+  "limits": [
+    {"text": "作为免训练的数值求解器，步数降到10步以下画质会明显下降，难以做到一两步出图。", "solved_by": ["lcm", "add", "dmd"]}
+  ],
+  "relations": [
+    {"to": "dpm-solver", "type": "solves", "note": "解决DPM-Solver在大引导系数下不稳定、甚至比DDIM更慢的问题。"},
+    {"to": "cfg", "type": "uses", "note": "针对无分类器引导的采样场景设计。"},
+    {"to": "ddim", "type": "extends", "note": "DDIM相当于一阶求解器，DPM-Solver++在同一ODE上给出高阶、多步的版本。"},
+    {"to": "imagen", "type": "uses", "note": "沿用Imagen提出的动态阈值来约束每步的x₀预测。"}
+  ],
+  "prereq": ["diffusion-process", "ode-sde", "guidance", "few-step-sampling", "taylor-expansion"],
+  "terms": [
+    {"t": "数据预测参数化", "d": "让网络直接输出它估计的干净图像x₀，而不是输出所加的噪声ε；两者可互相换算，但数值性质不同。"},
+    {"t": "多步法", "d": "数值求解ODE时利用前几步已算出的函数值来提高精度，不必在每一步内多次调用网络。"}
+  ],
+  "learn": "先读DDIM和DPM-Solver → 读本文第3–4节数据预测形式与多步法 → 在diffusers里把调度器换成DPMSolverMultistepScheduler，对比20步DDIM的结果。",
+  "check": {"source": "https://arxiv.org/abs/2211.01095", "confirmed": "标题、作者、v1日期2022-11-02、摘要中大引导系数下高阶采样器不稳定且可能慢于DDIM、DDIM需100–250步、数据预测模型与阈值方法、多步变体、15–20步高质量引导采样；WebUI中DPM++ 2M的普及与机构来自一般了解"}
+}

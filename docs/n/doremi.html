@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DoReMi数据配比优化（2023） · AI脉络</title>
+<meta name="description" content="预训练语料由维基百科、书籍、网页、代码等多个领域混合而成，各领域的采样比例对模型效果影响很大，但通常靠经验拍定，或者要用下游任务反复试。 先用分组分布鲁棒优化训练一个小代理模型，让它自动找出“哪些领域还学得不够”并提高其权重，得到一组领域配比；再按这组配比重采样数据训练大模型。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/doremi.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DoReMi数据配比优化（2023）">
+<meta property="og:description" content="预训练语料由维基百科、书籍、网页、代码等多个领域混合而成，各领域的采样比例对模型效果影响很大，但通常靠经验拍定，或者要用下游任务反复试。 先用分组分布鲁棒优化训练一个小代理模型，让它自动找出“哪些领域还学得不够”并提高其权重，得到一组领域配比；再按这组配比重采样数据训练大模型。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/doremi.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/doremi">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 规模定律与数据</div>
+<h1>DoReMi数据配比优化</h1>
+<div class="full">DoReMi: Optimizing Data Mixtures Speeds Up Language Model Pretraining</div>
+<div class="meta"><span>2023.05</span><span>论文</span><span>延伸</span><span>NeurIPS 2023</span><span>Sang Michael Xie, Hieu Pham, Xuanyi Dong, Nan Du, Hanxiao Liu, Yifeng Lu, Percy Liang, Quoc V. Le et al. · Google、斯坦福大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2305.10429" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/doremi">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>预训练语料由维基百科、书籍、网页、代码等多个领域混合而成，各领域的采样比例对模型效果影响很大，但通常靠经验拍定，或者要用下游任务反复试。</p></div><div><h4>方法</h4><p>先用分组分布鲁棒优化训练一个小代理模型，让它自动找出“哪些领域还学得不够”并提高其权重，得到一组领域配比；再按这组配比重采样数据训练大模型。</p></div><div><h4>影响</h4><p>把“数据配比”变成可以用小模型自动优化的问题，此后的数据混合规律、RegMix等工作都把它作为主要比较对象。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/the-pile.html">The Pile与开放预训练语料</a>由22个子集拼成，默认配比是人工定的；<a class="ln" href="../n/glam.html">GLaM</a>的训练集配比则是根据下游任务效果调出来的，成本很高。规模定律类研究大多固定数据分布，只讨论数据量。</p><p>DoReMi分三步。第一步，用默认配比训练一个小的<b>参考模型</b>。第二步，训练同样小的<b>代理模型</b>，目标是分组分布鲁棒优化（Group DRO）：对每个领域计算代理模型损失与参考模型损失的差（超额损失），表示这个领域“还有多少可学的”；在训练过程中不断调高超额损失大的领域的权重，相当于在一个极小极大博弈里让模型照顾最差的领域。整个训练过程中领域权重的平均值就是输出的配比。第三步，按这组配比重采样数据，训练真正的大模型。整个过程不需要任何下游任务信息。</p><p>摘要报告：用280M参数的代理模型确定配比，训练8B模型（大30倍）；在The Pile上所有领域的困惑度都下降，包括被调低权重的领域；平均少样本下游准确率比默认配比高6.5个百分点，用少2.6倍的训练步数达到基线准确率；在GLaM数据集上，不看下游任务的DoReMi与用下游任务调出的配比效果相当。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>得到的配比依赖代理模型规模和参考模型的选择，后来有工作发现在不同规模上重复运行结果不稳定；只能在预先划好的领域粒度上调权重，不能区分领域内部的数据质量。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/chinchilla.html">Chinchilla</a><span class="yr">2022.03 · LLM</span><div class=nt>规模定律关注数据量与参数量的配比，DoReMi关注数据内部各领域的配比，并用小模型的结论指导大模型。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/the-pile.html">The Pile与开放预训练语料</a><span class="yr">2020.12 · 数据·评测</span><div class=nt>主要实验在The Pile的22个领域上优化配比，并与其默认配比比较。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/glam.html">GLaM</a><span class="yr">2021.12 · LLM</span><div class=nt>GLaM的领域配比依赖下游任务调参，DoReMi不看下游任务也能达到相当效果。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/scaling-law-concept.html">幂律与规模定律</a> <a class="chip c" href="../c/cross-entropy.html">交叉熵</a> <a class="chip c" href="../c/distribution-shift.html">分布偏移</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/perplexity.html">困惑度</a></p>
+<h2>本篇术语</h2><ul><li><b>分组分布鲁棒优化（Group DRO）</b>　不最小化平均损失，而是最小化各组中最差那一组的损失；实践中不断给损失高的组加权。</li><li><b>超额损失</b>　代理模型在某领域的损失减去参考模型在该领域的损失，用来衡量这个领域还有多少可学的内容。</li></ul>
+<h2>怎么学</h2><p>先了解<a class="ln" href="../n/the-pile.html">The Pile与开放预训练语料</a>的组成；读本文算法1（领域权重的乘性更新）和主结果图；动手：在两三个小语料上用100M以下的模型复现一次DoReMi，看领域权重怎样随训练变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2305.10429" rel="noopener">https://arxiv.org/abs/2305.10429</a>（标题、10位作者、arXiv首次提交2023-05-17；摘要中用Group DRO训练小代理模型得到领域权重、不需要下游任务、280M代理决定8B模型（30倍）配比、The Pile所有领域困惑度下降、平均少样本准确率提高6.5个百分点、少2.6倍步数达到基线、GLaM数据集上与按下游任务调的配比相当。参考模型与超额损失的细节、NeurIPS 2023、后续不稳定的发现为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DoReMi%E6%95%B0%E6%8D%AE%E9%85%8D%E6%AF%94%E4%BC%98%E5%8C%96%EF%BC%88doremi%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adoremi%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/doremi.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mpt-7b.html"><small>本分支上一个 · 2023.05</small><b>MPT-7B可商用开源模型</b></a><a class="r" href="label-words-anchors.html"><small>本分支下一个 · 2023.05</small><b>标签词是锚点</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

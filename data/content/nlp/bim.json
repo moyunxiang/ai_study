@@ -1,0 +1,39 @@
+{
+  "id": "bim",
+  "who": "Stephen E. Robertson, Karen Spärck Jones · 剑桥大学计算机实验室",
+  "venue": "Journal of the American Society for Information Science, 1976",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1002/asi.4630270302"},
+    {"label": "Wikipedia：Binary independence model", "url": "https://en.wikipedia.org/wiki/Binary_independence_model"},
+    {"label": "Robertson & Zaragoza：The Probabilistic Relevance Framework: BM25 and Beyond", "url": "https://doi.org/10.1561/1500000019"}
+  ],
+  "problem": "TF-IDF等词权重是凭直觉设计的公式，说不清为什么好；用户给出相关反馈后，也没有原则性的办法据此重新给词加权。",
+  "idea": "把检索看成判断「这篇文档相关的概率」，假设词项在相关和不相关文档中各自独立出现，由贝叶斯公式推出每个查询词的最优权重：相关文档含该词的几率比上不相关文档含该词的几率，再取对数。",
+  "impact": "这个对数几率权重（RSJ权重）成为概率检索模型的核心部件，BM25里的IDF项就是它在没有相关信息时的形式。",
+  "background": "1970年代的检索系统已经在用词权重给文档打分：[[tf-idf]]按「越少见的词越有区分度」加权，[[rocchio]]用用户标注的相关文档改写查询向量。但这些都是经验公式，效果靠在[[cranfield]]式测试集上试出来。另一个问题是，用户其实能告诉系统哪些文档相关，可是怎样把这些信息变成词权重，没有理论说明。概率方法在更早就有人尝试，例如Maron和Kuhns用概率给文档标引（与[[naive-bayes]]同源），Yu和Salton在1976年提出按词在相关/不相关文档中的出现概率加权。",
+  "method": "Robertson和Spärck Jones从「按相关概率给文档排序」出发。文档只看每个查询词出现（1）还是不出现（0），并假设在相关文档集合里各个词独立出现，在不相关文档集合里也独立出现——这就是后来所称的**二元独立模型**，和朴素贝叶斯是同一个假设。设`p_i`是相关文档含第i个词的概率，`q_i`是不相关文档含它的概率，按相关几率排序等价于把文档里出现的查询词的权重相加：\n\n`w_i = log [ p_i(1−q_i) / ((1−p_i)q_i) ]`\n\n用相关反馈来估计时，设文档总数`N`、含该词的文档数`n`、已知相关文档数`R`、其中含该词的`r`，常用的带0.5修正的形式是\n\n`w_i = log [ (r+0.5)(N−n−R+r+0.5) / ((n−r+0.5)(R−r+0.5)) ]`\n\n加0.5是为了避免小样本时出现除零和极端值。论文推导并比较了几种不同假设下的加权函数，并在测试集上展示了利用相关信息加权的效果。",
+  "results": "据摘要，论文从一般的概率检索理论推出了若干相关性加权函数，并用测试集上的实验说明了它们的不同用法；原文中的具体数字本次未能核对，这里不引用。",
+  "legacy": "没有任何相关信息时（`R=r=0`），上式近似退化为`log((N−n+0.5)/(n+0.5))`，给出了IDF的一种概率解释。Robertson在1977年提出「概率排序原理」，为按相关概率排序提供了依据。此后Robertson、Walker等在Okapi系统里给它加上词频饱和与文档长度归一化，形成了[[bm25]]，在[[trec]]上长期是最强的基线之一，至今仍是Lucene、Elasticsearch等搜索引擎的默认打分。[[query-likelihood]]则换了一个方向：不估计相关概率，而是看文档的语言模型生成查询的概率。",
+  "pitfalls": "- 二元独立模型最早由Yu和Salton提出，「binary independence model」这个名字和对数几率权重的论证出自Robertson和Spärck Jones。\n- 权重只考虑词出现与否，不计词频；词频和文档长度是在BM25里才补上的。",
+  "limits": [
+    {"text": "只记词是否出现，一个词在文档中出现1次还是20次权重一样，也不区分长文档和短文档。", "solved_by": ["bm25"]},
+    {"text": "最好的形式需要已知的相关文档来估计p_i，多数查询根本没有相关反馈，只能用粗略的默认值。", "solved_by": ["bm25", "query-likelihood"]},
+    {"text": "词项独立假设忽略了词与词的关联和同义关系，查询词没出现就完全得不到分数。", "solved_by": ["lsa"]}
+  ],
+  "relations": [
+    {"to": "tf-idf", "type": "solves", "note": "为IDF这类凭经验设计的权重给出了概率推导：无相关信息时RSJ权重近似就是IDF。"},
+    {"to": "rocchio", "type": "rivals", "note": "两者都利用用户的相关反馈：Rocchio在向量空间里移动查询，RSJ则用相关文档估计每个词的概率权重。"},
+    {"to": "cranfield", "type": "uses", "note": "沿用Cranfield式带相关判断的测试集来比较不同加权函数。"},
+    {"to": "naive-bayes", "type": "extends", "note": "同样假设特征在类别内条件独立；把「相关/不相关」当作两类，用贝叶斯公式推出词权重。"}
+  ],
+  "prereq": ["probability-basics", "conditional-bayes", "retrieval", "classification-metrics"],
+  "terms": [
+    {"t": "概率排序原理", "d": "Robertson 1977年提出：按文档与查询相关的概率从高到低排序，在一定假设下能得到最优的检索效果。"},
+    {"t": "RSJ权重", "d": "Robertson-Spärck Jones权重，查询词在相关与不相关文档中出现几率之比的对数。"}
+  ],
+  "learn": "先复习贝叶斯公式和朴素贝叶斯 → 读Manning等《Introduction to Information Retrieval》第11章（概率信息检索）→ 动手：在一个小测试集上分别用IDF和带相关反馈的RSJ权重排序，比较平均精度。",
+  "check": {
+    "source": "https://doi.org/10.1002/asi.4630270302",
+    "confirmed": "OpenAlex记录：标题、作者Robertson与Spärck Jones、JASIS 1976年5月、摘要（相关性加权函数由一般概率检索理论推出并以测试集实验说明）；Wikipedia Binary independence model条目：Yu与Salton 1976年最先提出BIM、名称及log Y_i最优性出自Robertson与Spärck Jones、1977年概率排序原理；Wikipedia Okapi BM25条目：BM25基于Robertson、Spärck Jones等1970–80年代的概率框架，IDF含0.5修正。原文全文与实验数字未核对；作者机构凭一般了解。"
+  }
+}

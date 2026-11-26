@@ -1,0 +1,28 @@
+{
+ "id": "llm-d",
+ "who": "Red Hat发起；创始贡献者CoreWeave、Google Cloud、IBM Research、NVIDIA",
+ "aka": ["llm-d", "Kubernetes分布式推理", "K8s推理", "KV缓存感知路由", "KV-cache aware routing", "Inference Gateway"],
+ "links": [
+  {"label": "llm-d发布博客", "url": "https://llm-d.ai/blog/llm-d-announce"},
+  {"label": "Red Hat新闻稿", "url": "https://www.redhat.com/en/about/press-releases/red-hat-launches-llm-d-community-powering-distributed-gen-ai-inference-scale"},
+  {"label": "GitHub", "url": "https://github.com/llm-d/llm-d"}
+ ],
+ "problem": "Kubernetes的常规扩容是复制一模一样的副本再轮询分配请求；LLM请求长短差异极大、能否命中某个副本里的前缀缓存差别巨大，预填充和解码的资源需求也不同，这套做法在LLM推理上效率很低。",
+ "idea": "在vLLM之上做一个Kubernetes原生的分布式推理框架：网关按KV缓存命中和负载把请求路由到合适的副本，支持预填充—解码分离部署，并把KV缓存卸载到CPU内存或网络存储。",
+ "impact": "把此前各大厂内部的分离式推理做法整理成一个开源、可在多种加速器上部署的方案，成为K8s上部署大模型推理的主要开源选项之一，2026年10月发布1.0版。",
+ "method": "发布博客先指出LLM推理的特殊之处：请求的输入、输出长度差异很大（检索增强输入长、输出短，推理任务输入短、输出长），负载容易失衡；多轮对话、智能体和代码补全会反复发送相同前缀，路由到已有该前缀缓存的副本可以跳过大量预填充计算；预填充计算密集、解码访存密集（见[[splitwise]]与[[distserve]]），放在同一副本里会浪费资源。\n\nllm-d由Red Hat于2025年5月发起，新闻稿列出的创始贡献者是CoreWeave、Google Cloud、IBM Research和NVIDIA，合作方包括AMD、思科、Hugging Face、英特尔、Lambda、Mistral AI，支持者包括孕育了[[vllm]]的UC Berkeley Sky Computing Lab和孕育了LMCache的芝加哥大学LMCache Lab。主要组件：以vLLM为推理引擎；**AI感知的网络路由**（与Kubernetes Inference Gateway集成），把请求发给最可能已缓存相关计算的服务器；**预填充与解码分离**，两阶段在不同服务器上运行并独立扩缩；基于LMCache的**KV缓存卸载**，把KV缓存从GPU移到CPU内存或网络存储；以及用于服务器间快速传输的高性能通信接口，包括NVIDIA的NIXL库。\n\n它与[[mooncake]]、[[nvidia-dynamo]]解决的是同一类问题，区别在于以Kubernetes为部署与调度的基础。",
+ "limits": [
+  {"text": "部署与调优依赖Kubernetes和多组件协同，对没有K8s运维能力的小团队门槛较高；分离式部署的收益取决于负载形态，短请求场景未必划算。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "vllm", "type": "uses", "note": "以vLLM作为每个副本的推理引擎，在其上增加集群级调度。"},
+  {"to": "distserve", "type": "uses", "note": "博客以DistServe为例说明预填充—解码分离，llm-d把它做成可部署的组件。"},
+  {"to": "mooncake", "type": "extends", "note": "沿着以KV缓存为中心、分离式部署的思路，做成Kubernetes原生的开源方案。"},
+  {"to": "nvidia-dynamo", "type": "rivals", "note": "两者都做分布式、分离式LLM推理调度；Dynamo由NVIDIA主导，llm-d以Kubernetes生态和多厂商加速器为基础。"}
+ ],
+ "prereq": ["kv-cache", "throughput-latency", "training-vs-inference", "memory-bandwidth"],
+ "terms": [
+  {"t": "前缀缓存", "d": "把已算过的提示词前缀的KV缓存留下来；新请求如果以同样的前缀开头，就直接复用，省掉这部分预填充计算。"}
+ ],
+ "check": {"source": "https://www.redhat.com/en/about/press-releases/red-hat-launches-llm-d-community-powering-distributed-gen-ai-inference-scale", "confirmed": "新闻稿日期2025-05-20；创始贡献者CoreWeave、Google Cloud、IBM Research、NVIDIA；合作方AMD、Cisco、Hugging Face、Intel、Lambda、Mistral AI；支持者Berkeley Sky Computing Lab与芝加哥大学LMCache Lab；基于vLLM、AI感知路由、预填充解码分离、基于LMCache的KV缓存卸载、NIXL。llm-d.ai发布博客（2025-05-20）：Kubernetes原生、KV缓存感知路由、请求形态差异与前缀缓存、以DistServe为例。1.0版于2026-10发布来自Google News中IBM Research与Techzine的报道标题。"}
+}

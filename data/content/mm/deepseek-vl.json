@@ -1,0 +1,29 @@
+{
+  "id": "deepseek-vl",
+  "aka": ["DeepSeek-VL", "混合视觉编码器", "Hybrid Vision Encoder"],
+  "who": "Haoyu Lu, Wen Liu, Bo Zhang, Bingxuan Wang, Kai Dong, Bo Liu, Jingxiang Sun, Tongzheng Ren et al. · DeepSeek-AI",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2403.05525"},
+    {"label": "代码", "url": "https://github.com/deepseek-ai/DeepSeek-VL"}
+  ],
+  "problem": "开源VLM在基准上分数不错，但面对网页截图、PDF、图表等真实场景时体验差；多模态训练还常常损伤语言模型原有的文字能力。",
+  "idea": "按真实用户场景收集数据并整理指令集，用一个兼顾语义和细节的混合视觉编码器处理1024×1024高分辨率图，并在预训练中一直混入大量纯文本数据以保住语言能力。",
+  "impact": "DeepSeek第一代开源VLM，确立了“先保住语言能力、再加视觉”的训练取向，其后的DeepSeek-VL2、Janus系列都在此基础上发展。",
+  "method": "DeepSeek-VL从三个方面设计。数据上，预训练数据尽量覆盖真实场景：网页截图、PDF、OCR、图表和知识类内容；指令微调数据则先根据真实用户的使用情况整理出一套用例分类，再按分类构造数据，摘要称这显著改善了实际使用体验。\n\n结构上，它采用**混合视觉编码器**：一路是图文对比预训练的编码器（如[[siglip]]），擅长抓住整体语义，但输入分辨率低；另一路是在高分辨率下工作的编码器（如[[sam]]的图像编码器），擅长看清细节和小字。两路特征合并后在固定的token预算内送入语言模型，使模型能处理1024×1024的输入，计算开销仍然较低。\n\n训练上，作者认为一个好的VLM首先要有强语言能力，因此从预训练一开始就把语言模型训练整合进来，并刻意控制视觉与语言两种模态之间的“竞争”，避免文本能力退化。模型以[[deepseek-llm]]为底座，发布了1.3B和7B两个尺寸，摘要称其在同尺寸模型中取得最好或有竞争力的视觉-语言基准成绩，同时保持语言类基准的表现。",
+  "limits": [
+    {"text": "稠密的7B以下规模在复杂推理和高难度文档任务上仍有限；固定的1024分辨率难以适应极端长宽比的图像。", "solved_by": ["deepseek-vl2"]},
+    {"text": "双编码器增加了系统复杂度，两路特征的分工依赖人为设计。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "deepseek-llm", "type": "uses", "note": "以DeepSeek LLM为语言底座，并在多模态预训练中持续保留其语言能力。"},
+    {"to": "siglip", "type": "uses", "note": "混合编码器中负责语义的低分辨率分支采用对比预训练的视觉编码器。"},
+    {"to": "sam", "type": "uses", "note": "混合编码器中负责高分辨率细节的分支借用SAM的图像编码器。"},
+    {"to": "llava-1.5", "type": "extends", "note": "沿用视觉编码器加适配器接入LLM的结构，重点改在数据构成、高分辨率与训练策略上。"}
+  ],
+  "prereq": ["pretrain-finetune", "instruction-tuning", "image-patch", "contrastive-learning"],
+  "terms": [
+    {"t": "模态竞争", "d": "多模态训练中视觉数据比例过高时，语言模型原本的文字能力会下降；需要调配两类数据的比例来平衡。"}
+  ],
+  "learn": "先读[[llava-1.5]]理解基本结构，再读DeepSeek-VL原文关于混合编码器和训练阶段数据配比的部分；对照[[eyes-wide-shut]]思考为什么单一CLIP类编码器不够。",
+  "check": {"source": "https://arxiv.org/abs/2403.05525", "confirmed": "标题、作者、arXiv v1提交2024-03-08；摘要中真实场景数据（网页截图、PDF、OCR、图表、知识）、按用例分类构造指令数据、混合视觉编码器处理1024×1024、从预训练开始整合LLM训练并控制模态竞争、1.3B与7B两个尺寸并公开。混合编码器的两路具体为SigLIP与SAM-B、以DeepSeek LLM为底座为一般了解，未逐项核对。"}
+}

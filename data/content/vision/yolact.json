@@ -1,0 +1,32 @@
+{
+  "id": "yolact",
+  "who": "Daniel Bolya, Chong Zhou, Fanyi Xiao, Yong Jae Lee · 加州大学戴维斯分校",
+  "venue": "ICCV 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1904.02689"},
+    {"label": "代码", "url": "https://github.com/dbolya/yolact"}
+  ],
+  "aka": ["YOLACT", "YOLACT++", "实时实例分割", "real-time instance segmentation", "原型掩码", "prototype masks", "Fast NMS"],
+  "problem": "[[mask-rcnn]]这类“先检测、再在框内裁特征做掩码”的两阶段实例分割精度高但慢，难以在视频里实时运行。",
+  "idea": "把实例分割拆成两个并行的子任务：全图预测一组共享的“原型掩码”，每个检测框再预测一组系数，用系数线性组合原型得到该实例的掩码。",
+  "impact": "第一批在COCO上达到实时速度且精度可用的实例分割模型之一，“原型＋系数”的思路被后来的单阶段、动态卷积式实例分割反复借用。",
+  "method": "两阶段方法慢在“重新池化”：每个候选框都要从特征图上裁一块（RoIAlign）再单独跑掩码分支。YOLACT完全去掉这一步，整个网络是全卷积的：\n\n- **原型分支**：在[[fpn]]最高分辨率的一层上接几层卷积，对整张图输出k张（例如32张）原型掩码，它们不属于任何具体物体，像是一套“基底”。\n- **预测分支**：在类似[[retinanet]]的单阶段检测头上，每个锚框除了类别和框坐标，再多输出k个掩码系数。\n- **组装**：对NMS后留下的每个框，用它的k个系数对k张原型做线性组合 `M = σ(P·c)`，再用框把结果裁一下、二值化，就得到实例掩码。\n\n因为组合只是一次矩阵乘法，代价几乎可以忽略。作者还提出Fast NMS：把逐个比较的贪心NMS改成矩阵运算一次完成，摘要称比标准NMS快12毫秒、精度只略降。摘要报告在单张Titan Xp上以33.5 fps在COCO上取得29.8 mask mAP，并且只用一张GPU训练；由于不重新池化，掩码质量较高，在视频里也比较稳定。作者分析发现，尽管网络是全卷积的，原型会自发学会按位置区分不同实例。",
+  "legacy": "后续的YOLACT++加入可变形卷积等改进；同期的[[solo]]、CondInst等继续探索不依赖框裁剪的单阶段实例分割，再往后[[k-net]]、[[mask2former]]把“一组可学习的核或查询生成掩码”统一到所有分割任务。",
+  "limits": [
+    {"text": "掩码仍依赖检测框和NMS，框不准或两个物体重叠严重时，线性组合的掩码会互相串扰。", "solved_by": ["solo", "k-net"]},
+    {"text": "29.8 mAP明显低于同期两阶段方法，速度换来了精度损失。", "solved_by": ["mask2former"]}
+  ],
+  "relations": [
+    {"to": "mask-rcnn", "type": "rivals", "note": "Mask R-CNN在框内重新池化后预测掩码，精度高但慢；YOLACT去掉重新池化，以精度换实时速度。"},
+    {"to": "retinanet", "type": "uses", "note": "预测分支建立在RetinaNet式的单阶段锚框检测头上，额外输出掩码系数。"},
+    {"to": "fpn", "type": "uses", "note": "用FPN的多尺度特征做检测，用其高分辨率层生成原型掩码。"},
+    {"to": "yolo", "type": "extends", "note": "名字和目标都来自YOLO的“只看一次”：把单阶段实时思路推广到实例分割。"}
+  ],
+  "prereq": ["vision-tasks", "conv-layer", "anchor-nms", "iou-map", "matrix-multiplication"],
+  "terms": [
+    {"t": "实例分割", "d": "不仅给每个像素标类别，还要区分同一类里的不同个体，比如图里三个人各给一张掩码。"},
+    {"t": "原型掩码", "d": "网络对整张图输出的一组共享掩码基底，每个物体的掩码由它们加权组合而成。"}
+  ],
+  "learn": "先弄懂Mask R-CNN的RoIAlign和掩码分支，再读YOLACT第3节原型与系数的设计；用官方代码跑一段视频，把32张原型可视化出来看它们各自响应哪些区域。",
+  "check": {"source": "https://arxiv.org/abs/1904.02689", "confirmed": "arXiv记录：标题、四位作者、v1提交于2019-04-04；摘要中的原型掩码与掩码系数两个并行子任务、线性组合、29.8 mAP与33.5 fps（单张Titan Xp）、单GPU训练、不重新池化带来高质量掩码与时间稳定性、原型自发学会定位实例、Fast NMS快12 ms。k=32、FPN最高分辨率层生成原型、ICCV 2019、机构凭一般了解写。"}
+}

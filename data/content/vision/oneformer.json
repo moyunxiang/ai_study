@@ -1,0 +1,32 @@
+{
+  "id": "oneformer",
+  "who": "Jitesh Jain, Jiachen Li, MangTik Chiu, Ali Hassani, Nikita Orlov, Humphrey Shi · 俄勒冈大学SHI Labs / Picsart等",
+  "venue": "CVPR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2211.06220"},
+    {"label": "代码", "url": "https://github.com/SHI-Labs/OneFormer"}
+  ],
+  "aka": ["OneFormer", "通用图像分割", "universal image segmentation", "task token", "任务令牌", "train-once"],
+  "problem": "[[mask2former]]等“通用”分割架构虽然一个结构能做三种任务，但要达到最好效果仍需分别在语义、实例、全景分割上各训练一次。",
+  "idea": "只训练一次：每次训练随机抽一种任务，把它从全景标注中派生出对应真值，并把“现在做哪种任务”作为文本令牌喂给模型；再加一个查询与文本的对比损失区分任务和类别。",
+  "impact": "单个模型在ADE20K、Cityscapes、COCO三种任务上都超过分别训练的Mask2Former，把“通用分割”从共用架构推进到共用权重。",
+  "method": "OneFormer的结构基本沿用[[mask2former]]：骨干网络加像素解码器产生多尺度特征，一组对象查询经过Transformer解码器后各自输出一个类别和一张掩码。新东西有三处：\n\n- **任务条件的联合训练**：全景标注同时包含“东西”和“背景物”，可以派生出语义和实例真值。训练时每张图随机选一种任务，生成对应真值，于是一个训练过程覆盖三种任务。\n- **任务令牌**：把“the task is {panoptic/instance/semantic}”这样的文本编码成一个令牌，用来初始化对象查询，让模型推理时按指定任务输出。\n- **查询-文本对比损失**：为每张图生成描述其中各类物体个数的文本，用类似[[clip]]的对比损失把对象查询和这些文本对齐，帮助模型区分不同任务和类别。这部分只在训练时使用。\n\n摘要称单个OneFormer模型在ADE20K、Cityscapes和COCO的三种分割任务上都超过分别训练的Mask2Former，而后者训练资源是其三倍；换用ConvNeXt和DiNAT骨干后效果进一步提升。",
+  "legacy": "它让“一个权重做全部分割任务”成为常见目标；此后的开放词表分割、[[sam]]式可提示分割和[[eomt]]等工作继续在查询-掩码框架上扩展任务与类别。",
+  "limits": [
+    {"text": "类别仍限于训练集的固定类别表，不能按任意文字分割新类别。", "solved_by": ["sam-3"]},
+    {"text": "沿用Mask2Former的像素解码器和多尺度Transformer解码器，结构较重、推理较慢。", "solved_by": ["eomt"]}
+  ],
+  "relations": [
+    {"to": "mask2former", "type": "extends", "note": "以Mask2Former为基础架构，从“共用架构、分别训练”推进到“一次训练、一个权重”。"},
+    {"to": "k-net", "type": "extends", "note": "延续K-Net、MaskFormer一路的统一分割思路，把任务本身也作为模型的条件输入。"},
+    {"to": "clip", "type": "uses", "note": "借用图文对比学习的形式，用查询-文本对比损失区分任务和类别。"},
+    {"to": "panoptic-segmentation", "type": "uses", "note": "利用全景标注能派生语义与实例真值这一点，实现三任务联合训练。"}
+  ],
+  "prereq": ["vision-tasks", "transformer-block", "contrastive-learning", "iou-map", "attention-concept"],
+  "terms": [
+    {"t": "任务令牌", "d": "把要执行的任务名写成文本并编码成向量，输入模型告诉它这次按哪种分割方式输出。"},
+    {"t": "PQ（全景质量）", "d": "全景分割的主指标，同时衡量识别对了多少个区域和匹配上的区域分得有多准。"}
+  ],
+  "learn": "先读Mask2Former的整体结构，再读OneFormer第3节任务条件训练与任务令牌；用官方Demo对同一张图切换三种任务，观察输出差别。",
+  "check": {"source": "https://arxiv.org/abs/2211.06220", "confirmed": "arXiv记录：标题、六位作者、v1提交于2022-11-10；摘要中的现有全景架构仍需分别训练、任务条件联合训练、任务令牌、查询-文本对比损失、单模型在ADE20K/Cityscapes/COCO三种任务上超过分别训练的Mask2Former（后者三倍资源）、ConvNeXt与DiNAT骨干。任务令牌文本格式、对比损失只在训练时使用、CVPR 2023、机构凭一般了解写。"}
+}

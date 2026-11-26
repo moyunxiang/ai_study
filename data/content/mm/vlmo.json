@@ -1,0 +1,30 @@
+{
+  "id": "vlmo",
+  "aka": ["VLMo", "MoME", "Mixture-of-Modality-Experts", "模态专家混合"],
+  "who": "Hangbo Bao, Wenhui Wang, Li Dong, Qiang Liu, Owais Khan Mohammed, Kriti Aggarwal, Subhojit Som, Furu Wei · 微软",
+  "venue": "NeurIPS 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2111.02358"},
+    {"label": "代码", "url": "https://aka.ms/vlmo"}
+  ],
+  "problem": "图文模型要么是双编码器（检索快但交互浅），要么是融合编码器（理解强但检索慢），两类结构要分开训练。",
+  "idea": "每个Transformer块共享一层自注意力，前馈层换成视觉、语言、视觉-语言三个模态专家；同一个模型既能当双编码器做检索，也能当融合编码器做问答。",
+  "impact": "“共享注意力+模态专属前馈层”的设计被同团队的BEiT-3直接继承，成为把图像、文本和图文对放进一个骨干网络的常见做法。",
+  "method": "2021年的视觉语言预训练分两派：[[clip]]、[[align]]这样的双编码器，图像和文本各自编码后算相似度，检索时可以预先算好向量，非常快，但两种模态只在最后一个点积处交互，做视觉问答这类需要细粒度推理的任务不够强；[[vilt]]、[[albef]]这样的融合编码器，让图文token在深层互相注意，理解能力强，但检索时每一对图文都要过一遍网络，代价随候选数平方增长。\n\nVLMo提出模态专家混合（MoME）Transformer：每一层的自注意力参数所有模态共享，前馈网络则准备三份——视觉专家V-FFN、语言专家L-FFN和视觉-语言专家VL-FFN。输入纯图像就走V-FFN，纯文本走L-FFN，图文拼接时底层分别走各自专家、顶层改走VL-FFN。这样同一套参数，按路由方式不同，既能当双编码器（图文分开编码后做对比学习），又能当融合编码器（用图文匹配、掩码语言建模训练）。论文还提出分阶段预训练：先用纯图像数据以BEiT式掩码图像建模训练视觉专家和注意力，再用纯文本训练语言专家，最后在图文对上联合训练，从而利用大量单模态数据。\n\n摘要报告，VLMo在VQA、NLVR2和图文检索上取得了当时最好的结果。",
+  "limits": [
+    {"text": "图文融合时仍需把整段图像和文本拼接后过深层网络，对开放式生成（如图像描述、对话）不直接支持。", "solved_by": ["beit-3", "blip-2"]},
+    {"text": "模型规模和预训练数据量有限，三种专家的路由由人工规定而非学习得到。", "solved_by": ["beit-3"]}
+  ],
+  "relations": [
+    {"to": "vilt", "type": "extends", "note": "沿用ViLT的单流图文Transformer形式，并把它扩展成可切换为双编码器的结构。"},
+    {"to": "albef", "type": "rivals", "note": "ALBEF用独立编码器加融合层，VLMo用共享骨干加模态专家，两者都同时做对比与融合目标。"},
+    {"to": "beit", "type": "uses", "note": "分阶段预训练中用BEiT式掩码图像建模在纯图像数据上训练视觉部分。"},
+    {"to": "clip", "type": "solves", "note": "保留双编码器检索效率的同时补上CLIP缺少的深层图文交互。"}
+  ],
+  "prereq": ["transformer-block", "mixture-of-experts", "contrastive-learning", "masked-modeling", "pretrain-finetune"],
+  "terms": [
+    {"t": "双编码器与融合编码器", "d": "前者图像和文本各自独立编码成向量后比较，适合大规模检索；后者让两种模态的token在网络内部充分交互，适合问答推理。"}
+  ],
+  "learn": "先对比[[clip]]（双编码器）和[[vilt]]（融合编码器）的结构差异，再读VLMo第3节的MoME结构图和分阶段预训练，最后看[[beit-3]]如何把它放大。",
+  "check": {"source": "https://arxiv.org/abs/2111.02358", "confirmed": "标题、八位作者、arXiv v1提交2021-11-03；摘要中MoME Transformer每块含模态专家池与共享自注意力、可作融合编码器或双编码器、分阶段预训练利用纯图像与纯文本数据、VQA/NLVR2/图文检索最好成绩。三种专家的名称与路由方式、BEiT式视觉阶段、NeurIPS 2022与微软为一般了解，未逐项核对。"}
+}

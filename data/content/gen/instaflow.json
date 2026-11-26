@@ -1,0 +1,29 @@
+{
+  "id": "instaflow",
+  "who": "Xingchao Liu, Xiwen Zhang, Jianzhu Ma, Jian Peng, Qiang Liu · UT Austin / Helixon / 清华大学",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2309.06380"},
+    {"label": "代码", "url": "https://github.com/gnobitab/InstaFlow"}
+  ],
+  "aka": ["InstaFlow", "Reflow蒸馏", "一步Stable Diffusion"],
+  "problem": "Stable Diffusion要几十步采样才能出好图；此前用[[progressive-distillation]]等方法直接蒸馏到一步，画质会崩，没有可用的一步文生图模型。",
+  "idea": "先用[[rectified-flow]]的reflow过程把Stable Diffusion的噪声—图像对应关系“拉直”，再把拉直后的模型蒸馏成一步生成器；拉直后轨迹接近直线，一步走完误差小得多。",
+  "impact": "论文称这是第一个画质达到SD级别的一步扩散文生图模型，在MS COCO 2017-5k上FID从渐进蒸馏的37.2降到23.3；它让reflow从小数据集走到了大规模文生图。",
+  "method": "直接蒸馏的难点在于：教师模型从噪声到图像的ODE轨迹是弯曲的，而且同一片噪声区域可能对应差异很大的图像，学生一步跳过去只能得到平均后的模糊结果。\n\nRectified flow的reflow步骤正好针对这一点：用教师从大量随机噪声`z`生成图像`x`，得到成对数据`(z, x)`；再训练一个新模型去拟合从`z`到`x`的直线插值`x_t = t·x + (1−t)·z`的速度场。新模型的轨迹更直，噪声与图像的配对也更“干净”。InstaFlow把这一步做成了带文本条件的流水线：以Stable Diffusion为教师生成文本—噪声—图像三元组，做一次（或两次）reflow得到2-Rectified Flow，然后再以它为教师做一步蒸馏（见[[c:knowledge-distillation]]、[[c:few-step-sampling]]）。作者的消融显示，reflow对改善噪声与图像的匹配、使蒸馏成功起关键作用。论文还把网络扩大到更大的U-Net进一步提升一步生成的质量。",
+  "limits": [
+    {"text": "一步出图的细节和多样性仍明显不如原始多步模型，FID与几十步的SD仍有差距。", "solved_by": ["add", "dmd2"]},
+    {"text": "reflow要先用教师生成大量配对数据再训练，成本不低。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "rectified-flow", "type": "extends", "note": "把reflow拉直轨迹的过程推广到带文本条件的大规模文生图。"},
+    {"to": "stable-diffusion", "type": "uses", "note": "以Stable Diffusion为教师生成配对数据并初始化学生。"},
+    {"to": "progressive-distillation", "type": "rivals", "note": "同为步数蒸馏，作者以渐进蒸馏为主要对照，在一步设定下FID明显更低。"}
+  ],
+  "prereq": ["diffusion-process", "ode-sde", "knowledge-distillation", "few-step-sampling", "generation-metrics"],
+  "terms": [
+    {"t": "reflow", "d": "用当前模型生成噪声—图像配对，再训练新模型沿直线连接这些配对，使生成轨迹逐渐变直的过程。"}
+  ],
+  "learn": "先读Rectified Flow → 读本文的流水线图与reflow消融 → 对比LCM、SDXL Turbo等其他少步路线。",
+  "check": {"source": "https://arxiv.org/abs/2309.06380", "confirmed": "标题、作者、v1日期2023-09-12、摘要中直接蒸馏难以得到一步模型、reflow拉直轨迹并改善噪声与图像配对、首个SD级画质一步模型、COCO 2017-5k上FID 37.2→23.3、扩展网络到更大参数；ICLR 2024与机构来自一般了解"}
+}

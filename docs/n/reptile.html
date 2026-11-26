@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Reptile一阶元学习（2018） · AI脉络</title>
+<meta name="description" content="要对“内层几步梯度下降”再求导，涉及二阶导数，计算和显存开销大、实现麻烦。 不求二阶导：反复抽一个任务、在上面普通地训练几步，然后把初始化参数朝训练后的参数挪一小步。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/reptile.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Reptile一阶元学习（2018）">
+<meta property="og:description" content="要对“内层几步梯度下降”再求导，涉及二阶导数，计算和显存开销大、实现麻烦。 不求二阶导：反复抽一个任务、在上面普通地训练几步，然后把初始化参数朝训练后的参数挪一小步。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/reptile.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/reptile">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 迁移与元学习</div>
+<h1>Reptile一阶元学习</h1>
+<div class="full">On First-Order Meta-Learning Algorithms</div>
+<div class="meta"><span>2018.03</span><span>论文</span><span>延伸</span><span>Alex Nichol, Joshua Achiam, John Schulman · OpenAI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1803.02999" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://openai.com/index/reptile/" rel="noopener">OpenAI博客：Reptile ↗</a><a class="btn sm" href="../index.html#/n/reptile">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/maml.html">MAML元学习</a>要对“内层几步梯度下降”再求导，涉及二阶导数，计算和显存开销大、实现麻烦。</p></div><div><h4>方法</h4><p>不求二阶导：反复抽一个任务、在上面普通地训练几步，然后把初始化参数朝训练后的参数挪一小步。</p></div><div><h4>影响</h4><p>成为最简单的元学习基线之一，与一阶MAML一起说明“只用一阶导数也能学出好初始化”，在小样本学习和联邦学习等场景常被引用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>元学习的设定是：有一个任务分布，希望学到一组初始化参数φ，使得面对一个新任务时，只用少量样本做几步梯度下降就能学好。<a class="ln" href="../n/maml.html">MAML元学习</a>的做法是对“几步梯度下降后的损失”关于φ求导，这需要穿过内层优化过程反向传播，带来二阶导数；它的一阶近似（FOMAML）干脆忽略二阶项。</p><p>Reptile更简单：每轮抽一个任务τ，从当前φ出发用SGD或Adam训练k步得到 <code>φ̃</code>，然后更新 <code>φ ← φ + ε(φ̃ − φ)</code>。如果k=1，这只是在任务的平均损失上做普通的SGD；k大于1时，更新方向里会出现与MAML类似的项。论文用泰勒展开分析说明：Reptile与一阶MAML都在隐式地最大化同一任务内不同小批量梯度之间的内积，也就是鼓励学到的初始化让同一任务的不同样本“朝同一个方向学”，这正是快速泛化需要的。</p><p>摘要报告，作者把Finn等人的结果推广，显示一阶元学习算法在若干公认的小样本分类基准（如<a class="ln" href="../n/omniglot.html">Omniglot手写字符</a>和Mini-ImageNet）上表现良好，并给出理论分析解释其有效性。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>和MAML一样只学一个共享初始化，任务分布差异很大时，单一初始化难以同时适合所有任务。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/maml.html">MAML元学习</a><span class="yr">2017.03 · 基础</span><div class=nt>去掉MAML所需的二阶导数，只用一阶梯度实现初始化的元学习。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/omniglot.html">Omniglot手写字符</a><span class="yr">2015.12 · 数据·评测</span><div class=nt>在Omniglot等小样本分类基准上评测。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/prototypical.html">原型网络</a><span class="yr">2017.03 · 基础</span><div class=nt>同期的小样本学习路线：原型网络学度量空间，Reptile学可快速微调的初始化。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/meta-learning.html">元学习</a> <a class="chip c" href="../c/zero-few-shot.html">零样本与少样本</a> <a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="../c/taylor-expansion.html">泰勒展开</a></p>
+<h2>本篇术语</h2><ul><li><b>一阶MAML（FOMAML）</b>　忽略MAML中二阶导数项的近似版本，直接用内层训练结束处的梯度更新初始化。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/maml.html">MAML元学习</a>，再读本文第3节的算法和第5节的泰勒展开分析；用十几行代码在一维正弦回归的任务分布上实现Reptile，看几步微调后的拟合效果。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1803.02999" rel="noopener">https://arxiv.org/abs/1803.02999</a>（标题、作者Nichol、Achiam、Schulman，arXiv v1提交于2018-03-08；摘要中只用一阶导数的元学习算法族、包含并推广一阶MAML、Reptile反复采样任务训练并把初始化移向训练后的权重、在公认小样本分类基准上表现良好、给出理论分析。梯度内积的分析结论与具体基准名称来自一般了解；OpenAI博客页面已打开，确认标题与“反复采样任务、做SGD、把初始参数移向该任务学到的参数”的描述。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Reptile%E4%B8%80%E9%98%B6%E5%85%83%E5%AD%A6%E4%B9%A0%EF%BC%88reptile%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Areptile%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/reptile.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="swa.html"><small>本分支上一个 · 2018.03</small><b>随机权重平均SWA</b></a><a class="r" href="lottery-ticket.html"><small>本分支下一个 · 2018.03</small><b>彩票假说</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

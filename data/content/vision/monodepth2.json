@@ -1,0 +1,32 @@
+{
+  "id": "monodepth2",
+  "who": "Clément Godard, Oisin Mac Aodha, Michael Firman, Gabriel J. Brostow · 伦敦大学学院 / Niantic / 加州理工",
+  "venue": "ICCV 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1806.01260"},
+    {"label": "代码", "url": "https://github.com/nianticlabs/monodepth2"}
+  ],
+  "aka": ["Monodepth2", "MonoDepth2", "最小重投影误差", "minimum reprojection loss", "auto-masking", "自动掩码"],
+  "problem": "[[sfmlearner]]式的自监督单目深度假设场景静止、每个像素在相邻帧都可见，遮挡、运动物体和相机静止的帧会给出错误监督，深度图出现“洞”和伪影。",
+  "idea": "不靠更复杂的网络，而是三处简单修改：对多个相邻帧取逐像素最小的重投影误差来处理遮挡；在全分辨率上计算多尺度损失；自动屏蔽“看起来没动”的像素。",
+  "impact": "成为自监督单目深度在KITTI上最常用的基线和代码库，此后几年这一方向的论文几乎都与它比较或在它上面改。",
+  "method": "训练框架沿用[[sfmlearner]]：深度网络预测目标帧深度，位姿网络预测相邻帧相对运动，用二者把相邻帧扭到目标帧视角，用光度误差（SSIM与L1的组合）监督。Monodepth2的三点改进：\n\n- **最小重投影误差**：以前把前一帧和后一帧的误差取平均。但一个像素可能在前一帧被遮挡、在后一帧可见；平均会把遮挡处的大误差也算进来。改成对每个像素取多个源帧误差的**最小值**，只用能看见它的那一帧监督。\n- **全分辨率多尺度采样**：以前在解码器每个低分辨率输出上直接算损失，低分辨率深度图在大面积无纹理区域容易产生“洞”。改为先把各尺度深度上采样到输入分辨率，再统一计算光度误差。\n- **自动掩码**：如果某像素在没扭动的源帧上误差反而更小（例如相机停着不动，或物体与相机同速运动），就把它从损失中去掉。\n\n摘要称这一简单模型及其设计选择，比使用更复杂架构和损失的方法效果更好，在KITTI上取得当时最好的结果，并分别验证了每个部分的作用。它同时支持单目视频、双目图像以及两者混合的训练。",
+  "legacy": "Monodepth2的代码和KITTI评测协议被大量后续自监督深度工作沿用；之后的研究转向用大规模混合数据学零样本深度（[[midas]]、[[depth-anything]]），自监督光度损失则保留在视频深度、SLAM等场景中。",
+  "limits": [
+    {"text": "仍只能得到未知尺度的相对深度，换一台相机或场景尺度就不确定。", "solved_by": ["metric3d", "zoedepth"]},
+    {"text": "只在KITTI这类驾驶视频上训练，换到室内或网络照片泛化很差。", "solved_by": ["midas", "depth-anything"]}
+  ],
+  "relations": [
+    {"to": "sfmlearner", "type": "solves", "note": "SfMLearner的平均重投影误差在遮挡和静止帧处出错；最小重投影误差与自动掩码修补了这两个问题。"},
+    {"to": "monodepth", "type": "extends", "note": "同一作者的续作，沿用其左右一致性的双目自监督，并扩展到单目视频与混合训练。"},
+    {"to": "unet", "type": "uses", "note": "深度网络采用带跳跃连接的U-Net式编码器-解码器，编码器为ImageNet预训练的ResNet。"},
+    {"to": "kitti", "type": "uses", "note": "在KITTI上训练和评测，成为该基准上自监督深度的标准对照。"}
+  ],
+  "prereq": ["camera-geometry", "self-supervised", "encoder-decoder", "loss-function", "image-tensor"],
+  "terms": [
+    {"t": "重投影误差", "d": "用预测的深度和位姿把另一帧的像素搬到当前帧后，与当前帧真实像素之间的差。"},
+    {"t": "SSIM", "d": "结构相似度，比较两块图像的亮度、对比度和结构，比逐像素差更符合人眼感受。"}
+  ],
+  "learn": "先读SfMLearner弄懂视图合成监督，再读Monodepth2第3节三项改进及其消融；用官方代码在KITTI上分别关掉最小重投影和自动掩码，看深度图里的遮挡伪影。",
+  "check": {"source": "https://arxiv.org/abs/1806.01260", "confirmed": "arXiv记录：标题、四位作者、v1提交于2018-06-04；摘要中的最小重投影误差处理遮挡、全分辨率多尺度采样减少伪影、自动掩码忽略违反相机运动假设的像素、简单模型优于复杂方法、KITTI上最好结果、逐项验证。SSIM+L1、ResNet编码器、单目/双目/混合训练、ICCV 2019、机构凭一般了解写。"}
+}

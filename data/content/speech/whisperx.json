@@ -1,0 +1,32 @@
+{
+  "id": "whisperx",
+  "who": "Max Bain, Jaesung Huh, Tengda Han, Andrew Zisserman · 牛津大学视觉几何组（VGG）",
+  "venue": "arXiv 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2303.00747"},
+    {"label": "GitHub", "url": "https://github.com/m-bain/whisperX"}
+  ],
+  "problem": "[[whisper]]一次只能处理30秒音频，转写长录音要靠滑动窗口，容易漂移、幻觉和重复；时间戳不准，也没有逐词时间戳，而且只能按顺序一段段处理。",
+  "idea": "先用语音活动检测把长音频切成有人说话的片段并合并到约30秒，再批量交给Whisper转写，最后用一个音素识别模型做强制对齐，得到逐词的准确时间戳。",
+  "impact": "WhisperX成为给长视频、播客、会议录音做带时间戳字幕和说话人标注的常用开源流程，把Whisper从「转写一段话」变成可用于长音频生产的工具。",
+  "method": "Whisper在30秒窗口上训练，处理长音频时常用的做法是滑动窗口加上一段的输出作为提示，但一旦某一段出错，错误会传到后面（漂移），也会在静音处凭空生成文字（幻觉）或反复输出同一句。Whisper预测的句级时间戳也经常偏移。\n\nWhisperX的流程分三步：\n\n- **VAD切分与合并**：先用语音活动检测（VAD，判断哪些时间有人在说话）找出语音段，在静音处切开，再把相邻短片段合并到接近30秒（论文称为VAD Cut & Merge）。每段都从静音处开始，互相独立，因此可以批量并行转写。\n- **Whisper转写**：对每段独立转写，不再依赖上一段的文字作为条件。\n- **强制音素对齐**：用一个在音素上微调过的[[wav2vec-2]]类模型，把转写文字与音频逐帧对齐，得到每个词的起止时间（见[[c:sequence-alignment]]）。\n\n项目还可接入[[pyannote]]做说话人日志，标出每句话是谁说的。摘要称它在长音频转写和词切分基准上达到当时最好水平，并因批量推理获得12倍的转写提速。",
+  "limits": [
+    {"text": "强制对齐依赖各语言单独的音素模型，没有对齐模型的语言拿不到逐词时间戳。", "solved_by": []},
+    {"text": "整个流程是VAD、识别、对齐、说话人日志几个模型拼起来的，任何一环出错都会影响结果，无法端到端联合优化。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "whisper", "type": "uses", "note": "核心转写模型就是Whisper，WhisperX解决的是它在长音频和时间戳上的短板。"},
+    {"to": "wav2vec-2", "type": "uses", "note": "用wav2vec 2.0类音素识别模型做强制对齐，得到逐词时间戳。"},
+    {"to": "pyannote", "type": "uses", "note": "可接入pyannote做语音活动检测和说话人日志。"}
+  ],
+  "prereq": ["sequence-alignment", "word-error-rate", "encoder-decoder", "hallucination"],
+  "terms": [
+    {"t": "强制对齐", "d": "已知一段音频说的是哪些文字，求每个字或音素在音频里的起止时间。"},
+    {"t": "语音活动检测（VAD）", "d": "判断音频里每一小段时间是否有人在说话的模型或算法。"}
+  ],
+  "aka": ["WhisperX", "Whisper时间戳对齐", "VAD Cut & Merge", "逐词时间戳"],
+  "check": {
+    "source": "https://arxiv.org/abs/2303.00747",
+    "confirmed": "arXiv官方记录：标题、作者Bain/Huh/Han/Zisserman、v1提交2023-03-01；摘要关于滑动窗口漂移/幻觉/重复、时间戳不准、VAD与强制音素对齐、VAD Cut & Merge、批量推理12倍提速、长音频转写与词切分基准最好。pyannote集成与机构为一般了解（GitHub README）。"
+  }
+}

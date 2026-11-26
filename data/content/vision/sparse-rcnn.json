@@ -1,0 +1,29 @@
+{
+  "id": "sparse-rcnn",
+  "who": "Peize Sun, Rufeng Zhang, Yi Jiang, Tao Kong, Chenfeng Xu, Wei Zhan, Masayoshi Tomizuka, Lei Li et al. · 香港大学 / 字节跳动 / 同济大学 / 加州大学伯克利",
+  "venue": "CVPR 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2011.12450"},
+    {"label": "代码", "url": "https://github.com/PeizeSun/SparseR-CNN"}
+  ],
+  "aka": ["Sparse R-CNN", "SparseRCNN", "可学习候选框", "learnable proposals", "动态实例交互头"],
+  "problem": "主流检测器在特征图每个位置铺上k个锚框，候选多达数十万个，要人工设计锚框、多对一分配标签，还要靠NMS去重。",
+  "idea": "只用固定的100个可学习候选框和对应的可学习特征向量，经多轮R-CNN式细化直接输出结果，无需锚框和NMS。",
+  "impact": "证明不用稠密先验也能做到与成熟检测器相当的精度，和[[detr]]一起推动检测走向稀疏集合预测。",
+  "method": "Sparse R-CNN保留了[[faster-rcnn]]“先取区域特征、再分类回归”的结构，但删掉了区域建议网络。取而代之的是N个（如100个）可学习的候选框，每个框还配一个可学习的“候选特征”向量，二者都是普通参数，随训练更新，与输入图像无关。\n\n每一轮检测头里，先按候选框从FPN特征上取出RoI特征；再用对应的候选特征生成一个小卷积核的参数（动态实例交互），去处理这个RoI特征，得到更新后的物体特征，据此输出类别和框修正。修正后的框作为下一轮的候选，像[[cascade-rcnn]]那样迭代6轮。训练用与DETR相同的匈牙利一对一匹配，因此推理时无需NMS。摘要报告ResNet-50 FPN在3倍训练时长下达到45.0 AP、22帧每秒，训练收敛也与成熟基线相当。",
+  "limits": [
+    {"text": "候选框与图像无关，一开始只是固定的先验位置，对极小或密集目标的召回依赖多轮细化。", "solved_by": ["dino-detr"]}
+  ],
+  "relations": [
+    {"to": "detr", "type": "extends", "note": "借用DETR的可学习查询与一对一匹配，但用RoI特征与动态卷积代替全局注意力，收敛更快。"},
+    {"to": "faster-rcnn", "type": "solves", "note": "去掉区域建议网络和锚框设计，把数十万稠密候选换成100个可学习候选。"},
+    {"to": "cascade-rcnn", "type": "extends", "note": "沿用多阶段逐步细化框的做法，每一阶段的输出作为下一阶段的候选。"},
+    {"to": "deformable-detr", "type": "rivals", "note": "同期针对DETR收敛慢的两条路线：可变形注意力对比RoI加动态卷积。"}
+  ],
+  "prereq": ["vision-tasks", "anchor-nms", "iou-map", "conv-layer", "attention-concept"],
+  "terms": [
+    {"t": "动态卷积", "d": "卷积核的参数不是固定的，而是由另一个输入（这里是候选特征）即时生成。"}
+  ],
+  "learn": "先读Faster R-CNN与DETR，再读Sparse R-CNN第3节；在Detectron2上跑官方实现，比较它与RetinaNet的候选数量和后处理。",
+  "check": {"source": "https://arxiv.org/abs/2011.12450", "confirmed": "arXiv记录：标题、作者列表、v1提交于2020-11-25、摘要中的HWk个手工候选到N（如100）个可学习候选、免去多对一标签分配和NMS、45.0 AP（3×、R50-FPN）、22 fps。动态实例交互头、6轮迭代、匈牙利匹配、CVPR 2021与机构凭一般了解写。"}
+}

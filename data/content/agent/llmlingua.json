@@ -1,0 +1,27 @@
+{
+  "id": "llmlingua",
+  "who": "Huiqiang Jiang, Qianhui Wu, Chin-Yew Lin, Yuqing Yang, Lili Qiu · 微软",
+  "venue": "EMNLP 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2310.05736"},
+    {"label": "项目页", "url": "https://aka.ms/LLMLingua"}
+  ],
+  "aka": ["LLMLingua", "提示压缩", "prompt compression", "LongLLMLingua", "LLMLingua-2", "上下文压缩"],
+  "problem": "思维链示例、上下文学习示例和检索文档让提示越来越长，动辄上万个词元，推理又慢又贵。",
+  "idea": "用一个小语言模型估计每个词元的「意外程度」（困惑度），优先删掉容易被猜到、信息量低的词元；先按示例整段取舍，再逐词元迭代压缩，并让小模型的分布向目标大模型对齐。",
+  "impact": "在GSM8K、BBH、ShareGPT和arXiv摘要四类数据上，最多压缩约20倍而性能损失很小，开启了「提示压缩」这一方向，后续有面向长文档的LongLLMLingua和LLMLingua-2。",
+  "method": "直觉来自信息论：一个词元越容易被语言模型猜中（困惑度低），删掉它损失的信息越少。此前的Selective-Context就用小模型的自信息删内容，但删得零碎，压缩率一高就破坏语义。LLMLingua分三步由粗到细：\n- **预算控制器**：把提示分成指令、示例、问题三部分，分别分配压缩率；示例往往冗余最多，先在**整段示例**层面挑出保留哪些，保证剩下的示例完整可读；\n- **迭代式词元级压缩**：把留下的文本切成若干段，逐段用小模型计算困惑度，删除低信息词元；后一段的计算以前面已压缩的内容为条件，考虑了被删内容之间的相互依赖；\n- **分布对齐**：用目标大模型生成的数据对小模型做指令微调，让「小模型认为不重要」更接近「大模型认为不重要」。\n\n压缩后的提示直接发给GPT-3.5-Turbo、Claude-v1.3等黑盒模型使用（计算困惑度的小模型是Alpaca-7B或GPT2-Alpaca），不需要改大模型。它和[[context-engineering]]关心的是同一个问题——上下文窗口里该放什么——只是从「删词元」的角度切入，与[[lost-in-the-middle]]发现的长上下文利用不佳也相互印证。",
+  "limits": [
+    {"text": "删掉的词元对人类不可读，压缩后的提示难以检查和调试；对需要逐字精确的内容（代码、数字表格）风险较大。", "solved_by": []},
+    {"text": "压缩本身要先跑一遍7B级别的小模型，提示很长时这部分开销不可忽略。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "cot", "type": "solves", "note": "缓解思维链和少样本示例带来的提示过长问题，GSM8K上压缩的就是思维链示例。"},
+    {"to": "lost-in-the-middle", "type": "extends", "note": "同样关注长上下文中大量内容没被有效利用，选择直接删掉低信息部分。"},
+    {"to": "alpaca", "type": "uses", "note": "实验中用Alpaca-7B或GPT2-Alpaca作为计算困惑度的小模型。"},
+    {"to": "chatgpt", "type": "uses", "note": "压缩后的提示交给GPT-3.5-Turbo和Claude-v1.3这类黑盒大模型使用。"}
+  ],
+  "prereq": ["perplexity", "entropy", "context-window", "in-context-learning", "language-model"],
+  "learn": "先读[[c:perplexity]]和[[c:entropy]] → 读原文第4节三个模块 → 动手：用开源llmlingua库把一段1000词元的少样本提示压缩到200词元，比较压缩前后同一问题的回答。",
+  "check": {"source": "https://arxiv.org/abs/2310.05736", "confirmed": "标题、作者、v1提交于2023-10-09；摘要中预算控制器、迭代词元级压缩、指令微调分布对齐、GSM8K/BBH/ShareGPT/Arxiv-March23四个数据集、最多20倍压缩；正文（arxiv.org/html/2310.05736）核对示例级压缩、低困惑度词元贡献信息少的动机、对Selective-Context的改进、小模型为Alpaca-7B或GPT2-Alpaca、目标模型GPT-3.5-Turbo-0301与Claude-v1.3、作者单位微软。"}
+}

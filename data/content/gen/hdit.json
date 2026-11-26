@@ -1,0 +1,27 @@
+{
+  "id": "hdit",
+  "who": "Katherine Crowson, Stefan Andreas Baumann, Alex Birch, Tanishq Mathew Abraham, Daniel Z. Kaplan, Enrico Shippole · Stability AI / 慕尼黑大学等",
+  "venue": "ICML 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2401.11605"}
+  ],
+  "aka": ["HDiT", "Hourglass Diffusion Transformer", "沙漏扩散Transformer", "k-diffusion"],
+  "problem": "[[dit]]等扩散Transformer的全局注意力计算量随token数平方增长，只能在压缩后的潜空间上工作；想在1024×1024的像素上直接训练，Transformer算不起，U-Net又不如Transformer好扩展。",
+  "idea": "把Transformer做成沙漏形：高分辨率层只用局部邻域注意力，逐级合并图块降低分辨率，只在最低分辨率层用全局注意力，再逐级上采样并带跳跃连接；计算量随像素数线性增长。",
+  "impact": "论文称不需要多尺度结构、潜空间自编码器或自条件等常见的高分辨率技巧，就能在像素空间直接训练1024²图像，并在FFHQ-1024²上取得扩散模型的新最好成绩，是像素空间Transformer扩散路线的重要节点。",
+  "method": "HDiT的结构借鉴U-Net的层级思路，但每一级都是Transformer块：\n- **图块合并与拆分**：输入先切成小图块；往下每一级把相邻2×2个token合并成一个，分辨率减半、通道加宽；往上则拆分回来，并与同级的下采样特征用可学习的插值相加（类似跳跃连接）。\n- **分级注意力**：在高分辨率级别，每个token只与周围一个固定大小窗口内的token做注意力（邻域注意力），计算量与token数成正比；只有在分辨率已经很低的最内层，才使用普通的全局[[c:self-attention]]建模整体结构。\n- 结合[[edm]]的训练与采样设置，以及改进的位置编码和归一化。\n\n因为每层计算量都随像素数线性增长，整个网络可以直接在1024×1024像素上训练，而无需先用VAE压缩到潜空间（对比[[ldm]]），也无需像[[simple-diffusion]]那样依靠专门的U-Net改造。论文报告在ImageNet 256²上与现有模型相当，在FFHQ-1024²上创下扩散模型的新纪录。",
+  "limits": [
+    {"text": "像素空间训练的总算力仍远高于潜空间模型，论文的大规模文生图验证有限。", "solved_by": ["jit"]}
+  ],
+  "relations": [
+    {"to": "dit", "type": "solves", "note": "DiT的全局注意力只能用在潜空间，HDiT用分级局部注意力把Transformer扩散搬到高分辨率像素上。"},
+    {"to": "simple-diffusion", "type": "rivals", "note": "同为端到端像素空间高分辨率扩散：simple diffusion改造U-Net，HDiT改用沙漏形Transformer。"},
+    {"to": "edm", "type": "uses", "note": "沿用EDM的噪声参数化、损失加权与采样器。"}
+  ],
+  "prereq": ["diffusion-process", "self-attention", "image-patch", "efficient-attention", "residual-connection"],
+  "terms": [
+    {"t": "邻域注意力", "d": "每个位置只和自己周围固定大小窗口内的位置计算注意力，计算量随图像大小线性增长。"}
+  ],
+  "learn": "先读DiT与U-Net的跳跃连接 → 读本文第3节沙漏结构图与注意力类型的分配 → 对比JiT如何用大图块在像素空间做扩散。",
+  "check": {"source": "https://arxiv.org/abs/2401.11605", "confirmed": "标题、六位作者、v1日期2024-01-21、摘要中计算量随像素数线性增长、可直接在像素空间训练1024×1024、结合Transformer可扩展性与U-Net效率、无需多尺度结构/潜空间自编码器/自条件、ImageNet 256²上与现有模型相当、FFHQ-1024²上扩散模型新SOTA；机构、ICML 2024、邻域注意力与图块合并细节来自一般了解"}
+}

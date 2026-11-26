@@ -1,0 +1,26 @@
+{
+ "id": "deepspeed-ulysses",
+ "who": "Sam Ade Jacobs, Masahiro Tanaka, Chengming Zhang, Minjia Zhang, Shuaiwen Leon Song, Samyam Rajbhandari, Yuxiong He · 微软DeepSpeed",
+ "aka": ["Ulysses", "Ulysses序列并行", "All-to-All序列并行", "长序列训练", "context parallelism", "上下文并行"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2309.14509"},
+  {"label": "DeepSpeed", "url": "https://github.com/microsoft/DeepSpeed"}
+ ],
+ "problem": "数据并行切批、张量并行切隐藏维、流水线并行切层，都没有针对序列长度；训练几十万token的长序列时，单卡放不下一条序列的激活，已有的序列并行又受通信和显存效率限制。",
+ "idea": "沿序列维把输入切到多张卡上；到注意力这一步用一次All-to-All把“每卡一段序列、全部注意力头”换成“每卡完整序列、一部分注意力头”，各自算完再换回来。",
+ "impact": "与Ring Attention并列为长上下文训练最常用的两种序列并行方案，被DeepSpeed、Megatron等训练框架及许多长上下文模型的训练配置采用，两者也常被组合使用。",
+ "method": "Transformer的计算量由批大小、隐藏维、层数和序列长度决定。前三者分别有[[zero]]式数据并行、[[megatron]]张量并行、流水线并行来切；序列维上，[[megatron-sp]]只切LayerNorm等逐token部分，注意力仍要每张卡看到完整序列。\n\nUlysses把每层的输入沿序列维均分到P张卡上，每张卡有N/P个token。线性投影（算Q、K、V）是逐token的，各卡独立完成。注意力需要每个token看到全部token，于是做一次**All-to-All**转置：每张卡把自己那段token的Q、K、V按注意力头切成P份分发出去，换回来的是全部N个token、但只有H/P个头。由于各头的注意力互不相干，每张卡就能用任意注意力内核（如[[flashattention]]）独立算完自己那几个头，再用一次All-to-All换回按序列切分的布局，进入后面的前馈层。\n\n论文的通信分析指出：序列长度和卡数按比例同时增大时，每张卡的通信量保持不变，而其他方法的通信开销会随序列长度增长。摘要报告，与当时最好的基线相比，能在4倍长的序列上训练快2.5倍。",
+ "limits": [
+  {"text": "并行度不能超过注意力头数（用GQA时还受KV头数限制），序列再长、卡再多也切不下去。", "solved_by": ["ring-attention"]}
+ ],
+ "relations": [
+  {"to": "megatron-sp", "type": "extends", "note": "Megatron的序列并行只切逐token的部分；Ulysses把序列切分贯穿到注意力计算本身。"},
+  {"to": "zero", "type": "uses", "note": "作为DeepSpeed的一部分，与ZeRO的参数/优化器状态切分一起使用，以同时支持大模型和长序列。"},
+  {"to": "flashattention", "type": "uses", "note": "All-to-All之后每卡得到完整序列的部分注意力头，可直接调用FlashAttention等高效内核计算。"}
+ ],
+ "prereq": ["distributed-training", "self-attention", "context-window", "efficient-attention"],
+ "terms": [
+  {"t": "All-to-All", "d": "一种集合通信：每张卡把自己的数据切成P份，分别发给P张卡，同时从每张卡各收一份，相当于在卡之间做一次矩阵转置。"}
+ ],
+ "check": {"source": "https://arxiv.org/abs/2309.14509", "confirmed": "标题、七位作者、v1日期2023-09-25；摘要：数据/张量/流水线并行分别对应批、隐藏维、层数，未针对长序列；沿序列维切分并对注意力使用All-to-All；序列长度与设备按比例增长时通信量恒定；4倍序列长度下快2.5倍。按头分发的细节、并行度受头数限制为对方法的一般了解；被各框架采用为对后续生态的概括。"}
+}

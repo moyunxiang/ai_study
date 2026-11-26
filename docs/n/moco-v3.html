@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MoCo v3自监督ViT（2021） · AI脉络</title>
+<meta name="description" content="对比式自监督在卷积网络上已很成熟，换到上却没有可靠的训练配方；ViT训练常悄悄不稳定，结果看起来还行，其实只是“部分失败”。 回到批大小、学习率、优化器这些基本要素系统做实验，发现不稳定会无声地掉1–3个点；把patch投影层冻结为随机初始化就能明显稳住训练。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/moco-v3.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MoCo v3自监督ViT（2021）">
+<meta property="og:description" content="对比式自监督在卷积网络上已很成熟，换到上却没有可靠的训练配方；ViT训练常悄悄不稳定，结果看起来还行，其实只是“部分失败”。 回到批大小、学习率、优化器这些基本要素系统做实验，发现不稳定会无声地掉1–3个点；把patch投影层冻结为随机初始化就能明显稳住训练。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/moco-v3.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/moco-v3">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 视觉自监督</div>
+<h1>MoCo v3自监督ViT</h1>
+<div class="full">An Empirical Study of Training Self-Supervised Vision Transformers</div>
+<div class="meta"><span>2021.04</span><span>论文</span><span>延伸</span><span>ICCV 2021</span><span>Xinlei Chen, Saining Xie, Kaiming He · Facebook AI Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2104.02057" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/facebookresearch/moco-v3" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/moco-v3">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>对比式自监督在卷积网络上已很成熟，换到<a class="ln" href="../n/vit.html">Vision Transformer</a>上却没有可靠的训练配方；ViT训练常悄悄不稳定，结果看起来还行，其实只是“部分失败”。</p></div><div><h4>方法</h4><p>回到批大小、学习率、优化器这些基本要素系统做实验，发现不稳定会无声地掉1–3个点；把patch投影层冻结为随机初始化就能明显稳住训练。</p></div><div><h4>影响</h4><p>给出了自监督ViT的第一套可靠基线和配方，揭示的不稳定问题影响了此后DINO、MAE等工作对训练稳定性的关注。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>MoCo v3本身只是<a class="ln" href="../n/moco.html">MoCo</a>的小改：去掉记忆队列，改用大批次内的其他样本作负例；在查询端加一个预测头（借鉴<a class="ln" href="../n/byol.html">BYOL</a>）；两种视图互相预测的对称对比损失；骨干从ResNet换成ViT。论文自述“并不描述新方法”，重点是实验研究。</p><p>作者观察到：批次增大或学习率变高时，训练曲线会出现周期性的“凹陷”，模型并不发散，但最终精度悄悄降低约1–3%，如果没有更稳定的对照就察觉不到。追踪梯度发现，尖峰首先出现在第一层——把图像块映射为向量的patch投影层。于是他们直接冻结这一层，保持随机初始化不训练，训练明显更稳、精度更高；这个技巧对SimCLR、BYOL等框架同样有效。</p><p>正文表格中，线性探测精度ViT-B为76.7%、ViT-L为77.6%、ViT-H为78.1%，带BN的ViT-L/7达到81.0%，明显高于更大的iGPT。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>冻结patch投影只是缓解而非根治不稳定，更大模型上问题依旧；而且对比学习依赖强数据增强与大批次。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/mae.html">掩码自编码器MAE</a> <a class="chip hue" style="--h:216" href="../n/dinov2.html">DINOv2</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/vit.html">Vision Transformer</a><span class="yr">2020.10 · 视觉</span><div class=nt>研究对象是ViT骨干的自监督训练，发现并缓解其特有的不稳定。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/moco.html">MoCo</a><span class="yr">2019.11 · 视觉</span><div class=nt>沿用动量编码器的对比框架，去掉队列、加预测头，并把骨干换成ViT。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/dino.html">DINO</a><span class="yr">2021.04 · 视觉</span><div class=nt>同月出现的DINO用自蒸馏训练ViT，二者都给出了自监督ViT的强结果。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/byol.html">BYOL</a><span class="yr">2020.06 · 视觉</span><div class=nt>借鉴BYOL在查询端加预测头的结构。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/mae.html">掩码自编码器MAE</a><span class="yr">2021.11 · 视觉</span><div class=nt>冻结patch投影只是缓解而非根治不稳定，更大模型上问题依旧；而且对比学习依赖强数据增强与大批次。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/dinov2.html">DINOv2</a><span class="yr">2023.04 · 视觉</span><div class=nt>冻结patch投影只是缓解而非根治不稳定，更大模型上问题依旧；而且对比学习依赖强数据增强与大批次。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/contrastive-learning.html">对比学习</a> <a class="chip c" href="../c/self-supervised.html">自监督学习</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/image-patch.html">图像块与视觉token</a> <a class="chip c" href="../c/batch-size-epoch.html">批大小、步数与轮数</a> <a class="chip c" href="../c/learning-rate.html">学习率与学习率调度</a></p>
+<h2>本篇术语</h2><ul><li><b>线性探测</b>　冻结预训练好的骨干，只在其特征上训练一个线性分类器，用来衡量特征本身的质量。</li><li><b>patch投影层</b>　ViT的第一层，把每个16×16图像块展平后用一个线性层映射成向量。</li></ul>
+<h2>怎么学</h2><p>先读MoCo和BYOL，再读本文第4–5节的不稳定分析；用官方代码对比冻结与不冻结patch投影时的训练曲线。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://ar5iv.org/abs/2104.02057" rel="noopener">https://ar5iv.org/abs/2104.02057</a>（arXiv记录：标题、三位作者、v1提交于2021-04-05、摘要中“并不描述新方法”、不稳定导致隐藏的部分失败；ar5iv正文确认FAIR机构、不稳定导致约1–3%的精度下降而非发散、线性探测表（ViT-B 76.7、ViT-L 77.6、ViT-H 78.1、ViT-BN-L/7 81.0、iGPT-XL 72.0）。去队列、预测头、冻结patch投影的细节凭一般了解与正文前文，未逐节核对；ICCV 2021凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MoCo%20v3%E8%87%AA%E7%9B%91%E7%9D%A3ViT%EF%BC%88moco-v3%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amoco-v3%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/moco-v3.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="efficientnetv2.html"><small>本分支上一个 · 2021.04</small><b>EfficientNetV2</b></a><a class="r" href="dino.html"><small>本分支下一个 · 2021.04</small><b>DINO</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

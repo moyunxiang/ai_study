@@ -1,0 +1,26 @@
+{
+ "id": "smoothgrad",
+ "who": "Daniel Smilkov, Nikhil Thorat, Been Kim, Fernanda Viégas, Martin Wattenberg · Google",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1706.03825"},
+  {"label": "项目页", "url": "https://pair-code.github.io/saliency/"}
+ ],
+ "aka": ["SmoothGrad", "平滑梯度", "加噪平均显著图"],
+ "problem": "直接对输入求梯度得到的[[saliency-maps]]满是零散的噪点，看起来像雪花，很难看出模型到底在看图里的哪个物体。",
+ "idea": "在输入上加若干次随机高斯噪声，分别求梯度显著图，再把它们平均起来，用“加噪声”来去掉显著图里的噪声。",
+ "impact": "实现只需几行代码，可以套在任何梯度类归因方法外面，至今仍是归因工具库里的标准选项。",
+ "method": "作者的解释是：分类分数对输入的梯度在局部剧烈波动，像素稍有变化，梯度的方向就可能大变，所以单张梯度图里混入了大量与决策无关的高频噪点。既然局部梯度不稳定，就看它在一个小邻域内的平均。\n\n做法：`M̂(x) = (1/n) Σ_{k=1..n} M(x + ε_k)`，其中M是任意梯度类显著图（原始梯度、[[integrated-gradients]]等），`ε_k ~ N(0, σ²)` 是独立采样的高斯噪声。论文讨论了两个超参数：噪声强度σ一般取输入取值范围的10%–20%左右，样本数n取几十个后效果就趋于稳定。论文还发现，训练时也加噪声能让显著图更清晰。\n\n这篇短文另一个贡献是讨论可视化显著图的细节：要不要取绝对值、怎样截断极端值、如何叠加在原图上，这些选择都会显著改变人看到的“解释”。",
+ "limits": [
+  {"text": "让图“更好看”不等于更忠实于模型；后来的检验发现一些看起来清晰的显著图对模型参数并不敏感。", "solved_by": ["sanity-checks-saliency"]}
+ ],
+ "relations": [
+  {"to": "saliency-maps", "type": "solves", "note": "原始梯度显著图噪点多，SmoothGrad在加噪的邻域内平均梯度，使图像更清晰。"},
+  {"to": "integrated-gradients", "type": "uses", "note": "可以套在积分梯度等任意梯度类方法外面做平滑。"}
+ ],
+ "prereq": ["derivative-gradient", "gaussian", "expectation-variance", "image-tensor"],
+ "terms": [
+  {"t": "敏感度图", "d": "把每个像素对输出分数的梯度画成一张图，越亮表示这个像素变动对输出影响越大。"}
+ ],
+ "learn": "先读[[saliency-maps]] → 读原文第2–3节和项目页的对比图 → 用Captum的NoiseTunnel给预训练ResNet画普通梯度和SmoothGrad的对比。",
+ "check": {"source": "https://arxiv.org/abs/1706.03825", "confirmed": "arXiv记录：标题、5位作者、2017-06-12 v1；摘要所述SmoothGrad让梯度敏感度图更清晰、讨论可视化经验、公开代码与网站。σ取10%–20%、训练时加噪的结论来自对原文的一般了解，未逐项核对。"}
+}

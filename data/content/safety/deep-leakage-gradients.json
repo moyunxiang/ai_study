@@ -1,0 +1,26 @@
+{
+ "id": "deep-leakage-gradients",
+ "who": "Ligeng Zhu, Zhijian Liu, Song Han · MIT",
+ "venue": "NeurIPS 2019",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1906.08935"}
+ ],
+ "aka": ["DLG", "梯度泄露", "梯度反演", "gradient inversion", "gradient leakage"],
+ "problem": "分布式训练和[[fedavg]]式联邦学习只交换梯度、不交换原始数据，长期以来大家默认梯度是安全的，不会泄露训练样本。",
+ "idea": "随机初始化一张“假图片”和“假标签”，让它们在模型上算出的梯度去逼近别人共享的真实梯度；通过优化让两者梯度一致，假数据就会逐渐变成原始训练数据。",
+ "impact": "打破了“共享梯度即保护隐私”的直觉，开启了梯度反演攻击这一研究方向，促使联邦学习认真考虑[[dp-sgd]]、安全聚合等防护。",
+ "method": "设攻击者拿到了模型参数W和某个参与者在一批数据(x, y)上算出的梯度 `∇W = ∂L(F(x;W), y)/∂W`。攻击者随机生成虚拟输入x′和虚拟标签y′，在同一模型上算出虚拟梯度 `∇W′`，然后优化\n\n`min_{x′, y′} ‖∇W′ − ∇W‖²`\n\n也就是通过对“梯度之差”再求梯度（二阶导数），用L-BFGS不断调整x′和y′。当虚拟梯度与真实梯度足够接近时，x′就接近原始输入。\n\n摘要称，这种攻击在计算机视觉和自然语言处理任务上都有效，比以往方法强得多：图像可以做到像素级精确恢复，文本可以做到逐token匹配。作者讨论了几种防御，认为其中最有效的是梯度剪枝（把小幅度的梯度置零后再共享）。",
+ "limits": [
+  {"text": "实验多在小批量、小分辨率图像上进行，批量变大或模型训练充分后恢复质量会明显下降；防御方法的代价与安全性缺少系统评估。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "fedavg", "type": "uses", "note": "以联邦学习、分布式训练中“只共享梯度”的设定作为攻击对象。"},
+  {"to": "model-inversion", "type": "extends", "note": "模型反演从模型输出还原训练数据特征，DLG直接从共享梯度还原原始样本。"}
+ ],
+ "prereq": ["backpropagation", "gradient-descent", "jacobian-hessian", "distributed-training", "loss-function"],
+ "terms": [
+  {"t": "梯度剪枝（防御）", "d": "共享梯度前把绝对值较小的分量置零，只发送一部分梯度，以降低被反演出原始数据的风险。"}
+ ],
+ "learn": "先会反向传播和二阶导数 → 读原文第3节算法和第4节实验图 → 用PyTorch在MNIST或CIFAR-10上复现单张图片的梯度反演。",
+ "check": {"source": "https://arxiv.org/abs/1906.08935", "confirmed": "arXiv记录：标题、3位作者、2019-06-21 v1；摘要所述人们曾认为梯度可安全共享、从公开梯度获得私有训练数据、在视觉与NLP任务上验证、图像像素级、文本逐token、最有效防御为梯度剪枝。L-BFGS优化细节与NeurIPS 2019凭一般了解写。"}
+}

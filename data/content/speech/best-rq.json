@@ -1,0 +1,32 @@
+{
+  "id": "best-rq",
+  "who": "Chung-Cheng Chiu, James Qin, Yu Zhang, Jiahui Yu, Yonghui Wu · Google",
+  "venue": "arXiv 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2202.01855"}
+  ],
+  "problem": "[[wav2vec-2]]和[[w2v-bert]]要在预训练中同时学习量化器（把连续语音变成离散目标）和识别网络，两者纠缠在一起，训练复杂，也不方便搭配流式识别等不同结构。",
+  "idea": "量化器干脆不学：用一个随机初始化、永远不更新的投影矩阵和随机码本，把每帧语音映射成离散标签，模型只需预测被遮住帧的这些标签（BEST-RQ）。",
+  "impact": "随机投影量化证明了「预测目标不必学得很好」也能做好语音自监督，方法简单、可与任何编码器搭配，后来被Google的[[usm]]用于大规模多语言预训练。",
+  "method": "语音自监督的主流做法是掩码预测：遮住一部分帧，让模型根据上下文预测被遮住的内容（类似[[bert]]，见[[c:masked-modeling]]）。难点在于预测目标：连续频谱不好直接当分类目标，于是wav2vec 2.0用一个可学习的量化器产生离散目标，[[hubert]]则需要多轮聚类。\n\nBEST-RQ的量化器只有两步，而且全部是随机固定的（见[[c:vector-quantization]]）：\n\n- 用一个随机初始化的矩阵把每帧语音特征投影到低维；\n- 在一个随机初始化的码本里找最近的码字，它的编号就是这一帧的离散标签。\n\n投影矩阵和码本在整个自监督训练中都不更新。模型（如[[conformer]]编码器）读入部分帧被遮住的语音，对每个被遮住的位置预测它的标签，用交叉熵训练。因为量化器与识别模型完全分开，可以直接用于流式等不同的识别结构。摘要报告：在LibriSpeech上，非流式模型的词错误率与以往自监督方法相当；流式模型的词错误率和延迟都低于wav2vec 2.0和w2v-BERT；多语言任务上也比两者有明显提升。",
+  "limits": [
+    {"text": "随机量化器产生的标签与音素没有直接对应，学到的表示用于语音生成或离散语音token时不如专门设计的tokenizer。", "solved_by": ["speechtokenizer"]},
+    {"text": "论文主要在LibriSpeech和中等规模多语言任务上验证，能否扩展到数百种语言、千万小时级的无标注数据还没有证明。", "solved_by": ["usm"]}
+  ],
+  "relations": [
+    {"to": "wav2vec-2", "type": "solves", "note": "wav2vec 2.0的量化器需与模型一起学习、训练复杂；BEST-RQ改用固定的随机投影量化器。"},
+    {"to": "w2v-bert", "type": "rivals", "note": "同为Google的掩码预测式语音预训练；摘要称BEST-RQ在流式与多语言任务上更好。"},
+    {"to": "bert", "type": "extends", "note": "沿用遮住部分输入、预测其离散标签的掩码建模思路。"},
+    {"to": "conformer", "type": "uses", "note": "实验中作为被预训练的语音编码器。"}
+  ],
+  "prereq": ["self-supervised", "masked-modeling", "vector-quantization", "cross-entropy", "word-error-rate"],
+  "terms": [
+    {"t": "随机投影", "d": "用一个随机生成的矩阵把高维向量乘到低维空间；它不需要训练，却能大致保留向量之间的距离关系。"},
+    {"t": "码本", "d": "一组固定的向量，每个向量有一个编号；把输入换成最近码字的编号就完成了量化。"}
+  ],
+  "aka": ["BEST-RQ", "随机投影量化", "random-projection quantizer", "BERT-based Speech pre-Training with Random-projection Quantizer"],
+  "check": {
+    "source": "https://arxiv.org/abs/2202.01855",
+    "confirmed": "arXiv官方记录：标题、作者Chiu/Qin/Zhang/Yu/Wu、v1提交2022-02-03；摘要关于预测掩码语音的离散标签、随机初始化且不更新的投影矩阵与码本、与识别模型分离可用于通用架构、LibriSpeech非流式相当、流式WER与延迟优于wav2vec 2.0和w2v-BERT、多语言提升。USM摘要（arXiv 2303.01037）确认其多语言预训练使用随机投影量化；Conformer编码器为一般了解。"
+  }
+}

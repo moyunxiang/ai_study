@@ -1,0 +1,28 @@
+{
+  "id": "adain",
+  "who": "Xun Huang, Serge Belongie · Cornell University",
+  "venue": "ICCV 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1703.06868"}
+  ],
+  "aka": ["AdaIN", "自适应实例归一化", "Adaptive Instance Normalization"],
+  "problem": "[[neural-style]]能用任意风格但要逐图迭代优化，很慢；前馈风格迁移网络很快，却只能用训练时固定的一种或几种风格。",
+  "idea": "把风格看作特征图每个通道的均值和标准差：先对内容特征做实例归一化，再换成风格图特征的均值和标准差，一个无参数的层就完成了风格注入。",
+  "impact": "论文称首次实现了实时的任意风格迁移；“用另一路信号给出归一化的缩放和偏移”这一做法被[[stylegan]]直接采用，成为生成网络注入条件的常用方式。",
+  "method": "[[instance-norm]]的研究提示：特征图各通道的均值和方差这类统计量就承载了大部分“风格”。AdaIN据此设计了一个没有可学习参数的层：\n\n`AdaIN(x, y) = σ(y)·(x − μ(x))/σ(x) + μ(y)`\n\n其中`x`是内容图的特征，`y`是风格图的特征，`μ`、`σ`在每个通道的空间维度上计算。先把内容特征的统计“洗掉”，再套上风格特征的统计。\n\n整个网络是编码器—AdaIN—解码器：编码器用固定的[[vgg]]前几层，分别提取内容图和风格图的特征，经AdaIN对齐统计后，交给训练好的解码器还原成图像。训练损失是内容损失（输出特征与AdaIN结果的距离）加风格损失（各层特征均值、标准差与风格图的差异）。因为风格只以统计量形式进入，测试时可以换上训练中从未见过的风格图；在AdaIN输出与原内容特征之间插值，还能调节风格强度、混合多种风格。",
+  "limits": [
+    {"text": "只匹配一阶、二阶通道统计，复杂的笔触和局部结构迁移得不够细，效果通常不如逐图优化。", "solved_by": []},
+    {"text": "逐通道归一化会抹掉特征幅度，被[[stylegan]]沿用后造成水滴状伪影。", "solved_by": ["stylegan2"]}
+  ],
+  "relations": [
+    {"to": "instance-norm", "type": "extends", "note": "把实例归一化中固定可学习的缩放和偏移，换成由风格图特征统计量动态给出。"},
+    {"to": "neural-style", "type": "solves", "note": "保留任意风格的能力，同时把逐图迭代优化变为一次前向计算。"},
+    {"to": "vgg", "type": "uses", "note": "固定的VGG-19前几层作为编码器，也用于计算内容与风格损失。"}
+  ],
+  "prereq": ["normalization-layer", "encoder-decoder", "feature-representation", "expectation-variance"],
+  "terms": [
+    {"t": "任意风格迁移", "d": "测试时可以输入训练中没见过的任何风格图，不需要为新风格重新训练网络。"}
+  ],
+  "learn": "先读实例归一化 → 读本文第4–5节的AdaIN层和网络结构 → 写一个十几行的AdaIN函数，在两张图的VGG特征上试试。",
+  "check": {"source": "https://arxiv.org/abs/1703.06868", "confirmed": "标题、作者、v1日期2017-03-20、摘要中对齐内容特征与风格特征的均值和方差、实时任意风格迁移、内容风格权衡与风格插值；ICCV 2017、编码器为VGG-19与损失细节来自一般了解"}
+}

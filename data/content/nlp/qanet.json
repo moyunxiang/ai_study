@@ -1,0 +1,33 @@
+{
+  "id": "qanet",
+  "who": "Adams Wei Yu, David Dohan, Minh-Thang Luong, Rui Zhao, Kai Chen, Mohammad Norouzi, Quoc V. Le · 卡内基梅隆大学 / Google Brain",
+  "venue": "ICLR 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1804.09541"}
+  ],
+  "problem": "BiDAF等阅读理解模型都靠RNN加注意力，RNN必须逐词串行计算，训练和推理都慢，也就难以用更多数据训练。",
+  "idea": "编码器完全去掉循环网络：用卷积捕捉局部词间关系、用自注意力捕捉全局关系，速度提升数倍；省下的算力用来训练用回译生成的改写数据。",
+  "impact": "在SQuAD上训练快3–13倍、推理快4–9倍且精度相当，加上回译增强的单模型F1达84.6，高于当时已发表的81.8；它是Transformer式结构进入阅读理解的代表，也普及了用回译做文本数据增强。",
+  "method": "[[bidaf]]式模型的流程是：词向量→LSTM编码文章和问题→文章-问题双向注意力→LSTM建模→预测答案起止位置。QANet保留了这个流程和BiDAF的上下文-问题注意力层，但把所有LSTM换成同一种**编码块**：若干层深度可分离卷积（只看邻近几个词，捕捉短语级局部特征）+一层多头[[c:self-attention]]（任意两个词直接交互，捕捉全局关系）+前馈层，每个子层都带层归一化和残差连接，并加位置编码。这与[[transformer]]的编码器类似，只是多了卷积子层。没有循环，所有位置可以并行计算。\n\n**数据增强**：用英法两个方向的神经翻译模型对训练文章做[[back-translation]]（英→法→英），得到意思相同、措辞不同的改写句，并相应调整答案位置，扩充训练集。\n\n摘要报告：在[[squad]]上训练快3到13倍、推理快4到9倍，精度与循环模型相当；加入回译增强数据后，单模型测试集F1为84.6，明显高于当时已发表的最好成绩81.8。",
+  "limits": [
+    {"text": "仍需从头在SQuAD上训练任务专用模型，几个月后BERT类预训练模型微调就大幅超过了它。", "solved_by": ["bert"]},
+    {"text": "自注意力的计算与文章长度平方成正比，长文档阅读理解仍需截断或分段。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "bidaf", "type": "solves", "note": "保留BiDAF的整体流程与上下文-问题注意力，但用卷积+自注意力替换LSTM，解决RNN串行计算慢的问题。"},
+    {"to": "transformer", "type": "uses", "note": "编码块中的多头自注意力、位置编码、残差与层归一化沿用Transformer。"},
+    {"to": "back-translation", "type": "uses", "note": "借用翻译中的回译思路，经英→法→英改写训练文章做数据增强。"},
+    {"to": "squad", "type": "uses", "note": "在SQuAD上训练与评测，报告速度与F1。"},
+    {"to": "xception", "type": "uses", "note": "编码块中的卷积是深度可分离卷积，参数和计算量比普通卷积少。"}
+  ],
+  "prereq": ["conv-layer", "self-attention", "transformer-block", "residual-connection", "data-augmentation", "classification-metrics"],
+  "terms": [
+    {"t": "深度可分离卷积", "d": "先对每个通道单独做空间卷积，再用1×1卷积混合通道，比普通卷积省参数和计算。"},
+    {"t": "抽取式阅读理解", "d": "答案是原文中的一段连续文字，模型只需预测这段文字的起点和终点。"}
+  ],
+  "learn": "先读[[bidaf]]与[[transformer]]的讲解 → 读原文第2节编码块结构与第3节数据增强 → 动手：在SQuAD的子集上比较LSTM编码器与卷积+自注意力编码器的每轮训练时间和F1。",
+  "check": {
+    "source": "https://arxiv.org/abs/1804.09541",
+    "confirmed": "arXiv：标题、作者Yu、Dohan、Luong、Zhao、Chen、Norouzi、Le、2018-04-23提交、摘要（不用循环网络、卷积建模局部+自注意力建模全局、SQuAD训练快3–13倍推理快4–9倍、精度相当、用回译数据增强、单模型测试F1 84.6高于已发表最好的81.8）。深度可分离卷积、编码块细节、英法回译、ICLR 2018出处与机构凭一般了解，未逐项对照正文。"
+  }
+}

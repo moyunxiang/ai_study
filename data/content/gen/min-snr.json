@@ -1,0 +1,28 @@
+{
+  "id": "min-snr",
+  "who": "Tiankai Hang, Shuyang Gu, Chen Li, Jianmin Bao, Dong Chen, Han Hu, Xin Geng, Baining Guo · 东南大学 / 微软亚洲研究院 / 西安交通大学",
+  "venue": "ICCV 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2303.09556"},
+    {"label": "代码", "url": "https://github.com/TiankaiHang/Min-SNR-Diffusion-Training"}
+  ],
+  "aka": ["Min-SNR", "Min-SNR-γ", "最小信噪比加权", "Min-SNR weighting"],
+  "problem": "扩散模型训练收敛很慢；论文认为原因之一是不同时间步的梯度方向互相冲突，一个时间步学好了会拖累另一个，而此前的加权方案（如[[p2-weighting]]）多凭经验设计。",
+  "idea": "把扩散训练看成多任务学习，每个时间步是一个任务；为平衡各任务的冲突，把每步的损失权重设为截断后的信噪比`min(SNR(t), γ)`（换算到所用的预测目标），让低噪声步不再主导训练。",
+  "impact": "论文报告收敛速度比此前的加权策略快3.4倍，并以更小的模型在ImageNet 256×256上取得FID 2.06；只需改一行损失权重，被diffusers等训练脚本作为常用选项（snr_gamma）。",
+  "method": "扩散损失可以写成对时间步的加权和`L = Σ_t w(t) · ‖x₀ − x̂₀(x_t)‖²`。如果用预测干净图x₀的形式，等价于[[ddpm]]预测噪声时的权重是`w(t) = SNR(t)`：噪声越小（SNR越大）权重越大，模型被大量低噪声、几乎不用学的小任务主导。\n\n论文先用多任务学习里的帕累托最优思路求解每步该给多大权重，发现结果与截断SNR非常接近，于是提出简单的Min-SNR-γ：`w(t) = min(SNR(t), γ)`，γ通常取5左右。低噪声步的权重被封顶，高噪声步保持原样，各时间步的梯度贡献变得均衡。对预测噪声或预测v的模型，把这个权重换算到相应目标即可。\n\n论文在ViT和U-Net两种骨架、多种预测目标上做了实验，报告收敛快了3.4倍，在ImageNet 256×256上以比此前最好结果更小的模型取得FID 2.06。",
+  "limits": [
+    {"text": "γ仍是需要调的超参数，且多任务视角只给出近似最优的权重，没有和噪声采样分布、损失参数化统一起来考虑。", "solved_by": ["edm2"]}
+  ],
+  "relations": [
+    {"to": "p2-weighting", "type": "extends", "note": "同样按信噪比给时间步加权，但从多任务冲突出发给出了更有依据的截断方案。"},
+    {"to": "edm", "type": "uses", "note": "沿用EDM等工作把损失加权、预测目标统一到信噪比框架下讨论的方式。"},
+    {"to": "ddpm", "type": "solves", "note": "指出DDPM式损失隐含的权重过度偏向低噪声步，导致收敛慢。"}
+  ],
+  "prereq": ["diffusion-process", "noise-schedule", "loss-function", "generation-metrics"],
+  "terms": [
+    {"t": "梯度冲突", "d": "多任务学习中不同任务的梯度方向不一致，按一个任务的方向更新会让另一个任务变差。"}
+  ],
+  "learn": "先读DDPM损失与SNR的关系 → 读本文第3节多任务视角与权重推导 → 用diffusers训练脚本设置snr_gamma=5对比收敛曲线。",
+  "check": {"source": "https://arxiv.org/abs/2303.09556", "confirmed": "标题、八位作者、v1日期2023-03-16、摘要中收敛慢部分源于时间步间优化方向冲突、视为多任务学习、按截断SNR调整损失权重的Min-SNR-γ、收敛快3.4倍、以更小架构在ImageNet 256×256取得FID 2.06；机构、ICCV 2023、γ=5、帕累托推导细节、diffusers中的snr_gamma来自一般了解"}
+}

@@ -1,0 +1,30 @@
+{
+  "id": "null-text-inversion",
+  "who": "Ron Mokady, Amir Hertz, Kfir Aberman, Yael Pritch, Daniel Cohen-Or · Google Research / 特拉维夫大学",
+  "venue": "CVPR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2211.09794"}
+  ],
+  "aka": ["Null-text Inversion", "空文本反演", "Pivotal Inversion", "DDIM反演"],
+  "problem": "[[prompt-to-prompt]]能只改提示词里的几个词来编辑图像，但前提是知道这张图的生成噪声；对真实照片做[[ddim]]反演时，一旦开启[[cfg]]，误差逐步累积，重建出来的已不是原图。",
+  "idea": "先用无引导的DDIM反演得到一条“枢轴”轨迹，再逐步只优化CFG里那个“空文本”的嵌入，使带引导的采样精确沿这条轨迹回到原图；模型权重和描述文字都不动。",
+  "impact": "让Prompt-to-Prompt这类基于注意力控制的编辑能用于真实照片，成为2023年前后真实图像文本编辑的标准预处理步骤；“优化无条件嵌入来校正反演”的思路被后续反演方法反复比较。",
+  "method": "DDIM采样是确定性的，可以反过来跑：从真实图像`x_0`逐步加噪得到`x_T`，再从`x_T`采样回来就能近似重建。问题在于文本编辑需要较大的CFG系数`w`（如7.5），而反演过程基于无引导的估计，带引导采样时每一步都偏一点，越走越远。\n\nNull-text inversion的两个部分：\n- **枢轴反演**：先用`w=1`做DDIM反演，记录整条轨迹`x_T*, …, x_0*`作为“枢轴”。它不完美，但是一个好的锚点。\n- **空文本优化**：CFG的输出是`ε_uncond + w(ε_cond − ε_uncond)`，其中`ε_uncond`以空字符串的嵌入`∅`为条件。从`t=T`开始，对每个时间步单独优化一个`∅_t`，使从`x_t`带引导走一步的结果尽量接近枢轴上的`x_{t−1}*`。优化完成后，用这组`∅_t`加原始描述就能几乎完美地重建原图。\n\n之后只要把描述文字改几个词，并在采样时套用Prompt-to-Prompt的交叉注意力注入，就得到真实图像的编辑结果。整个过程基于公开的Stable Diffusion，不改模型权重。",
+  "limits": [
+    {"text": "每张图要为每个时间步做若干次优化，耗时约一分钟，不够快。", "solved_by": []},
+    {"text": "优化得到的空文本嵌入只对这一张图有效，编辑幅度过大时仍会破坏原图结构。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "prompt-to-prompt", "type": "solves", "note": "解决Prompt-to-Prompt无法用于真实图像的问题，为它提供精确的反演。"},
+    {"to": "ddim", "type": "extends", "note": "以DDIM确定性反演为起点，再加优化步骤修正其在引导下的误差。"},
+    {"to": "cfg", "type": "uses", "note": "利用CFG中的无条件分支，只优化空文本嵌入。"},
+    {"to": "stable-diffusion", "type": "uses", "note": "方法在公开的Stable Diffusion上实现和评测。"}
+  ],
+  "prereq": ["diffusion-process", "guidance", "embedding", "gradient-descent", "ode-sde"],
+  "terms": [
+    {"t": "DDIM反演", "d": "把确定性的DDIM采样过程倒着运行，从一张真实图像求出能生成它的初始噪声。"},
+    {"t": "空文本嵌入", "d": "无分类器引导中代表“没有条件”的那个文本嵌入，通常是空字符串经文本编码器的输出。"}
+  ],
+  "learn": "先读DDIM与Prompt-to-Prompt → 读本文第3节两个组件 → 跑官方notebook对一张照片先反演再改词编辑。",
+  "check": {"source": "https://arxiv.org/abs/2211.09794", "confirmed": "标题、作者、v1日期2022-11-17、摘要中真实图像编辑需先反演、枢轴反演、只优化CFG中的无条件文本嵌入、保持模型权重与条件嵌入不变、基于公开Stable Diffusion；逐时间步优化细节、约一分钟耗时、CVPR 2023与机构来自一般了解"}
+}

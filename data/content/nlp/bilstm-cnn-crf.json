@@ -1,0 +1,33 @@
+{
+  "id": "bilstm-cnn-crf",
+  "who": "Xuezhe Ma, Eduard Hovy · 卡内基梅隆大学",
+  "venue": "ACL 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1603.01354"}
+  ],
+  "aka": ["Ma & Hovy 2016", "BLSTM-CNN-CRF", "LSTM-CNNs-CRF"],
+  "problem": "命名实体识别和词性标注的强系统都依赖手工特征（前后缀、大小写、词典、地名表）和任务专门的预处理，换任务、换语言就要重做。",
+  "idea": "每个词的表示由预训练词向量加上一个字符级CNN提取的拼写特征组成，送入双向LSTM建模上下文，最后用CRF层联合解码整句标签，完全端到端、不做任何特征工程。",
+  "impact": "在宾州树库词性标注上达到97.55%、CoNLL-2003英文NER上达到91.21 F1，与同月的Lample等工作一起把「字符表示+BiLSTM+CRF」确立为BERT之前序列标注的标准架构。",
+  "method": "[[bilstm-crf]]（Huang等，2015）已经把双向LSTM和CRF接在一起，但输入里仍拼了不少手工拼写与上下文特征。Ma和Hovy的改动集中在词的表示上：对每个词的字符序列做一维卷积加最大池化（同[[char-cnn-text]]的思路），得到一个捕捉前后缀、大小写、数字等形态信息的字符向量，与GloVe预训练词向量拼接，作为词的输入。这样未登录词、拼写变体也能得到有意义的表示。\n\n之后是双向LSTM：前向读左边上下文、后向读右边上下文，两者拼成每个位置的上下文表示（在LSTM输入输出处都用dropout）。最上层是[[crf]]：不对每个位置独立做softmax，而是学一个标签转移矩阵，用维特比算法求整句得分最高的标签序列，这能保证「I-PER不会直接跟在B-ORG后面」这类约束。\n\n摘要报告：在宾州树库华尔街日报词性标注上97.55%准确率，在[[conll-2003]]英文命名实体识别上91.21 F1，均为当时最好结果，而且同一个模型两个任务通用。",
+  "limits": [
+    {"text": "每个词的上下文表示只从当前任务的少量标注数据学到，标注少的领域和语言效果下降明显。", "solved_by": ["elmo", "bert"]},
+    {"text": "CRF只建模相邻标签的一阶转移，嵌套实体和长距离标签依赖无法表示。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "bilstm-crf", "type": "extends", "note": "保留BiLSTM加CRF的结构，用字符级CNN替代手工拼写特征，实现真正的端到端。"},
+    {"to": "char-cnn-text", "type": "uses", "note": "用字符级卷积加最大池化提取每个词的形态特征。"},
+    {"to": "conll-2003", "type": "uses", "note": "在CoNLL-2003英文命名实体识别数据上评测，报告91.21 F1。"},
+    {"to": "lample-ner", "type": "rivals", "note": "同月发表：Lample等用字符级BiLSTM提取拼写特征，这里用字符CNN，两者精度相近，后来都成为常用实现。"}
+  ],
+  "prereq": ["recurrent-layer", "conv-layer", "embedding", "graphical-model", "dynamic-programming"],
+  "terms": [
+    {"t": "字符级表示", "d": "从一个词的字母序列计算出的向量，能捕捉前后缀和大小写等拼写信息，也能处理没见过的词。"},
+    {"t": "BIO标注", "d": "用B（实体开头）、I（实体内部）、O（不属于实体）给每个词打标签，把实体识别变成序列标注。"}
+  ],
+  "learn": "先读[[bilstm-crf]]与[[crf]]的讲解 → 读原文第2节模型结构 → 动手：用PyTorch在CoNLL-2003上实现字符CNN+BiLSTM+CRF，并去掉字符CNN或CRF各做一次消融。",
+  "check": {
+    "source": "https://arxiv.org/abs/1603.01354",
+    "confirmed": "arXiv：标题、作者Ma、Hovy、2016-03-04提交、摘要（传统系统依赖手工特征与预处理、结合词级与字符级表示的BiLSTM+CNN+CRF、真正端到端、宾州树库WSJ词性标注97.55%与CoNLL 2003 NER 91.21 F1）。GloVe词向量、dropout位置、ACL 2016出处与CMU机构凭一般了解。"
+  }
+}

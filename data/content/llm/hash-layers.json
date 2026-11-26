@@ -1,0 +1,27 @@
+{
+  "id": "hash-layers",
+  "who": "Stephen Roller, Sainbayar Sukhbaatar, Arthur Szlam, Jason Weston · Facebook AI Research",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2106.04426"}
+  ],
+  "aka": ["Hash Layers", "Hash MoE", "哈希路由", "Hash Routing", "随机路由MoE"],
+  "problem": "MoE要学一个路由器决定每个token去哪个专家，学出来的路由容易不均衡，还需要负载均衡损失或复杂的分配算法。",
+  "idea": "干脆不学路由：按当前token的编号做哈希，固定地决定它用哪组前馈层权重；没有路由参数，也不需要任何额外损失。",
+  "impact": "作为强对照说明了“学出来的路由”带来的收益没有想象中大，常在MoE路由研究中被当作基线比较。",
+  "method": "背景：[[switch-transformer]]用可学习的路由器加负载均衡损失，[[base-layers]]用线性分配算法保证均衡。两者都要回答“token该去哪个专家”，而路由本身会带来训练不稳定和额外开销。\n\nHash Layers把稀疏前馈层的专家选择改成一个固定的哈希函数：输入是当前位置的token编号（不是它的上下文表示），输出是专家编号。因为哈希在训练前就定好，不需要路由参数，不存在路由器“学偏”的问题，也不需要负载均衡损失。作者比较了多种哈希：随机哈希、按词频平衡的哈希（让每个专家分到的总词频接近）、基于聚类的哈希、以及用前后token或更长上下文做哈希的变体，摘要称**平衡的随机哈希、只看最局部特征**效果最好，学聚类或用更长上下文反而不如。\n\n摘要称在大规模语言建模、对话任务和下游微调上，这种方法优于或持平Switch Transformer和BASE层。",
+  "limits": [
+    {"text": "按token编号哈希意味着同一个词无论处在什么上下文都去同一个专家，专家无法按语义或任务分工；后来的大规模MoE仍然普遍采用可学习路由。", "solved_by": ["deepseekmoe", "aux-loss-free"]}
+  ],
+  "relations": [
+    {"to": "switch-transformer", "type": "rivals", "note": "Switch学习top-1路由并需负载均衡损失，Hash Layers用固定哈希，实验中持平或更好。"},
+    {"to": "base-layers", "type": "rivals", "note": "BASE层用最优分配保证均衡，Hash Layers用平衡哈希更简单地达到相近效果。"},
+    {"to": "sparse-moe", "type": "extends", "note": "同样把前馈层换成按输入选择的多组权重，只是选择规则不需要学习。"}
+  ],
+  "prereq": ["mixture-of-experts", "transformer-block", "tokenization", "ablation-baseline"],
+  "terms": [
+    {"t": "哈希路由", "d": "用一个事先固定的哈希函数把token编号映射到专家编号，不需要训练路由器。"}
+  ],
+  "learn": "先读[[switch-transformer]]和[[base-layers]]的路由设计；读本文不同哈希方式的对比表；动手：在小语言模型里用随机哈希和可学习top-1路由各训一个MoE，比较困惑度和专家负载分布。",
+  "check": {"source": "https://arxiv.org/abs/2106.04426", "confirmed": "标题、4位作者、arXiv首次提交2021-06-08；摘要中按当前token哈希到不同权重、与Switch和BASE层相比优于或持平、无需路由参数和负载均衡损失、平衡随机哈希与最局部特征最好、语言建模与对话及下游微调实验。NeurIPS 2021与机构为一般了解。"}
+}

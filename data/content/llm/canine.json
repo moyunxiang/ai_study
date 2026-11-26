@@ -1,0 +1,27 @@
+{
+  "id": "canine",
+  "who": "Jonathan H. Clark, Dan Garrette, Iulia Turc, John Wieting · Google Research",
+  "venue": "TACL 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2103.06874"}
+  ],
+  "aka": ["CANINE", "CANINE-C", "CANINE-S", "字符级编码器", "无分词预训练"],
+  "problem": "BERT类模型都要先用WordPiece等子词词表切分文本，固定词表对不同语言不公平，遇到拼写变化、罕见词和形态复杂的语言时很脆弱。",
+  "idea": "直接以Unicode字符为输入、不用词表：字符先用多个哈希嵌入表示，再用卷积把序列下采样4倍交给深层Transformer，输出时再上采样回字符。",
+  "impact": "是较早在多语言基准上与mBERT正面比较的无分词预训练编码器，和随后的ByT5一起把“去掉分词器”变成一个持续的研究方向。",
+  "method": "背景：[[bert]]使用[[wordpiece]]子词词表，词表由数据统计得到，主要照顾高资源语言；字符或字节级输入能避开词表，但序列会长好几倍，注意力开销随长度平方增长。\n\nCANINE的做法分三步。**输入**：每个字符的Unicode码位经过多个哈希函数映射到若干个小嵌入表，再拼接成字符向量，于是不需要为一百多万个码位各存一行嵌入。**下采样**：先用一层只看局部窗口的注意力编码字符，再用步长为4的卷积把序列长度缩短到四分之一，交给深层Transformer做上下文编码，计算量与普通子词模型相近。**上采样**：需要逐字符输出的任务（如抽取式问答）再把结果放大回字符长度。预训练有两种：CANINE-C直接自回归地预测被遮盖片段的字符，CANINE-S用子词损失作为软的归纳偏置，但推理时仍不需要分词器。\n\n摘要称在多语言问答基准TyDi QA上，CANINE比可比较的mBERT高2.8 F1，参数少28%。",
+  "limits": [
+    {"text": "只做了编码器，不能直接用于生成；下采样倍数固定为4，不随文本内容自适应，后来的字节级生成模型改为动态或按熵分块。", "solved_by": ["byt5", "blt", "h-net"]}
+  ],
+  "relations": [
+    {"to": "bert", "type": "rivals", "note": "与mBERT同为多语言预训练编码器，CANINE去掉了子词切分，直接读字符。"},
+    {"to": "wordpiece", "type": "solves", "note": "子词词表对多语言和拼写变化不鲁棒，CANINE不需要任何固定词表。"},
+    {"to": "transformer", "type": "uses", "note": "下采样后的深层编码部分是标准Transformer。"}
+  ],
+  "prereq": ["tokenization", "embedding", "masked-modeling", "transformer-block", "conv-layer"],
+  "terms": [
+    {"t": "哈希嵌入", "d": "用多个哈希函数把很大的编号空间映射到几个小嵌入表，再拼接起来，避免为每个编号单独存一行参数。"}
+  ],
+  "learn": "先理解[[wordpiece]]子词切分的做法和缺点；读本文的模型图（哈希嵌入、下采样、上采样）和TyDi QA结果表；之后对比[[byt5]]的“不下采样、直接加深编码器”路线。",
+  "check": {"source": "https://arxiv.org/abs/2103.06874", "confirmed": "标题、4位作者、arXiv首次提交2021-03-11；摘要中无显式分词和词表、可选子词软归纳偏置、下采样加深层Transformer、TyDi QA比mBERT高2.8 F1且参数少28%。哈希嵌入、下采样倍数4、CANINE-C/S两种预训练、TACL 2022为对正文的一般了解。"}
+}

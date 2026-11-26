@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>自动微分综述（2015） · AI脉络</title>
+<meta name="description" content="机器学习界长期把求梯度等同于“反向传播”，与已有几十年历史的自动微分领域彼此隔绝，常常重新发明对方的结果，“自动微分”“符号微分”等说法也被混用。 系统梳理自动微分：区分它与数值微分、符号微分，讲清前向模式与反向模式、运算符重载与源码变换等实现方式，并说明反向传播只是反向模式的一个特例。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/autodiff-survey.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="自动微分综述（2015）">
+<meta property="og:description" content="机器学习界长期把求梯度等同于“反向传播”，与已有几十年历史的自动微分领域彼此隔绝，常常重新发明对方的结果，“自动微分”“符号微分”等说法也被混用。 系统梳理自动微分：区分它与数值微分、符号微分，讲清前向模式与反向模式、运算符重载与源码变换等实现方式，并说明反向传播只是反向模式的一个特例。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/autodiff-survey.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/autodiff-survey">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 自动微分框架</div>
+<h1>自动微分综述</h1>
+<div class="full">Automatic differentiation in machine learning: a survey</div>
+<div class="meta"><span>2015.02</span><span>论文</span><span>延伸</span><span>JMLR 2018</span><span>Atılım Güneş Baydin, Barak A. Pearlmutter, Alexey Andreyevich Radul, Jeffrey Mark Siskind · 牛津大学, 爱尔兰国立梅努斯大学, MIT, 普渡大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1502.05767" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://jmlr.org/papers/v18/17-468.html" rel="noopener">JMLR ↗</a><a class="btn sm" href="../index.html#/n/autodiff-survey">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>机器学习界长期把求梯度等同于“反向传播”，与已有几十年历史的自动微分领域彼此隔绝，常常重新发明对方的结果，“自动微分”“符号微分”等说法也被混用。</p></div><div><h4>方法</h4><p>系统梳理自动微分：区分它与数值微分、符号微分，讲清前向模式与反向模式、运算符重载与源码变换等实现方式，并说明反向传播只是反向模式的一个特例。</p></div><div><h4>影响</h4><p>成为深度学习框架与可微编程方向最常被引用的自动微分入门综述，统一了这些术语在机器学习里的用法。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>求导数有三条路：<b>数值微分</b>用<code>(f(x+h) − f(x))/h</code>近似，有截断和舍入误差，n个输入要算n次；<b>符号微分</b>像代数软件那样推出导数表达式，表达式会急剧膨胀；<b>自动微分（AD）</b>把程序拆成一串加、乘、exp之类的基本运算，对每一步用<a class="lc" href="../c/chain-rule.html">链式法则</a>精确传导数，结果精确到机器精度，代价只是原程序的常数倍（见<a class="lc" href="../c/autodiff.html">自动微分与计算图</a>）。</p><p>综述的主体是两种模式。<b>前向模式</b>（<a class="ln" href="../n/wengert-list.html">Wengert列表与前向自动微分</a>的路线）让每个中间变量同时携带值和对某个输入的导数，可以用“对偶数”<code>a + b·ε</code>（<code>ε² = 0</code>）实现；一次前向得到对一个输入方向的导数，输入多时要跑很多遍。<b>反向模式</b>（<a class="ln" href="../n/ad-reverse-mode.html">反向模式自动微分</a>）先前向算完并记下计算过程，再从输出往回累积伴随量，一次就得到标量输出对所有输入的梯度——神经网络的损失是一个标量、参数有上百万，所以<a class="ln" href="../n/backprop.html">反向传播</a>正是反向模式的特例。</p><p>实现上，作者比较了运算符重载（运行时记录操作，像<a class="ln" href="../n/autograd-hips.html">autograd：给NumPy求导</a>、<a class="ln" href="../n/chainer.html">Chainer与Define-by-Run</a>的动态图）与源码变换（直接生成求导代码，像<a class="ln" href="../n/speelpenning.html">Speelpenning梯度代码生成</a>），并点出<a class="ln" href="../n/theano.html">Theano与自动微分</a>等框架实际在做的事情就是AD。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>综述写于动态图框架普及之前，对GPU上的大规模张量程序、编译器层面的求导（如对整段Python程序求导）只能简略讨论；这些后来由JAX、PyTorch 2等框架补上。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/jax.html">JAX</a> <a class="chip hue" style="--h:192" href="../n/pytorch-2.html">PyTorch 2与torch.compile</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/backprop.html">反向传播</a><span class="yr">1986 · 基础</span><div class=nt>明确指出反向传播是反向模式自动微分在神经网络上的特例。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/ad-reverse-mode.html">反向模式自动微分</a><span class="yr">1970 · 系统·效率</span><div class=nt>系统整理了反向模式自动微分的原理与实现，把它与机器学习里的用法对应起来。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/theano.html">Theano与自动微分</a><span class="yr">2010.06 · 系统·效率</span><div class=nt>以Theano等机器学习框架为例，说明它们实际实现的就是自动微分。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/wengert-list.html">Wengert列表与前向自动微分</a><span class="yr">1964.08 · 系统·效率</span><div class=nt>前向模式的部分沿用Wengert列表的思路：把计算记成一串基本运算，逐步传导数。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/pytorch-2.html">PyTorch 2与torch.compile</a><span class="yr">2023.03 · 系统·效率</span><div class=nt>综述写于动态图框架普及之前，对GPU上的大规模张量程序、编译器层面的求导（如对整段Python程序求导）只能简略讨论；这些后来由JAX、PyTorch 2等框架补上。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/jax.html">JAX</a><span class="yr">2018.12 · 系统·效率</span><div class=nt>综述写于动态图框架普及之前，对GPU上的大规模张量程序、编译器层面的求导（如对整段Python程序求导）只能简略讨论；这些后来由JAX、PyTorch 2等框架补上。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/derivative-gradient.html">导数、偏导与梯度</a> <a class="chip c" href="../c/chain-rule.html">链式法则</a> <a class="chip c" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a> <a class="chip c" href="../c/backpropagation.html">反向传播</a> <a class="chip c" href="../c/autodiff.html">自动微分与计算图</a></p>
+<h2>本篇术语</h2><ul><li><b>对偶数</b>　形如a + b·ε、规定ε² = 0的数。把x换成x + ε代入函数，ε前面的系数自动就是导数，是实现前向模式最简洁的办法。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1502.05767" rel="noopener">https://arxiv.org/abs/1502.05767</a>（标题、四位作者、v1日期2015-02-20；摘要：AD与反向传播的关系、两个领域长期互不了解、动态计算图与可微编程等名称、厘清autodiff与symbolic differentiation等术语。JMLR 2018（第18卷）发表信息与作者机构为一般了解；对偶数、两种模式与两类实现方式的介绍是综述的标准内容，未逐节对照。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E8%87%AA%E5%8A%A8%E5%BE%AE%E5%88%86%E7%BB%BC%E8%BF%B0%EF%BC%88autodiff-survey%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aautodiff-survey%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/autodiff-survey.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="autograd-hips.html"><small>本分支上一个 · 2015</small><b>autograd：给NumPy求导</b></a><a class="r" href="distillation.html"><small>本分支下一个 · 2015.03</small><b>知识蒸馏</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

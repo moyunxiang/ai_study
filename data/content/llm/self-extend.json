@@ -1,0 +1,28 @@
+{
+  "id": "self-extend",
+  "who": "Hongye Jin, Xiaotian Han, Jingfeng Yang, Zhimeng Jiang, Zirui Liu, Chia-Yuan Chang, Huiyuan Chen, Xia Hu · 德州农工大学、莱斯大学等",
+  "venue": "ICML 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2401.01325"},
+    {"label": "GitHub", "url": "https://github.com/datamllab/LongLM"}
+  ],
+  "aka": ["SelfExtend", "Self-Extend", "LLM Maybe LongLM", "分组注意力外推", "免训练上下文扩展"],
+  "problem": "用RoPE训练的LLM一旦输入超过训练长度，就会遇到没见过的相对位置，输出迅速崩坏；位置插值、YaRN等方法仍需要一段长文本微调。",
+  "idea": "推理时把远处token的相对位置做整除压缩（分组注意力），近处仍用原始位置（邻域注意力），让模型看到的相对位置始终落在训练范围内，完全不需要微调。",
+  "impact": "给出一个几行代码、零训练的上下文扩展办法，常作为免训练长上下文方法的基线，被llama.cpp等推理框架实现。",
+  "method": "背景：[[rope]]把位置信息编码进查询和键的旋转角度里，注意力分数只依赖相对距离。作者认为LLM失败于长输入的主要原因是遇到了训练时从没见过的大相对距离（分布外位置），而不是模型本身缺乏处理长文本的能力。[[position-interpolation]]把所有位置按比例压缩来解决，但压缩会让近处的细粒度位置变模糊，所以需要再微调。\n\nSelfExtend在推理时把注意力分两层：对距离在邻域窗口W以内的token，用原始相对位置，保证局部语序精确；对更远的token，把位置整除一个分组大小G（`p′ = ⌊p / G⌋`），相当于把G个相邻位置当成同一个位置，再整体平移使两段衔接起来。这样，最远的相对距离被压缩到约 `W + (L − W)/G`，只要不超过训练长度就不会出现分布外位置。两种注意力都直接用原模型的权重计算，按距离拼接成最终的注意力矩阵。\n\n摘要称只需少量代码修改，在多个长文本基准上有效扩展了现有LLM的上下文窗口。",
+  "limits": [
+    {"text": "远处位置被整除后，同一组内的token顺序信息丢失，需要精确定位远处细节的任务会受影响；而且推理时要算两套注意力，与FlashAttention等融合内核的配合需要额外实现。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "rope", "type": "uses", "note": "方法建立在RoPE只依赖相对位置的性质上，通过改写相对位置索引实现外推。"},
+    {"to": "position-interpolation", "type": "solves", "note": "位置插值需要长文本微调且模糊近处位置，SelfExtend免训练并保留近处的原始位置。"},
+    {"to": "alibi", "type": "rivals", "note": "ALiBi从训练时的位置设计入手争取外推，SelfExtend在推理时改写已训练RoPE模型的位置。"}
+  ],
+  "prereq": ["positional-encoding", "self-attention", "context-window", "distribution-shift"],
+  "terms": [
+    {"t": "分组注意力", "d": "把远处token的位置整除分组大小G，G个相邻位置共用一个位置编号，从而压缩最大相对距离。"}
+  ],
+  "learn": "先读[[rope]]和[[position-interpolation]]；读本文关于分布外位置的论证和两层注意力的示意图；动手：在一个4k上下文的开源模型上实现整除位置映射，测8k到16k长文本的passkey检索。",
+  "check": {"source": "https://arxiv.org/abs/2401.01325", "confirmed": "标题、8位作者、arXiv首次提交2024-01-02；摘要中LLM难以泛化到超过训练长度、无需微调、分组注意力处理远距离与邻域注意力处理近距离、两者用原模型自注意力计算、少量代码修改。整除公式、ICML 2024与llama.cpp实现为一般了解。"}
+}

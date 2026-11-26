@@ -4,6 +4,7 @@
   python3 scripts/build.py --check     只校验，不写任何文件（agent自检用）
   python3 scripts/build.py             校验 + 生成 docs/data/*.json
   python3 scripts/build.py --stats     额外打印各分支覆盖率
+  python3 scripts/build.py --wip       有agent正在补录时用：还没登记的讲解文件和主题线归属只算警告（先不收），其余照常
 
 输入：
   data/tracks.json, data/eras.json
@@ -39,6 +40,12 @@ MIN_LEN = {1: 500, 2: 280, 3: 110}   # background+method+results+legacy 的最�
 ALLOWED = {"id", "who", "venue", "links", *SHORT, *LONG, "limits", "relations", "prereq", "terms", "check", "aka"}
 
 errors, warnings = [], []
+
+
+# --wip：有agent正在补录时用。agent是“先写讲解和归属、最后才登记”的，所以会有还没登记的讲解文件和归属行；
+# 这两种情况在 --wip 下只算警告、先不收；正文里指向还没登记的节点的 [[链接]] 也只算警告（页面上显示成普通文字）。
+# 其余照常严格校验。
+WIP = "--wip" in sys.argv
 
 
 def err(where, msg):
@@ -150,7 +157,7 @@ def load_content(nodes):
             err(rel, f"id {nid!r} 与文件名不一致")
             continue
         if nid not in nodes:
-            err(rel, f"id {nid!r} 不在节点登记表里")
+            (warn if WIP else err)(rel, f"id {nid!r} 不在节点登记表里" + ("（--wip：先不收）" if WIP else ""))
             continue
         node = nodes[nid]
         if node["track"] != path.parent.name:
@@ -375,7 +382,7 @@ def check_links(nodes, content, concepts):
                 if ref[2:] not in concepts:
                     err(where, f"[[{ref}]] 指向未登记的概念")
             elif ref not in nodes:
-                err(where, f"[[{ref}]] 指向不存在的节点")
+                (warn if WIP else err)(where, f"[[{ref}]] 指向不存在的节点" + ("（--wip：先显示成普通文字）" if WIP else ""))
     for nid, c in content.items():
         where = f"data/content/{nodes[nid]['track']}/{nid}.json"
         for k in (*SHORT, *LONG):
@@ -516,7 +523,7 @@ def load_tree(nodes, order, track_keys):
                 cur = tk.get(cur["from"])
         for nid, th in assign.items():
             if nid not in nodes:
-                err(where, f"assign 里的 {nid!r} 不是已登记的节点")
+                (warn if WIP else err)(where, f"assign 里的 {nid!r} 不是已登记的节点" + ("（--wip：先不收）" if WIP else ""))
             elif nodes[nid]["track"] != k:
                 err(where, f"assign 里的 {nid} 属于分支 {nodes[nid]['track']}，不应出现在这里")
             elif th not in tk:

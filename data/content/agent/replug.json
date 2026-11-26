@@ -1,0 +1,26 @@
+{
+  "id": "replug",
+  "who": "Weijia Shi, Sewon Min, Michihiro Yasunaga, Minjoon Seo, Rich James, Mike Lewis, Luke Zettlemoyer, Wen-tau Yih · 华盛顿大学 / Meta AI等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2301.12652"}
+  ],
+  "aka": ["REPLUG", "RePlug", "REPLUG LSR", "黑盒检索增强", "black-box RAG", "LM监督检索", "LM-supervised retrieval", "检索集成"],
+  "problem": "REALM、RETRO、Atlas等检索增强方法都要改造或重训语言模型；而GPT-3这类最强模型只能通过API调用，既看不到参数也没法训练。",
+  "idea": "把语言模型当黑盒：每篇检索到的文档单独拼在输入前各跑一次，再按检索相似度加权平均输出概率；还用语言模型对文档「帮了多少忙」的打分反过来训练检索器。",
+  "impact": "证明不碰模型参数也能做检索增强，并给出「让LM监督检索器」的训练办法；此后黑盒、即插即用式RAG成为主流用法。",
+  "method": "**推理（集成）**：用[[contriever]]式双塔编码器从语料中找出前10篇文档。不是把10篇拼成一长串，而是每篇文档 d 各自拼到输入 x 前面送进冻结的模型，得到 `p(y | d∘x)`；最后按检索相似度的softmax权重 `λ(d,x)` 加权平均：`p(y|x) = Σ_d λ(d,x) · p(y | d∘x)`。这样不受上下文长度限制，文档数可以随意加。\n\n**训练检索器（LSR）**：模型参数不动，只更新检索器。对每个检索到的文档算两个分布：检索器给它的概率 `P_R(d|x)`，和语言模型看到它之后预测正确续写 y 的概率归一化后的 `Q(d|x,y)`；最小化两者的[[c:kl-divergence]]，让检索器学会挑「真正帮语言模型预测对」的文档。由于检索器在变，每3000步重算一次全部文档向量、重建[[faiss]]索引。\n\n结果：LSR版本让175B的[[gpt-3]]在Pile上的语言建模提升6.3%，让[[codex]]的五样本[[mmlu]]从68.3提到71.8（+5.1%），在NQ、TriviaQA的开放域问答上也有提升。",
+  "limits": [
+    {"text": "每篇文档要单独跑一次模型，检索10篇就是10倍推理开销。", "solved_by": []},
+    {"text": "各篇文档分开处理、只在输出概率上平均，模型无法在一次推理中综合多篇文档里的信息做多跳推理。", "solved_by": ["ircot"]}
+  ],
+  "relations": [
+    {"to": "rag", "type": "solves", "note": "RAG要联合微调生成器；REPLUG让生成器保持冻结甚至只通过API访问。"},
+    {"to": "realm", "type": "extends", "note": "沿用用语言建模信号训练检索器的思路，但不再训练语言模型本身。"},
+    {"to": "contriever", "type": "uses", "note": "检索器的初始化与结构。"},
+    {"to": "gpt-3", "type": "uses", "note": "作为黑盒被增强的主要模型，也是LSR训练时的打分模型。"},
+    {"to": "in-context-ralm", "type": "rivals", "note": "同一周公开的同类工作：In-Context RALM把文档直接拼进上下文且不训练检索器，REPLUG分文档集成并训练检索器。"}
+  ],
+  "prereq": ["retrieval", "language-model", "kl-divergence", "embedding", "softmax"],
+  "learn": "先读[[rag]]和[[realm]] → 读原文第3节推理集成与第4节LSR训练 → 动手：用一个小模型对同一问题分别拼接不同文档，比较各自预测正确答案的概率，体会LSR的监督信号。",
+  "check": {"source": "https://arxiv.org/abs/2301.12652", "confirmed": "标题、作者、v1提交于2023-01-30；摘要中GPT-3语言建模+6.3%、Codex五样本MMLU+5.1%；正文（arxiv.org/html/2301.12652）核对加权集成公式、top-10文档、KL损失只更新检索器、每3k步重建索引、MMLU 68.3→71.8。单位凭一般了解。"}
+}

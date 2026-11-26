@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Blended Diffusion局部编辑（2021） · AI脉络</title>
+<meta name="description" content="用户想“只把照片里这块区域改成文字描述的样子”，此前的方法要么只能整体修改，要么用GAN反演，在通用自然图片上质量差、背景也会被改动。 用户给一句话和一个区域掩码；在扩散采样的每一步，掩码内用引导的去噪结果，掩码外换成原图加同等噪声的版本，两者按掩码拼接，逐步融合成边界自然的局部编辑。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/blended-diffusion.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Blended Diffusion局部编辑（2021）">
+<meta property="og:description" content="用户想“只把照片里这块区域改成文字描述的样子”，此前的方法要么只能整体修改，要么用GAN反演，在通用自然图片上质量差、背景也会被改动。 用户给一句话和一个区域掩码；在扩散采样的每一步，掩码内用引导的去噪结果，掩码外换成原图加同等噪声的版本，两者按掩码拼接，逐步融合成边界自然的局部编辑。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/blended-diffusion.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/blended-diffusion">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 可控生成与编辑</div>
+<h1>Blended Diffusion局部编辑</h1>
+<div class="full">Blended Diffusion for Text-driven Editing of Natural Images</div>
+<div class="meta"><span>2021.11</span><span>论文</span><span>延伸</span><span>CVPR 2022</span><span>Omri Avrahami, Dani Lischinski, Ohad Fried · 耶路撒冷希伯来大学 / 赖赫曼大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2111.14818" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://omriavrahami.com/blended-diffusion-page/" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/blended-diffusion">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>用户想“只把照片里这块区域改成文字描述的样子”，此前的方法要么只能整体修改，要么用GAN反演，在通用自然图片上质量差、背景也会被改动。</p></div><div><h4>方法</h4><p>用户给一句话和一个区域掩码；在扩散采样的每一步，掩码内用<a class="ln" href="../n/clip.html">CLIP</a>引导的去噪结果，掩码外换成原图加同等噪声的版本，两者按掩码拼接，逐步融合成边界自然的局部编辑。</p></div><div><h4>影响</h4><p>把“文字+掩码”的局部编辑带到通用自然图像上，每步在掩码内外混合的做法成为扩散修复与局部编辑的标准技巧，后续有作者自己的潜空间版本，也影响了文生图产品的局部重绘功能。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>设原图x、掩码m（1表示要编辑的区域）、文本描述d。方法基于一个无条件的<a class="ln" href="../n/ddpm.html">DDPM</a>式扩散模型（<a class="ln" href="../n/adm.html">扩散超越GAN</a>的ImageNet模型），在采样的每一步t：</p><ul><li>先对当前带噪图x_t做一步去噪，并用CLIP引导：计算去噪后估计的干净图在掩码区域内与文本d的CLIP相似度，沿其梯度调整，使这块内容朝文字描述靠拢。</li><li>再把原图按同一噪声水平加噪得到x_t^bg。</li><li>两者拼接：<code>x_{t−1} = m ⊙ x_fg + (1 − m) ⊙ x_bg</code>。</li></ul><p>因为每一步都在相同噪声水平上混合，扩散模型会在后续步骤里把接缝处“补平”，背景则始终和原图一致。论文还发现，直接用CLIP梯度容易得到对CLIP的“对抗样本”（分数高但看起来不对），于是在计算CLIP损失前对图像做多种随机增强以缓解。论文展示了添加物体、替换或删除物体、换背景、向外扩展画面等应用，并与基于GAN和优化的方法比较了真实感、背景保持和文本匹配度。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>在像素空间逐步计算CLIP梯度，编辑一张图要数分钟，分辨率也受限。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/stable-diffusion.html">Stable Diffusion开源</a></div></li><li>只能改掩码内的区域，掩码要由用户画，无法做“把整张图变成冬天”这类全局语义编辑。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/prompt-to-prompt.html">Prompt-to-Prompt</a> <a class="chip hue" style="--h:288" href="../n/instructpix2pix.html">InstructPix2Pix</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/ddpm.html">DDPM</a><span class="yr">2020.06 · 生成</span><div class=nt>以扩散模型的逐步去噪作为生成器，在每一步做混合。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:240" href="../n/clip.html">CLIP</a><span class="yr">2021.01 · 多模态</span><div class=nt>用CLIP图文相似度的梯度把掩码区域的内容引向文本描述。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/adm.html">扩散超越GAN</a><span class="yr">2021.05 · 生成</span><div class=nt>采用ADM发布的ImageNet无条件扩散模型，沿用其引导采样的思路。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/sdedit.html">SDEdit</a><span class="yr">2021.08 · 生成</span><div class=nt>同样利用“给原图加噪再去噪”，但加入掩码混合与文本引导，只改局部。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/stable-diffusion.html">Stable Diffusion开源</a><span class="yr">2022.08 · 生成</span><div class=nt>在像素空间逐步计算CLIP梯度，编辑一张图要数分钟，分辨率也受限。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/prompt-to-prompt.html">Prompt-to-Prompt</a><span class="yr">2022.08 · 生成</span><div class=nt>只能改掩码内的区域，掩码要由用户画，无法做“把整张图变成冬天”这类全局语义编辑。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/instructpix2pix.html">InstructPix2Pix</a><span class="yr">2022.11 · 生成</span><div class=nt>只能改掩码内的区域，掩码要由用户画，无法做“把整张图变成冬天”这类全局语义编辑。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/guidance.html">条件生成与引导</a> <a class="chip c" href="../c/contrastive-learning.html">对比学习</a> <a class="chip c" href="../c/noise-schedule.html">噪声调度与采样步数</a></p>
+<h2>本篇术语</h2><ul><li><b>掩码混合</b>　按一张0/1掩码把两张图逐像素拼在一起：掩码为1处取编辑结果，为0处取原图。</li></ul>
+<h2>怎么学</h2><p>先读DDPM和CLIP → 读本文第3节混合步骤与增强对抗CLIP的消融 → 用diffusers的inpainting流程复现“文字+掩码”的局部重绘。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2111.14818" rel="noopener">https://arxiv.org/abs/2111.14818</a>（标题、三位作者、v1日期2021-11-29、摘要中基于文本与ROI掩码的通用自然图像局部编辑、结合CLIP与DDPM、在多个噪声水平上空间混合加噪原图与文本引导潜变量、增强缓解对抗结果、添加/删除/替换物体、换背景与外扩等应用、与基线比较；机构、CVPR 2022、所用ADM模型和公式细节来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Blended%20Diffusion%E5%B1%80%E9%83%A8%E7%BC%96%E8%BE%91%EF%BC%88blended-diffusion%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ablended-diffusion%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/blended-diffusion.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="sdedit.html"><small>本分支上一个 · 2021.08</small><b>SDEdit</b></a><a class="r" href="eg3d.html"><small>本分支下一个 · 2021.12</small><b>EG3D三维感知GAN</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

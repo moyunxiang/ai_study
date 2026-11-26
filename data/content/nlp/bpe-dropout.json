@@ -1,0 +1,32 @@
+{
+  "id": "bpe-dropout",
+  "who": "Ivan Provilkov, Dmitrii Emelianenko, Elena Voita · Yandex / 莫斯科物理技术学院 / 高等经济大学 / 爱丁堡大学 / 阿姆斯特丹大学",
+  "venue": "ACL 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1910.13267"}
+  ],
+  "aka": ["BPE dropout", "子词正则化", "随机BPE"],
+  "problem": "BPE对同一个词永远给出同一种切分，模型见不到同一个词的其他切法，难以学到词的内部构成，对拼写错误、切分差异也很脆弱；此前唯一的补救是换用另一套Unigram子词算法。",
+  "idea": "不换算法、不改合并表：训练时在BPE切分的每一步以概率p随机丢掉一部分可用的合并操作，于是同一个词每次被切成不同的子词序列；推理时恢复标准BPE。",
+  "impact": "几行代码就能接进现有BPE流程，翻译质量比标准BPE最多高3 BLEU、比Unigram子词正则化最多高0.9 BLEU，成为BPE上做子词正则化最常用的办法，主流分词库都提供了dropout选项。",
+  "method": "[[bpe]]的切分过程是：把词拆成字符，反复在当前切分中找出所有可用的合并（相邻两段在合并表里出现过），按学习时的优先级执行最优先的那个，直到无合并可做。结果是确定的，例如某个词总被切成同样的三段。[[subword-regularization]]（Kudo，2018）指出，让模型在训练中看到多种切分有正则化作用，但它依赖Unigram语言模型式的子词算法，要用BPE就得整体替换。\n\nBPE-dropout只改切分过程中的一行：每一步在挑选合并之前，把每个可用合并以概率p删掉，再从剩下的里面选优先级最高的执行。`p = 0`就是标准BPE，`p = 1`则把词切成单个字符，中间值控制切分粒度。训练时用`p > 0`（论文通常取0.1），同一个句子每个轮次都可能得到不同的子词序列；推理时用`p = 0`，即原始BPE。合并表不变，词表也不变。\n\n摘要报告：在多个翻译任务上，训练时用BPE-dropout、测试时用标准BPE，比标准BPE最多提高3 BLEU，比此前的子词正则化最多提高0.9 BLEU；论文还分析了它让模型更好地利用词的组成结构、对含噪声的输入更鲁棒。",
+  "limits": [
+    {"text": "随机切分让训练序列变长、每轮都要重新切分，训练变慢，且在数据量很大的设定下收益缩小。", "solved_by": []},
+    {"text": "仍以子词为单位，没有从根本上解决词表固定、对新文字和字节级噪声敏感的问题。", "solved_by": ["byt5"]}
+  ],
+  "relations": [
+    {"to": "bpe", "type": "extends", "note": "保留BPE的合并表与词表，只在切分时随机丢弃合并，让同一个词有多种切法。"},
+    {"to": "subword-regularization", "type": "solves", "note": "Kudo的子词正则化必须换用Unigram算法；BPE-dropout在BPE框架内实现同样的随机切分，效果还更好。"},
+    {"to": "dropout", "type": "extends", "note": "借用dropout随机丢弃以起正则化作用的思想，丢弃对象从神经元换成了合并操作。"}
+  ],
+  "prereq": ["tokenization", "regularization", "dropout-concept", "encoder-decoder", "text-metrics"],
+  "terms": [
+    {"t": "合并表", "d": "BPE训练时学到的有序合并规则列表，如先合并「t+h」再合并「th+e」，切分时按这个优先级执行。"},
+    {"t": "子词正则化", "d": "训练时给模型看同一句话的多种子词切分，类似数据增强，使模型对切分方式更鲁棒。"}
+  ],
+  "learn": "先读[[bpe]]与[[subword-regularization]]的讲解 → 读原文第2节的算法1 → 动手：用Hugging Face tokenizers训练一个BPE模型，打开dropout=0.1，对同一个词切分十次，观察切分结果的分布。",
+  "check": {
+    "source": "https://arxiv.org/abs/1910.13267",
+    "confirmed": "arXiv：标题、作者Provilkov、Emelianenko、Voita、2019-10-29提交、摘要（BPE切分确定、此前只能换用Kudo 2018的算法、BPE-dropout在BPE框架内随机破坏切分过程、训练用BPE-dropout测试用标准BPE、比BPE最多高3 BLEU、比此前子词正则化最多高0.9 BLEU）；PDF正文（pdftotext）：作者单位Yandex等、算法1、p=0等于标准BPE、p=1切成字符、训练通常取p=0.1、推理p=0。ACL 2020出处与分词库支持情况凭一般了解。"
+  }
+}

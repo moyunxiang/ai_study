@@ -1,0 +1,27 @@
+{
+  "id": "cut",
+  "who": "Taesung Park, Alexei A. Efros, Richard Zhang, Jun-Yan Zhu · UC Berkeley / Adobe Research",
+  "venue": "ECCV 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2007.15651"}
+  ],
+  "aka": ["CUT", "Contrastive Unpaired Translation", "PatchNCE", "对比无配对翻译", "FastCUT"],
+  "problem": "[[cyclegan]]靠“翻过去再翻回来要还原”的循环一致损失约束无配对翻译，必须同时训练正反两个生成器，而且这个约束过严，要求映射近似可逆。",
+  "idea": "只训练单向生成器，改用对比学习约束内容：输出图里某个位置的图块，应该和输入图同一位置的图块在特征空间里最接近，而和输入图其他位置的图块拉开距离。",
+  "impact": "把[[c:contrastive-learning]]引入图像翻译，取代循环一致损失成为无配对翻译的常用约束，训练更快、显存更省，还能在单张图片构成的“域”上训练。",
+  "method": "设输入图x经生成器G得到输出ŷ = G(x)。CUT用G的编码器部分提取x和ŷ在多个层上的特征图，再接一个小的多层感知机（类似[[simclr]]的投影头）把每个空间位置的特征映射成向量。\n\n对输出中的一个图块向量v，正样本是输入图同一位置图块的向量v⁺，负样本是**同一张输入图**里其他N个位置的图块向量v⁻。损失用[[cpc]]提出的InfoNCE形式：`ℓ = −log[exp(v·v⁺/τ) / (exp(v·v⁺/τ) + Σ exp(v·v⁻ᵢ/τ))]`，把它在多个层、多个位置上求和，称为PatchNCE损失。直觉是：马变斑马之后，马头那一块应该还是“头”，而不是背景或腿。论文发现从同一张图内取负样本比从数据集其他图取效果更好。\n\n总损失 = 对抗损失（输出要像目标域）+ 输入图上的PatchNCE + 目标域图上的PatchNCE（作为恒等约束，防止乱改）。论文报告它在马↔斑马、猫↔狗、Cityscapes等任务上质量优于CycleGAN，同时训练时间和显存更少；轻量版FastCUT更快。",
+  "limits": [
+    {"text": "仍是逐个域对训练的GAN方法，只能做纹理和外观层面的转换，难以改变物体形状或按文字指令编辑。", "solved_by": ["instructpix2pix", "pnp-diffusion"]}
+  ],
+  "relations": [
+    {"to": "cyclegan", "type": "solves", "note": "用单向的图块对比损失替代需要两个生成器的循环一致损失，训练更快更省。"},
+    {"to": "cpc", "type": "uses", "note": "PatchNCE直接采用CPC提出的InfoNCE对比损失形式。"},
+    {"to": "simclr", "type": "uses", "note": "借用对比学习中给特征接一个多层感知机投影头的做法。"}
+  ],
+  "prereq": ["contrastive-learning", "adversarial-training", "mutual-information", "image-patch", "softmax"],
+  "terms": [
+    {"t": "PatchNCE", "d": "在图块层面计算的InfoNCE对比损失：让输入和输出对应位置的图块特征相互接近，不对应的相互远离。"}
+  ],
+  "learn": "先读CycleGAN和InfoNCE → 读本文图2与第3节负样本取法的消融 → 用官方代码跑马变斑马并与CycleGAN对比训练时间。",
+  "check": {"source": "https://arxiv.org/abs/2007.15651", "confirmed": "标题、四位作者、v1日期2020-07-30、摘要中最大化输入输出对应图块互信息、基于对比学习、多层图块方式、负样本取自输入图内部、实现单向无配对翻译并提高质量减少训练时间、可扩展到单张图的域；机构、ECCV 2020、损失公式与FastCUT、具体任务来自一般了解"}
+}

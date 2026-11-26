@@ -1,0 +1,28 @@
+{
+ "id": "megatron-sp",
+ "who": "Vijay Korthikanti, Jared Casper, Sangkug Lym, Lawrence McAfee, Michael Andersch, Mohammad Shoeybi, Bryan Catanzaro · NVIDIA",
+ "venue": "MLSys 2023",
+ "aka": ["序列并行", "sequence parallelism", "Megatron序列并行", "SP", "选择性重计算", "selective activation recomputation", "激活重计算"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2205.05198"},
+  {"label": "Megatron-LM", "url": "https://github.com/NVIDIA/Megatron-LM"}
+ ],
+ "problem": "训练几千亿参数的模型，激活值占满显存，只好用激活重计算：反向时把前向重新算一遍，省了显存却白白多花约三分之一的计算。",
+ "idea": "两招让重计算几乎不再需要：张量并行没切到的LayerNorm、Dropout部分改为沿序列维切分（序列并行）；只对占显存多、计算少的注意力内部那几步做重计算（选择性重计算）。",
+ "impact": "序列并行和选择性重计算成为Megatron-LM与NeMo的标准选项，“TP+SP”也成了后来大模型训练配置里的常见组合。",
+ "method": "[[megatron]]的张量并行把注意力和前馈层的矩阵乘切到多张卡上，但层与层之间的LayerNorm和Dropout没有切，每张卡都存着完整的激活，模型越大越占显存。常规补救是[[grad-checkpointing]]式的整层重计算，代价是多做一遍前向。\n\n**序列并行**：在这些原本被复制的区域，把激活沿序列长度方向切开，每张卡只处理一部分token（LayerNorm、Dropout都是逐token运算，可以独立做）。原先张量并行区域边界上的一次All-Reduce，被拆成一次Reduce-Scatter加一次All-Gather，通信总量不变，但每张卡上的这部分激活变成了1/t（t为张量并行度）。\n\n**选择性重计算**：作者逐项估算了Transformer层里每块激活的大小与计算量，发现注意力里的softmax输出、dropout掩码等随序列长度平方增长、占了很多显存，重算它们却很便宜；于是只重计算这几步，其余激活照常保存。\n\n摘要报告：在最多一万亿参数的模型上，激活显存降为1/5，激活重计算带来的额外时间减少90%以上；在2240块A100上训练530B参数的GPT-3式模型，模型算力利用率（MFU）从重计算时的42.1%提高到54.2%，快29%。",
+ "limits": [
+  {"text": "序列并行与张量并行绑定、只在单个张量并行组内切分，序列很长时注意力本身的显存和计算仍集中在每张卡上。", "solved_by": ["deepspeed-ulysses", "ring-attention"]}
+ ],
+ "relations": [
+  {"to": "megatron", "type": "extends", "note": "在Megatron张量并行的基础上，把没被切分的LayerNorm、Dropout区域沿序列维再切一次。"},
+  {"to": "megatron-3d", "type": "extends", "note": "延续Megatron 3D并行的系统，进一步降低万卡级训练中的激活显存。"},
+  {"to": "grad-checkpointing", "type": "solves", "note": "整层激活重计算多花约一次前向的算力；选择性重计算只重算便宜而占显存的部分，把额外开销减少90%以上。"},
+  {"to": "mt-nlg", "type": "uses", "note": "以530B参数的GPT-3式模型为主要测试对象，规模与MT-NLG相同。"}
+ ],
+ "prereq": ["distributed-training", "self-attention", "transformer-block", "backpropagation", "params-flops"],
+ "terms": [
+  {"t": "MFU", "d": "模型算力利用率：训练实际完成的有效浮点运算量除以硬件理论峰值，重计算这类重复运算不算在内。"}
+ ],
+ "check": {"source": "https://arxiv.org/abs/2205.05198", "confirmed": "标题、七位作者、v1日期2022-05-10；摘要：序列并行与选择性重计算、配合张量并行几乎消除重计算、最多一万亿参数、激活显存降5倍、重计算开销减少90%以上、2240块A100上530B模型MFU 54.2%对42.1%快29%、实现在Megatron-LM与NeMo-Megatron。Reduce-Scatter+All-Gather替代All-Reduce、MLSys 2023、NVIDIA机构为对正文的一般了解。"}
+}

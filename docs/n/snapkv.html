@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SnapKV提示KV压缩（2024） · AI脉络</title>
+<meta name="description" content="长文档问答这类任务里，KV缓存主要来自很长的输入提示；H2O等方法在生成过程中逐步淘汰，却不压缩一次性读入的长提示本身，显存和每步解码的时间都随输入长度增长。 每个注意力头在生成时关注的提示位置相当稳定，而且用提示末尾一小段“观察窗口”对前文的注意力就能预先看出来；于是在预填充结束时，按观察窗口的…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/snapkv.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SnapKV提示KV压缩（2024）">
+<meta property="og:description" content="长文档问答这类任务里，KV缓存主要来自很长的输入提示；H2O等方法在生成过程中逐步淘汰，却不压缩一次性读入的长提示本身，显存和每步解码的时间都随输入长度增长。 每个注意力头在生成时关注的提示位置相当稳定，而且用提示末尾一小段“观察窗口”对前文的注意力就能预先看出来；于是在预填充结束时，按观察窗口的…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/snapkv.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/snapkv">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 推理服务引擎</div>
+<h1>SnapKV提示KV压缩</h1>
+<div class="full">SnapKV: LLM Knows What You are Looking for Before Generation</div>
+<div class="meta"><span>2024.04</span><span>论文</span><span>延伸</span><span>NeurIPS 2024</span><span>Yuhong Li, Yingbing Huang, Bowen Yang, Bharat Venkitesh, Acyr Locatelli, Hanchen Ye, Tianle Cai, Patrick Lewis, Deming Chen · 伊利诺伊大学厄巴纳-香槟分校, Cohere, 普林斯顿大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2404.14469" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/FasterDecoding/SnapKV" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/snapkv">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>长文档问答这类任务里，KV缓存主要来自很长的输入提示；H2O等方法在生成过程中逐步淘汰，却不压缩一次性读入的长提示本身，显存和每步解码的时间都随输入长度增长。</p></div><div><h4>方法</h4><p>每个注意力头在生成时关注的提示位置相当稳定，而且用提示末尾一小段“观察窗口”对前文的注意力就能预先看出来；于是在预填充结束时，按观察窗口的注意力为每个头挑出重要位置（连同邻近位置）保留，其余KV丢掉。</p></div><div><h4>影响</h4><p>免微调、即插即用，成为长上下文KV缓存压缩最常用的基线之一，PyramidKV等后续工作在其上按层分配预算。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/h2o.html">H2O KV缓存淘汰</a>按生成过程中累计的注意力分数淘汰token，<a class="ln" href="../n/streamingllm.html">StreamingLLM与注意力汇聚</a>只保留开头几个“注意力汇聚”token加最近窗口。作者关注另一个场景：输入是上万token的文档，输出却不长，此时KV缓存几乎全来自提示。</p><p>SnapKV的核心观察：在生成期间，每个注意力头持续关注提示里的一组特定位置，而且这个模式在提示<b>末尾</b>（通常是用户的问题）就已经显现。具体做法：取提示最后一段（观察窗口，如最后32个token），计算它们对前面所有位置的注意力，按头求和得到每个位置的重要性；用一维池化把相邻位置的分数聚在一起，避免只留下孤立的token、丢掉上下文；每个头各自保留得分最高的若干位置，再加上观察窗口本身。压缩只在预填充结束时做一次，之后照常解码，不需要任何微调。</p><p>摘要报告：处理16K token输入时，生成速度提高3.6倍、显存效率提高8.2倍，在16个长序列数据集上与原模型表现相当；对Hugging Face实现稍加修改，可在单块A100-80GB上处理多达380K token的上下文，在<a class="ln" href="../n/needle-haystack.html">大海捞针测试</a>测试中精度下降可以忽略。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>重要位置由提示末尾的问题决定；多轮对话里后续问题关注的内容一旦被丢掉就找不回来。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>每层每头用同样的预算，没有考虑不同层对上下文的需求不同。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/h2o.html">H2O KV缓存淘汰</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>同样按注意力分数决定保留哪些KV，但改为在预填充结束时一次性压缩长提示，并按头分别选择。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/streamingllm.html">StreamingLLM与注意力汇聚</a><span class="yr">2023.09 · 系统·效率</span><div class=nt>StreamingLLM固定保留开头和最近的token，SnapKV按观察窗口的注意力有选择地保留中间的重要位置。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/needle-haystack.html">大海捞针测试</a><span class="yr">2023.11 · 数据·评测</span><div class=nt>用大海捞针测试检验压缩后是否还能找到长文中的关键信息。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/context-window.html">上下文窗口</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2404.14469" rel="noopener">https://arxiv.org/abs/2404.14469</a>（标题、九位作者、v1日期2024-04-22；摘要：免微调、各注意力头生成时持续关注特定提示特征、可从提示末尾的观察窗口获得、为每个头选择聚簇的重要KV位置、16K输入时生成速度3.6×与显存效率8.2×、16个长序列数据集、单块A100-80GB处理380K token、大海捞针精度下降可忽略。观察窗口大小、池化细节、NeurIPS 2024与作者机构为对正文的一般了解；PyramidKV为后续工作的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SnapKV%E6%8F%90%E7%A4%BAKV%E5%8E%8B%E7%BC%A9%EF%BC%88snapkv%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asnapkv%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/snapkv.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="llm-c.html"><small>本分支上一个 · 2024.04</small><b>llm.c</b></a><a class="r" href="api-price-war.html"><small>本分支下一个 · 2024.05</small><b>大模型API价格战</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

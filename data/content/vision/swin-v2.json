@@ -1,0 +1,29 @@
+{
+  "id": "swin-v2",
+  "who": "Ze Liu, Han Hu, Yutong Lin, Zhuliang Yao, Zhenda Xie, Yixuan Wei, Jia Ning, Yue Cao et al. · 微软亚洲研究院",
+  "venue": "CVPR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2111.09883"},
+    {"label": "代码", "url": "https://github.com/microsoft/Swin-Transformer"}
+  ],
+  "aka": ["Swin V2", "SwinV2", "SwinV2-G", "post-norm", "cosine attention", "log-CPB", "对数连续位置偏置"],
+  "problem": "把[[swin]]做到几十亿参数时遇到三个问题：训练不稳定、低分辨率预训练的模型迁移到高分辨率下游任务时掉点、大模型对标注数据需求太大。",
+  "idea": "残差后归一化加余弦注意力稳住训练；对数间隔的连续位置偏置让模型跨分辨率迁移；用自监督的[[simmim]]减少对标注的依赖。",
+  "impact": "训练出30亿参数、可处理1536×1536输入的稠密视觉模型，在四类任务上刷新纪录，其稳定化技巧被后续大视觉模型借鉴。",
+  "method": "三项技术各解决一个问题。\n\n- **训练不稳定**：原版把层归一化放在残差分支开头（pre-norm），越深的层输出幅值越大，大模型训练会崩。V2改成残差分支末尾做归一化再相加（res-post-norm），并把注意力的点积换成按可学习温度缩放的余弦相似度，避免少数注意力值过大。\n- **分辨率迁移**：Swin用一张按窗口内相对位置查表的位置偏置，换窗口大小就要插值、效果下降。V2改用一个小MLP根据相对坐标生成偏置，并先对坐标取对数（log-spaced），外推到更大窗口时跨度更小。\n- **数据需求**：用同期提出的[[simmim]]掩码图像建模先做自监督预训练。\n\n摘要报告训练出30亿参数的SwinV2，可接受最高1536×1536的图像，在ImageNet-V2分类、COCO检测、ADE20K分割、Kinetics-400视频分类上创下新纪录；与谷歌十亿级视觉模型相比，标注数据少40倍、训练时间少40倍。",
+  "limits": [
+    {"text": "移位窗口等视觉专用设计使实现复杂、在加速器上效率不如朴素ViT，后来的大模型多回到朴素ViT。", "solved_by": ["hiera", "dinov2"]}
+  ],
+  "relations": [
+    {"to": "swin", "type": "extends", "note": "保留移位窗口层级结构，改归一化位置、注意力形式和位置偏置以扩展到30亿参数。"},
+    {"to": "simmim", "type": "uses", "note": "用SimMIM自监督预训练降低对标注图像的需求。"},
+    {"to": "scaling-vit", "type": "rivals", "note": "谷歌靠JFT-3B有标注数据把ViT做大；SwinV2用少40倍的标注数据达到更强结果。"}
+  ],
+  "prereq": ["self-attention", "normalization-layer", "positional-encoding", "scaling-law-concept", "image-patch"],
+  "terms": [
+    {"t": "pre-norm与post-norm", "d": "层归一化放在残差分支的开头还是结尾；位置不同会影响深层网络训练的稳定性。"},
+    {"t": "相对位置偏置", "d": "加在注意力分数上的一项，只取决于两个图像块的相对位置，帮助模型感知空间关系。"}
+  ],
+  "learn": "先读Swin Transformer，再读V2第3节的三项改进；在timm里加载swinv2模型，改变输入分辨率观察位置偏置如何外推。",
+  "check": {"source": "https://arxiv.org/abs/2111.09883", "confirmed": "arXiv记录：标题、作者列表、v1提交于2021-11-18、摘要中的三个问题与三项技术（残差后归一化+余弦注意力、对数间隔连续位置偏置、SimMIM）、30亿参数、1536×1536、ImageNet-V2/COCO/ADE20K/Kinetics-400纪录、标注数据和训练时间各少40倍。pre-norm问题的机理、可学习温度、MLP生成偏置的细节与CVPR 2022凭一般了解写。"}
+}

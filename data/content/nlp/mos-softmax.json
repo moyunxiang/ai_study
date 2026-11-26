@@ -1,0 +1,33 @@
+{
+  "id": "mos-softmax",
+  "who": "Zhilin Yang, Zihang Dai, Ruslan Salakhutdinov, William W. Cohen · 卡内基梅隆大学",
+  "venue": "ICLR 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1711.03953"}
+  ],
+  "aka": ["MoS", "Mixture of Softmaxes", "Softmax瓶颈", "Softmax Bottleneck"],
+  "problem": "几乎所有神经语言模型最后都用「隐状态点乘词向量再softmax」输出下一个词，这相当于用一个低秩矩阵去拟合所有上下文下的词分布，而真实语言的这个矩阵很可能是高秩的。",
+  "idea": "把语言建模写成矩阵分解问题，证明单个softmax的表达能力受隐层维度限制（Softmax瓶颈）；改用K个softmax的加权混合，混合后的对数概率矩阵不再受这个秩上限约束。",
+  "impact": "把PTB和WikiText-2的困惑度刷新到47.69和40.68，「Softmax瓶颈」也成为分析输出层表达能力的常用说法，后来的大模型输出层研究常引用它。",
+  "method": "设想一张巨大的矩阵`A`：每行是一个上下文，每列是一个词，元素是真实的条件对数概率`log P(w|c)`。用softmax的模型给出的是`H·Wᵀ`再按行归一化，其中`H`的每行是上下文的隐状态（维度d），`W`是词向量。所以模型能表示的对数概率矩阵秩至多约为`d+1`。词表有几万个词、上下文千变万化，作者论证自然语言的`A`很可能是高秩的，那么只要`d`远小于所需的秩，再怎么训练也拟合不了——这就是**Softmax瓶颈**。这个视角与[[levy-goldberg-pmi]]把词向量看作矩阵分解是一脉相承的。\n\n解决办法是**混合Softmax（MoS）**：从同一个隐状态投影出K个不同的上下文向量`h_{c,k}`，各做一次softmax，再用由上下文决定的权重`π_{c,k}`加权平均：\n\n`P(w|c) = Σ_k π_{c,k} · softmax(h_{c,k}ᵀ w)`\n\n混合发生在概率空间而不是对数空间，取对数后不再是低秩矩阵，表达能力因此提高。参数只多了少量投影矩阵，代价主要是要算K次softmax。\n\n实验以[[awd-lstm]]为骨干。摘要报告：在Penn Treebank和[[wikitext]]-2上把最好困惑度推进到47.69和40.68；在十亿词基准上也比基线低5.6以上。",
+  "limits": [
+    {"text": "每一步要计算K次完整词表的softmax，输出层计算量和显存成倍增加，大词表时代价高昂。", "solved_by": []},
+    {"text": "仍是LSTM语言模型，长距离依赖与训练并行度的限制没有改变。", "solved_by": ["transformer-xl", "gpt-2"]}
+  ],
+  "relations": [
+    {"to": "awd-lstm", "type": "uses", "note": "以AWD-LSTM为骨干网络，只替换最后的输出层。"},
+    {"to": "awd-lstm", "type": "solves", "note": "指出AWD-LSTM等模型的单一softmax输出受隐层维度的秩限制，用混合softmax突破这一瓶颈并刷新困惑度。"},
+    {"to": "levy-goldberg-pmi", "type": "extends", "note": "同样把神经语言模型看作对上下文-词矩阵的分解，进一步分析这个分解的秩上限。"},
+    {"to": "wikitext", "type": "uses", "note": "在WikiText-2与Penn Treebank上报告困惑度。"}
+  ],
+  "prereq": ["softmax", "low-rank", "eigen-svd", "language-model", "perplexity", "recurrent-layer"],
+  "terms": [
+    {"t": "Softmax瓶颈", "d": "单个softmax输出层能表示的对数概率矩阵秩不超过隐层维度加一，因而可能无法拟合高秩的真实语言分布。"},
+    {"t": "矩阵的秩", "d": "矩阵中线性无关的行（或列）的最大个数，衡量它能表达多少「独立方向」的信息。"}
+  ],
+  "learn": "先复习矩阵秩与SVD → 读原文第2节（瓶颈的论证）和第3节（MoS）→ 动手：构造一个秩为50的随机对数概率矩阵，分别用d=10的单softmax和K=5的混合softmax去拟合，比较拟合误差。",
+  "check": {
+    "source": "https://arxiv.org/abs/1711.03953",
+    "confirmed": "arXiv：标题、作者Yang、Dai、Salakhutdinov、Cohen、2017-11-10提交、摘要（把语言建模表述为矩阵分解、Softmax瓶颈、PTB 47.69与WikiText-2 40.68、十亿词数据上比基线低5.6以上）。秩约为d+1的论证、MoS公式、以AWD-LSTM为骨干、ICLR 2018与CMU机构凭一般了解，未逐项对照正文。"
+  }
+}

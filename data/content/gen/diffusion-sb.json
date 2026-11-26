@@ -1,0 +1,27 @@
+{
+  "id": "diffusion-sb",
+  "who": "Valentin De Bortoli, James Thornton, Jeremy Heng, Arnaud Doucet · 牛津大学 / ESSEC",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2106.01357"}
+  ],
+  "aka": ["DSB", "Diffusion Schrödinger Bridge", "扩散薛定谔桥", "薛定谔桥", "Schrödinger Bridge"],
+  "problem": "[[score-sde]]式扩散模型要求前向加噪跑得足够久，终点才近似标准高斯；时间短了，生成的起点分布就对不上，而且只能在“数据↔高斯”之间搭桥。",
+  "idea": "把生成建模写成薛定谔桥问题：在路径空间上找一个熵正则的最优传输，使扩散过程在有限时间内恰好把数据分布送到先验分布；用分数模型近似迭代比例拟合（IPF），交替训练前向和反向过程。",
+  "impact": "把扩散模型和最优传输、薛定谔桥理论接起来，开启了“任意两个分布之间搭桥”的一系列工作（如I²SB、扩散桥图像翻译），也是理解流匹配与整流流的理论背景之一。",
+  "method": "薛定谔桥问题问的是：给定起点分布（数据）和终点分布（先验），在所有连接它们的随机过程中，找一个最接近某个参考扩散（如布朗运动）的过程，接近程度用路径上的KL散度衡量。它等价于路径空间上的熵正则[[c:optimal-transport]]，经典解法是迭代比例拟合（IPF）：轮流固定一端，只调整过程使另一端的边缘分布对上。\n\n扩散薛定谔桥（DSB）把IPF的每一步都变成一次分数模型训练：\n- 第1轮：从数据出发跑前向SDE，训练网络学习反向过程的漂移，这恰好就是[[score-sde]]的做法，只是允许较短的时间区间。\n- 第2轮：从先验出发用刚学到的反向过程采样，再训练一个新的前向过程，使其终点更贴近先验。\n- 如此交替，每轮都缩小前向终点与先验、反向终点与数据之间的偏差。\n\n论文给出了收敛性分析，并在二维玩具分布、MNIST、CelebA上做了生成实验；它还指出DSB可以看作Sinkhorn算法在连续状态空间上的对应物，可当作通用的计算最优传输工具。",
+  "limits": [
+    {"text": "需要多轮交替训练前向和反向网络，每轮都要模拟整条轨迹，训练成本远高于普通扩散模型，在大规模图像上难以使用。", "solved_by": ["rectified-flow", "flow-matching"]}
+  ],
+  "relations": [
+    {"to": "score-sde", "type": "extends", "note": "第一轮迭代即退化为Score SDE的方法，后续迭代去掉了前向过程必须跑到高斯的限制。"},
+    {"to": "ddpm", "type": "extends", "note": "把固定的加噪过程换成可学习的前向过程，使数据和先验在有限时间内精确连接。"}
+  ],
+  "prereq": ["ode-sde", "score-function", "optimal-transport", "kl-divergence", "diffusion-process"],
+  "terms": [
+    {"t": "薛定谔桥", "d": "在给定起点和终点分布的所有随机过程中，与参考扩散最接近的那一个；可看作带熵正则的最优传输。"},
+    {"t": "迭代比例拟合IPF", "d": "轮流修正联合分布使其分别满足两个边缘约束的经典算法，离散情形就是Sinkhorn算法。"}
+  ],
+  "learn": "先读Score SDE和熵正则最优传输（Sinkhorn） → 读本文第3节IPF与DSB的对应 → 在二维两月形分布与高斯之间实现一次DSB。",
+  "check": {"source": "https://arxiv.org/abs/2106.01357", "confirmed": "标题、四位作者、v1日期2021-06-01、摘要中前向SDE需足够长时间才近似高斯的限制、薛定谔桥即路径空间上的熵正则最优传输、DSB近似IPF、首轮迭代恢复Song等人的方法、理论分析与生成实验、可视为Sinkhorn的连续状态版本；机构、NeurIPS 2021、具体数据集与后续I²SB等来自一般了解"}
+}

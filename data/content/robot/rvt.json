@@ -1,0 +1,29 @@
+{
+ "id": "rvt",
+ "who": "Ankit Goyal, Jie Xu, Yijie Guo, Valts Blukis, Yu-Wei Chao, Dieter Fox · NVIDIA",
+ "venue": "CoRL 2023",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2306.14896"},
+  {"label": "项目页", "url": "https://robotic-view-transformer.github.io/"}
+ ],
+ "problem": "三维操作里，显式建立体素等三维表示的方法（如PerAct）比只看相机图像的方法准，但体素计算量太大，训练和推理都慢。",
+ "idea": "把场景点云从机器人工作区周围的几个虚拟视角重新渲染成图像，用多视角Transformer在这些视图之间做注意力，再在每个视图上预测关键位置的热力图。",
+ "impact": "在保持三维精度的同时把训练加速了一个数量级以上，此后常被用作RLBench多任务三维操作的对比方法；作者后来又推出了RVT-2。",
+ "method": "[[peract]]把工作空间切成100×100×100的体素，用Perceiver Transformer在体素上预测下一个关键位姿，效果好但很重。RVT保留“三维”这一好处，换了一种表示：先把多台真实相机得到的RGB-D融合成点云，再从围绕工作区的若干个固定虚拟相机（比如正上、正前、左右）重新渲染出图像。这些虚拟视图不受真实相机位置影响，又比体素便宜得多。\n\n[[transformer]]先在每个视图内部做注意力，再在所有视图之间做注意力来汇总信息；每个视图上输出一张热力图，多个视图的热力图联合起来就确定了夹爪要去的三维位置，旋转和开合等再由额外的头预测。在18个RLBench任务、249种任务变体上，单个RVT模型的相对成功率比PerAct高26%，达到同等性能的训练速度快36倍，推理速度是PerAct的2.3倍；真机上每个任务只需约10条示范就能学会多种操作。",
+ "limits": [
+  {"text": "仍是基于关键帧的预测，依赖运动规划器在关键位姿之间移动，不适合需要连续动态控制的任务。", "solved_by": ["dp3"]},
+  {"text": "需要标定好的深度相机来构建点云，对透明、反光物体效果差。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "peract", "type": "solves", "note": "用虚拟视角重渲染代替体素，解决PerAct计算量大、训练慢的问题，同时精度更高。"},
+  {"to": "transformer", "type": "uses", "note": "多视角Transformer在视图内与视图间做注意力。"},
+  {"to": "rlbench", "type": "uses", "note": "在RLBench的18个任务上评测。"}
+ ],
+ "prereq": ["camera-geometry", "3d-representation", "self-attention", "imitation-learning"],
+ "terms": [
+  {"t": "虚拟视角重渲染", "d": "把点云从任意设定的相机位置重新投影成图像，相当于造出真实中并不存在的相机视图。"},
+  {"t": "关键帧动作", "d": "只预测任务中几个关键时刻的夹爪位姿，中间的运动交给传统运动规划器完成。"}
+ ],
+ "learn": "先读PerAct了解体素化的关键帧预测，再读RVT第3节的重渲染与多视角注意力；可以在RLBench上复现训练速度对比。",
+ "check": {"source": "https://arxiv.org/abs/2306.14896", "confirmed": "标题、六位作者、v1提交日期2023-06-26；摘要中虚拟视角重渲染与跨视图注意力、18个RLBench任务249种变体、相对PerAct成功率高26%、训练快36倍、推理2.3倍、真机约10条示范。"}
+}

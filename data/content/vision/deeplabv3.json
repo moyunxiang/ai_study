@@ -1,0 +1,32 @@
+{
+  "id": "deeplabv3",
+  "who": "Liang-Chieh Chen, George Papandreou, Florian Schroff, Hartwig Adam · Google",
+  "venue": "arXiv 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1706.05587"},
+    {"label": "代码", "url": "https://github.com/tensorflow/models/tree/master/research/deeplab"}
+  ],
+  "aka": ["DeepLabv3", "DeepLab v3", "ASPP", "空洞空间金字塔池化", "Atrous Spatial Pyramid Pooling", "空洞卷积", "膨胀卷积", "dilated convolution"],
+  "problem": "语义分割要同时看清细节和大范围上下文，物体又大小不一；早期[[deeplab]]靠空洞卷积保分辨率，但还要接[[densecrf]]后处理来修边界，多尺度处理也不够系统。",
+  "idea": "重新设计空洞卷积的用法：串联或并联多种空洞率来捕捉多尺度上下文，在ASPP模块中再加入全图池化得到的图像级特征，并去掉DenseCRF后处理。",
+  "impact": "DeepLabv3及其ASPP模块成为语义分割最常用的强基线之一，后来的[[deeplabv3plus]]只在它上面加了一个解码器。",
+  "method": "**空洞卷积**（atrous / dilated convolution）在卷积核的元素之间插入空隙：3×3核、空洞率r时，实际覆盖 `(2r+1)×(2r+1)` 的范围，但参数和计算量不变。这样可以不做下采样就扩大感受野，让特征图保持较高分辨率（例如原图的1/8或1/16，而不是分类网络的1/32）。\n\nDeepLabv3给出两种用法：\n\n- **串联**：在[[resnet]]后面复制几个残差块，空洞率逐级加大，让深层特征看到越来越大的范围；\n- **并联（ASPP）**：对同一张特征图同时用一个1×1卷积和三个不同空洞率（如6、12、18）的3×3卷积，再加一路**全图平均池化**后上采样回来的图像级特征，五路拼接后融合。图像级特征弥补了空洞率很大时有效权重变少、退化成1×1卷积的问题，也给每个像素带来整张图的上下文。\n\n论文还详细讨论了训练细节（如在高分辨率特征上训练批归一化、对真值而非预测做上采样）。摘要称DeepLabv3在不使用DenseCRF后处理的情况下明显超过之前各版DeepLab，在PASCAL VOC 2012上与当时最好的模型相当。",
+  "legacy": "[[deeplabv3plus]]在其上加入轻量解码器恢复边界，二者长期是分割代码库里的默认基线；空洞卷积和ASPP式多尺度上下文也被检测、深度估计等密集预测任务广泛借用，直到[[segformer]]、[[mask2former]]等Transformer方法取代。",
+  "limits": [
+    {"text": "输出只在1/8或1/16分辨率上预测再直接上采样，物体边界和细小结构仍然粗糙。", "solved_by": ["deeplabv3plus", "pointrend"]},
+    {"text": "保持高分辨率特征使深层计算量和显存很大，难以用于实时场景。", "solved_by": ["segformer"]}
+  ],
+  "relations": [
+    {"to": "deeplab", "type": "extends", "note": "沿用DeepLab的空洞卷积，把多尺度上下文做得更系统，并去掉DenseCRF后处理。"},
+    {"to": "pspnet", "type": "rivals", "note": "PSPNet用多尺度池化金字塔聚合上下文，DeepLabv3用多空洞率卷积加全图池化，两者是同期最常比较的两种做法。"},
+    {"to": "densecrf", "type": "solves", "note": "摘要称不再需要DenseCRF后处理也能明显超过以前的DeepLab。"},
+    {"to": "resnet", "type": "uses", "note": "以ResNet为骨干，在其后几个阶段用空洞卷积替代下采样。"}
+  ],
+  "prereq": ["conv-layer", "vision-tasks", "convolution-op", "normalization-layer", "iou-map"],
+  "terms": [
+    {"t": "空洞卷积", "d": "在卷积核元素之间插空隙，使同样大小的核覆盖更大的区域，不增加参数也不降低分辨率。"},
+    {"t": "ASPP", "d": "空洞空间金字塔池化：并联几个不同空洞率的卷积，从多个尺度同时提取上下文后拼在一起。"}
+  ],
+  "learn": "先画图弄懂空洞率为r时3×3卷积的覆盖范围，再读DeepLabv3第3节；在PASCAL VOC或Cityscapes上分别去掉图像级池化、改变输出步长，比较mIoU变化。",
+  "check": {"source": "https://arxiv.org/abs/1706.05587", "confirmed": "arXiv记录：标题、四位作者、v1提交于2017-06-17；摘要中的串联或并联空洞卷积捕捉多尺度上下文、ASPP加入图像级特征、分享训练经验、无DenseCRF后处理明显超过以前DeepLab、PASCAL VOC 2012上与当时最佳相当。空洞率6/12/18、输出步长1/8与1/16、BN训练细节凭一般了解写。"}
+}

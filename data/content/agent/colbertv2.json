@@ -1,0 +1,27 @@
+{
+  "id": "colbertv2",
+  "who": "Keshav Santhanam, Omar Khattab, Jon Saad-Falcon, Christopher Potts, Matei Zaharia · 斯坦福大学",
+  "venue": "NAACL 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2112.01488"},
+    {"label": "GitHub", "url": "https://github.com/stanford-futuredata/ColBERT"}
+  ],
+  "aka": ["ColBERT v2", "PLAID", "late interaction", "多向量检索", "multi-vector retrieval", "残差压缩"],
+  "problem": "ColBERT给每个词元存一个向量，检索效果好，但索引体积比单向量检索大一个数量级，难以用于大语料。",
+  "idea": "把每个词元向量写成「最近的聚类中心 + 低比特量化的残差」，并用交叉编码器蒸馏和难负例去噪训练，同时提升效果和压缩率。",
+  "impact": "在域内和多个域外基准上达到当时最好的检索质量，晚交互索引体积缩小6–10倍，成为RAG里常用的多向量检索器。",
+  "method": "[[colbert]]的「晚交互」做法是：查询和文档各自经过BERT，每个词元得到一个向量；打分时对查询的每个词元找文档里最相似的词元，再把这些最大相似度加起来（MaxSim）。这比把整段话压成一个向量的[[dpr]]更细，但每篇文档要存几百个向量，存储成了瓶颈。\n\nColBERTv2做了两件事：\n- **残差压缩**：先对所有词元向量做聚类，每个向量只记它所属的聚类中心编号，再把它与中心的差（残差）量化成每维1–2比特。作者的假设（附录中给了支持证据）是：表示相近语义的词元向量会聚在一起，所以残差小、量化损失也小。\n- **去噪监督**：用交叉编码器（把查询和文档拼起来一起读的精排模型）给候选文档打分，把分数蒸馏给ColBERT，并挖掘难负例，减轻训练标签里漏标正例带来的噪声。\n\n论文报告它在域内和域外多个基准上达到当时最好的质量，同时把晚交互的存储压缩6–10倍。后续的PLAID引擎进一步加速了它的检索，ColBERT系列也被[[dspy]]等框架直接用作检索模块。",
+  "limits": [
+    {"text": "即使压缩后，每个词元一个向量的索引仍比单向量检索大，检索时还要做逐词元的MaxSim计算，部署成本高于普通向量库。", "solved_by": []},
+    {"text": "只处理文本；扫描版文档、图表需要先做OCR，版面信息会丢失。", "solved_by": ["colpali"]}
+  ],
+  "relations": [
+    {"to": "colbert", "type": "solves", "note": "用聚类中心加低比特残差的压缩，解决ColBERT多向量索引体积过大的问题。"},
+    {"to": "dpr", "type": "rivals", "note": "单向量稠密检索存储小、速度快；ColBERTv2用多向量换取更好的域外泛化。"},
+    {"to": "monobert", "type": "uses", "note": "用交叉编码器式精排模型的分数做蒸馏信号，给检索器去噪。"},
+    {"to": "bert", "type": "uses", "note": "查询和文档编码器都基于BERT。"}
+  ],
+  "prereq": ["retrieval", "embedding", "clustering", "quantization-concept", "knowledge-distillation"],
+  "learn": "先读[[colbert]]理解MaxSim晚交互 → 读原文第3节残差压缩与去噪监督 → 动手：用RAGatouille或官方仓库给几千篇文档建索引，对比它和单向量嵌入在同一组问题上的召回。",
+  "check": {"source": "https://arxiv.org/abs/2112.01488", "confirmed": "标题、作者、v1提交于2021-12-02；摘要中残差压缩与去噪监督两项设计、域内外达到当时最好质量、存储缩小6–10倍；正文（arxiv.org/html/2112.01488）核对残差每维量化为1或2比特、词元向量聚类的假设。"}
+}

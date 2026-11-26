@@ -1,0 +1,32 @@
+{
+  "id": "pointrend",
+  "who": "Alexander Kirillov, Yuxin Wu, Kaiming He, Ross Girshick · Facebook AI Research",
+  "venue": "CVPR 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1912.08193"},
+    {"label": "代码", "url": "https://github.com/facebookresearch/detectron2/tree/main/projects/PointRend"}
+  ],
+  "aka": ["PointRend", "点渲染分割", "Point-based Rendering", "自适应细分", "adaptive subdivision", "边界细化"],
+  "problem": "分割网络在规则的低分辨率网格上预测再上采样：[[mask-rcnn]]的掩码只有28×28，[[deeplabv3]]的输出也只有原图的1/8，物体边缘被抹得很平滑；直接提高分辨率又太耗显存。",
+  "idea": "把分割看成计算机图形学里的渲染：先出一张粗掩码，再像自适应细分那样，只在最不确定的少数点（大多在边界上）用一个小网络重新预测，逐级提高分辨率。",
+  "impact": "以很小的额外计算换来明显更锐利的物体边界，可以插到现有实例和语义分割模型上，成为高质量掩码的常用附加模块。",
+  "method": "核心观察：一张掩码里绝大多数像素（物体内部和背景）很容易判断，难的只是边界附近一小圈。图形学渲染时也不会对每个像素同等用力，而是在变化剧烈的地方多采样（自适应细分）。\n\nPointRend模块包含三部分：\n\n- **选点**：从粗预测开始，每轮把掩码上采样2倍，然后挑出N个最不确定的点（例如预测概率最接近0.5的点）；\n- **点特征**：对每个点，从骨干网络的高分辨率特征图上双线性插值取细粒度特征，再拼上粗预测在该点的值；\n- **点头**：一个小的MLP对每个点单独预测标签，覆盖原来的值。\n\n反复几轮，就能从7×7的粗掩码细化到224×224，而只需要在少量点上计算。训练时随机采点、偏向不确定区域。摘要称它在COCO和Cityscapes的实例和语义分割上都带来显著提升，在以前方法过度平滑的区域输出清晰的边界，并能达到以往在显存或计算上不现实的输出分辨率。",
+  "legacy": "PointRend被收进Detectron2作为官方项目；“只在不确定点上算损失或细化”的做法被[[mask2former]]借用来降低掩码损失的显存，[[sam]]等后来的分割模型也采用了类似的点采样训练。",
+  "limits": [
+    {"text": "细化依赖粗掩码先大致正确，粗预测漏掉的薄结构或小物体，选点也找不回来。", "solved_by": []},
+    {"text": "是附加在两阶段检测或FCN式分割上的模块，没有改变按任务分设计的框架。", "solved_by": ["mask2former"]}
+  ],
+  "relations": [
+    {"to": "mask-rcnn", "type": "solves", "note": "Mask R-CNN的28×28掩码边界粗糙；PointRend在不确定点上逐级细化，把实例掩码分辨率提高到224×224。"},
+    {"to": "deeplabv3", "type": "solves", "note": "DeepLabv3在1/8分辨率上预测，边界被平滑；PointRend接在语义分割模型上细化边界。"},
+    {"to": "fpn", "type": "uses", "note": "从骨干/FPN的高分辨率特征图上插值取点特征。"},
+    {"to": "panoptic-fpn", "type": "extends", "note": "同一FAIR团队的分割工作，PointRend可接在这类基于FPN的分割模型上。"}
+  ],
+  "prereq": ["vision-tasks", "mlp", "conv-layer", "iou-map", "image-tensor"],
+  "terms": [
+    {"t": "自适应细分", "d": "图形学渲染技巧：先粗算一遍，只在变化剧烈或不确定的位置加密计算，节省大量算力。"},
+    {"t": "双线性插值", "d": "根据周围四个网格点的值按距离加权，求出任意非整数位置上的值。"}
+  ],
+  "learn": "先理解Mask R-CNN掩码分支的输出分辨率限制，再读PointRend第3节选点与点头；用Detectron2里的PointRend配置对同一图对比有无该模块的掩码边缘。",
+  "check": {"source": "https://arxiv.org/abs/1912.08193", "confirmed": "arXiv记录：标题、四位作者、v1提交于2019-12-17；摘要中的把分割类比为渲染、基于迭代细分在自适应选择的位置做点预测、可用于实例与语义分割、COCO与Cityscapes显著提升、清晰边界、达到以往不现实的输出分辨率、代码在Detectron2。28×28与7×7到224×224、按不确定度选点、MLP点头、Mask2Former与SAM借用点采样凭一般了解写。"}
+}

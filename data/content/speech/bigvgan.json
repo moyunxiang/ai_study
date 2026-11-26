@@ -1,0 +1,32 @@
+{
+  "id": "bigvgan",
+  "who": "Sang-gil Lee, Wei Ping, Boris Ginsburg, Bryan Catanzaro, Sungroh Yoon · NVIDIA / 首尔大学",
+  "venue": "arXiv 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2206.04658"},
+    {"label": "GitHub", "url": "https://github.com/NVIDIA/BigVGAN"}
+  ],
+  "problem": "[[hifi-gan]]这类GAN声码器在训练过的说话人上音质很好，但遇到没见过的说话人、语言、录音环境，甚至歌声和乐器声时，质量明显下降。",
+  "idea": "在GAN生成器里加入周期性激活函数（Snake）和抗混叠的上采样表示，给音频合成提供合适的归纳偏置，并把声码器规模放大到1.12亿参数，同时解决大规模GAN训练的失稳问题。",
+  "impact": "BigVGAN成为通用声码器的代表，被大量零样本TTS、语音编解码和音乐生成系统直接拿来把梅尔频谱还原成波形。",
+  "method": "GAN声码器（见[[c:vocoder-codec]]、[[c:adversarial-training]]）的生成器把梅尔频谱经过多级转置卷积上采样成波形。论文认为通用性差的一个原因是缺少适合周期信号的归纳偏置（见[[c:inductive-bias]]）：语音和音乐本质上由许多周期成分构成，而普通的Leaky ReLU激活不擅长外推周期结构。\n\n两处主要改动：\n\n- **Snake周期激活**：形如 `x + (1/α)·sin²(αx)` 的激活函数，α可学习，让网络天然倾向于生成周期性波形，对没见过的音高也能外推。\n- **抗混叠表示**：周期激活会产生超出采样率能表示的高频成分，造成混叠失真；BigVGAN在激活前后做上采样和低通滤波，再降采样回来。\n\n此外把模型放大到最多1.12亿参数，摘要称这一规模在文献中前所未有，并分析和处理了大规模GAN音频训练的失败模式。摘要报告：只在干净语音LibriTTS上训练的BigVGAN，在多种零样本（分布外）条件下——未见过的说话人、语言、录音环境、歌声、音乐和器乐——都达到当时最好的效果，代码与模型开源。",
+  "limits": [
+    {"text": "模型大、在时域逐级上采样，推理计算量比小型GAN声码器高得多。", "solved_by": ["vocos"]},
+    {"text": "仍以梅尔频谱为输入，需要上游声学模型或编解码器先给出频谱。", "solved_by": ["encodec", "dac"]}
+  ],
+  "relations": [
+    {"to": "hifi-gan", "type": "extends", "note": "沿用HiFi-GAN的生成器与多判别器框架，加入周期激活和抗混叠并放大规模。"},
+    {"to": "melgan", "type": "extends", "note": "同属以梅尔频谱为条件、全卷积并行生成波形的GAN声码器路线。"},
+    {"to": "gan", "type": "uses", "note": "以对抗训练为核心，论文着重处理大规模GAN训练的失稳。"}
+  ],
+  "prereq": ["adversarial-training", "vocoder-codec", "waveform-spectrogram", "inductive-bias", "neuron-activation"],
+  "terms": [
+    {"t": "混叠", "d": "信号里含有高于采样率一半的频率时，这些频率会被错误地折叠成低频，听起来是杂音。"},
+    {"t": "通用声码器", "d": "不针对特定说话人或数据集微调，就能把各种来源的频谱都还原成高质量波形的声码器。"}
+  ],
+  "aka": ["BigVGAN", "BigVGAN-v2", "通用声码器", "universal vocoder", "Snake激活"],
+  "check": {
+    "source": "https://arxiv.org/abs/2206.04658",
+    "confirmed": "arXiv官方记录：标题、作者Lee/Ping/Ginsburg/Catanzaro/Yoon、v1提交2022-06-09；摘要关于GAN声码器分布外泛化难、周期激活与抗混叠表示、最大1.12亿参数、大规模GAN训练失败模式、仅用LibriTTS训练在未见说话人/语言/录音环境/歌声/音乐/器乐上最好、代码开源。Snake公式、机构与被下游系统广泛采用为一般了解。"
+  }
+}

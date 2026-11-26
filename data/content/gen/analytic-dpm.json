@@ -1,0 +1,28 @@
+{
+  "id": "analytic-dpm",
+  "who": "Fan Bao, Chongxuan Li, Jun Zhu, Bo Zhang · 清华大学 / 中国人民大学",
+  "venue": "ICLR 2022（杰出论文奖）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2201.06503"},
+    {"label": "ICLR 2022杰出论文公告", "url": "https://blog.iclr.cc/2022/04/20/announcing-the-iclr-2022-outstanding-paper-award-recipients/"}
+  ],
+  "aka": ["Analytic-DPM", "解析DPM", "最优反向方差"],
+  "problem": "扩散模型的反向过程每一步是一个高斯，均值由网络预测，方差却要么像[[ddpm]]那样手工取两个固定值之一，要么像[[improved-ddpm]]那样再训练网络去学；步数一少，方差选得不准就会明显拖累质量和似然。",
+  "idea": "证明最优的反向方差和对应的最优KL散度都可以用分数函数解析表示，于是拿一个已训练好的模型，用蒙特卡洛估计出每一步的最优方差，不需要任何额外训练。",
+  "impact": "论文报告在多种DPM上提高了对数似然并带来20–80倍的采样加速，获ICLR 2022杰出论文奖；它说明“方差怎么选”本身就是加速采样的一个关键自由度。",
+  "method": "反向过程写作`p(x_{t−1} | x_t) = N(μ(x_t), σ_t² I)`。均值μ由去噪网络给出，大家早就知道怎么算；但σ_t取多少一直没有原则性答案：DDPM试过β_t和β̃_t两个上下界，发现步数多时差别不大；DDIM等少步采样时这一选择影响就大了。\n\nAnalytic-DPM的核心结论是：在让反向过程与前向过程的KL散度最小的意义下，最优方差σ_t*²有一个闭式表达，其中只含前向过程的噪声系数和一个量`E‖∇log q_t(x_t)‖²`——分数函数平方范数的期望。这个期望无法精确算，但可以用预训练好的分数网络在一批数据上做[[c:monte-carlo]]估计，每个时间步只需估一次、存下来。\n\n由于网络本身有误差，估出来的方差可能偏离，论文又推出最优方差的上下界，并把估计值截断在界内。整个方法不改模型、不重训，可以套在DDPM或[[ddim]]式的少步采样上。论文报告它提升了多种模型的对数似然，生成质量高，并在达到相近效果时快20到80倍。",
+  "limits": [
+    {"text": "仍属于一阶的高斯近似，几步到十几步的采样质量很快被专门设计的高阶ODE求解器超过。", "solved_by": ["dpm-solver", "edm"]}
+  ],
+  "relations": [
+    {"to": "ddpm", "type": "solves", "note": "替换DDPM里手工固定的两个反向方差选择，给出理论最优值。"},
+    {"to": "improved-ddpm", "type": "rivals", "note": "Improved DDPM靠训练网络学习方差，本文不训练、直接解析估计。"},
+    {"to": "ddim", "type": "extends", "note": "最优方差同样适用于DDIM式的非马尔可夫少步采样，提升少步效果。"}
+  ],
+  "prereq": ["diffusion-process", "score-function", "kl-divergence", "gaussian", "monte-carlo"],
+  "terms": [
+    {"t": "反向方差", "d": "扩散模型去噪一步时那个高斯分布的方差，决定每一步注入多少随机性。"}
+  ],
+  "learn": "先读DDPM与Improved DDPM关于方差的讨论 → 读本文定理1与方差截断 → 在预训练CIFAR-10模型上估计最优方差并比较不同步数的FID。",
+  "check": {"source": "https://arxiv.org/abs/2201.06503", "confirmed": "标题、四位作者、v1日期2022-01-17、摘要中最优反向方差与最优KL对分数函数有解析形式、蒙特卡洛估计、训练免费、上下界截断、提升对数似然、20x–80x加速；ICLR 2022杰出论文奖见官方博客公告；机构与公式细节来自一般了解"}
+}

@@ -1,0 +1,24 @@
+{
+ "id": "llm-pruner",
+ "who": "Xinyin Ma, Gongfan Fang, Xinchao Wang · 新加坡国立大学",
+ "venue": "NeurIPS 2023",
+ "aka": ["大模型结构化剪枝", "LLM structural pruning", "依赖图剪枝", "dependency graph pruning"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2305.11627"},
+  {"label": "GitHub", "url": "https://github.com/horseee/LLM-Pruner"}
+ ],
+ "problem": "SparseGPT这类非结构化剪枝得到不规则稀疏权重，难以直接提速；而按任务剪枝又会丢掉大模型的通用能力，用原始预训练语料重新训练代价太大。",
+ "idea": "在不针对具体任务、几乎不用原始训练数据的前提下，找出LLM里相互耦合的结构（注意力头、MLP通道等）作为整组，用梯度估计重要性后整组剪掉，再用LoRA在5万条数据上恢复3小时。",
+ "impact": "大语言模型结构化剪枝的早期代表和常用对比基线，确立了“少量数据估计重要性+LoRA恢复”的低成本流程。",
+ "method": "[[sparsegpt]]能一次性把大模型剪到50%稀疏，但剪掉的是零散的单个权重，矩阵形状不变，普通GPU上很难兑现加速。**结构化剪枝**直接删除整个注意力头或MLP的中间通道，模型真正变小变快；难点在于LLM里各部件环环相扣，删掉一个通道必须同时删掉与它相连的输入、输出权重，否则维度对不上。\n\nLLM-Pruner分三步：先自动构建**依赖图**，把彼此耦合、必须一起删除的结构归为一组；再用一阶梯度（及近似的二阶信息）估计每组被删除后损失的变化，作为重要性，删掉最不重要的组；最后用[[lora]]做快速恢复训练。整个流程的约束是任务无关、尽量不依赖原始预训练语料。\n\n摘要报告：恢复训练只需约3小时、5万条数据；在[[llama-1]]、Vicuna和ChatGLM上验证，剪枝后的模型在零样本分类和生成上仍有令人满意的能力。剪枝率较高时性能下降仍然明显。",
+ "limits": [
+  {"text": "剪掉20%以上参数后困惑度和下游精度下降明显，仅靠少量数据的LoRA恢复补不回来；后来的方法改用更多数据做继续预训练或蒸馏。", "solved_by": ["sheared-llama", "minitron"]}
+ ],
+ "relations": [
+  {"to": "sparsegpt", "type": "solves", "note": "SparseGPT的非结构化稀疏难以提速，LLM-Pruner改为整组删除耦合结构，直接得到更小的稠密模型。"},
+  {"to": "lora", "type": "uses", "note": "剪枝后用LoRA在少量数据上快速恢复性能。"},
+  {"to": "llama-1", "type": "uses", "note": "主要实验对象是LLaMA，另外还有Vicuna与ChatGLM。"}
+ ],
+ "prereq": ["transformer-block", "derivative-gradient", "peft-concept", "params-flops"],
+ "check": {"source": "https://arxiv.org/abs/2305.11627", "confirmed": "标题、三位作者、v1日期2023-05-19；摘要：任务无关、尽量不依赖原始训练数据、基于梯度信息选择性移除非关键的耦合结构、LoRA恢复仅需3小时与5万条数据、在LLaMA/Vicuna/ChatGLM上验证零样本分类与生成。依赖图、NUS、NeurIPS 2023与高剪枝率下的退化为一般了解。"}
+}

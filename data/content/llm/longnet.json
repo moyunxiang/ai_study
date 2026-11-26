@@ -1,0 +1,26 @@
+{
+  "id": "longnet",
+  "who": "Jiayu Ding, Shuming Ma, Li Dong, Xingxing Zhang, Shaohan Huang, Wenhui Wang, Nanning Zheng, Furu Wei · 微软研究院、西安交通大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2307.02486"}
+  ],
+  "aka": ["LongNet", "Dilated Attention", "膨胀注意力", "空洞注意力", "十亿token"],
+  "problem": "标准注意力的计算量随序列长度平方增长，已有的稀疏或线性注意力要么仍然太贵，要么表达能力下降，序列长度被卡在几万到几十万token。",
+  "idea": "提出膨胀注意力：近处稠密地看、越远的地方隔得越稀，并把多种分段长度和间隔组合起来，计算量对长度线性，任意两个token之间只需对数级的路径相连。",
+  "impact": "把“序列能扩到十亿token”作为一个可设计的目标提出来，膨胀注意力的分段加间隔思路常被后续长序列和分布式注意力工作引用比较。",
+  "method": "背景：[[sparse-transformer]]、[[longformer]]用固定稀疏模式降低注意力开销，但要么复杂度仍高于线性，要么远处的信息传不过来。\n\n**膨胀注意力（dilated attention）**的做法：把长度为N的序列切成长为w的段，在每段内每隔r个位置取一个token，只在这些被选中的token之间算注意力。w小、r=1时就是稠密的局部注意力；w大、r也大时，用很少的计算覆盖很远的距离。LongNet把若干组(w, r)按几何级数排开（例如段长和间隔每级翻倍），并行计算后加权合并，于是近处看得密、远处看得疏，总计算量对N线性，任意两个位置之间的信息只需对数级层数即可传到。不同注意力头还会错开选取的位置，避免有的位置永远被跳过。\n\n由于各段相互独立，LongNet可以把一条超长序列按段切到多张GPU上，只在需要跨段的稀疏部分做通信，作者据此称可把序列扩展到10亿token；语言建模实验显示在较短序列上的效果不比标准注意力差。",
+  "limits": [
+    {"text": "10亿token主要是计算复杂度和分布式可行性的展示，实际语言建模实验的长度远没有那么长；远处只稀疏采样，能否精确找回长文中任意位置的细节没有充分检验。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "sparse-transformer", "type": "extends", "note": "同样用结构化稀疏模式降低注意力开销，LongNet用多尺度分段加间隔把复杂度降到线性。"},
+    {"to": "longformer", "type": "rivals", "note": "Longformer用滑动窗口加少数全局token，LongNet用随距离指数变稀的膨胀模式覆盖远处。"},
+    {"to": "wavenet", "type": "uses", "note": "“间隔随层级成倍扩大以指数扩展感受野”的思路与WaveNet的膨胀卷积一致。"}
+  ],
+  "prereq": ["self-attention", "efficient-attention", "context-window", "big-o", "distributed-training"],
+  "terms": [
+    {"t": "膨胀注意力", "d": "把序列分段后每隔r个位置取一个token做注意力，r越大看得越远、越稀疏；多种段长和间隔组合起来使用。"}
+  ],
+  "learn": "先理解[[sparse-transformer]]的固定稀疏模式和WaveNet的膨胀卷积；读本文膨胀注意力的示意图和复杂度分析；动手：在小模型上实现两三组(w, r)的膨胀注意力，和滑窗注意力比较长文本困惑度。",
+  "check": {"source": "https://arxiv.org/abs/2307.02486", "confirmed": "标题、8位作者、arXiv首次提交2023-07-05；摘要中膨胀注意力随距离指数扩大关注范围、线性复杂度与对数依赖、可作分布式训练器、序列可超过10亿token且不损失短序列表现。机构为一般了解；分段长度和间隔按几何级数设置、多头错位为对论文正文的一般了解。"}
+}

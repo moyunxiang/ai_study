@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>PowerInfer冷热神经元推理（2023） · AI脉络</title>
+<meta name="description" content="一块RTX 4090只有24GB显存，放不下几十上百亿参数的模型；llama.cpp把放不下的层交给CPU算，速度被CPU拖慢很多。 神经元的激活呈幂律分布：少数“热”神经元几乎对任何输入都会激活，多数“冷”神经元只偶尔激活。把热神经元常驻GPU，冷神经元留在CPU上算，并用小预测器提前判断哪些神…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/powerinfer.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PowerInfer冷热神经元推理（2023）">
+<meta property="og:description" content="一块RTX 4090只有24GB显存，放不下几十上百亿参数的模型；llama.cpp把放不下的层交给CPU算，速度被CPU拖慢很多。 神经元的激活呈幂律分布：少数“热”神经元几乎对任何输入都会激活，多数“冷”神经元只偶尔激活。把热神经元常驻GPU，冷神经元留在CPU上算，并用小预测器提前判断哪些神…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/powerinfer.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/powerinfer">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 本地与端侧部署</div>
+<h1>PowerInfer冷热神经元推理</h1>
+<div class="full">PowerInfer: Fast Large Language Model Serving with a Consumer-grade GPU</div>
+<div class="meta"><span>2023.12</span><span>论文</span><span>延伸</span><span>SOSP 2024</span><span>Yixin Song, Zeyu Mi, Haotong Xie, Haibo Chen · 上海交通大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2312.12456" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/SJTU-IPADS/PowerInfer" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/powerinfer">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>一块RTX 4090只有24GB显存，放不下几十上百亿参数的模型；llama.cpp把放不下的层交给CPU算，速度被CPU拖慢很多。</p></div><div><h4>方法</h4><p>神经元的激活呈幂律分布：少数“热”神经元几乎对任何输入都会激活，多数“冷”神经元只偶尔激活。把热神经元常驻GPU，冷神经元留在CPU上算，并用小预测器提前判断哪些神经元这次会激活、只算它们。</p></div><div><h4>影响</h4><p>把“利用激活稀疏做端侧/单卡推理”变成可用的系统，在消费级显卡上把大模型推理速度提高了数倍，也推动了让模型激活更稀疏的研究。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/llama-cpp.html">llama.cpp与本地推理</a>支持把一部分层放GPU、其余放CPU，但按层切分时CPU那部分仍要算完整的矩阵乘。<a class="ln" href="../n/flexgen.html">FlexGen单卡卸载推理</a>靠大批量提高吞吐，却不照顾单个请求的延迟。</p><p>PowerInfer的观察是：在ReLU这类激活函数下，前馈层里每次只有一小部分神经元输出非零；而且在大量输入上统计，神经元被激活的频率呈<b>幂律分布</b>——少数热神经元几乎总被激活，其余冷神经元随输入变化。于是：<b>离线</b>先统计每个神经元的激活频率，按GPU显存把最热的那部分权重预先放到GPU上，冷的留在CPU内存；<b>在线</b>每层先用一个很小的<b>自适应预测器</b>猜这次哪些神经元会激活，GPU和CPU各自只计算本地被预测激活的那些神经元，最后合并结果，CPU与GPU之间几乎不必搬权重。配套实现了按神经元粒度跳过计算的稀疏算子。</p><p>摘要报告：在单块RTX 4090上，对多种模型（包括<a class="ln" href="../n/opt.html">OPT-175B</a>-175B）最多比llama.cpp快11.69倍且精度不变；OPT-30B上达到服务器级A100生成速度的82%。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>依赖ReLU带来的激活稀疏；主流LLM用SwiGLU等激活，天然稀疏性弱，需要先把模型改造（如换成ReLU再续训）才能获得同样的加速。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/opt.html">OPT-175B</a><span class="yr">2022.05 · LLM</span><div class=nt>以ReLU激活的OPT系列（直到175B）作为主要评测模型之一。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/llama-cpp.html">llama.cpp与本地推理</a><span class="yr">2023.03 · 系统·效率</span><div class=nt>llama.cpp按层把放不下的部分交给CPU，速度受CPU拖累；PowerInfer按神经元冷热分配，CPU只算少量冷神经元，最多快11.69倍。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/flexgen.html">FlexGen单卡卸载推理</a><span class="yr">2023.03 · 系统·效率</span><div class=nt>FlexGen用大批量换吞吐、延迟高；PowerInfer面向单用户低延迟的本地推理。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/neuron-activation.html">神经元与激活函数</a> <a class="chip c" href="../c/mlp.html">多层感知机</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2312.12456" rel="noopener">https://arxiv.org/abs/2312.12456</a>（标题、四位作者、v1日期2023-12-16；摘要：单块消费级GPU、神经元激活幂律分布、热神经元预载GPU冷神经元在CPU计算、自适应预测器与神经元感知稀疏算子、RTX 4090上最多比llama.cpp快11.69倍、包括OPT-175B、OPT-30B达到A100的82%。上海交大IPADS、SOSP 2024、“依赖ReLU激活稀疏”为对正文与后续讨论的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20PowerInfer%E5%86%B7%E7%83%AD%E7%A5%9E%E7%BB%8F%E5%85%83%E6%8E%A8%E7%90%86%EF%BC%88powerinfer%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Apowerinfer%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/powerinfer.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="gemini-nano.html"><small>本分支上一个 · 2023.12</small><b>Gemini Nano端侧模型</b></a><a class="r" href="llm-in-a-flash.html"><small>本分支下一个 · 2023.12</small><b>LLM in a flash闪存推理</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

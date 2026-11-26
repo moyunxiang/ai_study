@@ -1,0 +1,32 @@
+{
+  "id": "neural-cache-lm",
+  "who": "Edouard Grave, Armand Joulin, Nicolas Usunier · Facebook AI Research",
+  "venue": "ICLR 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1612.04426"}
+  ],
+  "aka": ["Neural Cache", "Continuous Cache", "缓存模型"],
+  "problem": "文章里刚出现过的词很可能再次出现（人名、地名、术语），LSTM语言模型却很难把几百上千词之前的具体词「抄」过来；带记忆的网络能做到，但要额外训练且计算昂贵。",
+  "idea": "把最近几千个时刻的隐状态和它们后面的那个词存起来；预测时用当前隐状态与存储的隐状态做点积，相似的历史位置就把它的下一个词的概率调高，再与原模型的分布插值。",
+  "impact": "不需要训练、可直接加到任何预训练LSTM上，在WikiText-2上把困惑度从99.3降到68.9；它把n-gram时代的缓存模型带进了神经语言模型，也成为之后动态评估、kNN-LM等「从上下文检索」方法的常见对照。",
+  "method": "缓存模型最早出现在语音识别里（Kuhn与De Mori等，1988–1990）：把最近出现过的词的一元频率混进n-gram模型，因为文章倾向于重复用词。神经网络版本的对应物是[[memn2n]]、Pointer Sentinel（见[[wikitext]]）等记忆/指针网络，它们需要专门训练注意力参数，计算量也随记忆长度增长。\n\n神经缓存把这件事简化到极点。在[[lstm]]语言模型运行时，记下每个位置i的隐状态`h_i`和它之后实际出现的词`x_{i+1}`。在第t步：\n\n`p_cache(w) ∝ Σ_{i<t} 1{x_{i+1}=w} · exp(θ · h_t·h_i)`\n\n即凡是与当前状态相似的历史位置，都把票投给它后面的那个词，`θ`控制分布的尖锐程度。最终分布是线性插值`p = (1−λ)·p_vocab + λ·p_cache`。只有`θ`和`λ`两个标量，在验证集上调即可，模型本身不再训练，存储几千个位置也几乎不增加开销。\n\n结果：WikiText-2测试集上，作者自己的LSTM困惑度99.3，加100个位置的缓存为81.6，加2000个位置为68.9，低于Pointer Sentinel LSTM的80.8；在1亿词的WikiText-103上从48.7降到40.8，相对改进约16%，比小数据上的约30%小。作者也指出，在103M词上训练的普通LSTM远远好过在2M词上训练的复杂模型，因此主张在较大的数据上比较方法。",
+  "limits": [
+    {"text": "缓存只能「抄」最近出现过的词，对从未在上下文中出现过的长距离信息没有帮助，且依赖人工调的插值权重。", "solved_by": ["transformer-xl"]},
+    {"text": "改进随训练数据增大而缩小，说明它补的主要是小模型记不住上下文的缺陷，而不是新的建模能力。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "lstm", "type": "uses", "note": "缓存存储的是LSTM语言模型各时刻的隐状态，可直接加在预训练LSTM之上。"},
+    {"to": "memn2n", "type": "rivals", "note": "端到端记忆网络需要训练注意力参数访问记忆；神经缓存用隐状态点积直接查表，无需训练，能扩展到几千个位置。"},
+    {"to": "wikitext", "type": "solves", "note": "WikiText论文提出的Pointer Sentinel要训练指针网络来复制上下文词，神经缓存不训练也达到更低困惑度。"}
+  ],
+  "prereq": ["language-model", "recurrent-layer", "softmax", "perplexity", "dot-product", "attention-concept"],
+  "terms": [
+    {"t": "缓存模型", "d": "把最近出现过的词的统计混进语言模型，利用「文章倾向重复用词」这一现象。"},
+    {"t": "线性插值", "d": "两个概率分布按权重λ和1−λ相加，得到的仍是合法的概率分布。"}
+  ],
+  "learn": "先读[[awd-lstm]]或任一LSTM语言模型教程 → 读原文第3节（神经缓存的定义与插值）→ 动手：在一个训练好的小LSTM语言模型上实现缓存，扫描θ和λ，观察验证集困惑度随缓存长度的变化。",
+  "check": {
+    "source": "https://arxiv.org/abs/1612.04426",
+    "confirmed": "arXiv：标题、作者Grave、Joulin、Usunier、2016-12-13提交；PDF正文（pdftotext，ICLR 2017审稿版）：Facebook AI Research、p_cache公式与线性插值、无需训练可用于预训练模型、Kuhn 1988/Kuhn & De Mori 1990缓存模型、表2 WikiText-2 LSTM 99.3/缓存100为81.6/缓存2000为68.9/Pointer Sentinel 80.8、WikiText-103 48.7→40.8、改进约16%对30%、主张在较大数据上比较。ICLR 2017接收凭一般了解。"
+  }
+}

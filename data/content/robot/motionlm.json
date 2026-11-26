@@ -1,0 +1,28 @@
+{
+ "id": "motionlm",
+ "who": "Ari Seff, Brian Cera, Dian Chen, Mason Ng, Aurick Zhou, Nigamaa Nayakanti, Khaled S. Refaat, Rami Al-Rfou, Benjamin Sapp · Waymo",
+ "venue": "ICCV 2023",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2309.16534"}
+ ],
+ "problem": "自动驾驶要预测周围车辆和行人接下来怎么走，而且多个参与者会互相影响；以往方法先分别生成每个人的轨迹再打分组合，依赖锚点和手工的交互启发式。",
+ "idea": "把连续轨迹离散成“运动token”，把多智能体运动预测当成语言建模：用一个自回归Transformer依次生成所有参与者在每个时间步的动作token。",
+ "impact": "把语言模型的“下一个token预测”搬到驾驶行为预测上，在Waymo开放运动数据集的交互预测榜上排名第一。",
+ "method": "[[vectornet]]等方法把地图和历史轨迹编码好后，通常对每个参与者独立地回归若干条候选未来（需要预设锚点或优化隐变量来表达多种可能），再用额外的启发式给多车组合打分。MotionLM的做法是：把每一步的位移量化成有限个离散token，场景编码器先把地图与历史编码成上下文，然后一个[[transformer]]解码器按时间顺序、对场景中的多个参与者交替地逐个生成token，训练目标就是标准的语言建模目标，即最大化序列token的平均对数概率。\n\n这样做带来几点好处：不需要锚点或显式隐变量就能学到多峰分布；多个参与者的联合未来在同一次自回归解码中产生，天然包含交互，而不是先独立生成再打分；顺序分解还支持在时间上因果的条件推演，比如“假如那辆车先让行，这辆车会怎样”。它在Waymo开放运动数据集的多智能体运动预测上取得新的最好成绩，在交互挑战榜上排名第一。",
+ "limits": [
+  {"text": "自回归逐token生成多个参与者的轨迹，推理开销随参与者数和时长增长，车载实时部署有压力。", "solved_by": []},
+  {"text": "只做预测，不直接输出自车的规划控制，预测与规划仍是两个模块。", "solved_by": ["emma"]}
+ ],
+ "relations": [
+  {"to": "vectornet", "type": "rivals", "note": "VectorNet一类方法为每个参与者回归轨迹；MotionLM改成离散token上的联合自回归生成。"},
+  {"to": "transformer", "type": "uses", "note": "用Transformer解码器做自回归的运动token生成。"},
+  {"to": "gpt-2", "type": "extends", "note": "借用语言模型的下一个token预测范式来建模多智能体运动。"}
+ ],
+ "prereq": ["autoregressive", "tokenization", "language-model", "mle", "decoding-sampling"],
+ "terms": [
+  {"t": "运动token", "d": "把每一小段时间内的位移量化到一个有限词表里的离散符号，像单词一样拿来生成。"},
+  {"t": "交互预测", "d": "同时预测多个会互相影响的参与者的联合未来，比如两车在路口谁先走。"}
+ ],
+ "learn": "先回顾语言模型的自回归训练和采样，再读论文中运动token化和多智能体交替解码的设计；可以对比同期的Wayformer、MTR等回归式方法。",
+ "check": {"source": "https://arxiv.org/abs/2309.16534", "confirmed": "标题、九位作者、v1提交日期2023-09-28；摘要中离散运动token、语言建模目标、无需锚点或隐变量、单次自回归解码得到联合分布、时间因果的条件推演、Waymo开放运动数据集新最好成绩与交互榜第一。"}
+}

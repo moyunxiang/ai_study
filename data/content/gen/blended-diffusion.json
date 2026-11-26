@@ -1,0 +1,30 @@
+{
+  "id": "blended-diffusion",
+  "who": "Omri Avrahami, Dani Lischinski, Ohad Fried · 耶路撒冷希伯来大学 / 赖赫曼大学",
+  "venue": "CVPR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2111.14818"},
+    {"label": "项目页", "url": "https://omriavrahami.com/blended-diffusion-page/"}
+  ],
+  "aka": ["Blended Diffusion", "混合扩散", "Blended Latent Diffusion", "文本局部编辑"],
+  "problem": "用户想“只把照片里这块区域改成文字描述的样子”，此前的方法要么只能整体修改，要么用GAN反演，在通用自然图片上质量差、背景也会被改动。",
+  "idea": "用户给一句话和一个区域掩码；在扩散采样的每一步，掩码内用[[clip]]引导的去噪结果，掩码外换成原图加同等噪声的版本，两者按掩码拼接，逐步融合成边界自然的局部编辑。",
+  "impact": "把“文字+掩码”的局部编辑带到通用自然图像上，每步在掩码内外混合的做法成为扩散修复与局部编辑的标准技巧，后续有作者自己的潜空间版本，也影响了文生图产品的局部重绘功能。",
+  "method": "设原图x、掩码m（1表示要编辑的区域）、文本描述d。方法基于一个无条件的[[ddpm]]式扩散模型（[[adm]]的ImageNet模型），在采样的每一步t：\n- 先对当前带噪图x_t做一步去噪，并用CLIP引导：计算去噪后估计的干净图在掩码区域内与文本d的CLIP相似度，沿其梯度调整，使这块内容朝文字描述靠拢。\n- 再把原图按同一噪声水平加噪得到x_t^bg。\n- 两者拼接：`x_{t−1} = m ⊙ x_fg + (1 − m) ⊙ x_bg`。\n\n因为每一步都在相同噪声水平上混合，扩散模型会在后续步骤里把接缝处“补平”，背景则始终和原图一致。论文还发现，直接用CLIP梯度容易得到对CLIP的“对抗样本”（分数高但看起来不对），于是在计算CLIP损失前对图像做多种随机增强以缓解。论文展示了添加物体、替换或删除物体、换背景、向外扩展画面等应用，并与基于GAN和优化的方法比较了真实感、背景保持和文本匹配度。",
+  "limits": [
+    {"text": "在像素空间逐步计算CLIP梯度，编辑一张图要数分钟，分辨率也受限。", "solved_by": ["stable-diffusion"]},
+    {"text": "只能改掩码内的区域，掩码要由用户画，无法做“把整张图变成冬天”这类全局语义编辑。", "solved_by": ["prompt-to-prompt", "instructpix2pix"]}
+  ],
+  "relations": [
+    {"to": "clip", "type": "uses", "note": "用CLIP图文相似度的梯度把掩码区域的内容引向文本描述。"},
+    {"to": "ddpm", "type": "uses", "note": "以扩散模型的逐步去噪作为生成器，在每一步做混合。"},
+    {"to": "adm", "type": "uses", "note": "采用ADM发布的ImageNet无条件扩散模型，沿用其引导采样的思路。"},
+    {"to": "sdedit", "type": "extends", "note": "同样利用“给原图加噪再去噪”，但加入掩码混合与文本引导，只改局部。"}
+  ],
+  "prereq": ["diffusion-process", "guidance", "contrastive-learning", "noise-schedule"],
+  "terms": [
+    {"t": "掩码混合", "d": "按一张0/1掩码把两张图逐像素拼在一起：掩码为1处取编辑结果，为0处取原图。"}
+  ],
+  "learn": "先读DDPM和CLIP → 读本文第3节混合步骤与增强对抗CLIP的消融 → 用diffusers的inpainting流程复现“文字+掩码”的局部重绘。",
+  "check": {"source": "https://arxiv.org/abs/2111.14818", "confirmed": "标题、三位作者、v1日期2021-11-29、摘要中基于文本与ROI掩码的通用自然图像局部编辑、结合CLIP与DDPM、在多个噪声水平上空间混合加噪原图与文本引导潜变量、增强缓解对抗结果、添加/删除/替换物体、换背景与外扩等应用、与基线比较；机构、CVPR 2022、所用ADM模型和公式细节来自一般了解"}
+}

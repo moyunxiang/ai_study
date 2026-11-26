@@ -1,0 +1,28 @@
+{
+  "id": "zero123-pp",
+  "who": "Ruoxi Shi, Hansheng Chen, Zhuoyang Zhang, Minghua Liu, Chao Xu, Xinyue Wei, Linghao Chen, Chong Zeng et al. · UC San Diego / Stanford / 清华大学 / UCLA / 浙江大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2310.15110"},
+    {"label": "代码", "url": "https://github.com/SUDO-AI-3D/zero123plus"}
+  ],
+  "aka": ["Zero123++", "Zero123plus", "Zero123 Plus"],
+  "problem": "[[zero123]]逐个视角生成，视角之间不一致，纹理也会退化；而为了加3D能力对Stable Diffusion大改结构，又会浪费它已经学到的二维先验。",
+  "idea": "把6个固定视角拼成一张3×2的大图，让Stable Diffusion像生成一张普通图片一样一次画出所有视角；条件图像通过尽量不改动原模型的方式注入，使微调代价最小。",
+  "impact": "生成的多视角图质量和一致性明显好于Zero123，开源后被大量单图转3D流水线（如多视图生成+大重建模型）用作第一阶段的多视角生成器；论文还展示了可以在其上训练ControlNet。",
+  "method": "关键思路是“尽量让任务看起来像原模型擅长的事”：\n- **拼图式多视图**：把6个预设相机位姿（固定的相对方位角与交替的仰角）下的视图排成一张3×2的图，作为一张图像来去噪。这样各视角在同一个U-Net里天然共享自注意力，一次生成就保持一致，不需要额外的跨视角模块。\n- **条件注入**：输入照片既通过一种“参考注意力”提供局部细节（把条件图的特征作为额外的键和值放进自注意力），也通过全局的图像嵌入提供整体语义，二者都不改变原模型结构。\n- **训练细节**：作者发现原版Stable Diffusion的噪声调度会让大面积纯色背景生成困难，改用更合适的噪声调度并换成v预测目标（见[[c:noise-schedule]]），微调更稳定。\n\n此外，作者在Zero123++上训练了一个以深度图为条件的[[controlnet]]，说明这个多视图基座可以像普通文生图模型一样再加控制。",
+  "limits": [
+    {"text": "只生成固定的6个视角、分辨率有限，仍需另外的重建步骤才能得到网格。", "solved_by": ["instant3d", "gs-lrm"]},
+    {"text": "生成的多视角之间仍会有细小的不一致，直接重建时会表现为模糊或伪影。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "zero123", "type": "solves", "note": "把逐视角独立生成改为一次生成拼在一起的多视角图，改善一致性与纹理退化。"},
+    {"to": "stable-diffusion", "type": "uses", "note": "从Stable Diffusion初始化并尽量保持其结构，以利用二维生成先验。"},
+    {"to": "controlnet", "type": "uses", "note": "展示可在多视图基座上训练深度条件的ControlNet。"}
+  ],
+  "prereq": ["diffusion-process", "camera-geometry", "self-attention", "pretrain-finetune", "noise-schedule"],
+  "terms": [
+    {"t": "参考注意力", "d": "把条件图像经同一网络得到的特征作为额外的键和值，拼进生成图像的自注意力里，让生成结果借用参考图的细节。"}
+  ],
+  "learn": "先读Zero-1-to-3 → 读这篇技术报告的条件注入与噪声调度部分 → 跑开源模型把一张物体照片变成6视角图，再用现成重建工具得到网格。",
+  "check": {"source": "https://arxiv.org/abs/2310.15110", "confirmed": "标题、作者、v1日期2023-10-23、摘要中单图生成3D一致多视角、尽量减少对现成图像扩散模型的微调、改善纹理退化与几何错位、可在其上训练ControlNet；3×2拼图、6视角、参考注意力与噪声调度的细节、机构来自一般了解，未逐项核对正文"}
+}

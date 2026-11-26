@@ -1,0 +1,29 @@
+{
+  "id": "instance-norm",
+  "who": "Dmitry Ulyanov, Andrea Vedaldi, Victor Lempitsky · Skoltech / University of Oxford",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1607.08022"},
+    {"label": "扩展版 arXiv:1701.02096", "url": "https://arxiv.org/abs/1701.02096"}
+  ],
+  "aka": ["InstanceNorm", "IN", "Instance Norm", "对比度归一化"],
+  "problem": "用前馈网络做快速风格迁移（一次前向就出图）比逐图优化快得多，但画质明显不如[[neural-style]]的迭代优化结果。",
+  "idea": "把风格化网络里的[[batchnorm]]换成实例归一化：对每张图、每个通道单独减均值除标准差，并且在测试时也这样做。",
+  "impact": "一个很小的改动让前馈风格迁移的质量大幅提升；实例归一化随后成为风格迁移、[[cyclegan]]等图像翻译网络的标准部件，也是[[adain]]和[[stylegan]]风格注入的起点。",
+  "method": "[[perceptual-loss]]和Ulyanov等人此前的纹理网络都训练一个生成网络：输入内容图，输出风格化后的图，训练时用Gatys式的风格损失监督。它们沿用了批归一化，即在一个小批量里统计每个通道的均值和方差。\n\n作者的观察是：风格化结果本不应依赖内容图的对比度，而批归一化把整批图混在一起统计，单张图的对比度信息会残留到输出里。改为实例归一化后，对单张图`x`的第`c`个通道，在其所有空间位置上计算均值`μ`和方差`σ²`，输出`(x−μ)/√(σ²+ε)`再乘以可学习的缩放、加偏移。这相当于网络里自带一个“去掉对比度”的操作。关键是训练和测试都用当前这张图的统计量，而不是像批归一化那样在测试时换成整个训练集的滑动平均。\n\n论文展示，同一架构只做这一处替换，风格化图像的质量就明显改善，可以用来训练实时生成的高性能网络。",
+  "limits": [
+    {"text": "一个网络仍只能学一种（或固定几种）风格，换风格要重新训练。", "solved_by": ["adain"]},
+    {"text": "逐图逐通道归一化会抹掉特征的绝对幅度信息，后来在[[stylegan2]]里被指出会造成水滴状伪影。", "solved_by": ["stylegan2"]}
+  ],
+  "relations": [
+    {"to": "batchnorm", "type": "extends", "note": "保留归一化加仿射变换的形式，但把统计范围从一个批次缩小到单张图的单个通道。"},
+    {"to": "perceptual-loss", "type": "solves", "note": "改善前馈风格迁移网络画质不如迭代优化的问题。"},
+    {"to": "neural-style", "type": "uses", "note": "训练目标仍是Gatys式的Gram矩阵风格损失加内容损失。"},
+    {"to": "texture-synthesis", "type": "uses", "note": "所改进的纹理网络就是要前馈地逼近Gatys纹理合成的结果。"}
+  ],
+  "prereq": ["normalization-layer", "conv-layer", "expectation-variance", "loss-function"],
+  "terms": [
+    {"t": "前馈风格迁移", "d": "先训练一个网络，之后对任意内容图只需一次前向计算就输出风格化结果，而不是每张图都迭代优化。"}
+  ],
+  "learn": "先弄懂批归一化在训练和测试时的差别 → 读这篇只有几页的短文 → 在一个风格迁移代码里把BatchNorm2d换成InstanceNorm2d对比效果。",
+  "check": {"source": "https://arxiv.org/abs/1607.08022", "confirmed": "标题、作者、v1日期2016-07-27、摘要中“仅把批归一化换成实例归一化并在训练与测试时都使用”；对比度不变性的动机与公式来自一般了解，StyleGAN2伪影的关联来自对StyleGAN2的一般了解"}
+}

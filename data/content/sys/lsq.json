@@ -1,0 +1,23 @@
+{
+ "id": "lsq",
+ "who": "Steven K. Esser, Jeffrey L. McKinstry, Deepika Bablani, Rathinakumar Appuswamy, Dharmendra S. Modha · IBM研究院",
+ "venue": "ICLR 2020",
+ "aka": ["LSQ", "可学习步长量化", "learnable step size", "LSQ+", "量化感知训练基线"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1902.08153"}
+ ],
+ "problem": "低比特量化感知训练里，量化步长（每个整数等级代表多大的实数）多半靠统计或手工设定，权重和激活降到2–4比特时，这个步长选得好不好直接决定精度。",
+ "idea": "把每层权重和激活量化器的步长s当作网络参数，推导出损失对s的梯度并按参数量和位宽给它乘一个缩放系数，让s和权重一起训练。",
+ "impact": "成为量化感知训练最常用的强基线之一，只需对训练代码做很小的改动；后续的低比特QAT方法普遍以它为起点或对照。",
+ "method": "量化器把实数v映射成 `v̂ = round(clip(v / s, −Q_N, Q_P)) × s`，其中Q_N、Q_P由位宽决定（如3比特无符号激活为0到7）。[[pact-quant]]学习的是截断阈值，步长随之间接确定；LSQ直接学习步长s本身。\n\n关键在于s的梯度。取整不可导，LSQ同样借助[[ste]]，但保留了取整带来的影响：在截断范围内，`∂v̂/∂s = −v/s + round(v/s)`，越靠近两个量化等级的分界处，梯度越大；超出范围时梯度为 −Q_N 或 Q_P。作者还发现，s的梯度量级与权重梯度相差悬殊，于是给它乘上 `g = 1/√(N·Q_P)`（N为该层权重或特征的个数），使步长与权重的更新速度相称。s的初值用 `2⟨|v|⟩/√Q_P` 估计。\n\n摘要报告：在ImageNet上，多种架构的权重与激活量化到2、3、4比特时，取得了当时最高的精度；3比特模型可以达到全精度基线的精度。",
+ "limits": [
+  {"text": "需要完整的量化感知训练，算力和数据成本对上百亿参数的大语言模型过高，大模型量化转而以训练后量化为主。", "solved_by": ["gptq", "awq"]}
+ ],
+ "relations": [
+  {"to": "pact-quant", "type": "extends", "note": "PACT学习激活截断阈值，LSQ改为直接学习权重与激活量化器的步长，并给出更精细的梯度。"},
+  {"to": "integer-quant", "type": "extends", "note": "沿用量化感知训练的伪量化框架，把固定的量化参数变成可学习参数。"},
+  {"to": "ste", "type": "uses", "note": "对取整使用直通估计，同时保留取整对步长梯度的影响。"}
+ ],
+ "prereq": ["quantization-concept", "backpropagation", "learning-rate", "floating-point"],
+ "check": {"source": "https://arxiv.org/abs/1902.08153", "confirmed": "标题、五位作者、v1日期2019-02-21；摘要：ImageNet上权重与激活2/3/4比特时达到当时最高精度、3比特模型达到全精度基线、估计并缩放任务损失对每层量化器步长的梯度使其与网络参数一起学习、只需对训练代码做简单修改。步长梯度公式、梯度缩放g与初始化、ICLR 2020、IBM机构为对正文的一般了解。"}
+}

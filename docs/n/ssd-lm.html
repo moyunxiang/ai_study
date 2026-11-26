@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SSD-LM单纯形块扩散（2022） · AI脉络</title>
+<meta name="description" content="扩散模型在图像上很成功，但文本扩散模型的生成质量远不如GPT-2这样的自回归模型；Diffusion-LM在学到的嵌入空间里扩散，输出长度固定，也难以直接接现成的分类器做控制。 两处设计：一是半自回归，一块一块地生成文本，块内用扩散反复修改、块间按顺序往后接；二是在词表上的“单纯形”空间扩散，噪声…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ssd-lm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SSD-LM单纯形块扩散（2022）">
+<meta property="og:description" content="扩散模型在图像上很成功，但文本扩散模型的生成质量远不如GPT-2这样的自回归模型；Diffusion-LM在学到的嵌入空间里扩散，输出长度固定，也难以直接接现成的分类器做控制。 两处设计：一是半自回归，一块一块地生成文本，块内用扩散反复修改、块间按顺序往后接；二是在词表上的“单纯形”空间扩散，噪声…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ssd-lm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ssd-lm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 非自回归与扩散</div>
+<h1>SSD-LM单纯形块扩散</h1>
+<div class="full">SSD-LM: Semi-autoregressive Simplex-based Diffusion Language Model for Text Generation and Modular Control</div>
+<div class="meta"><span>2022.10</span><span>论文</span><span>延伸</span><span>ACL 2023</span><span>Xiaochuang Han, Sachin Kumar, Yulia Tsvetkov · 华盛顿大学、卡内基梅隆大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2210.17432" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/ssd-lm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>扩散模型在图像上很成功，但文本扩散模型的生成质量远不如GPT-2这样的自回归模型；Diffusion-LM在学到的嵌入空间里扩散，输出长度固定，也难以直接接现成的分类器做控制。</p></div><div><h4>方法</h4><p>两处设计：一是半自回归，一块一块地生成文本，块内用扩散反复修改、块间按顺序往后接；二是在词表上的“单纯形”空间扩散，噪声直接加在每个词的logits式表示上。</p></div><div><h4>影响</h4><p>较早让文本扩散在无条件生成质量上与GPT-2持平，“块间自回归、块内扩散”的思路后来在块扩散等工作里成为主流折中方案。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/diffusion-lm.html">Diffusion-LM</a>把每个词映射到连续嵌入，在嵌入空间里加噪去噪，生成后再“舍入”回最近的词；它需要预先固定输出长度，而控制生成时要在这个学出来的嵌入空间上训练专门的分类器。</p><p>SSD-LM的第一个设计是<b>单纯形表示</b>：每个词表示成一个长度为词表大小V的向量，对应的词位置为+k、其余为−k（可以看成几乎确定的logits），扩散过程在这个V维空间里加高斯噪声，模型学习从带噪向量还原出原词的分布。因为表示就落在词表空间，任何现成的文本分类器都可以直接对模型输出的词概率求梯度，作为分类器引导做可控生成，不需要额外改造。第二个设计是<b>半自回归</b>：把文本切成若干块，每次在已生成的前文条件下，对下一块做完整的多步扩散，块内词与词之间是双向更新的，块与块之间按顺序生成，因此输出长度可以灵活决定。</p><p>摘要称在无条件生成基准上，SSD-LM在质量和多样性指标上持平或超过强的GPT-2基线，并大幅超过已有扩散基线；在可控生成上也优于有竞争力的基线，并且模块化更好。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>在V维词表空间上做多步扩散，计算量很大，生成比自回归模型慢得多；后来的掩码离散扩散直接在离散token上加噪，训练和采样都更高效。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/sedd.html">离散扩散语言模型SEDD</a> <a class="chip hue" style="--h:0" href="../n/mdlm.html">掩码扩散语言模型MDLM</a> <a class="chip hue" style="--h:0" href="../n/block-diffusion.html">块扩散BD3-LM</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a><span class="yr">2019.02 · LLM</span><div class=nt>以GPT-2为主要比较对象，在无条件生成质量和多样性上持平或超过。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/ddpm.html">DDPM</a><span class="yr">2020.06 · 生成</span><div class=nt>沿用DDPM的高斯加噪与逐步去噪框架，只是把对象换成词表维度的向量。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/diffusion-lm.html">Diffusion-LM</a><span class="yr">2022.05 · LLM</span><div class=nt>Diffusion-LM在学出的嵌入空间扩散、长度固定且控制需专门分类器；SSD-LM改在词表单纯形上扩散并按块生成。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/sedd.html">离散扩散语言模型SEDD</a><span class="yr">2023.10 · LLM</span><div class=nt>在V维词表空间上做多步扩散，计算量很大，生成比自回归模型慢得多；后来的掩码离散扩散直接在离散token上加噪，训练和采样都更高效。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/mdlm.html">掩码扩散语言模型MDLM</a><span class="yr">2024.06 · LLM</span><div class=nt>在V维词表空间上做多步扩散，计算量很大，生成比自回归模型慢得多；后来的掩码离散扩散直接在离散token上加噪，训练和采样都更高效。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/block-diffusion.html">块扩散BD3-LM</a><span class="yr">2025.03 · LLM</span><div class=nt>在V维词表空间上做多步扩散，计算量很大，生成比自回归模型慢得多；后来的掩码离散扩散直接在离散token上加噪，训练和采样都更高效。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/guidance.html">条件生成与引导</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a></p>
+<h2>本篇术语</h2><ul><li><b>单纯形（simplex）表示</b>　把一个词写成词表大小的向量，正确词的位置取大值、其余取小值，相当于一组几乎确定的logits，扩散就在这个空间里进行。</li><li><b>半自回归</b>　块与块之间按顺序生成，每一块内部的所有词同时生成、反复修改。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/diffusion-lm.html">Diffusion-LM</a>了解嵌入空间扩散；读本文第3节单纯形表示和半自回归解码；之后读<a class="ln" href="../n/block-diffusion.html">块扩散BD3-LM</a>看块内扩散、块间自回归的思路如何用在掩码扩散上。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2210.17432" rel="noopener">https://arxiv.org/abs/2210.17432</a>（标题、3位作者、arXiv首次提交2022-10-31；摘要中半自回归按块生成、可变长度、块内双向更新、在自然词表空间而非学出的潜空间扩散、可用现成分类器做引导和模块化控制、无条件生成持平或超过GPT-2并大幅超过扩散基线。±k单纯形构造、ACL 2023与机构为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SSD-LM%E5%8D%95%E7%BA%AF%E5%BD%A2%E5%9D%97%E6%89%A9%E6%95%A3%EF%BC%88ssd-lm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Assd-lm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ssd-lm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="diffuseq.html"><small>本分支上一个 · 2022.10</small><b>DiffuSeq</b></a><a class="r" href="icl-learning-algorithm.html"><small>本分支下一个 · 2022.11</small><b>ICL学的是什么算法</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

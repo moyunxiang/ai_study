@@ -1,0 +1,28 @@
+{
+ "id": "flexattention",
+ "who": "Juechu Dong, Boyuan Feng, Driss Guessous, Yanbo Liang, Horace He · Meta, 密歇根大学",
+ "venue": "MLSys 2025",
+ "aka": ["Flex Attention", "flex_attention", "score_mod", "mask_mod", "BlockMask", "注意力变体编译"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2412.05496"},
+  {"label": "PyTorch博客", "url": "https://pytorch.org/blog/flexattention/"}
+ ],
+ "problem": "FlashAttention极快但是一个写死的整体内核，研究者想试滑动窗口、ALiBi、文档掩码这类变体，要么等人手写新内核，要么退回又慢又占显存的朴素实现——论文称之为“软件彩票”。",
+ "idea": "让用户用几行PyTorch写两个小函数：mask_mod决定哪些位置可见，score_mod修改注意力分数；torch.compile把它们编译成Triton代码，塞进手写好的融合注意力模板，并按块跳过全被掩掉的部分。",
+ "impact": "成为PyTorch内置的注意力变体写法，多数常见变体不再需要专门的内核，并被torchtune、gpt-fast等PyTorch生态项目采用。",
+ "method": "[[flashattention-2]]把注意力融合成一个内核，但每加一种变体（[[alibi]]偏置、滑动窗口、前缀语言模型掩码、[[vllm]]的分页KV）都要改内核源码，变体之间还会组合爆炸。\n\nFlexAttention把变体抽象成两个函数。`mask_mod(b, h, q_idx, kv_idx) → bool`：返回这个位置能不能看，例如因果掩码是`q_idx >= kv_idx`。`score_mod(score, b, h, q_idx, kv_idx)`：改写分数，例如加上ALiBi的距离偏置。掩码可以用与、或组合，前缀LM就是“前缀掩码或因果掩码”。\n\n编译路径借助[[pytorch-2]]：TorchDynamo抓取这两个函数的计算图（连同自动求出的反向），TorchInductor把它们降成[[triton-lang]]代码，注入手写的前向、反向和解码注意力模板（模板里已经处理好在线softmax、分块和GQA）。另一个关键是**BlockMask**：把分数矩阵按128×128分块，事先算出哪些块完全被掩掉、直接跳过，哪些块完全可见、只需执行score_mod，只有部分可见的块才逐元素判断掩码。\n\n论文报告：因果掩码下前向是FA2的1.00–1.22倍、反向0.86–1.05倍；在torchtune训练LLaMA3-8B端到端提速超过2.4倍。",
+ "limits": [
+  {"text": "性能略逊于为特定变体手工调到极致的内核（反向最低只有FA2的0.86倍），且依赖torch.compile，首次编译慢、对动态形状不够友好。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "flashattention-2", "type": "solves", "note": "FA2是写死的单体内核，新变体要重写；FlexAttention把变体变成可编译的小函数，性能与FA2接近。"},
+  {"to": "pytorch-2", "type": "uses", "note": "依赖torch.compile的TorchDynamo抓图与TorchInductor代码生成。"},
+  {"to": "triton-lang", "type": "uses", "note": "用户函数被降成Triton代码，注入Triton写的注意力模板。"},
+  {"to": "alibi", "type": "uses", "note": "以ALiBi等变体为例，说明只用一个score_mod就能实现。"}
+ ],
+ "prereq": ["self-attention", "softmax", "efficient-attention", "cpu-gpu", "memory-bandwidth"],
+ "terms": [
+  {"t": "块稀疏", "d": "把大矩阵切成固定大小的块，只计算含有效元素的块，整块无效的直接跳过，从而在掩码很多时省下大量计算。"}
+ ],
+ "check": {"source": "https://arxiv.org/html/2412.05496v1", "confirmed": "标题、五位作者与Meta/密歇根大学、v1日期2024-12-07；摘要中“软件彩票”；正文：mask_mod与score_mod签名、因果掩码写法、与/或组合、create_block_mask默认块大小128、完全块与部分块、TorchDynamo→TorchInductor→Triton模板；因果前向1.00–1.22×、反向0.86–1.05×，torchtune LLaMA3-8B超过2.4×。MLSys 2025为一般了解。"}
+}

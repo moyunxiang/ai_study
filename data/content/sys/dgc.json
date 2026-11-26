@@ -1,0 +1,25 @@
+{
+ "id": "dgc",
+ "who": "Yujun Lin, Song Han, Huizi Mao, Yu Wang, William J. Dally · 清华大学, 斯坦福大学, 英伟达",
+ "venue": "ICLR 2018",
+ "aka": ["DGC", "梯度稀疏化", "gradient sparsification", "top-k梯度", "动量修正", "momentum correction"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1712.01887"},
+  {"label": "GitHub", "url": "https://github.com/synxlin/deep-gradient-compression"}
+ ],
+ "problem": "多机数据并行每一步都要交换全部梯度，ResNet-50一次就是近100MB，没有昂贵的高速网络就扩展不上去；在手机等联邦学习场景，网络更慢更不稳定。",
+ "idea": "每步只发送绝对值最大的极少数梯度，其余在本地累积到下一次；再用动量修正、本地梯度裁剪、动量因子遮蔽和预热训练四个技巧保证精度不掉。",
+ "impact": "让梯度压缩比做到数百倍而不损失精度，成为梯度稀疏化路线最常被引用的工作，“本地累积残差+只传top-k”的误差反馈思路被后续低通信训练方法反复使用。",
+ "method": "[[qsgd]]把每个梯度量化成少数几个比特，压缩比受位宽限制；另一条路是稀疏化：只传最重要的那一小部分。作者发现分布式SGD里99.9%的梯度交换是冗余的。\n\nDGC的基本操作：每个节点把本地梯度加到一个累积缓冲里，只把绝对值超过阈值（如前0.1%）的项发出去并从缓冲中清零，其余继续累积，迟早会因为变大而被发送，因此信息不会丢。直接这么做会伤害精度，论文配了四个技巧：**动量修正**，在累积缓冲里累积的是带[[momentum]]的速度而不只是梯度，让延迟发送的更新与原始动量SGD一致；**本地梯度裁剪**，在累积前做裁剪防止梯度爆炸；**动量因子遮蔽**，已发送的位置把动量清零，避免过时的动量把参数推偏；**预热训练**，训练初期逐步提高稀疏度。\n\n摘要报告：在CIFAR-10、ImageNet、Penn Treebank和LibriSpeech上，梯度压缩比达到270到600倍而精度不降，ResNet-50的梯度从97MB压到0.35MB，DeepSpeech从488MB压到0.74MB，使在普通1Gbps以太网上做大规模分布式训练成为可能。",
+ "limits": [
+  {"text": "选top-k和稀疏梯度的聚合（不同节点的非零位置不同）不适配高效的Ring All-Reduce，在高速互连的GPU集群上实际收益有限，因而主流大模型训练很少采用。", "solved_by": ["diloco"]}
+ ],
+ "relations": [
+  {"to": "qsgd", "type": "rivals", "note": "QSGD降低每个梯度的位宽，DGC只发送极少数大梯度，两者是梯度压缩的两条路线。"},
+  {"to": "parameter-server", "type": "solves", "note": "参数服务器与数据并行都要频繁交换全部梯度，DGC把通信量压到原来的几百分之一。"},
+  {"to": "fedavg", "type": "extends", "note": "把联邦学习这类慢网络、不稳定连接的场景作为梯度压缩的重要应用。"},
+  {"to": "momentum", "type": "uses", "note": "动量修正与动量因子遮蔽保证延迟发送的更新与动量SGD保持一致。"}
+ ],
+ "prereq": ["distributed-training", "sgd-minibatch", "momentum", "gradient-clipping"],
+ "check": {"source": "https://arxiv.org/abs/1712.01887", "confirmed": "标题、五位作者、v1日期2017-12-05；摘要：梯度交换限制多节点扩展、联邦学习更差、99.9%梯度交换冗余、四个技巧（动量修正、本地梯度裁剪、动量因子遮蔽、预热训练）、四个数据集、270–600倍压缩无精度损失、ResNet-50 97MB→0.35MB、DeepSpeech 488MB→0.74MB、1Gbps以太网。ICLR 2018、机构为一般了解；限制条目对All-Reduce的分析为一般了解。"}
+}

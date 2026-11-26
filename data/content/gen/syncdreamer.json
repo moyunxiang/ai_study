@@ -1,0 +1,30 @@
+{
+  "id": "syncdreamer",
+  "who": "Yuan Liu, Cheng Lin, Zijiao Zeng, Xiaoxiao Long, Lingjie Liu, Taku Komura, Wenping Wang · 香港大学 / 腾讯 / 宾夕法尼亚大学 / 德州农工大学",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2309.03453"},
+    {"label": "代码", "url": "https://github.com/liuyuan-pal/SyncDreamer"}
+  ],
+  "aka": ["SyncDreamer", "同步多视图扩散"],
+  "problem": "[[zero123]]能根据一张图生成物体在新视角下的样子，但每个视角是分开独立生成的，不同视角之间的形状和颜色常常对不上，难以直接重建成3D。",
+  "idea": "建模多个视角图像的联合分布：在一次反向去噪过程中同时生成若干固定视角，每一步都通过3D感知的特征注意力把各视角的中间状态同步起来。",
+  "impact": "让单图生成的多视角图像在几何和颜色上明显更一致，可以直接交给NeRF或网格重建；“多视图联合去噪+3D一致性约束”成为单图转3D流水线的主流做法之一。",
+  "method": "给定一张物体照片，目标是生成它在预设的N个视角（如环绕一圈的16个角度）下的图像。Zero123对每个视角单独做条件扩散，等于假设各视角相互独立。SyncDreamer改为对N张图的联合分布建模：N路去噪网络（共享从Zero123初始化的权重）并行运行，每一步都要知道其他视角此刻的中间结果。\n\n同步的方式是**3D感知特征注意力**：在每个去噪步，把所有视角的中间带噪图像特征“反投影”到一个共享的三维特征体中；生成某个视角时，网络沿该视角的相机光线去这个特征体中取对应位置的特征，通过注意力融合进来（见[[c:camera-geometry]]、[[c:attention-concept]]）。这样同一个空间点在不同视角里的外观就会被拉到一致。\n\n生成的多视角图像随后可用现成的NeRF或神经表面重建方法得到网格，论文展示了新视角合成、文生3D（先文生图再转3D）和图生3D等应用。",
+  "limits": [
+    {"text": "只生成固定仰角、较低分辨率（256×256）的固定视角，物体背面与顶部的细节有限。", "solved_by": ["zero123-pp"]},
+    {"text": "生成多视角后还要单独做一次逐物体的3D重建优化，整个流程仍需数分钟。", "solved_by": ["instant3d", "lrm"]}
+  ],
+  "relations": [
+    {"to": "zero123", "type": "solves", "note": "把各视角独立生成改为联合同步生成，解决Zero123多视角不一致的问题。"},
+    {"to": "mvdream", "type": "rivals", "note": "同期的多视图扩散，MVDream用多视角自注意力，SyncDreamer用三维特征体做3D感知的同步。"},
+    {"to": "stable-diffusion", "type": "uses", "note": "经由Zero123间接继承Stable Diffusion的预训练权重和二维先验。"}
+  ],
+  "prereq": ["diffusion-process", "camera-geometry", "attention-concept", "3d-representation"],
+  "terms": [
+    {"t": "多视图联合分布", "d": "把同一物体多个视角的图像当作一个整体来建模和采样，而不是各视角互不相干地生成。"},
+    {"t": "特征体", "d": "一个三维网格，每个格点存一个特征向量，用来汇总各视角在空间同一位置看到的信息。"}
+  ],
+  "learn": "先读Zero-1-to-3 → 读本文第3节同步扩散与3D感知注意力 → 对比MVDream、Zero123++三种多视图一致性做法。",
+  "check": {"source": "https://arxiv.org/abs/2309.03453", "confirmed": "标题、作者、v1日期2023-09-07、摘要中以Zero123为基础、多视图联合分布、单次反向过程同步各视角中间状态、3D感知特征注意力、用于新视角合成/文生3D/图生3D；16视角、256×256分辨率、ICLR 2024与机构来自一般了解"}
+}

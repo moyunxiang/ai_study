@@ -1,0 +1,30 @@
+{
+  "id": "simmim",
+  "who": "Zhenda Xie, Zheng Zhang, Yue Cao, Yutong Lin, Jianmin Bao, Zhuliang Yao, Qi Dai, Han Hu · 微软亚洲研究院 / 清华大学",
+  "venue": "CVPR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2111.09886"},
+    {"label": "代码", "url": "https://github.com/microsoft/SimMIM"}
+  ],
+  "aka": ["SimMIM", "掩码图像建模", "masked image modeling", "MIM", "像素回归预训练"],
+  "problem": "[[beit]]式掩码图像建模要先训练一个离散VAE当分词器，再按块状掩码预测视觉词，流程复杂，不清楚哪些设计真正必要。",
+  "idea": "逐个拆掉复杂部件：随机遮住较大的图像块，直接用一个线性层回归被遮像素的RGB值，发现这样就足够好。",
+  "impact": "与同月的[[mae]]一起确立了“遮住像素再预测像素”的简单路线，并支撑了30亿参数SwinV2的训练。",
+  "method": "SimMIM的框架只有四个部件：随机掩码、编码器、预测头、预测目标，作者对每一项做系统对照。\n\n- **掩码**：随机遮住图像块，块要较大（如32×32），遮挡比例适中即可构成有难度的前置任务；不需要BEiT那种分块（block-wise）掩码。\n- **编码器**：被遮的块换成可学习的掩码向量，和可见块一起输入ViT或[[swin]]。这一点与MAE不同——MAE的编码器只处理可见块。\n- **预测头**：一层线性层就够，更重的解码器没有带来提升。\n- **目标**：直接对原始像素做L1回归，效果不比离散视觉词分类差。\n\n摘要报告ViT-B只在ImageNet-1K上预训练再微调，top-1达83.8%，比此前最好方法高0.6个点；用在约6.5亿参数的SwinV2-H上达到87.1%；还借助它以少40倍的数据训练了30亿参数的SwinV2-G。",
+  "limits": [
+    {"text": "编码器要处理包括掩码向量在内的全部图像块，预训练计算量明显大于只编码可见块的做法。", "solved_by": ["mae"]},
+    {"text": "像素回归学到的特征偏底层，不微调时线性探测效果明显不如对比式或自蒸馏方法。", "solved_by": ["ibot", "dinov2"]}
+  ],
+  "relations": [
+    {"to": "beit", "type": "solves", "note": "去掉离散VAE分词器和块状掩码，证明直接回归像素就足够。"},
+    {"to": "vit", "type": "uses", "note": "以ViT-B等为编码器做对照实验。"},
+    {"to": "swin", "type": "uses", "note": "同一团队把它用于Swin与SwinV2这类层级骨干的预训练。"},
+    {"to": "mae", "type": "rivals", "note": "同月发布：二者都回归像素，MAE编码器只看可见块、配深解码器，SimMIM全块输入、线性头。"}
+  ],
+  "prereq": ["masked-modeling", "self-supervised", "image-patch", "pretrain-finetune", "self-attention"],
+  "terms": [
+    {"t": "掩码向量", "d": "一个可学习的向量，用来替换被遮住的图像块，告诉网络“这里需要预测”。"}
+  ],
+  "learn": "先读BEiT了解掩码图像建模，再读SimMIM第3–4节的各组件对照；和MAE论文放在一起对比编码器是否看掩码块。",
+  "check": {"source": "https://arxiv.org/abs/2111.09886", "confirmed": "arXiv记录：标题、八位作者、v1提交于2021-11-18、摘要中的去掉块状掩码与dVAE分词、较大掩码块（如32）、直接回归RGB、线性预测头、ViT-B 83.8%（+0.6）、SwinV2-H 87.1%、SwinV2-G用少40倍数据。掩码向量输入编码器、L1损失、CVPR 2022与机构凭一般了解写。"}
+}

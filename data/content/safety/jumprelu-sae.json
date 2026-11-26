@@ -1,0 +1,27 @@
+{
+ "id": "jumprelu-sae",
+ "who": "Senthooran Rajamanoharan, Tom Lieberum, Nicolas Sonnerat, Arthur Conmy, Vikrant Varma, János Kramár, Neel Nanda · Google DeepMind",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2407.14435"}
+ ],
+ "aka": ["JumpReLU SAE", "JumpReLU", "跳跃ReLU稀疏自编码器"],
+ "problem": "稀疏自编码器既要把激活重建得准，又要足够稀疏才好解释，两者互相拉扯；普通SAE用L1惩罚逼稀疏，还会把特征的激活值整体压小（收缩问题）。",
+ "idea": "把SAE编码器的ReLU换成带阈值的JumpReLU：低于阈值的输出直接置零，高于阈值的原样保留；再用直通估计器直接训练L0稀疏度，不再借用L1这个代理。",
+ "impact": "在同等稀疏度下重建更准，随后被用于DeepMind公开的[[gemma-scope]]，成为主流SAE结构之一。",
+ "method": "[[monosemanticity]]中的标准SAE把激活x编码成 `f = ReLU(W_e x + b_e)`，再线性解码重建，损失是重建误差加 `λ‖f‖₁`。L1惩罚的问题是：它不仅让很多特征变成零，也把非零特征的数值往小里压，导致重建偏差。\n\nJumpReLU定义为 `JumpReLU_θ(z) = z · H(z − θ)`，H是阶跃函数，θ是每个特征可学习的阈值：输入小于θ输出0，大于θ输出z本身。这样“开不开”由阈值决定，“开多大”不被压缩。损失直接用L0（非零特征的个数）衡量稀疏度。阶跃函数几乎处处导数为零，作者用直通估计器为θ构造可用的梯度，从而能够正常训练。\n\n摘要称，在Gemma 2 9B的激活上，JumpReLU SAE在给定稀疏度下的重建保真度优于同期的Gated SAE和TopK SAE（[[openai-sae]]），人工和自动的可解释性评估显示可解释性并未因此下降；训练和推理效率与普通SAE相当。",
+ "limits": [
+  {"text": "重建误差仍不为零，残余部分对模型行为的影响解释不了；更好的重建指标是否意味着下游任务更有用，后来受到质疑。", "solved_by": ["sae-negative-results"]}
+ ],
+ "relations": [
+  {"to": "monosemanticity", "type": "solves", "note": "原始SAE靠L1逼稀疏会压缩特征数值，JumpReLU用阈值加L0训练避免收缩。"},
+  {"to": "openai-sae", "type": "rivals", "note": "TopK SAE固定每次激活k个特征，JumpReLU用可学习阈值；论文报告同等稀疏度下重建更好。"},
+  {"to": "gemma-2", "type": "uses", "note": "在Gemma 2 9B的激活上训练和评估。"}
+ ],
+ "prereq": ["autoencoder", "regularization", "neuron-activation", "backpropagation", "norm"],
+ "terms": [
+  {"t": "直通估计器（STE）", "d": "前向传播用不可导的函数，反向传播时用一个近似的梯度代替，让这种函数也能被训练。"},
+  {"t": "收缩问题", "d": "L1惩罚让SAE特征的激活值系统性偏小，从而重建不准的现象。"}
+ ],
+ "learn": "先读[[monosemanticity]]和[[openai-sae]] → 读原文第2–3节的JumpReLU与STE推导 → 下载[[gemma-scope]]的SAE，看特征激活分布和阈值。",
+ "check": {"source": "https://arxiv.org/abs/2407.14435", "confirmed": "arXiv记录：标题、7位作者、2024-07-19 v1；摘要所述以JumpReLU替换ReLU、在Gemma 2 9B上同等稀疏度重建优于Gated与TopK SAE、人工与自动可解释性未下降、用STE训练并直接训练L0以避免收缩。JumpReLU公式与用于Gemma Scope凭一般了解写。"}
+}

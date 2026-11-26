@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SDXL-Lightning渐进对抗蒸馏（2024） · AI脉络</title>
+<meta name="description" content="把压到几步出图时，用均方误差逼近教师，步数一少图像就发糊；等对抗蒸馏画质锐利，却容易丢失多样性（模式覆盖不足）。 把两者结合：仍逐级减少步数做蒸馏，但每一级用对抗损失代替均方误差，判别器建在扩散U-Net的潜空间特征上，并在质量与模式覆盖之间做权衡。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sdxl-lightning.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SDXL-Lightning渐进对抗蒸馏（2024）">
+<meta property="og:description" content="把压到几步出图时，用均方误差逼近教师，步数一少图像就发糊；等对抗蒸馏画质锐利，却容易丢失多样性（模式覆盖不足）。 把两者结合：仍逐级减少步数做蒸馏，但每一级用对抗损失代替均方误差，判别器建在扩散U-Net的潜空间特征上，并在质量与模式覆盖之间做权衡。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sdxl-lightning.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sdxl-lightning">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 少步采样与蒸馏</div>
+<h1>SDXL-Lightning渐进对抗蒸馏</h1>
+<div class="full">SDXL-Lightning: Progressive Adversarial Diffusion Distillation</div>
+<div class="meta"><span>2024.02</span><span>论文</span><span>延伸</span><span>Shanchuan Lin, Anran Wang, Xiao Yang · 字节跳动</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2402.13929" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://huggingface.co/ByteDance/SDXL-Lightning" rel="noopener">模型 ↗</a><a class="btn sm" href="../index.html#/n/sdxl-lightning">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>把<a class="ln" href="../n/sdxl.html">SDXL</a>压到几步出图时，<a class="ln" href="../n/progressive-distillation.html">渐进蒸馏与v预测</a>用均方误差逼近教师，步数一少图像就发糊；<a class="ln" href="../n/add.html">对抗扩散蒸馏SDXL Turbo</a>等对抗蒸馏画质锐利，却容易丢失多样性（模式覆盖不足）。</p></div><div><h4>方法</h4><p>把两者结合：仍逐级减少步数做蒸馏，但每一级用对抗损失代替均方误差，判别器建在扩散U-Net的潜空间特征上，并在质量与模式覆盖之间做权衡。</p></div><div><h4>影响</h4><p>论文称在基于SDXL的1024像素一步/少步文生图上取得当时最好效果；开源的1、2、4、8步LoRA和完整UNet权重被社区大量用在ComfyUI等工作流中，是“Lightning”类加速模型的代表。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><b>渐进式</b>：和<a class="ln" href="../n/progressive-distillation.html">渐进蒸馏与v预测</a>一样，学生每一步要学会教师两步（或多步）的效果，学会后学生变成新的教师，步数再减半，逐级降到很少的步数。</p><p><b>对抗式</b>：均方误差要求学生的一步结果精确对上教师多步的结果；但步数很少时学生没有能力精确对齐，均方误差会让它输出各种可能结果的平均，画面就糊了。SDXL-Lightning改用对抗目标：判别器判断“学生走一步得到的潜变量”与“教师走多步得到的潜变量”是否来自同一分布，只要求分布一致而不要求逐点一致，于是画面保持锐利。</p><p>判别器直接复用预训练扩散U-Net的编码器部分，在潜空间、并在各个时间步上工作，不需要像<a class="ln" href="../n/add.html">对抗扩散蒸馏SDXL Turbo</a>那样把潜变量解码回像素再用图像网络判别，计算省、也能支持1024像素。论文还讨论了理论分析、如何放松条件以减少模式坍塌，以及修正一步模型的训练细节。最终开源了LoRA和完整UNet两种形式的权重。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>一步和两步版本的画质与提示遵循仍明显不如原始多步模型，且需要为每个底座模型重新蒸馏。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/dmd2.html">DMD2改进分布匹配蒸馏</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/sdxl.html">SDXL</a><span class="yr">2023.07 · 生成</span><div class=nt>以SDXL为教师和学生的初始化，发布的权重可直接替换SDXL。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/add.html">对抗扩散蒸馏SDXL Turbo</a><span class="yr">2023.11 · 生成</span><div class=nt>在对抗蒸馏的基础上加入渐进式结构并改在潜空间判别，以兼顾画质和模式覆盖、支持1024像素。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/progressive-distillation.html">渐进蒸馏与v预测</a><span class="yr">2022.02 · 生成</span><div class=nt>沿用逐级减半步数的渐进式蒸馏框架。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/dmd2.html">DMD2改进分布匹配蒸馏</a><span class="yr">2024.05 · 生成</span><div class=nt>一步和两步版本的画质与提示遵循仍明显不如原始多步模型，且需要为每个底座模型重新蒸馏。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/knowledge-distillation.html">知识蒸馏</a> <a class="chip c" href="../c/adversarial-training.html">对抗训练</a> <a class="chip c" href="../c/few-step-sampling.html">少步采样与扩散蒸馏</a> <a class="chip c" href="../c/latent-space.html">潜空间</a> <a class="chip c" href="../c/peft-concept.html">参数高效微调</a></p>
+<h2>本篇术语</h2><ul><li><b>模式覆盖</b>　生成模型的输出能否覆盖真实分布中的各种情形；只追求逼真而忽略覆盖，就会出现同一提示总生成相似图片的问题。</li></ul>
+<h2>怎么学</h2><p>先读渐进蒸馏与ADD → 读本文关于均方误差为何发糊的分析和判别器设计 → 在diffusers里加载4步LoRA与原始SDXL 30步对比。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2402.13929" rel="noopener">https://arxiv.org/abs/2402.13929</a>（标题、三位作者、v1日期2024-02-21、摘要中结合渐进式与对抗式蒸馏、在质量与模式覆盖间平衡、基于SDXL的1024像素一步/少步文生图新SOTA、讨论理论分析、判别器设计、模型形式与训练技巧、以LoRA和完整UNet开源；Hugging Face模型页确认提供1/2/4/8步检查点（1步为实验性）、从SDXL base 1.0蒸馏、提供ComfyUI用检查点；机构、判别器复用U-Net编码器、具体步数序列、无发表会议信息来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SDXL-Lightning%E6%B8%90%E8%BF%9B%E5%AF%B9%E6%8A%97%E8%92%B8%E9%A6%8F%EF%BC%88sdxl-lightning%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asdxl-lightning%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sdxl-lightning.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="lgm.html"><small>本分支上一个 · 2024.02</small><b>LGM多视图高斯重建</b></a><a class="r" href="sora.html"><small>本分支下一个 · 2024.02</small><b>Sora</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

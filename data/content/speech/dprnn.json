@@ -1,0 +1,32 @@
+{
+  "id": "dprnn",
+  "who": "Yi Luo, Zhuo Chen, Takuya Yoshioka · 哥伦比亚大学、微软",
+  "venue": "ICASSP 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1910.06379"}
+  ],
+  "problem": "时域语音分离直接处理采样点，一句话有几万到几十万步；RNN在这么长的序列上难以优化，一维卷积的感受野又覆盖不了整句。",
+  "idea": "把长序列切成许多重叠的小块，交替在块内（短程）和块间（长程）各跑一次RNN；每次处理的序列长度约为原长度的平方根。",
+  "impact": "DPRNN把WSJ0-2mix分离推到新高，并确立了「双路径」这种处理长序列的结构；后来的SepFormer等模型把其中的RNN换成Transformer，延续了同一框架。",
+  "method": "[[conv-tasnet]]表明：在时域上用可学习的编码器把波形切成短帧、估计每个说话人的掩码、再解码回波形，效果胜过传统的时频掩码方法。但帧很短（几毫秒），一段几秒钟的混合语音就有上万帧。普通RNN（见[[c:recurrent-layer]]）在这么长的序列上梯度难传，一维卷积要覆盖整句又得堆很多层。\n\nDPRNN的做法：把长度为L的帧序列切成长度为K、相互重叠一半的S个块，排成一个「块数 × 块长」的二维张量。每个DPRNN模块包含两步：**块内RNN**在每个块内部沿K方向跑一个双向LSTM，建模局部关系；**块间RNN**在相同位置上沿S方向跑另一个双向LSTM，在块与块之间传递信息。两步之间都有残差连接和归一化。若取 `K ≈ √L`，每个RNN处理的序列长度都只有约 `√L`，堆叠几个模块后，任意两帧之间都能交换信息。最后把块重叠相加还原成序列，估计每个说话人的掩码。\n\n摘要报告：把TasNet里的一维卷积换成DPRNN，并在时域上做更短帧（采样级）建模，在WSJ0-2mix上达到新的最好结果，模型比此前最好的系统小20倍。之后[[sepformer]]把块内、块间的RNN换成Transformer，双路径结构也被用在语音增强和说话人日志等任务上。",
+  "limits": [
+    {"text": "块内、块间都用双向LSTM，需要看完整句才能处理，不适合低延迟的流式分离。", "solved_by": []},
+    {"text": "RNN逐步计算，难以并行，长音频训练和推理仍然较慢。", "solved_by": ["sepformer"]}
+  ],
+  "relations": [
+    {"to": "conv-tasnet", "type": "solves", "note": "Conv-TasNet靠一维卷积建模长序列，感受野有限；DPRNN用块内/块间RNN覆盖整句，模型也更小。"},
+    {"to": "lstm", "type": "uses", "note": "块内和块间的序列建模都用双向LSTM。"},
+    {"to": "pit", "type": "uses", "note": "多说话人输出与参考之间的配对问题，沿用置换不变训练。"}
+  ],
+  "prereq": ["recurrent-layer", "gating", "residual-connection", "waveform-spectrogram", "loss-function"],
+  "terms": [
+    {"t": "语音分离", "d": "把多人同时说话的混合录音拆成每个人各自的声音。"},
+    {"t": "时域分离", "d": "直接在波形采样点上处理，而不是先变成频谱再处理。"},
+    {"t": "WSJ0-2mix", "d": "把两段朗读语音混在一起构成的分离基准数据集。"}
+  ],
+  "aka": ["DPRNN", "Dual-Path RNN", "双路径RNN", "DPRNN-TasNet"],
+  "check": {
+    "source": "https://arxiv.org/abs/1910.06379",
+    "confirmed": "arXiv官方记录：标题、作者Luo/Chen/Yoshioka、v1提交2019-10-14；摘要关于长序列难题、切块后块内和块间交替处理、每次处理长度与原长度平方根成正比、替换TasNet一维卷积并做采样级建模、WSJ0-2mix新最好且模型小20倍。块重叠一半、双向LSTM、PIT训练为一般了解。"
+  }
+}

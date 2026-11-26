@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>参数高效微调的统一视角（2021） · AI脉络</title>
+<meta name="description" content="Adapter、前缀微调、LoRA等参数高效方法各自有效，但看起来形式完全不同，大家不清楚它们成功的关键是什么、彼此是什么关系，也就不知道该怎么组合或改进。 把这些方法都改写成“对预训练模型某处隐藏状态加一个修改量Δh”，按修改量的函数形式、插入方式（串行/并行）、修改的位置（注意力/前馈层）和组…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/unified-peft.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="参数高效微调的统一视角（2021）">
+<meta property="og:description" content="Adapter、前缀微调、LoRA等参数高效方法各自有效，但看起来形式完全不同，大家不清楚它们成功的关键是什么、彼此是什么关系，也就不知道该怎么组合或改进。 把这些方法都改写成“对预训练模型某处隐藏状态加一个修改量Δh”，按修改量的函数形式、插入方式（串行/并行）、修改的位置（注意力/前馈层）和组…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/unified-peft.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/unified-peft">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 参数高效微调</div>
+<h1>参数高效微调的统一视角</h1>
+<div class="full">Towards a Unified View of Parameter-Efficient Transfer Learning</div>
+<div class="meta"><span>2021.10</span><span>论文</span><span>延伸</span><span>ICLR 2022</span><span>Junxian He, Chunting Zhou, Xuezhe Ma, Taylor Berg-Kirkpatrick, Graham Neubig · 卡内基梅隆大学, 南加州大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2110.04366" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/jxhe/unify-parameter-efficient-tuning" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/unified-peft">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Adapter、前缀微调、LoRA等参数高效方法各自有效，但看起来形式完全不同，大家不清楚它们成功的关键是什么、彼此是什么关系，也就不知道该怎么组合或改进。</p></div><div><h4>方法</h4><p>把这些方法都改写成“对预训练模型某处隐藏状态加一个修改量Δh”，按修改量的函数形式、插入方式（串行/并行）、修改的位置（注意力/前馈层）和组合方式几个维度来比较，再按最优组合拼出新方法。</p></div><div><h4>影响</h4><p>成为参数高效微调最常被引用的分析框架之一，提出的并行适配器与MAM Adapter让后来的研究常把LoRA、Adapter、前缀看成同一家族的变体。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/adapters.html">Adapter</a>在层与层之间串行插入小瓶颈网络，<a class="ln" href="../n/prefix-tuning.html">Prefix / Prompt Tuning</a>在注意力里加可训练的Key/Value，<a class="ln" href="../n/lora.html">LoRA</a>给权重加低秩增量。作者推导出：前缀微调对注意力输出的作用，可以写成原输出与一个由前缀决定的项的加权和，形式上很像一个并行接在注意力旁边的适配器；LoRA则是并行加在权重矩阵上的线性修改。于是三者都可以表示为<code>h ← h + s·Δh</code>，区别只在于：</p><ul><li><b>函数形式</b>：Δh是线性的（LoRA）、带非线性的瓶颈网络（Adapter），还是注意力式的加权（前缀）；</li><li><b>插入方式</b>：串行接在子层之后，还是与子层并行；</li><li><b>修改位置</b>：作用在注意力子层还是前馈子层；</li><li><b>组合函数</b>：直接相加、带缩放系数，还是门控加权。</li></ul><p>在翻译、摘要、语言理解和文本分类上的系统实验得出几条经验：并行插入优于串行；修改前馈层更适合参数预算较多的情况，修改注意力在预算极小时更划算。据此组合出<b>MAM Adapter</b>（在注意力上用前缀微调、在前馈层上用缩放的并行适配器），以更少的可训练参数在四类任务上都达到与全量微调相当的结果（摘要所述）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>实验主要在编码器—解码器和编码器模型上做，可训练参数比例仍是百分之几；后来的十亿级解码器LLM上，简单的LoRA因为可合并、无推理开销而成为事实标准，MAM这类组合方法用得不多。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/qlora.html">QLoRA</a> <a class="chip hue" style="--h:192" href="../n/dora.html">DoRA</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/lora.html">LoRA</a><span class="yr">2021.06 · 系统·效率</span><div class=nt>把LoRA看作在权重上做并行线性修改的特例，与其他方法放在同一坐标系里比较。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/adapters.html">Adapter</a><span class="yr">2019.02 · 系统·效率</span><div class=nt>把串行Adapter纳入统一框架，并发现改为并行插入效果更好。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/prefix-tuning.html">Prefix / Prompt Tuning</a><span class="yr">2021.01 · 系统·效率</span><div class=nt>推导出前缀微调等价于一种并行接在注意力上的适配器。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/qlora.html">QLoRA</a><span class="yr">2023.05 · 系统·效率</span><div class=nt>实验主要在编码器—解码器和编码器模型上做，可训练参数比例仍是百分之几；后来的十亿级解码器LLM上，简单的LoRA因为可合并、无推理开销而成为事实标准，MAM这类组合方法用得不多。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/dora.html">DoRA</a><span class="yr">2024.02 · 系统·效率</span><div class=nt>实验主要在编码器—解码器和编码器模型上做，可训练参数比例仍是百分之几；后来的十亿级解码器LLM上，简单的LoRA因为可合并、无推理开销而成为事实标准，MAM这类组合方法用得不多。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/peft-concept.html">参数高效微调</a> <a class="chip c" href="../c/transfer-learning.html">迁移学习</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/low-rank.html">低秩近似</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2110.04366" rel="noopener">https://arxiv.org/abs/2110.04366</a>（标题、五位作者、v1日期2021-10-08；摘要：拆解SOTA参数高效方法、统一为对特定隐藏状态的修改、按修改函数与应用位置等设计维度比较、在翻译/摘要/理解/分类四类任务上实验、组合出参数更少且与全量微调相当的新方法。串行/并行、注意力/前馈的具体结论、MAM Adapter构成、ICLR 2022与机构为对正文的一般了解，未逐项对照。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%8F%82%E6%95%B0%E9%AB%98%E6%95%88%E5%BE%AE%E8%B0%83%E7%9A%84%E7%BB%9F%E4%B8%80%E8%A7%86%E8%A7%92%EF%BC%88unified-peft%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aunified-peft%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/unified-peft.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="p-tuning-v2.html"><small>本分支上一个 · 2021.10</small><b>P-Tuning v2深度提示</b></a><a class="r" href="alpa.html"><small>本分支下一个 · 2022.01</small><b>Alpa自动并行</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

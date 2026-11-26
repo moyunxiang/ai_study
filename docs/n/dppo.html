@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DPPO扩散策略RL微调（2024） · AI脉络</title>
+<meta name="description" content="扩散策略从示范里学得好，但示范总有覆盖不到的情况，需要用强化学习继续提高。人们原本猜测策略梯度方法对扩散策略效率很低，因为扩散模型的动作概率不好算。 把扩散模型的整个去噪过程看成一个内层的马尔可夫决策过程，每一步去噪都是一个高斯动作、概率可以精确计算，于是可以直接套用PPO对扩散策略做策略梯度微调…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dppo.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DPPO扩散策略RL微调（2024）">
+<meta property="og:description" content="扩散策略从示范里学得好，但示范总有覆盖不到的情况，需要用强化学习继续提高。人们原本猜测策略梯度方法对扩散策略效率很低，因为扩散模型的动作概率不好算。 把扩散模型的整个去噪过程看成一个内层的马尔可夫决策过程，每一步去噪都是一个高斯动作、概率可以精确计算，于是可以直接套用PPO对扩散策略做策略梯度微调…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dppo.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dppo">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 操作技能学习</div>
+<h1>DPPO扩散策略RL微调</h1>
+<div class="full">Diffusion Policy Policy Optimization</div>
+<div class="meta"><span>2024.09</span><span>论文</span><span>延伸</span><span>ICLR 2025</span><span>Allen Z. Ren, Justin Lidard, Lars L. Ankile, Anthony Simeonov, Pulkit Agrawal, Anirudha Majumdar, Benjamin Burchfiel, Hongkai Dai et al. · Princeton University、MIT、Toyota Research Institute等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2409.00588" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://diffusion-ppo.github.io" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/dppo">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>扩散策略从示范里学得好，但示范总有覆盖不到的情况，需要用强化学习继续提高。人们原本猜测策略梯度方法对扩散策略效率很低，因为扩散模型的动作概率不好算。</p></div><div><h4>方法</h4><p>把扩散模型的整个去噪过程看成一个内层的马尔可夫决策过程，每一步去噪都是一个高斯动作、概率可以精确计算，于是可以直接套用PPO对扩散策略做策略梯度微调，并总结了一套实用技巧。</p></div><div><h4>影响</h4><p>在常见基准上比其他扩散策略RL方法和其他策略形式的PG微调都更强、更高效，并零样本部署到真机长程装配任务；此后对扩散或流匹配策略做在线RL的工作常把它作为对照。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/diffusion-policy.html">Diffusion Policy</a>输出动作的方式是从噪声出发去噪K步。直接对最后的动作求概率很难，所以过去多用Q函数引导等间接方法做RL微调。DPPO的关键观察是：每一步去噪本身就是“在当前带噪动作上加一个高斯扰动”，概率有解析形式。把环境的每个时间步展开成K个去噪子步，就得到一个两层的MDP，奖励只在最后一个子步给出。这样<a class="ln" href="../n/ppo.html">PPO</a>的比率裁剪、优势估计都能直接用。</p><p>实用技巧包括：只微调最后若干个去噪步、给去噪过程设置噪声下限以保证探索、配合动作分块等。实验发现，扩散参数化与RL微调结合时，探索发生在示范动作的“流形”附近，结构化、训练稳定，得到的策略也更鲁棒。论文在带像素观测的仿真机器人任务上验证，并把仿真训练的策略零样本部署到真机的长程多阶段装配任务。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍需大量环境交互，主要在仿真里微调后迁移，真机上直接在线训练成本高。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/hil-serl.html">HIL-SERL人在回路RL</a> <a class="chip hue" style="--h:96" href="../n/pi-star-0.6.html">π*0.6与RECAP</a></div></li><li>展开去噪步骤使有效时间跨度变长，信用分配更难，样本效率不如离策略方法。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/ppo.html">PPO</a><span class="yr">2017.07 · RL</span><div class=nt>把去噪过程视为内层MDP后直接使用PPO更新。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/ddpm.html">DDPM</a><span class="yr">2020.06 · 生成</span><div class=nt>利用DDPM每步去噪为高斯转移、概率可算的性质。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/diffusion-policy.html">Diffusion Policy</a><span class="yr">2023.03 · 具身·世界模型</span><div class=nt>在扩散策略的模仿学习之后接上策略梯度微调，解决示范覆盖不足的问题。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/pi-star-0.6.html">π*0.6与RECAP</a><span class="yr">2025.11 · 具身·世界模型</span><div class=nt>仍需大量环境交互，主要在仿真里微调后迁移，真机上直接在线训练成本高。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/hil-serl.html">HIL-SERL人在回路RL</a><span class="yr">2024.10 · 具身·世界模型</span><div class=nt>仍需大量环境交互，主要在仿真里微调后迁移，真机上直接在线训练成本高。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/mdp.html">马尔可夫决策过程</a> <a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a></p>
+<h2>本篇术语</h2><ul><li><b>两层MDP</b>　外层是环境的时间步，内层是每个时间步里扩散模型的去噪子步；把二者串起来后，每个子步都是一次可算概率的决策。</li></ul>
+<h2>怎么学</h2><p>先熟悉PPO的目标函数和Diffusion Policy的去噪采样，再读DPPO第4节的推导；官方代码提供Robomimic和装配任务的配置。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2409.00588" rel="noopener">https://arxiv.org/abs/2409.00588</a>（标题、作者（Allen Z. Ren等九位）、v1提交日期2024-09-01；摘要中用策略梯度微调扩散策略、此前猜测PG对扩散策略效率低、在常见基准上最强、结构化流形上探索与训练稳定、像素观测仿真任务、零样本部署到真机长程多阶段操作。两层MDP细节、技巧列表、机构和ICLR 2025为凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DPPO%E6%89%A9%E6%95%A3%E7%AD%96%E7%95%A5RL%E5%BE%AE%E8%B0%83%EF%BC%88dppo%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adppo%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dppo.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="hpt.html"><small>本分支上一个 · 2024.09</small><b>HPT异构预训练</b></a><a class="r" href="1x-world-model.html"><small>本分支下一个 · 2024.09</small><b>1X世界模型</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

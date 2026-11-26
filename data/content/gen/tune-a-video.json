@@ -1,0 +1,30 @@
+{
+  "id": "tune-a-video",
+  "who": "Jay Zhangjie Wu, Yixiao Ge, Xintao Wang, Weixian Lei, Yuchao Gu, Yufei Shi, Wynne Hsu, Ying Shan et al. · 新加坡国立大学Show Lab / 腾讯ARC Lab",
+  "venue": "ICCV 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2212.11565"},
+    {"label": "代码", "url": "https://github.com/showlab/Tune-A-Video"}
+  ],
+  "aka": ["Tune-A-Video", "单样本视频微调", "One-Shot Video Tuning"],
+  "problem": "像[[make-a-video]]、[[imagen-video]]那样用海量视频训练文生视频模型代价极高；能不能直接借用已有的文生图模型，只用一段视频就学会生成相似动作的新视频？",
+  "idea": "把预训练的Stable Diffusion“膨胀”成视频模型：二维卷积按帧共享，自注意力改成看首帧和前一帧的时空注意力；只用一段视频和它的描述微调注意力中少量参数，推理时用这段视频的DDIM反演噪声做结构引导。",
+  "impact": "提出“单样本视频微调”这一设定，显示文生图模型稍加改造就能产生连贯的视频片段，引出大量基于图像扩散模型做视频编辑、视频生成的免训练和轻量微调工作，也是[[animatediff]]这类“给图像模型加时间模块”路线的前奏。",
+  "method": "作者先有两点观察：文生图模型能画出表示动作的静态画面；而把同一模型同时生成多张图时，如果让它们互相“看见”，内容一致性出奇地好。\n\n据此对[[stable-diffusion]]做三处改造：\n- **按帧共享的空间层**：二维卷积与交叉注意力对每一帧独立使用原有权重。\n- **稀疏因果时空注意力**：把每帧的自注意力改为“查询来自当前帧，键和值来自第一帧和上一帧”，用较低计算量把帧与帧联系起来（见[[c:self-attention]]）。\n- **时间注意力层**：新增沿时间轴的注意力。\n\n**单样本微调**：给定一段视频（如“一个人在滑雪”）和描述，只更新注意力中的查询投影和新增的时间注意力，其余冻结。**推理**：先用[[ddim]]反演把原视频变成初始噪声，再用修改后的提示（如“蜘蛛侠在沙滩上滑雪”）采样，结果保留原视频的运动结构，换上新的主体和场景。",
+  "limits": [
+    {"text": "每个新视频都要单独微调，模型只记住这一段的运动，无法从文字生成全新的动作。", "solved_by": ["animatediff", "svd"]},
+    {"text": "片段短、帧数少，帧间仍有闪烁，大幅度运动时一致性下降。", "solved_by": ["video-ldm", "sora"]}
+  ],
+  "relations": [
+    {"to": "stable-diffusion", "type": "extends", "note": "把预训练的文生图U-Net膨胀为视频模型并做轻量微调。"},
+    {"to": "ddim", "type": "uses", "note": "推理时用DDIM反演原视频获得带结构信息的初始噪声。"},
+    {"to": "video-diffusion", "type": "rivals", "note": "视频扩散模型从头在视频数据上训练时空网络，本文改为借用图像模型、只用一段视频微调。"}
+  ],
+  "prereq": ["diffusion-process", "self-attention", "pretrain-finetune", "latent-space"],
+  "terms": [
+    {"t": "模型膨胀", "d": "把二维图像网络的层扩展到能处理多帧视频，同时尽量复用原来的图像权重。"},
+    {"t": "稀疏因果注意力", "d": "每一帧只与第一帧和前一帧做注意力，而不是与全部帧，以降低计算量。"}
+  ],
+  "learn": "先懂Stable Diffusion的U-Net与DDIM反演 → 读本文第3节的注意力改造 → 跑官方代码用一段自己的短视频做微调和换主体。",
+  "check": {"source": "https://arxiv.org/abs/2212.11565", "confirmed": "标题、作者、v1日期2022-12-22、摘要中单样本视频微调设定、基于预训练T2I模型、两点观察、定制的时空注意力与高效单样本微调、推理时DDIM反演提供结构引导；注意力的具体形式与可训练参数、ICCV 2023与机构来自一般了解"}
+}

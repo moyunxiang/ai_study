@@ -1,0 +1,31 @@
+{
+  "id": "d-vector",
+  "who": "Ehsan Variani, Xin Lei, Erik McDermott, Ignacio Lopez Moreno, Javier Gonzalez-Dominguez · Google",
+  "venue": "ICASSP 2014",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1109/icassp.2014.6854363"}
+  ],
+  "problem": "手机上的口令式说话人确认（例如说一句固定唤醒词来解锁）需要小而快的模型，而当时主流的i-vector依赖庞大的GMM-UBM和因子分析，计算和存储都重。",
+  "idea": "训练一个深度神经网络对训练集里的说话人做逐帧分类，之后丢掉输出层，把一段语音所有帧在最后一个隐层上的激活取平均，得到代表这个人的向量（d-vector）。",
+  "impact": "d-vector是用深度网络提取说话人嵌入的早期代表，「训练分类网络、取隐层当嵌入」的做法被x-vector、GE2E等直接继承，「d-vector」也成了神经说话人嵌入的通称之一。",
+  "method": "说话人确认要判断一段话是不是某个已注册的人说的。传统做法是[[gmm-ubm]]：先用大量人的语音训练一个通用背景模型，再为每个人做自适应；[[i-vector]]进一步用因子分析把一段语音压成几百维的向量。这些方法在手机上的口令式（文本相关）确认场景中模型较大。\n\n这篇工作的做法很直接。训练阶段，用许多说话人说同一个口令的录音训练一个前馈DNN（见[[c:mlp]]）：输入是一帧及其上下文的滤波器组特征，输出是「这帧属于训练集中哪个说话人」的分类（见[[c:softmax]]）。训练完成后去掉输出层，把一段语音所有帧在最后一个隐层的输出取平均，就是这段话的d-vector（见[[c:embedding]]）。注册时把一个人几段录音的d-vector再平均作为他的模型；测试时算新录音的d-vector与注册模型的余弦相似度，超过阈值就接受。\n\n论文在一个小规模的文本相关确认任务上比较了d-vector与i-vector，报告d-vector在小模型下表现接近，两者融合后错误率进一步下降，在有噪声时更稳健（具体数字未核对）。之后[[ge2e]]直接以端到端的损失训练这类嵌入，[[x-vector]]改用时延网络加统计池化，成为文本无关识别的主流。",
+  "limits": [
+    {"text": "按帧分类再简单平均，没有把「整段语音的嵌入要区分不同人」直接作为训练目标。", "solved_by": ["ge2e", "x-vector"]},
+    {"text": "只针对固定口令的文本相关场景，换成任意内容的文本无关识别时效果有限。", "solved_by": ["x-vector", "ecapa-tdnn"]}
+  ],
+  "relations": [
+    {"to": "i-vector", "type": "rivals", "note": "i-vector用GMM和因子分析得到说话人向量，d-vector用DNN隐层激活；论文发现两者融合效果更好。"},
+    {"to": "gmm-ubm", "type": "solves", "note": "GMM-UBM模型大、计算重，d-vector给出了更适合端侧的小模型方案。"},
+    {"to": "cd-dnn-hmm", "type": "uses", "note": "沿用当时语音识别中DNN的训练方式（帧级输入加上下文窗口、帧级分类）。"}
+  ],
+  "prereq": ["mlp", "embedding", "softmax", "classification-metrics", "waveform-spectrogram"],
+  "terms": [
+    {"t": "文本相关确认", "d": "注册和测试时都说同一句固定口令的说话人确认，例如唤醒词。"},
+    {"t": "余弦相似度", "d": "两个向量夹角的余弦，越接近1表示方向越接近。"}
+  ],
+  "aka": ["d-vector", "deep vector", "DNN说话人嵌入", "声纹d-vector"],
+  "check": {
+    "source": "https://doi.org/10.1109/icassp.2014.6854363",
+    "confirmed": "Crossref记录：标题Deep neural networks for small footprint text-dependent speaker verification、作者Variani/Lei/McDermott/Lopez Moreno/Gonzalez-Dominguez、ICASSP 2014（2014-05）。训练与取嵌入的流程、与i-vector比较和融合的结论为一般了解，未核对具体数字。"
+  }
+}

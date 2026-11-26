@@ -1,0 +1,28 @@
+{
+  "id": "admin",
+  "who": "Liyuan Liu, Xiaodong Liu, Jianfeng Gao, Weizhu Chen, Jiawei Han · UIUC / 微软",
+  "venue": "arXiv 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2004.08249"},
+    {"label": "代码", "url": "https://github.com/LiyuanLucasLiu/Transforemr-Clinic"}
+  ],
+  "aka": ["Admin初始化", "Adaptive Model Initialization", "放大效应", "amplification effect"],
+  "problem": "原版Post-LN Transformer层数一多就容易训崩，必须精心调学习率预热和优化器；大家只知道Pre-LN更稳，却说不清Post-LN到底难在哪。",
+  "idea": "分析指出根源不是梯度失衡，而是每层过度依赖残差分支、把小的参数更新放大成输出的大扰动；据此提出Admin初始化，训练初期压低残差分支的权重。",
+  "impact": "给“Post-LN难训、Pre-LN好训但效果略差”这件事提供了一个被广泛引用的解释，也是后来DeepNorm等深层稳定化方法的直接前身。",
+  "method": "当时有两种放LayerNorm的方式：原版[[transformer]]把归一化放在残差相加之后（Post-LN），[[pre-ln]]把它挪到子层之前。前者最终效果常常更好，但深了就训不动；后者稳但上限略低。\n\n作者从实验和理论两方面拆这个问题。他们发现梯度在各层之间不平衡并不是主因；真正的问题是一种“放大效应”：在Post-LN里，每层输出很大程度上由残差分支（注意力或前馈子层）决定，参数稍一更新，扰动就逐层累积放大，模型输出剧烈变化，训练因此不稳定。可如果让模型太少依赖残差分支，又会限制它的表达能力。\n\nAdmin（自适应模型初始化）的做法是：先跑一次前向传播，估计每层输出的方差，再据此给残差连接里的捷径分支乘上一个缩放系数，让训练初期各层对残差分支的依赖变轻；训练后期这些系数可学习，模型照样能发挥Post-LN的潜力。作者称Admin更稳、收敛更快、最终效果更好。",
+  "limits": [
+    {"text": "需要先做一次前向统计来设定缩放系数，实现比直接换成Pre-LN麻烦，深到几百层以上时是否仍然够稳没有验证。", "solved_by": ["deepnet"]}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "extends", "note": "研究的对象是原版Transformer的Post-LN结构为什么难训。"},
+    {"to": "pre-ln", "type": "rivals", "note": "Pre-LN靠挪动归一化位置换来稳定、但效果略差；Admin保留Post-LN，改用初始化解决稳定性。"},
+    {"to": "layernorm", "type": "uses", "note": "分析的核心变量是LayerNorm相对残差连接的位置。"}
+  ],
+  "prereq": ["residual-connection", "normalization-layer", "initialization", "transformer-block", "learning-rate"],
+  "terms": [
+    {"t": "Post-LN / Pre-LN", "d": "LayerNorm放在残差相加之后叫Post-LN，放在子层输入之前叫Pre-LN。"}
+  ],
+  "learn": "先弄清[[pre-ln]]讲的两种归一化位置；读本文关于放大效应的分析和Admin初始化的定义；动手：在一个12层以上的小Transformer上分别用Post-LN、Pre-LN、Post-LN+Admin训练，比较前几百步的损失曲线。",
+  "check": {"source": "https://arxiv.org/abs/2004.08249", "confirmed": "标题、5位作者、arXiv首次提交2020-04-17；摘要中“梯度失衡不是根因”“残差分支依赖造成放大效应”和Admin的定义及代码地址。"}
+}

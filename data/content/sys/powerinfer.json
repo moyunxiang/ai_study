@@ -1,0 +1,24 @@
+{
+ "id": "powerinfer",
+ "who": "Yixin Song, Zeyu Mi, Haotong Xie, Haibo Chen · 上海交通大学",
+ "venue": "SOSP 2024",
+ "aka": ["热冷神经元", "hot/cold neurons", "激活稀疏", "activation sparsity", "CPU-GPU混合推理", "消费级显卡推理"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2312.12456"},
+  {"label": "GitHub", "url": "https://github.com/SJTU-IPADS/PowerInfer"}
+ ],
+ "problem": "一块RTX 4090只有24GB显存，放不下几十上百亿参数的模型；llama.cpp把放不下的层交给CPU算，速度被CPU拖慢很多。",
+ "idea": "神经元的激活呈幂律分布：少数“热”神经元几乎对任何输入都会激活，多数“冷”神经元只偶尔激活。把热神经元常驻GPU，冷神经元留在CPU上算，并用小预测器提前判断哪些神经元这次会激活、只算它们。",
+ "impact": "把“利用激活稀疏做端侧/单卡推理”变成可用的系统，在消费级显卡上把大模型推理速度提高了数倍，也推动了让模型激活更稀疏的研究。",
+ "method": "[[llama-cpp]]支持把一部分层放GPU、其余放CPU，但按层切分时CPU那部分仍要算完整的矩阵乘。[[flexgen]]靠大批量提高吞吐，却不照顾单个请求的延迟。\n\nPowerInfer的观察是：在ReLU这类激活函数下，前馈层里每次只有一小部分神经元输出非零；而且在大量输入上统计，神经元被激活的频率呈**幂律分布**——少数热神经元几乎总被激活，其余冷神经元随输入变化。于是：**离线**先统计每个神经元的激活频率，按GPU显存把最热的那部分权重预先放到GPU上，冷的留在CPU内存；**在线**每层先用一个很小的**自适应预测器**猜这次哪些神经元会激活，GPU和CPU各自只计算本地被预测激活的那些神经元，最后合并结果，CPU与GPU之间几乎不必搬权重。配套实现了按神经元粒度跳过计算的稀疏算子。\n\n摘要报告：在单块RTX 4090上，对多种模型（包括[[opt]]-175B）最多比llama.cpp快11.69倍且精度不变；OPT-30B上达到服务器级A100生成速度的82%。",
+ "limits": [
+  {"text": "依赖ReLU带来的激活稀疏；主流LLM用SwiGLU等激活，天然稀疏性弱，需要先把模型改造（如换成ReLU再续训）才能获得同样的加速。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "llama-cpp", "type": "solves", "note": "llama.cpp按层把放不下的部分交给CPU，速度受CPU拖累；PowerInfer按神经元冷热分配，CPU只算少量冷神经元，最多快11.69倍。"},
+  {"to": "flexgen", "type": "rivals", "note": "FlexGen用大批量换吞吐、延迟高；PowerInfer面向单用户低延迟的本地推理。"},
+  {"to": "opt", "type": "uses", "note": "以ReLU激活的OPT系列（直到175B）作为主要评测模型之一。"}
+ ],
+ "prereq": ["neuron-activation", "mlp", "cpu-gpu", "memory-bandwidth", "throughput-latency"],
+ "check": {"source": "https://arxiv.org/abs/2312.12456", "confirmed": "标题、四位作者、v1日期2023-12-16；摘要：单块消费级GPU、神经元激活幂律分布、热神经元预载GPU冷神经元在CPU计算、自适应预测器与神经元感知稀疏算子、RTX 4090上最多比llama.cpp快11.69倍、包括OPT-175B、OPT-30B达到A100的82%。上海交大IPADS、SOSP 2024、“依赖ReLU激活稀疏”为对正文与后续讨论的一般了解。"}
+}

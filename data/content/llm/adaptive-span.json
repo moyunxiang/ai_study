@@ -1,0 +1,25 @@
+{
+  "id": "adaptive-span",
+  "who": "Sainbayar Sukhbaatar, Edouard Grave, Piotr Bojanowski, Armand Joulin · Facebook AI Research",
+  "venue": "ACL 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1905.07799"},
+    {"label": "代码", "url": "https://github.com/facebookresearch/adaptive-span"}
+  ],
+  "aka": ["Adaptive Span", "自适应跨度", "可学习注意力窗口"],
+  "problem": "自注意力的计算和显存随序列长度平方增长，Transformer很难看超过一千个token；字符级语言模型的依赖却常常跨越几千个字符。",
+  "idea": "让每个注意力头自己学一个“看多远”的跨度：用一个可微的软遮罩把超出跨度的位置权重逐渐压到零，跨度本身随训练调整，并对过长的跨度加惩罚。",
+  "impact": "实验显示底层的头只看很近的上下文、高层少数头才看得很远，从而以较少的计算把上下文扩到8000字符，是“不同头不同窗口”这类长上下文设计的早期代表。",
+  "method": "在[[transformer-xl]]式的字符级语言模型上，作者把每个注意力头的注意力权重乘以一个软遮罩 `m_z(x) = clamp((R + z − x)/R, 0, 1)`，其中x是与当前位置的距离，z是这个头可学习的跨度，R控制边缘的柔和程度：距离小于z的位置照常参与注意力，超过z以后权重线性衰减到零。z通过梯度学习，损失里再加一项对z的L1惩罚，鼓励头尽量看得短。由于超出跨度的位置可以直接不算，计算量和显存随实际学到的跨度而不是最大上下文增长。\n\n训练出来的模型呈现出清晰的分工：低层的大多数头跨度只有几十个字符，高层少数头的跨度达到数千。作者在text8和enwik8字符级语言建模上用最多8000字符的上下文取得了当时的最好成绩，同时减少了浮点运算量。它与同期[[sparse-transformer]]的固定稀疏模式形成对照：一个是人工规定看哪里，一个是让每个头学自己的窗口长度。",
+  "limits": [
+    {"text": "跨度只能决定“看多远”，窗口内仍是稠密注意力；遇到需要所有头都看全局的任务时节省有限，也只在字符级语言建模上验证。", "solved_by": ["longformer", "bigbird"]}
+  ],
+  "relations": [
+    {"to": "transformer-xl", "type": "uses", "note": "沿用Transformer-XL的片段缓存机制来支持长上下文的训练和推理。"},
+    {"to": "transformer", "type": "solves", "note": "缓解自注意力随长度平方增长、难以处理上千token的问题：每个头只在自己学到的跨度内计算。"},
+    {"to": "sparse-transformer", "type": "rivals", "note": "同期的长序列方案：Sparse Transformer用人工设计的固定稀疏模式，本文让每个头学习自己的窗口长度。"}
+  ],
+  "prereq": ["self-attention", "attention-concept", "language-model", "regularization", "big-o"],
+  "learn": "先读[[transformer-xl]]的片段缓存；读本文第2节软遮罩函数的定义和跨度可视化图；动手：在一个小字符级模型上给每个头加可学习跨度，训练后画出各层各头的跨度。",
+  "check": {"source": "https://arxiv.org/abs/1905.07799", "confirmed": "标题、4位作者、arXiv首次提交2019-05-19；摘要与HTML正文引言中的平方复杂度问题、8k字符上下文、text8/enwik8最好成绩、低层跨度小高层跨度大、使用Transformer-XL缓存和相对位置。软遮罩公式与ACL 2019为一般了解，未逐项对照。"}
+}

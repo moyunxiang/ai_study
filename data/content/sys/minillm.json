@@ -1,0 +1,27 @@
+{
+ "id": "minillm",
+ "who": "Yuxian Gu, Li Dong, Furu Wei, Minlie Huang · 清华大学, 微软研究院",
+ "venue": "ICLR 2024",
+ "aka": ["反向KL蒸馏", "reverse KL distillation", "LLM知识蒸馏", "白盒蒸馏", "white-box KD"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2306.08543"},
+  {"label": "GitHub", "url": "https://github.com/microsoft/LMOps/tree/main/minillm"}
+ ],
+ "problem": "标准知识蒸馏最小化教师与学生分布的正向KL，对分类模型很好；但生成任务里输出空间巨大，小模型被迫去覆盖教师分布的每个角落，结果在教师认为不太可能的地方也分配了概率，生成质量差。",
+ "idea": "把目标换成反向KL `KL(学生‖教师)`，让学生只集中在教师高概率的区域；这个目标要在学生自己生成的文本上计算，于是用策略梯度做在策略优化。",
+ "impact": "是白盒LLM蒸馏的早期代表作，与同期的GKD一起把“在策略蒸馏”带进LLM，后来的在策略蒸馏OPD正是这一路线的推广。",
+ "method": "[[distillation]]让学生拟合教师输出的软标签，等价于最小化正向KL `KL(p‖q_θ)`（p是教师、q是学生）。正向KL在p大而q小的地方惩罚很重，所以学生会把概率摊开去覆盖教师分布的所有模式（mode-covering）。学生容量远小于教师时，这意味着在教师几乎不会说的句子上也放了概率，生成时就容易采样出低质量文本（见[[c:kl-divergence]]）。\n\nMiniLLM改为最小化反向KL `KL(q_θ‖p)`：它在q大而p小时惩罚重，学生倾向于只抓住教师的主要模式（mode-seeking），生成更“准”。但反向KL的期望是在学生自己的分布下取的，必须用学生采样的序列来估计，梯度就成了强化学习式的策略梯度（教师对每个token的对数概率扮演奖励）。论文用三个技巧稳定训练：把整句的回报拆成逐步的单步项降低方差；采样时混入一部分教师分布，防止早期学生乱生成被“奖励黑客”；对长度做归一化，避免偏向短回答。\n\n摘要称，在指令跟随设置下，MiniLLM比基线生成更准确、整体质量更高、暴露偏差更低、校准更好，方法在120M到13B参数的多个模型族上都有效。",
+ "limits": [
+  {"text": "需要教师的完整输出概率（白盒），无法直接蒸馏只提供API的闭源模型；在策略采样也让训练比普通蒸馏贵不少。", "solved_by": ["on-policy-distill"]}
+ ],
+ "relations": [
+  {"to": "distillation", "type": "solves", "note": "标准蒸馏的正向KL让小生成模型过度覆盖教师分布；MiniLLM改用反向KL缓解。"},
+  {"to": "distilbert", "type": "extends", "note": "DistilBERT等把蒸馏用于编码器理解模型；MiniLLM把白盒蒸馏推广到生成式大模型。"},
+  {"to": "ppo", "type": "uses", "note": "反向KL的优化写成策略梯度形式，借鉴PPO等强化学习方法的稳定化技巧。"}
+ ],
+ "prereq": ["knowledge-distillation", "kl-divergence", "policy-gradient-concept", "autoregressive", "decoding-sampling"],
+ "terms": [
+  {"t": "暴露偏差", "d": "训练时模型总在真实前文上预测下一个词，生成时却要接着自己产生的前文写，前面错一点后面越错越多。"}
+ ],
+ "check": {"source": "https://arxiv.org/abs/2306.08543", "confirmed": "作者、v1日期2023-06-14；摘要：正向KL换反向KL、防止学生高估教师低概率区域、推导在策略优化、指令跟随下质量/暴露偏差/校准更好、120M到13B。arXiv当前版本标题为“MiniLLM: On-Policy Distillation of Large Language Models”，登记表用ICLR 2024发表标题“MiniLLM: Knowledge Distillation of Large Language Models”（据一般了解）。单步分解、教师混合采样、长度归一化三个技巧为对正文的一般了解，未逐项对照；机构为一般了解。"}
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DeBERTaV3（2021） · AI脉络</title>
+<meta name="description" content="ELECTRA的替换词检测比掩码语言模型更省样本，但它的生成器和判别器共享词嵌入时，两者的损失把嵌入往相反方向拉（“拔河”），拖慢训练、损害效果。 在DeBERTa上改用替换词检测预训练，并提出梯度解耦嵌入共享：判别器复用生成器的嵌入，但判别器的梯度只更新一个额外的残差嵌入，不回传到共享部分。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/debertav3.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DeBERTaV3（2021）">
+<meta property="og:description" content="ELECTRA的替换词检测比掩码语言模型更省样本，但它的生成器和判别器共享词嵌入时，两者的损失把嵌入往相反方向拉（“拔河”），拖慢训练、损害效果。 在DeBERTa上改用替换词检测预训练，并提出梯度解耦嵌入共享：判别器复用生成器的嵌入，但判别器的梯度只更新一个额外的残差嵌入，不回传到共享部分。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/debertav3.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/debertav3">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 预训练目标</div>
+<h1>DeBERTaV3</h1>
+<div class="full">DeBERTaV3: Improving DeBERTa using ELECTRA-Style Pre-Training with Gradient-Disentangled Embedding Sharing</div>
+<div class="meta"><span>2021.11</span><span>论文</span><span>延伸</span><span>ICLR 2023</span><span>Pengcheng He, Jianfeng Gao, Weizhu Chen · 微软</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2111.09543" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/microsoft/DeBERTa" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/debertav3">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>ELECTRA的替换词检测比掩码语言模型更省样本，但它的生成器和判别器共享词嵌入时，两者的损失把嵌入往相反方向拉（“拔河”），拖慢训练、损害效果。</p></div><div><h4>方法</h4><p>在DeBERTa上改用替换词检测预训练，并提出梯度解耦嵌入共享：判别器复用生成器的嵌入，但判别器的梯度只更新一个额外的残差嵌入，不回传到共享部分。</p></div><div><h4>影响</h4><p>成为BERT类编码器在自然语言理解任务上长期最强的开源基线之一，直到ModernBERT等新一代编码器出现前，分类、抽取类比赛和工业系统常用它。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/electra.html">ELECTRA替换词检测</a>的做法是：一个小生成器先把句子里被遮住的词填成看起来合理的词，再让判别器判断每个位置的词是原词还是被替换过的。ELECTRA让生成器和判别器共享词嵌入，作者分析发现，生成器希望语义相近的词嵌入靠近（便于猜词），判别器却需要把它们区分开（便于识别替换），两个梯度互相拉扯。</p><p><b>梯度解耦嵌入共享（GDES）</b>：判别器的嵌入等于生成器嵌入加一个残差项 <code>E_D = sg(E_G) + E_Δ</code>，sg表示停止梯度。生成器照常更新 <code>E_G</code>，判别器的梯度只更新 <code>E_Δ</code>。这样既保留共享带来的样本效率，又消除拔河。模型主体仍用<a class="ln" href="../n/deberta.html">DeBERTa解耦注意力</a>的解耦注意力。</p><p>结果：在与DeBERTa相同的预训练设置下，DeBERTaV3 Large在GLUE八个任务上平均91.37%，比DeBERTa高1.37个点、比ELECTRA高1.91个点；多语言版mDeBERTa Base在XNLI零样本跨语言上达到79.8%，比<a class="ln" href="../n/xlm-r.html">XLM-R</a> Base高3.6个点。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍是只有512左右上下文的双向编码器，不能生成文本，在大语言模型兴起后主要用于分类、检索和抽取等理解任务。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/modernbert.html">ModernBERT</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/xlm-r.html">XLM-R</a><span class="yr">2019.11 · LLM</span><div class=nt>多语言版mDeBERTa在XNLI零样本跨语言上比XLM-R Base高3.6个点。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/electra.html">ELECTRA替换词检测</a><span class="yr">2020.03 · LLM</span><div class=nt>解决ELECTRA生成器与判别器共享嵌入时的梯度拔河问题。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/deberta.html">DeBERTa解耦注意力</a><span class="yr">2020.06 · LLM</span><div class=nt>保留DeBERTa的解耦注意力结构，把预训练目标从掩码语言模型换成替换词检测。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/modernbert.html">ModernBERT</a><span class="yr">2024.12 · LLM</span><div class=nt>仍是只有512左右上下文的双向编码器，不能生成文本，在大语言模型兴起后主要用于分类、检索和抽取等理解任务。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/embedding.html">嵌入向量</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/self-supervised.html">自监督学习</a> <a class="chip c" href="../c/benchmark.html">基准、排行榜与SOTA</a></p>
+<h2>本篇术语</h2><ul><li><b>替换词检测（RTD）</b>　ELECTRA提出的预训练任务：判断句子中每个词是原词还是被生成器替换过的词，每个位置都提供训练信号。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/electra.html">ELECTRA替换词检测</a>和<a class="ln" href="../n/deberta.html">DeBERTa解耦注意力</a>；读本文对嵌入拔河的分析和GDES的定义；动手：用DeBERTaV3-base在一个文本分类任务上微调，和RoBERTa-base比较。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2111.09543" rel="noopener">https://arxiv.org/abs/2111.09543</a>（标题、3位作者、arXiv首次提交2021-11-18；摘要中RTD替换MLM、嵌入共享的拔河动态、梯度解耦嵌入共享、GLUE平均91.37%（比DeBERTa高1.37、比ELECTRA高1.91）、mDeBERTa Base XNLI 79.8%（比XLM-R Base高3.6）。E_D公式、上下文长度和ICLR 2023为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DeBERTaV3%EF%BC%88debertav3%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adebertav3%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/debertav3.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="icl-bayesian.html"><small>本分支上一个 · 2021.11</small><b>ICL即隐式贝叶斯推断</b></a><a class="r" href="glam.html"><small>本分支下一个 · 2021.12</small><b>GLaM</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

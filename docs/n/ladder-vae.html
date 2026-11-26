@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Ladder VAE层级推断（2016） · AI脉络</title>
+<meta name="description" content="只有一层隐变量时表达力有限；堆多层随机隐变量后很难训练，上层隐变量常常完全不被使用，层数加了似然却几乎不涨。 推断时先自下而上提取特征，再自上而下用生成模型的先验去逐层修正每一层的近似后验，相当于让推断网络和生成网络共享自上而下的路径；并配合批归一化和KL预热。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ladder-vae.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Ladder VAE层级推断（2016）">
+<meta property="og:description" content="只有一层隐变量时表达力有限；堆多层随机隐变量后很难训练，上层隐变量常常完全不被使用，层数加了似然却几乎不涨。 推断时先自下而上提取特征，再自上而下用生成模型的先验去逐层修正每一层的近似后验，相当于让推断网络和生成网络共享自上而下的路径；并配合批归一化和KL预热。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ladder-vae.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ladder-vae">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 隐变量与标准化流</div>
+<h1>Ladder VAE层级推断</h1>
+<div class="full">Ladder Variational Autoencoders</div>
+<div class="meta"><span>2016.02</span><span>论文</span><span>延伸</span><span>NeurIPS 2016</span><span>Casper Kaae Sønderby, Tapani Raiko, Lars Maaløe, Søren Kaae Sønderby, Ole Winther · 丹麦技术大学 / 哥本哈根大学 / 阿尔托大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1602.02282" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/ladder-vae">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/vae.html">变分自编码器VAE</a>只有一层隐变量时表达力有限；堆多层随机隐变量后很难训练，上层隐变量常常完全不被使用，层数加了似然却几乎不涨。</p></div><div><h4>方法</h4><p>推断时先自下而上提取特征，再自上而下用生成模型的先验去逐层修正每一层的近似后验，相当于让推断网络和生成网络共享自上而下的路径；并配合批归一化和KL预热。</p></div><div><h4>影响</h4><p>给出了训练多层随机隐变量VAE的基本配方，“自下而上+自上而下”的推断结构被后来的<a class="ln" href="../n/nvae.html">NVAE层级VAE</a>、<a class="ln" href="../n/vdvae.html">VDVAE极深层级VAE</a>等层级VAE直接沿用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>普通的多层VAE的推断网络是纯自下而上的：从图像x先推第一层隐变量z₁，再从z₁推z₂……每一层只看下面传上来的信息。问题是生成模型是自上而下的（先采z_L，再一层层生成），两条路径各走各的，上层的近似后验很容易退化成和先验一样，KL项变成0，等于这一层没用上（即<a class="ln" href="../n/posterior-collapse.html">后验坍塌与KL退火</a>所说的现象）。</p><p>Ladder VAE借鉴<a class="ln" href="../n/ladder-networks.html">梯形网络半监督学习</a>的结构：先做一遍确定性的自下而上计算，得到每层的“似然信号”（一个高斯的均值和方差）；然后自上而下走一遍，把这一层由生成模型给出的先验高斯与自下而上的似然高斯按精度加权合成，作为这一层的近似后验。这样后验从一开始就和先验对齐，只在数据有证据时才偏离。</p><p>论文还发现两点训练技巧对多层随机变量模型至关重要：批归一化，以及训练初期把KL项的权重从0逐渐升到1（确定性预热）。在MNIST等数据集上，它给出了更高的对数似然和更紧的下界，并且用上了更深、更分散的隐变量层级。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>实验停留在MNIST、OMNIGLOT这类小图，层级VAE生成自然图像的质量仍明显不如同期GAN。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/nvae.html">NVAE层级VAE</a> <a class="chip hue" style="--h:288" href="../n/vdvae.html">VDVAE极深层级VAE</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/vae.html">变分自编码器VAE</a><span class="yr">2013.12 · 生成</span><div class=nt>把单层隐变量VAE推广到多层随机隐变量，并重新设计推断网络。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/ladder-networks.html">梯形网络半监督学习</a><span class="yr">2015.07 · 基础</span><div class=nt>借用梯形网络先自下而上、再自上而下合并信息的结构来做近似推断。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/posterior-collapse.html">后验坍塌与KL退火</a><span class="yr">2015.11 · 生成</span><div class=nt>用自上而下的后验修正和KL预热，缓解上层隐变量不被使用的问题。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/nvae.html">NVAE层级VAE</a><span class="yr">2020.07 · 生成</span><div class=nt>实验停留在MNIST、OMNIGLOT这类小图，层级VAE生成自然图像的质量仍明显不如同期GAN。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/vdvae.html">VDVAE极深层级VAE</a><span class="yr">2020.11 · 生成</span><div class=nt>实验停留在MNIST、OMNIGLOT这类小图，层级VAE生成自然图像的质量仍明显不如同期GAN。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/elbo.html">变分推断与ELBO</a> <a class="chip c" href="../c/latent-variable.html">隐变量模型</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/gaussian.html">高斯分布</a> <a class="chip c" href="../c/reparameterization.html">重参数化技巧</a></p>
+<h2>本篇术语</h2><ul><li><b>KL预热</b>　训练开始时先不让KL惩罚起作用，再逐步把它的权重升到1，避免隐变量一开始就被压成和先验一样。</li></ul>
+<h2>怎么学</h2><p>先读VAE和ELBO → 读本文推断模型的图和精度加权合并公式 → 对比NVAE中的残差层级结构。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1602.02282" rel="noopener">https://arxiv.org/abs/1602.02282</a>（标题、五位作者、v1日期2016-02-06、摘要中递归用数据相关的似然修正生成分布、类似梯形网络、更好的对数似然与更紧下界、更深更分散的隐变量层级、批归一化与确定性预热的重要性；机构、NeurIPS 2016、精度加权合并的细节与MNIST/OMNIGLOT数据集来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Ladder%20VAE%E5%B1%82%E7%BA%A7%E6%8E%A8%E6%96%AD%EF%BC%88ladder-vae%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aladder-vae%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ladder-vae.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="pixelrnn.html"><small>本分支上一个 · 2016.01</small><b>PixelRNN / PixelCNN</b></a><a class="r" href="bigan.html"><small>本分支下一个 · 2016.05</small><b>BiGAN / ALI</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

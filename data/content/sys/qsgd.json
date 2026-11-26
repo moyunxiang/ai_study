@@ -1,0 +1,26 @@
+{
+ "id": "qsgd",
+ "who": "Dan Alistarh, Demjan Grubic, Jerry Li, Ryota Tomioka, Milan Vojnovic · 苏黎世联邦理工/IST Austria, MIT, 微软研究院",
+ "venue": "NeurIPS 2017",
+ "aka": ["Quantized SGD", "梯度量化", "gradient quantization", "梯度压缩", "gradient compression", "通信压缩"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1610.02132"}
+ ],
+ "problem": "并行SGD的主要障碍是节点间传梯度的通信量；已有的“只传量化梯度”的启发式方法（如1-bit SGD）实践中有效，但不保证收敛，也不知道是否最优。",
+ "idea": "把每个梯度分量随机舍入到少数几个等级上，使量化后的梯度仍是原梯度的无偏估计，再用高效的整数编码传输；等级数可调，在压缩率和收敛速度之间连续折中，并有收敛证明。",
+ "impact": "为梯度压缩提供了带理论保证的基本框架，与后来的Top-k稀疏化、PowerSGD等一起构成低通信分布式训练的主要比较对象。",
+ "method": "[[parameter-server]]和All-Reduce式数据并行都要每步交换与模型同样大的梯度。用32位浮点传几亿个分量，网络常常比GPU算得慢。\n\nQSGD对梯度向量`v`的每个分量做**随机量化**：先除以`‖v‖₂`归一化到[0,1]区间，再在s个等级之间随机舍入——例如落在第l级和第l+1级之间时，按与两端的距离成比例的概率取其中之一。这样期望恰好等于原值，量化后的梯度是**无偏**的，只是方差变大，论文给出方差上界，从而能沿用标准的SGD收敛分析（见[[c:sgd-minibatch]]）。传输时只需发送范数、每个分量的符号和等级，配合Elias整数编码，大部分分量为0时比特数还能进一步降低；论文称每次迭代的通信比特数可以低于模型维度的线性量级，并在渐近意义下达到最优。等级数s越大越接近原梯度、收敛越快，s越小越省带宽。\n\n摘要报告：在16块GPU上用QSGD训练ImageNet上的ResNet-152，达到完整精度的速度快1.8倍；存在一组通用参数，在已知的各种网络结构上量化后精度保持或略有提高。实验还覆盖了语音识别。",
+ "limits": [
+  {"text": "量化增加梯度方差，比特压得太低时需要更多步数才能收敛；与All-Reduce的环形求和结合并不直接，因为量化值相加后需要重新编码。", "solved_by": ["diloco"]}
+ ],
+ "relations": [
+  {"to": "parameter-server", "type": "solves", "note": "参数服务器式训练每步要传完整的32位梯度；QSGD把每个分量压到几个比特，直接减少通信量。"},
+  {"to": "distbelief", "type": "extends", "note": "延续DistBelief以来的数据并行SGD，专攻其中节点间的通信瓶颈。"},
+  {"to": "resnet", "type": "uses", "note": "主要实验之一是在16块GPU上训练ImageNet的ResNet-152。"}
+ ],
+ "prereq": ["sgd-minibatch", "distributed-training", "expectation-variance", "quantization-concept"],
+ "terms": [
+  {"t": "无偏估计", "d": "一个随机量的期望恰好等于要估计的真值。随机舍入的梯度虽然每次都有误差，但平均下来不偏不倚，所以SGD的收敛理论仍然适用。"}
+ ],
+ "check": {"source": "https://arxiv.org/abs/1610.02132", "confirmed": "标题、五位作者、v1日期2016-10-07；摘要：通信是并行SGD瓶颈、已有量化启发式不保证收敛、QSGD保证收敛、压缩与收敛可调、每次迭代亚线性比特、渐近最优通信、图像分类与语音识别实验、16 GPU上ResNet-152在ImageNet上快1.8倍、通用参数下精度保持或略升。随机舍入与Elias编码细节、NeurIPS 2017与机构为对正文的一般了解。"}
+}

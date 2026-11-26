@@ -1,0 +1,23 @@
+{
+ "id": "splitwise",
+ "who": "Pratyush Patel, Esha Choukse, Chaojie Zhang, Aashaka Shah, Íñigo Goiri, Saeed Maleki, Ricardo Bianchini · 华盛顿大学, 微软",
+ "venue": "ISCA 2024",
+ "aka": ["阶段拆分", "phase splitting", "预填充-解码分离", "PD分离", "prefill-decode disaggregation", "分离式推理"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2311.18677"}
+ ],
+ "problem": "一次LLM请求分两段：处理提示词的预填充是计算密集的，逐个生成token的解码是访存密集的。两段挤在同一台机器上，解码阶段用不满最新GPU的算力，却同样花着最贵的硬件和电力。",
+ "idea": "把一次请求的两个阶段放到不同的机器池上：预填充池用算力强的GPU，解码池可以用更便宜、更省电的GPU；预填充算完的KV缓存通过集群里的高速互连传给解码机器。",
+ "impact": "与DistServe同期，确立了“预填充—解码分离”这一推理集群设计，它随后成为Mooncake、NVIDIA Dynamo、llm-d等大规模推理系统的标准做法。",
+ "method": "作者基于微软生产环境中的两类LLM服务做了大量测量，确认两个阶段的特性截然不同：**预填充**一次并行处理全部提示词token，算力利用率高，对应首token延迟；**解码**每步只生成一个token，要把权重和KV缓存从显存读一遍，算力大量闲置（见[[c:kv-cache]]与[[c:memory-bandwidth]]），对应逐token延迟。即便用了[[orca-serving]]的连续批处理和[[vllm]]的显存管理，混在一起时仍会互相干扰，而且解码阶段并不需要最新GPU的全部算力，功耗也更低。\n\nSplitwise据此把集群拆成**提示池**和**token池**，必要时还有一个可以动态改变角色的混合池。请求先在提示池完成预填充，再把生成的KV缓存通过GPU集群的高速后端互连（InfiniBand）逐层流式传到token池的机器，传输与计算重叠以隐藏延迟。两个池可以用同一种GPU，也可以用不同代的GPU（如[[h100]]做预填充、[[a100]]做解码），按吞吐、成本、功耗三个目标分别配置规模。\n\n摘要报告：与当时的设计相比，可以在成本降低20%的情况下吞吐提高1.4倍；或在相同成本与功耗预算下吞吐提高2.35倍。",
+ "limits": [
+  {"text": "KV缓存要在机器之间传输，对互连带宽要求高；上下文很长时传输量很大，两池的比例也需要随负载动态调整。", "solved_by": ["mooncake", "nvidia-dynamo"]}
+ ],
+ "relations": [
+  {"to": "orca-serving", "type": "solves", "note": "连续批处理把预填充和解码混在同一批里，两者互相干扰；Splitwise把它们拆到不同机器上。"},
+  {"to": "vllm", "type": "extends", "note": "在vLLM式的KV缓存管理之上，进一步在机器之间迁移KV缓存。"},
+  {"to": "h100", "type": "uses", "note": "实验对比了用H100与A100等不同代GPU分别承担预填充与解码的集群配置。"}
+ ],
+ "prereq": ["kv-cache", "memory-bandwidth", "throughput-latency", "training-vs-inference", "interconnect"],
+ "check": {"source": "https://arxiv.org/abs/2311.18677", "confirmed": "标题、七位作者、v1日期2023-11-30；摘要：两阶段（计算密集的提示计算、访存密集的token生成）特性不同、生成阶段用不满算力、拆到不同机器、用GPU集群高速互连传状态、同构或异构机器、面向吞吐/成本/功耗、1.4倍吞吐且成本降20%或同预算2.35倍吞吐。ISCA 2024、华盛顿大学与微软、提示池/token池/混合池与InfiniBand逐层传输为对正文的一般了解。"}
+}

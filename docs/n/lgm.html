@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>LGM多视图高斯重建（2024） · AI脉络</title>
+<meta name="description" content="这类前馈重建模型几秒就能出三维物体，但它们用三平面加体渲染，训练时渲染开销很大，分辨率被卡在较低水平，生成结果细节模糊。 换用作为三维表示：先用多视图扩散模型从文字或单张图生成四个视角的图像，再用一个非对称U-Net对这四张图逐像素预测高斯球参数，把各视角的高斯合在一起就是三维物体。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/lgm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LGM多视图高斯重建（2024）">
+<meta property="og:description" content="这类前馈重建模型几秒就能出三维物体，但它们用三平面加体渲染，训练时渲染开销很大，分辨率被卡在较低水平，生成结果细节模糊。 换用作为三维表示：先用多视图扩散模型从文字或单张图生成四个视角的图像，再用一个非对称U-Net对这四张图逐像素预测高斯球参数，把各视角的高斯合在一起就是三维物体。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/lgm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/lgm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 三维生成</div>
+<h1>LGM多视图高斯重建</h1>
+<div class="full">LGM: Large Multi-View Gaussian Model for High-Resolution 3D Content Creation</div>
+<div class="meta"><span>2024.02</span><span>论文</span><span>延伸</span><span>ECCV 2024</span><span>Jiaxiang Tang, Zhaoxi Chen, Xiaokang Chen, Tengfei Wang, Gang Zeng, Ziwei Liu · 北京大学 / 南洋理工大学S-Lab / 上海人工智能实验室</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2402.05054" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/lgm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/lrm.html">大重建模型LRM</a>这类前馈重建模型几秒就能出三维物体，但它们用三平面加体渲染，训练时渲染开销很大，分辨率被卡在较低水平，生成结果细节模糊。</p></div><div><h4>方法</h4><p>换用<a class="ln" href="../n/3dgs.html">3D高斯泼溅</a>作为三维表示：先用多视图扩散模型从文字或单张图生成四个视角的图像，再用一个非对称U-Net对这四张图逐像素预测高斯球参数，把各视角的高斯合在一起就是三维物体。</p></div><div><h4>影响</h4><p>论文报告保持5秒内生成三维物体，同时把训练分辨率提高到512，是“多视图扩散+前馈高斯重建”路线的代表开源模型，常被后续图生3D工作当作基线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>LGM把文生3D和图生3D都拆成两步：</p><ul><li><b>多视图生成</b>：文字输入时用<a class="ln" href="../n/mvdream.html">MVDream多视图扩散</a>，图片输入时用ImageDream之类的模型，生成同一物体在四个正交方向上的图像。</li><li><b>前馈高斯重建</b>：把四张图连同各自的相机射线信息（每个像素的射线方向编码）输入一个非对称U-Net。网络带有跨视图的自注意力，让各视角交换信息；输出分辨率低于输入，每个输出像素对应一个三维高斯球，预测它的位置、大小、旋转、不透明度和颜色。四个视角的高斯直接合并，就得到物体的三维高斯表示。</li></ul><p>训练时从多个新视角把高斯渲染成图像，与真值图像比较。由于高斯泼溅的光栅化渲染比体渲染快得多，训练可以用更高的分辨率。论文还用数据增强缓解多视图扩散生成的图像彼此不完全一致带来的问题，并提供把高斯转成网格的后处理。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>质量受上游多视图扩散的一致性限制，四个视角之间的细微矛盾会变成重建中的模糊或重影。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/trellis.html">TRELLIS结构化3D潜变量</a></div></li><li>输出是高斯球而不是可直接编辑的网格，转网格后几何细节和拓扑质量下降。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/trellis.html">TRELLIS结构化3D潜变量</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/3dgs.html">3D高斯泼溅</a><span class="yr">2023.08 · 视觉</span><div class=nt>以三维高斯作为输出表示，并用其快速光栅化渲染进行训练。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/lrm.html">大重建模型LRM</a><span class="yr">2023.11 · 生成</span><div class=nt>用高斯泼溅替代三平面体渲染，降低训练渲染成本，把前馈重建的分辨率提高到512。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/mvdream.html">MVDream多视图扩散</a><span class="yr">2023.08 · 生成</span><div class=nt>文生3D时用MVDream先生成四个视角的图像。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/instant3d.html">Instant3D</a><span class="yr">2023.11 · 生成</span><div class=nt>沿用“先多视图扩散、再前馈重建”的两步流水线，把重建器换成高斯U-Net。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/trellis.html">TRELLIS结构化3D潜变量</a><span class="yr">2024.12 · 生成</span><div class=nt>质量受上游多视图扩散的一致性限制，四个视角之间的细微矛盾会变成重建中的模糊或重影。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a> <a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/volume-rendering.html">体渲染</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a></p>
+<h2>本篇术语</h2><ul><li><b>前馈重建</b>　神经网络一次前向计算就直接输出三维表示，而不是对每个物体单独迭代优化几分钟到几小时。</li></ul>
+<h2>怎么学</h2><p>先读3D高斯泼溅和LRM → 读本文第3节非对称U-Net与多视图高斯融合 → 用开源代码从一张图生成高斯并导出网格。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2402.05054" rel="noopener">https://arxiv.org/abs/2402.05054</a>（标题、六位作者、v1日期2024-02-07、摘要中前馈模型分辨率受训练计算限制、提出多视图高斯特征表示与非对称U-Net骨干、借助多视图扩散从文字或单图生成多视图、5秒内生成并把训练分辨率提高到512；机构、ECCV 2024、所用MVDream/ImageDream、射线编码、数据增强与转网格后处理来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20LGM%E5%A4%9A%E8%A7%86%E5%9B%BE%E9%AB%98%E6%96%AF%E9%87%8D%E5%BB%BA%EF%BC%88lgm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Algm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/lgm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="hdit.html"><small>本分支上一个 · 2024.01</small><b>HDiT沙漏像素Transformer</b></a><a class="r" href="sdxl-lightning.html"><small>本分支下一个 · 2024.02</small><b>SDXL-Lightning渐进对抗蒸馏</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

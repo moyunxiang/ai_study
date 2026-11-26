@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DoReFa-Net低比特训练（2016） · AI脉络</title>
+<meta name="description" content="BNN、XNOR-Net把权重和激活压到1比特，但反向传播里的梯度仍是32位浮点，训练本身没法用低比特运算加速；1比特之外的任意位宽也缺少统一做法。 权重、激活和梯度三者都量化到各自可选的低位宽：前向用低比特权重与激活做位运算卷积，反向把参数梯度随机量化成低比特后再传播。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dorefa-net.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DoReFa-Net低比特训练（2016）">
+<meta property="og:description" content="BNN、XNOR-Net把权重和激活压到1比特，但反向传播里的梯度仍是32位浮点，训练本身没法用低比特运算加速；1比特之外的任意位宽也缺少统一做法。 权重、激活和梯度三者都量化到各自可选的低位宽：前向用低比特权重与激活做位运算卷积，反向把参数梯度随机量化成低比特后再传播。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dorefa-net.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dorefa-net">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 低比特量化</div>
+<h1>DoReFa-Net低比特训练</h1>
+<div class="full">DoReFa-Net: Training Low Bitwidth Convolutional Neural Networks with Low Bitwidth Gradients</div>
+<div class="meta"><span>2016.06</span><span>论文</span><span>延伸</span><span>Shuchang Zhou, Yuxin Wu, Zekun Ni, Xinyu Zhou, He Wen, Yuheng Zou · 旷视科技</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1606.06160" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/tensorpack/tensorpack/tree/master/examples/DoReFa-Net" rel="noopener">代码（tensorpack） ↗</a><a class="btn sm" href="../index.html#/n/dorefa-net">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>BNN、XNOR-Net把权重和激活压到1比特，但反向传播里的梯度仍是32位浮点，训练本身没法用低比特运算加速；1比特之外的任意位宽也缺少统一做法。</p></div><div><h4>方法</h4><p>权重、激活和梯度三者都量化到各自可选的低位宽：前向用低比特权重与激活做位运算卷积，反向把参数梯度随机量化成低比特后再传播。</p></div><div><h4>影响</h4><p>量化感知训练里常被引用的基线，它对权重先做tanh归一化再量化、对激活截断到[0,1]的写法，被许多后续低比特方法沿用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/bnn.html">二值化神经网络BNN</a>与<a class="ln" href="../n/xnor-net.html">XNOR-Net</a>证明了二值化网络可以训练，但只覆盖推理时的前向计算。DoReFa-Net的名字来自“权重（W）、激活（A）、梯度（G）”都降位宽的设想：如果梯度也是低比特的，训练时的卷积同样可以用位运算实现，从而在CPU、FPGA、ASIC、GPU上加速训练。</p><p>做法上，k比特量化函数把[0,1]内的实数四舍五入到 <code>2^k − 1</code> 个等级，反向时用<a class="ln" href="../n/ste.html">直通估计器STE</a>直接让梯度穿过取整。权重先用tanh压缩、再线性映射到[0,1]后量化；激活先截断到[0,1]再量化；参数梯度在反向传播时加入均匀噪声做<b>随机量化</b>，再送入卷积层。三者位宽可以独立选择，论文系统比较了不同组合。</p><p>摘要报告：在SVHN和ImageNet上，DoReFa-Net能达到与32位网络相当的精度；例如由AlexNet改造、1比特权重、2比特激活、6比特梯度从头训练的模型，ImageNet验证集top-1为46.1%。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>激活截断范围和量化步长都是手工固定的，位宽降到2–4比特时精度损失仍大；后来的方法把截断阈值和步长变成可学习参数。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/pact-quant.html">PACT可学习截断激活量化</a> <a class="chip hue" style="--h:192" href="../n/lsq.html">LSQ可学习步长量化</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/ste.html">直通估计器STE</a><span class="yr">2013.08 · 基础</span><div class=nt>量化函数不可导，反向传播用直通估计器近似其梯度。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/binaryconnect.html">BinaryConnect二值权重</a><span class="yr">2015.11 · 系统·效率</span><div class=nt>BinaryConnect只二值化权重，DoReFa-Net把权重、激活、梯度三者统一处理。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/bnn.html">二值化神经网络BNN</a><span class="yr">2016.02 · 系统·效率</span><div class=nt>沿用二值网络用直通估计训练离散权重的做法，扩展到低比特梯度以加速训练本身。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/xnor-net.html">XNOR-Net</a><span class="yr">2016.03 · 系统·效率</span><div class=nt>从1比特权重与激活推广到任意位宽，并且把梯度也量化。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/pact-quant.html">PACT可学习截断激活量化</a><span class="yr">2018.05 · 系统·效率</span><div class=nt>DoReFa-Net把激活固定截断在[0,1]，PACT改为每层学习截断上界α，减少低比特激活的精度损失。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/lsq.html">LSQ可学习步长量化</a><span class="yr">2019.02 · 系统·效率</span><div class=nt>激活截断范围和量化步长都是手工固定的，位宽降到2–4比特时精度损失仍大；后来的方法把截断阈值和步长变成可学习参数。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/quantization-concept.html">量化</a> <a class="chip c" href="../c/backpropagation.html">反向传播</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/floating-point.html">浮点精度：FP32、FP16、BF16、INT8</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1606.06160" rel="noopener">https://arxiv.org/abs/1606.06160</a>（标题、六位作者、v1日期2016-06-20；摘要：低比特权重与激活配合低比特参数梯度、反向随机量化梯度、位卷积可在CPU/FPGA/ASIC/GPU上实现、SVHN与ImageNet精度与32位相当、AlexNet 1比特权重2比特激活6比特梯度top-1 46.1%。tanh权重变换、激活截断、旷视机构为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DoReFa-Net%E4%BD%8E%E6%AF%94%E7%89%B9%E8%AE%AD%E7%BB%83%EF%BC%88dorefa-net%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adorefa-net%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dorefa-net.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="nccl.html"><small>本分支上一个 · 2016.04</small><b>NCCL集合通信库</b></a><a class="r" href="paddlepaddle.html"><small>本分支下一个 · 2016.08</small><b>百度飞桨PaddlePaddle</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

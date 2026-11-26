@@ -1,0 +1,29 @@
+{
+  "id": "vat",
+  "who": "Takeru Miyato, Shin-ichi Maeda, Masanori Koyama, Ken Nakae, Shin Ishii · 京都大学、ATR",
+  "venue": "ICLR 2016；期刊版TPAMI 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1507.00677"},
+    {"label": "期刊版arXiv", "url": "https://arxiv.org/abs/1704.03976"}
+  ],
+  "aka": ["VAT", "Virtual Adversarial Training", "虚拟对抗训练", "局部分布平滑", "LDS", "Local Distributional Smoothness"],
+  "problem": "[[fgsm]]式的对抗训练能让模型对微小扰动更稳，但它构造扰动时要用真实标签，只能用在有标签样本上，帮不了半监督学习。",
+  "idea": "不用标签，而用模型自己当前的预测分布作为参照，找出让预测分布变化最大（KL散度最大）的那个微小扰动方向，再惩罚这个变化，让模型在每个输入附近都“平滑”。",
+  "impact": "VAT成为深度半监督学习中一致性正则的代表方法之一，在SVHN、CIFAR-10半监督基准上是后来[[mixmatch]]等方法常比较的强基线；同样的“在最坏方向上做一致性”思路也被用于文本分类和域适应。",
+  "method": "对每个输入x，模型给出类别分布 `p(y|x)`。VAT定义“局部分布平滑度”：在半径ε内找一个扰动r，使 `KL( p(y|x) ‖ p(y|x+r) )` 最大，这个r叫虚拟对抗扰动；然后把这个最大KL当作正则项加进损失。因为参照的是模型自己的预测而不是真实标签，所以无标签样本同样可以计算，这就是“虚拟”的含义。\n\n找最大化KL的方向看似要解一个优化问题，作者用幂迭代近似：在r=0附近，KL的二阶展开由一个类Hessian矩阵决定，最坏方向是它的主特征向量；从一个随机方向出发，做一次前向和反向传播就能得到很好的近似。因此每步只需额外不超过两对前向-反向传播，代价不大。\n\n与[[entropy-minimization]]结合（期刊版称VAT+EntMin）后，摘要报告其在SVHN和CIFAR-10半监督任务上达到当时最好水平；它也可以用于纯有监督训练当正则器。和[[temporal-ensembling]]等随机扰动的一致性方法相比，VAT的扰动是有针对性地挑出来的“最坏方向”。",
+  "limits": [
+    {"text": "扰动只在输入空间的一个小球内，度量是像素空间的欧氏距离，不能表达裁剪、颜色变换这类语义保持的大变化。", "solved_by": ["fixmatch"]},
+    {"text": "需要额外的前向-反向传播和对ε的调节，在大模型上比只用数据增强的一致性方法更贵。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "fgsm", "type": "extends", "note": "把对抗训练里依赖标签的扰动方向换成依赖模型自身预测的方向，使其能用于无标签数据。"},
+    {"to": "entropy-minimization", "type": "uses", "note": "期刊版把VAT与最小熵正则结合，得到最好的半监督结果。"},
+    {"to": "ladder-networks", "type": "rivals", "note": "同期的深度半监督方法：梯形网络用去噪重构，VAT用对最坏扰动的预测一致性。"}
+  ],
+  "prereq": ["semi-supervised", "kl-divergence", "adversarial-training", "regularization", "jacobian-hessian"],
+  "terms": [
+    {"t": "幂迭代", "d": "求矩阵最大特征向量的简单办法：拿一个随机向量反复乘矩阵再归一化，方向会收敛到主特征向量。"}
+  ],
+  "learn": "先懂[[fgsm]]的对抗扰动和KL散度；读期刊版第3节的幂迭代近似；在MNIST上只留100个标签，实现VAT损失（关键就是一次随机方向的前向-反向）并与纯有监督对比。",
+  "check": {"source": "https://arxiv.org/abs/1507.00677", "confirmed": "标题Distributional Smoothing with Virtual Adversarial Training、5位作者、arXiv v1提交于2015-07-02；摘要中局部分布平滑LDS、基于KL的稳健性、命名为VAT。另查期刊版arXiv 1704.03976（2017-04-13，4位作者）：不用标签定义对抗方向、可用于半监督、近似梯度不超过两对前向反向传播、结合熵最小化在SVHN与CIFAR-10上最好。机构与ICLR 2016、TPAMI来自一般了解。"}
+}

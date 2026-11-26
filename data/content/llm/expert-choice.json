@@ -1,0 +1,26 @@
+{
+  "id": "expert-choice",
+  "who": "Yanqi Zhou, Tao Lei, Hanxiao Liu, Nan Du, Yanping Huang, Vincent Zhao, Andrew Dai, Zhifeng Chen et al. · Google",
+  "venue": "NeurIPS 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2202.09368"}
+  ],
+  "aka": ["Expert Choice", "EC路由", "expert-choice routing", "专家挑token"],
+  "problem": "MoE通常让每个token挑top-k个专家，热门专家被挤爆、冷门专家训练不足，只能靠辅助损失和容量上限硬压；而且每个token分到的计算量固定，不管它难不难。",
+  "idea": "把选择方向反过来：不是token挑专家，而是每个专家从一批token里挑自己得分最高的k个，于是每个专家的负载天然固定，一个token可以被零个、一个或多个专家处理。",
+  "impact": "从路由方式上消除负载不均，训练收敛快一倍以上；“由容器挑token”的思路后来被Mixture-of-Depths等工作借用。",
+  "method": "在[[switch-transformer]]（top-1）和[[gshard]]（top-2）里，路由器给每个token算出对各专家的分数，token按分数选专家。热门专家收到的token超过容量就要丢弃，冷门专家几乎收不到样本，所以需要额外的负载均衡损失。\n\n专家选择路由同样先算出token对专家的分数矩阵（n个token × e个专家），但对每一列（每个专家）取top-k：专家容量 `k = n × c / e`，c是平均每个token使用几个专家的容量因子。这样每个专家处理的token数恰好是k，负载均衡由构造保证；而一个重要的token可能被多个专家选中，得到更多计算，不重要的token可能一个专家都没选上，直接走残差连接。\n\n作者在与Switch top-1、GShard top-2相同计算预算下比较，称训练收敛时间缩短一半以上；在GLUE和SuperGLUE的11个任务上微调效果更好，用更小的激活成本也在11个任务中的7个上超过稠密T5。",
+  "limits": [
+    {"text": "专家要在一整批token里挑选，生成时每次只来一个新token、还看不到后面的token，直接用于自回归解码会破坏因果性，所以主流解码器LLM仍用token挑专家，负载均衡只能另想办法。", "solved_by": ["aux-loss-free"]}
+  ],
+  "relations": [
+    {"to": "switch-transformer", "type": "solves", "note": "Switch的top-1路由会负载不均、需要辅助损失和丢token；专家选择让每个专家负载固定。"},
+    {"to": "gshard", "type": "solves", "note": "同样针对GShard top-2路由的负载失衡，并在相同计算预算下与之比较。"}
+  ],
+  "prereq": ["mixture-of-experts", "softmax", "transformer-block", "params-flops"],
+  "terms": [
+    {"t": "容量因子", "d": "每个专家最多处理多少token的放大系数；容量因子为2，相当于平均每个token用两个专家。"}
+  ],
+  "learn": "先读[[switch-transformer]]的路由与负载均衡损失；读本文的路由算法和与top-k路由的对比实验；动手：用一个分数矩阵分别按行取top-k和按列取top-k，统计各专家收到的token数。",
+  "check": {"source": "https://arxiv.org/abs/2202.09368", "confirmed": "标题、作者、arXiv首次提交2022-02-18；摘要中“专家挑top-k个token”、固定桶大小、与Switch top-1和GShard top-2比较收敛快2倍以上、GLUE/SuperGLUE 11个任务、7/11个任务超过T5稠密模型。容量公式、自回归因果性问题和NeurIPS 2022为一般了解。"}
+}

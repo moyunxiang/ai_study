@@ -1,0 +1,28 @@
+{
+ "id": "thunderkittens",
+ "who": "Benjamin F. Spector, Simran Arora, Aaryan Singhal, Daniel Y. Fu, Christopher Ré · 斯坦福大学",
+ "venue": "ICLR 2025",
+ "aka": ["TK", "雷猫", "GPU内核DSL", "tile-based kernel"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2410.20399"},
+  {"label": "GitHub", "url": "https://github.com/HazyResearch/ThunderKittens"}
+ ],
+ "problem": "H100这类新GPU的算力要靠张量核心、异步拷贝等特性才能吃满，手写CUDA内核极难；即便是线性注意力这种成熟运算，现有内核也远达不到理论性能。",
+ "idea": "只给少数几个抽象：以16×16矩阵块为基本数据类型、用类似PyTorch的块运算写计算；线程块级提供异步加载与计算重叠的模板；网格级帮助隐藏启动和访存开销。",
+ "impact": "证明一个很小的嵌入式C++库就能写出与cuBLAS、FlashAttention-3相当的内核，被不少研究组用来给新架构（线性注意力、状态空间模型）写高效内核。",
+ "method": "[[flashattention-3]]要用上[[h100]]的异步特性，靠的是专家花数月手写；[[cutlass]]功能全但模板极其复杂；[[triton-lang]]易写，但对最新硬件特性的控制有限。ThunderKittens的出发点是：GPU有三层层次，每层只需要一个合适的抽象。\n\n**warp级**：基本数据结构是16×16的矩阵块（tile），与张量核心一次处理的形状对应，在块上做矩阵乘、逐元素运算、行求和等类似PyTorch的操作，寄存器和共享内存的布局由库处理。**线程块级**：提供一个“生产者—消费者”模板，一部分warp负责把下一块数据异步搬进共享内存，另一部分同时计算当前块，把访存藏在计算后面。**网格级**：帮助隐藏线程块启动、收尾和访存的开销。\n\n摘要报告：GEMM和注意力推理上与cuBLAS、FlashAttention-3持平；注意力反向比最强基线快10–40%，状态空间模型快8倍，线性注意力快14倍。",
+ "limits": [
+  {"text": "主要面向NVIDIA H100一代硬件，写内核仍需要懂GPU层次结构的C++程序员，离普通研究者用Python直接写内核还有距离。", "solved_by": ["tilelang"]}
+ ],
+ "relations": [
+  {"to": "flashattention-3", "type": "rivals", "note": "FA3是为H100手工深度优化的注意力内核；TK用通用抽象写出的注意力推理内核与之持平，反向更快。"},
+  {"to": "cutlass", "type": "rivals", "note": "同为C++模板方式写GPU内核；CUTLASS覆盖面广但复杂，TK刻意只保留少数抽象。"},
+  {"to": "triton-lang", "type": "rivals", "note": "Triton在Python里按块编程、由编译器处理细节；TK留在C++里，换取对异步拷贝等硬件特性的直接控制。"},
+  {"to": "h100", "type": "uses", "note": "抽象围绕H100的张量核心与异步数据搬运设计。"}
+ ],
+ "prereq": ["cpu-gpu", "matrix-multiplication", "memory-bandwidth", "self-attention", "efficient-attention"],
+ "terms": [
+  {"t": "warp", "d": "GPU上同步执行同一条指令的一组32个线程，是调度和使用张量核心的基本单位。"}
+ ],
+ "check": {"source": "https://arxiv.org/abs/2410.20399", "confirmed": "标题、五位作者、v1日期2024-10-27；摘要：三层抽象（16×16块、线程块级异步重叠模板、网格级隐藏启动与访存开销）、与cuBLAS和FA3持平、注意力反向快10–40%、状态空间模型8×、线性注意力14×。ICLR 2025与斯坦福Hazy Research为一般了解。"}
+}

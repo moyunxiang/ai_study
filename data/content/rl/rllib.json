@@ -1,0 +1,26 @@
+{
+  "id": "rllib",
+  "who": "Eric Liang, Richard Liaw, Philipp Moritz, Robert Nishihara, Roy Fox, Ken Goldberg, Joseph E. Gonzalez, Michael I. Jordan et al. · UC Berkeley RISELab",
+  "venue": "ICML 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1712.09381"},
+    {"label": "官网", "url": "https://rllib.io/"}
+  ],
+  "problem": "RL算法把采样、经验回放、梯度计算、参数同步等不规则的计算层层嵌套，每个研究组都为A3C、Ape-X之类的分布式算法从头写一套并行代码，难以复用、难以扩展。",
+  "idea": "按「自顶向下的层级控制」组织RL组件：由一个驱动程序调度许多短时运行的计算任务，并把并行性和资源需求封装在这些任务里；在[[ray]]之上提供一组可组合的分布式原语。",
+  "impact": "成为工业界最常用的分布式RL库之一，多智能体、离线RL和大规模并行训练的许多应用直接基于它搭建。",
+  "method": "论文的主张是：RL的分布式计算不该写成很多进程各自长时间运行、靠消息互相通信的样子，而应像普通程序调用函数那样，由一个中心逻辑自上而下地发起任务。例如一次训练迭代 = 让若干「采样器」各自运行若干步并返回轨迹 → 汇总 → 交给「优化器」更新参数 → 把新参数广播出去。每个调用都是[[ray]]上的一个远程任务或actor方法，Ray负责调度到不同的CPU、GPU和机器上。\n\n在这个抽象下，RLlib把策略（网络与损失）、采样（与环境交互）、优化（同步SGD、异步梯度、分布式回放等策略）拆成可替换的组件。摘要称，这些原语使大量算法能以高性能、可扩展的方式实现，并有大量代码复用。库里很快实现了[[a3c]]、PPO、DQN系列、Ape-X、IMPALA等主流算法，并支持多智能体训练。",
+  "limits": [
+    {"text": "抽象层很多、配置项繁杂，研究者想改一个算法细节往往要穿过好几层代码，单文件实现因此流行起来。", "solved_by": ["cleanrl"]},
+    {"text": "调度开销使它在小规模、单机快速实验时不如专用的GPU向量化环境实现。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ray", "type": "uses", "note": "建在Ray的任务与actor模型之上，由Ray负责分布式调度和资源管理。"},
+    {"to": "a3c", "type": "uses", "note": "A3C等异步算法是需要分布式实现的典型例子，库里作为标准算法提供。"},
+    {"to": "openai-baselines", "type": "rivals", "note": "Baselines提供参考实现但以单机为主；RLlib以可组合的分布式执行为核心。"}
+  ],
+  "prereq": ["distributed-training", "actor-critic", "on-off-policy", "throughput-latency"],
+  "learn": "先了解Ray的任务与actor；按官方文档用RLlib在CartPole上跑PPO，再把采样器数量从1调到8，观察吞吐变化。",
+  "check": {"source": "https://arxiv.org/abs/1712.09381", "confirmed": "标题、9位作者、arXiv v1于2017-12-26；摘要中RL计算模式深度嵌套且不规则、以自顶向下层级控制组合分布式组件、并行与资源封装在短时任务中、可扩展原语支持高性能实现和代码复用、rllib.io。ICML 2018与库中具体算法列表按一般了解。"},
+  "aka": ["Ray RLlib", "RLlib", "分布式强化学习库"]
+}

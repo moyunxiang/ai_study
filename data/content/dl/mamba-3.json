@@ -1,0 +1,30 @@
+{
+  "id": "mamba-3",
+  "who": "Aakash Lahoti, Kevin Y. Li, Berlin Chen, Caitlin Wang, Aviv Bick, J. Zico Kolter, Tri Dao, Albert Gu · 卡内基梅隆大学 / 普林斯顿大学 / Cartesia AI / Together AI",
+  "venue": "ICLR 2026",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2603.15569"},
+    {"label": "Together AI博客", "url": "https://www.together.ai/blog/mamba-3"}
+  ],
+  "problem": "[[mamba-2]]为了训练快，把状态转移简化到“标量乘单位阵”，推理时计算太简单、被显存带宽卡住；不少线性模型还在状态追踪这类任务上失败。",
+  "idea": "从“推理优先”的角度回到状态空间模型的原理，做三处改进：由SSM离散化推出更有表达力的递推、用复数值的状态更新增强状态追踪、用多输入多输出（MIMO）形式在不增加解码延迟的前提下提高效果。",
+  "impact": "推理为主的时代里线性模型的一次重新设计；作者开源了内核，作为新的SSM基线与[[gated-deltanet]]等直接比较。",
+  "method": "背景是推理开销的变化：强化学习后训练和智能体工作流需要生成大量样本，推理成本越来越重要。线性模型的吸引力在于状态大小固定、计算随长度线性增长，但作者指出，Mamba-2为加速训练而不断简化状态空间机制，导致解码时每一步算得太少、GPU大部分时间在搬运显存。\n\nMamba-3的三项改动：其一，用状态空间模型的离散化理论推出更有表达力的递推公式，而不是简单的一阶近似；其二，让状态更新取复数值，相当于在状态上加入依赖输入的旋转，这对需要记住“当前处在什么状态”的状态追踪任务（如奇偶性判断）很关键，[[s4d]]和[[lru]]也用过复数对角状态，而Mamba-2丢掉了这一点；其三，把单输入单输出（SISO）的递推改成多输入多输出（MIMO），在同样的显存读写量下做更多计算，提高硬件利用率，不增加解码延迟。\n\n摘要报告：Mamba-3在检索、状态追踪和下游语言建模任务上都有显著提升；在15亿参数规模，平均下游精度比次好的模型（Gated DeltaNet）高0.6个百分点，MIMO变体再高1.2个百分点，合计1.8个百分点。官方博客称，在15亿参数规模，Mamba-3 SISO的预填充加解码延迟在所有序列长度上都低于Mamba-2、Gated DeltaNet和Llama-3.2-1B。",
+  "limits": [
+    {"text": "公开结果主要在15亿参数左右，更大规模与混合架构中是否保持优势还需要后续验证。", "solved_by": []},
+    {"text": "与所有固定状态的线性模型一样，从超长上下文中精确检索细节的能力仍受状态容量限制，实际部署多与注意力层混合。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mamba-2", "type": "solves", "note": "针对Mamba-2过度简化状态转移、推理受显存带宽限制和状态追踪弱的问题重新设计递推。"},
+    {"to": "gated-deltanet", "type": "rivals", "note": "论文中的主要对比对象；摘要称在1.5B规模上平均下游精度高0.6个百分点。"},
+    {"to": "s4d", "type": "uses", "note": "重新引入复数值对角状态的思想，用于增强状态追踪。"},
+    {"to": "mamba", "type": "extends", "note": "延续Mamba系列输入依赖的选择性状态空间框架。"}
+  ],
+  "prereq": ["state-space-model", "recurrent-layer", "memory-bandwidth", "throughput-latency", "ode-sde"],
+  "terms": [
+    {"t": "状态追踪", "d": "要求模型在读序列时持续维护一个离散状态（如奇偶性、棋盘局面）的任务，许多线性模型在这类任务上会失败。"},
+    {"t": "MIMO", "d": "多输入多输出：每次递推同时处理多路输入和输出，提高每次读写显存所做的计算量。"}
+  ],
+  "learn": "先读[[mamba]]与[[mamba-2]]，再读Together AI博客对三项改动的直观解释，之后读论文的方法部分；可以用开源内核在小规模上对比Mamba-2与Mamba-3在奇偶性任务上的表现。",
+  "check": {"source": "https://arxiv.org/abs/2603.15569", "confirmed": "arXiv：标题、8位作者、v1提交于2026-03-16，摘要中推理优先视角、三项改进（离散化递推、复数状态更新、MIMO）、1.5B规模比Gated DeltaNet高0.6分、MIMO再高1.2分共1.8分。OpenAlex记录发表于ICLR 2026。Together AI博客（2026-03-17）：作者机构、Mamba-2把对角转移简化为标量乘单位阵、推理受显存带宽限制、SISO在1.5B规模上的延迟比较。奇偶性等例子来自一般了解。"}
+}

@@ -1,0 +1,31 @@
+{
+  "id": "sepformer",
+  "who": "Cem Subakan, Mirco Ravanelli, Samuele Cornell, Mirko Bronzi, Jianyuan Zhong · Mila等",
+  "venue": "arXiv 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2010.13154"}
+  ],
+  "problem": "当时最好的语音分离模型（[[conv-tasnet]]之后的双路径RNN一类）依赖循环网络，只能按时间顺序计算，难以并行，长序列上又慢又占显存。",
+  "idea": "去掉循环结构，用Transformer在两个尺度上建模：把编码后的序列切成小块，块内Transformer看短程依赖，块间Transformer看长程依赖（SepFormer）。",
+  "impact": "SepFormer把WSJ0-2mix分离基准推到当时的最高水平，成为SpeechBrain工具包里的标准分离模型，此后的时域分离模型越来越多地改用注意力而不是循环网络做骨干。",
+  "method": "时域分离沿用[[conv-tasnet]]的三段式：一个可学习的一维卷积编码器把混合波形变成特征序列；分离网络为每个说话人估计一个掩码；解码器把掩码后的特征还原成各人的波形。训练用[[pit]]式的置换不变损失，指标是尺度不变信噪比（SI-SNR）。\n\nSepFormer替换的是中间的分离网络：把很长的特征序列切成重叠的小块，交替使用两种[[transformer]]层（见[[c:self-attention]]）——块内（intra-chunk）Transformer在每个小块内部做注意力，建模短程依赖；块间（inter-chunk）Transformer在不同小块的同一位置之间做注意力，建模长程依赖。这样每次注意力只在较短的维度上计算，避免整段序列做全局注意力的平方代价。\n\n摘要报告：在WSJ0-2mix上SI-SNR提升22.3 dB，在三人混合的WSJ0-3mix上19.5 dB，均为当时最好；即使把编码后的表示降采样8倍仍有竞争力，因此比性能相近的分离系统明显更快、更省显存。",
+  "limits": [
+    {"text": "WSJ0-2mix是干净朗读语音的人工混合，带噪声、混响的真实录音上性能会明显下降。", "solved_by": []},
+    {"text": "需要事先知道说话人数，每个输出对应一个固定的人数设置。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "conv-tasnet", "type": "extends", "note": "沿用编码器-掩码-解码器的时域分离框架，只把分离网络换成双尺度Transformer。"},
+    {"to": "transformer", "type": "uses", "note": "块内和块间建模都用Transformer层，完全不用循环网络。"},
+    {"to": "pit", "type": "uses", "note": "训练时用置换不变损失处理输出与说话人的对应关系。"}
+  ],
+  "prereq": ["self-attention", "transformer-block", "conv-layer", "waveform-spectrogram", "loss-function"],
+  "terms": [
+    {"t": "SI-SNR", "d": "尺度不变信噪比：比较分离出的波形和真实单人波形，忽略整体音量差异，单位dB，越高越好；「提升」指相对于原混合信号的增加量。"},
+    {"t": "WSJ0-2mix", "d": "把两段《华尔街日报》朗读语音人工混合得到的标准语音分离数据集。"}
+  ],
+  "aka": ["SepFormer", "Separation Transformer", "双路径Transformer分离", "语音分离", "speech separation"],
+  "check": {
+    "source": "https://arxiv.org/abs/2010.13154",
+    "confirmed": "arXiv官方记录：标题Attention is All You Need in Speech Separation、作者Subakan/Ravanelli/Cornell/Bronzi/Zhong、v1提交2020-10-25；摘要关于RNN难以并行、无RNN的Transformer分离网络、多尺度短程与长程依赖、WSJ0-2mix SI-SNRi 22.3 dB与WSJ0-3mix 19.5 dB、降采样8倍仍有竞争力、更快更省显存。块内/块间结构细节、SpeechBrain集成与机构为一般了解。"
+  }
+}

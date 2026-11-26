@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>ThunderKittens内核库（2024） · AI脉络</title>
+<meta name="description" content="H100这类新GPU的算力要靠张量核心、异步拷贝等特性才能吃满，手写CUDA内核极难；即便是线性注意力这种成熟运算，现有内核也远达不到理论性能。 只给少数几个抽象：以16×16矩阵块为基本数据类型、用类似PyTorch的块运算写计算；线程块级提供异步加载与计算重叠的模板；网格级帮助隐藏启动和访存开…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/thunderkittens.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ThunderKittens内核库（2024）">
+<meta property="og:description" content="H100这类新GPU的算力要靠张量核心、异步拷贝等特性才能吃满，手写CUDA内核极难；即便是线性注意力这种成熟运算，现有内核也远达不到理论性能。 只给少数几个抽象：以16×16矩阵块为基本数据类型、用类似PyTorch的块运算写计算；线程块级提供异步加载与计算重叠的模板；网格级帮助隐藏启动和访存开…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/thunderkittens.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/thunderkittens">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 编译器与高性能算子</div>
+<h1>ThunderKittens内核库</h1>
+<div class="full">ThunderKittens: Simple, Fast, and Adorable AI Kernels</div>
+<div class="meta"><span>2024.10</span><span>论文</span><span>延伸</span><span>ICLR 2025</span><span>Benjamin F. Spector, Simran Arora, Aaryan Singhal, Daniel Y. Fu, Christopher Ré · 斯坦福大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2410.20399" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/HazyResearch/ThunderKittens" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/thunderkittens">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>H100这类新GPU的算力要靠张量核心、异步拷贝等特性才能吃满，手写CUDA内核极难；即便是线性注意力这种成熟运算，现有内核也远达不到理论性能。</p></div><div><h4>方法</h4><p>只给少数几个抽象：以16×16矩阵块为基本数据类型、用类似PyTorch的块运算写计算；线程块级提供异步加载与计算重叠的模板；网格级帮助隐藏启动和访存开销。</p></div><div><h4>影响</h4><p>证明一个很小的嵌入式C++库就能写出与cuBLAS、FlashAttention-3相当的内核，被不少研究组用来给新架构（线性注意力、状态空间模型）写高效内核。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/flashattention-3.html">FlashAttention-3</a>要用上<a class="ln" href="../n/h100.html">H100</a>的异步特性，靠的是专家花数月手写；<a class="ln" href="../n/cutlass.html">CUTLASS</a>功能全但模板极其复杂；<a class="ln" href="../n/triton-lang.html">Triton GPU编程语言</a>易写，但对最新硬件特性的控制有限。ThunderKittens的出发点是：GPU有三层层次，每层只需要一个合适的抽象。</p><p><b>warp级</b>：基本数据结构是16×16的矩阵块（tile），与张量核心一次处理的形状对应，在块上做矩阵乘、逐元素运算、行求和等类似PyTorch的操作，寄存器和共享内存的布局由库处理。<b>线程块级</b>：提供一个“生产者—消费者”模板，一部分warp负责把下一块数据异步搬进共享内存，另一部分同时计算当前块，把访存藏在计算后面。<b>网格级</b>：帮助隐藏线程块启动、收尾和访存的开销。</p><p>摘要报告：GEMM和注意力推理上与cuBLAS、FlashAttention-3持平；注意力反向比最强基线快10–40%，状态空间模型快8倍，线性注意力快14倍。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>主要面向NVIDIA H100一代硬件，写内核仍需要懂GPU层次结构的C++程序员，离普通研究者用Python直接写内核还有距离。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/tilelang.html">TileLang分块编程语言</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:72" href="../n/h100.html">H100</a><span class="yr">2022.03 · 硬件</span><div class=nt>抽象围绕H100的张量核心与异步数据搬运设计。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/triton-lang.html">Triton GPU编程语言</a><span class="yr">2019.06 · 系统·效率</span><div class=nt>Triton在Python里按块编程、由编译器处理细节；TK留在C++里，换取对异步拷贝等硬件特性的直接控制。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/cutlass.html">CUTLASS</a><span class="yr">2017.12 · 系统·效率</span><div class=nt>同为C++模板方式写GPU内核；CUTLASS覆盖面广但复杂，TK刻意只保留少数抽象。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/flashattention-3.html">FlashAttention-3</a><span class="yr">2024.07 · 系统·效率</span><div class=nt>FA3是为H100手工深度优化的注意力内核；TK用通用抽象写出的注意力推理内核与之持平，反向更快。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/tilelang.html">TileLang分块编程语言</a><span class="yr">2025.04 · 系统·效率</span><div class=nt>都以矩阵块为核心抽象；ThunderKittens是C++库，TileLang是带编译器的Python语言。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/matrix-multiplication.html">矩阵乘法与线性变换</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/efficient-attention.html">稀疏注意力与高效注意力</a></p>
+<h2>本篇术语</h2><ul><li><b>warp</b>　GPU上同步执行同一条指令的一组32个线程，是调度和使用张量核心的基本单位。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2410.20399" rel="noopener">https://arxiv.org/abs/2410.20399</a>（标题、五位作者、v1日期2024-10-27；摘要：三层抽象（16×16块、线程块级异步重叠模板、网格级隐藏启动与访存开销）、与cuBLAS和FA3持平、注意力反向快10–40%、状态空间模型8×、线性注意力14×。ICLR 2025与斯坦福Hazy Research为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ThunderKittens%E5%86%85%E6%A0%B8%E5%BA%93%EF%BC%88thunderkittens%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Athunderkittens%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/thunderkittens.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="sageattention.html"><small>本分支上一个 · 2024.10</small><b>SageAttention八比特注意力</b></a><a class="r" href="intellect-1.html"><small>本分支下一个 · 2024.11</small><b>INTELLECT-1去中心化训练</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

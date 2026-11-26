@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>序列并行与选择性重计算（2022） · AI脉络</title>
+<meta name="description" content="训练几千亿参数的模型，激活值占满显存，只好用激活重计算：反向时把前向重新算一遍，省了显存却白白多花约三分之一的计算。 两招让重计算几乎不再需要：张量并行没切到的LayerNorm、Dropout部分改为沿序列维切分（序列并行）；只对占显存多、计算少的注意力内部那几步做重计算（选择性重计算）。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/megatron-sp.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="序列并行与选择性重计算（2022）">
+<meta property="og:description" content="训练几千亿参数的模型，激活值占满显存，只好用激活重计算：反向时把前向重新算一遍，省了显存却白白多花约三分之一的计算。 两招让重计算几乎不再需要：张量并行没切到的LayerNorm、Dropout部分改为沿序列维切分（序列并行）；只对占显存多、计算少的注意力内部那几步做重计算（选择性重计算）。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/megatron-sp.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/megatron-sp">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 大模型并行训练</div>
+<h1>序列并行与选择性重计算</h1>
+<div class="full">Reducing Activation Recomputation in Large Transformer Models</div>
+<div class="meta"><span>2022.05</span><span>论文</span><span>延伸</span><span>MLSys 2023</span><span>Vijay Korthikanti, Jared Casper, Sangkug Lym, Lawrence McAfee, Michael Andersch, Mohammad Shoeybi, Bryan Catanzaro · NVIDIA</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2205.05198" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/NVIDIA/Megatron-LM" rel="noopener">Megatron-LM ↗</a><a class="btn sm" href="../index.html#/n/megatron-sp">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>训练几千亿参数的模型，激活值占满显存，只好用激活重计算：反向时把前向重新算一遍，省了显存却白白多花约三分之一的计算。</p></div><div><h4>方法</h4><p>两招让重计算几乎不再需要：张量并行没切到的LayerNorm、Dropout部分改为沿序列维切分（序列并行）；只对占显存多、计算少的注意力内部那几步做重计算（选择性重计算）。</p></div><div><h4>影响</h4><p>序列并行和选择性重计算成为Megatron-LM与NeMo的标准选项，“TP+SP”也成了后来大模型训练配置里的常见组合。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/megatron.html">Megatron-LM模型并行</a>的张量并行把注意力和前馈层的矩阵乘切到多张卡上，但层与层之间的LayerNorm和Dropout没有切，每张卡都存着完整的激活，模型越大越占显存。常规补救是<a class="ln" href="../n/grad-checkpointing.html">梯度检查点</a>式的整层重计算，代价是多做一遍前向。</p><p><b>序列并行</b>：在这些原本被复制的区域，把激活沿序列长度方向切开，每张卡只处理一部分token（LayerNorm、Dropout都是逐token运算，可以独立做）。原先张量并行区域边界上的一次All-Reduce，被拆成一次Reduce-Scatter加一次All-Gather，通信总量不变，但每张卡上的这部分激活变成了1/t（t为张量并行度）。</p><p><b>选择性重计算</b>：作者逐项估算了Transformer层里每块激活的大小与计算量，发现注意力里的softmax输出、dropout掩码等随序列长度平方增长、占了很多显存，重算它们却很便宜；于是只重计算这几步，其余激活照常保存。</p><p>摘要报告：在最多一万亿参数的模型上，激活显存降为1/5，激活重计算带来的额外时间减少90%以上；在2240块A100上训练530B参数的GPT-3式模型，模型算力利用率（MFU）从重计算时的42.1%提高到54.2%，快29%。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>序列并行与张量并行绑定、只在单个张量并行组内切分，序列很长时注意力本身的显存和计算仍集中在每张卡上。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/deepspeed-ulysses.html">DeepSpeed-Ulysses序列并行</a> <a class="chip hue" style="--h:192" href="../n/ring-attention.html">Ring Attention序列并行</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/grad-checkpointing.html">梯度检查点</a><span class="yr">2016.04 · 系统·效率</span><div class=nt>整层激活重计算多花约一次前向的算力；选择性重计算只重算便宜而占显存的部分，把额外开销减少90%以上。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/megatron.html">Megatron-LM模型并行</a><span class="yr">2019.09 · 系统·效率</span><div class=nt>在Megatron张量并行的基础上，把没被切分的LayerNorm、Dropout区域沿序列维再切一次。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/megatron-3d.html">Megatron 3D并行</a><span class="yr">2021.04 · 系统·效率</span><div class=nt>延续Megatron 3D并行的系统，进一步降低万卡级训练中的激活显存。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/mt-nlg.html">MT-NLG 530B</a><span class="yr">2022.01 · LLM</span><div class=nt>以530B参数的GPT-3式模型为主要测试对象，规模与MT-NLG相同。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/deepspeed-ulysses.html">DeepSpeed-Ulysses序列并行</a><span class="yr">2023.09 · 系统·效率</span><div class=nt>Megatron的序列并行只切逐token的部分；Ulysses把序列切分贯穿到注意力计算本身。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/ring-attention.html">Ring Attention序列并行</a><span class="yr">2023.10 · 系统·效率</span><div class=nt>序列并行与张量并行绑定、只在单个张量并行组内切分，序列很长时注意力本身的显存和计算仍集中在每张卡上。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/backpropagation.html">反向传播</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a></p>
+<h2>本篇术语</h2><ul><li><b>MFU</b>　模型算力利用率：训练实际完成的有效浮点运算量除以硬件理论峰值，重计算这类重复运算不算在内。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2205.05198" rel="noopener">https://arxiv.org/abs/2205.05198</a>（标题、七位作者、v1日期2022-05-10；摘要：序列并行与选择性重计算、配合张量并行几乎消除重计算、最多一万亿参数、激活显存降5倍、重计算开销减少90%以上、2240块A100上530B模型MFU 54.2%对42.1%快29%、实现在Megatron-LM与NeMo-Megatron。Reduce-Scatter+All-Gather替代All-Reduce、MLSys 2023、NVIDIA机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%BA%8F%E5%88%97%E5%B9%B6%E8%A1%8C%E4%B8%8E%E9%80%89%E6%8B%A9%E6%80%A7%E9%87%8D%E8%AE%A1%E7%AE%97%EF%BC%88megatron-sp%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amegatron-sp%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/megatron-sp.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ia3.html"><small>本分支上一个 · 2022.05</small><b>(IA)³</b></a><a class="r" href="flashattention.html"><small>本分支下一个 · 2022.05</small><b>FlashAttention</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

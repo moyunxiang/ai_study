@@ -1,0 +1,24 @@
+{
+ "id": "kivi",
+ "who": "Zirui Liu, Jiayi Yuan, Hongye Jin, Shaochen Zhong, Zhaozhuo Xu, Vladimir Braverman, Beidi Chen, Xia Hu · 莱斯大学, 德州农工大学, 史蒂文斯理工, 卡内基梅隆大学",
+ "venue": "ICML 2024",
+ "aka": ["KV缓存量化", "KV cache quantization", "2比特KV缓存", "per-channel key quantization"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2402.02750"},
+  {"label": "GitHub", "url": "https://github.com/jy-yuan/KIVI"}
+ ],
+ "problem": "批量大、上下文长时，KV缓存比模型权重还占显存，每步解码搬运KV还让计算单元空等；把KV缓存量化到很低比特又缺少对其数值分布的研究，直接按token量化误差很大。",
+ "idea": "分析发现Key里有固定的几个通道数值特别大，Value没有这个现象，于是Key按通道、Value按token分组做2比特非对称量化，最近的一小段token保持全精度。",
+ "impact": "成为免调参KV缓存量化的常用基线，“Key按通道、Value按token”的做法被后续KV量化工作广泛沿用。",
+ "method": "[[c:kv-cache]]保存每个已生成token每层的Key和Value，长上下文下它决定了能开多大批。[[h2o]]这类方法丢掉一部分token；量化则保留全部token、只把每个数存得更省。\n\n作者先统计了Llama、Falcon、Mistral等模型KV缓存的数值分布：Key里有若干**固定的通道**数值远大于其他通道，Value则没有明显的通道离群。量化时如果按token分组，同一组里混着离群通道和普通通道，缩放比例被离群值撑大，普通通道的精度就丢了；按通道分组，误差被关在离群通道内部。论文在Llama-2-13B上测得：Key按token量化的注意力分数相对误差约47.00，按通道只有9.60。Value直接影响注意力输出的每个token，按token量化更合适。\n\n具体做法：Key每攒满R个token（实验取R=128），就按通道、每G=32个token一组量化成2比特；Value用长度R的队列，最老的出队后按token量化。最近的token始终全精度，作者指出这对GSM8K这类难任务很关键。摘要报告：峰值显存（含权重）降为约1/2.6，批大小可增到4倍，实际吞吐提高2.35–3.47倍，质量几乎不变。",
+ "limits": [
+  {"text": "只压缩每个数的比特数，不减少token数量；上下文到百万级时KV缓存仍随长度线性增长，需要与淘汰、稀疏或架构改动结合。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "efficient-inference", "type": "solves", "note": "该文指出KV缓存是长序列推理的主要显存瓶颈；KIVI把每个KV数值压到2比特，直接缓解这一点。"},
+  {"to": "h2o", "type": "rivals", "note": "H2O靠丢弃不重要的token压缩KV，KIVI保留全部token只降低精度，两者可以互补。"},
+  {"to": "llm-int8", "type": "extends", "note": "LLM.int8()发现激活里有固定的离群特征维度；KIVI在KV缓存的Key上观察到类似的离群通道，并据此选择按通道量化。"}
+ ],
+ "prereq": ["kv-cache", "quantization-concept", "self-attention", "memory-bandwidth"],
+ "check": {"source": "https://arxiv.org/abs/2402.02750", "confirmed": "标题、八位作者、v1日期2024-02-05；摘要：KV缓存成为新瓶颈、Key按通道Value按token、免调参2比特、峰值显存降2.6×、批大小4×、吞吐2.35–3.47×；arXiv HTML v2：作者机构（莱斯、史蒂文斯、CMU等）、R=128与G=32、残差全精度窗口对GSM8K的重要性、Llama-2-13B上47.00对9.60的相对误差。ICML 2024来自HTML页面关键词；德州农工为一般了解。"}
+}

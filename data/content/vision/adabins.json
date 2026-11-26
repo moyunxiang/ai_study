@@ -1,0 +1,30 @@
+{
+  "id": "adabins",
+  "who": "Shariq Farooq Bhat, Ibraheem Alhashim, Peter Wonka · 阿卜杜拉国王科技大学（KAUST）",
+  "venue": "CVPR 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2011.14141"},
+    {"label": "代码", "url": "https://github.com/shariqfarooq123/AdaBins"}
+  ],
+  "aka": ["AdaBins", "自适应区间", "adaptive bins", "mini-ViT", "区间深度估计"],
+  "problem": "[[dorn]]把深度切成固定区间来预测，但不同图的深度分布差别很大（室内大多在几米内，室外可达几十米），固定区间要么浪费、要么不够细，输出还有台阶感。",
+  "idea": "让网络看完整张图后，为这张图自适应地决定区间的划分（区间中心随图而变），再把每个像素的深度表示成各区间中心的加权和，而不是只取一个区间。",
+  "impact": "在NYU Depth v2和KITTI上明显刷新监督式单目深度结果，“全局决定区间＋逐像素软组合”的做法被[[zoedepth]]的度量区间模块直接继承。",
+  "method": "网络前半部分是普通的编码器-解码器，输出高分辨率的解码特征。在其后接一个AdaBins模块，核心是一个小型的Vision Transformer（论文称mini-ViT）：\n\n- 把解码特征切成小块送进Transformer，让它综合整张图的信息，输出一个长度为N（如256）的向量，归一化后表示N个区间的宽度，从而得到这张图专属的区间中心 `c_1…c_N`；\n- Transformer的另一部分输出与像素特征做内积，得到每个像素对N个区间的“归属分数”，经softmax变成概率 `p_i`；\n- 每个像素的最终深度是 `d = Σ p_i · c_i`，即区间中心的加权平均，所以输出是连续的，没有台阶。\n\n这里引入[[transformer]]的意义在于“全局处理”：卷积只看局部，而区间划分需要了解整张图的深度范围。摘要称在多个常用深度数据集的所有指标上都明显超过当时最好的方法，并用消融实验验证了该模块的作用。",
+  "legacy": "[[zoedepth]]把AdaBins式的区间模块改进为可在多个数据集间切换的度量区间头，用来把相对深度模型变成度量深度模型；之后[[depth-anything]]、[[depth-pro]]等大模型多改用直接回归。",
+  "limits": [
+    {"text": "仍是在单个数据集上监督训练，换到别的场景或相机需要重新训练，零样本泛化差。", "solved_by": ["zoedepth", "metric3d"]}
+  ],
+  "relations": [
+    {"to": "dorn", "type": "solves", "note": "DORN的区间对所有图固定；AdaBins按每张图自适应决定区间，并用软组合消除台阶。"},
+    {"to": "vit", "type": "uses", "note": "用一个小型ViT对解码特征做全局处理，估计区间宽度。"},
+    {"to": "eigen-depth", "type": "extends", "note": "同属监督式单图深度估计，沿用NYU与KITTI的评测设定。"}
+  ],
+  "prereq": ["vision-tasks", "encoder-decoder", "self-attention", "softmax", "loss-function"],
+  "terms": [
+    {"t": "区间（bin）", "d": "把连续取值范围切成的若干小段；AdaBins的区间宽度每张图不同。"},
+    {"t": "软组合", "d": "不只选一个区间，而是按概率对所有区间中心加权求平均，得到连续的输出。"}
+  ],
+  "learn": "先读DORN了解固定区间的离散化，再读AdaBins第3节mini-ViT如何输出区间宽度；把同一张室内图和室外图的区间中心画成直方图，比较它们如何随场景变化。",
+  "check": {"source": "https://arxiv.org/abs/2011.14141", "confirmed": "arXiv记录：标题、三位作者、v1提交于2020-11-28；摘要中的编码器-解码器基线、基于Transformer的模块把深度范围分成按图自适应估计中心的区间、深度为区间中心的线性组合、在常用深度数据集所有指标上明显领先、消融验证。N=256、mini-ViT细节、softmax概率、CVPR 2021、机构凭一般了解写。"}
+}

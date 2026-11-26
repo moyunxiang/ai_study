@@ -1,0 +1,28 @@
+{
+  "id": "wurstchen",
+  "who": "Pablo Pernias, Dominic Rampas, Mats L. Richter, Christopher J. Pal, Marc Aubreville · Technische Hochschule Ingolstadt / Mila 等",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2306.00637"}
+  ],
+  "aka": ["Würstchen", "Wuerstchen", "Stable Cascade"],
+  "problem": "[[ldm]]把图像压到潜空间后计算量已大降，但它的压缩率不高（如8倍下采样），训练一个大文生图模型仍要约20万GPU小时，学术团队负担不起。",
+  "idea": "在极度压缩的“语义潜空间”（约42倍空间压缩）里做文本条件扩散，再用第二个扩散模型把这个很小的语义表示还原成普通VQGAN潜变量，最后解码成图。",
+  "impact": "论文称训练只用24,602 A100 GPU小时（对比SD 2.1的20万），推理快一倍以上，画质在用户偏好研究中更好；Stability AI后来基于这一架构发布了Stable Cascade。",
+  "method": "Würstchen把生成拆成三个阶段，按推理顺序叫Stage C、B、A：\n- **Stage A**：一个[[vqgan]]式自编码器，把图像压到常规大小的潜空间（4倍下采样）。\n- **Stage B**：一个潜扩散模型，以极小的语义表示为条件，生成Stage A的潜变量，相当于“把草图展开成细节”。\n- **Stage C**：真正听文本的文生图扩散模型，只在一个很小的语义潜空间里工作（1024×1024的图对应约24×24的特征图）。训练时这个语义表示由一个图像编码器提取。\n\n关键观察是：高度压缩的图像语义表示比文本嵌入提供了更细致的引导，而在这么小的空间里做主要的文本条件扩散，算力需求大幅下降。论文报告训练需24,602个A100 GPU小时，远少于[[sd-2]]（2.1版）的约20万，所需数据也更少，推理速度提高一倍以上。",
+  "limits": [
+    {"text": "三阶段级联训练与推理流程复杂，语义压缩过高时小物体和文字等细节容易丢失。", "solved_by": []},
+    {"text": "仍是U-Net式结构，未采用后来成为主流的DiT与流匹配骨架。", "solved_by": ["sd3", "sana"]}
+  ],
+  "relations": [
+    {"to": "ldm", "type": "extends", "note": "沿着“在压缩空间里生成”的思路，把压缩率从约8倍推到约42倍，并分多级还原。"},
+    {"to": "sd-2", "type": "solves", "note": "以SD 2.1为成本对照，把训练GPU小时降低约一个数量级。"},
+    {"to": "vqgan", "type": "uses", "note": "最底层的Stage A是一个VQGAN式自编码器。"}
+  ],
+  "prereq": ["latent-space", "diffusion-process", "autoencoder", "vector-quantization", "params-flops"],
+  "terms": [
+    {"t": "语义潜空间", "d": "比普通潜空间压缩得多、只保留图像大致语义和布局的表示，细节交给后续阶段补。"}
+  ],
+  "learn": "先读LDM → 读本文三阶段结构图 → 在diffusers中运行Stable Cascade，观察各阶段的输出。",
+  "check": {"source": "https://arxiv.org/abs/2306.00637", "confirmed": "标题、作者、v1日期2023-06-01、摘要中极度压缩的语义图像表示引导扩散、24,602 A100 GPU小时对比SD 2.1的20万GPU小时、数据需求更少、推理快两倍以上、用户偏好研究；42倍压缩、三阶段细节、ICLR 2024与Stable Cascade来自一般了解"}
+}

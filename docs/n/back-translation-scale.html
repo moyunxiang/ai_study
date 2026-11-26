@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>大规模回译（2018） · AI脉络</title>
+<meta name="description" content="回译已是用单语数据增强翻译模型的标准做法，但通常用束搜索生成伪源句；生成方式是否重要、伪数据与真实平行语料比孰优孰劣、能扩到多大规模，都不清楚。 系统比较生成回译的几种方式（束搜索、贪心、无限制采样、top-k采样、给束搜索结果加噪声），发现采样或加噪的伪源句训练信号更强，并把回译扩到两亿多句单语…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/back-translation-scale.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="大规模回译（2018）">
+<meta property="og:description" content="回译已是用单语数据增强翻译模型的标准做法，但通常用束搜索生成伪源句；生成方式是否重要、伪数据与真实平行语料比孰优孰劣、能扩到多大规模，都不清楚。 系统比较生成回译的几种方式（束搜索、贪心、无限制采样、top-k采样、给束搜索结果加噪声），发现采样或加噪的伪源句训练信号更强，并把回译扩到两亿多句单语…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/back-translation-scale.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/back-translation-scale">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 神经机器翻译与生成</div>
+<h1>大规模回译</h1>
+<div class="full">Understanding Back-Translation at Scale</div>
+<div class="meta"><span>2018.08</span><span>论文</span><span>延伸</span><span>EMNLP 2018</span><span>Sergey Edunov, Myle Ott, Michael Auli, David Grangier · Facebook AI Research / Google Brain</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1808.09381" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/back-translation-scale">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>回译已是用单语数据增强翻译模型的标准做法，但通常用束搜索生成伪源句；生成方式是否重要、伪数据与真实平行语料比孰优孰劣、能扩到多大规模，都不清楚。</p></div><div><h4>方法</h4><p>系统比较生成回译的几种方式（束搜索、贪心、无限制采样、top-k采样、给束搜索结果加噪声），发现采样或加噪的伪源句训练信号更强，并把回译扩到两亿多句单语数据。</p></div><div><h4>影响</h4><p>在WMT&#x27;14英德上达到35 BLEU的新纪录；「回译要采样或加噪而不是取最优束」成为此后翻译系统的常规做法。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/back-translation.html">回译</a>的流程是：训练一个反方向的目标→源模型，把目标语言单语句子译成伪源句，与原句组成伪平行对加入训练。此前大家默认用束搜索生成伪源句，因为它的译文最准。</p><p>作者比较了五种生成方式：束搜索和贪心（取最可能的输出），无限制采样（按模型分布随机采样，多样但有时离谱），top-k采样（只在概率最高的k个词中采样，介于两者之间），以及<b>加噪束搜索</b>——对束搜索输出以0.1的概率删词、以0.1的概率替换成占位符、并在小范围内打乱词序。模型是大型<a class="ln" href="../n/transformer.html">Transformer</a>，单语数据来自<a class="ln" href="../n/wmt.html">WMT机器翻译评测</a>新闻语料，去重后2.26亿句德语句子。</p><p>结论：除了极低资源的情形，采样和加噪束搜索产生的回译效果最好。分析显示，束搜索输出过于「规整」，模型很容易从伪源句猜出目标，学不到东西；采样或加噪的伪源句更难，提供的训练信号更强。论文还比较了伪数据与真实平行数据的价值、领域效应。最终只用公开的WMT平行语料加2.26亿句回译，在WMT&#x27;14英德测试集上达到35 BLEU。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要先训练一个质量不错的反向模型并翻译上亿句单语文本，计算成本很高；在极低资源时采样回译反而不如束搜索。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>回译数据的风格（「翻译腔」）与真实源语言文本不同，评测时可能高估改进，测试集方向性的影响后来引起争论。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>正反两个方向的翻译模型都是大型Transformer。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/wmt.html">WMT机器翻译评测</a><span class="yr">2006.06 · 数据·评测</span><div class=nt>使用WMT公开平行语料与新闻单语语料，在WMT&#x27;14英德测试集上报告结果。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/back-translation.html">回译</a><span class="yr">2015.11 · NLP</span><div class=nt>把Sennrich等的回译从几百万句扩大到两亿多句，并研究伪源句的生成方式。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/six-challenges-nmt.html">NMT的六大挑战</a><span class="yr">2017.06 · NLP</span><div class=nt>实验基于2017年的RNN注意力模型，Transformer和大规模回译出现后，长句、低资源等部分结论需要重新检验。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/data-augmentation.html">数据增强</a> <a class="chip c" href="../c/text-metrics.html">文本生成的自动指标</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a></p>
+<h2>本篇术语</h2><ul><li><b>回译</b>　用反方向的翻译模型把目标语言单语句子译回源语言，得到伪平行句对来扩充训练数据。</li><li><b>top-k采样</b>　每一步只在概率最高的k个词中按概率随机选一个，比完全随机采样稳定、比束搜索多样。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/back-translation.html">回译</a>的讲解 → 读原文第3节（生成方式）与第5节（分析）→ 动手：用一个小型反向模型对同一批单语句子分别用束搜索和采样生成伪源句，比较它们训练出的正向模型BLEU。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1808.09381" rel="noopener">https://arxiv.org/abs/1808.09381</a>（arXiv：标题、作者Edunov、Ott、Auli、Grangier、2018-08-28提交、摘要（除资源匮乏外采样或加噪束搜索回译最有效、采样/加噪数据训练信号更强、与真实平行数据比较及领域效应、扩到数亿单语句、WMT&#x27;14英德35 BLEU）；PDF正文（pdftotext）：Facebook AI Research与Google Brain、top-k采样、加噪方式（删词0.1、占位符替换0.1、局部交换）、2.26亿句去重单语数据。EMNLP 2018出处与「翻译腔」争论凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%A4%A7%E8%A7%84%E6%A8%A1%E5%9B%9E%E8%AF%91%EF%BC%88back-translation-scale%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aback-translation-scale%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/back-translation-scale.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="sentencepiece.html"><small>本分支上一个 · 2018.08</small><b>SentencePiece</b></a><a class="r" href="laser.html"><small>本分支下一个 · 2018.12</small><b>LASER多语言句向量</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

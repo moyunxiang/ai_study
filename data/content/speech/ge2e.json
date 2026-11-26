@@ -1,0 +1,32 @@
+{
+  "id": "ge2e",
+  "who": "Li Wan, Quan Wang, Alan Papir, Ignacio Lopez Moreno · Google",
+  "venue": "arXiv 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1710.10467"}
+  ],
+  "problem": "端到端说话人确认网络用元组（几段注册语音加一段测试语音）构造训练样本，每步只更新一个元组，训练慢，还要先专门挑选样本。",
+  "idea": "一个批次里放N个人、每人M段语音，计算每段语音与每个人「中心」的相似度矩阵，让每段语音靠近自己人的中心、远离最像的别人的中心，即广义端到端（GE2E）损失。",
+  "impact": "GE2E成为训练说话人嵌入（d-vector）的常用损失，它训练出的说话人编码器被[[sv2tts]]直接拿来做多说话人语音合成和声音克隆。",
+  "method": "说话人确认要回答「这段话是不是这个人说的」。做法是用一个网络（这里是多层LSTM，见[[c:recurrent-layer]]）把一段语音压成一个定长向量（说话人嵌入，也叫d-vector），同一个人的向量应该彼此接近（见[[c:embedding]]）。\n\nGE2E的训练批次由N个说话人、每人M段语音组成。对每个人求其M个嵌入的平均作为中心 `c_k`；对每段语音的嵌入 `e_ji` 计算它与所有中心的余弦相似度，乘上可学习的缩放并加偏置，得到一个相似度矩阵。损失要求 `e_ji` 与自己人的中心相似度高、与其他人中心相似度低，有两种写法：对每行做softmax（见[[c:softmax]]），或只惩罚与最相似的那个别人中心的差距（contrast）。计算自己人的中心时会去掉这段语音本身，避免平凡解。与此前的元组式TE2E损失相比，它每一步都关注当前最难区分的样本，且不需要事先挑选样本。\n\n摘要报告：说话人确认的等错误率降低10%以上，同时训练时间减少60%。论文还提出MultiReader技术做领域自适应，使一个模型同时支持多个唤醒词（如「OK Google」和「Hey Google」）和多种方言。",
+  "limits": [
+    {"text": "LSTM编码器只能逐帧顺序计算；在与文本无关的大规模说话人识别上，后来的TDNN类嵌入成为更常用的选择。", "solved_by": ["x-vector", "ecapa-tdnn"]},
+    {"text": "训练需要成千上万个说话人、且每人有多段录音的带标签数据，每个批次都要凑齐N人M句。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "i-vector", "type": "rivals", "note": "i-vector用因子分析得到说话人向量；GE2E用端到端训练的神经网络嵌入替代。"},
+    {"to": "facenet", "type": "extends", "note": "与FaceNet的三元组损失同属度量学习，但用一个批次内的相似度矩阵同时比较所有人，而不是逐个三元组。"},
+    {"to": "lstm", "type": "uses", "note": "说话人编码器是多层LSTM，取最后一帧输出作为嵌入。"}
+  ],
+  "prereq": ["embedding", "contrastive-learning", "softmax", "recurrent-layer", "loss-function"],
+  "terms": [
+    {"t": "说话人确认", "d": "给定一个人的注册录音和一段新录音，判断新录音是不是同一个人说的。"},
+    {"t": "等错误率（EER）", "d": "调节判决阈值，使误接受率等于误拒绝率时的错误率，越低越好。"},
+    {"t": "d-vector", "d": "用深度神经网络从语音中提取的定长说话人向量。"}
+  ],
+  "aka": ["GE2E", "d-vector", "说话人嵌入", "generalized end-to-end loss", "声纹嵌入"],
+  "check": {
+    "source": "https://arxiv.org/abs/1710.10467",
+    "confirmed": "arXiv官方记录：标题、作者Wan/Wang/Papir/Lopez Moreno、v1提交2017-10-28；摘要关于比TE2E更高效、强调难例、无需样本选择、EER降低10%以上、训练时间减少60%、MultiReader支持OK Google/Hey Google与多方言。相似度矩阵与两种损失写法、LSTM结构、被SV2TTS采用为一般了解。"
+  }
+}

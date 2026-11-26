@@ -1,0 +1,27 @@
+{
+ "id": "nccl",
+ "who": "NVIDIA（发布博客作者Nathan Luehr）",
+ "aka": ["Nickel", "NVIDIA Collective Communications Library", "集合通信库", "collective communication", "All-Reduce库", "GPU通信库"],
+ "links": [
+  {"label": "NVIDIA技术博客", "url": "https://developer.nvidia.com/blog/fast-multi-gpu-collectives-nccl/"},
+  {"label": "GitHub", "url": "https://github.com/NVIDIA/nccl"}
+ ],
+ "problem": "一台服务器装8块以上GPU已经常见，但多卡训练常常因为卡间交换梯度太慢而几乎不提速；当时的通信大多走通用的MPI，不了解GPU之间的PCIe/NVLink拓扑。",
+ "idea": "专门为多GPU写一套集合通信原语（All-Reduce、All-Gather、Broadcast、Reduce、Reduce-Scatter）：按机器的互连拓扑自动排出环形顺序，每个集合操作作为一个CUDA内核直接在GPU之间搬数据。",
+ "impact": "成为NVIDIA GPU上分布式训练的默认通信层，PyTorch、TensorFlow、Horovod、DeepSpeed、Megatron的多卡通信底下基本都是它。",
+ "method": "数据并行训练每一步都要把所有卡上的梯度求和再分发回去（All-Reduce，见[[c:distributed-training]]）。卡越多、模型越大，这一步越可能比计算本身还慢。NVIDIA 2016年4月的发布博客把多卡扩展差的原因归为两点：暴露的并行度不够，或者卡间交换数据太多、通信时间超过计算。\n\nNCCL（读作Nickel）的设计要点：**拓扑感知**，根据PCIe交换机、[[nvlink]]的连接方式自动决定GPU在环上的顺序，让每条链路都满负荷而不互相抢带宽；**环形算法**，All-Reduce等操作都用环实现，每块卡只与左右邻居通信，总流量与卡数基本无关；**单内核实现**，每个集合操作是一个整体的[[cuda]]内核，借助GPUDirect点对点访问直接读写其他卡的显存，博客称单个线程块就能跑满PCIe 3.0 x16链路，其余GPU资源可以同时做计算；接口模仿MPI，异步挂在CUDA流上，方便通信与计算重叠。最初版本只支持单机多卡，后续版本扩展到跨机的InfiniBand等网络。\n\n此后的[[horovod]]、PyTorch的DDP等直接调用NCCL完成梯度同步，张量并行和专家并行里的All-to-All也依赖它。",
+ "limits": [
+  {"text": "首个版本只支持单机内多GPU，跨机通信仍要另外接MPI等方案。", "solved_by": ["horovod"]},
+  {"text": "只针对NVIDIA GPU；超大规模集群上，环形算法的延迟随卡数增长，需要树形、分层等算法以及新的互连硬件配合。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "cuda", "type": "uses", "note": "每个集合通信操作实现为一个CUDA内核，挂在CUDA流上异步执行。"},
+  {"to": "nvlink", "type": "uses", "note": "按NVLink、PCIe等卡间互连的拓扑安排通信顺序，以吃满带宽。"},
+  {"to": "distbelief", "type": "solves", "note": "DistBelief一类参数服务器把梯度汇总到中心节点，容易成为瓶颈；NCCL用GPU之间的环形集合通信去掉了中心。"}
+ ],
+ "prereq": ["distributed-training", "cpu-gpu", "interconnect", "memory-bandwidth"],
+ "terms": [
+  {"t": "集合通信", "d": "一组进程共同参与的通信模式，如All-Reduce（所有人的数组求和后每人都拿到结果）、Broadcast（一人发给所有人）。"}
+ ],
+ "check": {"source": "https://developer.nvidia.com/blog/fast-multi-gpu-collectives-nccl/", "confirmed": "博客标题、发布日期2016-04-07、作者Nathan Luehr；拓扑感知、all-reduce/all-gather/broadcast/reduce/reduce-scatter、环形算法、单个CUDA内核与GPUDirect P2P、单线程块跑满PCIe 3.0 x16、类MPI接口与异步流、单进程/多进程部署、多卡扩展差的两个原因。“首版仅单机”为博客中“节点内任意数量GPU”的推断；之后支持跨机与各框架采用为一般了解。"}
+}

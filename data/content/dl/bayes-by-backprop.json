@@ -1,0 +1,28 @@
+{
+  "id": "bayes-by-backprop",
+  "who": "Charles Blundell, Julien Cornebise, Koray Kavukcuoglu, Daan Wierstra · Google DeepMind",
+  "venue": "ICML 2015",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1505.05424"}
+  ],
+  "problem": "[[bayesian-nn]]能给出权重的不确定性，但传统的拉普拉斯近似或MCMC在大网络上太慢，没有一种能直接嵌进反向传播训练的实用办法。",
+  "idea": "给每个权重一个高斯分布而不是一个数，用[[c:reparameterization]]把采样写成可微运算，再用反向传播最小化变分自由能，同时学出每个权重的均值和方差。",
+  "impact": "成为“变分贝叶斯神经网络”的标准做法和不确定性估计的常见基线，也被用来驱动强化学习与老虎机问题中的探索。",
+  "method": "普通网络把每个权重当作一个确定的数。Bayes by Backprop改为学习权重的近似后验 `q(w|θ)`：每个权重服从高斯分布，参数θ包括均值μ和由ρ决定的标准差 `σ = log(1 + exp(ρ))`（保证为正）。训练目标是变分自由能（即负的证据下界），`F = KL(q(w|θ) ‖ p(w)) − E_q[log p(D|w)]`：第一项让后验别偏离先验太远，第二项要求拟合数据。作者把它解释为一种“压缩代价”，起到正则化的作用。\n\n关键在于怎样对这个期望求梯度。做法与[[vae]]相同：先采样标准正态噪声ε，再令 `w = μ + σ·ε`，这样损失对μ和ρ都可以直接反向传播，只比普通训练多一倍参数和一次采样。先验用两个零均值高斯的混合（尺度混合先验）。\n\n摘要报告：在MNIST分类上，这种正则化的效果与[[dropout]]相当；在非线性回归中，学到的不确定性改善了泛化；在上下文老虎机任务里，用后验采样（汤普森采样）驱动探索与利用的权衡。",
+  "limits": [
+    {"text": "参数量翻倍，且平均场高斯后验假设权重之间相互独立，往往低估不确定性，在大网络上效果不如简单的集成方法。", "solved_by": ["deep-ensembles"]}
+  ],
+  "relations": [
+    {"to": "variational-inference", "type": "uses", "note": "用变分推断近似权重后验，目标是变分自由能。"},
+    {"to": "bayesian-nn", "type": "solves", "note": "给贝叶斯神经网络提供了能与反向传播兼容、可扩展到较大网络的训练方法。"},
+    {"to": "vae", "type": "uses", "note": "借用VAE的重参数化技巧，对权重采样求梯度。"},
+    {"to": "dropout", "type": "rivals", "note": "在MNIST上作为正则化方法与Dropout比较；后来MC Dropout也被解释为一种近似贝叶斯推断。"}
+  ],
+  "prereq": ["map-bayesian", "kl-divergence", "elbo", "reparameterization", "backpropagation"],
+  "terms": [
+    {"t": "变分自由能", "d": "变分推断的优化目标，等于负的证据下界；最小化它就是在让近似后验接近真实后验。"},
+    {"t": "汤普森采样", "d": "每次从后验中采样一组参数、按这组参数选最优动作的探索策略。"}
+  ],
+  "learn": "先补[[variational-inference]]和[[vae]]的重参数化，再读原文第3节；用PyTorch给一个小MLP的每个权重加上μ和ρ，在一维回归玩具数据上画出预测均值和不确定性带。",
+  "check": {"source": "https://arxiv.org/abs/1505.05424", "confirmed": "标题、4位作者、arXiv v1提交于2015-05-20；摘要中Bayes by Backprop名称、最小化变分自由能（压缩代价）、MNIST上与dropout相当、非线性回归中不确定性改善泛化、强化学习中的探索-利用权衡。σ的softplus参数化、尺度混合先验与ICML 2015来自一般了解。"}
+}

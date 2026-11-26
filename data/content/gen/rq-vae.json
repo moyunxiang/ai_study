@@ -1,0 +1,26 @@
+{
+  "id": "rq-vae",
+  "who": "Doyup Lee, Chiheon Kim, Saehoon Kim, Minsu Cho, Wook-Shin Han · Kakao Brain / 浦项科技大学",
+  "venue": "CVPR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2203.01941"}
+  ],
+  "aka": ["RQ-VAE", "RQ-Transformer", "残差量化", "Residual Quantization"],
+  "problem": "自回归图像生成要先用[[vq-vae]]/[[vqgan]]把图像变成离散码序列；序列越短，Transformer越省算力，但在码本大小固定时，把图压得更小就会丢细节，短序列和高保真难以兼得。",
+  "idea": "残差量化：每个位置不只用一个码，而是先量化一次，再对剩下的误差继续量化，叠D层码，逐层逼近原特征；生成时用RQ-Transformer在每个位置一次预测一整叠码。",
+  "impact": "论文称能把256×256图像表示成8×8的码图而仍保持高保真，采样也比此前自回归模型快得多；残差量化后来被广泛用于图像分词器和音频编解码器的多层码设计。",
+  "method": "**RQ-VAE**：编码器把图像变成一张低分辨率特征图。对每个位置的特征向量z，先在码本里找最近的码k₁，得到残差`r₁ = z − e(k₁)`；再对r₁找最近的码k₂，得到r₂，如此重复D次。最终用`e(k₁)+…+e(k_D)`近似z。由于每一层都在修正上一层的误差，同一个码本反复使用就能得到很精细的近似，相当于用D个码的组合表达一个向量。于是可以把空间分辨率压得更低（256×256→8×8），序列长度大幅缩短。\n\n**RQ-Transformer**：要生成的是一个8×8×D的码栈。它分两级：空间Transformer按光栅顺序处理各位置，输出每个位置的上下文向量；深度Transformer以这个向量为起点，在该位置内部依次预测k₁到k_D。这样长序列的注意力只发生在64个位置之间，计算成本明显降低。\n\n论文在无条件和类别条件、文本条件的图像生成基准上报告优于此前的自回归模型，并且采样速度显著更快。",
+  "limits": [
+    {"text": "仍是离散码加逐位置自回归，生成质量没有超过同期扩散模型，码栈深度也带来了额外的推理步骤。", "solved_by": ["var", "mar"]}
+  ],
+  "relations": [
+    {"to": "vq-vae", "type": "extends", "note": "把单层向量量化推广为多层残差量化，在相同码本下更精确地逼近特征。"},
+    {"to": "vqgan", "type": "solves", "note": "VQGAN要用较长的码序列才能保真，RQ-VAE在更短的序列上达到高保真。"}
+  ],
+  "prereq": ["vector-quantization", "autoregressive", "transformer-block", "autoencoder"],
+  "terms": [
+    {"t": "残差量化", "d": "先粗量化一次，再把剩下的误差继续量化，多层码相加逐步逼近原向量。"}
+  ],
+  "learn": "先读VQ-VAE和VQGAN → 读本文第3节残差量化与两级Transformer → 对比VAR的多尺度残差量化。",
+  "check": {"source": "https://arxiv.org/abs/2203.01941", "confirmed": "标题、五位作者、v1日期2022-03-03、摘要中短序列与保真的率失真困境、RQ-VAE与RQ-Transformer两阶段框架、固定码本下精确逼近特征图、256×256图像表示为8×8特征图、优于现有AR模型且采样更快；机构、CVPR 2022、两级Transformer细节与对音频编解码器的影响来自一般了解"}
+}

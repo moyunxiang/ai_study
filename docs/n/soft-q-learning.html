@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>软Q学习（能量策略）（2017） · AI脉络</title>
+<meta name="description" content="等连续控制算法学的是确定性或单峰高斯策略，一旦认定一条路就很少尝试其他做法；最大熵RL能鼓励多样行为，但在连续状态和动作上一直只能在表格情形下做。 把最大熵目标下的最优策略写成能量模型 π(a|s) ∝ exp(Q_soft(s,a)/α) ，用软Bellman方程学软Q函数，再训练一个采样网络（…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/soft-q-learning.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="软Q学习（能量策略）（2017）">
+<meta property="og:description" content="等连续控制算法学的是确定性或单峰高斯策略，一旦认定一条路就很少尝试其他做法；最大熵RL能鼓励多样行为，但在连续状态和动作上一直只能在表格情形下做。 把最大熵目标下的最优策略写成能量模型 π(a|s) ∝ exp(Q_soft(s,a)/α) ，用软Bellman方程学软Q函数，再训练一个采样网络（…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/soft-q-learning.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/soft-q-learning">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 策略梯度与演员评论家</div>
+<h1>软Q学习（能量策略）</h1>
+<div class="full">Reinforcement Learning with Deep Energy-Based Policies</div>
+<div class="meta"><span>2017.02</span><span>论文</span><span>延伸</span><span>ICML 2017</span><span>Tuomas Haarnoja, Haoran Tang, Pieter Abbeel, Sergey Levine · UC Berkeley / OpenAI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1702.08165" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/soft-q-learning">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/ddpg.html">DDPG</a>等连续控制算法学的是确定性或单峰高斯策略，一旦认定一条路就很少尝试其他做法；最大熵RL能鼓励多样行为，但在连续状态和动作上一直只能在表格情形下做。</p></div><div><h4>方法</h4><p>把最大熵目标下的最优策略写成能量模型 <code>π(a|s) ∝ exp(Q_soft(s,a)/α)</code>，用软Bellman方程学软Q函数，再训练一个采样网络（用摊销的Stein变分梯度下降）去近似从这个分布中采样。</p></div><div><h4>影响</h4><p>把最大熵RL带进深度连续控制，直接引出了更简单稳定的<a class="ln" href="../n/sac.html">SAC</a>；「软Q」「软值」的写法也被后来的离线RL和模仿学习方法（如<a class="ln" href="../n/iq-learn.html">IQ-Learn逆软Q模仿</a>）沿用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>最大熵RL的目标是在回报之外再奖励策略的熵：<code>Σ E[r_t + α·H(π(·|s_t))]</code>，α控制有多看重随机性。在这个目标下，最优策略是对软Q函数做玻尔兹曼分布：Q高的动作概率大，但次优动作也保留一定概率，因此策略可以是多峰的。软Q满足软Bellman方程 <code>Q(s,a) = r + γ·E[V(s&#x27;)]</code>，其中 <code>V(s) = α·log ∫ exp(Q(s,a)/α) da</code>，即把max换成log-sum-exp。</p><p>连续动作里这个积分和采样都算不出来。作者用重要性采样估计软值V；再训练一个输入状态和噪声、输出动作的采样网络，用摊销SVGD让它产生的样本分布逼近 <code>exp(Q/α)</code>。摘要称，这样做的好处包括更好的探索，以及可组合性——在一个任务上学到的技能可以迁移到别的任务，作者在模拟的游泳和行走机器人上验证了这些性质；文中还指出actor-critic方法可以看作是在对应能量模型上做近似推断。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>SVGD采样网络和重要性采样估计软值都很复杂，训练不稳定、实现门槛高。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/sac.html">SAC</a></div></li><li>温度α需要手动设定，对结果影响很大。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/sac.html">SAC</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/q-learning.html">Q-learning</a><span class="yr">1992 · RL</span><div class=nt>把Q学习里的max换成log-sum-exp的软max，得到熵正则下的软Q学习。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/dqn-nature.html">DQN（Nature版）</a><span class="yr">2015.02 · RL</span><div class=nt>软Q函数用深度网络近似，并沿用经验回放和目标网络。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/maxent-irl.html">最大熵逆强化学习</a><span class="yr">2008 · RL</span><div class=nt>沿用最大熵框架下策略呈玻尔兹曼分布的形式，把它从逆RL用到正向控制。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/ddpg.html">DDPG</a><span class="yr">2015.09 · RL</span><div class=nt>DDPG学确定性策略；软Q学多峰的随机策略，探索更充分。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/sac.html">SAC</a><span class="yr">2018.01 · RL</span><div class=nt>SVGD采样网络和重要性采样估计软值都很复杂，训练不稳定、实现门槛高。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/sqil.html">SQIL软Q模仿</a><span class="yr">2019.05 · RL</span><div class=nt>用软Q学习作为底层RL算法，理论分析也基于最大熵框架。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/iq-learn.html">IQ-Learn逆软Q模仿</a><span class="yr">2021.06 · RL</span><div class=nt>依赖最大熵框架下软Q与奖励、策略之间的对应关系。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/entropy.html">信息量与熵</a> <a class="chip c" href="../c/energy-based.html">能量模型与玻尔兹曼分布</a> <a class="chip c" href="../c/bellman-equation.html">Bellman方程</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a></p>
+<h2>本篇术语</h2><ul><li><b>最大熵RL</b>　在回报之外再加上策略熵的奖励，让智能体在不损失太多回报的前提下尽量保持随机。</li><li><b>SVGD</b>　Stein变分梯度下降：一种让一组样本逐步移动、使其分布逼近目标分布的确定性方法；摊销版本训练一个网络直接产生这样的样本。</li></ul>
+<h2>怎么学</h2><p>先懂熵和softmax；读原文第2–3节的软Bellman方程；再读<a class="ln" href="../n/sac.html">SAC</a>，对比两者在实现上的简化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1702.08165" rel="noopener">https://arxiv.org/abs/1702.08165</a>（标题Reinforcement Learning with Deep Energy-Based Policies、四位作者、arXiv v1于2017-02-27；摘要中连续状态动作的能量模型策略、最大熵策略、soft Q-learning以玻尔兹曼分布表示最优策略、摊销SVGD学采样网络、改进探索与技能可组合、游泳与行走机器人实验、与actor-critic的近似推断联系。软值的log-sum-exp形式与重要性采样估计按原文正文通行描述；ICML 2017按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E8%BD%AFQ%E5%AD%A6%E4%B9%A0%EF%BC%88%E8%83%BD%E9%87%8F%E7%AD%96%E7%95%A5%EF%BC%89%EF%BC%88soft-q-learning%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asoft-q-learning%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/soft-q-learning.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="deepstack.html"><small>本分支上一个 · 2017.01</small><b>DeepStack</b></a><a class="r" href="es-openai.html"><small>本分支下一个 · 2017.03</small><b>进化策略作为RL替代</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

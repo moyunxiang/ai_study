@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Levenshtein Transformer（2019） · AI脉络</title>
+<meta name="description" content="非自回归模型要么事先固定输出长度、在固定格子里反复改写，要么只能从左到右逐词生成；都不能在生成过程中自由地增删词、改变长度。 把生成看成一连串编辑操作：每一轮先并行决定删掉哪些词，再决定在哪些空隙插入几个占位符，最后并行填出占位符的词，长度可以随轮次动态变化。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/levenshtein-transformer.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Levenshtein Transformer（2019）">
+<meta property="og:description" content="非自回归模型要么事先固定输出长度、在固定格子里反复改写，要么只能从左到右逐词生成；都不能在生成过程中自由地增删词、改变长度。 把生成看成一连串编辑操作：每一轮先并行决定删掉哪些词，再决定在哪些空隙插入几个占位符，最后并行填出占位符的词，长度可以随轮次动态变化。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/levenshtein-transformer.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/levenshtein-transformer">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 非自回归与扩散</div>
+<h1>Levenshtein Transformer</h1>
+<div class="full">Levenshtein Transformer</div>
+<div class="meta"><span>2019.05</span><span>论文</span><span>延伸</span><span>NeurIPS 2019</span><span>Jiatao Gu, Changhan Wang, Jake Zhao · Facebook AI Research / 纽约大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1905.11006" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/levenshtein-transformer">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>非自回归模型要么事先固定输出长度、在固定格子里反复改写，要么只能从左到右逐词生成；都不能在生成过程中自由地增删词、改变长度。</p></div><div><h4>方法</h4><p>把生成看成一连串编辑操作：每一轮先并行决定删掉哪些词，再决定在哪些空隙插入几个占位符，最后并行填出占位符的词，长度可以随轮次动态变化。</p></div><div><h4>影响</h4><p>把“插入/删除”作为基本操作引入并行生成，同一个模型既能从零生成也能修改已有文本，是编辑式非自回归生成的代表工作。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/non-autoregressive-nmt.html">非自回归翻译NAT</a>一次并行输出全部词但要先预测长度，<a class="ln" href="../n/mask-predict.html">Mask-Predict并行解码</a>在固定长度内反复重写置信度低的词。Levenshtein Transformer的名字来自编辑距离（Levenshtein距离），它的每一轮迭代由三个分类器完成，都共享同一个Transformer解码器：</p><ul><li>删除：对当前序列的每个词判断“保留还是删除”；</li><li>插入占位符：对每两个相邻词之间的空隙预测要插入几个占位符；</li><li>填词：并行预测每个占位符应是哪个词。</li></ul><p>从空序列出发反复执行，就是生成；从一段已有文本出发，就是修改。训练时用模仿学习：根据当前序列和目标序列的编辑距离算出“专家”应做的最优编辑，让模型模仿，并让删除和插入互相为对方制造训练样本。作者称它在机器翻译和摘要上效果与自回归Transformer相当、解码效率高得多；用机器翻译训练好的模型还能直接用于自动译后编辑。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要从自回归教师模型做知识蒸馏才能达到可比的翻译质量，迭代轮数和三个分类器的误差会累积，在开放式长文本生成上没有验证。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/mdlm.html">掩码扩散语言模型MDLM</a> <a class="chip hue" style="--h:0" href="../n/seed-diffusion.html">Seed Diffusion</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>删除、插入、填词三个分类器共享一个Transformer解码器。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/non-autoregressive-nmt.html">非自回归翻译NAT</a><span class="yr">2017.11 · LLM</span><div class=nt>NAT必须事先固定输出长度；本文通过插入和删除在生成中动态改变长度。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/mask-predict.html">Mask-Predict并行解码</a><span class="yr">2019.04 · LLM</span><div class=nt>同期的迭代并行解码：Mask-Predict在固定长度内反复重写低置信度词，本文改为增删式编辑。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/mdlm.html">掩码扩散语言模型MDLM</a><span class="yr">2024.06 · LLM</span><div class=nt>需要从自回归教师模型做知识蒸馏才能达到可比的翻译质量，迭代轮数和三个分类器的误差会累积，在开放式长文本生成上没有验证。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/seed-diffusion.html">Seed Diffusion</a><span class="yr">2025.08 · LLM</span><div class=nt>需要从自回归教师模型做知识蒸馏才能达到可比的翻译质量，迭代轮数和三个分类器的误差会累积，在开放式长文本生成上没有验证。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a> <a class="chip c" href="../c/knowledge-distillation.html">知识蒸馏</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a></p>
+<h2>本篇术语</h2><ul><li><b>编辑距离</b>　把一个序列改成另一个序列最少需要多少次插入、删除、替换；Levenshtein距离是其中最常用的一种。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/non-autoregressive-nmt.html">非自回归翻译NAT</a>和<a class="ln" href="../n/mask-predict.html">Mask-Predict并行解码</a>；读本文三种操作的定义和模仿学习的训练流程图；动手：用fairseq里的Levenshtein Transformer示例在小翻译数据上训练，打印每轮删除和插入的过程。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1905.11006" rel="noopener">https://arxiv.org/abs/1905.11006</a>（标题、3位作者、arXiv首次提交2019-05-27；摘要中插入和删除作为基本操作、动态改变长度、互为学习信号的训练技巧、翻译和摘要效果相当而效率更高、可直接用于自动译后编辑。三个分类器的结构、模仿学习细节、依赖蒸馏和NeurIPS 2019为一般了解，未逐项对照。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Levenshtein%20Transformer%EF%BC%88levenshtein-transformer%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Alevenshtein-transformer%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/levenshtein-transformer.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="adaptive-span.html"><small>本分支上一个 · 2019.05</small><b>自适应注意力跨度</b></a><a class="r" href="xlnet.html"><small>本分支下一个 · 2019.06</small><b>XLNet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

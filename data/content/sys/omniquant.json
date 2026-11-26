@@ -1,0 +1,25 @@
+{
+ "id": "omniquant",
+ "who": "Wenqi Shao, Mengzhao Chen, Zhaoyang Zhang, Peng Xu, Lirui Zhao, Zhiqian Li, Kaipeng Zhang, Peng Gao et al. · 上海人工智能实验室, 香港大学等",
+ "venue": "ICLR 2024",
+ "aka": ["可学习权重截断", "LWC", "可学习等价变换", "LET", "W4A4量化"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2308.13137"},
+  {"label": "GitHub", "url": "https://github.com/OpenGVLab/OmniQuant"}
+ ],
+ "problem": "GPTQ、AWQ、SmoothQuant等大模型训练后量化的截断范围、平滑缩放系数都是按规则手工定的，到W4A4或W2A16这类极低比特时精度掉得厉害；而完整的量化感知训练对大模型又太贵。",
+ "idea": "保留训练后量化的低成本，但把量化参数变成可学习的：逐个Transformer块地最小化量化前后输出误差，同时学习权重截断阈值和激活到权重的等价变换系数。",
+ "impact": "成为W4A4、W2A16等极低比特设置下常用的对比基线，“逐块可微地学习少量量化参数”的思路被后续PTQ方法广泛借用。",
+ "method": "[[smoothquant]]用一个手工公式把激活里的离群值“搬”到权重上，[[awq]]按激活大小手工搜索缩放系数，[[gptq]]逐列补偿量化误差但截断范围固定。OmniQuant认为这些手工规则在极低比特下不够用。\n\n它包含两个可学习部件：**可学习权重截断（LWC）**，为每组权重学习上下界的缩放比例，决定把多少极端值截掉；**可学习等价变换（LET）**，为激活学习逐通道的平移和缩放参数，并把相反的变换吸收进权重，输出在全精度下不变，量化难度从激活转移到权重。优化方式是逐块的：以一个Transformer块为单位，冻结原始权重，只更新这些少量参数，最小化量化块与全精度块输出的差异，误差不会在整个网络上累积，显存需求也小。\n\n摘要报告：在单张A100-40G上用128条样本、1–16小时即可处理7B到70B的LLaMA-2；覆盖W4A4、W6A6、W4A16、W3A16、W2A16等设置，并在真实设备上带来推理加速与显存节省。",
+ "limits": [
+  {"text": "W4A4下激活离群值仍让精度损失明显，逐通道变换处理不了旋转意义下的离群分布；后来的方法改用正交旋转把离群值摊平。", "solved_by": ["quarot", "spinquant"]}
+ ],
+ "relations": [
+  {"to": "smoothquant", "type": "extends", "note": "SmoothQuant用固定公式在激活与权重之间转移量化难度，OmniQuant把这个等价变换的系数改成可学习的。"},
+  {"to": "awq", "type": "rivals", "note": "AWQ用网格搜索确定缩放，OmniQuant用梯度逐块优化截断与变换参数。"},
+  {"to": "gptq", "type": "rivals", "note": "同为大模型训练后量化，GPTQ逐列补偿误差，OmniQuant学习截断阈值，两者在仅权重量化上常被直接比较。"},
+  {"to": "llama-2", "type": "uses", "note": "主要实验对象是7B到70B的LLaMA-2系列。"}
+ ],
+ "prereq": ["quantization-concept", "transformer-block", "gradient-descent", "neuron-activation"],
+ "check": {"source": "https://arxiv.org/abs/2308.13137", "confirmed": "标题、作者（Shao, Chen等十人）、v1日期2023-08-25；摘要：现有PTQ手工设定量化参数、极低比特下效果差、LWC优化权重截断阈值、LET把量化难度从激活转到权重、逐块误差最小化的可微框架、单张A100-40G上128样本1–16小时处理LLaMA-2 7–70B、W4A4/W6A6/W4A16/W3A16/W2A16。ICLR 2024、机构为一般了解。"}
+}

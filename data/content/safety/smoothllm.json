@@ -1,0 +1,27 @@
+{
+ "id": "smoothllm",
+ "who": "Alexander Robey, Eric Wong, Hamed Hassani, George J. Pappas · 宾夕法尼亚大学",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2310.03684"},
+  {"label": "代码", "url": "https://github.com/arobey1/smooth-llm"}
+ ],
+ "aka": ["SmoothLLM", "随机平滑防越狱", "扰动投票防御"],
+ "problem": "[[gcg]]优化出来的乱码后缀能让对齐过的模型输出有害内容，而且可迁移，当时几乎没有专门针对这类越狱的防御。",
+ "idea": "观察到对抗优化出的提示很“脆”，改动几个字符就失效；于是把输入复制多份、每份随机扰动一部分字符，分别让模型回答，再按多数结果判断并返回。",
+ "impact": "把图像领域的[[randomized-smoothing]]思想搬到大模型越狱防御上，成为后来越狱防御论文最常比较的基线之一。",
+ "method": "做法分三步。第一步复制：把用户的提示复制N份。第二步扰动：对每份随机选一定比例的字符，做替换、插入或成块修改。第三步聚合：让模型分别回答这N份，用一个判别规则看每个回答是否越狱，取多数一方的结论，并从多数一方中挑一个回答返回给用户。\n\n它有效的原因在于：[[gcg]]找到的后缀是逐个token精细优化的，字符级的小改动就会打破它的效果；而正常的提问在小扰动下语义基本不变，模型仍能正常回答。这与[[randomized-smoothing]]在图像上“加噪后投票”的做法同源。\n\n摘要称，在多种主流大模型上，SmoothLLM对GCG、[[pair]]、RandomSearch和AmpleGCG等越狱的鲁棒性达到了当时最好的水平，也能抵抗自适应的GCG攻击，在正常任务上的性能有小但不可忽略的下降，并且适用于任何大模型。代价是每次请求要调用N次模型。",
+ "limits": [
+  {"text": "每次请求需多次调用模型，成本成倍增加；对语义层面的越狱（如角色扮演、多轮诱导）帮助有限，因为它们不怕字符扰动。", "solved_by": ["circuit-breakers", "constitutional-classifiers"]}
+ ],
+ "relations": [
+  {"to": "gcg", "type": "solves", "note": "利用GCG后缀对字符扰动很脆弱的特点，用随机扰动加投票来防御。"},
+  {"to": "randomized-smoothing", "type": "extends", "note": "把图像分类中的随机平滑思想推广到语言模型越狱防御。"},
+  {"to": "pair", "type": "solves", "note": "在PAIR等黑盒越狱上同样测试了防御效果。"}
+ ],
+ "prereq": ["language-model", "tokenization", "ensemble", "adversarial-training"],
+ "terms": [
+  {"t": "自适应攻击", "d": "攻击者知道防御的具体做法，并专门针对它设计的攻击，是检验防御是否真有效的标准。"}
+ ],
+ "learn": "先读[[randomized-smoothing]]和[[gcg]] → 读原文第3–4节的算法与脆弱性实验 → 再读[[attacker-moves-second]]看自适应攻击如何检验这类防御。",
+ "check": {"source": "https://arxiv.org/abs/2310.03684", "confirmed": "arXiv记录：标题、4位作者、2023-10-05 v1；摘要中的字符级扰动脆弱性、随机扰动多份并聚合、对GCG、PAIR、RandomSearch、AmpleGCG的鲁棒性、抵抗自适应GCG、小但不可忽略的性能代价。机构凭一般了解写。"}
+}

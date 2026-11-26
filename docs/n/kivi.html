@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>KIVI两比特KV缓存（2024） · AI脉络</title>
+<meta name="description" content="批量大、上下文长时，KV缓存比模型权重还占显存，每步解码搬运KV还让计算单元空等；把KV缓存量化到很低比特又缺少对其数值分布的研究，直接按token量化误差很大。 分析发现Key里有固定的几个通道数值特别大，Value没有这个现象，于是Key按通道、Value按token分组做2比特非对称量化，最…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/kivi.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="KIVI两比特KV缓存（2024）">
+<meta property="og:description" content="批量大、上下文长时，KV缓存比模型权重还占显存，每步解码搬运KV还让计算单元空等；把KV缓存量化到很低比特又缺少对其数值分布的研究，直接按token量化误差很大。 分析发现Key里有固定的几个通道数值特别大，Value没有这个现象，于是Key按通道、Value按token分组做2比特非对称量化，最…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/kivi.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/kivi">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 低比特量化</div>
+<h1>KIVI两比特KV缓存</h1>
+<div class="full">KIVI: A Tuning-Free Asymmetric 2bit Quantization for KV Cache</div>
+<div class="meta"><span>2024.02</span><span>论文</span><span>延伸</span><span>ICML 2024</span><span>Zirui Liu, Jiayi Yuan, Hongye Jin, Shaochen Zhong, Zhaozhuo Xu, Vladimir Braverman, Beidi Chen, Xia Hu · 莱斯大学, 德州农工大学, 史蒂文斯理工, 卡内基梅隆大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2402.02750" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/jy-yuan/KIVI" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/kivi">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>批量大、上下文长时，KV缓存比模型权重还占显存，每步解码搬运KV还让计算单元空等；把KV缓存量化到很低比特又缺少对其数值分布的研究，直接按token量化误差很大。</p></div><div><h4>方法</h4><p>分析发现Key里有固定的几个通道数值特别大，Value没有这个现象，于是Key按通道、Value按token分组做2比特非对称量化，最近的一小段token保持全精度。</p></div><div><h4>影响</h4><p>成为免调参KV缓存量化的常用基线，“Key按通道、Value按token”的做法被后续KV量化工作广泛沿用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="lc" href="../c/kv-cache.html">KV缓存</a>保存每个已生成token每层的Key和Value，长上下文下它决定了能开多大批。<a class="ln" href="../n/h2o.html">H2O KV缓存淘汰</a>这类方法丢掉一部分token；量化则保留全部token、只把每个数存得更省。</p><p>作者先统计了Llama、Falcon、Mistral等模型KV缓存的数值分布：Key里有若干<b>固定的通道</b>数值远大于其他通道，Value则没有明显的通道离群。量化时如果按token分组，同一组里混着离群通道和普通通道，缩放比例被离群值撑大，普通通道的精度就丢了；按通道分组，误差被关在离群通道内部。论文在Llama-2-13B上测得：Key按token量化的注意力分数相对误差约47.00，按通道只有9.60。Value直接影响注意力输出的每个token，按token量化更合适。</p><p>具体做法：Key每攒满R个token（实验取R=128），就按通道、每G=32个token一组量化成2比特；Value用长度R的队列，最老的出队后按token量化。最近的token始终全精度，作者指出这对GSM8K这类难任务很关键。摘要报告：峰值显存（含权重）降为约1/2.6，批大小可增到4倍，实际吞吐提高2.35–3.47倍，质量几乎不变。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只压缩每个数的比特数，不减少token数量；上下文到百万级时KV缓存仍随长度线性增长，需要与淘汰、稀疏或架构改动结合。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/llm-int8.html">LLM.int8()与离群特征</a><span class="yr">2022.08 · 系统·效率</span><div class=nt>LLM.int8()发现激活里有固定的离群特征维度；KIVI在KV缓存的Key上观察到类似的离群通道，并据此选择按通道量化。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/efficient-inference.html">KV缓存与推理扩展分析</a><span class="yr">2022.11 · 系统·效率</span><div class=nt>该文指出KV缓存是长序列推理的主要显存瓶颈；KIVI把每个KV数值压到2比特，直接缓解这一点。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/h2o.html">H2O KV缓存淘汰</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>H2O靠丢弃不重要的token压缩KV，KIVI保留全部token只降低精度，两者可以互补。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/quantization-concept.html">量化</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2402.02750" rel="noopener">https://arxiv.org/abs/2402.02750</a>（标题、八位作者、v1日期2024-02-05；摘要：KV缓存成为新瓶颈、Key按通道Value按token、免调参2比特、峰值显存降2.6×、批大小4×、吞吐2.35–3.47×；arXiv HTML v2：作者机构（莱斯、史蒂文斯、CMU等）、R=128与G=32、残差全精度窗口对GSM8K的重要性、Llama-2-13B上47.00对9.60的相对误差。ICML 2024来自HTML页面关键词；德州农工为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20KIVI%E4%B8%A4%E6%AF%94%E7%89%B9KV%E7%BC%93%E5%AD%98%EF%BC%88kivi%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Akivi%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/kivi.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="dora.html"><small>本分支上一个 · 2024.02</small><b>DoRA</b></a><a class="r" href="bitnet.html"><small>本分支下一个 · 2024.02</small><b>1.58比特模型BitNet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

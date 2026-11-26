@@ -1,0 +1,29 @@
+{
+  "id": "tip-adapter",
+  "aka": ["Tip-Adapter", "Tip-Adapter-F", "免训练CLIP适配器", "缓存模型"],
+  "who": "Renrui Zhang, Rongyao Fang, Wei Zhang, Peng Gao, Kunchang Li, Jifeng Dai, Yu Qiao, Hongsheng Li · 上海人工智能实验室、香港中文大学等",
+  "venue": "ECCV 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2111.03930"},
+    {"label": "代码", "url": "https://github.com/gaopengcuhk/Tip-Adapter"}
+  ],
+  "problem": "CLIP-Adapter等方法靠训练一个小适配器提升CLIP的少样本分类，但仍要反向传播训练，丢掉了CLIP“拿来即用”的优点。",
+  "idea": "不训练：把少样本训练集的图像特征当“键”、独热标签当“值”，构成一个缓存模型，测试图像按与键的相似度从缓存里取标签，再和CLIP零样本预测相加。",
+  "impact": "以免训练的方式达到或超过需要训练的适配器，和CoOp一起成为CLIP少样本适配最常被比较的基线。",
+  "method": "[[clip]]零样本分类之后，大家想用每类几张样本进一步提升效果。[[coop]]学习提示向量，CLIP-Adapter则在CLIP特征后加一个带残差的小网络并训练它。这些方法都要反向传播训练，需要额外计算和调参。\n\nTip-Adapter把少样本训练集直接变成一个“键-值缓存”：用CLIP图像编码器提取每张训练图像的特征作为键，对应类别的独热向量作为值。来了一张测试图，先算它和所有键的余弦相似度，经过一个指数函数变成权重，用这些权重对值做加权求和，得到“缓存预测”；再与CLIP原本的零样本预测（图像特征与类名文本嵌入的相似度）按比例相加作为最终输出。整个过程没有任何梯度更新，本质上是一个可微的近邻分类器。\n\n论文还给了Tip-Adapter-F：用缓存的键初始化一个线性层再微调几轮，由于起点已经很好，收敛非常快。摘要报告，免训练版本的效果与需要训练的CLIP-Adapter相当甚至更好，实验覆盖ImageNet和另外10个数据集的少样本分类。",
+  "limits": [
+    {"text": "缓存大小随训练样本数线性增长，样本多时存储和相似度计算成本上升，优势也会被普通微调追平。", "solved_by": []},
+    {"text": "只适配分类任务的输出端，对检测、分割或需要改变视觉特征本身的任务帮助有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "clip", "type": "extends", "note": "在CLIP零样本预测之上叠加一个由少样本特征构成的缓存预测。"},
+    {"to": "coop", "type": "rivals", "note": "CoOp通过训练提示适配CLIP，Tip-Adapter不训练、直接用少样本特征做检索式修正。"},
+    {"to": "knn", "type": "uses", "note": "缓存模型本质上是以相似度加权的近邻分类。"}
+  ],
+  "prereq": ["zero-few-shot", "k-nearest-neighbors", "embedding", "one-hot", "contrastive-learning"],
+  "terms": [
+    {"t": "缓存模型（cache model）", "d": "把训练样本的特征和标签原样存下来，测试时按相似度从中检索并加权组合标签，相当于不需要训练的记忆。"}
+  ],
+  "learn": "先懂[[clip]]的零样本分类和k近邻，再读Tip-Adapter原文的公式（缓存预测与零样本预测的加权和），用几十行代码在一个小数据集上实现免训练版。",
+  "check": {"source": "https://arxiv.org/abs/2111.03930", "confirmed": "标题、八位作者、arXiv v1提交2021-11-06；摘要中CLIP-Adapter需额外训练、Tip-Adapter无需反向传播、由少样本训练集构建键值缓存模型、与CLIP-Adapter相当或更好、微调几轮可进一步提升且收敛快、ImageNet及另外10个数据集。指数变换与加权相加的具体形式、Tip-Adapter-F命名、机构与ECCV 2022为一般了解，未逐项核对。"}
+}

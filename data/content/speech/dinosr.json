@@ -1,0 +1,32 @@
+{
+  "id": "dinosr",
+  "who": "Alexander H. Liu, Heng-Jui Chang, Michael Auli, Wei-Ning Hsu, James R. Glass · MIT、Meta AI",
+  "venue": "NeurIPS 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2305.10005"}
+  ],
+  "problem": "HuBERT要先离线做k-means聚类生成伪标签、训练一轮再重新聚类，多轮迭代很麻烦；data2vec的自蒸馏不需要离线聚类，但回归的是连续向量，没有离散的「音素单元」。",
+  "idea": "把掩码预测、自蒸馏和在线聚类合在一起：教师网络给出上下文表示，在训练过程中实时聚类成离散单元，学生网络在被遮住的位置预测这些单元。",
+  "impact": "DinoSR在SUPERB等多项下游任务上超过此前的自监督语音模型，表明离散目标可以在训练中自动产生，不必依赖HuBERT式的多轮离线聚类。",
+  "method": "[[hubert]]的目标是让模型在被遮住的位置预测离散的伪标签，这些标签来自对MFCC或上一轮模型特征做k-means；每换一轮目标都要停下来重新聚类。[[data2vec]]用自蒸馏代替：一个教师网络（学生参数的指数滑动平均）看完整输入，学生看被遮住的输入，去回归教师的连续表示。\n\nDinoSR结合二者。第一步，教师网络看未遮挡的音频，输出每帧的上下文表示；第二步，对教师若干层的表示各自维护一组码本（类似[[c:vector-quantization]]），把每帧分到最近的码字，并在训练中用滑动平均在线更新码字，这就是「在线聚类」，得到一套由机器自己发现的类音素单元；第三步，学生网络在被遮住的帧上预测这些离散单元（见[[c:masked-modeling]]）。教师参数是学生参数的滑动平均，这一点继承自图像领域的[[dino]]和[[byol]]（见[[c:knowledge-distillation]]）。\n\n摘要报告：DinoSR在多个下游任务上超过此前最好的结果，论文还分析了学到的离散单元与音素的对应关系（具体数字未写）。在线产生离散目标的思路与此后语音分词器（离散单元）的研究相互呼应。",
+  "limits": [
+    {"text": "码本大小、用哪几层做聚类等超参数需要调，学到的单元与真实音素只是近似对应。", "solved_by": []},
+    {"text": "和同类自监督模型一样，预训练仍需大量算力，对说话人和噪声信息的保留取决于目标层的选择。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "hubert", "type": "solves", "note": "HuBERT要多轮离线k-means生成目标；DinoSR在训练中在线聚类，一步得到离散目标。"},
+    {"to": "data2vec", "type": "extends", "note": "沿用data2vec的教师-学生自蒸馏，但把回归连续表示改为预测离散单元。"},
+    {"to": "dino", "type": "uses", "note": "教师是学生参数的滑动平均，这一自蒸馏机制来自DINO。"},
+    {"to": "wav2vec-2", "type": "rivals", "note": "wav2vec 2.0用对比损失和量化器，DinoSR用自蒸馏加在线聚类。"}
+  ],
+  "prereq": ["self-supervised", "masked-modeling", "knowledge-distillation", "vector-quantization", "clustering"],
+  "terms": [
+    {"t": "自蒸馏", "d": "没有外部老师，教师网络就是学生网络参数的滑动平均，学生去模仿教师的输出。"},
+    {"t": "在线聚类", "d": "训练过程中边处理数据边更新聚类中心，而不是事先离线把所有数据聚好。"}
+  ],
+  "aka": ["DinoSR", "自蒸馏语音表示", "self-distillation online clustering"],
+  "check": {
+    "source": "https://arxiv.org/abs/2305.10005",
+    "confirmed": "arXiv官方记录：标题、作者Liu/Chang/Auli/Hsu/Glass、v1提交2023-05-17；摘要关于结合掩码语言建模、自蒸馏、在线聚类，教师提取上下文表示后在线聚类得到机器发现的音素库存，离散token指导学生，多项下游任务超过此前最好。码本按层维护、滑动平均更新、NeurIPS 2023为一般了解。"
+  }
+}

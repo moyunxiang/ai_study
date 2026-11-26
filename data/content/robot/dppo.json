@@ -1,0 +1,29 @@
+{
+ "id": "dppo",
+ "who": "Allen Z. Ren, Justin Lidard, Lars L. Ankile, Anthony Simeonov, Pulkit Agrawal, Anirudha Majumdar, Benjamin Burchfiel, Hongkai Dai et al. · Princeton University、MIT、Toyota Research Institute等",
+ "venue": "ICLR 2025",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2409.00588"},
+  {"label": "项目页", "url": "https://diffusion-ppo.github.io"}
+ ],
+ "aka": ["Diffusion Policy Policy Optimization", "扩散策略PPO微调"],
+ "problem": "扩散策略从示范里学得好，但示范总有覆盖不到的情况，需要用强化学习继续提高。人们原本猜测策略梯度方法对扩散策略效率很低，因为扩散模型的动作概率不好算。",
+ "idea": "把扩散模型的整个去噪过程看成一个内层的马尔可夫决策过程，每一步去噪都是一个高斯动作、概率可以精确计算，于是可以直接套用PPO对扩散策略做策略梯度微调，并总结了一套实用技巧。",
+ "impact": "在常见基准上比其他扩散策略RL方法和其他策略形式的PG微调都更强、更高效，并零样本部署到真机长程装配任务；此后对扩散或流匹配策略做在线RL的工作常把它作为对照。",
+ "method": "[[diffusion-policy]]输出动作的方式是从噪声出发去噪K步。直接对最后的动作求概率很难，所以过去多用Q函数引导等间接方法做RL微调。DPPO的关键观察是：每一步去噪本身就是“在当前带噪动作上加一个高斯扰动”，概率有解析形式。把环境的每个时间步展开成K个去噪子步，就得到一个两层的MDP，奖励只在最后一个子步给出。这样[[ppo]]的比率裁剪、优势估计都能直接用。\n\n实用技巧包括：只微调最后若干个去噪步、给去噪过程设置噪声下限以保证探索、配合动作分块等。实验发现，扩散参数化与RL微调结合时，探索发生在示范动作的“流形”附近，结构化、训练稳定，得到的策略也更鲁棒。论文在带像素观测的仿真机器人任务上验证，并把仿真训练的策略零样本部署到真机的长程多阶段装配任务。",
+ "limits": [
+  {"text": "仍需大量环境交互，主要在仿真里微调后迁移，真机上直接在线训练成本高。", "solved_by": ["hil-serl", "pi-star-0.6"]},
+  {"text": "展开去噪步骤使有效时间跨度变长，信用分配更难，样本效率不如离策略方法。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "diffusion-policy", "type": "extends", "note": "在扩散策略的模仿学习之后接上策略梯度微调，解决示范覆盖不足的问题。"},
+  {"to": "ppo", "type": "uses", "note": "把去噪过程视为内层MDP后直接使用PPO更新。"},
+  {"to": "ddpm", "type": "uses", "note": "利用DDPM每步去噪为高斯转移、概率可算的性质。"}
+ ],
+ "prereq": ["diffusion-process", "policy-gradient-concept", "mdp", "imitation-learning", "actor-critic"],
+ "terms": [
+  {"t": "两层MDP", "d": "外层是环境的时间步，内层是每个时间步里扩散模型的去噪子步；把二者串起来后，每个子步都是一次可算概率的决策。"}
+ ],
+ "learn": "先熟悉PPO的目标函数和Diffusion Policy的去噪采样，再读DPPO第4节的推导；官方代码提供Robomimic和装配任务的配置。",
+ "check": {"source": "https://arxiv.org/abs/2409.00588", "confirmed": "标题、作者（Allen Z. Ren等九位）、v1提交日期2024-09-01；摘要中用策略梯度微调扩散策略、此前猜测PG对扩散策略效率低、在常见基准上最强、结构化流形上探索与训练稳定、像素观测仿真任务、零样本部署到真机长程多阶段操作。两层MDP细节、技巧列表、机构和ICLR 2025为凭一般了解。"}
+}

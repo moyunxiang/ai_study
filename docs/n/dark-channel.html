@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>暗通道先验去雾（2009） · AI脉络</title>
+<meta name="description" content="雾霾图像的退化与每个像素的景深有关，单张图里深度未知，去雾是一个严重欠定的问题；此前的方法要么需要多张图或额外深度信息，要么依赖强假设、容易失真。 统计发现：户外无雾图像的非天空区域里，几乎每个小块中总有某些像素在某个颜色通道上非常暗（接近0）。雾会把这些暗像素抬亮，于是“暗通道”有多亮就直接反映…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dark-channel.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="暗通道先验去雾（2009）">
+<meta property="og:description" content="雾霾图像的退化与每个像素的景深有关，单张图里深度未知，去雾是一个严重欠定的问题；此前的方法要么需要多张图或额外深度信息，要么依赖强假设、容易失真。 统计发现：户外无雾图像的非天空区域里，几乎每个小块中总有某些像素在某个颜色通道上非常暗（接近0）。雾会把这些暗像素抬亮，于是“暗通道”有多亮就直接反映…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dark-channel.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dark-channel">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 图像复原</div>
+<h1>暗通道先验去雾</h1>
+<div class="full">Single Image Haze Removal Using Dark Channel Prior</div>
+<div class="meta"><span>2009.06</span><span>论文</span><span>延伸</span><span>CVPR 2009（最佳论文）</span><span>Kaiming He, Jian Sun, Xiaoou Tang · 香港中文大学 / 微软亚洲研究院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1109/CVPR.2009.5206515" rel="noopener">DOI ↗</a><a class="btn sm" href="https://people.csail.mit.edu/kaiming/" rel="noopener">作者主页 ↗</a><a class="btn sm" href="../index.html#/n/dark-channel">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>雾霾图像的退化与每个像素的景深有关，单张图里深度未知，去雾是一个严重欠定的问题；此前的方法要么需要多张图或额外深度信息，要么依赖强假设、容易失真。</p></div><div><h4>方法</h4><p>统计发现：户外无雾图像的非天空区域里，几乎每个小块中总有某些像素在某个颜色通道上非常暗（接近0）。雾会把这些暗像素抬亮，于是“暗通道”有多亮就直接反映了雾有多浓。</p></div><div><h4>影响</h4><p>一个简单的统计先验让单图去雾第一次变得实用，获CVPR 2009最佳论文，成为去雾领域此后多年的标准基线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>去雾通常用大气散射模型：<code>I(x) = J(x)·t(x) + A·(1 − t(x))</code>。I是看到的有雾图，J是要恢复的无雾图，A是大气光（雾的颜色，近似为常数），<code>t(x) = e^(−β·d(x))</code> 是透射率，距离d越远t越小、雾越重。一张图里J、t、A全未知，必须加先验。</p><p><b>暗通道</b>定义为：对每个像素，在以它为中心的小块（如15×15）内，取三个颜色通道的最小值，再在块内取最小值：<code>J_dark(x) = min_{y∈Ω(x)} min_c J^c(y)</code>。作者统计了大量户外无雾照片，发现非天空区域的J_dark几乎都接近0——原因是自然场景里到处是阴影、鲜艳颜色（只有一两个通道亮）和深色物体。</p><p>把这个先验代入散射模型，对两边取暗通道并令J_dark≈0，就直接得到透射率的估计：<code>t(x) ≈ 1 − ω·min_{y∈Ω(x)} min_c (I^c(y)/A^c)</code>，其中ω（如0.95）保留一点雾以保持远近感。大气光A取暗通道最亮的那部分像素对应的颜色。由于暗通道按块计算，t会有块状边缘，论文用软抠图（soft matting）对t细化，最后反解出 <code>J = (I − A)/max(t, t₀) + A</code>。副产品t还能换算出相对深度图。</p><h2>后来的发展</h2><p>暗通道先验被大量去雾、水下图像增强和低照度增强方法沿用；作者后来用引导滤波替代耗时的软抠图做细化。深度学习时代的去雾网络多以它为对照，并常把散射模型和暗通道作为网络结构或损失的一部分。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>先验在天空、白墙、雪地等大片明亮且接近大气光颜色的区域不成立，这些地方会被过度去雾、出现色偏。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>软抠图细化计算量大，处理一张图需要较长时间。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+
+
+
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/image-tensor.html">图像作为张量</a> <a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/probability-basics.html">随机变量与概率分布</a></p>
+<h2>本篇术语</h2><ul><li><b>大气散射模型</b>　描述雾如何形成图像的物理公式：看到的颜色是物体本身颜色按透射率衰减，再加上被散射进来的大气光。</li><li><b>透射率</b>　从物体到相机的光有多少没被雾散射掉，物体越远透射率越低。</li></ul>
+<h2>怎么学</h2><p>先理解大气散射模型中每一项的物理含义，再用几十行代码实现暗通道、透射率估计和反解（细化步骤可先用引导滤波代替）；拿几张雾天照片和白墙、天空较多的照片观察先验何时失效。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1109/CVPR.2009.5206515" rel="noopener">https://doi.org/10.1109/CVPR.2009.5206515</a>（Crossref记录：标题Single image haze removal using dark channel prior、三位作者He/Sun/Tang、CVPR 2009（2009-06）；何恺明MIT主页列出CVPR 2009最佳论文奖；维基百科称其博士论文同题。散射模型公式、15×15块、ω=0.95、软抠图细化、大气光估计方式、引导滤波后续凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%9A%97%E9%80%9A%E9%81%93%E5%85%88%E9%AA%8C%E5%8E%BB%E9%9B%BE%EF%BC%88dark-channel%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adark-channel%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dark-channel.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="dpm.html"><small>本分支上一个 · 2008.06</small><b>可变形部件模型DPM</b></a><a class="r" href="building-rome.html"><small>本分支下一个 · 2009.09</small><b>一天建成罗马</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

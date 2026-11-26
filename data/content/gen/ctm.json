@@ -1,0 +1,28 @@
+{
+  "id": "ctm",
+  "who": "Dongjun Kim, Chieh-Hsin Lai, Wei-Hsiang Liao, Naoki Murata, Yuhta Takida, Toshimitsu Uesaka, Yutong He, Yuki Mitsufuji, Stefano Ermon · Sony AI / 斯坦福大学",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2310.02279"},
+    {"label": "代码", "url": "https://github.com/sony/ctm"}
+  ],
+  "aka": ["CTM", "Consistency Trajectory Model", "一致性轨迹模型"],
+  "problem": "[[consistency-models]]能一步出图，但只会“从任意时刻直接跳到终点”，多走几步时质量不升反降，无法在速度和质量之间灵活权衡，也丢掉了分数函数。",
+  "idea": "训练一个网络G(x_t, t, s)，能沿概率流ODE从任意时刻t跳到任意更早时刻s；s取终点就是一致性模型，s无限接近t就退化为分数模型，一个网络兼得两者。",
+  "impact": "论文报告单步采样在CIFAR-10上FID 1.73、ImageNet 64×64上FID 1.92，均为当时一步扩散采样的最好成绩；“任意两点之间跳跃”的思路被后来的[[shortcut-models]]、[[meanflow]]等少步生成方法延续。",
+  "method": "把扩散采样看作沿概率流ODE从噪声端（时刻T）走到数据端（时刻0）的一条轨迹。分数模型只知道每一点的切线方向，必须一小步一小步积分；一致性模型只学“从任意点直接到终点0”的映射。CTM学的是整条轨迹上**任意两点之间**的映射`G(x_t, t, s) ≈ x_s`（s ≤ t）。\n\n训练时，以一个预训练的教师扩散模型为参照：从x_t出发，一条路径是让学生直接跳到s；另一条是先用教师的ODE求解器走一小段到中间时刻u，再让学生从u跳到s；要求两条路径落点一致（在特征空间比较）。同时加入去噪分数匹配损失保持分数能力，以及一个GAN判别损失提升单步质量。\n\n由于能任意跳跃，CTM支持新的采样方式：例如“长跳—回加噪—再长跳”的γ采样，算力增加时质量单调提升，避免了一致性模型多步时的退化；又因为可以得到分数，现有的条件引导、似然计算等方法也能直接用。",
+  "limits": [
+    {"text": "需要预训练教师模型并同时优化一致性、分数匹配和对抗三种损失，训练流程复杂，在大规模文生图上的验证有限。", "solved_by": ["scm", "shortcut-models"]}
+  ],
+  "relations": [
+    {"to": "consistency-models", "type": "solves", "note": "一致性模型多步采样会退化，CTM通过任意时刻间跳跃使质量随步数单调提升。"},
+    {"to": "score-sde", "type": "extends", "note": "在概率流ODE的框架下同时学习分数与轨迹上任意两点间的映射。"},
+    {"to": "edm", "type": "uses", "note": "采用EDM的预训练模型和噪声参数化作为教师与实验基础。"}
+  ],
+  "prereq": ["ode-sde", "score-function", "knowledge-distillation", "adversarial-training", "few-step-sampling"],
+  "terms": [
+    {"t": "概率流ODE", "d": "与扩散SDE具有相同边缘分布的确定性常微分方程，沿它从噪声积分到时刻0即得到样本。"}
+  ],
+  "learn": "先读一致性模型和概率流ODE → 读本文第3节G(x_t, t, s)的参数化与训练目标 → 对比sCM和MeanFlow如何处理“两个时刻之间的跳跃”。",
+  "check": {"source": "https://arxiv.org/abs/2310.02279", "confirmed": "标题、九位作者、v1日期2023-10-01、摘要中CM无法权衡质量与速度、CTM包含CM与分数模型为特例、单次前向输出分数并可在概率流ODE上任意初末时刻间移动、结合对抗训练与去噪分数匹配、单步FID CIFAR-10 1.73与ImageNet 64 1.92、算力增加时质量持续提升、可计算似然；机构、ICLR 2024、训练目标与γ采样细节来自一般了解"}
+}

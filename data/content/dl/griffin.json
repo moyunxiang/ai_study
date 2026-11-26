@@ -1,0 +1,28 @@
+{
+  "id": "griffin",
+  "who": "Soham De, Samuel L. Smith, Anushan Fernando, Aleksandar Botev, George Cristian-Muraru, Albert Gu, Ruba Haroun, Leonard Berrada et al. · Google DeepMind",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2402.19427"}
+  ],
+  "aka": ["Hawk", "RG-LRU", "RecurrentGemma"],
+  "problem": "循环网络推理快、序列越长越占优势，但难训练、难扩展；纯循环模型在需要精确回忆上下文的任务上又不如注意力。",
+  "idea": "提出带门控的线性循环层RG-LRU：只用它的模型叫Hawk；再把它与只看附近窗口的局部注意力层交替混合，得到Griffin。",
+  "impact": "证明“门控线性循环+局部注意力”的混合架构能在语言建模上追平Transformer且推理更快，谷歌据此发布了RecurrentGemma开源模型。",
+  "method": "RG-LRU在[[lru]]的对角线性递推上加了门控：每一步的衰减系数由输入决定，`h_t = a_t ⊙ h_{t−1} + √(1 − a_t²) ⊙ (i_t ⊙ x_t)`，其中 `a_t = a^{c·r_t}`，r_t和i_t是由当前输入算出的循环门和输入门。这样模型可以根据内容决定“这一步要保留多少旧记忆”，与[[mamba]]的选择性思想相似，但递推仍是对角线性的，可以高效计算。\n\nHawk由RG-LRU层和MLP层交替堆叠而成，是纯循环模型。Griffin则在其中插入局部注意力层：每个位置只关注前面固定长度窗口内的词（与[[longformer]]的滑动窗口同一类做法），所以推理时缓存大小固定，不随序列增长。循环层负责压缩远处的信息，局部注意力负责精确处理附近的上下文。\n\n摘要报告：Hawk在下游任务上超过了Mamba报告的成绩；Griffin在训练词元数少6倍以上的情况下与Llama-2表现相当，并能外推到比训练时长得多的序列；训练时硬件效率与Transformer相当，推理时延迟更低、吞吐量显著更高；Griffin被扩展到140亿参数，论文还说明了如何为分布式训练切分模型。",
+  "limits": [
+    {"text": "局部注意力窗口之外只能靠固定大小的循环状态记忆，需要从很长上下文中精确检索某个细节时仍弱于全注意力。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "lru", "type": "extends", "note": "在LRU的对角线性递推上加入由输入决定的门控，得到RG-LRU。"},
+    {"to": "mamba", "type": "rivals", "note": "同为让循环衰减依赖输入的选择性线性循环；摘要称Hawk在下游任务上超过Mamba报告的结果。"},
+    {"to": "longformer", "type": "uses", "note": "Griffin中的局部注意力采用滑动窗口式的注意力，只看附近固定长度的上下文。"},
+    {"to": "llama-2", "type": "rivals", "note": "作为Transformer基线对比，Griffin用更少训练词元达到相当效果。"}
+  ],
+  "prereq": ["recurrent-layer", "gating", "state-space-model", "efficient-attention", "kv-cache"],
+  "terms": [
+    {"t": "局部注意力", "d": "每个位置只对前面固定长度窗口内的位置做注意力，计算量和缓存都不随序列长度增长。"},
+    {"t": "混合架构", "d": "在同一个模型里交替使用循环层（或线性注意力层）和注意力层，兼顾效率与精确检索。"}
+  ],
+  "learn": "先读[[lru]]，再读本文第2节的RG-LRU公式与模块结构图；可以试用开源的RecurrentGemma，对比同规模Transformer在长序列生成时的显存占用。",
+  "check": {"source": "https://arxiv.org/abs/2402.19427", "confirmed": "标题、作者（共17位）、arXiv v1提交于2024-02-29；摘要中Hawk（门控线性循环）与Griffin（混合局部注意力）、Hawk超过Mamba报告的下游成绩、Griffin用少6倍以上词元匹配Llama-2、长度外推、推理延迟与吞吐优势、扩展到14B。RG-LRU公式与RecurrentGemma来自一般了解，未逐项核对。"}
+}

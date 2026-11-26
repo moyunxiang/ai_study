@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Ansor自动生成张量程序（2020） · AI脉络</title>
+<meta name="description" content="同一个算子在不同CPU、GPU上的最优写法差别很大。厂商算子库要大量人工；TVM早期的自动调优又要求人先写好调度模板，搜索空间窄。 不要模板：从计算定义自动构造分层的搜索空间，先随机采样出完整程序的“骨架”，再用进化搜索加一个学出来的代价模型细调，并在整个网络的多个子图间分配调优时间。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ansor.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Ansor自动生成张量程序（2020）">
+<meta property="og:description" content="同一个算子在不同CPU、GPU上的最优写法差别很大。厂商算子库要大量人工；TVM早期的自动调优又要求人先写好调度模板，搜索空间窄。 不要模板：从计算定义自动构造分层的搜索空间，先随机采样出完整程序的“骨架”，再用进化搜索加一个学出来的代价模型细调，并在整个网络的多个子图间分配调优时间。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ansor.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ansor">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 编译器与高性能算子</div>
+<h1>Ansor自动生成张量程序</h1>
+<div class="full">Ansor: Generating High-Performance Tensor Programs for Deep Learning</div>
+<div class="meta"><span>2020.06</span><span>论文</span><span>延伸</span><span>OSDI 2020</span><span>Lianmin Zheng, Chengfan Jia, Minmin Sun, Zhao Wu, Cody Hao Yu, Ameer Haj-Ali, Yida Wang, Ion Stoica et al. · UC Berkeley, 阿里巴巴, 亚马逊AWS</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2006.06762" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://tvm.apache.org/docs/" rel="noopener">TVM文档 ↗</a><a class="btn sm" href="../index.html#/n/ansor">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>同一个算子在不同CPU、GPU上的最优写法差别很大。厂商算子库要大量人工；TVM早期的自动调优又要求人先写好调度模板，搜索空间窄。</p></div><div><h4>方法</h4><p>不要模板：从计算定义自动构造分层的搜索空间，先随机采样出完整程序的“骨架”，再用进化搜索加一个学出来的代价模型细调，并在整个网络的多个子图间分配调优时间。</p></div><div><h4>影响</h4><p>并入TVM成为其自动调度器，让编译器自己搜出的内核在多种硬件上接近或超过手写库，是“搜索+代价模型”路线的代表作。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/tvm.html">TVM深度学习编译器</a>沿用<a class="ln" href="../n/halide.html">Halide：算法与调度分离</a>把“算什么”和“怎么算”（调度：循环怎么切块、怎么并行、放哪级缓存）分开，并用机器学习模型预测某个调度跑多快，指导搜索。但它的搜索空间来自人写的模板，模板没覆盖的优化永远搜不到，而且每种新算子都要写模板。</p><p>Ansor分三步。<b>构造空间</b>：按一组推导规则（如多级分块、融合相邻的逐元素运算）从计算定义自动生成程序的高层草图，再随机填写分块大小等细节，得到大量完整候选程序。<b>细调</b>：对这些候选做进化搜索（变异、交叉），用一个在真实测速数据上不断更新的代价模型挑出值得实测的程序。<b>任务调度</b>：一个网络有很多子图，调度器按梯度式的估计决定把调优时间优先花在对端到端延迟贡献最大的子图上。</p><p>摘要报告，相对当时最好的方法，深度网络在Intel CPU、ARM CPU、NVIDIA GPU上的执行性能最多提高3.8倍、2.6倍、1.7倍。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每个模型、每种硬件都要花数小时实测搜索，模型频繁变化时成本高；对注意力这类需要特殊算法改写的融合算子，通用搜索难以找到FlashAttention式的写法。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/flexattention.html">FlexAttention注意力变体</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/tvm.html">TVM深度学习编译器</a><span class="yr">2018.02 · 系统·效率</span><div class=nt>TVM的自动调优依赖人写的调度模板；Ansor自动生成搜索空间，去掉了模板这一步。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/halide.html">Halide：算法与调度分离</a><span class="yr">2013.06 · 系统·效率</span><div class=nt>沿用Halide“算法与调度分离”的思路，把调度的选择完全交给自动搜索。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/flexattention.html">FlexAttention注意力变体</a><span class="yr">2024.12 · 系统·效率</span><div class=nt>每个模型、每种硬件都要花数小时实测搜索，模型频繁变化时成本高；对注意力这类需要特殊算法改写的融合算子，通用搜索难以找到FlashAttention式的写法。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/matrix-multiplication.html">矩阵乘法与线性变换</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+<h2>本篇术语</h2><ul><li><b>代价模型</b>　一个小的预测模型，输入一段候选程序的特征，输出它大约跑多快；用它代替真机测速来筛掉大部分候选。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2006.06762" rel="noopener">https://arxiv.org/abs/2006.06762</a>（标题、作者、v1日期2020-06-11；摘要：厂商库与现有搜索策略的不足、分层搜索空间采样、进化搜索与学习的代价模型、多子图任务调度、Intel CPU/ARM CPU/NVIDIA GPU上最多3.8×/2.6×/1.7×。OSDI 2020、作者机构、并入TVM为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Ansor%E8%87%AA%E5%8A%A8%E7%94%9F%E6%88%90%E5%BC%A0%E9%87%8F%E7%A8%8B%E5%BA%8F%EF%BC%88ansor%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aansor%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ansor.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mindspore.html"><small>本分支上一个 · 2020.03</small><b>华为MindSpore</b></a><a class="r" href="pytorch-ddp.html"><small>本分支下一个 · 2020.06</small><b>PyTorch DDP数据并行</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

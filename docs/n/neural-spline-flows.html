@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>神经样条流NSF（2019） · AI脉络</title>
+<meta name="description" content="的耦合层和自回归层里，每个维度上的可逆变换多是仿射变换（乘一个数再加一个数），单层表达力弱，只能靠堆很多层来拟合复杂分布。 把逐维的仿射变换换成单调的有理二次样条：在一个区间上分成K段，每段用一个有理二次函数，由神经网络输出各段的宽度、高度和节点导数，既灵活又能解析求逆、算雅可比。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/neural-spline-flows.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="神经样条流NSF（2019）">
+<meta property="og:description" content="的耦合层和自回归层里，每个维度上的可逆变换多是仿射变换（乘一个数再加一个数），单层表达力弱，只能靠堆很多层来拟合复杂分布。 把逐维的仿射变换换成单调的有理二次样条：在一个区间上分成K段，每段用一个有理二次函数，由神经网络输出各段的宽度、高度和节点导数，既灵活又能解析求逆、算雅可比。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/neural-spline-flows.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/neural-spline-flows">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 隐变量与标准化流</div>
+<h1>神经样条流NSF</h1>
+<div class="full">Neural Spline Flows</div>
+<div class="meta"><span>2019.06</span><span>论文</span><span>延伸</span><span>NeurIPS 2019</span><span>Conor Durkan, Artur Bekasov, Iain Murray, George Papamakarios · 爱丁堡大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1906.04032" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/neural-spline-flows">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="lc" href="../c/normalizing-flow.html">可逆流与流匹配</a>的耦合层和自回归层里，每个维度上的可逆变换多是仿射变换（乘一个数再加一个数），单层表达力弱，只能靠堆很多层来拟合复杂分布。</p></div><div><h4>方法</h4><p>把逐维的仿射变换换成单调的有理二次样条：在一个区间上分成K段，每段用一个有理二次函数，由神经网络输出各段的宽度、高度和节点导数，既灵活又能解析求逆、算雅可比。</p></div><div><h4>影响</h4><p>样条耦合层成为标准化流的常用模块，被nflows等开源库实现，并广泛用于密度估计、变分推断和科学计算中的模拟推断。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>以耦合层为例：把输入x分成两半，前一半原样保留，另一半的每个维度都经过一个一元可逆函数，函数参数由前一半经神经网络算出。<a class="ln" href="../n/realnvp.html">标准化流RealNVP</a>、<a class="ln" href="../n/glow.html">Glow</a>里这个一元函数是仿射的<code>y = a·x + b</code>，形状过于简单。</p><p>神经样条流把它换成<b>单调有理二次样条</b>：在区间[−B, B]上设K+1个节点，神经网络输出每段的宽度、高度（经softmax保证加起来等于区间长度）和每个节点处的导数（经softplus保证为正）。每一段内部用两个二次多项式之比来插值，这种形式保证单调递增，因而可逆；求逆只需解一个二次方程，有闭式解；每一维的导数也能直接算出，于是整层的对数雅可比行列式就是各维导数的对数之和。区间外则用恒等映射。</p><p>同样的样条也能用在自回归流（参数由<a class="ln" href="../n/made.html">MADE</a>式网络给出）里。论文在表格密度估计、变分自编码器的后验和图像生成上，报告了比仿射版本更好的似然，或用更少的层达到相近效果。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>标准化流整体在高分辨率图像生成上的样本质量仍明显落后于GAN和扩散模型，样条层没有改变这一点。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/ddpm.html">DDPM</a> <a class="chip hue" style="--h:288" href="../n/flow-matching.html">Flow Matching</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/made.html">MADE</a><span class="yr">2015.02 · 生成</span><div class=nt>在自回归版本中用掩码网络输出每个维度的样条参数。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/realnvp.html">标准化流RealNVP</a><span class="yr">2016.05 · 生成</span><div class=nt>保留耦合层结构，把逐维的仿射变换换成更灵活的单调样条。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/glow.html">Glow</a><span class="yr">2018.07 · 生成</span><div class=nt>同为提高流表达力：Glow靠1×1可逆卷积和加深网络，本文靠增强单层的逐维变换。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/ddpm.html">DDPM</a><span class="yr">2020.06 · 生成</span><div class=nt>标准化流整体在高分辨率图像生成上的样本质量仍明显落后于GAN和扩散模型，样条层没有改变这一点。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/flow-matching.html">Flow Matching</a><span class="yr">2022.10 · 生成</span><div class=nt>标准化流整体在高分辨率图像生成上的样本质量仍明显落后于GAN和扩散模型，样条层没有改变这一点。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/normalizing-flow.html">可逆流与流匹配</a> <a class="chip c" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a> <a class="chip c" href="../c/mle.html">最大似然估计</a> <a class="chip c" href="../c/probability-basics.html">随机变量与概率分布</a></p>
+<h2>本篇术语</h2><ul><li><b>有理二次样条</b>　把区间分段，每段用两个二次多项式之比来插值的曲线；可以构造成严格单调，因此可逆。</li></ul>
+<h2>怎么学</h2><p>先读RealNVP的耦合层和变量替换公式 → 读本文第3节样条参数化与求逆 → 用nflows库在二维玩具分布上比较仿射流和样条流。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1906.04032" rel="noopener">https://arxiv.org/abs/1906.04032</a>（标题、四位作者、v1日期2019-06-10、摘要中基于单调有理二次样条的可微模块、同时增强耦合与自回归变换、保持解析可逆、在密度估计、变分推断和图像生成上的改进；机构、NeurIPS 2019、参数化细节与nflows库来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E7%A5%9E%E7%BB%8F%E6%A0%B7%E6%9D%A1%E6%B5%81NSF%EF%BC%88neural-spline-flows%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aneural-spline-flows%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/neural-spline-flows.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="vq-vae-2.html"><small>本分支上一个 · 2019.06</small><b>VQ-VAE-2</b></a><a class="r" href="dvd-gan.html"><small>本分支下一个 · 2019.07</small><b>DVD-GAN</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

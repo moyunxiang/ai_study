@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>自车状态与开环评测之疑（2023） · AI脉络</title>
+<meta name="description" content="UniAD、VAD等端到端驾驶模型都在nuScenes上做开环规划评测、比谁的轨迹误差更低，可这些数字真的反映了规划能力吗？ 仔细拆解评测：发现nuScenes场景太简单，模型只要读入自车的速度等“自车状态”就能把未来轨迹猜个八九不离十，感知信息几乎没用上。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ego-status-ad.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="自车状态与开环评测之疑（2023）">
+<meta property="og:description" content="UniAD、VAD等端到端驾驶模型都在nuScenes上做开环规划评测、比谁的轨迹误差更低，可这些数字真的反映了规划能力吗？ 仔细拆解评测：发现nuScenes场景太简单，模型只要读入自车的速度等“自车状态”就能把未来轨迹猜个八九不离十，感知信息几乎没用上。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ego-status-ad.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ego-status-ad">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 自动驾驶</div>
+<h1>自车状态与开环评测之疑</h1>
+<div class="full">Is Ego Status All You Need for Open-Loop End-to-End Autonomous Driving?</div>
+<div class="meta"><span>2023.12</span><span>论文</span><span>延伸</span><span>CVPR 2024</span><span>Zhiqi Li, Zhiding Yu, Shiyi Lan, Jiahan Li, Jan Kautz, Tong Lu, Jose M. Alvarez · 南京大学、NVIDIA</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2312.03031" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/NVlabs/BEV-Planner" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/ego-status-ad">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>UniAD、VAD等端到端驾驶模型都在nuScenes上做开环规划评测、比谁的轨迹误差更低，可这些数字真的反映了规划能力吗？</p></div><div><h4>方法</h4><p>仔细拆解评测：发现nuScenes场景太简单，模型只要读入自车的速度等“自车状态”就能把未来轨迹猜个八九不离十，感知信息几乎没用上。</p></div><div><h4>影响</h4><p>一篇重要的负结果分析：让“只比nuScenes开环轨迹误差”的评测方式受到广泛质疑。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>端到端自动驾驶（<a class="ln" href="../n/uniad.html">UniAD端到端规划</a>、<a class="ln" href="../n/vad.html">VAD矢量化端到端</a>）把感知、预测、规划串成一个网络，常用的评测是在<a class="ln" href="../n/nuscenes.html">nuScenes</a>上开环比较预测轨迹与人类轨迹的L2误差和碰撞率。这篇论文逐项拆解这套设定，指出几个“魔鬼细节”。</p><p>第一，nuScenes的驾驶场景相对简单；把自车状态（当前速度、加速度、转向等）输入模型后，模型主要依赖这些量来外推未来路径，感知信息没有被充分利用。第二，现有指标不能全面衡量规划质量，可能导出有偏的结论。为此作者新增一个指标，检查预测轨迹是否压出道路边界；并给出一个不依赖任何感知标注的简单基线，就能取得与复杂端到端方法相当的成绩。结论是：在当前基准和指标的限制下，继续刷开环榜单未必能得出可信、普适的结论，社区应重新审视相关研究。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>指出了开环评测的问题，但本身没有提供一个大规模、可信的闭环评测替代方案。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/nuscenes.html">nuScenes</a><span class="yr">2019.03 · 数据·评测</span><div class=nt>分析nuScenes规划评测的场景分布和指标缺陷。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/uniad.html">UniAD端到端规划</a><span class="yr">2022.12 · 具身·世界模型</span><div class=nt>以UniAD等引入自车状态的端到端模型为分析对象，指出其在nuScenes上的优势可能来自自车状态而非感知。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/vad.html">VAD矢量化端到端</a><span class="yr">2023.03 · 具身·世界模型</span><div class=nt>同样检验VAD在开环评测下的表现，并用简单基线达到相近成绩。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/navsim.html">NAVSIM非反应式驾驶评测</a><span class="yr">2024.06 · 具身·世界模型</span><div class=nt>回应开环L2评测不可靠的质疑，用仿真式指标替代位移误差。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/benchmark.html">基准、排行榜与SOTA</a> <a class="chip c" href="../c/ablation-baseline.html">基线与消融实验</a> <a class="chip c" href="../c/end-to-end.html">端到端学习</a> <a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a></p>
+<h2>本篇术语</h2><ul><li><b>开环评测</b>　只把模型预测的轨迹与录下的人类轨迹比对，模型的输出不会影响后续画面；与之相对的闭环评测要让模型真的在仿真里开车。</li><li><b>自车状态</b>　本车自己的速度、加速度、转向角等信息，不需要看周围环境就能获得。</li></ul>
+<h2>怎么学</h2><p>先了解UniAD的规划评测指标，再读本文对场景分布和自车状态的消融；之后看NAVSIM、Bench2Drive等新基准如何回应这些问题。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2312.03031" rel="noopener">https://arxiv.org/abs/2312.03031</a>（标题、七位作者、v1提交日期2023-12-05；摘要中nuScenes场景简单导致依赖自车速度等状态、现有指标不全面、新增道路遵守指标、不依赖感知标注的简单基线、提醒重新审视研究；CVPR 2024见OpenAlex。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E8%87%AA%E8%BD%A6%E7%8A%B6%E6%80%81%E4%B8%8E%E5%BC%80%E7%8E%AF%E8%AF%84%E6%B5%8B%E4%B9%8B%E7%96%91%EF%BC%88ego-status-ad%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aego-status-ad%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ego-status-ad.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="dobb-e.html"><small>本分支上一个 · 2023.11</small><b>Dobb-E家庭机器人</b></a><a class="r" href="gr-1.html"><small>本分支下一个 · 2023.12</small><b>GR-1视频预训练策略</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

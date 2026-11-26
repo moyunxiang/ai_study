@@ -1,0 +1,31 @@
+{
+  "id": "spatten",
+  "who": "Hanrui Wang, Zhekai Zhang, Song Han · MIT",
+  "venue": "HPCA 2021",
+  "aka": ["SpAtten", "稀疏注意力加速器", "Cascade Token Pruning", "级联token剪枝", "注意力加速器"],
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2012.09852"}
+  ],
+  "problem": "注意力的计算量随输入长度平方增长，数据搬运复杂、运算强度低，而已有的神经网络加速器几乎都是为卷积和循环网络设计的。",
+  "idea": "算法与硬件一起设计：运行时按重要性逐层剪掉不重要的token和注意力头，先只取高位数据计算、置信度不够再取低位，用专门的top-k引擎快速排序。",
+  "impact": "把“注意力专用加速器”变成体系结构会议上的一个子方向，其中按注意力分数动态丢弃token的想法，在后来大模型KV缓存压缩的工作里也能看到。",
+  "method": "[[transformer]]和[[bert]]出现后，加速器研究面临新的负载：注意力没有可训练的权重可剪，矩阵随句子长度变化，DRAM访问量大。SpAtten从“人类语言高度冗余”出发，提出三种运行时的稀疏化：\n\n- 级联token剪枝：根据累计的注意力分数判断哪些token不重要，在后续层里直接丢掉，被剪掉的token不再参与之后所有层的计算；\n- 级联头剪枝：同理丢掉不重要的注意力头；\n- 渐进量化：先只从DRAM取数据的高位（MSB）来算注意力，如果softmax结果的置信度低，再取低位（LSB）重算，用计算换内存访问。\n\n因为剪掉哪些token要在运行时按分数排名决定，作者设计了高吞吐的top-k硬件引擎。摘要报告，在30个基准上平均把DRAM访问减少10倍且精度无损，相比A3加速器、MNNFast加速器、TITAN Xp GPU和Xeon CPU分别加速1.6、3.0、162和347倍。",
+  "limits": [
+    {"text": "主要评估BERT这一量级的模型和较短输入，对后来上千亿参数、十万token上下文的LLM推理，瓶颈已转到KV缓存容量和带宽。", "solved_by": []},
+    {"text": "按注意力分数丢token可能误删后面才会用到的信息，对生成任务的长期影响需要谨慎评估。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "solves", "note": "针对Transformer注意力平方复杂度和低运算强度，在硬件上做运行时稀疏化。"},
+    {"to": "bert", "type": "uses", "note": "以BERT等预训练模型作为主要评测负载。"},
+    {"to": "eie", "type": "extends", "note": "同一研究组从压缩网络的稀疏推理引擎，转向没有可训练权重可剪的注意力，改为在运行时剪token和头。"}
+  ],
+  "prereq": ["self-attention", "softmax", "memory-bandwidth", "kv-cache"],
+  "terms": [
+    {"t": "top-k引擎", "d": "从一组分数里快速选出最大的k个的硬件模块，用来在运行时决定保留哪些token或头。"}
+  ],
+  "learn": "先确保理解[[c:self-attention]]的计算流程，再读本文第3节的级联剪枝；可以对比后来LLM推理中按注意力分数淘汰KV缓存的做法。",
+  "check": {
+    "source": "https://arxiv.org/abs/2012.09852",
+    "confirmed": "arXiv记录核对标题、作者Hanrui Wang/Zhekai Zhang/Song Han、v1日期2020-12-17与摘要：级联token与头剪枝、top-k引擎、渐进量化、30个基准DRAM访问减少10倍、对A3/MNNFast/TITAN Xp/Xeon加速1.6/3.0/162/347倍。HPCA 2021与MIT按一般了解写。"
+  }
+}

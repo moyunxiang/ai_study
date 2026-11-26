@@ -1,0 +1,32 @@
+{
+  "id": "ratnaparkhi-tagger",
+  "who": "Adwait Ratnaparkhi · 宾夕法尼亚大学",
+  "venue": "EMNLP 1996",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/W96-0213/"},
+    {"label": "PDF", "url": "https://faculty.washington.edu/fxia/courses/LING572/maxent_adwait96.pdf"}
+  ],
+  "problem": "HMM词性标注器只能用「前一两个标签+当前词」这类固定信息，想加入词缀、大小写、前后词等线索就得重写模型，且各条线索互相重叠、不独立。",
+  "idea": "用最大熵模型直接估计「在这个上下文里该打什么标签」的条件概率，任意多的、互相重叠的上下文特征都能加进来，再用束搜索为整句选出最可能的标签序列。",
+  "impact": "在宾州树库上达到96.6%的准确率，成为90年代末最常用的标注器之一，也是把最大熵带进序列标注的代表工作，直接引出了MEMM与后来的CRF。",
+  "method": "[[church-tagger]]一类HMM标注器把问题写成生成模型：`P(词|标签)·P(标签|前两个标签)`，要加新线索（例如词以-ing结尾、首字母大写、带连字符）就会破坏这种分解。[[maxent-nlp]]提出的最大熵框架给了另一种写法：直接建模`P(t_i | h_i)`，`h_i`是当前位置的「历史」——当前词、前后各两个词、前两个已预测的标签；每条特征是一个0/1指示函数，比如「当前词后缀为-ing且标签为VBG」，模型为每条特征学一个权重，概率正比于`exp(Σ λ_j f_j(h,t))`。对低频词和未登录词，再加上前后缀、是否含数字和大写等拼写特征。\n\n解码时逐词向右，用束搜索保留若干个得分最高的部分标签序列。论文在[[penn-treebank]]华尔街日报部分上报告96.6%的准确率；还专门为几类难区分的标签（如介词和小品词）设计了特征，并发现这些错误很多源于树库标注本身的不一致，于是提出了相应的训练策略。\n\n这个「逐位置条件分类+束搜索」的套路后来被称为最大熵马尔可夫模型（[[memm]]），其标签偏置问题又促成了[[crf]]。",
+  "limits": [
+    {"text": "每个位置单独归一化，概率只在局部比较，会出现「标签偏置」：分支少的状态即使和观察不符也会被偏好。", "solved_by": ["crf"]},
+    {"text": "特征仍要人工设计（词缀、大小写、窗口词），对新语言新领域需要重新做特征工程。", "solved_by": ["collobert-weston", "bilstm-crf"]}
+  ],
+  "relations": [
+    {"to": "maxent-nlp", "type": "uses", "note": "直接套用最大熵（多类逻辑回归）框架，把词性标注写成每个位置的条件分类。"},
+    {"to": "church-tagger", "type": "solves", "note": "HMM生成模型难以容纳重叠的拼写和上下文特征，最大熵模型可任意加入这些特征。"},
+    {"to": "penn-treebank", "type": "uses", "note": "在宾州树库华尔街日报部分训练与测试，并分析了树库标注不一致的问题。"}
+  ],
+  "prereq": ["logistic-regression", "softmax", "feature-representation", "hmm-concept", "entropy"],
+  "terms": [
+    {"t": "最大熵模型", "d": "在满足训练数据特征期望的约束下选择熵最大的分布，形式上等同于多类逻辑回归。"},
+    {"t": "束搜索", "d": "逐步解码时只保留得分最高的k个部分结果，在精度和计算量之间折中。"}
+  ],
+  "learn": "先复习逻辑回归与HMM标注 → 读原文第2–4节的特征表 → 动手：用scikit-learn的逻辑回归加词缀/大小写/窗口特征在NLTK树库样本上做词性标注，再与HMM标注器比较。",
+  "check": {
+    "source": "https://faculty.washington.edu/fxia/courses/LING572/maxent_adwait96.pdf",
+    "confirmed": "OpenAlex记录：标题、作者Ratnaparkhi、EMNLP 1996、摘要（以语料训练的统计模型、96.6%准确率、属于最大熵模型、同时使用多种上下文特征、为难点设计专门特征并讨论语料一致性问题及训练策略）；ACL Anthology W96-0213确认EMNLP 1996。特征模板与束搜索的细节凭一般了解；作者机构凭一般了解。"
+  }
+}

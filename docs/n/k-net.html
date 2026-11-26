@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>K-Net统一分割（2021） · AI脉络</title>
+<meta name="description" content="语义、实例、全景分割本质相近，却各用一套专门框架：语义分割靠逐像素分类，实例分割靠检测框或式的位置网格，全景分割再把两者拼起来。 用一组可学习的卷积核统一三种任务：每个核负责生成一张掩码（一个实例或一类“背景物”），并让核根据它当前分到的像素反复更新自己，用二分匹配端到端训练。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/k-net.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="K-Net统一分割（2021）">
+<meta property="og:description" content="语义、实例、全景分割本质相近，却各用一套专门框架：语义分割靠逐像素分类，实例分割靠检测框或式的位置网格，全景分割再把两者拼起来。 用一组可学习的卷积核统一三种任务：每个核负责生成一张掩码（一个实例或一类“背景物”），并让核根据它当前分到的像素反复更新自己，用二分匹配端到端训练。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/k-net.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/k-net">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 图像分割</div>
+<h1>K-Net统一分割</h1>
+<div class="full">K-Net: Towards Unified Image Segmentation</div>
+<div class="meta"><span>2021.06</span><span>论文</span><span>延伸</span><span>NeurIPS 2021</span><span>Wenwei Zhang, Jiangmiao Pang, Kai Chen, Chen Change Loy · 南洋理工大学 / 上海人工智能实验室 / 商汤</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2106.14855" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/ZwwWayne/K-Net" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/k-net">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>语义、实例、全景分割本质相近，却各用一套专门框架：语义分割靠逐像素分类，实例分割靠检测框或<a class="ln" href="../n/solo.html">SOLO无框实例分割</a>式的位置网格，全景分割再把两者拼起来。</p></div><div><h4>方法</h4><p>用一组可学习的卷积核统一三种任务：每个核负责生成一张掩码（一个实例或一类“背景物”），并让核根据它当前分到的像素反复更新自己，用二分匹配端到端训练。</p></div><div><h4>影响</h4><p>与同期的<a class="ln" href="../n/maskformer.html">MaskFormer</a>一起确立了“一组核或查询各出一张掩码”的统一分割范式，训练和推理都不需要框和NMS。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>思路从语义分割说起：语义分割的最后一层其实就是C个1×1卷积核，每个核和特征图做内积得到一类的掩码。K-Net把这个想法推广——准备N个可学习的核，每个核和特征图卷积得到一张掩码；有的核负责“东西”（可数的实例），有的负责“背景物”（天空、道路这类不可数的区域）。</p><p>难点在于实例：一开始的静态核分不清同类的两个人。K-Net提出<b>核更新</b>：先用当前核得到一张粗掩码，用掩码把属于它的像素特征汇聚起来，再用这些特征通过门控方式更新核本身，核与核之间还做一次注意力交互；重复几轮，核就变得“动态”，专门对应图中具体的某个实例。训练时像<a class="ln" href="../n/detr.html">DETR</a>那样用二分匹配把N个预测掩码和真值一一配对，所以天然不需要检测框和NMS。</p><p>摘要报告：在COCO test-dev全景分割上取得55.2% PQ，在ADE20K验证集语义分割上取得54.3% mIoU，超过当时公开的单模型结果；实例分割精度与Cascade Mask R-CNN相当，推理快60%–90%。</p><h2>后来的发展</h2><p>几个月后的<a class="ln" href="../n/mask2former.html">Mask2Former通用分割</a>用带掩码注意力的Transformer解码器把同一范式做得更强，此后通用分割模型（包括<a class="ln" href="../n/oneformer.html">OneFormer</a>）大多沿用“查询/核→掩码＋二分匹配”的形式。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>三种任务虽然共用一个框架，但仍要分别训练三个模型才能各自达到最好效果。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>核更新只在少数几轮内进行，交互能力有限，此后被更强的掩码注意力解码器超越。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/mask2former.html">Mask2Former通用分割</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/detr.html">DETR</a><span class="yr">2020.05 · 视觉</span><div class=nt>沿用DETR的二分匹配损失，使训练与推理都不需要框和NMS。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/panoptic-segmentation.html">全景分割</a><span class="yr">2018.01 · 视觉</span><div class=nt>为全景分割任务给出一个不需要分别建模“东西”和“背景物”的统一解法。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/panoptic-fpn.html">Panoptic FPN</a><span class="yr">2019.01 · 视觉</span><div class=nt>Panoptic FPN用实例和语义两个分支拼出全景结果；K-Net用同一组核同时处理两类区域。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/yolact.html">YOLACT实例分割</a><span class="yr">2019.04 · 视觉</span><div class=nt>掩码仍依赖检测框和NMS，框不准或两个物体重叠严重时，线性组合的掩码会互相串扰。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/solo.html">SOLO无框实例分割</a><span class="yr">2019.12 · 视觉</span><div class=nt>SOLOv2用动态卷积核生成实例掩码；K-Net把可学习核推广到语义和全景分割，并用核更新代替位置网格。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/mask2former.html">Mask2Former通用分割</a><span class="yr">2021.12 · 视觉</span><div class=nt>核更新只在少数几轮内进行，交互能力有限，此后被更强的掩码注意力解码器超越。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/oneformer.html">OneFormer</a><span class="yr">2022.11 · 视觉</span><div class=nt>延续K-Net、MaskFormer一路的统一分割思路，把任务本身也作为模型的条件输入。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/attention-concept.html">注意力机制</a> <a class="chip c" href="../c/gating.html">门控机制</a> <a class="chip c" href="../c/iou-map.html">IoU与mAP</a></p>
+<h2>本篇术语</h2><ul><li><b>核更新</b>　用当前掩码汇聚它覆盖的像素特征，再据此修改卷积核，使核越来越对应图中某个具体物体。</li><li><b>二分匹配</b>　把N个预测和若干真值按代价最小做一对一配对（匈牙利算法），每个真值只被一个预测负责。</li></ul>
+<h2>怎么学</h2><p>先理解语义分割最后一层就是一组1×1卷积核，再读K-Net第3节核更新的三步；与MaskFormer、Mask2Former对照，比较“核”与“查询”的异同。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2106.14855" rel="noopener">https://arxiv.org/abs/2106.14855</a>（arXiv记录：标题、四位作者、v1提交于2021-06-28；摘要中的可学习核统一三种分割、核更新使核动态且依赖其分组、二分匹配端到端训练、无NMS无框、COCO test-dev全景55.2% PQ、ADE20K val 54.3% mIoU、实例分割与Cascade Mask R-CNN相当且快60%–90%。核更新的门控与核间注意力细节、NeurIPS 2021、机构凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20K-Net%E7%BB%9F%E4%B8%80%E5%88%86%E5%89%B2%EF%BC%88k-net%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ak-net%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/k-net.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="neus.html"><small>本分支上一个 · 2021.06</small><b>NeuS神经隐式表面</b></a><a class="r" href="maskformer.html"><small>本分支下一个 · 2021.07</small><b>MaskFormer</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+ "id": "vq-bet",
+ "who": "Seungjae Lee, Yibin Wang, Haritheja Etukuru, H. Jin Kim, Nur Muhammad Mahi Shafiullah, Lerrel Pinto · NYU、首尔大学",
+ "venue": "ICML 2024",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2403.03181"},
+  {"label": "项目页", "url": "https://sjlee.cc/vq-bet"}
+ ],
+ "problem": "BeT用k-means把连续动作聚成离散簇来表达多种做法，但k-means在高维动作或长动作序列上难以扩展，也不能端到端求梯度。",
+ "idea": "把k-means换成分层的残差向量量化（residual VQ）来给动作“分词”：先粗分到一个码字，再逐层量化残差，Transformer预测各层码字和一个小偏移。",
+ "impact": "给多峰行为克隆提供了一个比扩散策略推理快得多的离散化方案；也是“把动作离散成token”这条路线的代表之一。",
+ "method": "行为克隆要学的动作分布往往是多峰的：绕障碍从左走或从右走都对，用均方误差回归会平均成撞上去。[[bet]]的办法是把动作用k-means聚类、Transformer做分类再加偏移修正；但k-means没有梯度信息，簇数随动作维度和序列长度一增加就不够用。\n\nVQ-BeT先单独训练一个动作编码器，用[[vq-vae]]式的分层残差量化把一段连续动作压成几层离散码：第一层码字给出粗略的动作模式，后面各层依次量化剩余误差，这种残差量化的结构与[[soundstream]]等音频编解码器相同。策略部分是一个GPT式Transformer，输入观测（可以带目标条件），逐层预测码字，再加一个连续偏移得到精确动作。\n\n论文在七个环境上评测，包括仿真操作、自动驾驶和真机机器人，称其优于BeT和[[diffusion-policy]]等方法，能更好地保留行为的多种模式，推理速度比扩散策略快5倍。",
+ "limits": [
+  {"text": "动作编码器需要单独预训练，码本大小和层数等超参数要按任务调。", "solved_by": ["fast"]}
+ ],
+ "relations": [
+  {"to": "bet", "type": "solves", "note": "用可学习的分层残差量化代替k-means，解决BeT在高维和长时程动作上难扩展的问题。"},
+  {"to": "vq-vae", "type": "uses", "note": "动作分词器基于向量量化自编码器。"},
+  {"to": "soundstream", "type": "uses", "note": "采用与SoundStream相同的残差向量量化结构。"},
+  {"to": "diffusion-policy", "type": "rivals", "note": "同为多峰行为建模：扩散策略靠多步去噪，VQ-BeT靠离散码一步预测，推理更快。"}
+ ],
+ "prereq": ["vector-quantization", "imitation-learning", "autoregressive", "transformer-block"],
+ "terms": [
+  {"t": "残差向量量化", "d": "先用一个码字近似输入，再用下一个码本去近似剩下的误差，层层叠加，用少量离散码表达精细的连续值。"}
+ ],
+ "learn": "先读BeT理解“簇分类+偏移”，再看VQ-BeT第3节的动作分词器；可以在Push-T等小环境上对比VQ-BeT与Diffusion Policy的成功率和推理耗时。",
+ "check": {"source": "https://arxiv.org/abs/2403.03181", "confirmed": "标题、六位作者、v1提交日期2024-03-05；摘要中k-means难以扩展、分层向量量化给动作分词、七个环境、优于BeT与Diffusion Policy、推理比扩散策略快5倍；ICML 2024见PMLR v235。"}
+}

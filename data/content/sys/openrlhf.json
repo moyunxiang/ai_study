@@ -1,0 +1,24 @@
+{
+ "id": "openrlhf",
+ "who": "Jian Hu, Xibin Wu, Wei Shen, Jason Klein Liu, Zilin Zhu, Weixun Wang, Songlin Jiang, Haoran Wang et al. · OpenRLHF开源社区",
+ "aka": ["RLHF框架", "RL训练框架", "RLHF framework", "PPO训练框架", "RLVR框架"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2405.11143"},
+  {"label": "GitHub", "url": "https://github.com/OpenRLHF/OpenRLHF"}
+ ],
+ "problem": "RLHF的PPO要同时摆弄演员、评论家、奖励、参考四个模型，而且大部分时间花在让模型生成回答上；早期框架把它们挤在一起，生成慢、代码复杂，新手很难上手和扩展到70B规模。",
+ "idea": "用Ray把四个模型分别调度到不同GPU组上，生成阶段交给vLLM加速，训练阶段用DeepSpeed ZeRO，模型接口沿用Hugging Face，代码保持简洁。",
+ "impact": "是2024–2025年学术界和开源社区做RLHF、RLVR推理训练最常用的框架之一，许多复现R1式推理训练的项目基于它或在它之上改写。",
+ "method": "[[instructgpt]]式RLHF用[[ppo]]训练：演员模型（被训练的策略）生成回答，奖励模型打分，评论家模型估计价值，参考模型提供KL约束。四个模型都和策略一样大时，一台机器放不下；而且每轮训练前都要先大量生成回答，自回归生成往往占了大部分时间。\n\nOpenRLHF的设计：用[[ray]]把四个模型作为独立的角色分配到不同的GPU上，彼此之间远程传递数据；演员模型的**生成交给[[vllm]]**，用分页KV缓存和连续批处理提高吞吐，训练好的权重再同步回vLLM引擎；**训练用[[zero]]**（DeepSpeed）切分参数与优化器状态；模型加载与保存沿用[[hf-transformers]]的格式。除PPO外，框架也支持REINFORCE++、GRPO式算法、DPO等，以及可验证奖励的RL（RLVR）。\n\n摘要报告，在不同模型尺寸下训练效率比当时最好的框架快1.22–1.68倍，实现所需代码行数明显更少，并已被多家机构采用。",
+ "limits": [
+  {"text": "生成与训练基本按轮次交替进行，长思维链生成时最慢的样本会拖住整批，GPU有大量空等时间。", "solved_by": ["areal"]}
+ ],
+ "relations": [
+  {"to": "ray", "type": "uses", "note": "用Ray调度演员、评论家、奖励、参考四个模型到不同GPU组，并在它们之间传数据。"},
+  {"to": "vllm", "type": "uses", "note": "RL中最耗时的回答生成交给vLLM推理引擎。"},
+  {"to": "zero", "type": "uses", "note": "训练阶段用DeepSpeed ZeRO切分大模型的参数、梯度与优化器状态。"},
+  {"to": "instructgpt", "type": "extends", "note": "实现的核心流程就是InstructGPT式的PPO-RLHF，并扩展到RLVR等新算法。"}
+ ],
+ "prereq": ["rlhf-concept", "policy-gradient-concept", "distributed-training", "kv-cache"],
+ "check": {"source": "https://arxiv.org/abs/2405.11143", "confirmed": "标题、作者（共15+位）、v1日期2024-05-20；摘要：面向RLHF与RLVR、基于Ray/vLLM/DeepSpeed/HuggingFace Transformers、相对SOTA框架快1.22–1.68倍、代码行数更少、已被多家机构采用。四模型分配、权重同步、支持REINFORCE++/GRPO/DPO为对项目文档的一般了解；被R1复现项目采用为对社区的概括。"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "scst",
+  "aka": ["SCST", "Self-Critical Sequence Training", "自批判序列训练", "CIDEr优化"],
+  "who": "Steven J. Rennie, Etienne Marcheret, Youssef Mroueh, Jarret Ross, Vaibhava Goel · IBM Watson",
+  "venue": "CVPR 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1612.00563"}
+  ],
+  "problem": "图像描述模型用逐词交叉熵训练，测试时却按CIDEr等句子级指标打分；指标不可微，训练和评测对不上。",
+  "idea": "把描述生成当作策略，用REINFORCE直接优化CIDEr，并用模型自己贪心解码那句话的得分当基线，省掉单独学习的价值网络。",
+  "impact": "“先交叉熵预训练、再用SCST优化CIDEr”成为此后几年图像描述论文的标准两段式训练流程。",
+  "method": "此前的描述模型（如[[show-attend-tell]]）用[[c:teacher-forcing]]逐词最大化似然，但评测看的是[[cider]]这类整句指标。两者不一致：训练时从不看自己生成的整句好不好，测试时却只看整句。[[mixer]]已经尝试用强化学习直接优化句子级指标，但需要估计基线来降低梯度方差。\n\nSCST的做法很简单。把模型看作一个策略，按概率采样出一句话 `w^s`，算出它的CIDEr得分 `r(w^s)`；同时让模型用测试时真正会用的贪心解码生成另一句 `ŵ`，得分 `r(ŵ)` 当作基线。梯度为 `∇L ≈ −(r(w^s) − r(ŵ)) ∇log p(w^s)`：采样句比自己贪心句更好就提高它的概率，更差就压低。这是[[reinforce]]的一种形式，但基线来自模型“自己批评自己”，不用训练额外的价值估计器，而且奖励直接和测试时的解码方式对齐。\n\n作者报告直接优化CIDEr、测试时贪心解码最有效，在MSCOCO评测服务器上把CIDEr的最好成绩从104.9提高到114.7。此后[[bottom-up-top-down]]等描述模型都在交叉熵预训练之后接一段SCST微调。",
+  "limits": [
+    {"text": "模型学会讨好CIDEr这一个指标，生成的句子趋于套路化、多样性下降，指标涨了但人类觉得未必更好。", "solved_by": []},
+    {"text": "奖励只看与参考描述的n-gram重合，不检查描述是否真的符合图像内容，可能强化看似通顺的错误描述。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "reinforce", "type": "uses", "note": "梯度估计本身就是REINFORCE，只是把基线换成模型自己贪心解码的得分。"},
+    {"to": "mixer", "type": "solves", "note": "MIXER也用强化学习优化句子级指标，但需要另行估计基线；SCST用自身推理结果做基线，省去这一步并降低方差。"},
+    {"to": "cider", "type": "uses", "note": "把CIDEr直接作为奖励优化。"},
+    {"to": "show-attend-tell", "type": "extends", "note": "在注意力描述模型之上换用强化学习目标训练。"}
+  ],
+  "prereq": ["policy-gradient-concept", "reward-return", "teacher-forcing", "text-metrics", "decoding-sampling"],
+  "terms": [
+    {"t": "基线（baseline）", "d": "强化学习里从奖励中减去的参考值，只改变梯度的方差而不改变期望；SCST用模型自己贪心解码的得分作基线。"}
+  ],
+  "learn": "先弄懂REINFORCE和基线为什么能降方差，再读SCST原文第3节的公式推导；可以在一个小的描述模型上先用交叉熵训练，再加几轮SCST，观察CIDEr和句子多样性的变化。",
+  "check": {"source": "https://arxiv.org/abs/1612.00563", "confirmed": "标题、五位作者、arXiv v1提交2016-12-02；摘要中SCST以自身测试时推理输出归一化奖励、直接优化CIDEr+贪心解码最有效、MSCOCO评测服务器CIDEr从104.9到114.7。IBM机构与CVPR 2017为一般了解，未逐项核对。"}
+}

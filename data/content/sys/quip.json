@@ -1,0 +1,30 @@
+{
+ "id": "quip",
+ "who": "Jerry Chee, Yaohui Cai, Volodymyr Kuleshov, Christopher De Sa · 康奈尔大学；QuIP#另有Albert Tseng, Qingyao Sun",
+ "venue": "NeurIPS 2023（QuIP）/ ICML 2024（QuIP#）",
+ "aka": ["QuIP#", "QuIP sharp", "非相干处理", "incoherence processing", "2比特量化", "2-bit quantization", "E8格码本", "Hadamard变换量化"],
+ "links": [
+  {"label": "arXiv（QuIP）", "url": "https://arxiv.org/abs/2307.13304"},
+  {"label": "arXiv（QuIP#）", "url": "https://arxiv.org/abs/2402.04396"},
+  {"label": "GitHub", "url": "https://github.com/Cornell-RelaxML/quip-sharp"}
+ ],
+ "problem": "GPTQ这类训练后量化在4比特很好用，降到每个权重2比特就基本崩溃；少数特别大的权重和重要方向会让舍入误差集中爆发。",
+ "idea": "量化前先用随机正交矩阵把权重和海森矩阵“搅匀”（非相干处理），让数值大小均匀、重要方向不再对齐坐标轴，再做自适应舍入；QuIP#把正交矩阵换成快速的随机Hadamard变换，并用E8格码本做向量量化。",
+ "impact": "第一次让2比特的LLM权重量化给出可用结果；“先旋转再量化”的思路被QuaRot、SpinQuant等后续工作直接继承。",
+ "method": "[[gptq]]按层把量化看成最小化`tr((Ŵ − W) H (Ŵ − W)ᵀ)`（H是该层输入的二阶统计，类似[[obs]]里的海森矩阵）的问题，逐列舍入并补偿误差。QuIP的观察是：如果权重里有个别特别大的值，或者H的重要方向恰好对准某几个坐标，舍入误差就会集中在那里。\n\n**QuIP**两步：先给权重左右各乘一个随机正交矩阵`W' = U W Vᵀ`（H也相应变换），这样权重幅度变得均匀、H与坐标轴“非相干”；再用一种最小化上述二次代理目标的自适应舍入（论文证明GPTQ/OPTQ是它的一个特例）。推理时把正交变换乘回去即可。论文给出了LLM规模量化算法的第一个理论分析，并称这是第一个在每权重2比特下给出可用结果的LLM量化方法。\n\n**QuIP#**三点改进：用随机Hadamard变换代替一般正交矩阵，更快且理论性质更好；非相干处理后的权重近似球形高斯分布，于是把8个权重作为一组，用基于E8格（8维最优球堆积）的硬件友好码本做向量量化；最后加一步微调。摘要称在不超过4比特的极端压缩下超过已有训练后量化方法。",
+ "limits": [
+  {"text": "只量化权重，激活和KV缓存仍是16位，算力瓶颈的大批量推理受益有限。", "solved_by": ["quarot"]},
+  {"text": "向量量化的码本查表需要专门的解码内核，通用推理框架支持不如标量的4比特格式普遍。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "gptq", "type": "extends", "note": "同样逐层最小化带海森矩阵的二次误差；QuIP证明GPTQ是其自适应舍入的特例，并加上非相干预处理。"},
+  {"to": "obs", "type": "uses", "note": "借鉴最优脑外科用二阶信息衡量改动权重代价的思想。"},
+  {"to": "llama-2", "type": "uses", "note": "QuIP#的主要实验在Llama 2系列上做2–4比特量化。"}
+ ],
+ "prereq": ["quantization-concept", "eigen-svd", "jacobian-hessian", "vector-quantization"],
+ "terms": [
+  {"t": "非相干", "d": "权重的数值大小比较均匀，而且需要精确舍入的重要方向不与任何单个坐标对齐；这样每个权重承担的误差差不多，不会被个别大值拖垮。"},
+  {"t": "Hadamard变换", "d": "一种元素全是±1（再除以常数）的正交矩阵，乘法可以用类似快速傅里叶变换的方法在n·log n时间内完成。"}
+ ],
+ "check": {"source": "https://arxiv.org/abs/2307.13304", "confirmed": "QuIP：标题、四位作者、v1日期2023-07-25，摘要中非相干权重与海森、自适应舍入最小化二次代理、随机正交矩阵、首个LLM规模理论分析、适用于OPTQ、首个2比特可用结果。QuIP#（https://arxiv.org/abs/2402.04396）：标题、作者、v1日期2024-02-06，随机Hadamard变换、E8格码本、微调、≤4比特优于已有PTQ。NeurIPS/ICML会议信息为一般了解；GPTQ为特例的说法据QuIP摘要“理论也适用于OPTQ”与正文的一般了解。"}
+}

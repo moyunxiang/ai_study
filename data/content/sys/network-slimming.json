@@ -1,0 +1,24 @@
+{
+ "id": "network-slimming",
+ "who": "Zhuang Liu, Jianguo Li, Zhiqiang Shen, Gao Huang, Shoumeng Yan, Changshui Zhang · 清华大学, 英特尔中国研究院等",
+ "venue": "ICCV 2017",
+ "aka": ["通道剪枝", "channel pruning", "BN缩放因子剪枝", "结构化剪枝", "slimming"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1708.06519"},
+  {"label": "GitHub", "url": "https://github.com/liuzhuangthu/network-slimming"}
+ ],
+ "problem": "逐个权重剪枝得到的不规则稀疏矩阵，在普通GPU上并不跑得更快，要靠专门的稀疏库或硬件才能兑现加速。",
+ "idea": "直接拿每个通道后面批归一化层的缩放因子γ当作通道的重要性，训练时给γ加L1稀疏惩罚，训完把γ接近0的整条通道剪掉，再微调。",
+ "impact": "成为通道级结构化剪枝最常用的基线之一，剪完的模型就是一个更窄的普通网络，不需要任何特殊软硬件。",
+ "method": "[[deep-compression]]一类方法剪掉的是单个权重，剩下的矩阵稀疏却不规则；而剪掉一整个卷积通道，网络就直接变窄，计算量和显存都实打实地减少。难点是怎样判断哪个通道不重要。\n\nNetwork Slimming利用现代CNN里几乎每个卷积层后都有[[batchnorm]]：BN对每个通道输出乘一个可学习的缩放因子γ。γ接近0，这个通道的输出就几乎不起作用。做法分三步：训练时在损失里加上所有γ的L1惩罚 `L = L_task + λ Σ|γ|`，把不重要通道的γ压向0（这与[[lasso]]的思路相同）；按全局阈值剪掉γ最小的通道；微调剩下的窄网络。这个过程可以重复多轮。\n\n摘要报告：对VGGNet用多轮版本，模型大小缩小20倍、计算量减少5倍，精度相当；方法适用于VGG、ResNet、DenseNet，训练开销很小。同一作者一年后的论文“Rethinking the Value of Network Pruning”又发现，剪出的结构从头训练往往和微调一样好。",
+ "limits": [
+  {"text": "依赖批归一化层，对没有BN或改用LayerNorm的Transformer不能直接套用；L1惩罚的强度λ和剪枝比例要手工调。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "deep-compression", "type": "solves", "note": "逐权重剪枝的不规则稀疏难以在通用硬件上加速，通道级剪枝直接得到更窄的稠密网络。"},
+  {"to": "batchnorm", "type": "uses", "note": "把BN层每个通道的缩放因子γ当作通道重要性的指标。"},
+  {"to": "lasso", "type": "uses", "note": "对γ施加L1稀疏惩罚，把不重要的通道推向零。"}
+ ],
+ "prereq": ["conv-layer", "normalization-layer", "regularization"],
+ "check": {"source": "https://arxiv.org/abs/1708.06519", "confirmed": "标题、六位作者、v1日期2017-08-22；摘要：通道级稀疏、无需特殊软硬件、适用VGGNet/ResNet/DenseNet、训练时自动识别不重要通道后剪掉、VGGNet多轮版本模型缩小20倍计算减少5倍。BN缩放因子加L1惩罚的细节、ICCV 2017、机构为一般了解。"}
+}

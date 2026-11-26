@@ -1,0 +1,32 @@
+{
+  "id": "contextnet",
+  "who": "Wei Han, Zhengdong Zhang, Yu Zhang, Jiahui Yu, Chung-Cheng Chiu, James Qin, Anmol Gulati, Ruoming Pang, Yonghui Wu · Google",
+  "venue": "Interspeech 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2005.03191"}
+  ],
+  "problem": "纯卷积的端到端识别模型计算友好，但卷积核只看局部，准确率一直落后于LSTM和Transformer编码器。",
+  "idea": "在全卷积编码器的每个块里加上squeeze-and-excitation模块，用整句的平均特征去重新加权各通道，把全局上下文注入卷积；再用一个宽度系数统一缩放模型大小。",
+  "impact": "ContextNet是2020年LibriSpeech上被广泛比较的强基线，也是Google后续大规模半监督识别实验常用的编码器之一。",
+  "method": "端到端识别的编码器当时有三类选择：LSTM、自注意力（[[transformer-transducer]]）和卷积（如[[jasper]]）。卷积的好处是并行、省算力，缺点是每层只看几帧，要堆很多层才能「看见」整句话。\n\nContextNet是一个CNN编码器加RNN-T解码器（见[[rnn-t]]）的模型。编码器由许多卷积块组成，每块包含若干深度可分离一维卷积、批归一化和Swish激活，并带残差连接（见[[c:residual-connection]]）。关键改动是在每块末尾加上来自图像网络[[senet]]的squeeze-and-excitation（SE）模块：先把整段序列在时间上求平均，得到一个全局向量，经两层小网络变成每个通道的权重，再乘回每一帧的特征。这样一来，即使卷积核很小，每一帧的表示也能受到全句信息的调节。作者还借鉴[[efficientnet]]的思路，用一个宽度系数α统一放大或缩小所有层的通道数，在计算量和准确率之间平滑取舍；编码器还逐步下采样，降低序列长度。\n\n摘要报告：在LibriSpeech上，不用外部语言模型时clean/other测试集词错率2.1%/4.6%，加语言模型为1.9%/4.1%；只用1000万参数的小模型为2.9%/7.0%，而此前最好的2000万参数系统是3.9%/11.3%。同月发表的[[conformer]]把卷积和自注意力结合起来，在同一基准上进一步领先，成为更通用的选择。",
+  "limits": [
+    {"text": "SE模块用整句平均做全局上下文，流式识别时拿不到未来帧，需要改成只用已见部分的平均。", "solved_by": []},
+    {"text": "全局信息只是通道权重这样的粗粒度调节，不能像自注意力那样让任意两帧直接交互。", "solved_by": ["conformer"]}
+  ],
+  "relations": [
+    {"to": "jasper", "type": "solves", "note": "Jasper/QuartzNet一类纯卷积模型缺全局上下文；ContextNet用SE模块注入整句信息，准确率明显提高。"},
+    {"to": "senet", "type": "uses", "note": "直接借用图像网络的squeeze-and-excitation模块。"},
+    {"to": "rnn-t", "type": "uses", "note": "卷积编码器之后接RNN-T的预测网络和联合网络。"},
+    {"to": "transformer-transducer", "type": "rivals", "note": "同期Google的另一种Transducer编码器选择：自注意力对比带全局上下文的卷积。"}
+  ],
+  "prereq": ["conv-layer", "residual-connection", "normalization-layer", "word-error-rate", "end-to-end"],
+  "terms": [
+    {"t": "squeeze-and-excitation", "d": "先把特征在时间（或空间）上平均成一个向量，再算出每个通道的缩放系数，用来强调有用的通道。"},
+    {"t": "深度可分离卷积", "d": "先对每个通道单独做卷积，再用1×1卷积混合通道，比普通卷积参数少得多。"}
+  ],
+  "aka": ["ContextNet", "CNN-RNN-T", "卷积Transducer"],
+  "check": {
+    "source": "https://arxiv.org/abs/2005.03191",
+    "confirmed": "arXiv官方记录：标题、作者Han/Zhang/Zhang/Yu/Chiu/Qin/Gulati/Pang/Wu、v1提交2020-05-07；摘要中的CNN-RNN-transducer结构、SE模块、宽度缩放、LibriSpeech 2.1%/4.6%（无LM）、1.9%/4.1%（有LM）、10M参数2.9%/7.0%对比此前20M参数3.9%/11.3%。块内具体组件与Interspeech 2020为一般了解。"
+  }
+}

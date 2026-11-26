@@ -1,0 +1,30 @@
+{
+  "id": "lookahead",
+  "who": "Michael R. Zhang, James Lucas, Geoffrey Hinton, Jimmy Ba · 多伦多大学、Vector研究所",
+  "venue": "NeurIPS 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1907.08610"}
+  ],
+  "aka": ["Lookahead", "Lookahead优化器", "快慢权重优化", "k steps forward 1 step back", "Ranger"],
+  "problem": "改进SGD的工作大多走两条路：自适应学习率（[[adagrad]]、[[adam]]）或加速（动量、Nesterov）；两者都对超参数敏感，训练过程方差也大。",
+  "idea": "维护两套权重：内层优化器（SGD或Adam）先用“快权重”往前走k步，再让“慢权重”朝快权重的终点挪一部分，并把快权重拉回慢权重重新出发。",
+  "impact": "作为一种可以包在任何优化器外面的轻量外壳被广泛试用，常与[[radam]]组合使用（社区称Ranger）；“周期性地向慢权重插值”的思路也出现在后来的分布式与平均类优化方法中。",
+  "method": "Lookahead不替换现有优化器，而是在它外面套一层。设慢权重为φ。每一轮：先把快权重θ设为φ，然后用内层优化器A（例如SGD或Adam）在小批量上正常更新θ共k步（论文常用k=5或10）；接着更新慢权重 `φ ← φ + α(θ_k − φ)`，α通常取0.5；然后开始下一轮。直观地说，快权重负责“探路”，慢权重只朝k步之后的落点挪一半，相当于对快权重轨迹做了指数平均，抵消掉沿高曲率方向来回震荡的那部分，所以叫“往前走k步，退回一步”。\n\n它的额外开销只是多存一份权重和每k步一次插值，计算量几乎不变。作者在二次模型上分析了它的收敛性和方差，显示它能降低内层优化器的方差。\n\n摘要报告：在ImageNet、CIFAR-10/100、神经机器翻译和Penn Treebank语言建模上，Lookahead能明显改进SGD和Adam，即使用默认超参数也如此，并提高了训练稳定性。它与[[swa]]、[[polyak-averaging]]都是“对权重轨迹求平均”的思路，区别在于Lookahead在训练中就把平均后的权重拿回来接着训练。",
+  "limits": [
+    {"text": "提升幅度依任务而异，在大规模语言模型预训练中没有成为标准配置；k和α也成了新的超参数。", "solved_by": []},
+    {"text": "对内层优化器自身的问题（如自适应方法早期方差大）只做了间接缓解，常需与其他修正组合使用。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "adam", "type": "uses", "note": "Adam可以作为内层优化器，Lookahead包在外面降低其更新方差。"},
+    {"to": "momentum", "type": "rivals", "note": "论文把加速类方法与自适应方法并列为改进SGD的两条老路，Lookahead是与二者正交的第三种思路。"},
+    {"to": "polyak-averaging", "type": "extends", "note": "同样对权重轨迹做平均，但把平均结果在训练中反馈回去作为新的起点。"},
+    {"to": "swa", "type": "rivals", "note": "SWA在训练后期平均权重用于推断，Lookahead在整个训练中周期性插值。"},
+    {"to": "fast-weights", "type": "uses", "note": "借用“快权重/慢权重”的说法，但这里的快权重是优化轨迹而非网络里的记忆。"}
+  ],
+  "prereq": ["sgd-minibatch", "momentum", "adaptive-optimizer", "learning-rate"],
+  "terms": [
+    {"t": "快权重与慢权重", "d": "Lookahead里两份参数：快权重由内层优化器频繁更新，慢权重每k步才朝快权重挪一次。"}
+  ],
+  "learn": "先熟悉[[adam]]和[[polyak-averaging]]；读论文算法1和第3节的二次模型分析；动手给自己的训练脚本套一层Lookahead（十几行代码），比较k=5、α=0.5与不用时的损失曲线抖动。",
+  "check": {"source": "https://arxiv.org/abs/1907.08610", "confirmed": "标题、4位作者、arXiv v1提交于2019-07-19；摘要中两类改进SGD的方法、两套权重、用另一优化器产生的快权重序列选择搜索方向、降低内层优化器方差、开销可忽略、ImageNet/CIFAR/NMT/PTB上改进SGD与Adam。k与α常用取值、NeurIPS 2019、机构与Ranger组合来自一般了解。"}
+}

@@ -1,0 +1,23 @@
+{
+ "id": "binaryconnect",
+ "who": "Matthieu Courbariaux, Yoshua Bengio, Jean-Pierre David · 蒙特利尔综合理工学院, 蒙特利尔大学",
+ "venue": "NeurIPS 2015",
+ "aka": ["二值权重", "binary weights", "BC", "权重二值化", "1-bit weights"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1511.00363"},
+  {"label": "GitHub", "url": "https://github.com/MatthieuCourbariaux/BinaryConnect"}
+ ],
+ "problem": "神经网络推理里最耗面积和功耗的是乘法器；如果权重只能取+1或−1，乘法就退化成加减，但直接把权重二值化后训练会因为梯度太小而学不动。",
+ "idea": "前向和反向传播时用二值化的权重，但另外保存一份全精度权重来累积梯度更新；每次更新后再从全精度权重重新取符号。",
+ "impact": "确立了“二值前向、全精度累积”这一低比特训练的基本套路，后续把激活也二值化的BNN、XNOR-Net都直接在它上面扩展。",
+ "method": "2015年做专用深度学习芯片的人希望权重越省越好。最极端是1比特：权重只取±1，乘加`w·x`就变成按符号加或减`x`。难点在训练：[[c:sgd-minibatch]]每一步的更新量很小，如果每步之后都把权重压回±1，这些小更新会被直接抹掉。\n\nBinaryConnect的解法是**两份权重**：一份全精度的`w`专门用来累积梯度；每次前向和反向传播前，先把它二值化成`w_b`，确定性版本`w_b = sign(w)`，随机版本按“硬sigmoid”给出的概率取+1，否则取−1。用`w_b`算出梯度后，把梯度加到全精度的`w`上，并把`w`裁剪到[−1, 1]之内，免得它无限增大、不再影响符号。推理时只需要`w_b`。这里用的“把对`w_b`的梯度直接当成对`w`的梯度”正是[[ste]]的思路。\n\n作者还指出，随机二值化像[[dropout]]一样往权重里注入噪声，起到正则化作用。摘要称在置换不变的MNIST、CIFAR-10和SVHN上取得了接近当时最好的结果。",
+ "limits": [
+  {"text": "只二值化了权重，激活仍是全精度，乘加里仍有大量全精度运算；而且只在MNIST、CIFAR-10这类小数据集上验证，没有覆盖ImageNet规模。", "solved_by": ["bnn", "xnor-net"]}
+ ],
+ "relations": [
+  {"to": "ste", "type": "uses", "note": "反向传播时把对二值权重的梯度直接传给全精度权重，正是直通估计器的做法。"},
+  {"to": "dropout", "type": "extends", "note": "作者把随机二值化看作和Dropout类似的噪声注入，认为它同样起正则化作用。"}
+ ],
+ "prereq": ["backpropagation", "sgd-minibatch", "quantization-concept", "regularization"],
+ "check": {"source": "https://arxiv.org/abs/1511.00363", "confirmed": "标题、三位作者、v1日期2015-11-02；摘要：二值权重把乘加变成累加、前向与反向用二值权重并保留全精度权重累积梯度、与Dropout类似的正则作用、在置换不变MNIST/CIFAR-10/SVHN接近最佳。确定性/随机二值化、硬sigmoid、裁剪到[−1,1]、NeurIPS 2015与机构为对正文的一般了解，未逐项对照。"}
+}

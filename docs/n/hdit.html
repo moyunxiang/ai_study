@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>HDiT沙漏像素Transformer（2024） · AI脉络</title>
+<meta name="description" content="等扩散Transformer的全局注意力计算量随token数平方增长，只能在压缩后的潜空间上工作；想在1024×1024的像素上直接训练，Transformer算不起，U-Net又不如Transformer好扩展。 把Transformer做成沙漏形：高分辨率层只用局部邻域注意力，逐级合并图块降低…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/hdit.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="HDiT沙漏像素Transformer（2024）">
+<meta property="og:description" content="等扩散Transformer的全局注意力计算量随token数平方增长，只能在压缩后的潜空间上工作；想在1024×1024的像素上直接训练，Transformer算不起，U-Net又不如Transformer好扩展。 把Transformer做成沙漏形：高分辨率层只用局部邻域注意力，逐级合并图块降低…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/hdit.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/hdit">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 潜空间与骨架网络</div>
+<h1>HDiT沙漏像素Transformer</h1>
+<div class="full">Scalable High-Resolution Pixel-Space Image Synthesis with Hourglass Diffusion Transformers</div>
+<div class="meta"><span>2024.01</span><span>论文</span><span>延伸</span><span>ICML 2024</span><span>Katherine Crowson, Stefan Andreas Baumann, Alex Birch, Tanishq Mathew Abraham, Daniel Z. Kaplan, Enrico Shippole · Stability AI / 慕尼黑大学等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2401.11605" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/hdit">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/dit.html">Diffusion Transformer</a>等扩散Transformer的全局注意力计算量随token数平方增长，只能在压缩后的潜空间上工作；想在1024×1024的像素上直接训练，Transformer算不起，U-Net又不如Transformer好扩展。</p></div><div><h4>方法</h4><p>把Transformer做成沙漏形：高分辨率层只用局部邻域注意力，逐级合并图块降低分辨率，只在最低分辨率层用全局注意力，再逐级上采样并带跳跃连接；计算量随像素数线性增长。</p></div><div><h4>影响</h4><p>论文称不需要多尺度结构、潜空间自编码器或自条件等常见的高分辨率技巧，就能在像素空间直接训练1024²图像，并在FFHQ-1024²上取得扩散模型的新最好成绩，是像素空间Transformer扩散路线的重要节点。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>HDiT的结构借鉴U-Net的层级思路，但每一级都是Transformer块：</p><ul><li><b>图块合并与拆分</b>：输入先切成小图块；往下每一级把相邻2×2个token合并成一个，分辨率减半、通道加宽；往上则拆分回来，并与同级的下采样特征用可学习的插值相加（类似跳跃连接）。</li><li><b>分级注意力</b>：在高分辨率级别，每个token只与周围一个固定大小窗口内的token做注意力（邻域注意力），计算量与token数成正比；只有在分辨率已经很低的最内层，才使用普通的全局<a class="lc" href="../c/self-attention.html">自注意力与多头注意力</a>建模整体结构。</li><li>结合<a class="ln" href="../n/edm.html">EDM设计空间</a>的训练与采样设置，以及改进的位置编码和归一化。</li></ul><p>因为每层计算量都随像素数线性增长，整个网络可以直接在1024×1024像素上训练，而无需先用VAE压缩到潜空间（对比<a class="ln" href="../n/ldm.html">潜空间扩散LDM</a>），也无需像<a class="ln" href="../n/simple-diffusion.html">simple diffusion像素扩散</a>那样依靠专门的U-Net改造。论文报告在ImageNet 256²上与现有模型相当，在FFHQ-1024²上创下扩散模型的新纪录。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>像素空间训练的总算力仍远高于潜空间模型，论文的大规模文生图验证有限。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/jit.html">JiT像素空间x预测</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/edm.html">EDM设计空间</a><span class="yr">2022.06 · 生成</span><div class=nt>沿用EDM的噪声参数化、损失加权与采样器。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/dit.html">Diffusion Transformer</a><span class="yr">2022.12 · 生成</span><div class=nt>DiT的全局注意力只能用在潜空间，HDiT用分级局部注意力把Transformer扩散搬到高分辨率像素上。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/simple-diffusion.html">simple diffusion像素扩散</a><span class="yr">2023.01 · 生成</span><div class=nt>同为端到端像素空间高分辨率扩散：simple diffusion改造U-Net，HDiT改用沙漏形Transformer。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/jit.html">JiT像素空间x预测</a><span class="yr">2025.11 · 生成</span><div class=nt>像素空间训练的总算力仍远高于潜空间模型，论文的大规模文生图验证有限。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/image-patch.html">图像块与视觉token</a> <a class="chip c" href="../c/efficient-attention.html">稀疏注意力与高效注意力</a> <a class="chip c" href="../c/residual-connection.html">残差连接</a></p>
+<h2>本篇术语</h2><ul><li><b>邻域注意力</b>　每个位置只和自己周围固定大小窗口内的位置计算注意力，计算量随图像大小线性增长。</li></ul>
+<h2>怎么学</h2><p>先读DiT与U-Net的跳跃连接 → 读本文第3节沙漏结构图与注意力类型的分配 → 对比JiT如何用大图块在像素空间做扩散。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2401.11605" rel="noopener">https://arxiv.org/abs/2401.11605</a>（标题、六位作者、v1日期2024-01-21、摘要中计算量随像素数线性增长、可直接在像素空间训练1024×1024、结合Transformer可扩展性与U-Net效率、无需多尺度结构/潜空间自编码器/自条件、ImageNet 256²上与现有模型相当、FFHQ-1024²上扩散模型新SOTA；机构、ICML 2024、邻域注意力与图块合并细节来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20HDiT%E6%B2%99%E6%BC%8F%E5%83%8F%E7%B4%A0Transformer%EF%BC%88hdit%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ahdit%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/hdit.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="instantid.html"><small>本分支上一个 · 2024.01</small><b>InstantID单图保ID</b></a><a class="r" href="lgm.html"><small>本分支下一个 · 2024.02</small><b>LGM多视图高斯重建</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

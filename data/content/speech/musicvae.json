@@ -1,0 +1,32 @@
+{
+  "id": "musicvae",
+  "who": "Adam Roberts, Jesse Engel, Colin Raffel, Curtis Hawthorne, Douglas Eck · Google Brain（Magenta项目）",
+  "venue": "arXiv 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1803.05428"},
+    {"label": "代码", "url": "http://g.co/magenta/musicvae-code"}
+  ],
+  "problem": "[[vae]]能把数据压成有意义的隐变量，但用在长序列上时，循环解码器太强，干脆忽略隐变量自己往下生成（后验坍缩），乐曲的长程结构也学不好。",
+  "idea": "用分层解码器：先由一个「指挥」网络从隐变量生成每个小节的嵌入，再由底层解码器根据各自的小节嵌入独立生成该小节的音符，迫使模型真正依赖隐变量。",
+  "impact": "MusicVAE让符号音乐（音符序列）有了一个可以插值、采样和做属性运算的隐空间，Magenta据此做了多款作曲工具，它也是音乐生成综述里讲序列VAE与后验坍缩的经典例子。",
+  "method": "MusicVAE处理的是符号音乐：一段16小节的旋律、鼓点或多声部乐句被表示成音符事件序列，而不是音频波形。编码器是双向[[lstm]]，读完整段后输出隐变量的均值和方差（见[[c:latent-variable]]、[[c:elbo]]）。\n\n问题在解码器：如果用一个普通的自回归LSTM直接生成几百个音符，它只看前面的音符就能把下一个猜得不错，隐变量z就被冷落了，这就是后验坍缩。论文的分层解码器先用一个「指挥」（conductor）RNN从z生成16个小节嵌入，每个小节嵌入再交给底层RNN去生成这一小节的音符；底层RNN每到新的小节就重新初始化，无法跨小节依赖前面的音符，只能依靠来自z的小节嵌入，从而保住了长程结构。\n\n摘要报告：在音符序列建模上，分层模型在采样、插值和重建方面都比「扁平」的基线明显更好；实现开源。在隐空间里两段旋律之间做线性插值，能得到平滑过渡的中间旋律。",
+  "limits": [
+    {"text": "只生成符号音符，不涉及音色和演奏，最终声音还要靠合成器或真人演奏。", "solved_by": ["jukebox", "musiclm"]},
+    {"text": "长度固定为最多十几小节，无法生成一首完整歌曲的结构。", "solved_by": ["music-transformer", "jukebox"]}
+  ],
+  "relations": [
+    {"to": "vae", "type": "extends", "note": "把变分自编码器用到长音符序列上，并用分层解码器解决后验坍缩。"},
+    {"to": "lstm", "type": "uses", "note": "编码器和两级解码器都是LSTM。"},
+    {"to": "nsynth", "type": "rivals", "note": "同为Magenta项目：NSynth在音频层面学习音色的隐空间，MusicVAE在符号层面学习旋律的隐空间。"}
+  ],
+  "prereq": ["latent-variable", "elbo", "autoencoder", "recurrent-layer", "autoregressive"],
+  "terms": [
+    {"t": "后验坍缩", "d": "VAE的解码器太强时，不用隐变量也能把数据重建得很好，于是隐变量里几乎不含信息。"},
+    {"t": "符号音乐", "d": "用音符的音高、起止时间、力度等离散事件来表示的音乐，类似乐谱或MIDI，而不是录音波形。"}
+  ],
+  "aka": ["MusicVAE", "Magenta", "分层VAE", "符号音乐生成", "MIDI生成"],
+  "check": {
+    "source": "https://arxiv.org/abs/1803.05428",
+    "confirmed": "arXiv官方记录：标题A Hierarchical Latent Vector Model for Learning Long-Term Structure in Music、作者Roberts/Engel/Raffel/Hawthorne/Eck、v1提交2018-03-13；摘要关于循环VAE难建模长程结构、分层解码器先输出子序列嵌入再独立生成子序列、避免后验坍缩、采样/插值/重建优于扁平基线、代码地址。16小节、conductor命名、双向LSTM编码器、Magenta工具为一般了解。"
+  }
+}

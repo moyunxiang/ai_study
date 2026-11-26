@@ -1,0 +1,28 @@
+{
+  "id": "s4d",
+  "who": "Albert Gu, Ankit Gupta, Karan Goel, Christopher Ré · 斯坦福大学等",
+  "venue": "NeurIPS 2022",
+  "links": [
+    {"label": "arXiv（S4D）", "url": "https://arxiv.org/abs/2206.11893"},
+    {"label": "arXiv（DSS）", "url": "https://arxiv.org/abs/2203.14343"}
+  ],
+  "aka": ["DSS", "Diagonal State Space", "对角SSM"],
+  "problem": "[[s4]]把状态矩阵写成“对角加低秩”的特殊结构，并要用专门的算法算卷积核，数学和实现都很复杂，难以推广。",
+  "idea": "先由DSS发现：去掉低秩修正、让状态矩阵完全对角，效果几乎不变；S4D再系统解释其原因，并说明关键在于用从HiPPO矩阵导出的初始化。",
+  "impact": "把状态空间层简化为对角形式，卷积核两行代码就能算；此后的[[mamba]]等模型都采用对角（乃至标量）的状态矩阵。",
+  "method": "状态空间层的核心递推是 `h_t = A h_{t−1} + B x_t，y_t = C h_t`。[[s4]]用[[hippo]]推出的特殊矩阵作为A，这个矩阵本身不能稳定地对角化，于是S4把它写成“正规矩阵加低秩”的形式，再配合一套复杂的算法高效计算卷积核。\n\n2022年3月，Gupta、Gu与Berant的DSS论文给出一个意外的结果：直接假设A是对角矩阵、去掉低秩修正，在Long Range Arena长序列基准和Speech Commands语音分类上就能追平S4，只要初始化取自S4矩阵的近似。三个月后的S4D论文要回答“为什么”：作者证明，把S4矩阵的对角部分单独拿出来，在状态维数趋于无穷时恢复的是同一个卷积核，所以对角化并没有丢掉HiPPO的长程记忆机制；而换成随机初始化效果就会明显变差，说明初始化才是关键。论文还系统比较了对角SSM的各种参数化与离散化选择。\n\n最终的S4D是S4的一个简单对角版本，卷积核的计算只需要两行代码。摘要报告，它在几乎所有设置下与S4相当，在图像、音频和医学时间序列上取得了最好结果，在Long Range Arena上平均达到85%。",
+  "limits": [
+    {"text": "参数A、B、C不随输入变化（线性时不变），无法根据内容决定记住或忽略哪些信息，在语言建模这类需要选择性记忆的任务上明显落后于注意力。", "solved_by": ["mamba"]}
+  ],
+  "relations": [
+    {"to": "s4", "type": "extends", "note": "去掉S4的低秩修正，把状态矩阵简化为对角，并解释为何仍然有效。"},
+    {"to": "hippo", "type": "uses", "note": "对角状态矩阵的初始化取自HiPPO矩阵，这被证明是性能的关键。"}
+  ],
+  "prereq": ["state-space-model", "eigen-svd", "convolution-op", "ode-sde", "recurrent-layer"],
+  "terms": [
+    {"t": "线性时不变", "d": "系统的参数不随时间和输入改变，因此整段序列的输出可以写成输入与一个固定卷积核的卷积。"},
+    {"t": "Long Range Arena", "d": "2020年提出的长序列基准，序列长度从一千到一万多，用来比较高效序列模型的长程建模能力。"}
+  ],
+  "learn": "先读[[s4]]理解状态空间层的递推和卷积两种视角，再读S4D论文第3节的对角化分析；照着论文里的两行代码自己实现S4D卷积核，在序列MNIST上训练一个小模型。",
+  "check": {"source": "https://arxiv.org/abs/2206.11893", "confirmed": "S4D：标题、4位作者、arXiv v1提交于2022-06-23；摘要中DSS的发现、对角限制在无穷状态维极限下恢复同一卷积核、初始化关键、卷积核两行代码、LRA平均85%。DSS：arXiv 2203.14343，v1提交于2022-03-27，作者Gupta、Gu、Berant，摘要中去掉低秩修正后在LRA与Speech Commands上追平S4。NeurIPS 2022来自一般了解。"}
+}

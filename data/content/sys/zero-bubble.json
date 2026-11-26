@@ -1,0 +1,25 @@
+{
+ "id": "zero-bubble",
+ "who": "Penghui Qi, Xinyi Wan, Guangxing Huang, Min Lin · Sea AI Lab",
+ "venue": "ICLR 2024",
+ "aka": ["ZB-H1", "ZB-H2", "零气泡流水线", "zero bubble PP", "反向拆分", "B/W拆分", "DualPipe前身"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2401.10241"},
+  {"label": "GitHub", "url": "https://github.com/sail-sg/zero-bubble-pipeline-parallelism"}
+ ],
+ "problem": "流水线并行里，各段GPU必须等上一段把数据传过来才能开工，开头和结尾总有一段时间空转（流水线气泡）；1F1B调度减少了显存，但气泡在同步训练里一直被认为无法消除。",
+ "idea": "把反向传播拆成两半：对输入求梯度（B，下一段等着要）和对参数求梯度（W，谁也不等）；把W推迟去填补原本空闲的气泡，再绕开优化器步骤里的全局同步，在同步训练语义下做到零气泡。",
+ "impact": "流水线调度研究的转折点之一，“B/W拆分”被后续调度广泛采用，DeepSeek-V3的DualPipe也在此思路上把前后向与通信重叠。",
+ "method": "[[gpipe]]把一个批切成微批依次流过各段，[[pipedream]]的1F1B调度让每段交替做一次前向、一次反向以控制显存，但两者在每一步的开头和结尾都有气泡：p段流水线里，气泡占比大约随 `(p−1)/m`（m为微批数）变化。\n\n作者观察到，反向计算其实包含两件事：B算损失对本层输入的梯度，必须尽快传给前一段；W算损失对本层权重的梯度，只在优化器更新前需要。原有调度把两者绑在一起，导致前一段只能干等。拆开之后，B留在关键路径上，W可以挪到任何空闲时刻。基于此作者手工设计了ZB-H1（与1F1B显存相当、气泡约减为三分之一）和ZB-H2（显存稍多、气泡接近为零）两种调度，并给出一个按模型配置和显存上限自动搜索最优调度的算法。要真正做到零气泡，还要处理优化器步骤前的梯度范数裁剪、NaN检查等全局同步，论文用“先乐观更新、事后校验回滚”的办法绕过这些同步点。\n\n摘要报告：在相近显存限制下吞吐比1F1B最多高23%，放宽显存限制后最多高31%；实现基于[[megatron-3d]]所在的Megatron-LM代码库开源。",
+ "limits": [
+  {"text": "推迟W需要暂存更多激活和中间梯度，零气泡版本的显存高于1F1B；调度依赖较准确的各阶段耗时估计，MoE等负载不均的模型还需要把通信也纳入重叠。", "solved_by": ["deepseek-infra-week"]}
+ ],
+ "relations": [
+  {"to": "pipedream", "type": "solves", "note": "1F1B调度仍有固定的流水线气泡，拆分反向的B与W后可以把气泡填满。"},
+  {"to": "gpipe", "type": "extends", "note": "沿用GPipe的同步微批流水线语义，在不改变训练结果的前提下改进调度。"},
+  {"to": "megatron-3d", "type": "uses", "note": "实现基于Megatron-LM，与其张量并行、数据并行组合使用并以其1F1B为基线。"}
+ ],
+ "prereq": ["distributed-training", "backpropagation", "throughput-latency"],
+ "terms": [{"t": "流水线气泡", "d": "流水线并行中某些GPU因为等待上下游数据而空闲的时间，占比越大，算力浪费越多。"}],
+ "check": {"source": "https://arxiv.org/abs/2401.10241", "confirmed": "标题、四位作者、v1日期2023-11-30（arXiv编号为2401但首次提交日期为2023-11-30）；摘要：首个在同步训练语义下实现零气泡的调度、反向拆成对输入与对参数的梯度两部分、手工设计调度并给出自动搜索算法、绕过优化器步骤的同步、相近显存下比1F1B吞吐高最多23%、放宽后31%、基于Megatron-LM开源。ZB-H1/H2的具体气泡比例、优化器回滚细节、ICLR 2024、与DualPipe的关系为一般了解。"}
+}

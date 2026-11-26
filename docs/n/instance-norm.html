@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>实例归一化InstanceNorm（2016） · AI脉络</title>
+<meta name="description" content="用前馈网络做快速风格迁移（一次前向就出图）比逐图优化快得多，但画质明显不如的迭代优化结果。 把风格化网络里的换成实例归一化：对每张图、每个通道单独减均值除标准差，并且在测试时也这样做。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/instance-norm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="实例归一化InstanceNorm（2016）">
+<meta property="og:description" content="用前馈网络做快速风格迁移（一次前向就出图）比逐图优化快得多，但画质明显不如的迭代优化结果。 把风格化网络里的换成实例归一化：对每张图、每个通道单独减均值除标准差，并且在测试时也这样做。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/instance-norm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/instance-norm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 图像翻译与风格迁移</div>
+<h1>实例归一化InstanceNorm</h1>
+<div class="full">Instance Normalization: The Missing Ingredient for Fast Stylization</div>
+<div class="meta"><span>2016.07</span><span>论文</span><span>延伸</span><span>Dmitry Ulyanov, Andrea Vedaldi, Victor Lempitsky · Skoltech / University of Oxford</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1607.08022" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://arxiv.org/abs/1701.02096" rel="noopener">扩展版 arXiv:1701.02096 ↗</a><a class="btn sm" href="../index.html#/n/instance-norm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>用前馈网络做快速风格迁移（一次前向就出图）比逐图优化快得多，但画质明显不如<a class="ln" href="../n/neural-style.html">神经风格迁移</a>的迭代优化结果。</p></div><div><h4>方法</h4><p>把风格化网络里的<a class="ln" href="../n/batchnorm.html">Batch Normalization</a>换成实例归一化：对每张图、每个通道单独减均值除标准差，并且在测试时也这样做。</p></div><div><h4>影响</h4><p>一个很小的改动让前馈风格迁移的质量大幅提升；实例归一化随后成为风格迁移、<a class="ln" href="../n/cyclegan.html">CycleGAN</a>等图像翻译网络的标准部件，也是<a class="ln" href="../n/adain.html">AdaIN任意风格迁移</a>和<a class="ln" href="../n/stylegan.html">StyleGAN</a>风格注入的起点。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/perceptual-loss.html">感知损失</a>和Ulyanov等人此前的纹理网络都训练一个生成网络：输入内容图，输出风格化后的图，训练时用Gatys式的风格损失监督。它们沿用了批归一化，即在一个小批量里统计每个通道的均值和方差。</p><p>作者的观察是：风格化结果本不应依赖内容图的对比度，而批归一化把整批图混在一起统计，单张图的对比度信息会残留到输出里。改为实例归一化后，对单张图<code>x</code>的第<code>c</code>个通道，在其所有空间位置上计算均值<code>μ</code>和方差<code>σ²</code>，输出<code>(x−μ)/√(σ²+ε)</code>再乘以可学习的缩放、加偏移。这相当于网络里自带一个“去掉对比度”的操作。关键是训练和测试都用当前这张图的统计量，而不是像批归一化那样在测试时换成整个训练集的滑动平均。</p><p>论文展示，同一架构只做这一处替换，风格化图像的质量就明显改善，可以用来训练实时生成的高性能网络。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>一个网络仍只能学一种（或固定几种）风格，换风格要重新训练。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/adain.html">AdaIN任意风格迁移</a></div></li><li>逐图逐通道归一化会抹掉特征的绝对幅度信息，后来在<a class="ln" href="../n/stylegan2.html">StyleGAN2</a>里被指出会造成水滴状伪影。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/stylegan2.html">StyleGAN2</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/batchnorm.html">Batch Normalization</a><span class="yr">2015.02 · 基础</span><div class=nt>保留归一化加仿射变换的形式，但把统计范围从一个批次缩小到单张图的单个通道。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/neural-style.html">神经风格迁移</a><span class="yr">2015.08 · 生成</span><div class=nt>训练目标仍是Gatys式的Gram矩阵风格损失加内容损失。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/texture-synthesis.html">CNN纹理合成</a><span class="yr">2015.05 · 生成</span><div class=nt>所改进的纹理网络就是要前馈地逼近Gatys纹理合成的结果。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/perceptual-loss.html">感知损失</a><span class="yr">2016.03 · 视觉</span><div class=nt>改善前馈风格迁移网络画质不如迭代优化的问题。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/stylegan2.html">StyleGAN2</a><span class="yr">2019.12 · 生成</span><div class=nt>逐图逐通道归一化会抹掉特征的绝对幅度信息，后来在<a class="ln" href="../n/stylegan2.html">StyleGAN2</a>里被指出会造成水滴状伪影。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/adain.html">AdaIN任意风格迁移</a><span class="yr">2017.03 · 生成</span><div class=nt>把实例归一化中固定可学习的缩放和偏移，换成由风格图特征统计量动态给出。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/expectation-variance.html">期望与方差</a> <a class="chip c" href="../c/loss-function.html">损失函数</a></p>
+<h2>本篇术语</h2><ul><li><b>前馈风格迁移</b>　先训练一个网络，之后对任意内容图只需一次前向计算就输出风格化结果，而不是每张图都迭代优化。</li></ul>
+<h2>怎么学</h2><p>先弄懂批归一化在训练和测试时的差别 → 读这篇只有几页的短文 → 在一个风格迁移代码里把BatchNorm2d换成InstanceNorm2d对比效果。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1607.08022" rel="noopener">https://arxiv.org/abs/1607.08022</a>（标题、作者、v1日期2016-07-27、摘要中“仅把批归一化换成实例归一化并在训练与测试时都使用”；对比度不变性的动机与公式来自一般了解，StyleGAN2伪影的关联来自对StyleGAN2的一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%AE%9E%E4%BE%8B%E5%BD%92%E4%B8%80%E5%8C%96InstanceNorm%EF%BC%88instance-norm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ainstance-norm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/instance-norm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="gated-pixelcnn.html"><small>本分支上一个 · 2016.06</small><b>门控条件PixelCNN</b></a><a class="r" href="vgan-video.html"><small>本分支下一个 · 2016.09</small><b>视频GAN</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

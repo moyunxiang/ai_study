@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Metric3D度量深度（2023） · AI脉络</title>
+<meta name="description" content="靠混合多数据集训练获得零样本泛化，但只能预测相对深度；度量深度模型又只能用单一相机训练，因为不同焦距会让同样的画面对应不同距离。 把所有训练图像变换到一个统一焦距的“标准相机空间”再学深度，预测后按真实焦距换回，消除相机带来的尺度歧义，从而能在海量混合数据上训练度量深度。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/metric3d.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Metric3D度量深度（2023）">
+<meta property="og:description" content="靠混合多数据集训练获得零样本泛化，但只能预测相对深度；度量深度模型又只能用单一相机训练，因为不同焦距会让同样的画面对应不同距离。 把所有训练图像变换到一个统一焦距的“标准相机空间”再学深度，预测后按真实焦距换回，消除相机带来的尺度歧义，从而能在海量混合数据上训练度量深度。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/metric3d.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/metric3d">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 单目深度估计</div>
+<h1>Metric3D度量深度</h1>
+<div class="full">Metric3D: Towards Zero-shot Metric 3D Prediction from A Single Image</div>
+<div class="meta"><span>2023.07</span><span>论文</span><span>延伸</span><span>ICCV 2023</span><span>Wei Yin, Chi Zhang, Hao Chen, Zhipeng Cai, Gang Yu, Kaixuan Wang, Xiaozhi Chen, Chunhua Shen · 大疆 / 腾讯 / 阿德莱德大学 / 浙江大学 等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2307.10984" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/YvanYin/Metric3D" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/metric3d">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/midas.html">MiDaS混合数据集深度</a>靠混合多数据集训练获得零样本泛化，但只能预测相对深度；度量深度模型又只能用单一相机训练，因为不同焦距会让同样的画面对应不同距离。</p></div><div><h4>方法</h4><p>把所有训练图像变换到一个统一焦距的“标准相机空间”再学深度，预测后按真实焦距换回，消除相机带来的尺度歧义，从而能在海量混合数据上训练度量深度。</p></div><div><h4>影响</h4><p>第一批能在未见过的相机和网络照片上给出米制深度的通用模型之一，让单目深度可以直接用于测量、SLAM尺度恢复等。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>核心观察是“度量歧义”：同一辆车，用长焦拍得大、用广角拍得小，网络只看像素无法判断真实距离，除非知道焦距。Metric3D提出标准相机空间变换模块：设定一个标准焦距，训练时要么把图像按焦距比缩放，要么把真值深度按焦距比缩放，使所有样本都像是同一台相机拍的；推理时预测标准空间的深度，再乘回真实焦距的比例得到米制深度。这个模块与网络结构无关，可以插到现有单目深度模型里。</p><p>有了它，模型可以混合来自上千种相机、超过800万张图像稳定训练。摘要报告在7个零样本基准上取得领先，赢得第二届单目深度估计挑战赛冠军，并能缓解单目SLAM的尺度漂移，实现带米制尺度的稠密建图。</p><h2>后来的发展</h2><p>2024年的Metric3D v2加入表面法线联合估计并换用ViT骨干；同期<a class="ln" href="../n/depth-pro.html">Depth Pro度量深度</a>、<a class="ln" href="../n/moge.html">MoGe单目几何</a>、<a class="ln" href="../n/depth-anything-v2.html">Depth Anything V2</a>等都把零样本度量深度作为主要目标。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>推理时需要知道相机焦距，网络照片缺少内参时只能用默认值，度量误差变大。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/depth-pro.html">Depth Pro度量深度</a> <a class="chip hue" style="--h:216" href="../n/moge.html">MoGe单目几何</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/eigen-depth.html">单图深度预测</a><span class="yr">2014.06 · 视觉</span><div class=nt>延续单图回归深度的路线，从单一数据集的度量深度推广到跨相机零样本。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/sfmlearner.html">SfMLearner自监督深度</a><span class="yr">2017.04 · 视觉</span><div class=nt>单目视频只能恢复到未知尺度，深度和位移都没有米制单位。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/monodepth2.html">Monodepth2</a><span class="yr">2018.06 · 视觉</span><div class=nt>仍只能得到未知尺度的相对深度，换一台相机或场景尺度就不确定。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/midas.html">MiDaS混合数据集深度</a><span class="yr">2019.07 · 视觉</span><div class=nt>MiDaS用仿射不变损失绕开尺度问题、只给相对深度；Metric3D用标准相机变换解决尺度歧义，在混合数据上学米制深度。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/adabins.html">AdaBins自适应区间</a><span class="yr">2020.11 · 视觉</span><div class=nt>仍是在单个数据集上监督训练，换到别的场景或相机需要重新训练，零样本泛化差。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/dpt.html">DPT稠密预测ViT</a><span class="yr">2021.03 · 视觉</span><div class=nt>DPT等相对深度模型泛化好但无尺度，Metric3D追求同时泛化且有尺度。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/convnext.html">ConvNeXt</a><span class="yr">2022.01 · 视觉</span><div class=nt>第一版主要采用ConvNeXt骨干。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/zoedepth.html">ZoeDepth</a><span class="yr">2023.02 · 视觉</span><div class=nt>度量尺度只来自少数几个微调数据集，按“室内/室外”二选一路由，遇到焦距或场景差异很大的照片尺度仍会偏。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/unidepth.html">UniDepth通用度量深度</a><span class="yr">2024.03 · 视觉</span><div class=nt>Metric3D需在推理时提供焦距；UniDepth从图像自行预测稠密相机表示，无需任何额外输入。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/depth-pro.html">Depth Pro度量深度</a><span class="yr">2024.10 · 视觉</span><div class=nt>推理时需要知道相机焦距，网络照片缺少内参时只能用默认值，度量误差变大。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/moge.html">MoGe单目几何</a><span class="yr">2024.10 · 视觉</span><div class=nt>推理时需要知道相机焦距，网络照片缺少内参时只能用默认值，度量误差变大。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/distribution-shift.html">分布偏移</a> <a class="chip c" href="../c/zero-few-shot.html">零样本与少样本</a> <a class="chip c" href="../c/loss-function.html">损失函数</a></p>
+<h2>本篇术语</h2><ul><li><b>度量深度</b>　以米为单位的真实距离；相对深度只知道谁远谁近，不知道具体多远。</li><li><b>焦距</b>　相机内参之一，决定视野宽窄和物体在画面里的大小，同一物体焦距越长显得越大。</li></ul>
+<h2>怎么学</h2><p>先弄清针孔相机模型中焦距与成像大小的关系，再读Metric3D第3节标准相机变换；用官方模型对同一场景的广角与长焦照片测深度对比。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2307.10984" rel="noopener">https://arxiv.org/abs/2307.10984</a>（arXiv记录：标题、八位作者、v1提交于2023-07-20、摘要中的度量歧义、标准相机空间变换模块可插入现有模型、800多万张图像与数千种相机模型、7个零样本基准、第二届单目深度估计挑战赛冠军、缓解单目SLAM尺度漂移。变换的具体两种方式、ConvNeXt骨干、Metric3D v2信息、机构与ICCV 2023凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Metric3D%E5%BA%A6%E9%87%8F%E6%B7%B1%E5%BA%A6%EF%BC%88metric3d%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ametric3d%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/metric3d.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="cotracker.html"><small>本分支上一个 · 2023.07</small><b>CoTracker</b></a><a class="r" href="3dgs.html"><small>本分支下一个 · 2023.08</small><b>3D高斯泼溅</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

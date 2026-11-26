@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>最小二乘策略迭代LSPI（2003） · AI脉络</title>
+<meta name="description" content="能高效地用样本估计一个固定策略的状态价值，但没有环境模型就没法据此挑动作，所以只能做预测、不能做控制。 改为用最小二乘估计状态-动作价值Q，再在策略迭代框架里反复「评估-贪心改进」，得到一个无模型、离策略、能反复利用同一批样本的控制算法。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/lspi.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="最小二乘策略迭代LSPI（2003）">
+<meta property="og:description" content="能高效地用样本估计一个固定策略的状态价值，但没有环境模型就没法据此挑动作，所以只能做预测、不能做控制。 改为用最小二乘估计状态-动作价值Q，再在策略迭代框架里反复「评估-贪心改进」，得到一个无模型、离策略、能反复利用同一批样本的控制算法。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/lspi.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/lspi">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 价值函数与时序差分</div>
+<h1>最小二乘策略迭代LSPI</h1>
+<div class="full">Least-Squares Policy Iteration</div>
+<div class="meta"><span>2003.12</span><span>论文</span><span>延伸</span><span>JMLR 2003</span><span>Michail G. Lagoudakis, Ronald Parr · Duke University</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://www.jmlr.org/papers/v4/lagoudakis03a.html" rel="noopener">JMLR ↗</a><a class="btn sm" href="../index.html#/n/lspi">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/lstd.html">最小二乘TD（LSTD）</a>能高效地用样本估计一个固定策略的状态价值，但没有环境模型就没法据此挑动作，所以只能做预测、不能做控制。</p></div><div><h4>方法</h4><p>改为用最小二乘估计状态-动作价值Q，再在策略迭代框架里反复「评估-贪心改进」，得到一个无模型、离策略、能反复利用同一批样本的控制算法。</p></div><div><h4>影响</h4><p>成为线性函数近似下批量RL的标准基线，和<a class="ln" href="../n/fitted-q.html">拟合Q迭代FQI</a>一起代表了深度RL之前「用一批数据学控制」的主流做法。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>策略迭代（<a class="ln" href="../n/howard-policy-iteration.html">Howard策略迭代</a>）交替做两件事：评估当前策略的价值，再对价值取贪心得到新策略。LSPI把评估这一步换成LSTDQ：用线性特征 <code>Q(s,a) ≈ φ(s,a)ᵀw</code> 表示动作价值，对一批样本 <code>(s,a,r,s′)</code> 直接解一个线性方程组 <code>A w = b</code>，其中 <code>A = Σ φ(s,a)(φ(s,a) − γφ(s′,π(s′)))ᵀ</code>，<code>b = Σ φ(s,a) r</code>。这是<a class="ln" href="../n/lstd.html">最小二乘TD（LSTD）</a>在Q函数上的版本，不用学习率、一次求解。</p><p>因为学的是Q而不是V，改进策略时只需 <code>π(s) = argmax_a Q(s,a)</code>，不需要环境模型。又因为目标里用的是新策略在s′的动作，同一批样本可以在每一轮迭代中重复使用，不管它们是怎样收集的——这使LSPI成为离策略、批量的方法。</p><p>摘要报告：在倒立摆平衡和更难的骑自行车到达目标任务上，LSPI只靠观察少量随机动作的试验就学会了控制，并与有无经验回放的<a class="ln" href="../n/q-learning.html">Q-learning</a>做了对比。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>依赖人工设计的线性特征φ(s,a)，特征选不好就学不出来，难以处理图像等原始输入。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/nfq.html">神经拟合Q迭代NFQ</a> <a class="chip hue" style="--h:120" href="../n/dqn-nature.html">DQN（Nature版）</a></div></li><li>每轮要解一个特征维度大小的线性方程组，特征一多计算和内存都随维度平方或立方增长。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/q-learning.html">Q-learning</a><span class="yr">1992 · RL</span><div class=nt>同样无模型、离策略，但LSPI批量求解、反复用样本，原文实验与Q学习直接比较样本效率。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/howard-policy-iteration.html">Howard策略迭代</a><span class="yr">1960 · RL</span><div class=nt>整体框架就是近似版的策略迭代：评估一步用最小二乘，改进一步取贪心。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/lstd.html">最小二乘TD（LSTD）</a><span class="yr">1996 · RL</span><div class=nt>把LSTD从估计状态价值推广到估计动作价值（LSTDQ），使其能用于控制。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/dqn-nature.html">DQN（Nature版）</a><span class="yr">2015.02 · RL</span><div class=nt>依赖人工设计的线性特征φ(s,a)，特征选不好就学不出来，难以处理图像等原始输入。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/nfq.html">神经拟合Q迭代NFQ</a><span class="yr">2005 · RL</span><div class=nt>依赖人工设计的线性特征φ(s,a)，特征选不好就学不出来，难以处理图像等原始输入。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/policy-value.html">策略与价值函数</a> <a class="chip c" href="../c/bellman-equation.html">Bellman方程</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a> <a class="chip c" href="../c/linear-regression.html">线性回归</a> <a class="chip c" href="../c/td-error.html">时序差分与自举</a></p>
+<h2>本篇术语</h2><ul><li><b>批量强化学习</b>　先收集好一批交互数据，再只用这批数据学习策略，学习过程中不再与环境交互。</li></ul>
+<h2>怎么学</h2><p>先读懂<a class="ln" href="../n/lstd.html">最小二乘TD（LSTD）</a>的线性方程组；读原文第4–5节LSTDQ和LSPI的伪代码；在CartPole上用多项式或径向基特征实现LSPI，与表格Q学习比较所需样本数。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://www.jmlr.org/papers/v4/lagoudakis03a.html" rel="noopener">https://www.jmlr.org/papers/v4/lagoudakis03a.html</a>（标题、两位作者、JMLR第4卷（2003年12月）1107–1149页；摘要中LSTD无法直接用于控制、LSPI学状态-动作价值、无模型离策略可复用样本、倒立摆与自行车实验、与Q学习比较。LSTDQ公式按通行写法给出。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%9C%80%E5%B0%8F%E4%BA%8C%E4%B9%98%E7%AD%96%E7%95%A5%E8%BF%AD%E4%BB%A3LSPI%EF%BC%88lspi%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Alspi%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/lspi.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="r-max.html"><small>本分支上一个 · 2002.10</small><b>R-max乐观探索</b></a><a class="r" href="apprenticeship-learning.html"><small>本分支下一个 · 2004</small><b>学徒学习</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

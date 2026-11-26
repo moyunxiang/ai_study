@@ -1,0 +1,24 @@
+{
+ "id": "dorefa-net",
+ "who": "Shuchang Zhou, Yuxin Wu, Zekun Ni, Xinyu Zhou, He Wen, Yuheng Zou · 旷视科技",
+ "aka": ["DoReFa", "低比特梯度", "low-bitwidth gradients", "任意比特量化训练"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1606.06160"},
+  {"label": "代码（tensorpack）", "url": "https://github.com/tensorpack/tensorpack/tree/master/examples/DoReFa-Net"}
+ ],
+ "problem": "BNN、XNOR-Net把权重和激活压到1比特，但反向传播里的梯度仍是32位浮点，训练本身没法用低比特运算加速；1比特之外的任意位宽也缺少统一做法。",
+ "idea": "权重、激活和梯度三者都量化到各自可选的低位宽：前向用低比特权重与激活做位运算卷积，反向把参数梯度随机量化成低比特后再传播。",
+ "impact": "量化感知训练里常被引用的基线，它对权重先做tanh归一化再量化、对激活截断到[0,1]的写法，被许多后续低比特方法沿用。",
+ "method": "[[bnn]]与[[xnor-net]]证明了二值化网络可以训练，但只覆盖推理时的前向计算。DoReFa-Net的名字来自“权重（W）、激活（A）、梯度（G）”都降位宽的设想：如果梯度也是低比特的，训练时的卷积同样可以用位运算实现，从而在CPU、FPGA、ASIC、GPU上加速训练。\n\n做法上，k比特量化函数把[0,1]内的实数四舍五入到 `2^k − 1` 个等级，反向时用[[ste]]直接让梯度穿过取整。权重先用tanh压缩、再线性映射到[0,1]后量化；激活先截断到[0,1]再量化；参数梯度在反向传播时加入均匀噪声做**随机量化**，再送入卷积层。三者位宽可以独立选择，论文系统比较了不同组合。\n\n摘要报告：在SVHN和ImageNet上，DoReFa-Net能达到与32位网络相当的精度；例如由AlexNet改造、1比特权重、2比特激活、6比特梯度从头训练的模型，ImageNet验证集top-1为46.1%。",
+ "limits": [
+  {"text": "激活截断范围和量化步长都是手工固定的，位宽降到2–4比特时精度损失仍大；后来的方法把截断阈值和步长变成可学习参数。", "solved_by": ["pact-quant", "lsq"]}
+ ],
+ "relations": [
+  {"to": "xnor-net", "type": "extends", "note": "从1比特权重与激活推广到任意位宽，并且把梯度也量化。"},
+  {"to": "bnn", "type": "extends", "note": "沿用二值网络用直通估计训练离散权重的做法，扩展到低比特梯度以加速训练本身。"},
+  {"to": "binaryconnect", "type": "extends", "note": "BinaryConnect只二值化权重，DoReFa-Net把权重、激活、梯度三者统一处理。"},
+  {"to": "ste", "type": "uses", "note": "量化函数不可导，反向传播用直通估计器近似其梯度。"}
+ ],
+ "prereq": ["quantization-concept", "backpropagation", "conv-layer", "floating-point"],
+ "check": {"source": "https://arxiv.org/abs/1606.06160", "confirmed": "标题、六位作者、v1日期2016-06-20；摘要：低比特权重与激活配合低比特参数梯度、反向随机量化梯度、位卷积可在CPU/FPGA/ASIC/GPU上实现、SVHN与ImageNet精度与32位相当、AlexNet 1比特权重2比特激活6比特梯度top-1 46.1%。tanh权重变换、激活截断、旷视机构为一般了解。"}
+}

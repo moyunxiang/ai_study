@@ -1,0 +1,25 @@
+{
+ "id": "zeroquant",
+ "who": "Zhewei Yao, Reza Yazdani Aminabadi, Minjia Zhang, Xiaoxia Wu, Conglong Li, Yuxiong He · 微软",
+ "venue": "NeurIPS 2022",
+ "aka": ["ZeroQuant", "DeepSpeed量化", "逐层蒸馏", "LKD", "W8A8", "group-wise quantization"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2206.01861"},
+  {"label": "DeepSpeed", "url": "https://github.com/microsoft/DeepSpeed"}
+ ],
+ "problem": "千亿级模型用FP16推理都要多卡，量化感知训练要完整再训练、代价太大；简单的训练后INT8量化在GPT类大模型上又会明显掉精度。",
+ "idea": "训练后量化加三件事：权重按小组、激活按每个token各自定缩放比例；用不需要原始训练数据的逐层知识蒸馏修复更低比特的层；配上把量化/反量化融进算子的推理内核。",
+ "impact": "是最早一批面向GPT规模模型的训练后量化系统之一，与LLM.int8()、SmoothQuant同期，其细粒度分组思路被后来的LLM量化方法普遍采用。",
+ "method": "[[integer-quant]]式的量化感知训练要在训练中模拟量化，对BERT尚可，对几百亿参数的模型重新训练不现实。直接做训练后量化，用一个缩放比例覆盖整个权重矩阵、整批激活，又会被少数大值拖累精度。\n\nZeroQuant的三个部件：**细粒度量化**，权重矩阵切成小组分别算缩放比例（group-wise），激活按每个token单独算（token-wise），动态适应不同token的数值范围；**逐层知识蒸馏（LKD）**，要把全连接层压到INT4时，一层一层地让量化后的层去拟合原层的输出（[[distillation]]的思路），每次只需要一层的显存，也不需要原始训练数据；**系统后端**，把量化、反量化和相邻运算融合进内核，避免这些额外操作吃掉加速。\n\n摘要报告：BERT和GPT-3风格模型的权重与激活都降到INT8时精度几乎不变，相对FP16推理最多快5.19倍/4.16倍；全连接层INT4、注意力INT8、激活INT8时显存降为FP16的约三分之一；GPT-J-6B和GPT-NeoX-20B上INT8效率最多提高5.2倍。",
+ "limits": [
+  {"text": "更大的模型里激活出现极端离群值，单靠按token定缩放比例的INT8激活量化仍会掉点。", "solved_by": ["llm-int8", "smoothquant"]},
+  {"text": "INT4需要额外的逐层蒸馏，流程比只用少量校准数据的一次性方法重。", "solved_by": ["gptq", "awq"]}
+ ],
+ "relations": [
+  {"to": "integer-quant", "type": "solves", "note": "量化感知训练对大模型代价太高；ZeroQuant改成训练后量化，只在需要时做轻量的逐层蒸馏。"},
+  {"to": "distillation", "type": "uses", "note": "逐层蒸馏让量化后的层去模仿原始层的输出。"},
+  {"to": "gpt-neox", "type": "uses", "note": "在当时最大的开源模型GPT-J-6B与GPT-NeoX-20B上验证INT8量化。"}
+ ],
+ "prereq": ["quantization-concept", "floating-point", "knowledge-distillation", "memory-bandwidth"],
+ "check": {"source": "https://arxiv.org/abs/2206.01861", "confirmed": "标题、六位作者、v1日期2022-06-04；摘要：细粒度权重与激活量化、无原始数据的逐层蒸馏LKD、量化系统后端、INT8最多5.19×/4.16×、INT4全连接+INT8注意力内存减3倍、GPT-J6B与GPT-NeoX20B上最多5.2×。“权重group-wise、激活token-wise”为正文常见描述，未逐句对照；NeurIPS 2022与微软为一般了解。"}
+}

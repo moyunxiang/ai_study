@@ -1,0 +1,29 @@
+{
+  "id": "plenoxels",
+  "who": "Alex Yu, Sara Fridovich-Keil, Matthew Tancik, Qinhong Chen, Benjamin Recht, Angjoo Kanazawa · 加州大学伯克利",
+  "venue": "CVPR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2112.05131"},
+    {"label": "项目页", "url": "https://alexyu.net/plenoxels/"}
+  ],
+  "aka": ["Plenoxels", "plenoptic voxels", "全光体素", "无网络辐射场", "显式体素辐射场", "球谐函数"],
+  "problem": "[[nerf]]把整个场景塞进一个大MLP，每个采样点都要过一遍网络，单个场景优化要一两天。",
+  "idea": "干脆去掉神经网络：用稀疏三维体素网格直接存每个格点的密度和球谐系数，用和NeRF相同的体渲染与梯度下降优化。",
+  "impact": "以快两个数量级的速度达到NeRF的画质，说明NeRF的成功主要来自可微体渲染而非神经网络本身，为显式表示路线（包括[[3dgs]]）铺路。",
+  "method": "场景被表示成一个稀疏体素网格，每个格点存一个不透明度和一组球谐函数系数。球谐函数是定义在球面上的一组基函数，用它们的组合表示“从不同方向看这个点是什么颜色”，从而建模反光等视角相关效果。\n\n渲染一条光线时，沿光线采样点，用三线性插值从周围8个格点取出密度和颜色，再按NeRF的[[c:volume-rendering]]公式累加成像素颜色。损失是渲染像素与真实照片的差，加上一项全变分正则（让相邻格点的值平滑，抑制噪点）。因为没有网络，梯度直接落到格点参数上，配合由粗到细地细分网格并剪掉空格子，优化非常快。摘要称在标准基准上优化速度比NeRF快两个数量级，画质没有损失。",
+  "limits": [
+    {"text": "稠密/稀疏体素网格的显存随分辨率立方增长，大场景或高分辨率时存储很大。", "solved_by": ["instant-ngp", "3dgs"]},
+    {"text": "渲染仍要沿光线逐点采样，难以做到高分辨率实时渲染。", "solved_by": ["3dgs"]}
+  ],
+  "relations": [
+    {"to": "nerf", "type": "solves", "note": "保留NeRF的体渲染与逐场景优化，用显式体素取代MLP，把优化时间从约一天降到分钟级。"},
+    {"to": "mip-nerf", "type": "rivals", "note": "同期NeRF改进多追求画质（如抗锯齿），Plenoxels则追求优化速度并放弃神经网络。"}
+  ],
+  "prereq": ["volume-rendering", "3d-representation", "gradient-descent", "regularization", "camera-geometry"],
+  "terms": [
+    {"t": "球谐函数", "d": "球面上的一组正交基函数，类似傅里叶级数之于周期函数，可以用少量系数表示随方向变化的颜色。"},
+    {"t": "三线性插值", "d": "在三维网格中，用一个点周围8个格点的值按距离加权求出该点的值。"}
+  ],
+  "learn": "先读NeRF的体渲染部分，再读Plenoxels第3节；用官方代码优化一个合成场景，与NeRF比较达到相同PSNR所需时间。",
+  "check": {"source": "https://arxiv.org/abs/2112.05131", "confirmed": "arXiv记录：标题、六位作者、v1提交于2021-12-09、摘要中的稀疏三维网格+球谐函数、无神经部件、用梯度方法与正则从标定图像优化、比NeRF快两个数量级且画质不降。三线性插值、全变分正则、粗到细细分与剪枝、CVPR 2022凭一般了解写。"}
+}

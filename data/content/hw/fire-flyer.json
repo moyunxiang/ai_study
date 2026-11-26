@@ -1,0 +1,32 @@
+{
+  "id": "fire-flyer",
+  "who": "Wei An, Xiao Bi, Guanting Chen, Shanhuang Chen, Chengqi Deng, Honghui Ding et al. · DeepSeek-AI",
+  "venue": "arXiv 2024",
+  "aka": ["Fire-Flyer 2", "萤火二号", "萤火", "HFReduce", "HaiScale", "3FS", "幻方AI集群", "DeepSeek集群"],
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2408.14158"}
+  ],
+  "problem": "训练大模型的标准配置是NVIDIA的DGX整机加三层InfiniBand网络，造价和功耗都很高；预算有限的团队需要一套更便宜、又不明显变慢的集群。",
+  "idea": "放弃DGX，用1万块PCIe版A100搭普通服务器，每台只配一张200Gbps网卡，网络改成两层fat-tree；再用自研的CPU侧allreduce、并行训练库和并行文件系统把通信和存储的短板补回来。",
+  "impact": "公开了DeepSeek训练早期模型所用集群的完整软硬件协同设计；其中的3FS后来在[[deepseek-infra-week]]开源，是“低成本也能训好模型”这一叙事的基础设施来源。",
+  "method": "论文描述的萤火二号（Fire-Flyer 2）约有1250个计算节点、1万块PCIe A100，每节点8块GPU直接连到CPU，配一张Mellanox ConnectX-6 200Gbps [[infiniband]]网卡。网络是分成两个区的两层[[fat-tree]]，每区一个800端口的fat-tree服务约600个节点，共用122台交换机，作者对比称三层PCIe方案需要约200台、DGX式三层方案需要1320台。最初不用[[nvlink]]，后来为训练LLM加装了NVLink桥，让每两块GPU之间有600GB/s。\n\n通信库HFReduce把allreduce放在CPU上用双二叉树完成，论文报告在186MiB数据量下跨节点带宽6.3–8.1GB/s，而NCCL为1.6–4.8GB/s；3FS文件系统用180个存储节点、2880块NVMe SSD，读吞吐达8TB/s。与DGX-A100相比，表II给出约83%的性能、60%的节点价格、2500W对4200W的功率，摘要概括为接近DGX-A100的性能、成本减半、能耗降低40%（论文前后说法不完全一致）。",
+  "limits": [
+    {"text": "PCIe卡之间没有NVSwitch全互连，张量并行等需要高带宽的并行方式受限，只能靠NVLink桥和软件调度弥补。", "solved_by": []},
+    {"text": "整套方案围绕A100一代设计，出口管制下能否换用更新的GPU或国产芯片复制同样的性价比，论文没有讨论。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "a100", "type": "uses", "note": "用1万块PCIe版A100搭建，而不是DGX-A100整机。"},
+    {"to": "infiniband", "type": "uses", "note": "每节点一张200Gbps InfiniBand网卡，组成两层fat-tree。"},
+    {"to": "nvlink", "type": "rivals", "note": "最初刻意不用NVLink/NVSwitch以降低成本，靠CPU侧allreduce补通信，后来只加装了NVLink桥。"},
+    {"to": "fat-tree", "type": "uses", "note": "网络采用分区的两层fat-tree拓扑。"}
+  ],
+  "prereq": ["distributed-training", "interconnect", "datacenter-power"],
+  "terms": [
+    {"t": "allreduce", "d": "数据并行训练中把所有GPU的梯度求和后再发回每块GPU的集体通信操作，是集群通信的主要开销。"}
+  ],
+  "learn": "先了解[[c:distributed-training]]中的数据并行与allreduce，再读论文第III节的网络设计和表II的成本对比；可对照[[meta-rsc]]等用DGX搭建的集群。",
+  "check": {
+    "source": "https://arxiv.org/html/2408.14158v2",
+    "confirmed": "arXiv记录核对标题、作者（An等52人）、v1日期2024-08-26与摘要；HTML全文核对约1250节点、每节点8卡1张200Gbps CX-6、两区两层fat-tree每区800端口约600节点、122台交换机对比200/1320台、后加NVLink桥600GB/s、HFReduce 6.3–8.1 vs 1.6–4.8GB/s、3FS 180节点2880块SSD读8TB/s、表II 83%性能/60%价格/2500W对4200W，单位为DeepSeek-AI。正式发表处未见，记为arXiv。"
+  }
+}

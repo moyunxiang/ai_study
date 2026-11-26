@@ -1,0 +1,33 @@
+{
+  "id": "distil-whisper",
+  "who": "Sanchit Gandhi, Patrick von Platen, Alexander M. Rush · Hugging Face",
+  "venue": "arXiv 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2311.00430"},
+    {"label": "GitHub", "url": "https://github.com/huggingface/distil-whisper"}
+  ],
+  "problem": "[[whisper]]越做越大，在低延迟或资源受限的场景里跑不动；而直接训练小模型又缺少Whisper那样海量的标注数据。",
+  "idea": "用Whisper自己给大量开源音频打伪标签，按词错误率过滤掉质量差的标签，再用知识蒸馏训练一个只保留少数几层解码器的小模型。",
+  "impact": "Distil-Whisper及其后续版本成为开源语音识别里最常用的Whisper加速替代品之一，也展示了用伪标签加蒸馏压缩语音大模型的标准做法。",
+  "method": "Whisper是编码器-解码器结构，生成文字时解码器要一个token一个token地跑，解码器层数直接决定速度。Distil-Whisper保留Whisper的完整编码器，只从教师模型里挑出少数几层初始化一个很浅的解码器，然后用[[c:knowledge-distillation]]训练：学生既模仿教师在每个位置的输出分布，也学习教师给出的伪标签。\n\n伪标签来自一个用开源语料拼成的大规模数据集，由Whisper转写。论文用一个简单的启发式过滤：把Whisper的转写和数据集自带的原始文本比较，词错误率（见[[c:word-error-rate]]）太高的样本直接丢掉，只保留最可靠的伪标签。\n\n摘要报告：蒸馏后的模型快5.8倍、参数少51%，在分布外测试数据上零样本识别的词错误率与原模型相差在1%以内；它保留了Whisper对困难声学条件的鲁棒性，在长音频上更不容易产生幻觉错误。它还被设计成Whisper的草稿模型，配合[[speculative-decoding]]可以在保证输出与原模型数学上完全一致的前提下提速2倍。",
+  "limits": [
+    {"text": "首个版本只针对英语训练，多语言识别和翻译能力没有保留下来。", "solved_by": []},
+    {"text": "编码器仍是完整大小，编码阶段的计算量没有减少，在端侧设备上依然偏重。", "solved_by": ["moonshine"]}
+  ],
+  "relations": [
+    {"to": "whisper", "type": "extends", "note": "以Whisper为教师和初始化来源，压缩出更快的学生模型。"},
+    {"to": "distillation", "type": "uses", "note": "用知识蒸馏让学生模仿教师的输出分布。"},
+    {"to": "speculative-decoding", "type": "uses", "note": "作为草稿模型与Whisper配合做推测解码，输出与原模型一致而速度提升2倍。"},
+    {"to": "whisper-v3", "type": "rivals", "note": "OpenAI的large-v3-turbo同样通过削减解码器层数提速，两者思路相近。"}
+  ],
+  "prereq": ["knowledge-distillation", "encoder-decoder", "word-error-rate", "autoregressive", "transformer-block"],
+  "terms": [
+    {"t": "伪标签", "d": "没有人工标注时，用一个已有模型的预测结果当作训练标签。"},
+    {"t": "幻觉错误", "d": "识别模型输出了音频里根本没有说过的词句，长音频和静音段上尤其常见。"}
+  ],
+  "aka": ["distil-large-v2", "distil-large-v3", "蒸馏版Whisper", "Whisper蒸馏"],
+  "check": {
+    "source": "https://arxiv.org/abs/2311.00430",
+    "confirmed": "arXiv官方记录：标题、作者Gandhi/von Platen/Rush、v1提交2023-11-01；摘要关于伪标签、WER启发式过滤、快5.8倍、参数少51%、分布外WER差距1%以内、长音频幻觉更少、推测解码提速2倍。浅层解码器的具体层数、仅英语、与large-v3-turbo的关系为一般了解，未在摘要中核对。"
+  }
+}

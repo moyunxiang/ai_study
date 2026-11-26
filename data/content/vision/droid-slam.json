@@ -1,0 +1,30 @@
+{
+  "id": "droid-slam",
+  "who": "Zachary Teed, Jia Deng · 普林斯顿大学",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2108.10869"},
+    {"label": "代码", "url": "https://github.com/princeton-vl/DROID-SLAM"}
+  ],
+  "aka": ["DROID-SLAM", "DROID", "深度视觉SLAM", "Dense Bundle Adjustment", "DBA"],
+  "problem": "[[orb-slam2]]等传统SLAM在弱纹理、快速运动下经常整段跟丢；早期学习式SLAM又精度不够，只能在训练过的场景里用。",
+  "idea": "把[[raft]]光流的循环迭代更新搬到SLAM：网络反复预测像素对应关系的修正量，再通过可微的稠密光束平差层同时更新相机位姿和每个像素的深度。",
+  "impact": "在多个基准上大幅降低误差和灾难性失败，成为学习式SLAM的标准基线，后来的前馈重建SLAM都拿它对比。",
+  "method": "DROID-SLAM维护一张“帧图”：图中每条边连接两帧，表示它们看到了同一片区域。对每条边，网络先根据当前估计的位姿和深度算出像素在另一帧中应落的位置，再查两帧特征的相关体（与RAFT相同的做法），由一个循环更新单元（ConvGRU）输出这些对应位置的修正量和置信度。\n\n关键部件是**稠密光束平差层**（Dense Bundle Adjustment）：把网络修正后的对应关系当作观测，用高斯-牛顿法求解使所有像素重投影一致的相机位姿与逐像素逆深度。这一步可微，因此整个系统能端到端训练。网络只在合成的单目视频上训练，测试时可以直接利用双目或深度输入提升精度。摘要称它精度大幅超过以往工作，灾难性失败也少得多。",
+  "limits": [
+    {"text": "对每对相关帧都要做稠密相关和优化，显存和GPU算力需求大，难以部署在小型机器人上。", "solved_by": []},
+    {"text": "需要已知相机内参，无法处理未标定的网络视频。", "solved_by": ["megasam", "vggt"]}
+  ],
+  "relations": [
+    {"to": "raft", "type": "extends", "note": "沿用RAFT的全对相关体与ConvGRU迭代更新，把输出从光流换成用于位姿与深度优化的对应修正。"},
+    {"to": "orb-slam2", "type": "solves", "note": "缓解特征点SLAM在弱纹理与快速运动下跟丢的问题，并以ORB-SLAM系列为主要对照。"},
+    {"to": "lsd-slam", "type": "extends", "note": "延续直接法“利用所有像素”的思想，但把光度对齐换成学习出来的对应关系。"}
+  ],
+  "prereq": ["camera-geometry", "recurrent-layer", "gating", "end-to-end", "3d-representation"],
+  "terms": [
+    {"t": "逆深度", "d": "深度的倒数。远处的点逆深度接近0，用它参数化可以稳定地表示很远的点。"},
+    {"t": "灾难性失败", "d": "SLAM系统在某段完全跟丢或轨迹严重发散，误差不是变大一点而是整段不可用。"}
+  ],
+  "learn": "先读RAFT弄懂相关体与迭代更新，再复习光束平差的高斯-牛顿解法；读DROID-SLAM第3节，最后在TartanAir或EuRoC序列上跑开源演示。",
+  "check": {"source": "https://arxiv.org/abs/2108.10869", "confirmed": "arXiv记录：标题、两位作者、v1提交于2021-08-24、摘要中的循环迭代更新相机位姿与逐像素深度、稠密光束平差层、精度大幅提升与灾难性失败更少、单目训练而测试可用双目/RGB-D。帧图、ConvGRU、合成数据训练等细节凭一般了解写，未逐项对照正文。"}
+}

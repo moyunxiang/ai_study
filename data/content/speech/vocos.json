@@ -1,0 +1,33 @@
+{
+  "id": "vocos",
+  "who": "Hubert Siuzdak · Gemelo AI（Charactr）",
+  "venue": "arXiv 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2306.00814"},
+    {"label": "GitHub", "url": "https://github.com/gemelo-ai/vocos"}
+  ],
+  "problem": "主流GAN声码器在时域上用多级转置卷积把频谱一点点上采样成波形，计算冗余；直接生成频域系数本来更高效，却一直卡在相位难以恢复的问题上。",
+  "idea": "不再在时域上采样，而是让网络在帧率上直接预测每一帧的复数傅里叶频谱（幅度和相位），再用一次逆短时傅里叶变换（iSTFT）得到波形，配合GAN训练保证音质。",
+  "impact": "Vocos在音质与时域声码器相当的同时快了一个数量级，被[[f5-tts]]等开源TTS系统用作声码器，让频域声码器成为时域GAN声码器之外的常用选择。",
+  "method": "时域声码器（[[hifi-gan]]、[[bigvgan]]）的输入是每秒几十到上百帧的梅尔频谱，输出是每秒上万个采样点，所以要用转置卷积逐级上采样上百倍，大部分计算花在高采样率上。另一条路是频域：短时傅里叶变换（见[[c:fourier-transform]]）把波形与「每帧一个复数频谱」一一对应，只要预测出每帧的幅度和相位，用快速的逆变换就能直接得到波形。难点在相位：它在时间和频率上看起来杂乱无章，直接回归很难学好。\n\nVocos的骨干是一串[[convnext]]块，全程在输入帧率上运算（不做上采样），最后为每帧输出幅度和相位：幅度用指数参数化，相位用单位圆上的余弦与正弦表示以避免相位卷绕带来的不连续。训练沿用GAN声码器的多判别器对抗损失和梅尔频谱重建损失（见[[c:adversarial-training]]）。除了梅尔频谱，Vocos也可以用[[encodec]]的离散token作为输入，替代EnCodec自带的解码器。\n\n摘要报告：音质与当时最好的方法相当，计算效率显著提升，速度比主流时域神经声码器快一个数量级；代码和权重开源。",
+  "limits": [
+    {"text": "频域预测在很低的帧率或很强的压缩下，相位估计仍可能出现细微的金属感或相位失真。", "solved_by": []},
+    {"text": "它本身只是声码器，不解决从文字或token预测频谱的上游问题。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "hifi-gan", "type": "solves", "note": "HiFi-GAN在时域逐级上采样、计算冗余；Vocos在帧率上预测傅里叶系数，速度快一个数量级。"},
+    {"to": "convnext", "type": "uses", "note": "骨干网络由ConvNeXt块组成，在输入帧率上运算。"},
+    {"to": "encodec", "type": "uses", "note": "可直接以EnCodec的离散token为输入，替代其原有的解码器重建音频。"},
+    {"to": "bigvgan", "type": "rivals", "note": "BigVGAN靠放大时域GAN追求通用性，Vocos改走频域路线追求效率。"}
+  ],
+  "prereq": ["fourier-transform", "waveform-spectrogram", "vocoder-codec", "adversarial-training", "conv-layer"],
+  "terms": [
+    {"t": "逆短时傅里叶变换（iSTFT）", "d": "把一帧帧的复数频谱变回连续波形的运算，有快速算法，计算很便宜。"},
+    {"t": "相位", "d": "每个频率成分正弦波的起始位置；人耳对它不敏感，但重建波形时缺了它就会失真。"}
+  ],
+  "aka": ["Vocos", "傅里叶声码器", "iSTFT声码器", "频域声码器"],
+  "check": {
+    "source": "https://arxiv.org/abs/2306.00814",
+    "confirmed": "arXiv官方记录：标题、作者Hubert Siuzdak、v1提交2023-06-01；摘要关于时域GAN忽略时频归纳偏置、上采样冗余、相位恢复难题、直接生成傅里叶谱系数、音质达到最好水平、速度提升一个数量级、代码与权重开源。Vocos GitHub README确认可从EnCodec token单次前向重建音频；F5-TTS GitHub README的推理基准表以Vocos为声码器。ConvNeXt骨干与幅度/相位参数化为一般了解。"
+  }
+}

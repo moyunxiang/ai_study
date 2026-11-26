@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Simba：小芯片拼成的加速器（2019） · AI脉络</title>
+<meta name="description" content="把加速器做成一整块大芯片，良率低、成本高；拆成很多小芯片（chiplet）放进同一封装又会带来芯片间通信的面积、延迟和能耗开销，当时的多芯片模块只敢放几颗粗粒度的大芯片。 真正造出一个由36颗细粒度小芯片组成的推理加速器，实测芯片间通信的代价，并用三种考虑数据局部性的分块映射方法把通信开销压下去。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/simba-mcm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Simba：小芯片拼成的加速器（2019）">
+<meta property="og:description" content="把加速器做成一整块大芯片，良率低、成本高；拆成很多小芯片（chiplet）放进同一封装又会带来芯片间通信的面积、延迟和能耗开销，当时的多芯片模块只敢放几颗粗粒度的大芯片。 真正造出一个由36颗细粒度小芯片组成的推理加速器，实测芯片间通信的代价，并用三种考虑数据局部性的分块映射方法把通信开销压下去。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/simba-mcm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/simba-mcm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:72"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/hw.html">硬件与算力</a> › AI加速器</div>
+<h1>Simba：小芯片拼成的加速器</h1>
+<div class="full">Simba: Scaling Deep-Learning Inference with Multi-Chip-Module-Based Architecture</div>
+<div class="meta"><span>2019.10</span><span>论文</span><span>延伸</span><span>MICRO 2019（最佳论文）</span><span>Yakun Sophia Shao, Jason Clemons, Rangharajan Venkatesan, Brian Zimmer, Priyanka Raina, William J. Dally, Joel Emer, Stephen W. Keckler et al. · NVIDIA</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://research.nvidia.com/publication/2019-10_simba-scaling-deep-learning-inference-multi-chip-module-based-architecture" rel="noopener">NVIDIA Research ↗</a><a class="btn sm" href="../index.html#/n/simba-mcm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>把加速器做成一整块大芯片，良率低、成本高；拆成很多小芯片（chiplet）放进同一封装又会带来芯片间通信的面积、延迟和能耗开销，当时的多芯片模块只敢放几颗粗粒度的大芯片。</p></div><div><h4>方法</h4><p>真正造出一个由36颗细粒度小芯片组成的推理加速器，实测芯片间通信的代价，并用三种考虑数据局部性的分块映射方法把通信开销压下去。</p></div><div><h4>影响</h4><p>第一批流片实测的chiplet式深度学习加速器之一，为后来数据中心GPU和AI芯片普遍转向多芯片封装提供了来自加速器一侧的量化证据。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/chiplets.html">Chiplet小芯片</a>的思路是用多颗小芯片在封装内拼成大系统，降低制造和设计成本。深度学习推理既要大量算力，也要大量片上存储，看上去很适合拆分；问题在于，层与层、芯片与芯片之间的数据交换会不会把省下的成本吃掉。</p><p>NVIDIA团队设计、实现、流片并测试了Simba：一个封装里有36颗小芯片，每颗峰值4 TOPS，整个封装最高128 TOPS、能效最高6.1 TOPS/W。每颗小芯片内部是一组处理单元和分布式的片上存储，这一设计与<a class="ln" href="../n/eyeriss.html">Eyeriss数据流加速器</a>的空间阵列一脉相承；整个系统可以把网络的不同层灵活映射到分布式的计算和存储单元上。作者提出三种改进数据局部性的分块优化，相比基线映射最多提速16%；在ResNet-50上批量为1时，Simba每秒处理1988张图像，推理延迟0.50毫秒。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>非均匀的芯片间延迟让层的映射方式对性能影响很大，需要专门的映射与调度工具，否则多芯片的扩展效率会明显下降。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:72" href="../n/eyeriss.html">Eyeriss数据流加速器</a><span class="yr">2016.06 · 硬件</span><div class=nt>同属空间阵列加加分布式片上存储的设计（Joel Emer同为作者），把它从单芯片扩展到多芯片封装。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:72" href="../n/scnn.html">SCNN稀疏卷积加速器</a><span class="yr">2017.05 · 硬件</span><div class=nt>同一NVIDIA研究团队的下一代加速器研究，关注点从稀疏转向多芯片扩展。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:72" href="../n/chiplets.html">Chiplet小芯片</a><span class="yr">2019.08 · 硬件</span><div class=nt>把小芯片封装的思路用到深度学习加速器上，并且做到36颗细粒度小芯片。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/chip-basics.html">晶体管、制程与摩尔定律</a> <a class="chip c" href="../c/interconnect.html">互连：从芯片到机柜到集群</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+<h2>本篇术语</h2><ul><li><b>多芯片模块（MCM）</b>　在同一个封装基板上放多颗芯片，用封装内连线相连，对外看起来像一颗芯片。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/chiplets.html">Chiplet小芯片</a>了解小芯片封装，再读Simba论文中芯片间通信开销的测量部分；可与<a class="ln" href="../n/mi300x.html">MI300X：192GB HBM3</a>等后来的多芯片GPU对比。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://research.nvidia.com/publication/2019-10_simba-scaling-deep-learning-inference-multi-chip-module-based-architecture" rel="noopener">https://research.nvidia.com/publication/2019-10_simba-scaling-deep-learning-inference-multi-chip-module-based-architecture</a>（NVIDIA Research页面核对标题、作者列表、2019-10-12 MICRO发表、最佳论文奖与摘要：36颗小芯片、每颗4 TOPS、封装128 TOPS与6.1 TOPS/W、三种分块优化最多16%、ResNet-50批量1时1988张/秒与0.50毫秒。“第一批流片实测”为定性说法。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Simba%EF%BC%9A%E5%B0%8F%E8%8A%AF%E7%89%87%E6%8B%BC%E6%88%90%E7%9A%84%E5%8A%A0%E9%80%9F%E5%99%A8%EF%BC%88simba-mcm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asimba-mcm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/simba-mcm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="cerebras.html"><small>本分支上一个 · 2019.08</small><b>Cerebras晶圆级芯片</b></a><a class="r" href="ms-openai-sc.html"><small>本分支下一个 · 2020.05</small><b>微软为OpenAI建的超算</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

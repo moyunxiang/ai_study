@@ -1,0 +1,28 @@
+{
+  "id": "unipc",
+  "who": "Wenliang Zhao, Lujia Bai, Yongming Rao, Jie Zhou, Jiwen Lu · 清华大学",
+  "venue": "NeurIPS 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2302.04867"},
+    {"label": "代码", "url": "https://github.com/wl-zhao/UniPC"}
+  ],
+  "aka": ["UniPC", "UniC", "UniP", "统一预测-校正采样器"],
+  "problem": "[[dpm-solver]]、[[dpm-solver-pp]]等高阶ODE求解器已把采样压到二三十步，但在少于10步时画质仍明显下降，而很多应用正需要这么少的步数。",
+  "idea": "设计一个通用的校正器UniC：每走一步后，利用这一步本来就要算的网络输出，对刚得到的结果做一次修正，把精度阶数提高一阶，却不增加任何网络调用；再配一个支持任意阶的预测器UniP，组成预测-校正框架。",
+  "impact": "在极少步数下比此前求解器质量更好，被diffusers等库内置为常用调度器之一，常出现在Stable Diffusion类模型的采样器选项中。",
+  "method": "扩散模型采样可以写成解概率流ODE，每一步都要调用一次去噪网络（一次函数评估，NFE），总耗时基本正比于NFE。高阶求解器的思路是用前几步的网络输出做多项式外推，以更大的步长达到相同精度。\n\nUniPC分两部分：\n- **预测器UniP**：给出任意阶的多步外推公式，在DPM-Solver的指数积分形式下推导，统一了不同阶数。\n- **校正器UniC**：走完一步到达x_{t_i}后，下一步本来就要在这个点上调用网络得到输出ε(x_{t_i})。UniC把这次调用的结果“回头”用一下，和之前的输出一起重新拟合，把x_{t_i}修正得更准，然后才继续向前走。因为复用了本来就要算的网络输出，校正是免费的，却能把精度阶数提高一阶。\n\nUniC可以套在任意现有求解器后面。论文报告，只用10次函数评估时，在CIFAR-10无条件生成上FID为3.87，在ImageNet 256×256条件生成上FID为7.51，在像素空间和潜空间模型、带与不带引导的情形下都优于此前方法。",
+  "limits": [
+    {"text": "训练免费的求解器在5步以下仍会明显失真，要做到1到4步出图还得靠蒸馏或一致性训练。", "solved_by": ["lcm", "add", "dmd"]}
+  ],
+  "relations": [
+    {"to": "dpm-solver", "type": "extends", "note": "在DPM-Solver的指数积分形式下推导任意阶预测器，并加上免费的校正步。"},
+    {"to": "dpm-solver-pp", "type": "solves", "note": "在少于10步、带引导的设置下进一步提升DPM-Solver++的采样质量。"}
+  ],
+  "prereq": ["ode-sde", "diffusion-process", "taylor-expansion", "few-step-sampling"],
+  "terms": [
+    {"t": "预测-校正", "d": "数值解微分方程的经典套路：先用外推公式预测下一步，再用新得到的信息修正这个预测。"},
+    {"t": "NFE", "d": "函数评估次数，即采样过程中调用去噪网络的次数，是衡量扩散采样速度的标准单位。"}
+  ],
+  "learn": "先读DDIM和DPM-Solver → 读本文第3节UniC为何不增加NFE → 在diffusers里把调度器换成UniPCMultistepScheduler，比较8步与20步的结果。",
+  "check": {"source": "https://arxiv.org/abs/2302.04867", "confirmed": "标题、五位作者、v1日期2023-02-09、摘要中少于10步时现有采样器不足、统一校正器UniC可接在任意采样器后提升精度阶数且不增加模型评估、任意阶预测器UniP、10次函数评估时CIFAR10无条件FID 3.87和ImageNet 256×256条件FID 7.51；机构、NeurIPS 2023、diffusers内置来自一般了解"}
+}

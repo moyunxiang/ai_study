@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>LambdaRank与LambdaMART（2010） · AI脉络</title>
+<meta name="description" content="搜索排序的好坏用NDCG这类只看名次的指标衡量，它对模型参数不可导；RankNet优化的成对错误数与NDCG并不一致，排在第1位和第50位的错误被同等对待。 不去写出那个不可导的损失，而是直接规定梯度：在RankNet的成对梯度上乘以「交换这两篇文档会让NDCG变化多少」；再把这种梯度（lambd…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/lambdamart.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LambdaRank与LambdaMART（2010）">
+<meta property="og:description" content="搜索排序的好坏用NDCG这类只看名次的指标衡量，它对模型参数不可导；RankNet优化的成对错误数与NDCG并不一致，排在第1位和第50位的错误被同等对待。 不去写出那个不可导的损失，而是直接规定梯度：在RankNet的成对梯度上乘以「交换这两篇文档会让NDCG变化多少」；再把这种梯度（lambd…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/lambdamart.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/lambdamart">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 检索与文本挖掘</div>
+<h1>LambdaRank与LambdaMART</h1>
+<div class="full">From RankNet to LambdaRank to LambdaMART: An Overview</div>
+<div class="meta"><span>2010.06</span><span>论文</span><span>重要</span><span>Microsoft Research技术报告 MSR-TR-2010-82</span><span>Christopher J. C. Burges · 微软研究院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/MSR-TR-2010-82.pdf" rel="noopener">技术报告PDF ↗</a><a class="btn sm" href="https://proceedings.neurips.cc/paper_files/paper/2006/file/af44c4c56f385c43f2529f9b1b018f6a-Paper.pdf" rel="noopener">LambdaRank（NIPS 2006） ↗</a><a class="btn sm" href="https://en.wikipedia.org/wiki/Learning_to_rank" rel="noopener">Wikipedia：Learning to rank ↗</a><a class="btn sm" href="../index.html#/n/lambdamart">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>搜索排序的好坏用NDCG这类只看名次的指标衡量，它对模型参数不可导；RankNet优化的成对错误数与NDCG并不一致，排在第1位和第50位的错误被同等对待。</p></div><div><h4>方法</h4><p>不去写出那个不可导的损失，而是直接规定梯度：在RankNet的成对梯度上乘以「交换这两篇文档会让NDCG变化多少」；再把这种梯度（lambda）交给梯度提升树去拟合，就是LambdaMART。</p></div><div><h4>影响</h4><p>LambdaMART成为工业界排序学习的主力，2010年雅虎排序学习挑战赛第一赛道的冠军方案是LambdaMART集成；今天LightGBM、XGBoost里的lambdarank目标就是它。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>2000年代的网页搜索已经不再只用<a class="ln" href="../n/bm25.html">BM25</a>一个分数，而是把BM25、PageRank、点击率等几百个特征交给机器学习模型排序，即「排序学习」。<a class="ln" href="../n/ranknet.html">RankNet排序学习</a>（2005）是其中的代表：对同一查询下的每一对文档，用神经网络打分，再用交叉熵让「更相关的那篇分更高」。</p><p>问题在于评价指标。搜索看的是NDCG（归一化折损累计增益）：排在越前面的位置权重越大，前几名排错的代价远大于后面。NDCG只取决于名次，名次随分数跳变，对参数几乎处处梯度为0，没法直接优化；而RankNet数的是错误对的个数，模型可能为了修正第50名附近的一堆小错误，牺牲第1名。</p><h2>方法</h2><p><b>LambdaRank</b>（Burges等，NIPS 2006）的观察是：梯度下降真正需要的只是梯度，不需要损失函数本身。对一对文档i（更相关）和j，RankNet给出的梯度大小是<code>σ / (1 + exp(σ(s_i − s_j)))</code>；LambdaRank把它乘以交换i、j两篇文档后NDCG变化的绝对值：</p><p class="formula"><code>λ_ij = −σ / (1 + exp(σ(s_i − s_j))) · |ΔNDCG_ij|</code></p><p>每篇文档把它和所有其他文档配对得到的λ相加，就得到这篇文档分数该往上推还是往下拉、推多大力。牵涉到前几名的交换<code>|ΔNDCG|</code>大，梯度也大，模型于是优先把头部排对。后来的实验与分析表明，这样定义的梯度确实在直接提升NDCG。</p><p><b>LambdaMART</b>（Wu、Burges、Svore、Gao，2008年技术报告）把模型从神经网络换成MART，即<a class="ln" href="../n/gradient-boosting.html">梯度提升机GBM</a>回归树：每一轮把λ当作要拟合的「伪残差」，长一棵新的回归树加到模型上，并用牛顿法步长给叶子节点赋值。树模型擅长处理量纲各异的手工特征，训练也快。Burges这份2010年报告把散落在多篇论文和报告里的三者推导整理成一篇完整说明。</p><h2>结果</h2><p>据报告摘要，LambdaMART排序器的集成赢得了2010年雅虎排序学习挑战赛（Yahoo! Learning to Rank Challenge）第一赛道；报告本身是综述性的推导说明，不报告新的实验数字。</p><h2>后来的发展</h2><p>LambdaMART此后十年都是排序学习的标准强基线，开源实现进入RankLib、XGBoost和LightGBM（目标函数名就叫lambdarank）。神经检索兴起后，<a class="ln" href="../n/monobert.html">BERT重排序</a>等BERT重排序模型在效果上超过了基于手工特征的LambdaMART，但在要融合大量异构特征的工业排序里，梯度提升树配lambda梯度仍很常见。「不写损失、直接定义与指标对齐的梯度」这个想法也被借到推荐系统等其他排序任务。</p><h2>容易误解的地方</h2><ul><li>LambdaRank、LambdaMART分别在2006年和2008年提出，本节点挂在2010年的综述报告上，是因为它第一次把三者完整地写在一起，后来被广泛引用。</li><li>λ梯度并不对应一个事先写好的损失函数；后来有工作（如LambdaLoss）才给出它对应的概率框架。</li></ul>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍然依赖人工设计的几百个特征（BM25分、PageRank、点击统计），模型本身不理解查询和文档的文字含义。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/dssm.html">DSSM深度语义匹配</a> <a class="chip hue" style="--h:336" href="../n/monobert.html">BERT重排序</a></div></li><li>训练需要大量人工标注的分级相关性，标注昂贵；直接用点击日志又会带入位置偏差。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/bm25.html">BM25</a><span class="yr">1994 · NLP</span><div class=nt>BM25等传统检索分数是排序学习模型最重要的输入特征之一。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/gradient-boosting.html">梯度提升机GBM</a><span class="yr">2001 · 基础</span><div class=nt>LambdaMART用梯度提升回归树（MART）拟合每轮的lambda梯度。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/ranknet.html">RankNet排序学习</a><span class="yr">2005.08 · NLP</span><div class=nt>RankNet优化的成对错误数与NDCG不一致、对头部错误不敏感，lambda梯度按名次重要性加权解决了这一点。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/dssm.html">DSSM深度语义匹配</a><span class="yr">2013.10 · NLP</span><div class=nt>仍然依赖人工设计的几百个特征（BM25分、PageRank、点击统计），模型本身不理解查询和文档的文字含义。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/monobert.html">BERT重排序</a><span class="yr">2019.01 · 推理·智能体</span><div class=nt>仍然依赖人工设计的几百个特征（BM25分、PageRank、点击统计），模型本身不理解查询和文档的文字含义。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/decision-tree.html">决策树</a> <a class="chip c" href="../c/ensemble.html">集成学习</a> <a class="chip c" href="../c/retrieval.html">检索与向量数据库</a> <a class="chip c" href="../c/classification-metrics.html">准确率、精确率、召回率与F1</a></p>
+<h2>本篇术语</h2><ul><li><b>NDCG</b>　归一化折损累计增益：按名次给相关文档打折计分（第k位乘以1/log₂(k+1)），再除以理想排序的得分，取值0到1。</li><li><b>排序学习</b>　Learning to Rank：用机器学习把多个相关性特征组合成一个排序分数，按成对、按列表等方式训练。</li><li><b>MART</b>　Multiple Additive Regression Trees，即梯度提升回归树：每一轮拟合当前梯度，逐棵累加小树。</li></ul>
+<h2>怎么学</h2><p>先复习梯度提升树和交叉熵 → 读Burges报告第1–5节（RankNet → LambdaRank → LambdaMART的推导）→ 动手：用LightGBM的lambdarank目标在MSLR-WEB10K或任一小型排序数据上训练，并与按单一BM25分排序比较NDCG@10。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/MSR-TR-2010-82.pdf" rel="noopener">https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/MSR-TR-2010-82.pdf</a>（OpenAlex记录：标题、作者Burges、2010-06-23、摘要（LambdaMART是LambdaRank的提升树版本、LambdaRank基于RankNet、LambdaMART集成赢得2010年雅虎排序学习挑战赛第一赛道、本报告给出完整推导）；Wikipedia Learning to rank条目：LambdaRank 2006年（NIPS）、成对损失乘以交换带来的指标变化，LambdaMART来自Wu、Burges、Svore、Gao 2008年技术报告MSR-TR-2008-109。PDF正文无法解析，λ公式与牛顿步长等细节凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20LambdaRank%E4%B8%8ELambdaMART%EF%BC%88lambdamart%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Alambdamart%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/lambdamart.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="distant-supervision.html"><small>本分支上一个 · 2009.08</small><b>远程监督关系抽取</b></a><a class="r" href="nell.html"><small>本分支下一个 · 2010.07</small><b>NELL永不停止的语言学习</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "id": "uda",
+  "who": "Qizhe Xie, Zihang Dai, Eduard Hovy, Minh-Thang Luong, Quoc V. Le · Google Brain、卡内基梅隆大学",
+  "venue": "NeurIPS 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1904.12848"},
+    {"label": "官方代码", "url": "https://github.com/google-research/uda"}
+  ],
+  "aka": ["UDA", "Unsupervised Data Augmentation", "无监督数据增强", "一致性训练", "Consistency Training"],
+  "problem": "一致性正则类半监督方法（[[temporal-ensembling]]、[[vat]]等）给无标签样本加的扰动只是高斯噪声、dropout或简单平移翻转，扰动太弱，约束带来的信息有限。",
+  "idea": "把有监督训练里效果最好的数据增强（图像上的[[autoaugment]]类策略、文本上的[[back-translation]]）直接当作一致性训练的扰动：要求模型对原样本和强增强样本给出一致的预测。",
+  "impact": "确立了“扰动的质量决定半监督效果”这一认识，强增强加一致性成为后来[[fixmatch]]等方法的核心；它在文本分类上也大幅减少了所需标签；同一团队随后的[[noisy-student]]同样强调给学生模型加强噪声。",
+  "method": "UDA的损失由两部分组成：有标签样本上的交叉熵，加上无标签样本上的一致性损失 `KL( p(y|x) ‖ p(y|x̂) )`，其中x̂是x经过强数据增强后的版本，`p(y|x)` 这一侧不回传梯度，当作固定目标。和以往方法的关键区别在于x̂怎么造：\n\n- 图像：使用AutoAugment搜出来的增强策略（后续版本改用RandAugment），即随机组合旋转、剪切、颜色、对比度等多种变换；\n- 文本：用[[back-translation]]把句子翻译成另一种语言再译回来，得到意思相同但措辞不同的句子；另有基于TF-IDF的词替换。\n\n作者认为好的扰动应当多样、真实（保持标签不变）并带有针对任务的归纳偏置，这正是有监督学习里调好的增强所具备的。论文还配了几个训练技巧：训练信号退火（逐步放开有标签样本上已经很有把握的样本，防止对少量标签过拟合）、对目标分布做锐化和置信度过滤。\n\n摘要报告：在6个语言任务和3个视觉任务上带来明显提升；IMDb文本分类只用20个标注样本，错误率为4.20，优于此前用2.5万个标注样本训练的最好模型；CIFAR-10只用250个标签错误率为5.43，超过以往所有方法；它还能与BERT微调这类迁移学习叠加，在ImageNet上无论只用10%标签还是全量标签外加130万张无标签图片都能带来提升。",
+  "limits": [
+    {"text": "强增强策略需要针对每个模态和任务专门设计（图像变换、回译），换到新领域要重新找合适的增强。", "solved_by": []},
+    {"text": "引入了训练信号退火、锐化温度、置信阈值等多项技巧和超参数，哪些真正必要不够清楚。", "solved_by": ["fixmatch"]}
+  ],
+  "relations": [
+    {"to": "vat", "type": "solves", "note": "把VAT在像素空间里的小扰动换成语义保持的强增强，扰动更丰富，效果大幅提升。"},
+    {"to": "autoaugment", "type": "uses", "note": "图像上用AutoAugment搜索出的增强策略生成一致性训练的扰动。"},
+    {"to": "back-translation", "type": "uses", "note": "文本上用回译生成同义改写作为增强样本。"},
+    {"to": "temporal-ensembling", "type": "extends", "note": "沿用一致性训练框架，只改变扰动的生成方式。"},
+    {"to": "bert", "type": "uses", "note": "文本实验中与BERT微调结合，说明半监督与迁移学习可以叠加。"}
+  ],
+  "prereq": ["semi-supervised", "data-augmentation", "kl-divergence", "pretrain-finetune"],
+  "terms": [
+    {"t": "训练信号退火", "d": "UDA的技巧：训练早期只让模型从“还没学会”的有标签样本上学习，模型已很有把握的样本暂时不计损失，防止在少量标签上过拟合。"}
+  ],
+  "learn": "先读[[temporal-ensembling]]和[[vat]]了解一致性训练；读UDA第2–3节关于好扰动的讨论；在CIFAR-10上把一致性方法的扰动从随机翻转换成RandAugment，对比只改这一处带来的差别。",
+  "check": {"source": "https://arxiv.org/abs/1904.12848", "confirmed": "标题、5位作者、arXiv v1提交于2019-04-29；摘要中扰动质量对半监督至关重要、用RandAugment和回译替换简单噪声、6个语言任务和3个视觉任务、IMDb 20个标注样本错误率4.20优于2.5万标注的最好模型、CIFAR-10 250标签错误率5.43、与BERT微调结合、ImageNet 10%标签与全量加130万无标签图片均有提升。v1使用AutoAugment、训练信号退火等技巧、TF-IDF词替换、机构与NeurIPS 2020来自一般了解。"}
+}

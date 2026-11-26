@@ -1,0 +1,31 @@
+{
+  "id": "grad-tts",
+  "who": "Vadim Popov, Ivan Vovk, Vladimir Gogoryan, Tasnima Sadekova, Mikhail Kudinov · 华为诺亚方舟实验室",
+  "venue": "arXiv 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2105.06337"}
+  ],
+  "problem": "扩散模型和基于分数的生成模型已在图像和声码器上表现出很强的建模能力，但还没有被用来直接从文字生成梅尔频谱这一TTS的核心步骤。",
+  "idea": "编码器先从文字预测一个粗糙的「平均频谱」，用单调对齐搜索与语音对齐；解码器是一个基于分数的扩散模型，从以这个平均频谱为中心的噪声出发，逐步去噪得到真实的梅尔频谱。",
+  "impact": "Grad-TTS是最早一批把扩散模型用作TTS声学模型的工作，它的「编码器给先验均值、扩散解码器细化」的结构被后来的扩散与流匹配TTS（如Matcha-TTS）沿用。",
+  "method": "Grad-TTS的前半部分与[[glow-tts]]相同：文字编码器为每个音素输出一个向量，用单调对齐搜索（MAS）找出每个音素对应多少帧，把向量按时长展开，得到一个和目标频谱同样长度的「平均频谱」μ。\n\n后半部分用随机微分方程（SDE）描述扩散（见[[c:diffusion-process]]、[[score-sde]]）：前向过程把真实频谱逐渐加噪，但不是变成标准正态噪声，而是变成以μ为均值的高斯噪声 `N(μ, I)`；反向过程由一个U-Net形状的网络估计分数（见[[c:score-function]]），从 `N(μ, I)` 采样出发一步步去噪，还原出频谱。因为起点已经很接近目标，所需的去噪步数比从纯噪声开始少。SDE框架还允许在推理时显式调节步数，在音质和速度之间折中。生成的频谱再交给[[hifi-gan]]这类声码器变成波形。摘要称，主观听测的平均意见分与当时最好的TTS方法相当。",
+  "limits": [
+    {"text": "去噪要迭代多步，步数少时音质下降，推理速度不如一步出结果的非自回归模型。", "solved_by": ["e2-tts", "f5-tts"]},
+    {"text": "仍依赖单调对齐搜索和显式时长，韵律较平，零样本克隆新音色的能力有限。", "solved_by": ["voicebox", "naturalspeech-2"]}
+  ],
+  "relations": [
+    {"to": "score-sde", "type": "uses", "note": "解码器用随机微分方程框架下的分数模型，并把终点分布改为以文本先验为均值的高斯。"},
+    {"to": "glow-tts", "type": "extends", "note": "沿用Glow-TTS的文字编码器与单调对齐搜索，把基于流的解码器换成扩散解码器。"},
+    {"to": "ddpm", "type": "extends", "note": "把去噪扩散概率模型从图像推广到文本条件的梅尔频谱生成。"},
+    {"to": "diffwave", "type": "rivals", "note": "DiffWave用扩散生成波形（声码器一侧），Grad-TTS用扩散生成频谱（声学模型一侧）。"}
+  ],
+  "prereq": ["diffusion-process", "score-function", "ode-sde", "gaussian", "waveform-spectrogram", "sequence-alignment"],
+  "terms": [
+    {"t": "单调对齐搜索（MAS）", "d": "用动态规划在音素和频谱帧之间找一条只往前走、似然最大的对齐路径，从而得到每个音素的时长。"}
+  ],
+  "aka": ["Grad-TTS", "扩散TTS", "diffusion TTS", "基于分数的TTS"],
+  "check": {
+    "source": "https://arxiv.org/abs/2105.06337",
+    "confirmed": "arXiv官方记录：标题、作者Popov/Vovk/Gogoryan/Sadekova/Kudinov、v1提交2021-05-13；摘要关于分数解码器从编码器预测的噪声逐步变换出梅尔频谱、单调对齐搜索、SDE框架推广到以不同参数的噪声重建、显式调节音质与速度、MOS与当时最好方法相当。U-Net解码器、声码器选择、机构及被Matcha-TTS沿用为一般了解。"
+  }
+}

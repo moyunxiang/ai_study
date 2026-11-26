@@ -1,0 +1,32 @@
+{
+  "id": "cd-ctc",
+  "who": "Haşim Sak, Andrew Senior, Kanishka Rao, Françoise Beaufays · Google",
+  "venue": "Interspeech 2015",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1507.06947"}
+  ],
+  "problem": "LSTM声学模型比DNN准，但按每10毫秒一帧逐帧计算、逐帧解码，线上语音搜索要求又快又准，计算量是瓶颈。",
+  "idea": "用CTC训练LSTM输出上下文相关音素，同时把相邻几帧叠在一起、把帧率降到原来的三分之一，让模型更准、解码也更快。",
+  "impact": "展示了CTC在工业级大词汇量识别上的实用价值；低帧率加CTC/序列训练的组合，此后被许多声学模型沿用（Kaldi的链式模型同样采用降低帧率）。",
+  "method": "[[lstm-am]]已经表明深层LSTM作声学模型优于前馈DNN；作者在此前工作里又发现，用[[ctc]]初始化、再做序列区分性训练（见[[smbr]]）的音素模型，可以追平传统的上下文相关HMM状态模型。这篇文章在这条路线上继续做工程改进，回答「怎样让它在生产系统里又准又快」。\n\n几项关键技巧：**帧堆叠**，把相邻的若干帧声学特征拼成一个输入向量；**降低帧率**，网络不再每10毫秒输出一次，而是每30毫秒输出一次，序列长度变为三分之一，LSTM计算和解码步数都大幅减少。由于CTC允许输出「空白」并且不要求逐帧对齐（见[[c:sequence-alignment]]），低帧率不会破坏训练。**上下文相关（CD）音素建模**，输出单元从几十个独立音素换成考虑左右邻居的音素类别，进一步提升准确率。论文还给出了让LSTM直接输出整词的初步结果。\n\n摘要报告：帧堆叠和降低帧率带来了更准的模型和更快的解码，CD音素建模再带来提升（具体数字未写）。按一般了解，这套CTC加低帧率的LSTM模型在2015年被用于Google语音搜索；之后[[rnn-t]]（2012年已提出）和注意力模型逐步把整套流程推向完全端到端。",
+  "limits": [
+    {"text": "CTC假设各输出之间条件独立，模型本身不含语言模型，仍需外接WFST解码和语言模型。", "solved_by": ["las", "chiu-s2s-asr"]},
+    {"text": "输出上下文相关音素仍要依赖发音词典和决策树绑定，没有摆脱传统系统的组件。", "solved_by": ["las", "chiu-s2s-asr"]}
+  ],
+  "relations": [
+    {"to": "ctc", "type": "uses", "note": "用CTC损失训练LSTM，不需要逐帧对齐标签。"},
+    {"to": "lstm-am", "type": "extends", "note": "同一组人此前证明了LSTM声学模型的优势，这里继续提升它的准确率和速度。"},
+    {"to": "smbr", "type": "uses", "note": "CTC训练之后再做序列区分性训练。"},
+    {"to": "tied-state", "type": "uses", "note": "上下文相关音素类别沿用决策树状态绑定的思路来控制类别数。"}
+  ],
+  "prereq": ["recurrent-layer", "gating", "sequence-alignment", "phoneme-acoustic", "word-error-rate"],
+  "terms": [
+    {"t": "帧率", "d": "声学模型每秒输出多少次判断；传统是每10毫秒一次，即每秒100帧。"},
+    {"t": "上下文相关音素", "d": "按左右相邻音素区分的音素类别，例如a在b后和在k后算不同类别。"}
+  ],
+  "aka": ["CD-phone CTC", "CTC LSTM声学模型", "低帧率CTC", "Google voice search CTC"],
+  "check": {
+    "source": "https://arxiv.org/abs/1507.06947",
+    "confirmed": "arXiv官方记录：标题Fast and Accurate Recurrent Neural Network Acoustic Models for Speech Recognition、作者Sak/Senior/Rao/Beaufays、v1提交2015-07-24；摘要关于帧堆叠、降低帧率、CD音素建模、直接输出词的初步结果。30毫秒帧率、部署到Google语音搜索为一般了解。"
+  }
+}

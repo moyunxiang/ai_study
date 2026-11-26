@@ -1,0 +1,30 @@
+{
+  "id": "tsn",
+  "who": "Limin Wang, Yuanjun Xiong, Zhe Wang, Yu Qiao, Dahua Lin, Xiaoou Tang, Luc Van Gool · 苏黎世联邦理工 / 香港中文大学 / 中科院深圳先进院",
+  "venue": "ECCV 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1608.00859"},
+    {"label": "代码", "url": "https://github.com/yjxiong/temporal-segment-networks"}
+  ],
+  "aka": ["TSN", "Temporal Segment Network", "时序分段网络", "稀疏时间采样"],
+  "problem": "[[two-stream]]只看单帧和短段光流，抓不住持续几秒的动作结构；而视频训练集又小，深网络容易过拟合。",
+  "idea": "把整段视频均分成K段，每段随机抽一小片输入共享权重的双流网络，再把各段的预测取平均作为整段视频的预测来训练。",
+  "impact": "稀疏时间采样加段级共识成为视频识别的标准训练方式，后来的TSM、SlowFast等工作沿用了这种采样。",
+  "method": "TSN的核心是“稀疏采样+视频级监督”。一段视频先等分成K段（论文常用K=3），每段随机取一帧RGB或一小叠光流，K个片段送进同一个卷积网络（权重共享），得到K组类别分数；再用一个“段共识”函数（最简单的是平均）合成整段视频的分数，损失在这个视频级分数上计算。这样每次前向只算K个片段，成本与单片段相近，但梯度来自覆盖整段视频的信息。\n\n论文还总结了一组在小数据上训练视频网络的“好做法”：用ImageNet预训练初始化光流网络、部分冻结[[batchnorm]]统计量、加dropout、角点裁剪与尺度抖动等增强，并尝试RGB差分和扭曲光流作为额外输入。骨干采用带BN的Inception（[[googlenet]]系列）。摘要报告在HMDB51上69.4%、UCF101上94.2%的准确率。",
+  "limits": [
+    {"text": "段共识是简单平均，不建模片段之间的先后顺序，对依赖时序的动作（如“把东西从左推到右”）区分力弱。", "solved_by": ["non-local", "slowfast", "timesformer"]},
+    {"text": "仍需预先计算光流作为第二个流，存储和时间开销大。", "solved_by": ["i3d", "slowfast"]}
+  ],
+  "relations": [
+    {"to": "two-stream", "type": "extends", "note": "保留RGB+光流双流结构，把单片段训练扩展为覆盖整段视频的多片段训练。"},
+    {"to": "googlenet", "type": "uses", "note": "骨干为带批归一化的Inception网络。"},
+    {"to": "batchnorm", "type": "uses", "note": "提出部分BN（只更新第一层BN统计量）以缓解小数据过拟合。"},
+    {"to": "dense-trajectories", "type": "rivals", "note": "在UCF101/HMDB51上超过以iDT为代表的手工特征方法。"}
+  ],
+  "prereq": ["conv-layer", "pretrain-finetune", "normalization-layer", "data-augmentation", "vision-tasks"],
+  "terms": [
+    {"t": "段共识", "d": "把一段视频里多个片段各自的预测合并成一个结论的函数，如取平均或取最大。"}
+  ],
+  "learn": "先读双流网络，再读TSN第3节的稀疏采样与段共识；用mmaction2跑一个TSN在UCF101上的训练配置。",
+  "check": {"source": "https://arxiv.org/abs/1608.00859", "confirmed": "arXiv记录：标题、七位作者、v1提交于2016-08-02、摘要中的长时程结构建模、稀疏时间采样、视频级监督、HMDB51 69.4%与UCF101 94.2%。K=3、部分BN、BN-Inception骨干等细节凭一般了解写，未逐项对照正文。"}
+}

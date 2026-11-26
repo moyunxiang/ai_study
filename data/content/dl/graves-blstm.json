@@ -1,0 +1,29 @@
+{
+  "id": "graves-blstm",
+  "who": "Alex Graves, Jürgen Schmidhuber · IDSIA（瑞士）",
+  "venue": "Neural Networks 18(5-6), 2005",
+  "links": [
+    {"label": "Neural Networks（DOI）", "url": "https://doi.org/10.1016/j.neunet.2005.06.042"}
+  ],
+  "problem": "[[lstm]]只能从左往右读序列，判断当前这一帧属于哪个音素时用不到后面的上下文；[[bidirectional-rnn]]能看两边，却仍受普通RNN梯度消失的限制。原始LSTM的训练还用的是截断的近似梯度。",
+  "idea": "把双向结构和LSTM单元结合成双向LSTM（BLSTM），并用完整的随时间反向传播计算LSTM的精确梯度，在TIMIT音素逐帧分类上系统比较多种网络结构。",
+  "impact": "双向LSTM此后成为语音识别、手写识别和NLP序列标注的标准编码器，直到Transformer出现前一直是最常用的序列建模组件之一。",
+  "method": "逐帧音素分类的任务是：给定一段语音的声学特征序列，对每一帧（约10毫秒）判断它属于哪个音素。一个音素的发音会受后面音素的影响（协同发音），所以只看过去不够。双向结构用两个独立的循环网络，一个从前往后读、一个从后往前读，在每一帧把两者的隐藏状态拼起来再做分类，于是每一帧都能用到整段序列的信息。\n\n这篇论文把两个方向的循环层都换成带遗忘门的[[lstm]]（见[[lstm-forget-gate]]），并且不再沿用原始LSTM那种只在单元内部传梯度的截断近似，而是用完整的[[bptt]]算精确梯度，作者指出这样更易于实现和检验。论文在TIMIT语料上比较了BLSTM、单向LSTM、双向普通RNN、普通RNN和多层感知机，并考察了加入目标延迟（让单向网络等几帧再输出）的效果。结论是双向结构优于单向，LSTM优于普通RNN，BLSTM综合最好且训练更快（具体百分比本次未能核对原文）。",
+  "limits": [
+    {"text": "需要先拿到整段输入才能做反向那一路，不能用于逐帧实时输出的流式识别。", "solved_by": []},
+    {"text": "逐帧分类需要每一帧都有对齐好的标签，而语音转写通常只有整句文字，没有帧级对齐。", "solved_by": ["ctc"]}
+  ],
+  "relations": [
+    {"to": "lstm", "type": "extends", "note": "把LSTM放进双向结构，并改用完整BPTT计算精确梯度。"},
+    {"to": "bidirectional-rnn", "type": "extends", "note": "沿用双向RNN的前后两路结构，把普通循环单元换成LSTM以缓解梯度消失。"},
+    {"to": "lstm-forget-gate", "type": "uses", "note": "使用带遗忘门的LSTM单元。"},
+    {"to": "timit", "type": "uses", "note": "在TIMIT语料上做逐帧音素分类实验。"}
+  ],
+  "prereq": ["recurrent-layer", "gating", "backpropagation", "phoneme-acoustic", "vanishing-exploding"],
+  "terms": [
+    {"t": "逐帧分类", "d": "对语音的每一个短时间帧单独给出类别标签。"},
+    {"t": "协同发音", "d": "相邻音素在发音时相互影响，使同一音素在不同上下文中声学特征不同。"}
+  ],
+  "learn": "先掌握[[lstm]]和[[bidirectional-rnn]]，再读原文介绍BLSTM结构与完整梯度的部分；用PyTorch的nn.LSTM(bidirectional=True)在一个序列标注小数据集上对比单向与双向的效果。",
+  "check": {"source": "https://api.crossref.org/works/10.1016/j.neunet.2005.06.042", "confirmed": "经Crossref与OpenAlex核对：标题、作者Graves与Schmidhuber、Neural Networks第18卷第5-6期602-610页、2005-07。摘要被出版方屏蔽，未能打开；比较的网络结构、完整BPTT、TIMIT实验与结论方向来自一般了解，具体数字没有写。"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "photomaker",
+  "who": "Zhen Li, Mingdeng Cao, Xintao Wang, Zhongang Qi, Ming-Ming Cheng, Ying Shan · 南开大学 / 腾讯ARC Lab / 东京大学",
+  "venue": "CVPR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2312.04461"},
+    {"label": "项目页", "url": "https://photo-maker.github.io/"}
+  ],
+  "aka": ["PhotoMaker", "堆叠ID嵌入", "Stacked ID Embedding", "人像定制"],
+  "problem": "生成“某个具体的人”的新照片时，[[dreambooth]]这类测试时微调要为每个人训练几分钟到几十分钟，免训练的图像提示方法又常常保不住身份；高效、身份保真和文本可控三者难以同时满足。",
+  "idea": "把任意张同一人的照片分别编码，与文本中代表这个人的类别词（如“man”）的嵌入融合，再把这些融合结果堆叠成一个“堆叠ID嵌入”，替换原来那个词的位置送进文生图模型，不需要为每个人微调。",
+  "impact": "成为开源人像定制的常用方案之一，与[[instantid]]等同期工作一起把“上传几张照片、几秒内生成不同场景的同一个人”变成普遍可用的功能；堆叠嵌入还能混合不同人的特征。",
+  "method": "PhotoMaker基于[[sdxl]]，核心是如何把“这个人是谁”以文本嵌入的形式交给模型：\n- 对输入的N张同一人的照片（数量可变），各自用[[clip]]图像编码器提取嵌入。\n- 在文字提示里，用户用一个触发词标出要定制的人（例如“a man img”）。取出类别词“man”的文本嵌入，分别与每张照片的图像嵌入用多层感知机融合，得到N个融合嵌入。\n- 把这N个嵌入沿序列方向堆叠起来，替换提示中那个类别词的位置。文生图模型的交叉注意力于是能同时看到这个人在多张照片里的特征。\n\n训练只更新图像编码器的部分层、融合模块和U-Net中的LoRA参数。为此作者构建了一条以身份为中心的数据构建流水线，收集同一人的多张照片并配上描述。推理时不需要任何微调，几秒即可得到结果。论文报告身份保持能力优于基于测试时微调的方法，同时速度显著更快，并展示了改变年龄、性别、艺术风格，以及把两个人的特征混合等应用。",
+  "limits": [
+    {"text": "身份保真度仍不如专门的人脸识别特征方案，多人同框和精确控制姿态构图比较困难。", "solved_by": ["instantid"]}
+  ],
+  "relations": [
+    {"to": "dreambooth", "type": "solves", "note": "免去每个人单独测试时微调，同时保持更好的身份保真。"},
+    {"to": "ip-adapter", "type": "rivals", "note": "同为免训练图像提示：IP-Adapter走独立的图像交叉注意力，PhotoMaker把图像特征融进文本类别词的嵌入。"},
+    {"to": "sdxl", "type": "uses", "note": "以SDXL为底座模型。"},
+    {"to": "clip", "type": "uses", "note": "用CLIP图像编码器提取每张身份照片的嵌入。"}
+  ],
+  "prereq": ["embedding", "contrastive-learning", "attention-concept", "peft-concept", "diffusion-process"],
+  "terms": [
+    {"t": "堆叠ID嵌入", "d": "把同一人多张照片各自融合得到的嵌入沿序列方向拼成一组，整体代表这个人的身份。"}
+  ],
+  "learn": "先读DreamBooth和IP-Adapter → 读本文第3节嵌入融合与堆叠 → 用开源模型上传几张自拍，比较只用一张与用四张的身份保持。",
+  "check": {"source": "https://arxiv.org/abs/2312.04461", "confirmed": "标题、六位作者、v1日期2023-12-07、摘要中现有个性化方法不能兼顾效率、ID保真与文本可控、把任意数量ID图编码为堆叠ID嵌入、可整合不同ID的特征、以ID为中心的数据构建流水线、ID保持优于测试时微调方法且显著更快；机构、CVPR 2024、基于SDXL、CLIP编码器、融合与LoRA训练细节来自一般了解"}
+}

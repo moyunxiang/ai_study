@@ -1,0 +1,30 @@
+{
+  "id": "acktr",
+  "who": "Yuhuai Wu, Elman Mansimov, Shun Liao, Roger Grosse, Jimmy Ba · 多伦多大学 / 纽约大学",
+  "venue": "NeurIPS 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1708.05144"}
+  ],
+  "problem": "[[trpo]]的信赖域自然梯度更新稳定，但每步要用共轭梯度近似求逆Fisher矩阵，计算昂贵、难以扩展到大网络；[[a3c]]等一阶方法便宜但样本效率低。",
+  "idea": "用[[kfac]]的克罗内克分解来近似Fisher信息矩阵，使自然梯度的计算接近普通SGD的成本，再加上信赖域约束，同时优化actor和critic。",
+  "impact": "给出了可扩展的二阶策略优化方案，作为A2C/ACKTR一并收入[[openai-baselines]]，是2017–2019年常见的对比基线之一。",
+  "method": "[[natural-pg]]用Fisher矩阵F的逆去修正梯度方向：`Δθ = F⁻¹∇J`，这样参数变化以「策略分布改变多少」来度量，而不是以参数距离度量。难点是F的维度等于参数个数的平方，无法直接求逆。\n\nK-FAC的做法是：对每一层分别近似，把该层的Fisher块写成两个小矩阵的克罗内克积 `A ⊗ S`（A来自层输入激活的二阶统计，S来自反传梯度的二阶统计），这样求逆只要分别求两个小矩阵的逆。ACKTR（Actor Critic using Kronecker-Factored Trust Region）把这一近似用到actor-critic上：actor的自然梯度对应策略分布的Fisher矩阵，critic则把价值回归看作高斯分布下的最大似然，也用K-FAC更新；步长按信赖域（KL不超过阈值）自动缩放。\n\n摘要称，这是第一个可扩展的actor-critic信赖域自然梯度方法，能直接从像素学离散控制，也能学连续控制；在Atari和MuJoCo上，相比此前最好的同策略actor-critic方法，平均获得更高回报，样本效率提升2到3倍。",
+  "limits": [
+    {"text": "K-FAC实现复杂，需要维护每层的统计量，与多数深度学习框架的标准优化器不兼容。", "solved_by": ["ppo"]},
+    {"text": "仍是同策略方法，样本效率比不上离策略的actor-critic。", "solved_by": ["sac", "td3"]}
+  ],
+  "relations": [
+    {"to": "kfac", "type": "uses", "note": "用K-FAC的克罗内克分解来近似Fisher矩阵及其逆。"},
+    {"to": "trpo", "type": "solves", "note": "解决TRPO共轭梯度计算昂贵、难以扩展的问题，以接近一阶方法的成本做信赖域自然梯度。"},
+    {"to": "natural-pg", "type": "extends", "note": "沿用自然策略梯度框架，并把自然梯度也用于critic。"},
+    {"to": "a3c", "type": "rivals", "note": "与A3C/A2C的一阶更新相比，样本效率高2到3倍，但实现更复杂。"}
+  ],
+  "prereq": ["policy-gradient-concept", "actor-critic", "kl-divergence", "jacobian-hessian"],
+  "terms": [
+    {"t": "Fisher信息矩阵", "d": "衡量参数微小变化会让概率分布改变多少的矩阵；自然梯度用它的逆来修正普通梯度。"},
+    {"t": "克罗内克积", "d": "两个矩阵A、B的一种乘法，得到的大矩阵由A的每个元素乘以整块B拼成；其逆等于各自逆的克罗内克积。"}
+  ],
+  "learn": "先读[[natural-pg]]和[[trpo]]；读原文第3节K-FAC近似；用OpenAI Baselines的acktr在一个Atari游戏上与a2c比较曲线。",
+  "check": {"source": "https://arxiv.org/abs/1708.05144", "confirmed": "标题、五位作者、arXiv v1于2017-08-17；摘要中用K-FAC做信赖域、扩展自然策略梯度、同时优化actor和critic、首个可扩展的actor-critic信赖域自然梯度方法、Atari与MuJoCo上平均2到3倍样本效率提升、代码在openai/baselines。层级Fisher分解形式按K-FAC通行描述；NeurIPS 2017与机构按通行引用。"},
+  "aka": ["ACKTR", "Actor Critic using Kronecker-Factored Trust Region", "克罗内克分解信赖域"]
+}

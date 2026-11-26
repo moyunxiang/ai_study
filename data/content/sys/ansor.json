@@ -1,0 +1,26 @@
+{
+ "id": "ansor",
+ "who": "Lianmin Zheng, Chengfan Jia, Minmin Sun, Zhao Wu, Cody Hao Yu, Ameer Haj-Ali, Yida Wang, Ion Stoica et al. · UC Berkeley, 阿里巴巴, 亚马逊AWS",
+ "venue": "OSDI 2020",
+ "aka": ["TVM auto-scheduler", "自动调度", "张量程序自动生成", "auto-tuning", "自动调优"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2006.06762"},
+  {"label": "TVM文档", "url": "https://tvm.apache.org/docs/"}
+ ],
+ "problem": "同一个算子在不同CPU、GPU上的最优写法差别很大。厂商算子库要大量人工；TVM早期的自动调优又要求人先写好调度模板，搜索空间窄。",
+ "idea": "不要模板：从计算定义自动构造分层的搜索空间，先随机采样出完整程序的“骨架”，再用进化搜索加一个学出来的代价模型细调，并在整个网络的多个子图间分配调优时间。",
+ "impact": "并入TVM成为其自动调度器，让编译器自己搜出的内核在多种硬件上接近或超过手写库，是“搜索+代价模型”路线的代表作。",
+ "method": "[[tvm]]沿用[[halide]]把“算什么”和“怎么算”（调度：循环怎么切块、怎么并行、放哪级缓存）分开，并用机器学习模型预测某个调度跑多快，指导搜索。但它的搜索空间来自人写的模板，模板没覆盖的优化永远搜不到，而且每种新算子都要写模板。\n\nAnsor分三步。**构造空间**：按一组推导规则（如多级分块、融合相邻的逐元素运算）从计算定义自动生成程序的高层草图，再随机填写分块大小等细节，得到大量完整候选程序。**细调**：对这些候选做进化搜索（变异、交叉），用一个在真实测速数据上不断更新的代价模型挑出值得实测的程序。**任务调度**：一个网络有很多子图，调度器按梯度式的估计决定把调优时间优先花在对端到端延迟贡献最大的子图上。\n\n摘要报告，相对当时最好的方法，深度网络在Intel CPU、ARM CPU、NVIDIA GPU上的执行性能最多提高3.8倍、2.6倍、1.7倍。",
+ "limits": [
+  {"text": "每个模型、每种硬件都要花数小时实测搜索，模型频繁变化时成本高；对注意力这类需要特殊算法改写的融合算子，通用搜索难以找到FlashAttention式的写法。", "solved_by": ["flexattention"]}
+ ],
+ "relations": [
+  {"to": "tvm", "type": "solves", "note": "TVM的自动调优依赖人写的调度模板；Ansor自动生成搜索空间，去掉了模板这一步。"},
+  {"to": "halide", "type": "extends", "note": "沿用Halide“算法与调度分离”的思路，把调度的选择完全交给自动搜索。"}
+ ],
+ "prereq": ["matrix-multiplication", "cpu-gpu", "memory-bandwidth", "throughput-latency"],
+ "terms": [
+  {"t": "代价模型", "d": "一个小的预测模型，输入一段候选程序的特征，输出它大约跑多快；用它代替真机测速来筛掉大部分候选。"}
+ ],
+ "check": {"source": "https://arxiv.org/abs/2006.06762", "confirmed": "标题、作者、v1日期2020-06-11；摘要：厂商库与现有搜索策略的不足、分层搜索空间采样、进化搜索与学习的代价模型、多子图任务调度、Intel CPU/ARM CPU/NVIDIA GPU上最多3.8×/2.6×/1.7×。OSDI 2020、作者机构、并入TVM为一般了解。"}
+}

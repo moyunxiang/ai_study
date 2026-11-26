@@ -1,0 +1,27 @@
+{
+  "id": "open-reasoner-zero",
+  "who": "Jingcheng Hu, Yinmin Zhang, Qi Han, Daxin Jiang, Xiangyu Zhang, Heung-Yeung Shum · 阶跃星辰 / 清华大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2503.24290"},
+    {"label": "GitHub", "url": "https://github.com/Open-Reasoner-Zero/Open-Reasoner-Zero"}
+  ],
+  "aka": ["ORZ", "Open-Reasoner-Zero", "开源R1-Zero复现", "zero RL", "零RL", "vanilla PPO"],
+  "problem": "DeepSeek-R1-Zero说明直接在基座模型上做大规模RL就能长出长推理，但训练代码和数据没有公开；大家也不确定GRPO、KL约束、格式奖励这些设计是否必需。",
+  "idea": "用最朴素的配置复现：原版PPO加GAE（λ=1、γ=1）、只看答案对不对的0/1奖励、不加KL正则，配上几万道精选题，在同一基座Qwen2.5-32B上训练并完整开源。",
+  "impact": "在AIME2024、MATH500和GPQA Diamond上超过同基座的DeepSeek-R1-Zero-Qwen-32B，训练步数只要其约十分之一；代码、数据和权重全部公开，成为「零RL」复现的常用参照。",
+  "method": "「零RL」指不做监督微调，直接对基座模型做强化学习。Open-Reasoner-Zero刻意把配置做到最简：\n- **算法**：原版[[ppo]]，优势用[[gae]]估计，取 `λ = 1, γ = 1`（相当于用整条回答的最终奖励减去价值估计），没有KL惩罚项；\n- **奖励**：只抽取回答中 `<answer>` 标签里的内容与参考答案比对，一致得1、否则得0，不像[[deepseek-r1]]那样另加格式奖励；\n- **数据**：从AIME（2023年及以前）、MATH、NuminaMath、Tulu3 MATH、OpenR1-Math-220k和AoPS论坛收集并清洗出几万道数学与通用推理题，另用程序合成逻辑谜题等。\n\n在Qwen2.5-32B基座上，训练过程中准确率和回答长度一起稳定增长，复现了R1-Zero的「越训越长」现象。分析显示，学到的价值函数（critic）能识别并压低重复啰嗦的回答模式，使优势估计更稳，这是作者选择PPO而非[[grpo]]的理由之一。与同期的[[dapo]]、[[dr-grpo]]一起，说明R1-Zero式训练的关键在于数据和稳定性，而不是复杂的技巧。",
+  "limits": [
+    {"text": "需要训练一个与策略同规模的价值模型，资源开销高于无critic的GRPO类方法。", "solved_by": []},
+    {"text": "实验集中在Qwen2.5系列基座上，而Qwen基座本身已有较强推理和自我反思倾向，结论能否推广到其他模型家族需要另外验证。", "solved_by": ["spurious-rewards"]}
+  ],
+  "relations": [
+    {"to": "deepseek-r1", "type": "extends", "note": "开源复现并简化R1-Zero式的基座模型大规模RL。"},
+    {"to": "ppo", "type": "uses", "note": "使用原版PPO，不加KL约束。"},
+    {"to": "gae", "type": "uses", "note": "优势估计用GAE，取λ=1、γ=1。"},
+    {"to": "grpo", "type": "rivals", "note": "R1用无价值网络的GRPO；ORZ认为学到的critic能让优势估计更稳，坚持用PPO。"},
+    {"to": "qwen2.5", "type": "uses", "note": "以Qwen2.5-32B等基座模型训练。"}
+  ],
+  "prereq": ["policy-gradient-concept", "actor-critic", "td-error", "reward-design", "reasoning-tokens"],
+  "learn": "先读[[deepseek-r1]]和[[ppo]] → 读原文第2节「最简配方」和第3.2节消融 → 动手：在小模型上分别用λ=0.95和λ=1的GAE跑数学题RL，比较训练稳定性和回答长度。",
+  "check": {"source": "https://arxiv.org/abs/2503.24290", "confirmed": "标题、作者、v1提交于2025-03-31；摘要中原版PPO+GAE(λ=1, γ=1)、规则奖励、无KL、Qwen2.5-32B基座在AIME2024/MATH500/GPQA Diamond上超过DeepSeek-R1-Zero-Qwen-32B、训练步数约1/10、critic压低重复模式；正文（arxiv.org/html/2503.24290）核对只检查<answer>标签的0/1奖励、无格式奖励、数据来源列表、作者单位阶跃星辰与清华。"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "longlora",
+  "who": "Yukang Chen, Shengju Qian, Haotian Tang, Xin Lai, Zhijian Liu, Song Han, Jiaya Jia · 香港中文大学、MIT",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2309.12307"},
+    {"label": "GitHub", "url": "https://github.com/dvlab-research/LongLoRA"}
+  ],
+  "aka": ["LongLoRA", "S2-Attn", "Shifted Sparse Attention", "移位稀疏注意力", "LongAlpaca"],
+  "problem": "把已训好的LLM扩到更长上下文需要在长序列上续训，注意力开销随长度平方增长：8192长度的自注意力计算量是2048的16倍，普通实验室训不起。",
+  "idea": "训练时用分组的局部注意力并把一半注意力头错开半组（S²-Attn）近似全局注意力，推理时仍用原来的全注意力；再配合放开嵌入层和归一化层的LoRA，只训少量参数。",
+  "impact": "让单台8卡A100就能把Llama 2 7B扩到100k上下文，是2023年下半年社区做长上下文微调的常用方案之一。",
+  "method": "背景：[[position-interpolation]]和[[yarn]]解决了“位置编码怎么外推”，但模型仍需在长文本上微调一段时间，长序列的注意力和显存是主要成本；而直接用[[lora]]只训低秩增量，作者发现扩上下文的效果明显不如全参数微调。\n\nLongLoRA做了两处改动。一是**移位稀疏注意力S²-Attn**：训练时把长度为N的序列切成若干组（例如每组2048个token），每组内部做普通注意力，计算量从与N²成正比降到与N成正比；为了让信息能跨组流动，把一半注意力头的序列错开半个组长再分组，这样相邻两组在这些头里会被拼在一起。作者称这只需两行代码，且推理时可以直接换回全注意力，模型结构不变。二是**改进的LoRA**：发现只要把嵌入层和归一化层也设为可训练（它们参数很少），LoRA扩上下文的效果就能接近全参数微调。\n\n作者在[[llama-2]] 7B到70B上实验，摘要称在单台8×A100上把7B扩到100k、70B扩到32k，并发布长指令数据LongAlpaca。",
+  "limits": [
+    {"text": "训练时的分组局部注意力与推理时的全注意力并不一致，在需要大范围精确检索的长文本任务上，这种近似训练的效果受质疑；后来更多做法是直接配合FlashAttention做全注意力续训或改进位置编码。", "solved_by": ["longrope"]}
+  ],
+  "relations": [
+    {"to": "position-interpolation", "type": "uses", "note": "沿用位置插值把RoPE位置压到训练范围内，LongLoRA解决的是续训本身的算力成本。"},
+    {"to": "lora", "type": "extends", "note": "发现普通LoRA扩上下文效果差，加上可训练的嵌入层和归一化层后接近全参数微调。"},
+    {"to": "llama-2", "type": "uses", "note": "主要实验对象是Llama 2 7B/13B/70B。"},
+    {"to": "longformer", "type": "rivals", "note": "同样用局部窗口注意力省计算，但Longformer把稀疏注意力当作模型结构，LongLoRA只在训练时用，推理换回全注意力。"}
+  ],
+  "prereq": ["self-attention", "context-window", "positional-encoding", "peft-concept", "low-rank"],
+  "terms": [
+    {"t": "S²-Attn", "d": "移位稀疏注意力：序列分组后组内做注意力，一半注意力头把序列错开半组再分组，让信息在组间传递。"}
+  ],
+  "learn": "先读[[position-interpolation]]和[[lora]]；读本文S²-Attn的示意图和“可训练嵌入与归一化”的消融；动手：用官方代码把一个小模型从2k扩到8k，比较有无移位分组的困惑度。",
+  "check": {"source": "https://arxiv.org/abs/2309.12307", "confirmed": "标题、7位作者、arXiv首次提交2023-09-21；摘要中8192长度注意力计算量为2048的16倍、S²-Attn两行代码且推理可选、可训练嵌入与归一化的LoRA、Llama2 7B扩到100k与70B扩到32k（单台8×A100）、LongAlpaca数据。机构与ICLR 2024为一般了解。"}
+}

@@ -1,0 +1,27 @@
+{
+  "id": "base-layers",
+  "who": "Mike Lewis, Shruti Bhosale, Tim Dettmers, Naman Goyal, Luke Zettlemoyer · Facebook AI Research、华盛顿大学",
+  "venue": "ICML 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2103.16716"}
+  ],
+  "aka": ["BASE Layers", "BASE layer", "Balanced Assignment of Experts", "平衡分配专家", "线性分配路由"],
+  "problem": "稀疏MoE让每个token自己挑专家，很难学到均衡的路由：热门专家过载、冷门专家闲置，只能靠启发式规则和额外的负载均衡损失。",
+  "idea": "把“token分给哪个专家”写成线性分配问题，在每个训练批次里求一个最优分配，保证每个专家收到同样多的token，不需要辅助损失和新超参数。",
+  "impact": "第一次把负载均衡从“加损失去鼓励”改成“用分配算法直接保证”，和同期的Hash Layers、之后的专家选择路由一起构成MoE路由设计的几条代表路线。",
+  "method": "背景：[[sparse-moe]]、[[gshard]]和[[switch-transformer]]里，路由器给每个token打分，token去分数最高的专家；为了不让所有token挤向同几个专家，要设容量上限、丢弃溢出的token，并加一项负载均衡损失，它的权重又是需要调的超参数。\n\nBASE层把路由看成一个**平衡分配**问题：一个批次有T个token、E个专家，每个专家恰好接收T/E个token，目标是让所有token与所分配专家的得分（token表示与专家向量的点积）之和最大。这是经典的线性分配问题，可用拍卖算法等求解，作者在多GPU上并行地近似求解。训练时用这个最优均衡分配；测试时没有整批token可供分配，就让每个token直接去得分最高的专家。专家的输出再乘上一个与得分相关的门控值，使路由打分能通过梯度学习。\n\n由于负载均衡由构造保证，训练不需要辅助损失，也没有新的超参数；摘要称这种分配方式既保证了计算负载均衡，又简化了训练，代码开源在fairseq中。",
+  "limits": [
+    {"text": "训练时要在整批token上求解分配问题，带来额外计算和跨设备通信；训练用均衡分配、测试用贪心路由，两者不一致。", "solved_by": ["expert-choice", "aux-loss-free"]}
+  ],
+  "relations": [
+    {"to": "switch-transformer", "type": "solves", "note": "Switch需要容量上限和负载均衡损失，BASE层用最优分配直接保证每个专家负载相等。"},
+    {"to": "gshard", "type": "solves", "note": "GShard的top-2路由同样依赖辅助损失和丢token，BASE层去掉了这些机制。"},
+    {"to": "sparse-moe", "type": "extends", "note": "沿用把前馈层换成多个稀疏激活专家的结构，只改变路由方式。"}
+  ],
+  "prereq": ["mixture-of-experts", "transformer-block", "dot-product", "distributed-training"],
+  "terms": [
+    {"t": "线性分配问题", "d": "给定n个任务和n个执行者之间的得分表，找一种一对一（或均等）的分配使总得分最大，可用匈牙利算法、拍卖算法等求解。"}
+  ],
+  "learn": "先读[[switch-transformer]]里的负载均衡损失和容量因子；读本文第2–3节分配问题的建模与求解；之后对比同年的Hash Layers（不学路由）与[[expert-choice]]（专家挑token）。",
+  "check": {"source": "https://arxiv.org/abs/2103.16716", "confirmed": "标题、5位作者、arXiv首次提交2021-03-30；摘要中平衡分配专家、把token到专家的分配写成线性分配问题、每个专家接收等量token、不需要新超参数和辅助损失、代码在fairseq。拍卖算法、测试时贪心路由、ICML 2021为对正文的一般了解。"}
+}

@@ -1,0 +1,31 @@
+{
+  "id": "joint-ctc-attention",
+  "who": "Suyoun Kim, Takaaki Hori, Shinji Watanabe · 卡内基梅隆大学 / 三菱电机研究实验室（MERL）",
+  "venue": "arXiv 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1609.06773"}
+  ],
+  "problem": "注意力编码器-解码器识别模型太灵活：没有从左到右的单调约束，在噪声环境下和长输入上容易对齐出错，训练初期也很难收敛。",
+  "idea": "在注意力模型的共享编码器上再接一个CTC输出层，两个损失加权相加一起训练，用CTC的单调对齐约束去「拉住」注意力。",
+  "impact": "CTC与注意力联合训练（以及后来的联合解码）成为ESPnet、WeNet等开源工具的默认配方，今天很多注意力和Conformer识别模型仍带一个辅助CTC分支。",
+  "method": "端到端识别有两条主要路线：[[ctc]]假设各帧输出相互独立，并强制从左到右的单调对齐；注意力模型（[[las]]、[[chorowski-attention]]）在生成每个字时都能参考之前生成的字，没有独立性假设，通常更准，但它的对齐完全靠注意力权重自由学出来，长句和噪声下容易跳读、重复或提前结束。\n\n论文的做法是多任务学习：编码器（多层双向LSTM）由两个分支共享，一个是注意力解码器，一个是CTC输出层，总损失为 `L = λ·L_CTC + (1−λ)·L_attention`，λ在0到1之间。CTC分支的前向后向计算只允许单调对齐，等于给共享编码器加了一个对齐方面的正则，注意力因此更快学到合理的对齐。摘要称，在WSJ和CHiME-4任务上，联合模型比单独的CTC和单独的注意力基线字符错误率相对降低5.4%–14.6%。",
+  "limits": [
+    {"text": "注意力解码器要等整句音频输入完才能开始输出，不适合边说边出字的流式识别。", "solved_by": ["streaming-rnnt-mobile", "wenet"]},
+    {"text": "论文只在训练阶段联合，解码时仍主要依赖注意力分支，对齐错误在推理时并没有被完全杜绝。", "solved_by": ["espnet"]}
+  ],
+  "relations": [
+    {"to": "ctc", "type": "uses", "note": "把CTC当作辅助损失，借它的单调对齐约束稳定训练。"},
+    {"to": "las", "type": "solves", "note": "LAS类注意力模型在噪声和长输入下对齐不稳、收敛慢；联合CTC训练缓解了这两点。"},
+    {"to": "chorowski-attention", "type": "extends", "note": "沿用基于注意力的编码器-解码器识别结构，加上CTC分支做多任务学习。"}
+  ],
+  "prereq": ["encoder-decoder", "attention-concept", "sequence-alignment", "end-to-end", "recurrent-layer"],
+  "terms": [
+    {"t": "多任务学习", "d": "一个共享的网络同时为几个相关目标训练，各目标的损失加权相加，互相起到正则作用。"},
+    {"t": "单调对齐", "d": "输出的第k个字对应的音频位置不早于第k−1个字，就像从左往右读，不会跳回去。"}
+  ],
+  "aka": ["Hybrid CTC/Attention", "CTC-Attention", "联合CTC注意力", "joint CTC-attention", "CTC辅助损失"],
+  "check": {
+    "source": "https://arxiv.org/abs/1609.06773",
+    "confirmed": "arXiv官方记录：标题、作者Kim/Hori/Watanabe、v1提交2016-09-21；摘要关于注意力对噪声和长输入的对齐问题、多任务联合CTC-注意力、WSJ与CHiME-4上字符错误率相对降低5.4–14.6%。编码器结构细节、机构与后续被ESPnet采用为一般了解。"
+  }
+}

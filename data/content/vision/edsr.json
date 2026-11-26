@@ -1,0 +1,31 @@
+{
+  "id": "edsr",
+  "who": "Bee Lim, Sanghyun Son, Heewon Kim, Seungjun Nah, Kyoung Mu Lee · 首尔大学",
+  "venue": "CVPR Workshops 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1707.02921"},
+    {"label": "代码", "url": "https://github.com/sanghyun-son/EDSR-PyTorch"}
+  ],
+  "aka": ["EDSR", "MDSR", "增强深度残差超分网络", "去BN超分", "NTIRE 2017冠军"],
+  "problem": "[[srgan]]论文里的SRResNet照搬分类用的残差块，其中的批归一化等模块并不适合像素级复原，网络也难以稳定地做大。",
+  "idea": "从残差块中去掉批归一化、把模型做宽做深，并用残差缩放稳定训练；另给出一个模型同时支持多种放大倍数的MDSR。",
+  "impact": "赢得NTIRE 2017超分辨率挑战，“去掉BN的残差块”成为此后超分网络（包括[[esrgan]]）的默认结构。",
+  "method": "EDSR的主体是一串残差块，开头一层卷积提特征，结尾用亚像素卷积（把通道重排成空间分辨率）放大。改动主要是“做减法”：\n\n- **去掉批归一化**：BN会把特征归一化，抹掉图像本身的亮度、对比度范围，对超分这种要求像素准确的任务有害；去掉后还省下约40%显存，可以堆更大的模型。\n- **做大模型**：最终版本用32个残差块、每层256通道。模型太宽时训练不稳定，于是在每个残差分支的输出乘0.1（残差缩放）再加回去。\n- **MDSR**：不同放大倍数（×2、×3、×4）共享主体，只在头尾各配一个小的倍数专用模块，一个模型覆盖多种倍数。\n\n训练用L1损失而不是L2。摘要称去掉不必要模块后性能超过当时所有先进方法，并赢得NTIRE 2017超分辨率挑战。",
+  "limits": [
+    {"text": "只在双三次下采样的合成数据上训练，遇到真实照片里的噪声、模糊、压缩等未知退化效果大幅下降。", "solved_by": ["real-esrgan"]},
+    {"text": "用L1像素损失优化，结果偏平滑，细纹理不够真实。", "solved_by": ["esrgan"]}
+  ],
+  "relations": [
+    {"to": "srgan", "type": "solves", "note": "改进SRGAN中的SRResNet生成器：去掉BN、加大模型并用残差缩放稳定训练。"},
+    {"to": "resnet", "type": "extends", "note": "残差学习结构的超分特化版。"},
+    {"to": "batchnorm", "type": "rivals", "note": "论证批归一化对像素级复原有害，把它从残差块中删除。"},
+    {"to": "srcnn", "type": "extends", "note": "延续SRCNN以来的卷积超分路线，把网络加深到几十个残差块。"}
+  ],
+  "prereq": ["conv-layer", "residual-connection", "normalization-layer", "loss-function", "image-tensor"],
+  "terms": [
+    {"t": "亚像素卷积", "d": "先输出r²倍的通道，再把它们重新排列成r倍的长和宽，实现高效上采样。"},
+    {"t": "残差缩放", "d": "把残差分支的输出乘上一个小系数（如0.1）再相加，防止大模型训练初期数值爆炸。"}
+  ],
+  "learn": "先读SRCNN和SRResNet，再读EDSR第3节；用EDSR-PyTorch在DIV2K上训练×2模型，比较带与不带BN时的PSNR。",
+  "check": {"source": "https://arxiv.org/abs/1707.02921", "confirmed": "arXiv记录：标题、五位作者、v1提交于2017-07-10、摘要中的去掉常规残差网络中不必要模块、扩大模型并稳定训练、MDSR多倍数单模型、赢得NTIRE 2017超分挑战。去BN省约40%显存、32块256通道、0.1残差缩放、L1损失、亚像素卷积凭一般了解写，未逐项对照正文。"}
+}

@@ -1,0 +1,31 @@
+{
+  "id": "samplernn",
+  "who": "Soroush Mehri, Kundan Kumar, Ishaan Gulrajani, Rithesh Kumar, Shubham Jain, Jose Sotelo, Aaron Courville, Yoshua Bengio · 蒙特利尔大学MILA",
+  "venue": "arXiv 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1612.07837"}
+  ],
+  "problem": "逐个采样点生成音频时，一秒有上万个点，模型要同时记住几毫秒的波形细节和几秒钟的长程结构；[[wavenet]]靠很深的扩张卷积扩大感受野，计算量大。",
+  "idea": "用多个按不同时间分辨率工作的模块分层生成：高层循环网络每隔很多个采样点更新一次，负责长程结构；底层是一个小的自回归多层感知机，在高层给的条件下逐个生成采样点。",
+  "impact": "SampleRNN与WaveNet同期证明了逐采样点的自回归神经网络能生成可信的原始音频，它的分层多速率思路被Char2Wav用作声码器，并影响了后来[[wavernn]]等高效自回归声码器。",
+  "method": "音频生成被写成自回归分解（见[[c:autoregressive]]）：`p(x) = Π_t p(x_t | x_1…x_{t−1})`，每个采样点量化为256个离散值，用softmax分类（见[[c:softmax]]）。难点在于条件依赖的历史极长。\n\nSampleRNN把模型分成若干层（tier）：最上层把一大段采样点（比如几十个点为一帧）作为输入，用循环网络（见[[c:recurrent-layer]]）在帧的尺度上更新状态，频率低、看得远；中间层在更短的帧上运行，接收上层的输出作为条件；最底层是无记忆的自回归多层感知机，只看最近的若干个采样点加上上层条件，逐点输出分布。高层的循环网络每更新一次，底层要生成很多个点，因此长程记忆的计算被大大摊薄。\n\n论文在三个性质不同的数据集上做无条件音频生成（不给文字或其他条件），摘要称人工评测中它生成的样本比竞争模型更受偏好，并分析了各组成部分的贡献。",
+  "limits": [
+    {"text": "仍需逐个采样点串行生成，实时合成很困难。", "solved_by": ["parallel-wavenet", "wavernn", "melgan"]},
+    {"text": "论文只做无条件生成，要用于文字转语音还需要接上文本或频谱条件。", "solved_by": ["tacotron-2", "wavernn"]}
+  ],
+  "relations": [
+    {"to": "wavenet", "type": "rivals", "note": "同期的逐采样点生成模型：WaveNet用扩张卷积，SampleRNN用分层多速率循环网络。"},
+    {"to": "pixelrnn", "type": "extends", "note": "沿用把高维数据逐元素自回归分解、每个元素做256类softmax的做法，从像素推广到音频采样点。"},
+    {"to": "lstm", "type": "uses", "note": "高层模块使用门控循环网络在帧尺度上建模长程依赖。"}
+  ],
+  "prereq": ["autoregressive", "recurrent-layer", "softmax", "waveform-spectrogram", "mlp"],
+  "terms": [
+    {"t": "采样点", "d": "数字音频每秒记录若干次（例如16000次）声压值，每个值就是一个采样点。"},
+    {"t": "多速率", "d": "模型的不同部分按不同的时间步长更新，高层慢、底层快。"}
+  ],
+  "aka": ["SampleRNN", "分层采样点RNN", "多尺度自回归音频生成"],
+  "check": {
+    "source": "https://arxiv.org/abs/1612.07837",
+    "confirmed": "arXiv官方记录：标题、作者Mehri/Kumar/Gulrajani/Kumar/Jain/Sotelo/Courville/Bengio、v1提交2016-12-22；摘要关于一次生成一个采样点、无记忆的自回归MLP与有状态RNN分层组合、三个数据集、人工评测更受偏好、各组件贡献分析。256级量化、门控循环单元的具体类型、被Char2Wav采用为一般了解。"
+  }
+}

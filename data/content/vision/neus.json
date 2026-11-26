@@ -1,0 +1,30 @@
+{
+  "id": "neus",
+  "who": "Peng Wang, Lingjie Liu, Yuan Liu, Christian Theobalt, Taku Komura, Wenping Wang · 香港大学 / 马普信息学所 / 德州农工大学",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2106.10689"},
+    {"label": "代码", "url": "https://github.com/Totoro97/NeuS"}
+  ],
+  "aka": ["NeuS", "神经表面重建", "neural surface reconstruction", "SDF体渲染", "NeuS2", "Neuralangelo"],
+  "problem": "[[nerf]]渲染逼真但密度场里没有明确的表面，提出来的网格坑坑洼洼；IDR等表面方法又需要前景掩码，且容易陷入局部最优。",
+  "idea": "用符号距离函数（SDF）的零等值面表示表面，再设计一种从SDF算出体渲染权重的新公式，让体渲染训练直接优化出准确的表面。",
+  "impact": "成为多视图神经表面重建的标准方法，Neuralangelo、NeuS2等大量后续工作直接沿用它的SDF体渲染公式。",
+  "method": "NeuS用一个MLP表示场景的SDF：输入三维坐标，输出该点到最近表面的带符号距离，表面就是SDF=0的位置（[[deepsdf]]的表示方式）；另一个网络输出颜色。\n\n难点在于怎样把SDF接进NeRF式的体渲染。若直接把SDF换算成密度再套NeRF公式，权重最大的点会偏离真正的表面，作者称之为一阶偏差。NeuS的做法是：沿光线用Sigmoid函数`Φ_s(f(x))`把SDF值变成一个“累积不透明度”，再由它的变化率定义不透明密度，这样权重恰好在SDF穿过零点处达到峰值，并能处理光线穿过多个表面时的遮挡。参数s控制Sigmoid的陡峭程度，训练中自动变大，表面越来越锐利。训练只需要多视图照片，不需要掩码。摘要报告在DTU和BlendedMVS上的表面重建质量超过当时的先进方法，复杂结构和自遮挡物体上尤其明显。",
+  "limits": [
+    {"text": "沿用NeRF的大MLP与逐光线采样，单个场景训练要数小时。", "solved_by": ["instant-ngp"]},
+    {"text": "在大范围、无边界的室外场景和弱纹理区域上表面容易出错。", "solved_by": ["2dgs"]}
+  ],
+  "relations": [
+    {"to": "nerf", "type": "solves", "note": "解决NeRF密度场提取不出准确表面的问题，同时保留体渲染优化稳定的优点。"},
+    {"to": "deepsdf", "type": "uses", "note": "以MLP表示的符号距离函数作为几何表示。"},
+    {"to": "occupancy-networks", "type": "extends", "note": "同属坐标网络隐式表面路线，把监督从三维真值换成多视图照片。"}
+  ],
+  "prereq": ["volume-rendering", "3d-representation", "mlp", "camera-geometry", "neuron-activation"],
+  "terms": [
+    {"t": "符号距离函数", "d": "SDF：空间中每点到最近表面的距离，外部为正、内部为负，表面是它等于零的地方。"},
+    {"t": "Marching Cubes", "d": "从三维网格上的标量场中提取等值面网格的经典算法，常用来把SDF变成三角网格。"}
+  ],
+  "learn": "先学NeRF的体渲染公式和SDF概念，再读NeuS第3节的无偏权重推导；用官方代码在DTU一个物体上训练并导出网格。",
+  "check": {"source": "https://arxiv.org/abs/2106.10689", "confirmed": "arXiv记录：标题、六位作者、v1提交于2021-06-20、摘要中IDR/DVR需要掩码易陷局部最优、NeRF表面约束不足、SDF零等值面表示、新的体渲染公式一阶无偏、无需掩码、DTU与BlendedMVS上超过先进方法。Sigmoid公式细节、参数s、机构与NeurIPS 2021凭一般了解写。"}
+}

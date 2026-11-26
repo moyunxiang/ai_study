@@ -1,0 +1,29 @@
+{
+  "id": "u-vit",
+  "who": "Fan Bao, Shen Nie, Kaiwen Xue, Yue Cao, Chongxuan Li, Hang Su, Jun Zhu · 清华大学 / 中国人民大学 / 北京智源人工智能研究院",
+  "venue": "CVPR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2209.12152"},
+    {"label": "代码", "url": "https://github.com/baofff/U-ViT"}
+  ],
+  "aka": ["U-ViT", "UViT", "All are Worth Words"],
+  "problem": "扩散模型的去噪网络几乎都是卷积[[unet]]；[[vit]]在识别任务上已证明可扩展，但在扩散生成里能否替代U-Net、哪些U-Net部件是必须的，并不清楚。",
+  "idea": "把时间步、条件（类别或文本）和加噪图像的图块全部当作token送进一个纯Transformer，并在浅层和深层之间加U-Net式的长跳连接。",
+  "impact": "与几个月后的[[dit]]几乎同时证明了Transformer可作扩散骨架；论文报告在ImageNet 256×256类别条件生成上FID 2.29；该团队随后的UniDiffuser等文生图工作也以它为骨架。",
+  "method": "U-ViT的结构很简单：\n- **一切皆token**：加噪图像（或[[ldm]]的潜变量）切成小块线性嵌入成token；扩散时间步`t`和条件`c`也各自嵌入成token，与图块token拼成一个序列，由同一组Transformer块统一处理（见[[c:image-patch]]、[[c:self-attention]]）。文本条件时，把文本编码器输出的多个token都放进序列。\n- **长跳连接**：类似U-Net，把第`i`个浅层块的输出与对称位置的深层块输入拼接后线性降维，再送入深层块。\n- 输出端把图块token还原成图像，可选再接一个3×3卷积。\n\n作者做了系统消融，结论是：长跳连接对扩散模型的图像建模至关重要；而U-Net里的下采样、上采样算子并非必需。在潜空间版本上，类别条件ImageNet 256×256取得FID 2.29，MS-COCO文生图FID 5.48（不使用大规模外部数据训练生成模型的设定下），与相近规模的卷积U-Net相当或更好。",
+  "limits": [
+    {"text": "把条件当作序列中的token并不总是最优，后续工作发现自适应归一化（adaLN）等条件注入方式在放大时更稳定、更省算力。", "solved_by": ["dit"]},
+    {"text": "只在中等规模上验证，Transformer骨架在更大模型和数据上的放大规律留给了后续工作。", "solved_by": ["dit", "sd3"]}
+  ],
+  "relations": [
+    {"to": "vit", "type": "uses", "note": "以ViT的图块嵌入和Transformer块作为去噪网络主体。"},
+    {"to": "unet", "type": "rivals", "note": "试图替代扩散模型中的卷积U-Net，但保留了它的长跳连接。"},
+    {"to": "ldm", "type": "uses", "note": "最好的结果是在LDM的潜空间中训练得到的。"}
+  ],
+  "prereq": ["transformer-block", "image-patch", "diffusion-process", "residual-connection", "latent-space"],
+  "terms": [
+    {"t": "长跳连接", "d": "把网络浅层的输出直接送到深层对称位置，使深层能拿到低层细节；U-Net里编码器与解码器之间的连接就是这种。"}
+  ],
+  "learn": "先读ViT和LDM → 读本文第3节结构与消融 → 与DiT对比两种条件注入方式（token拼接 vs adaLN）。",
+  "check": {"source": "https://arxiv.org/abs/2209.12152", "confirmed": "标题、作者、v1日期2022-09-25、摘要中时间/条件/图块全部作为token、长跳连接、ImageNet 256×256 FID 2.29与MS-COCO文生图FID 5.48、长跳连接关键而上下采样非必需；CVPR 2023、机构与UniDiffuser沿用来自一般了解"}
+}

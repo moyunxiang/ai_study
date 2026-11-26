@@ -1,0 +1,34 @@
+{
+  "id": "mccfr",
+  "who": "Marc Lanctot, Kevin Waugh, Martin Zinkevich, Michael Bowling · University of Alberta / Yahoo! Research",
+  "venue": "NIPS 2009",
+  "links": [
+    {"label": "NeurIPS", "url": "https://proceedings.neurips.cc/paper/2009/hash/00411460f7c92d2124a67ea0f4cb5f85-Abstract.html"},
+    {"label": "作者页（含勘误说明）", "url": "https://webdocs.cs.ualberta.ca/~bowling/publications/b2hd-09nips-mccfr-w-trws.html"}
+  ],
+  "problem": "[[cfr]]每一轮都要遍历整棵博弈树，游戏一大，单次迭代的代价就高得无法承受；扑克里用的「机会采样」是专门为扑克设计的技巧，不能直接用到别的游戏。",
+  "idea": "把CFR的每轮更新改成只在采样到的部分博弈树上做，并用重要性加权保证期望上与完整CFR一致；给出结果采样和外部采样两种通用方案，并证明遗憾以高概率有界。",
+  "impact": "MCCFR成为大规模不完全信息博弈求解的主力算法族，Libratus、Pluribus、DeepStack等扑克AI以及后来的Deep CFR都建立在它的采样思想上。",
+  "background": "不完全信息博弈（比如扑克，看不到对手的底牌）通常写成扩展式博弈：一棵博弈树，加上「信息集」——玩家无法区分的那些节点被归成一组，必须采取同一个策略。2007年的[[cfr]]（反事实遗憾最小化）把求纳什均衡分解成在每个信息集上独立地最小化遗憾：每轮遍历整棵树，计算每个动作的「反事实遗憾」，用遗憾匹配更新策略，平均策略收敛到近似均衡。\n\n问题在于每轮都要遍历整棵树。扑克研究里已经用了一种叫机会采样（chance sampling）的技巧：每轮只采样一组发牌结果，不遍历所有发牌。但它是针对扑克的特例，缺乏一般化的理论说明。",
+  "method": "MCCFR的思路是：把博弈树的终局节点划分成若干「块」，每轮只采样一块，只在通往这一块的路径上计算遗憾，并按采样概率的倒数加权。论文先证明这样得到的采样反事实遗憾在期望上等于CFR的真实遗憾，所以原版CFR和扑克用的机会采样都是MCCFR的特例。\n\n在此基础上给出两种通用采样方案：\n- **结果采样**（outcome sampling）：每轮只采样一条从根到终局的完整路径，所有玩家和机会节点的动作都采样，只更新这一条路径上的信息集。单次迭代最便宜，但方差最大。\n- **外部采样**（external sampling）：对正在更新的玩家，遍历他所有的动作；对手和机会节点的动作则采样。这在代价和方差之间折中，后来成为最常用的版本。\n\n两种方案都被证明总遗憾以高概率有界，因此靠自我对弈就能算出近似均衡。论文还为原版CFR证明了一个更紧的遗憾界，并与MCCFR的界联系起来。",
+  "results": "摘要称，在多种游戏上，采样版本虽然需要更多迭代，但每次迭代代价低得多，整体收敛可以快得多。作者页注明NIPS正式版本中有一处错误已更正，详见NIPS 2009勘误。",
+  "legacy": "之后的扑克AI大多在MCCFR的框架里工作：[[cepheus]]用的[[cfr-plus]]虽然是完整遍历，但大规模无限注扑克的蓝图策略普遍用外部采样MCCFR计算，[[libratus]]和[[pluribus]]都是例子；[[deep-cfr]]用神经网络近似遗憾值，数据同样来自外部采样的遍历。OpenSpiel等博弈框架也把结果采样和外部采样作为标准实现。",
+  "limits": [
+    {"text": "结果采样的重要性权重在长博弈中可能很大，估计方差高，收敛慢。", "solved_by": []},
+    {"text": "仍然要为每个信息集存储遗憾和平均策略的表格，对无限注扑克这种规模必须先做人为的状态抽象。", "solved_by": ["deep-cfr"]}
+  ],
+  "relations": [
+    {"to": "cfr", "type": "extends", "note": "证明采样版本在期望上执行与CFR相同的遗憾更新，把原版和扑克专用的机会采样统一为特例。"},
+    {"to": "nash-equilibrium", "type": "uses", "note": "两人零和博弈里，平均策略的遗憾趋于零即意味着逼近纳什均衡。"},
+    {"to": "mcts", "type": "rivals", "note": "同样靠蒙特卡洛采样避免遍历整棵博弈树；UCT面向完全信息博弈的搜索，MCCFR面向不完全信息博弈的均衡求解。"}
+  ],
+  "prereq": ["nash-equilibrium", "monte-carlo", "importance-sampling", "self-play", "tree-search"],
+  "terms": [
+    {"t": "信息集", "d": "当前玩家无法区分的一组博弈状态，比如对手底牌不同但自己看到的牌面一样的那些局面。"},
+    {"t": "反事实遗憾", "d": "假设自己一直设法走到这个信息集，当初改选某个动作能多赢多少；CFR对每个信息集最小化它。"},
+    {"t": "外部采样", "d": "更新某个玩家时，遍历他自己的所有动作，只对对手和发牌等外部因素采样。"}
+  ],
+  "learn": "先弄懂[[cfr]]和遗憾匹配；读原文第3节的采样框架和外部采样伪代码；在库恩扑克（Kuhn poker）上分别实现CFR和外部采样MCCFR，比较以计算量为横轴的可剥削度曲线。",
+  "check": {"source": "https://proceedings.neurips.cc/paper/2009/hash/00411460f7c92d2124a67ea0f4cb5f85-Abstract.html", "confirmed": "标题、NIPS 2009、四位作者（检索结果与作者页）；摘要中CFR与扑克机会采样为特例、期望上相同的遗憾更新、结果采样与外部采样、高概率遗憾有界、对原版CFR的更紧界、迭代更多但每次更便宜而整体更快；作者页注明正式版有一处错误已更正。Libratus、Pluribus使用MCCFR一句按一般了解，未逐篇核对。"},
+  "aka": ["MCCFR", "Monte Carlo CFR", "外部采样", "external sampling", "结果采样", "outcome sampling"]
+}

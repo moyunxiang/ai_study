@@ -1,0 +1,27 @@
+{
+  "id": "ladder-vae",
+  "who": "Casper Kaae Sønderby, Tapani Raiko, Lars Maaløe, Søren Kaae Sønderby, Ole Winther · 丹麦技术大学 / 哥本哈根大学 / 阿尔托大学",
+  "venue": "NeurIPS 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1602.02282"}
+  ],
+  "aka": ["LVAE", "Ladder VAE", "梯形VAE", "层级VAE"],
+  "problem": "[[vae]]只有一层隐变量时表达力有限；堆多层随机隐变量后很难训练，上层隐变量常常完全不被使用，层数加了似然却几乎不涨。",
+  "idea": "推断时先自下而上提取特征，再自上而下用生成模型的先验去逐层修正每一层的近似后验，相当于让推断网络和生成网络共享自上而下的路径；并配合批归一化和KL预热。",
+  "impact": "给出了训练多层随机隐变量VAE的基本配方，“自下而上+自上而下”的推断结构被后来的[[nvae]]、[[vdvae]]等层级VAE直接沿用。",
+  "method": "普通的多层VAE的推断网络是纯自下而上的：从图像x先推第一层隐变量z₁，再从z₁推z₂……每一层只看下面传上来的信息。问题是生成模型是自上而下的（先采z_L，再一层层生成），两条路径各走各的，上层的近似后验很容易退化成和先验一样，KL项变成0，等于这一层没用上（即[[posterior-collapse]]所说的现象）。\n\nLadder VAE借鉴[[ladder-networks]]的结构：先做一遍确定性的自下而上计算，得到每层的“似然信号”（一个高斯的均值和方差）；然后自上而下走一遍，把这一层由生成模型给出的先验高斯与自下而上的似然高斯按精度加权合成，作为这一层的近似后验。这样后验从一开始就和先验对齐，只在数据有证据时才偏离。\n\n论文还发现两点训练技巧对多层随机变量模型至关重要：批归一化，以及训练初期把KL项的权重从0逐渐升到1（确定性预热）。在MNIST等数据集上，它给出了更高的对数似然和更紧的下界，并且用上了更深、更分散的隐变量层级。",
+  "limits": [
+    {"text": "实验停留在MNIST、OMNIGLOT这类小图，层级VAE生成自然图像的质量仍明显不如同期GAN。", "solved_by": ["nvae", "vdvae"]}
+  ],
+  "relations": [
+    {"to": "vae", "type": "extends", "note": "把单层隐变量VAE推广到多层随机隐变量，并重新设计推断网络。"},
+    {"to": "ladder-networks", "type": "uses", "note": "借用梯形网络先自下而上、再自上而下合并信息的结构来做近似推断。"},
+    {"to": "posterior-collapse", "type": "solves", "note": "用自上而下的后验修正和KL预热，缓解上层隐变量不被使用的问题。"}
+  ],
+  "prereq": ["elbo", "latent-variable", "kl-divergence", "gaussian", "reparameterization"],
+  "terms": [
+    {"t": "KL预热", "d": "训练开始时先不让KL惩罚起作用，再逐步把它的权重升到1，避免隐变量一开始就被压成和先验一样。"}
+  ],
+  "learn": "先读VAE和ELBO → 读本文推断模型的图和精度加权合并公式 → 对比NVAE中的残差层级结构。",
+  "check": {"source": "https://arxiv.org/abs/1602.02282", "confirmed": "标题、五位作者、v1日期2016-02-06、摘要中递归用数据相关的似然修正生成分布、类似梯形网络、更好的对数似然与更紧下界、更深更分散的隐变量层级、批归一化与确定性预热的重要性；机构、NeurIPS 2016、精度加权合并的细节与MNIST/OMNIGLOT数据集来自一般了解"}
+}

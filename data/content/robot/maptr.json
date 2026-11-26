@@ -1,0 +1,29 @@
+{
+ "id": "maptr",
+ "who": "Bencheng Liao, Shaoyu Chen, Xinggang Wang, Tianheng Cheng, Qian Zhang, Wenyu Liu, Chang Huang · 华中科技大学、地平线",
+ "venue": "ICLR 2023",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2208.14437"},
+  {"label": "GitHub", "url": "https://github.com/hustvl/MapTR"}
+ ],
+ "problem": "高精地图对规划不可或缺，但离线制作和维护成本极高；想让车辆用摄像头在线实时“画”出矢量地图，又难在车道线这类元素的形状和点的顺序没有唯一标准。",
+ "idea": "把每个地图元素建模成一组点，并把它所有等价的点排列方式（比如一条线从哪头开始数、一个多边形从哪个点开始）都视为正确答案，用DETR式的分层查询和分层匹配直接输出矢量地图。",
+ "impact": "让纯视觉在线矢量地图构建达到实时速度；同一团队后来的VAD把这种矢量化地图表示用在了端到端规划上。",
+ "method": "[[vectornet]]这类方法假定有现成的高精地图。MapTR要从环视摄像头里直接把地图做出来：先用[[bevformer]]一类的方法把多视角图像特征变到鸟瞰平面，再用[[detr]]式的Transformer解码器输出地图元素（车道分隔线、道路边界、人行横道）。\n\n难点在于标注本身有歧义：一条折线从左往右数和从右往左数是同一条线，一个闭合多边形从任意一个顶点开始绕都是同一个形状。若强行规定一种顺序，模型会被迫学一个任意的约定，训练不稳定。MapTR提出“置换等价”的建模：每个元素是一个点集加上一组等价的排列，训练时在这组排列里挑与预测最接近的一个计算损失。解码端用分层查询：元素级查询负责“有哪些元素”，点级查询负责“每个元素的点在哪”，相应地做元素级和点级两层二分匹配。\n\n在[[nuscenes]]上，MapTR在只用相机输入的矢量地图方法中性能和效率都最好；轻量版MapTR-nano在RTX 3090上以25.1 FPS实时运行，比此前最好的相机方法快8倍、mAP高5.0。",
+ "limits": [
+  {"text": "只建模感知范围内的当前帧地图，远处和被遮挡区域的准确性有限，也没有利用多帧时序和先验地图。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "detr", "type": "uses", "note": "沿用DETR的查询与二分匹配框架，扩展为元素级与点级的分层查询和匹配。"},
+  {"to": "bevformer", "type": "uses", "note": "用鸟瞰视角特征作为地图解码的输入。"},
+  {"to": "vectornet", "type": "solves", "note": "VectorNet依赖离线高精地图；MapTR从摄像头在线生成同样的矢量化地图表示。"},
+  {"to": "nuscenes", "type": "uses", "note": "在nuScenes上训练与评测矢量地图构建。"}
+ ],
+ "prereq": ["attention-concept", "camera-geometry", "iou-map", "vision-tasks"],
+ "terms": [
+  {"t": "置换等价", "d": "同一个地图元素可以有多种点的排列方式，它们描述的是同一个形状，训练时都算对。"},
+  {"t": "在线建图", "d": "车辆行驶时用自身传感器实时构建周围地图，而不是依赖事先采集制作的地图。"}
+ ],
+ "learn": "先读DETR的二分匹配损失和BEVFormer的鸟瞰特征，再读MapTR第3节的置换等价建模；可以看看VAD如何把MapTR式的矢量地图接到规划上。",
+ "check": {"source": "https://arxiv.org/abs/2208.14437", "confirmed": "标题、七位作者、v1提交日期2022-08-30；摘要中点集加等价排列的置换等价建模、分层查询与分层二分匹配、nuScenes上相机输入方法中最好、MapTR-nano在RTX 3090上25.1 FPS、比此前最好相机方法快8倍且mAP高5.0。"}
+}

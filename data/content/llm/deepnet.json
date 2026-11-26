@@ -1,0 +1,27 @@
+{
+  "id": "deepnet",
+  "who": "Hongyu Wang, Shuming Ma, Li Dong, Shaohan Huang, Dongdong Zhang, Furu Wei · 微软研究院",
+  "venue": "arXiv 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2203.00555"}
+  ],
+  "aka": ["DeepNorm", "Deep Norm", "千层Transformer"],
+  "problem": "Transformer很难做得特别深：Post-LN效果好但几十层以上就不稳定，Pre-LN稳定但效果打折，此前最深的Transformer也就一两百层。",
+  "idea": "提出DeepNorm：在残差相加时把捷径分支放大一个常数α、同时把子层初始化缩小一个常数β，α、β由理论推导给出，使每步更新对输出的影响有界。",
+  "impact": "把Transformer稳定训练到1000层，兼得Post-LN的效果和Pre-LN的稳定；DeepNorm后来被GLM-130B等大模型采用。",
+  "method": "[[admin]]已经指出，Post-LN难训的根源是每层对残差分支依赖太重，参数一更新输出就剧烈变化。DeepNet把这个思路做成一个只需改两处常数的方案。\n\n**DeepNorm**：原来的Post-LN是 `x ← LN(x + f(x))`，DeepNorm改成 `x ← LN(α·x + f(x))`，α>1，相当于放大捷径、相对削弱子层的贡献；同时子层里部分权重在初始化时乘以β<1。作者推导了模型更新幅度的上界，α、β按编码器层数N、解码器层数M取值（层数越多，α越大、β越小），保证无论多深，每次参数更新造成的输出变化都被控制在常数量级。\n\n结果：作者把Transformer稳定训练到1000层（2500个注意力和前馈子层），比此前最深的Transformer深一个数量级。在覆盖7482个翻译方向的多语言基准上，200层、32亿参数的模型比48层、120亿参数的此前最佳模型高5个BLEU。\n\n后续：DeepNorm被[[glm-130b]]用作训练稳定手段之一。不过主流大模型最终多采用Pre-LN（RMSNorm）配合较浅较宽的结构，千层模型并未成为主流。",
+  "limits": [
+    {"text": "主要在机器翻译上验证；对于千亿参数的解码器语言模型，“更深”是否比“更宽”划算没有回答，主流后来走的是Pre-LN加中等深度。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "admin", "type": "extends", "note": "沿用Admin“残差分支依赖过重导致放大效应”的分析，把缩放改成有理论上界的固定常数。"},
+    {"to": "pre-ln", "type": "solves", "note": "Pre-LN稳定但效果打折；DeepNorm在保留Post-LN效果的同时达到甚至超过Pre-LN的稳定性。"},
+    {"to": "transformer", "type": "extends", "note": "只改残差相加方式和初始化，把原版Transformer的深度推到1000层。"}
+  ],
+  "prereq": ["residual-connection", "normalization-layer", "initialization", "transformer-block", "vanishing-exploding"],
+  "terms": [
+    {"t": "DeepNorm", "d": "残差相加前把输入乘以常数α、子层权重初始化乘以β的归一化方案，α、β随层数确定。"}
+  ],
+  "learn": "先读[[admin]]理解放大效应；读本文给出α、β取值的那张表和理论推导的结论；动手：在小模型上把层数加到100层以上，比较Post-LN和DeepNorm是否发散。",
+  "check": {"source": "https://arxiv.org/abs/2203.00555", "confirmed": "标题、6位作者、arXiv首次提交2022-03-01；摘要中1000层（2500个子层）、7482个翻译方向、200层3.2B模型比48层12B模型高5 BLEU。DeepNorm的公式形式与GLM-130B采用DeepNorm为一般了解，未逐项对照。"}
+}

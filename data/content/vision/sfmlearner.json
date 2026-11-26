@@ -1,0 +1,32 @@
+{
+  "id": "sfmlearner",
+  "who": "Tinghui Zhou, Matthew Brown, Noah Snavely, David G. Lowe · 加州大学伯克利分校 / Google",
+  "venue": "CVPR 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1704.07813"},
+    {"label": "项目页", "url": "https://people.eecs.berkeley.edu/~tinghuiz/projects/SfMLearner/"}
+  ],
+  "aka": ["SfMLearner", "SfM-Learner", "自监督深度与位姿", "unsupervised depth and ego-motion", "视图合成监督", "view synthesis supervision"],
+  "problem": "监督式单目深度需要激光雷达等昂贵的深度真值；[[monodepth]]改用双目图像自监督，但仍要求采集时有标定好的立体相机。",
+  "idea": "只用普通单目视频训练：一个网络预测目标帧的深度，另一个预测相邻帧之间的相机运动，用二者把相邻帧“扭”到目标帧视角，以重建误差作为监督信号。",
+  "impact": "确立了从无标注单目视频同时学深度和相机位姿的自监督范式，[[monodepth2]]等大量后续工作都在这个框架上改进。",
+  "method": "如果知道目标帧每个像素的深度D、相机内参K以及到相邻帧的相对位姿T，就能算出这个像素在相邻帧里落在哪：`p_s ≈ K·T·D(p_t)·K⁻¹·p_t`。再从相邻帧的这个位置用双线性插值取颜色（这种可微的采样来自[[stn]]），就“合成”出了目标帧。如果深度和位姿都对，合成图应该和真实目标帧一样。\n\nSfMLearner据此训练两个网络：\n\n- **深度网络**：输入单张图，输出逐像素深度；\n- **位姿网络**：输入目标帧和前后几帧，输出相对的6自由度相机运动。\n\n损失就是合成帧与目标帧的光度误差（加平滑项）。场景里的运动物体和遮挡会违反“静态场景”假设，作者另外让位姿网络输出一张“可解释性掩码”，降低这些像素的权重。两个网络在训练时通过视图合成目标耦合，测试时可以分别单独使用。摘要报告在KITTI上，单目深度与使用真值位姿或深度训练的监督方法相当，位姿估计在可比输入条件下与已有SLAM系统相比有优势。",
+  "legacy": "[[monodepth2]]用最小重投影误差和自动掩码修补了遮挡与静止帧问题；此后的大量自监督深度、光流联合估计工作都沿用“深度网络＋位姿网络＋光度重建”的结构。",
+  "limits": [
+    {"text": "假设场景静止，运动物体、遮挡区域和相机不动的帧会产生错误的监督，常见“深度洞”。", "solved_by": ["monodepth2"]},
+    {"text": "单目视频只能恢复到未知尺度，深度和位移都没有米制单位。", "solved_by": ["metric3d"]}
+  ],
+  "relations": [
+    {"to": "monodepth", "type": "solves", "note": "Monodepth需要标定好的双目图像训练；SfMLearner只用单目视频，代价是要同时学相机运动。"},
+    {"to": "stn", "type": "uses", "note": "用可微的双线性采样把相邻帧按深度和位姿扭到目标帧视角。"},
+    {"to": "eigen-depth", "type": "rivals", "note": "Eigen等用深度真值监督回归；SfMLearner用视图合成误差代替真值。"},
+    {"to": "kitti", "type": "uses", "note": "在KITTI驾驶视频上训练和评测深度与位姿。"}
+  ],
+  "prereq": ["camera-geometry", "self-supervised", "conv-layer", "loss-function", "image-tensor"],
+  "terms": [
+    {"t": "视图合成", "d": "用深度和相机运动把一张图的像素搬到另一个视角，生成从那个视角看到的图像。"},
+    {"t": "自运动（ego-motion）", "d": "拍摄者（相机）自身在两帧之间的平移和旋转。"}
+  ],
+  "learn": "先补针孔相机投影与齐次坐标，再读论文第3节视图合成公式；用KITTI的一小段序列实现一次“已知深度和位姿→合成相邻帧”，观察误差图。",
+  "check": {"source": "https://arxiv.org/abs/1704.07813", "confirmed": "arXiv记录：标题、四位作者（Zhou、Brown、Snavely、Lowe）、v1提交于2017-04-25；摘要中的从无结构视频序列做单目深度与相机运动估计、深度与位姿网络通过视图合成目标耦合、测试时可独立使用、KITTI上深度与监督方法相当、位姿与SLAM系统相比有优势。投影公式、可解释性掩码、机构、CVPR 2017凭一般了解写。"}
+}

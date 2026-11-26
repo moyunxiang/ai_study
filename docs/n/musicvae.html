@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MusicVAE（2018） · AI脉络</title>
+<meta name="description" content="能把数据压成有意义的隐变量，但用在长序列上时，循环解码器太强，干脆忽略隐变量自己往下生成（后验坍缩），乐曲的长程结构也学不好。 用分层解码器：先由一个「指挥」网络从隐变量生成每个小节的嵌入，再由底层解码器根据各自的小节嵌入独立生成该小节的音符，迫使模型真正依赖隐变量。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/musicvae.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MusicVAE（2018）">
+<meta property="og:description" content="能把数据压成有意义的隐变量，但用在长序列上时，循环解码器太强，干脆忽略隐变量自己往下生成（后验坍缩），乐曲的长程结构也学不好。 用分层解码器：先由一个「指挥」网络从隐变量生成每个小节的嵌入，再由底层解码器根据各自的小节嵌入独立生成该小节的音符，迫使模型真正依赖隐变量。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/musicvae.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/musicvae">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:168"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/speech.html">语音与音频</a> › 音乐与音效生成</div>
+<h1>MusicVAE</h1>
+<div class="full">A Hierarchical Latent Vector Model for Learning Long-Term Structure in Music</div>
+<div class="meta"><span>2018.03</span><span>论文</span><span>延伸</span><span>arXiv 2018</span><span>Adam Roberts, Jesse Engel, Colin Raffel, Curtis Hawthorne, Douglas Eck · Google Brain（Magenta项目）</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1803.05428" rel="noopener">arXiv ↗</a><a class="btn sm" href="http://g.co/magenta/musicvae-code" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/musicvae">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/vae.html">变分自编码器VAE</a>能把数据压成有意义的隐变量，但用在长序列上时，循环解码器太强，干脆忽略隐变量自己往下生成（后验坍缩），乐曲的长程结构也学不好。</p></div><div><h4>方法</h4><p>用分层解码器：先由一个「指挥」网络从隐变量生成每个小节的嵌入，再由底层解码器根据各自的小节嵌入独立生成该小节的音符，迫使模型真正依赖隐变量。</p></div><div><h4>影响</h4><p>MusicVAE让符号音乐（音符序列）有了一个可以插值、采样和做属性运算的隐空间，Magenta据此做了多款作曲工具，它也是音乐生成综述里讲序列VAE与后验坍缩的经典例子。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>MusicVAE处理的是符号音乐：一段16小节的旋律、鼓点或多声部乐句被表示成音符事件序列，而不是音频波形。编码器是双向<a class="ln" href="../n/lstm.html">LSTM</a>，读完整段后输出隐变量的均值和方差（见<a class="lc" href="../c/latent-variable.html">隐变量模型</a>、<a class="lc" href="../c/elbo.html">变分推断与ELBO</a>）。</p><p>问题在解码器：如果用一个普通的自回归LSTM直接生成几百个音符，它只看前面的音符就能把下一个猜得不错，隐变量z就被冷落了，这就是后验坍缩。论文的分层解码器先用一个「指挥」（conductor）RNN从z生成16个小节嵌入，每个小节嵌入再交给底层RNN去生成这一小节的音符；底层RNN每到新的小节就重新初始化，无法跨小节依赖前面的音符，只能依靠来自z的小节嵌入，从而保住了长程结构。</p><p>摘要报告：在音符序列建模上，分层模型在采样、插值和重建方面都比「扁平」的基线明显更好；实现开源。在隐空间里两段旋律之间做线性插值，能得到平滑过渡的中间旋律。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只生成符号音符，不涉及音色和演奏，最终声音还要靠合成器或真人演奏。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/jukebox.html">Jukebox</a> <a class="chip hue" style="--h:168" href="../n/musiclm.html">MusicLM与音乐生成</a></div></li><li>长度固定为最多十几小节，无法生成一首完整歌曲的结构。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/music-transformer.html">Music Transformer</a> <a class="chip hue" style="--h:168" href="../n/jukebox.html">Jukebox</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/lstm.html">LSTM</a><span class="yr">1997 · 基础</span><div class=nt>编码器和两级解码器都是LSTM。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/vae.html">变分自编码器VAE</a><span class="yr">2013.12 · 生成</span><div class=nt>把变分自编码器用到长音符序列上，并用分层解码器解决后验坍缩。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:168" href="../n/nsynth.html">NSynth</a><span class="yr">2017.04 · 语音</span><div class=nt>同为Magenta项目：NSynth在音频层面学习音色的隐空间，MusicVAE在符号层面学习旋律的隐空间。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/jukebox.html">Jukebox</a><span class="yr">2020.04 · 语音</span><div class=nt>只生成符号音符，不涉及音色和演奏，最终声音还要靠合成器或真人演奏。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/music-transformer.html">Music Transformer</a><span class="yr">2018.09 · 语音</span><div class=nt>长度固定为最多十几小节，无法生成一首完整歌曲的结构。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/musiclm.html">MusicLM与音乐生成</a><span class="yr">2023.01 · 语音</span><div class=nt>只生成符号音符，不涉及音色和演奏，最终声音还要靠合成器或真人演奏。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/latent-variable.html">隐变量模型</a> <a class="chip c" href="../c/elbo.html">变分推断与ELBO</a> <a class="chip c" href="../c/autoencoder.html">自编码器</a> <a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a></p>
+<h2>本篇术语</h2><ul><li><b>后验坍缩</b>　VAE的解码器太强时，不用隐变量也能把数据重建得很好，于是隐变量里几乎不含信息。</li><li><b>符号音乐</b>　用音符的音高、起止时间、力度等离散事件来表示的音乐，类似乐谱或MIDI，而不是录音波形。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1803.05428" rel="noopener">https://arxiv.org/abs/1803.05428</a>（arXiv官方记录：标题A Hierarchical Latent Vector Model for Learning Long-Term Structure in Music、作者Roberts/Engel/Raffel/Hawthorne/Eck、v1提交2018-03-13；摘要关于循环VAE难建模长程结构、分层解码器先输出子序列嵌入再独立生成子序列、避免后验坍缩、采样/插值/重建优于扁平基线、代码地址。16小节、conductor命名、双向LSTM编码器、Magenta工具为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MusicVAE%EF%BC%88musicvae%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amusicvae%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/musicvae.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="gst.html"><small>本分支上一个 · 2018.03</small><b>GST全局风格token</b></a><a class="r" href="speech-transformer.html"><small>本分支下一个 · 2018.04</small><b>Speech-Transformer</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

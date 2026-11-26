@@ -1,0 +1,32 @@
+{
+  "id": "restormer",
+  "who": "Syed Waqas Zamir, Aditya Arora, Salman Khan, Munawar Hayat, Fahad Shahbaz Khan, Ming-Hsuan Yang · 起源人工智能研究院 / MBZUAI / 莫纳什大学 / 加州大学默塞德分校 等",
+  "venue": "CVPR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2111.09881"},
+    {"label": "代码", "url": "https://github.com/swz30/Restormer"}
+  ],
+  "aka": ["Restormer", "Restoration Transformer", "MDTA", "转置注意力", "transposed attention", "GDFN", "通道维自注意力"],
+  "problem": "Transformer能建模远距离像素关系，但自注意力的计算量随像素数平方增长，用在动辄几百万像素的复原任务上不可行；[[swinir]]只在小窗口内做注意力，又丢掉了全局交互。",
+  "idea": "把自注意力从“像素×像素”改成“通道×通道”：在通道维上计算注意力图，复杂度随分辨率线性增长；前馈层加入门控和深度卷积，再用多尺度U形结构处理高分辨率图像。",
+  "impact": "在去雨、运动去模糊、散焦去模糊和去噪等多项任务上取得当时最好结果，成为高分辨率图像复原的主力Transformer骨干之一，常被后续工作（包括[[nafnet]]）作为对照。",
+  "method": "Restormer的两处关键改动都在Transformer块内部：\n\n- **多Dconv头转置注意力（MDTA）**：普通自注意力对H×W个像素两两计算相似度，得到 `(HW)×(HW)` 的注意力图。MDTA把Q、K的形状转置，计算的是 `C×C` 的通道间“协方差”注意力图，C只有几十到几百，于是代价只随像素数线性增长；注意力隐式地编码了全局上下文。生成Q、K、V之前先用1×1卷积和3×3深度卷积，补上局部信息。\n- **门控Dconv前馈网络（GDFN）**：前馈层分两路，其中一路经过GELU激活后作为门，与另一路逐元素相乘，再配合深度卷积，控制哪些信息往后传。\n\n整体是4级的编码器-解码器（U形）结构，带跳跃连接；训练时采用渐进式学习，先用小图块、后用大图块，使模型能适应测试时的大图。摘要称Restormer在去雨、单图运动去模糊、散焦去模糊（单图与双像素数据）以及图像去噪（高斯灰度/彩色与真实噪声）上取得最好结果。",
+  "legacy": "Restormer成为多任务复原的通用骨干，被大量去雨、去模糊、低照度增强工作直接采用；[[nafnet]]证明在相近结构下去掉大部分非线性和注意力也能达到甚至超过它，复原网络随后转向更简单高效的设计，而扩散模型则在感知质量上开辟了另一条路线。",
+  "limits": [
+    {"text": "每个模型针对一种退化单独训练，面对混合或未知退化需要逐一换模型。", "solved_by": []},
+    {"text": "以PSNR为目标训练，重度退化下结果偏平滑，细节不如生成式方法逼真。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "swinir", "type": "solves", "note": "SwinIR的注意力局限在小窗口内；Restormer用通道维转置注意力在线性代价下获得全局交互。"},
+    {"to": "transformer", "type": "extends", "note": "改造Transformer块的注意力与前馈层，使其适用于高分辨率像素级任务。"},
+    {"to": "unet", "type": "uses", "note": "采用多级U形编码器-解码器与跳跃连接组织Transformer块。"},
+    {"to": "rcan", "type": "rivals", "note": "RCAN等卷积复原网络受限于局部感受野；Restormer用全局通道注意力建模远距离依赖。"}
+  ],
+  "prereq": ["self-attention", "transformer-block", "encoder-decoder", "gating", "efficient-attention"],
+  "terms": [
+    {"t": "转置注意力", "d": "在通道之间而不是像素之间计算注意力，注意力图大小只与通道数有关。"},
+    {"t": "深度卷积", "d": "每个通道单独用自己的卷积核做卷积，不跨通道混合，计算量很小。"}
+  ],
+  "learn": "先读SwinIR了解窗口注意力的局限，再读Restormer第3节MDTA与GDFN；用张量形状推一遍普通注意力与转置注意力在1024×1024图像上的内存差别。",
+  "check": {"source": "https://arxiv.org/abs/2111.09881", "confirmed": "arXiv记录：标题、六位作者、v1提交于2021-11-18；摘要中的Transformer计算量随空间分辨率平方增长不适合高分辨率复原、在多头注意力与前馈网络两个构件上做关键设计以兼顾远距离交互与大图适用、去雨/运动去模糊/散焦去模糊（单图与双像素）/高斯与真实去噪上取得最好结果。MDTA与GDFN具体机制、4级U形结构、渐进式学习、CVPR 2022、机构凭一般了解写。"}
+}

@@ -1,0 +1,27 @@
+{
+  "id": "prime-rewards",
+  "who": "Ganqu Cui, Lifan Yuan, Zefan Wang, Hanbin Wang, Yuchen Zhang, Jiacheng Chen, Wendi Li, Bingxiang He et al. · 上海AI Lab / 清华大学等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2502.01456"},
+    {"label": "GitHub", "url": "https://github.com/PRIME-RL/PRIME"}
+  ],
+  "aka": ["PRIME", "Process Reinforcement through Implicit Rewards", "隐式过程奖励", "implicit PRM", "Eurus-2-7B-PRIME", "稠密奖励RL"],
+  "problem": "推理RL通常只在答案对错上给一个奖励，信号稀疏、难以分辨哪一步有功；过程奖励模型能逐步打分，但逐步标注很贵，固定不变的PRM又容易被策略钻空子。",
+  "idea": "用「隐式PRM」：一个只用答案对错训练的语言模型奖励，其每个词元的对数概率比就是该步的过程奖励；RL过程中用同一批rollout和结果标签在线更新它，再把稠密奖励和结果奖励一起用于估计优势。",
+  "impact": "从Qwen2.5-Math-7B-Base出发，在多个推理基准上比SFT模型平均提高15.1%，Eurus-2-7B-PRIME用Qwen2.5-Math-7B-Instruct十分之一的数据超过了它；是把过程奖励用进在线RL的代表工作。",
+  "method": "**隐式PRM**：奖励模型和参考模型都是语言模型，把整条回答的奖励定义为 `r(y) = β · log[π_φ(y) / π_ref(y)]`，像普通结果奖励模型一样只用答案对错训练。训练好后，每个词元的过程奖励可以直接读出：`r(y_t) = β · log[π_φ(y_t | y_<t) / π_ref(y_t | y_<t)]`，不需要任何逐步标注。\n\n**PRIME的一轮训练**：\n- 策略模型和隐式PRM都从同一个参考模型初始化；\n- 对每个题目采样多条回答，用规则判对错，并过滤掉过易或过难的题；\n- 用这批回答和对错标签**在线更新**隐式PRM，防止策略钻固定奖励模型的空子；\n- 算出每个词元的稠密奖励，与结果奖励一起估计优势，再据此更新策略。\n\n它可以和REINFORCE类、[[ppo]]、[[grpo]]等多种优势估计配合，并发现隐式PRM当作奖励用比当作价值函数用更好。思路上承接[[prm]]、[[math-shepherd]]等过程监督工作，并与同期主要只用结果奖励的[[deepseek-r1]]路线形成对照。",
+  "limits": [
+    {"text": "额外维护并在线训练一个与策略同等规模的奖励模型，显存和算力开销明显高于只用结果奖励的GRPO类方法。", "solved_by": []},
+    {"text": "隐式过程奖励只是对数概率比，未必对应人能理解的「这一步对不对」，其可靠性在长推理链上缺少直接验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "prm", "type": "solves", "note": "不需要逐步人工标注就能得到逐词元的过程奖励，并能在线更新以减轻奖励被钻空子。"},
+    {"to": "math-shepherd", "type": "rivals", "note": "Math-Shepherd靠蒙特卡洛展开自动标注步骤，PRIME靠只用结果标签训练的隐式奖励。"},
+    {"to": "grpo", "type": "extends", "note": "在GRPO/RLOO等结果奖励RL上叠加稠密过程奖励。"},
+    {"to": "dpo", "type": "uses", "note": "隐式奖励的形式 β·log(π/π_ref) 来自DPO对奖励的重参数化。"},
+    {"to": "qwen2.5", "type": "uses", "note": "以Qwen2.5-Math-7B-Base为起点训练。"}
+  ],
+  "prereq": ["policy-gradient-concept", "reward-design", "credit-assignment", "kl-divergence", "reasoning-tokens"],
+  "learn": "先读[[prm]]和[[grpo]] → 读原文第3节隐式PRM与在线更新 → 动手：拿一个DPO训练过的模型和它的参考模型，对一段解题过程逐词元算 log(π/π_ref)，看奖励集中在哪些位置。",
+  "check": {"source": "https://arxiv.org/abs/2502.01456", "confirmed": "标题、作者、v1提交于2025-02-03；摘要中在线更新PRM、只需rollout与结果标签、比SFT模型平均+15.1%、Eurus-2-7B-PRIME以10%数据超过Qwen2.5-Math-7B-Instruct；正文（arxiv.org/html/2502.01456）核对隐式PRM的两个公式、PRIME流程（同一参考模型初始化、按准确率过滤、在线更新、稠密奖励估计优势）、与REINFORCE/PPO/GRPO配合、作为奖励优于作为价值、单位上海AI Lab与清华。"}
+}

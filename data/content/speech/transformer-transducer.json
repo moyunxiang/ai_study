@@ -1,0 +1,32 @@
+{
+  "id": "transformer-transducer",
+  "who": "Qian Zhang, Han Lu, Haşim Sak, Anshuman Tripathi, Erik McDermott, Stephen Koo, Shankar Kumar · Google",
+  "venue": "ICASSP 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2002.02562"}
+  ],
+  "problem": "RNN-T适合流式识别但编码器是LSTM，难以并行训练；Transformer识别模型准确率高，却要看完整句才能输出，不能边听边出字。",
+  "idea": "把RNN-T里的音频编码器和标签编码器都换成Transformer，仍用RNN-T损失训练，并限制自注意力只看有限的左侧（和少量右侧）上下文，从而可以流式解码。",
+  "impact": "证明了自注意力编码器可以放进流式Transducer框架，此后「Transformer/Conformer编码器 + Transducer」成为流式识别的主流组合。",
+  "method": "[[rnn-t]]由三部分组成：音频编码器把声学帧编码成向量，标签编码器（预测网络）把已经输出的字编码成向量，二者经一个前馈「联合网络」结合，对每个「帧位置 × 标签历史」组合输出下一个标签（或空白）的概率。损失对所有可能的对齐路径求和，天然支持逐帧推进的流式解码。原来这两个编码器都是LSTM。\n\nTransformer Transducer把它们都换成[[transformer]]式的自注意力层（见[[c:self-attention]]）。直接用全句注意力就无法流式，于是作者限制每一层注意力只看左边固定数量的帧；由于层层叠加，感受野会随层数增长，计算量对每帧保持有界。再额外允许看少量未来帧，可以在延迟和准确率之间折中。\n\n摘要报告：在LibriSpeech上，限制左侧上下文后解码变得可行，准确率只略有下降；全注意力版本达到当时该基准上的最好准确率；允许看有限个未来帧，可以缩小有限注意力版与全注意力版之间的差距。几个月后的[[conformer]]在编码器里再加入卷积模块，成为同类模型的标准编码器。",
+  "limits": [
+    {"text": "纯自注意力编码器对局部声学细节（如短促的辅音）建模不如卷积，参数效率有限。", "solved_by": ["conformer", "contextnet"]},
+    {"text": "Transducer的联合网络要对「帧数 × 标签数 × 词表」的张量计算损失，训练显存开销很大。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "rnn-t", "type": "extends", "note": "保留RNN-T的损失与三模块结构，把LSTM编码器换成Transformer。"},
+    {"to": "transformer", "type": "uses", "note": "音频和标签两个编码器都使用自注意力Transformer层。"},
+    {"to": "speech-transformer", "type": "solves", "note": "Speech-Transformer这类注意力编码器-解码器要等整句结束才能解码；限定上下文的Transducer可以流式输出。"},
+    {"to": "streaming-rnnt-mobile", "type": "rivals", "note": "同一时期Google的端侧流式识别仍用LSTM编码器的RNN-T；这里用自注意力编码器追求更高准确率。"}
+  ],
+  "prereq": ["self-attention", "transformer-block", "sequence-alignment", "word-error-rate", "end-to-end"],
+  "terms": [
+    {"t": "流式识别", "d": "一边接收音频一边输出文字，不必等用户说完整句。"},
+    {"t": "联合网络", "d": "Transducer中把声学编码与已输出文字的编码合并、预测下一个输出的小网络。"}
+  ],
+  "aka": ["T-T", "Transformer-Transducer", "TT", "Transformer RNN-T"],
+  "check": {
+    "source": "https://arxiv.org/abs/2002.02562",
+    "confirmed": "arXiv官方记录：标题、作者Zhang/Lu/Sak/Tripathi/McDermott/Koo/Kumar、v1提交2020-02-07；摘要关于音频和标签都用Transformer编码、RNN-T损失、LibriSpeech上限制左上下文只略降准确率、全注意力版达到当时最好、看有限未来帧缩小差距。ICASSP 2020为一般了解。"
+  }
+}

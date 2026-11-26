@@ -1,0 +1,31 @@
+{
+  "id": "fmllr",
+  "who": "Mark J. F. Gales · 剑桥大学",
+  "venue": "Computer Speech & Language 1998",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1006/csla.1998.0043"}
+  ],
+  "problem": "MLLR只变换高斯均值，方差不跟着变；而且每个高斯类都要单独做变换，用在说话人自适应训练里计算很重。",
+  "idea": "让均值和方差共用同一个线性变换（约束MLLR），数学上等价于直接对输入特征做一次线性变换，于是自适应可以变成「先变换特征、再用原模型打分」。",
+  "impact": "约束MLLR（CMLLR，常称fMLLR）成了GMM-HMM说话人自适应和自适应训练的标准工具；深度学习初期，fMLLR变换后的特征也是DNN声学模型的常用输入。",
+  "method": "[[mllr]]用仿射变换 `μ' = Aμ + b` 调整高斯均值，方差保持不变。Gales这篇长文系统整理了线性变换自适应的几种形式，其中最常被用到的是**约束**形式：均值和协方差用同一个矩阵变换，`μ' = Aμ + b`，`Σ' = AΣAᵀ`。可以证明这时计算似然等价于把每帧特征 x 变换成 `x' = A⁻¹(x − b)`，再在原模型下打分（另加一个雅可比行列式项）。所以实际系统里直接估一个特征变换 `W`，常写成 `x' = Wx + b`，名字也就叫feature-space MLLR（fMLLR）。\n\n变换用最大似然准则（见[[c:mle]]）按行迭代估计，只需新说话人十几秒到几十秒的语音。因为变换作用在特征上，同一个说话人只需变换一次特征，后面所有高斯都不用改，这使[[sat]]的训练成本大幅下降：每个训练说话人的特征先各自规整，再训练一个规范模型。\n\n后来Kaldi的标准GMM流程里，LDA+MLLT之后接SAT+fMLLR是通用配方；[[dnn-hmm]]刚兴起时，很多系统把fMLLR规整后的特征作为网络输入以获得额外收益。以上与工具包的关系为一般了解。",
+  "limits": [
+    {"text": "整个说话人只用一个（或少数几个）全局线性变换，无法刻画非线性的嗓音差异。", "solved_by": ["i-vector", "x-vector"]},
+    {"text": "需要先有一遍识别结果作为自适应的标注，测试时要解码两遍，不适合低延迟的流式识别。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mllr", "type": "extends", "note": "在MLLR只变换均值的基础上，把均值和方差约束为同一个变换，从而等价于特征空间变换。"},
+    {"to": "sat", "type": "solves", "note": "SAT原本要为每个说话人改模型参数，代价高；fMLLR改为变换特征，让自适应训练便宜得多。"},
+    {"to": "hmm-asr", "type": "uses", "note": "被自适应的对象是GMM-HMM声学模型。"}
+  ],
+  "prereq": ["hmm-concept", "gaussian", "mle", "vector-matrix", "covariance"],
+  "terms": [
+    {"t": "约束MLLR（CMLLR）", "d": "均值和协方差共用同一个线性变换的MLLR，等价于对特征做线性变换。"},
+    {"t": "两遍解码", "d": "先用通用模型识别一遍得到粗略文字，以此估计自适应变换，再用自适应后的模型识别第二遍。"}
+  ],
+  "aka": ["fMLLR", "CMLLR", "constrained MLLR", "约束MLLR", "特征空间MLLR", "feature-space MLLR"],
+  "check": {
+    "source": "https://doi.org/10.1006/csla.1998.0043",
+    "confirmed": "Crossref记录：标题Maximum likelihood linear transformations for HMM-based speech recognition、作者M.J.F. Gales、Computer Speech & Language、1998-04。约束变换的公式、与SAT和Kaldi配方的关系为一般了解，未逐项对照原文。"
+  }
+}

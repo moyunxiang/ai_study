@@ -1,0 +1,28 @@
+{
+  "id": "scnn",
+  "who": "Angshuman Parashar, Minsoo Rhu, Anurag Mukkara, Antonio Puglielli, Rangharajan Venkatesan, Brucek Khailany, Joel Emer, Stephen W. Keckler, William J. Dally · NVIDIA / MIT / 斯坦福等",
+  "venue": "ISCA 2017",
+  "aka": ["SCNN", "Sparse CNN", "稀疏卷积加速器", "零值跳过"],
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1708.04485"}
+  ],
+  "problem": "剪枝后的网络权重里大量是零，ReLU又让激活值大量为零，但稠密加速器照样把这些零乘一遍、存一遍，白白浪费能量和带宽。",
+  "idea": "设计一种新数据流，让权重和激活都以压缩稀疏格式存储和传输，只把两者都非零的组合送进乘法器阵列，乘积再由专门的累加器阵列按地址归位。",
+  "impact": "第一批同时利用权重稀疏和激活稀疏的卷积加速器之一，和[[eie]]一起成为“稀疏加速”方向的标准对照，NVIDIA后来在A100上用更规整的[[sparse-tensor-core]]把稀疏带进产品。",
+  "method": "稀疏来自两处：训练时用[[deep-compression]]一类方法剪枝，会让很多权重变成零；推理时[[relu]]把负数截成零，又让很多激活值为零。两个零之一出现，乘积就是零，这次乘法和相应的读写都可以省掉。难点在于非零元素的位置不规则，硬件很难把它们整齐地喂给乘法器。\n\nSCNN的做法是：权重和激活都保持压缩编码（只存非零值和位置），省掉无用的数据传输和存储；在每个处理单元里，把一小批非零权重和一小批非零激活做“笛卡尔积”式的全组合相乘，这样乘法器阵列始终有活干，数据也被充分复用；乘积对应的输出坐标由索引算出，送进一个分体的累加器阵列相加。摘要报告，在当时的网络上，SCNN相比同等配置的稠密CNN加速器，性能提升2.7倍、能效提升2.3倍。",
+  "limits": [
+    {"text": "非结构化稀疏让控制和累加开销很大，网络稀疏度不够高时收益明显缩水；主要面向卷积层。", "solved_by": ["sparse-tensor-core"]}
+  ],
+  "relations": [
+    {"to": "eie", "type": "extends", "note": "EIE利用全连接层的稀疏权重，SCNN把稀疏加速推广到卷积层，并同时利用权重和激活两种稀疏。"},
+    {"to": "deep-compression", "type": "uses", "note": "权重稀疏来自这类剪枝方法。"},
+    {"to": "relu", "type": "uses", "note": "激活稀疏来自ReLU把负值截成零。"},
+    {"to": "eyeriss", "type": "rivals", "note": "Eyeriss优化稠密卷积的数据复用；SCNN在压缩域里重新设计数据流，代价是更复杂的索引和累加。"}
+  ],
+  "prereq": ["conv-layer", "neuron-activation", "memory-bandwidth"],
+  "learn": "先看[[eie]]理解稀疏全连接层怎样加速，再读本文第3节的数据流图；动手：用一个剪掉一半权重的卷积核和ReLU后的特征图，数一数有多少次乘法真正需要做。",
+  "check": {
+    "source": "https://arxiv.org/abs/1708.04485",
+    "confirmed": "arXiv记录核对标题、9位作者、v1日期2017-05-23与摘要：压缩编码数据流、乘法器阵列与累加器阵列、相对稠密加速器性能2.7倍与能效2.3倍。ISCA 2017与作者单位按一般了解写，未在arXiv页逐项核对。"
+  }
+}

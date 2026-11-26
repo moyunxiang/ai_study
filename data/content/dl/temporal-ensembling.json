@@ -1,0 +1,29 @@
+{
+  "id": "temporal-ensembling",
+  "who": "Samuli Laine, Timo Aila · NVIDIA",
+  "venue": "ICLR 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1610.02242"}
+  ],
+  "aka": ["Temporal Ensembling", "时间集成", "Π-model", "Pi-model", "Π模型", "自集成", "Self-Ensembling", "一致性正则", "Consistency Regularization"],
+  "problem": "[[pseudo-label]]直接拿网络当前这一步的预测当目标，噪声大、容易自我强化错误；[[ladder-networks]]效果好但结构复杂。",
+  "idea": "对同一个无标签样本，在不同的dropout和数据增强下让网络预测两次并要求一致（Π模型）；进一步把每个样本历次epoch的预测做指数滑动平均，用这个“集成预测”当训练目标（时间集成）。",
+  "impact": "Π模型和时间集成把“一致性正则”确立为深度半监督学习的主流框架，直接催生了[[mean-teacher]]，并成为后来UDA、MixMatch、[[fixmatch]]等方法的共同出发点。",
+  "method": "论文提出两个方法。\n\n**Π模型**：每个训练样本在一个小批量里送进网络两次，两次使用不同的随机增强（平移、翻转）和不同的[[dropout]]掩码，得到两个预测z和z̃。损失是有标签样本上的交叉熵，加上所有样本上两次预测之差的平方 `‖z − z̃‖²`，后一项乘以随训练从0逐渐升高的权重 `w(t)`。无标签样本只参与第二项，于是网络被要求在各种扰动下给出稳定的预测。\n\n**时间集成**：Π模型的目标本身也很嘈杂。时间集成为每个训练样本保存一个预测的累积值Z，每个epoch结束后更新 `Z ← αZ + (1−α)z`（α如0.6），再做偏差修正得到目标z̃。由于Z汇集了网络在不同epoch、不同扰动下的输出，它像一个集成模型，比单次预测更可靠。每个样本每个epoch只需前向一次，比Π模型便宜。\n\n摘要报告：在不加增强时，SVHN（500个标签）错误率从18.44%降到7.05%，CIFAR-10（4000个标签）从18.63%降到16.55%；启用标准增强后分别降到5.12%和12.16%。用Tiny Images里的随机图片作额外无标签数据也能明显提升CIFAR-100；方法对错误标签也有较好的容忍度。",
+  "limits": [
+    {"text": "时间集成的目标每个epoch才更新一次，并且要为每个训练样本存一份预测，数据集很大时笨重且目标更新太慢。", "solved_by": ["mean-teacher"]},
+    {"text": "扰动只有简单的平移、翻转和dropout，一致性约束能提供的信息有限。", "solved_by": ["fixmatch"]}
+  ],
+  "relations": [
+    {"to": "ladder-networks", "type": "extends", "note": "Π模型可看作梯形网络中“带噪与不带噪路径输出一致”思想的简化版，去掉了逐层重构结构。"},
+    {"to": "pseudo-label", "type": "solves", "note": "用多次扰动和历次预测的集成代替单次预测作为目标，缓解伪标签目标噪声大的问题。"},
+    {"to": "dropout", "type": "uses", "note": "随机dropout掩码是产生两次不同预测的扰动来源之一。"},
+    {"to": "polyak-averaging", "type": "uses", "note": "对每个样本的预测做指数滑动平均，再做类似Adam的偏差修正。"}
+  ],
+  "prereq": ["semi-supervised", "dropout-concept", "data-augmentation", "ensemble", "loss-function"],
+  "terms": [
+    {"t": "一致性正则", "d": "要求模型对同一样本的不同扰动版本给出相同预测；无标签样本不需要标签也能计算这一项。"}
+  ],
+  "learn": "先懂[[dropout]]和数据增强；读论文第2节的两张算法图；在CIFAR-10上只留4000个标签实现Π模型（同一批数据前向两次加平方差损失），注意 w(t) 的升温曲线对稳定性的影响。",
+  "check": {"source": "https://arxiv.org/abs/1610.02242", "confirmed": "标题、2位作者、arXiv v1提交于2016-10-07；摘要中自集成、用不同epoch与不同正则/增强条件下的输出形成共识预测作为目标、SVHN 500标签18.44%→7.05%、CIFAR-10 4000标签18.63%→16.55%、加增强后5.12%与12.16%、Tiny Images提升CIFAR-100、容忍错误标签。Π模型细节、α取值、机构与ICLR 2017来自一般了解。"}
+}

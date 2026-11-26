@@ -1,0 +1,27 @@
+{
+  "id": "sdxl-lightning",
+  "who": "Shanchuan Lin, Anran Wang, Xiao Yang · 字节跳动",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2402.13929"},
+    {"label": "模型", "url": "https://huggingface.co/ByteDance/SDXL-Lightning"}
+  ],
+  "aka": ["SDXL-Lightning", "Lightning", "渐进式对抗蒸馏", "Progressive Adversarial Diffusion Distillation"],
+  "problem": "把[[sdxl]]压到几步出图时，[[progressive-distillation]]用均方误差逼近教师，步数一少图像就发糊；[[add]]等对抗蒸馏画质锐利，却容易丢失多样性（模式覆盖不足）。",
+  "idea": "把两者结合：仍逐级减少步数做蒸馏，但每一级用对抗损失代替均方误差，判别器建在扩散U-Net的潜空间特征上，并在质量与模式覆盖之间做权衡。",
+  "impact": "论文称在基于SDXL的1024像素一步/少步文生图上取得当时最好效果；开源的1、2、4、8步LoRA和完整UNet权重被社区大量用在ComfyUI等工作流中，是“Lightning”类加速模型的代表。",
+  "method": "**渐进式**：和[[progressive-distillation]]一样，学生每一步要学会教师两步（或多步）的效果，学会后学生变成新的教师，步数再减半，逐级降到很少的步数。\n\n**对抗式**：均方误差要求学生的一步结果精确对上教师多步的结果；但步数很少时学生没有能力精确对齐，均方误差会让它输出各种可能结果的平均，画面就糊了。SDXL-Lightning改用对抗目标：判别器判断“学生走一步得到的潜变量”与“教师走多步得到的潜变量”是否来自同一分布，只要求分布一致而不要求逐点一致，于是画面保持锐利。\n\n判别器直接复用预训练扩散U-Net的编码器部分，在潜空间、并在各个时间步上工作，不需要像[[add]]那样把潜变量解码回像素再用图像网络判别，计算省、也能支持1024像素。论文还讨论了理论分析、如何放松条件以减少模式坍塌，以及修正一步模型的训练细节。最终开源了LoRA和完整UNet两种形式的权重。",
+  "limits": [
+    {"text": "一步和两步版本的画质与提示遵循仍明显不如原始多步模型，且需要为每个底座模型重新蒸馏。", "solved_by": ["dmd2"]}
+  ],
+  "relations": [
+    {"to": "progressive-distillation", "type": "extends", "note": "沿用逐级减半步数的渐进式蒸馏框架。"},
+    {"to": "add", "type": "solves", "note": "在对抗蒸馏的基础上加入渐进式结构并改在潜空间判别，以兼顾画质和模式覆盖、支持1024像素。"},
+    {"to": "sdxl", "type": "uses", "note": "以SDXL为教师和学生的初始化，发布的权重可直接替换SDXL。"}
+  ],
+  "prereq": ["knowledge-distillation", "adversarial-training", "few-step-sampling", "latent-space", "peft-concept"],
+  "terms": [
+    {"t": "模式覆盖", "d": "生成模型的输出能否覆盖真实分布中的各种情形；只追求逼真而忽略覆盖，就会出现同一提示总生成相似图片的问题。"}
+  ],
+  "learn": "先读渐进蒸馏与ADD → 读本文关于均方误差为何发糊的分析和判别器设计 → 在diffusers里加载4步LoRA与原始SDXL 30步对比。",
+  "check": {"source": "https://arxiv.org/abs/2402.13929", "confirmed": "标题、三位作者、v1日期2024-02-21、摘要中结合渐进式与对抗式蒸馏、在质量与模式覆盖间平衡、基于SDXL的1024像素一步/少步文生图新SOTA、讨论理论分析、判别器设计、模型形式与训练技巧、以LoRA和完整UNet开源；Hugging Face模型页确认提供1/2/4/8步检查点（1步为实验性）、从SDXL base 1.0蒸馏、提供ComfyUI用检查点；机构、判别器复用U-Net编码器、具体步数序列、无发表会议信息来自一般了解"}
+}

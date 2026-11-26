@@ -1,0 +1,25 @@
+{
+ "id": "pytorch-ddp",
+ "who": "Shen Li, Yanli Zhao, Rohan Varma, Omkar Salpekar, Pieter Noordhuis, Teng Li, Adam Paszke, Soumith Chintala et al. · Facebook AI",
+ "venue": "VLDB 2020",
+ "aka": ["DDP", "DistributedDataParallel", "PyTorch分布式数据并行", "梯度分桶", "gradient bucketing", "torch.distributed"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2006.15704"},
+  {"label": "PyTorch文档", "url": "https://pytorch.org/docs/stable/notes/ddp.html"}
+ ],
+ "problem": "数据并行的原理很简单（每张卡一份模型、各算各的梯度、再求平均），但要在PyTorch的动态图里高效实现并不容易：梯度何时算好、何时开始通信、怎么让通信藏到计算背后，都牵扯细微的依赖关系。",
+ "idea": "把梯度按反向传播的大致顺序分进若干“桶”，一个桶里的梯度都算好就立刻发起All-Reduce，与剩余的反向计算重叠；再允许在梯度累积时跳过中间几步的同步。",
+ "impact": "这篇论文系统写出了DistributedDataParallel的设计，DDP至今是PyTorch多卡训练最常用的入口，后来的FSDP也建立在同一套通信与钩子机制上。",
+ "method": "[[c:distributed-training]]里最常用的是数据并行：每张卡复制完整模型，处理不同的数据，每步把梯度做All-Reduce取平均，所有副本保持一致。朴素实现是反向全部算完后再逐个参数同步，通信既碎又不能与计算重叠。\n\n论文介绍的DDP（PyTorch v1.5）有三项关键技术。**梯度分桶**：逐个参数做All-Reduce会产生大量小消息，一次同步全部又要等反向全部结束，所以把参数按大致的反向顺序分进固定大小的桶（默认约25MB），一个桶里的梯度齐了就发一次集合通信。**计算与通信重叠**：通过autograd钩子在每个参数梯度就绪时登记，桶满即在后台用[[nccl]]（或Gloo）启动异步All-Reduce，后面层的反向计算继续进行。**跳过同步**：梯度累积时，前几个小批只在本地累加，最后一步才同步，减少通信次数。\n\n论文的评估显示，配置得当时DDP在256块GPU上接近线性扩展。",
+ "limits": [
+  {"text": "每张卡要放下完整的模型参数、梯度和优化器状态，模型一大就装不下；更早的[[zero]]已经提出把这些状态切分到各卡，PyTorch原生的对应实现是后来的FSDP。", "solved_by": ["fsdp"]}
+ ],
+ "relations": [
+  {"to": "pytorch", "type": "extends", "note": "在PyTorch的动态图与autograd之上实现数据并行，靠梯度钩子获知何时可以通信。"},
+  {"to": "horovod", "type": "rivals", "note": "Horovod以外部库形式给TensorFlow/PyTorch加环形All-Reduce；DDP把同样的能力做成PyTorch原生模块，并加入分桶与重叠。"},
+  {"to": "nccl", "type": "uses", "note": "GPU上的All-Reduce默认交给NCCL完成。"},
+  {"to": "ring-allreduce", "type": "uses", "note": "梯度同步沿用环形All-Reduce的通信模式。"}
+ ],
+ "prereq": ["distributed-training", "backpropagation", "sgd-minibatch", "batch-size-epoch"],
+ "check": {"source": "https://arxiv.org/abs/2006.15704", "confirmed": "标题、作者、v1日期2020-06-28；摘要：PyTorch分布式数据并行模块的设计与评估、v1.5原生提供梯度分桶/计算通信重叠/跳过梯度同步、256块GPU接近线性扩展。VLDB 2020、默认桶大小约25MB、通过autograd钩子触发为对正文的一般了解，未逐项对照。"}
+}

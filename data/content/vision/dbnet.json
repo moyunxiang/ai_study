@@ -1,0 +1,30 @@
+{
+  "id": "dbnet",
+  "who": "Minghui Liao, Zhaoyi Wan, Cong Yao, Kai Chen, Xiang Bai · 华中科技大学 / 旷视 / 上海交通大学",
+  "venue": "AAAI 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1911.08947"},
+    {"label": "代码", "url": "https://github.com/MhLiao/DB"}
+  ],
+  "aka": ["DB", "DBNet", "DBNet++", "Differentiable Binarization", "可微二值化", "分割式文字检测"],
+  "problem": "弯曲文字用分割做检测最准，但要把概率图二值化成文字区域，固定阈值的后处理既复杂又不能训练，拖慢速度。",
+  "idea": "让网络在预测文字概率图之外再预测一张阈值图，用一个可求导的近似阶跃函数做二值化，把阈值也交给训练学习。",
+  "impact": "以很轻的骨干就能又快又准地检测任意形状文字，被PaddleOCR等工业OCR系统采用为默认检测器。",
+  "method": "DBNet是一个分割网络：骨干加特征金字塔，输出与图像同尺寸（下采样后）的两张图——概率图P（每个像素属于文字的概率）和阈值图T。普通做法是“P大于固定阈值就算文字”，这个硬阈值不可导。本文改成可微二值化：`B = 1 / (1 + e^(−k(P − T)))`，k取较大值（如50），使它接近阶跃函数又处处可导。这样阈值随位置变化、可以学习，文字边界处的阈值更高，相邻文字更容易被分开。训练时概率图、阈值图和近似二值图三者都有监督；推理时只需概率图配一个简单的框生成步骤，后处理很省。\n\n摘要报告在五个基准上同时取得精度和速度的领先结果；用ResNet-18骨干，在MSRA-TD500上F值82.8、速度62帧每秒。",
+  "limits": [
+    {"text": "只负责找文字区域，识别还要接一个单独的识别模型，两阶段误差会叠加。", "solved_by": ["pp-ocr"]},
+    {"text": "对极小或排得很密的文字，收缩后的文字核可能粘连或丢失。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "east", "type": "rivals", "note": "EAST直接回归四边形，难以处理弯曲文字；DBNet走分割路线，可以检测任意形状。"},
+    {"to": "fpn", "type": "uses", "note": "用特征金字塔融合多尺度特征得到高分辨率概率图。"},
+    {"to": "deformable-conv", "type": "uses", "note": "骨干中加入可变形卷积，以适应长宽比变化大的文字。"},
+    {"to": "fcn", "type": "uses", "note": "本质上是FCN式的逐像素分割网络，把文字检测转成预测文字概率图。"}
+  ],
+  "prereq": ["conv-layer", "vision-tasks", "neuron-activation", "loss-function", "iou-map"],
+  "terms": [
+    {"t": "二值化", "d": "把0到1之间的概率图按阈值变成只有0和1的图，1表示属于文字。"}
+  ],
+  "learn": "先了解语义分割与FPN，再读DBNet第3节的可微二值化公式；用PaddleOCR的DB检测模型跑几张街景照片，查看概率图与阈值图。",
+  "check": {"source": "https://arxiv.org/abs/1911.08947", "confirmed": "arXiv记录：标题、五位作者、v1提交于2019-11-20、摘要中的可微二值化模块、自适应阈值、简化后处理、五个基准、ResNet-18在MSRA-TD500上F值82.8与62 FPS。阈值图公式与k=50、可变形卷积、AAAI 2020、PaddleOCR采用凭一般了解写。"}
+}

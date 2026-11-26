@@ -1,0 +1,27 @@
+{
+  "id": "lru",
+  "who": "Antonio Orvieto, Samuel L. Smith, Albert Gu, Anushan Fernando, Caglar Gulcehre, Razvan Pascanu, Soham De · DeepMind等",
+  "venue": "ICML 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2303.06349"}
+  ],
+  "problem": "[[s4]]、[[s4d]]等深度状态空间模型在长序列任务上远胜传统RNN，但它们的推导依赖连续时间系统和HiPPO理论，说不清性能到底来自哪里；普通RNN则既难优化又不能并行训练。",
+  "idea": "从普通RNN出发，一步步做消融：去掉非线性、把递推矩阵对角化（复数）、用指数参数化控制特征值靠近单位圆、并对输入做归一化，得到线性循环单元LRU。",
+  "impact": "说明深度SSM的优势可以用“线性、对角、合理初始化与归一化”的RNN复现，不必依赖连续时间理论；LRU直接成为Hawk/Griffin中RG-LRU层的基础。",
+  "method": "作者把一个标准的循环网络 `h_t = σ(A h_{t−1} + B x_t)` 当作起点，逐项加入改动，并在Long Range Arena上观察每一步的效果。第一步去掉循环里的非线性σ，让递推变成线性：这样递推可以用并行扫描在序列长度上并行计算，训练速度与SSM相当，而网络的非线性交给层与层之间的MLP。第二步把矩阵A对角化成复数对角矩阵Λ，每个状态分量独立地按 `h_t = λ h_{t−1} + …` 演化。\n\n第三步处理稳定性与长程记忆：把每个λ写成 `exp(−exp(ν) + iθ)` 的形式，保证模长小于1，并在初始化时让模长接近1（衰减很慢），从而能记住很远的信息。第四步加一个归一化系数，防止模长接近1时隐藏状态被输入不断累加而爆掉。依据的是标准的信号传播分析，而不是连续时间系统的离散化。\n\n摘要报告：这样设计的深度RNN，在长程推理任务上恢复了深度SSM的出色表现，训练速度也与之相当；最终的LRU模块在Long Range Arena上的表现和计算效率都与SSM相当。",
+  "limits": [
+    {"text": "LRU的递推仍与输入无关（线性时不变），不能按内容选择性地记忆或遗忘。", "solved_by": ["griffin", "mamba"]}
+  ],
+  "relations": [
+    {"to": "s4", "type": "rivals", "note": "从RNN而不是连续时间系统出发，追平了S4在长序列基准上的表现，并解释其性能来源。"},
+    {"to": "s4d", "type": "extends", "note": "同样使用对角复数状态矩阵，但改用指数参数化和归一化，不依赖HiPPO初始化。"},
+    {"to": "rnn-elman", "type": "extends", "note": "以普通循环网络为起点，通过去掉非线性和重新参数化让它重新可用于长序列。"},
+    {"to": "vanishing-gradient", "type": "solves", "note": "通过把特征值模长初始化在接近1并加归一化，缓解长序列上的梯度消失与爆炸。"}
+  ],
+  "prereq": ["recurrent-layer", "state-space-model", "eigen-svd", "vanishing-exploding", "normalization-layer"],
+  "terms": [
+    {"t": "并行扫描", "d": "一种并行算法，可以在对数级的步数内算出线性递推在每个时刻的结果，让循环网络也能在序列维度上并行训练。"}
+  ],
+  "learn": "先读[[s4d]]，再读本文第3节逐步消融的表格；用JAX或PyTorch写一个对角复数LRU层，用并行扫描实现，并与逐步循环的结果对照。",
+  "check": {"source": "https://arxiv.org/abs/2303.06349", "confirmed": "标题、7位作者、arXiv v1提交于2023-03-11；摘要中RNN难优化与慢、深度SSM的优势、基于信号传播的设计、线性化与对角化递推、更好的参数化与初始化、前向归一化、LRU在LRA上匹配SSM的表现与效率。指数参数化的具体形式、ICML 2023与机构来自一般了解。"}
+}

@@ -1,0 +1,25 @@
+{
+ "id": "spinquant",
+ "who": "Zechun Liu, Changsheng Zhao, Igor Fedorov, Bilge Soran, Dhruv Choudhary, Raghuraman Krishnamoorthi, Vikas Chandra, Yuandong Tian, Tijmen Blankevoort · Meta",
+ "venue": "ICLR 2025",
+ "aka": ["学习旋转矩阵", "learned rotation", "旋转量化", "rotation quantization", "Cayley优化"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2405.16406"},
+  {"label": "GitHub", "url": "https://github.com/facebookresearch/SpinQuant"}
+ ],
+ "problem": "QuaRot用随机正交旋转把激活离群值摊平，使4比特权重-激活-KV量化可行；但作者发现不同的随机旋转效果差异很大，零样本推理任务上最多相差13分。",
+ "idea": "既然旋转的选择很重要，就别随机取：在少量校准数据上直接优化旋转矩阵，让它在保持正交（全精度输出不变）的约束下最小化量化后的损失。",
+ "impact": "让4比特权重、激活和KV缓存同时量化的精度差距进一步缩小，与QuaRot一起成为“旋转后量化”路线的代表，Meta在端侧部署的量化Llama中使用了这一方法。",
+ "method": "Transformer里在相邻两个线性层之间插入一个正交矩阵R及其逆 `R⁻¹ = Rᵀ`，全精度输出完全不变，但激活被“转”了一下，原来集中在少数通道的大值被分散到所有通道，量化误差随之下降。[[quarot]]用随机Hadamard矩阵做这件事。\n\nSpinQuant先归纳出一组在全精度下输出等价的旋转插入位置（残差流上的、注意力内部的等），然后把其中可合并进权重的旋转当作可学习参数，在校准数据上以量化网络的损失为目标优化。正交约束用**Cayley SGD**保持：每步更新后矩阵仍在正交矩阵流形上。学完后旋转被合并进权重，推理时不增加额外开销；少数无法合并的位置仍用在线Hadamard变换。\n\n摘要报告：权重、激活、KV缓存都量化到4比特时，LLaMA-2 7B在零样本推理任务上与全精度只差2.9分，比LLM-QAT高19.1分、比SmoothQuant高25.0分；在较难量化的LLaMA-3 8B上，与全精度的差距相对QuaRot缩小最多45.1%。",
+ "limits": [
+  {"text": "需要为每个模型单独优化旋转，校准成本高于纯随机旋转；4比特以下的权重-激活联合量化仍有较大精度损失。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "quarot", "type": "extends", "note": "QuaRot使用随机Hadamard旋转，SpinQuant发现随机旋转之间差异巨大，改为学习旋转矩阵。"},
+  {"to": "smoothquant", "type": "solves", "note": "SmoothQuant的逐通道缩放在W4A4下损失过大，SpinQuant用学到的旋转在4比特设置下把差距从25分以上缩到2.9分。"},
+  {"to": "omniquant", "type": "rivals", "note": "OmniQuant学习逐通道的缩放与平移，SpinQuant学习整个正交旋转，两者都是用少量数据学习等价变换。"},
+  {"to": "llama-3", "type": "uses", "note": "在LLaMA-2和更难量化的LLaMA-3 8B上评估。"}
+ ],
+ "prereq": ["quantization-concept", "vector-matrix", "eigen-svd", "kv-cache"],
+ "check": {"source": "https://arxiv.org/abs/2405.16406", "confirmed": "标题、九位作者、v1日期2024-05-26；摘要：旋转可消除离群值、多种全精度等价的旋转参数化、随机旋转之间零样本推理最多差13分、学习旋转矩阵、W4A4KV4下LLaMA-2 7B差距2.9分、超LLM-QAT 19.1分与SmoothQuant 25.0分、LLaMA-3 8B上相对QuaRot缩小差距最多45.1%。Cayley SGD、ICLR 2025、Meta端侧量化Llama采用为一般了解。"}
+}

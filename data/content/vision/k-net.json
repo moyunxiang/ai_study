@@ -1,0 +1,32 @@
+{
+  "id": "k-net",
+  "who": "Wenwei Zhang, Jiangmiao Pang, Kai Chen, Chen Change Loy · 南洋理工大学 / 上海人工智能实验室 / 商汤",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2106.14855"},
+    {"label": "代码", "url": "https://github.com/ZwwWayne/K-Net"}
+  ],
+  "aka": ["K-Net", "Kernel Network", "可学习核分割", "统一分割", "unified segmentation", "kernel update"],
+  "problem": "语义、实例、全景分割本质相近，却各用一套专门框架：语义分割靠逐像素分类，实例分割靠检测框或[[solo]]式的位置网格，全景分割再把两者拼起来。",
+  "idea": "用一组可学习的卷积核统一三种任务：每个核负责生成一张掩码（一个实例或一类“背景物”），并让核根据它当前分到的像素反复更新自己，用二分匹配端到端训练。",
+  "impact": "与同期的[[maskformer]]一起确立了“一组核或查询各出一张掩码”的统一分割范式，训练和推理都不需要框和NMS。",
+  "method": "思路从语义分割说起：语义分割的最后一层其实就是C个1×1卷积核，每个核和特征图做内积得到一类的掩码。K-Net把这个想法推广——准备N个可学习的核，每个核和特征图卷积得到一张掩码；有的核负责“东西”（可数的实例），有的负责“背景物”（天空、道路这类不可数的区域）。\n\n难点在于实例：一开始的静态核分不清同类的两个人。K-Net提出**核更新**：先用当前核得到一张粗掩码，用掩码把属于它的像素特征汇聚起来，再用这些特征通过门控方式更新核本身，核与核之间还做一次注意力交互；重复几轮，核就变得“动态”，专门对应图中具体的某个实例。训练时像[[detr]]那样用二分匹配把N个预测掩码和真值一一配对，所以天然不需要检测框和NMS。\n\n摘要报告：在COCO test-dev全景分割上取得55.2% PQ，在ADE20K验证集语义分割上取得54.3% mIoU，超过当时公开的单模型结果；实例分割精度与Cascade Mask R-CNN相当，推理快60%–90%。",
+  "legacy": "几个月后的[[mask2former]]用带掩码注意力的Transformer解码器把同一范式做得更强，此后通用分割模型（包括[[oneformer]]）大多沿用“查询/核→掩码＋二分匹配”的形式。",
+  "limits": [
+    {"text": "三种任务虽然共用一个框架，但仍要分别训练三个模型才能各自达到最好效果。", "solved_by": []},
+    {"text": "核更新只在少数几轮内进行，交互能力有限，此后被更强的掩码注意力解码器超越。", "solved_by": ["mask2former"]}
+  ],
+  "relations": [
+    {"to": "solo", "type": "extends", "note": "SOLOv2用动态卷积核生成实例掩码；K-Net把可学习核推广到语义和全景分割，并用核更新代替位置网格。"},
+    {"to": "detr", "type": "uses", "note": "沿用DETR的二分匹配损失，使训练与推理都不需要框和NMS。"},
+    {"to": "panoptic-fpn", "type": "rivals", "note": "Panoptic FPN用实例和语义两个分支拼出全景结果；K-Net用同一组核同时处理两类区域。"},
+    {"to": "panoptic-segmentation", "type": "solves", "note": "为全景分割任务给出一个不需要分别建模“东西”和“背景物”的统一解法。"}
+  ],
+  "prereq": ["vision-tasks", "conv-layer", "attention-concept", "gating", "iou-map"],
+  "terms": [
+    {"t": "核更新", "d": "用当前掩码汇聚它覆盖的像素特征，再据此修改卷积核，使核越来越对应图中某个具体物体。"},
+    {"t": "二分匹配", "d": "把N个预测和若干真值按代价最小做一对一配对（匈牙利算法），每个真值只被一个预测负责。"}
+  ],
+  "learn": "先理解语义分割最后一层就是一组1×1卷积核，再读K-Net第3节核更新的三步；与MaskFormer、Mask2Former对照，比较“核”与“查询”的异同。",
+  "check": {"source": "https://arxiv.org/abs/2106.14855", "confirmed": "arXiv记录：标题、四位作者、v1提交于2021-06-28；摘要中的可学习核统一三种分割、核更新使核动态且依赖其分组、二分匹配端到端训练、无NMS无框、COCO test-dev全景55.2% PQ、ADE20K val 54.3% mIoU、实例分割与Cascade Mask R-CNN相当且快60%–90%。核更新的门控与核间注意力细节、NeurIPS 2021、机构凭一般了解写。"}
+}

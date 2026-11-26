@@ -1,0 +1,30 @@
+{
+  "id": "radam",
+  "who": "Liyuan Liu, Haoming Jiang, Pengcheng He, Weizhu Chen, Xiaodong Liu, Jianfeng Gao, Jiawei Han · UIUC、微软等",
+  "venue": "ICLR 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1908.03265"},
+    {"label": "官方代码", "url": "https://github.com/LiyuanLucasLiu/RAdam"}
+  ],
+  "aka": ["RAdam", "Rectified Adam", "修正Adam", "Adam方差修正"],
+  "problem": "用[[adam]]训练Transformer等模型时，不加学习率预热（warmup）常常一开始就训崩，但没人说得清预热到底在修什么。",
+  "idea": "指出训练初期梯度二阶矩只用少量样本估计，自适应学习率的方差过大；给自适应项乘一个随步数变化的修正系数，方差太大时直接退化成带动量的SGD。",
+  "impact": "给“为什么需要warmup”提供了一个被广泛引用的解释，RAdam也成了一段时间里常被比较的Adam变体；后续不少工作对这一解释提出了补充和不同看法。",
+  "method": "Adam用梯度平方的指数滑动平均 `v_t` 估计每个参数的梯度尺度，再用 `1/√v_t` 缩放步长。作者的观察是：训练刚开始时 `v_t` 只由很少几步的梯度平方构成，这个估计本身方差很大，于是 `1/√v_t` 这个自适应学习率时大时小，可能一步把参数推到很差的区域。学习率预热（前若干步用很小的学习率，参见[[large-batch-sgd]]和[[transformer]]的训练配方）在作者看来正是一种降方差手段：在估计还不可靠时少走几步。\n\nRAdam把这个直觉写成公式。它把滑动平均近似看成有效样本数为 `ρ_t` 的样本均值（`ρ_t` 随步数增长，最大值 `ρ_∞ = 2/(1−β₂) − 1`），据此推出自适应学习率方差的近似值，再定义修正系数 `r_t`，使修正后的方差保持稳定。当 `ρ_t` 还很小（论文中取不超过4）时方差不可控，就干脆不用自适应项，只做带动量的SGD更新；之后用 `r_t` 乘以Adam的自适应步长。这样不需要手动设定预热步数。\n\n摘要报告：在图像分类、语言建模和神经机器翻译上的实验支持方差假设，并显示RAdam效果好、对超参数较稳健。之后的工作也讨论了预热的其他作用（例如应对训练初期的尖锐曲率），所以“预热只是降方差”并不是定论。",
+  "limits": [
+    {"text": "只解释并替代了预热中与二阶矩估计方差有关的那部分；大模型训练里预热还在应对初期的尖锐曲率和不稳定，实践中多数大模型仍保留显式预热。", "solved_by": []},
+    {"text": "除了训练早期外，RAdam与Adam几乎一样，对Adam后期收敛与泛化的问题没有改变。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "adam", "type": "solves", "note": "修正Adam训练初期自适应学习率方差过大、需要人工预热的问题。"},
+    {"to": "large-batch-sgd", "type": "extends", "note": "为该文推广的学习率预热给出机制解释，并尝试用自动修正代替手动预热。"},
+    {"to": "transformer", "type": "solves", "note": "Transformer训练依赖预热，RAdam在机器翻译等任务上检验了去掉预热的可行性。"},
+    {"to": "momentum", "type": "uses", "note": "方差无法控制的最初几步退化为带动量的SGD更新。"}
+  ],
+  "prereq": ["adaptive-optimizer", "learning-rate", "momentum", "expectation-variance"],
+  "terms": [
+    {"t": "学习率预热", "d": "训练最初的若干步把学习率从很小的值逐渐升到目标值，避免一开始步子太大把训练搞崩。"}
+  ],
+  "learn": "先弄懂[[adam]]里一阶矩、二阶矩和偏差修正的作用；读论文第3节关于自适应学习率方差的推导；动手在一个小Transformer上比较Adam不加预热、Adam加预热和RAdam的前几百步损失曲线。",
+  "check": {"source": "https://arxiv.org/abs/1908.03265", "confirmed": "标题、7位作者、arXiv v1提交于2019-08-08；摘要中预热作为降方差手段的假设、训练早期自适应学习率方差过大、RAdam引入方差修正项、图像分类/语言建模/机器翻译实验。ρ_t阈值4、ICLR 2020与机构来自一般了解。"}
+}
