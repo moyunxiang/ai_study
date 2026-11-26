@@ -214,14 +214,15 @@ function initChrome() {
   mb.onclick = e => { e.stopPropagation(); menu.hidden = !menu.hidden; mb.setAttribute('aria-expanded', String(!menu.hidden)); };
   document.addEventListener('click', e => { if (!e.target.closest('#more')) closeMenus(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
-  const themeBtn = $('#theme');
+  const themeBtn = $('#theme'), sysLight = matchMedia('(prefers-color-scheme: light)');
+  const isLight = t => t === 'light' || (t === 'auto' && sysLight.matches);      // 以前有“跟随系统”这一档，记着它的浏览器照旧生效，点一下按钮就变成明确的深色或浅色
   const applyTheme = t => {
     if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
-    themeBtn.textContent = '外观：' + ({light: '浅色', auto: '跟随系统'}[t] || '深色');
+    const tip = '外观：' + (isLight(t) ? '浅色' : '深色') + '（点一下换成' + (isLight(t) ? '深色' : '浅色') + '）'; themeBtn.title = tip; themeBtn.setAttribute('aria-label', tip);
     const m = $('meta[name=theme-color]'); if (m) m.content = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim() || '#111213';
   };
   applyTheme(store.get('theme', ''));
-  themeBtn.onclick = e => { e.stopPropagation(); const t = {light: 'auto', auto: ''}[store.get('theme', '')] ?? 'light'; store.set('theme', t); applyTheme(t); };      // 深色（默认）→ 浅色 → 跟随系统
+  themeBtn.onclick = () => { closeMenus(); const t = isLight(store.get('theme', '')) ? '' : 'light'; store.set('theme', t); applyTheme(t); };      // 深色（默认）⇄ 浅色
 }
 
 /* ——— 首页 ——— */
