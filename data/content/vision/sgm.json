@@ -1,0 +1,30 @@
+{
+  "id": "sgm",
+  "who": "Heiko Hirschmüller · 德国航空航天中心（DLR）",
+  "venue": "CVPR 2005",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1109/CVPR.2005.56"},
+    {"label": "维基百科", "url": "https://en.wikipedia.org/wiki/Semi-global_matching"}
+  ],
+  "aka": ["SGM", "半全局匹配", "Semi-Global Matching", "SGBM", "双目立体匹配", "stereo matching", "视差图", "disparity map"],
+  "problem": "双目立体匹配要为每个像素找到另一张图中的对应点（视差）：逐像素或窗口匹配快但错误多；[[graph-cuts]]、置信传播等全局优化精度高，却太慢，难以实时或处理大图。",
+  "idea": "把二维的全局平滑能量近似成沿多个方向（8或16个）的一维动态规划之和：每条路径上用动态规划累积匹配代价并惩罚视差跳变，再把各方向的结果相加取最小，用互信息作为对光照变化鲁棒的匹配代价。",
+  "impact": "以接近全局方法的精度和可预测的运行时间成为工业界最常用的立体匹配算法，广泛用于机器人、辅助驾驶和航测，并被做进FPGA与ASIC；OpenCV中的StereoSGBM即其变体。",
+  "method": "对校正后的双目图像，左图像素p取视差d，意味着它对应右图同一行、向左偏移d个像素的位置。SGM的能量为 `E(D) = Σ_p C(p, D_p) + Σ_{q∈N_p} P1·[|D_p − D_q| = 1] + Σ_{q∈N_p} P2·[|D_p − D_q| > 1]`：第一项是匹配代价，第二、三项分别对相邻像素视差差1和差更多施加小惩罚P1和大惩罚P2——小的变化允许斜面，大的跳变只在物体边缘出现。\n\n在整张二维图上精确最小化这个能量是NP难的。SGM沿r方向的路径递推：`L_r(p, d) = C(p, d) + min(L_r(p−r, d), L_r(p−r, d±1)+P1, min_k L_r(p−r, k)+P2) − min_k L_r(p−r, k)`，然后把8或16个方向的L_r相加得到 `S(p, d)`，每个像素取使S最小的d。每个方向上都是一维动态规划，计算量与像素数×视差数成正比，且非常规则，适合并行硬件。\n\n匹配代价方面，论文用分层计算的互信息，能容忍两台相机之间的曝光和响应差异；之后再做左右一致性检查剔除遮挡和错误匹配，并做亚像素插值。论文在[[middlebury]]立体评测上验证了效果。",
+  "limits": [
+    {"text": "只沿少数直线方向近似全局平滑，在大片无纹理、反光和重复纹理区域仍会出错，并产生条纹状伪影。", "solved_by": []},
+    {"text": "需要预先校正的双目相机，且视差搜索范围要事先给定。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "graph-cuts", "type": "rivals", "note": "图割等全局优化精度高但慢；SGM用多方向一维动态规划近似全局能量，换来可预测的线性时间。"},
+    {"to": "middlebury", "type": "uses", "note": "在Middlebury立体评测上报告精度与排名。"},
+    {"to": "bellman", "type": "uses", "note": "每个方向上的代价聚合是标准的动态规划递推。"}
+  ],
+  "prereq": ["camera-geometry", "dynamic-programming", "mutual-information", "image-tensor"],
+  "terms": [
+    {"t": "视差", "d": "同一个三维点在左右两张图中的水平位置之差；视差越大，点离相机越近，深度 = 基线×焦距/视差。"},
+    {"t": "代价聚合", "d": "把单个像素的匹配代价与周围像素的代价按某种规则合并，以减少噪声导致的误匹配。"}
+  ],
+  "learn": "先复习动态规划和双目视差与深度的关系，再读论文第2、3节聚合公式；用OpenCV的StereoSGBM在KITTI或Middlebury的一对图像上计算视差图，调P1、P2观察平滑程度变化。",
+  "check": {"source": "https://doi.org/10.1109/CVPR.2005.56", "confirmed": "Crossref记录：标题Accurate and Efficient Stereo Processing by Semi-Global Matching and Mutual Information、作者H. Hirschmüller、CVPR 2005会议论文；维基百科条目：2005年由Hirschmüller在德国航空航天中心提出、用于从校正双目图像估计稠密视差、运行时间可预测、适合ASIC/FPGA并行实现、在机器人和辅助驾驶中广泛采用、加入惩罚视差跳变的正则项。聚合公式、P1/P2、8或16方向、分层互信息、左右一致性、Middlebury评测、OpenCV StereoSGBM凭一般了解写。"}
+}

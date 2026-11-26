@@ -1,0 +1,28 @@
+{
+  "id": "auto-cot",
+  "who": "Zhuosheng Zhang, Aston Zhang, Mu Li, Alex Smola · 上海交通大学 / 亚马逊",
+  "venue": "ICLR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2210.03493"},
+    {"label": "GitHub", "url": "https://github.com/amazon-research/auto-cot"}
+  ],
+  "aka": ["Auto-CoT", "自动思维链", "Automatic Chain-of-Thought", "自动构造示例", "多样性示例选择", "Retrieval-Q-CoT"],
+  "problem": "少样本思维链效果好，但每个任务都要人手写几道带完整推理过程的示例；零样本的「Let's think step by step」不用写示例，效果又差一截。",
+  "idea": "让模型用零样本思维链自己给示例题写推理过程；为了不让错误示例扎堆，先把问题聚类，每个簇只挑一道靠近中心、长度适中的题。",
+  "impact": "在GPT-3的十个推理基准上与人工写示例的思维链持平或更好，说明示例的多样性比与测试题相似更重要；是自动构造提示示例这条路上常被引用的方法。",
+  "method": "最直接的自动化办法是：对每道测试题，检索最相似的8道题，让模型用[[zero-shot-cot]]写出推理当示例。作者发现这样反而比随机挑题更差（MultiArith上82.8%对86.2%）。原因是零样本思维链本身会出错，而错误往往集中在某类相似的题上——检索相似题会把同一类错误一起带进提示，模型照着错，作者称之为「被相似性误导」。\n\nAuto-CoT分两步：\n- **问题聚类**：用[[sentence-bert]]把所有题目编码成向量，用[[k-means]]分成k簇（k等于示例数，默认8）。\n- **示例采样**：每个簇里按到中心的距离从近到远试，用零样本思维链生成推理，取第一道满足简单规则的题：问题不超过60个词元、推理不超过5步、算术题的答案要出现在推理里。\n\n这样8个示例来自8类不同的题，即使个别示例推理有错，也不会全是同一种错。在text-davinci-002上，十个算术、常识和符号推理基准的结果与人工写示例的[[cot]]持平或更好。",
+  "limits": [
+    {"text": "生成的示例推理本身可能有错，方法只是靠多样性稀释错误，没有核对示例是否正确。", "solved_by": []},
+    {"text": "需要事先拿到一批同任务的题目来聚类，单独一道新题无法直接使用。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "cot", "type": "solves", "note": "免去为每个任务手写思维链示例的人工。"},
+    {"to": "zero-shot-cot", "type": "uses", "note": "用「Let's think step by step」自动生成示例的推理过程。"},
+    {"to": "sentence-bert", "type": "uses", "note": "把问题编码成向量以便聚类。"},
+    {"to": "k-means", "type": "uses", "note": "把问题分簇，保证示例来自不同类型。"},
+    {"to": "complexity-cot", "type": "rivals", "note": "同期研究「挑哪些示例」：复杂度提示选推理步数多的，Auto-CoT选彼此不同类的。"}
+  ],
+  "prereq": ["in-context-learning", "zero-few-shot", "clustering", "embedding"],
+  "learn": "先读[[cot]]和[[zero-shot-cot]] → 读原文第3节「被相似性误导」的分析和第4节方法 → 动手：对GSM8K前200题做句向量聚类，每簇挑一道生成示例，与随机示例对比准确率。",
+  "check": {"source": "https://arxiv.org/abs/2210.03493", "confirmed": "标题、作者、v1提交于2022-10-07；摘要中两种范式、多样性、十个基准与人工CoT持平或更好；正文（arxiv.org/html/2210.03493）核对Sentence-BERT与k-means、默认8簇、60词元与5步规则、text-davinci-002、Retrieval-Q-CoT 82.8%对Random-Q-CoT 86.2%。venue与单位凭一般了解。"}
+}

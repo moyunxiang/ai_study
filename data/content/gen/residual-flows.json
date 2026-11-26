@@ -1,0 +1,30 @@
+{
+  "id": "residual-flows",
+  "who": "Ricky T. Q. Chen, Jens Behrmann, David Duvenaud, Jörn-Henrik Jacobsen · 多伦多大学 / Vector研究所 / 不来梅大学",
+  "venue": "NeurIPS 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1906.02735"}
+  ],
+  "aka": ["Residual Flows", "残差流", "可逆残差网络", "i-ResNet", "Russian roulette估计"],
+  "problem": "耦合层式的流（[[realnvp]]、[[glow]]）为了可逆要把网络结构切成两半，限制了表达力；可逆残差网络只需约束Lipschitz常数即可逆，但此前用它估计对数密度时有偏，网络越强偏差越大。",
+  "idea": "用“俄罗斯轮盘”随机截断给出对数行列式级数的无偏估计，再用另一条无穷级数算梯度以节省显存，并换用不饱和的激活函数和更一般的Lipschitz约束。",
+  "impact": "让普通残差网络形态的可逆模型可以被无偏地按最大似然训练，在流模型中取得当时最好的密度估计，并展示了同一网络兼做生成和分类的能力。",
+  "method": "残差块`y = x + g(x)`在g的Lipschitz常数小于1时一定可逆（逆变换可以用不动点迭代`x ← y − g(x)`求出），所以只要对每层做[[spectral-norm]]式的约束，就能把常见的[[resnet]]变成标准化流，而不必像耦合层那样只变换一半维度。\n\n难点在似然：变量替换公式要算`log|det(I + J_g)|`，它可以展开成迹的幂级数`Σ_k (−1)^{k+1} tr(J_g^k)/k`。此前的可逆残差网络把级数截断到固定项数，估计有偏。Residual Flows用**俄罗斯轮盘估计**：随机决定算到第几项，并按“算到这一项的概率”给每项加权，期望恰好等于无穷级数，于是得到无偏估计；迹本身用Hutchinson随机向量估计。为了不把每一项的计算图都存下来，梯度改用另一条可逐项求、无需保存中间结果的级数。\n\n此外，常用的ELU等激活函数导数会饱和，作者提出LipSwish激活，并把Lipschitz约束推广到混合范数。论文报告在流模型中取得当时最好的密度估计，并在同时做生成和分类的设置下优于基于耦合层的网络。",
+  "limits": [
+    {"text": "采样要对每一层做不动点迭代，训练时还要随机展开多项级数，速度和显存开销都明显高于耦合层流。", "solved_by": []},
+    {"text": "和其他精确似然模型一样，样本质量不及同期GAN，后来图像生成的主流转向扩散模型。", "solved_by": ["ddpm"]}
+  ],
+  "relations": [
+    {"to": "resnet", "type": "uses", "note": "可逆性来自对残差分支加Lipschitz约束，网络形态就是普通残差网络。"},
+    {"to": "glow", "type": "rivals", "note": "不用耦合层切分维度，用无约束结构的残差块做可逆变换，在密度估计上超过耦合层流。"},
+    {"to": "ffjord", "type": "rivals", "note": "同样用随机迹估计处理雅可比，但FFJORD走连续时间ODE，残差流是离散层的级数展开。"},
+    {"to": "spectral-norm", "type": "uses", "note": "用谱归一化类方法把每层的Lipschitz常数压到1以下以保证可逆。"}
+  ],
+  "prereq": ["normalizing-flow", "jacobian-hessian", "residual-connection", "monte-carlo", "mle"],
+  "terms": [
+    {"t": "俄罗斯轮盘估计", "d": "对无穷级数随机决定在第几项停下，并把每项除以“走到这一项”的概率，使估计值的期望正好等于整个级数，从而无偏。"},
+    {"t": "Lipschitz常数", "d": "函数输出变化与输入变化之比的上界；小于1意味着这个映射是压缩的，残差块因此可逆。"}
+  ],
+  "learn": "先复习变量替换公式和对数行列式 → 读本文第3节无偏估计和梯度级数 → 对比FFJORD的Hutchinson迹估计。",
+  "check": {"source": "https://arxiv.org/abs/1906.02735", "confirmed": "标题、四位作者、v1日期2019-06-06、摘要中可逆残差网络只需Lipschitz条件、此前估计有偏且随表达力增加、俄罗斯轮盘无偏估计、替代级数降低梯度显存、避免导数饱和的激活与混合范数Lipschitz约束、流模型中最好的密度估计、联合生成判别建模优于耦合块；机构、NeurIPS 2019、LipSwish名称、不动点求逆与Hutchinson估计来自一般了解"}
+}

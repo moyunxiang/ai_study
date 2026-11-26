@@ -1,0 +1,32 @@
+{
+  "id": "unity",
+  "who": "Hirofumi Inaguma, Sravya Popuri, Ilia Kulikov, Peng-Jen Chen, Changhan Wang, Yu-An Chung, Yun Tang, Ann Lee, Shinji Watanabe, Juan Pino · Meta AI、卡内基梅隆大学",
+  "venue": "ACL 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2212.08055"}
+  ],
+  "problem": "单段式的语音到离散单元翻译（S2UT）让一个解码器直接输出语音单元，既要翻译又要管发音，质量不够好；而且没法利用大量纯文本数据。",
+  "idea": "两段式解码：第一段解码器先生成目标语言的文本（子词），第二段再根据第一段的隐藏状态生成离散语音单元；第一段文本解码器还可以用大量文本做去噪预训练。",
+  "impact": "UnitY比单段S2UT高2.5–4.2 ASR-BLEU、解码快2.83倍，它的两段式结构随后成为Meta SeamlessM4T系列语音到语音翻译的核心架构。",
+  "method": "[[s2ut]]先用自监督模型（如[[hubert]]）把目标语音离散化成单元序列，再训练一个模型把源语音直接翻译成这些单元，最后用单元声码器合成语音（见[[c:vector-quantization]]）。这比生成频谱简单，但单个解码器同时负责「翻译」和「发音」。[[translatotron-2]]已经表明，先预测语言层面的中间表示能显著提升直接翻译的质量。\n\nUnitY的结构：语音编码器编码源语音；**第一段解码器**以子词为单位生成目标文本，作者发现用子词比用字符或音素效果更好；一个小的文本到单元编码器读取第一段解码器的隐藏状态；**第二段解码器**据此生成离散语音单元，再交给单元声码器出波形（见[[c:encoder-decoder]]）。两段都在一个模型里联合训练，搜索时也设计了两段式的束搜索策略，并配合更好的正则化。为了利用纯文本，第一段文本解码器先用多语言去噪自编码任务预训练（类似[[mbart]]）。\n\n摘要报告：在多种数据规模的基准上，UnitY比单段的语音到单元翻译模型高2.5–4.2 ASR-BLEU，解码速度快2.83倍；即使第二段改为预测频谱，这些改进依然有效，但预测离散单元比预测频谱解码快2.51倍。",
+  "limits": [
+    {"text": "两段式解码仍需先生成整段文本，再生成语音，不能边听边译。", "solved_by": ["seamless", "hibiki"]},
+    {"text": "离散单元丢掉了源说话人的音色和情感，翻译出的语音不像原说话人。", "solved_by": ["seamless"]}
+  ],
+  "relations": [
+    {"to": "s2ut", "type": "solves", "note": "单段S2UT一个解码器既翻译又发音；UnitY先出文本再出单元，ASR-BLEU提高2.5–4.2。"},
+    {"to": "translatotron-2", "type": "extends", "note": "同样采用「先语言中间表示、再语音」的两段式思路，但第二段输出离散单元而不是频谱。"},
+    {"to": "mbart", "type": "uses", "note": "第一段文本解码器用多语言去噪自编码任务预训练，以利用纯文本数据。"},
+    {"to": "hubert", "type": "uses", "note": "目标语音的离散单元来自HuBERT类自监督模型的聚类。"}
+  ],
+  "prereq": ["encoder-decoder", "vector-quantization", "text-metrics", "pretrain-finetune", "decoding-sampling"],
+  "terms": [
+    {"t": "离散语音单元", "d": "对自监督语音特征做聚类得到的编号序列，像「伪音素」一样表示语音内容。"},
+    {"t": "ASR-BLEU", "d": "先用语音识别把译出的语音转成文字，再与参考译文计算BLEU，用来评测语音到语音翻译。"}
+  ],
+  "aka": ["UnitY", "两段式语音翻译", "two-pass S2ST"],
+  "check": {
+    "source": "https://arxiv.org/abs/2212.08055",
+    "confirmed": "arXiv官方记录：标题UnitY: Two-pass Direct Speech-to-speech Translation with Discrete Units、作者Inaguma/Popuri/Kulikov/Chen/Wang/Chung/Tang/Lee/Watanabe/Pino、v1提交2022-12-15；摘要关于先生成文本表示再预测离散单元、第一段子词预测、两段解码器设计与搜索策略、正则化、去噪自编码预训练文本解码器、比单段S2UT高2.5–4.2 ASR-BLEU且快2.83倍、预测单元比频谱快2.51倍。ACL 2023、被SeamlessM4T采用为一般了解。"
+  }
+}

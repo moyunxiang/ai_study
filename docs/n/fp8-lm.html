@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>FP8-LM八比特训练（2023） · AI脉络</title>
+<meta name="description" content="H100支持FP8矩阵乘，NVIDIA的Transformer Engine也只把矩阵乘换成FP8，梯度、优化器状态和分布式通信仍是16或32位，大模型训练省下的显存和时间有限。 提出一套分三级逐步启用的FP8自动混合精度框架：先让梯度用FP8存储与通信，再让优化器状态用FP8，最后让分布式并行中…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/fp8-lm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="FP8-LM八比特训练（2023）">
+<meta property="og:description" content="H100支持FP8矩阵乘，NVIDIA的Transformer Engine也只把矩阵乘换成FP8，梯度、优化器状态和分布式通信仍是16或32位，大模型训练省下的显存和时间有限。 提出一套分三级逐步启用的FP8自动混合精度框架：先让梯度用FP8存储与通信，再让优化器状态用FP8，最后让分布式并行中…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/fp8-lm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/fp8-lm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 大模型并行训练</div>
+<h1>FP8-LM八比特训练</h1>
+<div class="full">FP8-LM: Training FP8 Large Language Models</div>
+<div class="meta"><span>2023.10</span><span>论文</span><span>延伸</span><span>Houwen Peng, Kan Wu, Yixuan Wei, Guoshuai Zhao, Yuxiang Yang, Ze Liu, Yifan Xiong, Ziyue Yang et al. · 微软</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2310.18313" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/Azure/MS-AMP" rel="noopener">GitHub (MS-AMP) ↗</a><a class="btn sm" href="../index.html#/n/fp8-lm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>H100支持FP8矩阵乘，NVIDIA的Transformer Engine也只把矩阵乘换成FP8，梯度、优化器状态和分布式通信仍是16或32位，大模型训练省下的显存和时间有限。</p></div><div><h4>方法</h4><p>提出一套分三级逐步启用的FP8自动混合精度框架：先让梯度用FP8存储与通信，再让优化器状态用FP8，最后让分布式并行中的数据也用FP8，配合缩放技巧避免溢出。</p></div><div><h4>影响</h4><p>较早系统地把FP8扩展到梯度、优化器和通信的公开工作，开源的MS-AMP成为FP8大模型训练的参考实现之一，后续的FP8训练工作常以它为对照。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/fp8.html">FP8训练格式</a>定义了E4M3和E5M2两种8位浮点格式，硬件上在<a class="ln" href="../n/h100.html">H100</a>得到支持。8位浮点的动态范围很窄，直接存梯度容易下溢或上溢，所以此前的FP8训练只在矩阵乘里用它，其余仍按<a class="ln" href="../n/mixed-precision.html">混合精度训练</a>的16/32位处理。</p><p>FP8-LM的关键观察是：LLM训练里的大多数变量，包括梯度和优化器状态，都可以用低精度格式表示，而不损失模型精度、也无需调整超参数。框架分三级：第1级，权重和梯度以FP8存储，梯度的All-Reduce通信也用FP8，采用自动缩放防止溢出；第2级，Adam的一阶、二阶动量用FP8或FP16保存，主权重保留较高精度；第3级，把FP8支持扩展到<a class="ln" href="../n/megatron-3d.html">Megatron 3D并行</a>的张量、流水线、序列并行和<a class="ln" href="../n/zero.html">ZeRO与DeepSpeed</a>式切分中。</p><p>摘要报告：在H100上训练GPT-175B时，相比广泛使用的BF16框架Megatron-LM，实际显存降低39%、速度快75%，比Transformer Engine快37%；方法也可用于指令微调和RLHF。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>FP8的动态范围仍有限，需要逐张量缩放和许多工程技巧；更低的4比特训练还需要更细粒度的块缩放格式。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/nvfp4.html">NVFP4四比特预训练</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/mixed-precision.html">混合精度训练</a><span class="yr">2017.10 · 系统·效率</span><div class=nt>沿用混合精度训练的主权重与损失缩放思路，把更多变量降到8位。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/zero.html">ZeRO与DeepSpeed</a><span class="yr">2019.10 · 系统·效率</span><div class=nt>在ZeRO式的切分优化器状态上使用FP8，进一步减少分布式训练的显存与通信。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/megatron-3d.html">Megatron 3D并行</a><span class="yr">2021.04 · 系统·效率</span><div class=nt>以BF16的Megatron-LM为基线，并把FP8接入其张量、流水线并行。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:72" href="../n/fp8.html">FP8训练格式</a><span class="yr">2022.09 · 硬件</span><div class=nt>使用FP8 E4M3/E5M2格式，并把它从矩阵乘推广到梯度、优化器状态与通信。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/nvfp4.html">NVFP4四比特预训练</a><span class="yr">2025.09 · 系统·效率</span><div class=nt>FP8的动态范围仍有限，需要逐张量缩放和许多工程技巧；更低的4比特训练还需要更细粒度的块缩放格式。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/floating-point.html">浮点精度：FP32、FP16、BF16、INT8</a> <a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/adaptive-optimizer.html">自适应学习率优化器</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2310.18313" rel="noopener">https://arxiv.org/abs/2310.18313</a>（标题、作者（Peng, Wu, Wei等20人）、v1日期2023-10-27；摘要：多数变量如梯度和优化器状态可用低精度格式且不改超参数、三级FP8利用（8位梯度、优化器状态、分布式学习）、H100上GPT-175B比BF16的Megatron-LM显存降39%且快75%、比Transformer Engine快37%、可用于指令微调与RLHF、MS-AMP开源。各级具体格式（一阶二阶动量的精度）与自动缩放细节为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20FP8-LM%E5%85%AB%E6%AF%94%E7%89%B9%E8%AE%AD%E7%BB%83%EF%BC%88fp8-lm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Afp8-lm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/fp8-lm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="sheared-llama.html"><small>本分支上一个 · 2023.10</small><b>Sheared-LLaMA结构化剪枝</b></a><a class="r" href="diloco.html"><small>本分支下一个 · 2023.11</small><b>DiLoCo低通信训练</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

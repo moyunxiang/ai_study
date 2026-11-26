@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MOPO模型离线优化（2020） · AI脉络</title>
+<meta name="description" content="当时最成功的离线RL方法（、）都是无模型的，靠把策略约束在数据支撑集内来避免外推误差，这也让策略无法泛化到数据之外的状态。 改用学到的动力学模型生成额外数据，但把奖励减去模型的不确定度： r̃ = r − λ·u(s,a) ，让策略只在模型可信的地方冒险离开数据。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/mopo.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MOPO模型离线优化（2020）">
+<meta property="og:description" content="当时最成功的离线RL方法（、）都是无模型的，靠把策略约束在数据支撑集内来避免外推误差，这也让策略无法泛化到数据之外的状态。 改用学到的动力学模型生成额外数据，但把奖励减去模型的不确定度： r̃ = r − λ·u(s,a) ，让策略只在模型可信的地方冒险离开数据。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/mopo.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/mopo">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 离线RL与序列建模</div>
+<h1>MOPO模型离线优化</h1>
+<div class="full">MOPO: Model-based Offline Policy Optimization</div>
+<div class="meta"><span>2020.05</span><span>论文</span><span>延伸</span><span>NeurIPS 2020</span><span>Tianhe Yu, Garrett Thomas, Lantao Yu, Stefano Ermon, James Zou, Sergey Levine, Chelsea Finn, Tengyu Ma · 斯坦福大学 / UC Berkeley</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2005.13239" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/mopo">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>当时最成功的离线RL方法（<a class="ln" href="../n/bcq.html">BCQ批量约束Q学习</a>、<a class="ln" href="../n/bear.html">BEAR自举误差约束</a>）都是无模型的，靠把策略约束在数据支撑集内来避免外推误差，这也让策略无法泛化到数据之外的状态。</p></div><div><h4>方法</h4><p>改用学到的动力学模型生成额外数据，但把奖励减去模型的不确定度：<code>r̃ = r − λ·u(s,a)</code>，让策略只在模型可信的地方冒险离开数据。</p></div><div><h4>影响</h4><p>确立了基于模型的离线RL里「不确定度惩罚奖励」这一路线，与同期的MOReL一起成为后来COMBO、MOBILE等方法的出发点。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>作者先观察到：直接把为在线设计的<a class="ln" href="../n/mbpo.html">MBPO</a>用在离线数据上，已经比无模型方法好不少，但它没有任何机制防止策略钻进模型出错的区域。</p><p>MOPO的做法：在离线数据上训练一组概率动力学模型（每个输出下一状态和奖励的高斯分布，做法同<a class="ln" href="../n/pets.html">PETS概率集成模型</a>）；定义不确定度 <code>u(s,a)</code> 为集成中各模型预测方差的最大范数；在模型里从数据中的状态出发做短程展开（几步），每步的奖励换成 <code>r − λ·u</code>，把这些虚拟数据与真实数据混合，用SAC训练策略。</p><p>理论上，作者证明当u是模型误差的上界时，策略在惩罚后MDP中的回报是它在真实MDP中回报的下界，因此最大化惩罚回报就是在最大化一个保守估计；并刻画了离开数据支撑集的收益与风险之间的权衡。摘要称，MOPO在已有离线RL基准上超过了标准的基于模型方法和此前最好的无模型离线方法，并在两个需要从别的任务数据泛化的连续控制任务上表现突出。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>实际使用的不确定度只是集成方差的启发式，不一定真是模型误差的上界，理论保证在实践中不成立。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>惩罚系数λ和展开步数对结果很敏感，需要按数据集调。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/bcq.html">BCQ批量约束Q学习</a><span class="yr">2018.12 · RL</span><div class=nt>同样处理离线分布偏移，BCQ走无模型的动作约束路线，MOPO走基于模型的保守路线。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/pets.html">PETS概率集成模型</a><span class="yr">2018.05 · RL</span><div class=nt>用概率神经网络集成学动力学，并以集成的预测方差估计不确定度。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/mbpo.html">MBPO</a><span class="yr">2019.06 · RL</span><div class=nt>沿用MBPO的短程模型展开加SAC训练，在奖励里加入不确定度惩罚以适应离线设定。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/bear.html">BEAR自举误差约束</a><span class="yr">2019.06 · RL</span><div class=nt>BEAR等方法把策略锁在数据支撑集内；MOPO允许在模型可信时离开支撑集，以获得泛化。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/offline-rl.html">离线强化学习</a> <a class="chip c" href="../c/model-based-rl.html">基于模型的强化学习</a> <a class="chip c" href="../c/ensemble.html">集成学习</a> <a class="chip c" href="../c/distribution-shift.html">分布偏移</a></p>
+<h2>本篇术语</h2><ul><li><b>不确定度惩罚</b>　在奖励里减去模型对这一步预测有多不确定的估计，让策略少去模型没把握的地方。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/mbpo.html">MBPO</a>和<a class="ln" href="../n/offline-rl-tutorial.html">离线RL综述与问题定义</a>；读原文第4节算法与定理；在D4RL的halfcheetah数据集上用OfflineRL-Kit之类的库跑MOPO并调λ。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2005.13239" rel="noopener">https://arxiv.org/abs/2005.13239</a>（标题、八位作者、arXiv v1于2020-05-27；摘要中最成功的已有方法为无模型且约束策略在数据支撑内、已有基于模型RL离线时已有显著收益、用动力学不确定度人为惩罚奖励、理论上最大化真实MDP回报的下界、刻画离开支撑集的收益风险权衡、超过已有基线并在两个需泛化的任务上表现好。不确定度定义与展开细节按原文正文通行描述；NeurIPS 2020与机构、MOReL/COMBO关系按一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MOPO%E6%A8%A1%E5%9E%8B%E7%A6%BB%E7%BA%BF%E4%BC%98%E5%8C%96%EF%BC%88mopo%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amopo%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/mopo.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="offline-rl-tutorial.html"><small>本分支上一个 · 2020.05</small><b>离线RL综述与问题定义</b></a><a class="r" href="nle.html"><small>本分支下一个 · 2020.06</small><b>NetHack学习环境</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

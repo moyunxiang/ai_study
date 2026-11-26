@@ -1,0 +1,72 @@
+{
+  "id": "rest",
+  "who": "Caglar Gulcehre, Tom Le Paine, Srivatsan Srinivasan, Ksenia Konyushkova, Lotte Weerts, Abhishek Sharma, Aditya Siddhant, Alex Ahern et al. · Google DeepMind",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2308.08998"
+    }
+  ],
+  "aka": [
+    "ReST",
+    "Reinforced Self-Training",
+    "强化自训练",
+    "Grow/Improve",
+    "增长批量强化学习"
+  ],
+  "problem": "在线RLHF每一步都要用当前策略重新采样、打分、更新，样本用一次就扔，计算昂贵；纯离线方法又只能用固定数据，无法越过数据本身的质量。",
+  "idea": "交替两步：Grow阶段用当前模型为每个输入生成大量候选，用奖励模型打分形成数据集；Improve阶段在这批数据上按逐步提高的奖励阈值过滤，用离线方法反复微调。数据可以多次复用。",
+  "impact": "把“采样—打分—过滤—微调”的自训练循环系统化，后续的ReST-EM、拒绝采样微调等用模型自产数据改进模型的方法常以它为参照。",
+  "method": "背景：[[instructgpt]]式的RLHF用[[ppo]]在线训练，样本只用一次；离线强化学习（如[[cql]]）能复用数据，但受限于数据本身。作者借鉴“增长批量强化学习”（growing batch RL）：数据集分批扩充，每批内用离线方法训练。\n\nReST有两个嵌套循环。**Grow（外循环）**：用当前策略对训练集中的每个输入采样多个输出，再用一个学好的奖励模型给每个输出打分，加入数据集。**Improve（内循环）**：在这个数据集上多次微调，每一轮把奖励阈值提高一些，只保留分数超过阈值的样本做训练，于是模型逐渐只模仿越来越好的输出；内循环用的是离线目标，最简单的就是对过滤后的样本做监督学习（行为克隆），也可以换成其他离线RL损失。一次Grow之后可以做多轮Improve，因此生成的数据被复用多次，比在线RLHF更省采样。\n\n作者指出方法适用于各种生成任务，但实验集中在机器翻译：摘要称在机器翻译基准上，以自动指标和人工评测衡量都显著提升了翻译质量，并且计算和样本效率高。",
+  "limits": [
+    {
+      "text": "过滤和微调都依赖学到的奖励模型，反复提高阈值容易让模型钻奖励模型的漏洞；实验只在机器翻译上，对开放式对话和推理任务的效果没有验证。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "instructgpt",
+      "type": "solves",
+      "note": "InstructGPT的在线PPO每轮重新采样、样本只用一次，ReST用离线的Grow/Improve循环复用生成数据。"
+    },
+    {
+      "to": "ppo",
+      "type": "rivals",
+      "note": "以在线策略梯度RLHF为对照，ReST改用基于阈值过滤的离线微调。"
+    },
+    {
+      "to": "cql",
+      "type": "uses",
+      "note": "Improve阶段可以接入离线强化学习损失，作者比较了行为克隆与多种离线RL目标。"
+    },
+    {
+      "to": "star",
+      "type": "extends",
+      "note": "与STaR同属“模型生成、筛选、再微调”的自训练循环，ReST用奖励模型和逐步提高的阈值做筛选。"
+    },
+    {
+      "to": "rm-overoptimization",
+      "type": "uses",
+      "note": "反复按奖励模型分数过滤会面临奖励模型过优化的问题，这是ReST需要用阈值和正则控制的风险。"
+    }
+  ],
+  "prereq": [
+    "rlhf-concept",
+    "offline-rl",
+    "imitation-learning",
+    "reward-design",
+    "language-model"
+  ],
+  "terms": [
+    {
+      "t": "增长批量强化学习",
+      "d": "介于在线和离线强化学习之间：分批收集新数据，每批收集完后用离线方法在全部已有数据上训练。"
+    }
+  ],
+  "learn": "先了解[[instructgpt]]的RLHF流程和离线强化学习的基本概念；读本文算法1的Grow与Improve循环和阈值设置；动手：在一个小翻译或摘要任务上，用一个现成的质量评分器实现一轮Grow加三轮阈值递增的Improve。",
+  "check": {
+    "source": "https://arxiv.org/abs/2308.08998",
+    "confirmed": "标题、14位作者中的前8位、arXiv首次提交2023-08-17；摘要中受增长批量RL启发、从策略采样生成数据集再用离线RL改进、离线产生数据可复用因而比在线RLHF高效、通用于生成任务但聚焦机器翻译、自动指标与人工评测上翻译质量显著提升。Grow/Improve命名、阈值递增与离线损失的比较、机构为对正文的一般了解。"
+  }
+}

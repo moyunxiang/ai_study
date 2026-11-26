@@ -1,0 +1,33 @@
+{
+  "id": "nce-lm",
+  "who": "Andriy Mnih, Yee Whye Teh · 伦敦大学学院Gatsby计算神经科学中心",
+  "venue": "ICML 2012",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1206.6426"}
+  ],
+  "aka": ["NCE语言模型", "Noise-Contrastive Estimation LM", "噪声对比估计训练语言模型"],
+  "problem": "神经概率语言模型要显式归一化，算对数似然梯度时得把词表里所有词都过一遍，中等规模的数据也要训练几周，所以远不如n-gram模型常用。",
+  "idea": "用噪声对比估计（NCE）训练：不再对全词表求和，而是让模型区分「真实出现的下一个词」和从噪声分布（如一元词频）里抽出的少量假词，把归一化常数当作参数或直接固定为1。",
+  "impact": "在Penn Treebank上把训练时间缩短一个数量级以上而模型质量不变，且比重要性采样更稳定；NCE随后被word2vec简化成负采样，也成为大词表神经模型训练的标准技巧之一。",
+  "method": "[[nplm]]输出层的[[c:softmax]]需要计算`Z = Σ_w exp(s(w, h))`，其中`s`是词`w`在上下文`h`下的得分，求和覆盖整个词表（几万到几十万个词），梯度同样如此。此前的加速办法有[[c:importance-sampling]]（不稳定，需要很多样本）和[[hierarchical-softmax]]、[[hlbl]]这类树结构（要先建树）。\n\n[[nce]]是Gutmann和Hyvärinen提出的估计未归一化分布的方法。这篇把它用到语言模型：对每个真实的（上下文，下一个词）样本，再从噪声分布`q`里抽k个噪声词，训练一个二分类器判断一个词来自数据还是来自噪声，分类器的对数几率是`s(w,h) − log(k·q(w))`。这样每一步只需计算k+1个词的得分。作者发现每个上下文的归一化常数可以直接固定为1，模型会自己学到近似归一化的输出。\n\n摘要报告：在Penn Treebank上训练时间缩短一个数量级以上而不影响模型质量；所需噪声样本远少于重要性采样；在4700万词、8万词表的语料上训练的模型，在微软研究院句子补全挑战上取得当时最好结果。",
+  "limits": [
+    {"text": "NCE只在训练时省去归一化，测试时若要得到严格的概率仍需对全词表求和。", "solved_by": []},
+    {"text": "需要选择噪声分布和样本数k，k太小时梯度方差大，对很大的词表效果不稳定。", "solved_by": ["skip-gram-ns"]}
+  ],
+  "relations": [
+    {"to": "nce", "type": "uses", "note": "直接采用Gutmann和Hyvärinen的噪声对比估计，把它用于离散的下一个词分布。"},
+    {"to": "nplm", "type": "solves", "note": "解决神经概率语言模型训练时每一步都要对全词表归一化、训练要几周的瓶颈。"},
+    {"to": "hlbl", "type": "rivals", "note": "同一作者之前用词树加速；NCE不需要建树，直接在原始输出层上训练。"},
+    {"to": "log-bilinear-lm", "type": "uses", "note": "实验中被加速的模型是对数双线性语言模型。"}
+  ],
+  "prereq": ["language-model", "softmax", "logistic-regression", "importance-sampling", "mle", "perplexity"],
+  "terms": [
+    {"t": "噪声分布", "d": "用来抽取「假词」的分布，常用训练语料的一元词频；模型要学会把真实的下一个词和这些假词分开。"},
+    {"t": "自归一化", "d": "训练后模型输出的指数得分之和近似为1，测试时可以不再显式计算归一化常数。"}
+  ],
+  "learn": "先读[[nce]]的讲解和[[c:importance-sampling]] → 读原文第2–3节NCE目标的推导 → 动手：在小语料上分别用完整softmax、NCE（k=25）和负采样训练同一个模型，比较训练速度和困惑度。",
+  "check": {
+    "source": "https://arxiv.org/abs/1206.6426",
+    "confirmed": "arXiv：标题、作者Mnih与Teh、2012-06-27提交（ICML 2012）、摘要（NPLM训练要几周、显式归一化需要遍历词表、基于NCE的算法、Penn Treebank上训练时间缩短一个数量级以上且不影响质量、比重要性采样更高效更稳定、47M词80K词表、MSR句子补全挑战最好结果）。归一化常数固定为1、对数几率公式凭一般了解；作者机构凭一般了解。"
+  }
+}

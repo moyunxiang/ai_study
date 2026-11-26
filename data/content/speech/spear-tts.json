@@ -1,0 +1,32 @@
+{
+  "id": "spear-tts",
+  "who": "Eugene Kharitonov, Damien Vincent, Zalán Borsos, Raphaël Marinier, Sertan Girgin, Olivier Pietquin, Matt Sharifi, Marco Tagliasacchi, Neil Zeghidour · Google",
+  "venue": "TACL 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2302.03540"}
+  ],
+  "problem": "高质量多说话人TTS需要大量「文本-语音」配对数据，而这种数据贵且少；海量的纯语音数据却用不上。",
+  "idea": "把TTS拆成两个序列到序列任务：「读」——文本到语义token，「说」——语义token到声学token。「说」只需纯音频就能训练；「读」用预训练加回译来减少配对数据的需求；用一段3秒的提示音控制音色。",
+  "impact": "SPEAR-TTS只用15分钟配对数据就达到与当时最好方法相当的字错率，展示了「语义token + 声学token」两级分解对低资源TTS的价值，这一分解与AudioLM一脉相承，影响了后来多种分级语音生成模型。",
+  "method": "[[audiolm]]把音频表示成两种离散token：来自自监督模型[[w2v-bert]]的**语义token**（主要编码内容）和来自[[soundstream]]编解码器的**声学token**（编码音色、录音条件等细节），并分级生成。SPEAR-TTS把这套表示用到TTS上（见[[c:vector-quantization]]）。\n\n**说（speaking）**：一个Transformer从语义token生成声学token。语义token可以由任何语音自动提取，所以这一步只用无标注音频就能训练，数据量可以很大。音色控制靠「示例提示」：在生成时先给一段目标说话人3秒录音的语义和声学token，模型接着往下生成，就会延续这个人的声音，不需要显式的说话人嵌入或说话人标签。\n\n**读（reading）**：一个编码器-解码器从文本生成语义token（见[[c:encoder-decoder]]），这是唯一需要配对数据的部分。作者先在大量语音上以去噪任务预训练这个模型，再用少量配对数据训练一个反向模型（语义token到文本），对海量纯语音做「回译」生成伪配对数据，最后用这些数据训练正向模型。\n\n摘要报告：只用15分钟配对数据，SPEAR-TTS的字错率就与当时最好的方法相当；主观测试中自然度和声学质量与真实录音相当；可以推广到只给3秒样本的未见说话人。",
+  "limits": [
+    {"text": "两级自回归生成，加上声学token层数多，推理速度慢。", "solved_by": ["soundstorm"]},
+    {"text": "语义token仍会带有部分说话人和韵律信息，音色完全由3秒提示决定，控制粒度粗。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "audiolm", "type": "extends", "note": "沿用AudioLM的语义token加声学token两级表示，把无条件音频续写变成文本条件的TTS。"},
+    {"to": "w2v-bert", "type": "uses", "note": "语义token来自w2v-BERT自监督模型的量化特征。"},
+    {"to": "soundstream", "type": "uses", "note": "声学token来自SoundStream神经编解码器。"},
+    {"to": "vall-e", "type": "rivals", "note": "同期的零样本TTS：VALL-E从音素直接生成EnCodec token，SPEAR-TTS经过语义token中转以减少配对数据需求。"}
+  ],
+  "prereq": ["vector-quantization", "encoder-decoder", "self-supervised", "zero-few-shot", "vocoder-codec"],
+  "terms": [
+    {"t": "回译", "d": "先训练一个反方向模型，把大量无标注数据「翻译」成伪配对数据，再用来训练正方向模型。"},
+    {"t": "示例提示", "d": "生成前先给模型一段目标说话人的样本，让它沿着这段样本的风格接着生成。"}
+  ],
+  "aka": ["SPEAR-TTS", "Speak, Read and Prompt", "低资源TTS"],
+  "check": {
+    "source": "https://arxiv.org/abs/2302.03540",
+    "confirmed": "arXiv官方记录：标题Speak, Read and Prompt: High-Fidelity Text-to-Speech with Minimal Supervision、作者Kharitonov/Vincent/Borsos/Marinier/Girgin/Pietquin/Sharifi/Tagliasacchi/Zeghidour、v1提交2023-02-07；摘要关于读与说两个序列到序列任务、语义token与声学token、说的模块只用音频训练、预训练加回译、3秒示例提示泛化到未见说话人、15分钟配对数据字错率与最好方法相当、主观测试与真实录音相当。w2v-BERT与SoundStream来源、TACL 2023为一般了解。"
+  }
+}

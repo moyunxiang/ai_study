@@ -1,0 +1,32 @@
+{
+  "id": "parallel-wavegan",
+  "who": "Ryuichi Yamamoto, Eunwoo Song, Jae-Min Kim · LINE、NAVER",
+  "venue": "ICASSP 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1910.11480"}
+  ],
+  "problem": "Parallel WaveNet靠「教师-学生」概率密度蒸馏实现并行生成，要先训练一个自回归教师WaveNet，再训练学生，流程复杂、难以调好。",
+  "idea": "直接训练一个非自回归的WaveNet作为生成器，用多分辨率STFT频谱损失加上GAN对抗损失联合优化，不需要任何教师模型。",
+  "impact": "Parallel WaveGAN只有144万参数，单卡生成24kHz语音快于实时28倍，训练简单；它提出的多分辨率STFT损失被HiFi-GAN之后的众多GAN声码器和神经音频编解码器沿用。",
+  "method": "[[parallel-wavenet]]要先有一个训练好的自回归[[wavenet]]作为教师，再用概率密度蒸馏训练一个基于逆自回归流的学生，才能并行地一次生成整段波形。蒸馏本身不稳定，还需要额外的感知损失。\n\nParallel WaveGAN的生成器是一个非自回归的WaveNet式网络（膨胀卷积、残差连接，见[[c:conv-layer]]），输入是随机噪声和上采样后的梅尔频谱条件，一次输出整段波形。训练目标有两项。**多分辨率STFT损失**：分别用三组不同的窗长和跳步对生成波形与真实波形做短时傅里叶变换（见[[c:fourier-transform]]），比较两者的频谱收敛误差和对数幅度误差。单一分辨率容易让模型只在某个时频尺度上匹配，几种分辨率一起用，能同时约束时间细节和频率细节。**对抗损失**：一个判别器区分真实与生成的波形，生成器要骗过它（见[[c:adversarial-training]]与[[gan]]）。两者结合，频谱损失让训练稳定、收敛快，对抗损失补充真实感。\n\n摘要报告：模型只有1.44M参数，在单GPU上生成24kHz语音比实时快28.68倍；在基于Transformer的TTS框架中听测MOS达到4.16，与最好的基于蒸馏的Parallel WaveNet系统相当。同月发表的[[melgan]]也用GAN做声码器，之后[[hifi-gan]]在判别器设计上进一步提升了音质。",
+  "limits": [
+    {"text": "单一的波形判别器对语音中的周期性结构把握不够，音质仍不及后来的多周期判别器方案。", "solved_by": ["hifi-gan"]},
+    {"text": "主要在单说话人语音上训练，换成未见过的说话人、歌唱或乐器时音质下降。", "solved_by": ["bigvgan"]}
+  ],
+  "relations": [
+    {"to": "parallel-wavenet", "type": "solves", "note": "Parallel WaveNet需要训练教师并做密度蒸馏；Parallel WaveGAN直接用频谱损失加对抗损失训练，不需要教师。"},
+    {"to": "wavenet", "type": "uses", "note": "生成器沿用WaveNet的膨胀卷积残差结构，但改为非自回归。"},
+    {"to": "gan", "type": "uses", "note": "用判别器提供对抗损失，提升生成波形的真实感。"},
+    {"to": "melgan", "type": "rivals", "note": "同月的另一种GAN声码器：MelGAN用多尺度判别器和特征匹配，Parallel WaveGAN用多分辨率STFT损失。"}
+  ],
+  "prereq": ["vocoder-codec", "adversarial-training", "fourier-transform", "waveform-spectrogram", "conv-layer"],
+  "terms": [
+    {"t": "多分辨率STFT损失", "d": "用几组不同窗长的短时傅里叶变换比较生成与真实音频的频谱，同时约束时间和频率细节。"},
+    {"t": "概率密度蒸馏", "d": "让学生网络生成的分布在教师网络下有高概率，从而把自回归教师的能力转给并行学生。"}
+  ],
+  "aka": ["Parallel WaveGAN", "PWG", "多分辨率STFT损失", "multi-resolution STFT loss"],
+  "check": {
+    "source": "https://arxiv.org/abs/1910.11480",
+    "confirmed": "arXiv官方记录：标题、作者Yamamoto/Song/Kim、v1提交2019-10-25；摘要关于无需蒸馏、非自回归WaveNet、多分辨率频谱损失与对抗损失联合训练、1.44M参数、单GPU生成24kHz语音快于实时28.68倍、Transformer TTS中MOS 4.16与最好的蒸馏式Parallel WaveNet相当。三组STFT配置、机构、ICASSP 2020为一般了解。"
+  }
+}

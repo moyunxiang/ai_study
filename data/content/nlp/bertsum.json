@@ -1,0 +1,34 @@
+{
+  "id": "bertsum",
+  "who": "Yang Liu, Mirella Lapata · 爱丁堡大学",
+  "venue": "EMNLP-IJCNLP 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1908.08345"},
+    {"label": "GitHub", "url": "https://github.com/nlpyang/PreSumm"}
+  ],
+  "aka": ["BertSum", "BERTSUM", "BertSumExt", "BertSumAbs", "PreSumm"],
+  "problem": "BERT在分类和阅读理解上大幅领先，但它是按词和句对设计的编码器，输入长度有限，也没有句子级的表示，不能直接拿来做需要理解整篇文档、按句挑选或生成摘要的任务。",
+  "idea": "给每个句子前加一个[CLS]记号、用交替的句段嵌入区分相邻句子，让BERT输出每句的向量；抽取式模型在其上叠几层句间Transformer给每句打分，生成式模型则把BERT当编码器、配一个随机初始化的Transformer解码器，并为两者使用不同的优化器设置。",
+  "impact": "在三个新闻摘要数据集上同时刷新了抽取式和生成式的最好结果，成为预训练模型做摘要的标准基线，此后的BART、PEGASUS等摘要工作都与它比较。",
+  "method": "此前神经摘要的主流是[[pointer-generator]]这样的LSTM编码器-解码器，抽取式摘要则用RNN给句子打分。[[bert]]的原始输入是一或两个片段，只有一个[CLS]汇总整段。\n\n**文档级编码**：在每个句子开头插入[CLS]、结尾插入[SEP]，并给奇数句和偶数句交替使用两种句段嵌入，这样每个[CLS]位置的输出就是对应句子的表示，同时又能看到上下文中的其他句子。**抽取式（BertSumExt）**：在句子向量上再叠几层句间[[transformer]]层，用sigmoid给每句打一个「是否放进摘要」的分数，选得分最高的几句。**生成式（BertSumAbs）**：BERT作编码器，解码器是6层随机初始化的Transformer。由于编码器已经预训练而解码器没有，两者用同一学习率会互相拖累，作者为编码器和解码器分别设定学习率与预热步数。**两阶段微调（BertSumExtAbs）**：先在抽取任务上微调编码器，再做生成式训练，摘要称这能进一步提升生成质量。\n\n在CNN/DailyMail、NYT和XSum三个数据集上，模型在抽取式和生成式两种设定下都取得当时最好的结果（按[[rouge]]评价）。",
+  "limits": [
+    {"text": "受BERT最多512个位置的限制，长文档要截断，后面的内容看不到。", "solved_by": ["longformer"]},
+    {"text": "生成式模型的解码器没有预训练，需要专门的学习率技巧来平衡；编码器和解码器一起预训练的模型随后表现更好。", "solved_by": ["bart", "pegasus"]}
+  ],
+  "relations": [
+    {"to": "bert", "type": "uses", "note": "以预训练BERT为文档编码器，改造输入格式以得到每个句子的表示。"},
+    {"to": "pointer-generator", "type": "solves", "note": "指针-生成器的LSTM编码器没有预训练，对文档的理解有限；BertSum用预训练编码器在同一数据集上取得更高分。"},
+    {"to": "transformer", "type": "uses", "note": "句间打分层和生成式解码器都是Transformer层。"},
+    {"to": "rouge", "type": "uses", "note": "所有实验以ROUGE作为自动评价指标。"}
+  ],
+  "prereq": ["pretrain-finetune", "transformer-block", "encoder-decoder", "learning-rate", "text-metrics"],
+  "terms": [
+    {"t": "抽取式摘要", "d": "从原文中挑出若干原句拼成摘要，不改写。"},
+    {"t": "生成式摘要", "d": "让模型逐词生成摘要，可以使用原文没有的词和句式。"}
+  ],
+  "learn": "先读[[bert]]和[[pointer-generator]]的讲解 → 读原文第3节文档编码、第4节两种模型与微调日程 → 动手：用PreSumm代码在CNN/DailyMail的一个子集上训练BertSumExt，看它选出的句子是不是多集中在文章开头。",
+  "check": {
+    "source": "https://arxiv.org/abs/1908.08345",
+    "confirmed": "arXiv：标题、作者Liu与Lapata、2019-08-22提交、摘要（基于BERT的文档级编码器得到句子表示；抽取式叠句间Transformer层；生成式为编码器和解码器采用不同优化器以缓解预训练与否的不匹配；两阶段微调进一步提升；三个数据集上抽取与生成均为最好结果；PreSumm代码）。每句加[CLS]、交替句段嵌入、6层解码器、CNN/DM、NYT、XSum数据集名和爱丁堡机构凭一般了解；正文不写ROUGE数字。"
+  }
+}

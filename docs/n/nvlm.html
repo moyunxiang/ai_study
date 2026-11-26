@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>NVLM架构对比（2024） · AI脉络</title>
+<meta name="description" content="开源VLM往往在多模态训练后纯文本能力下降；而“把视觉token拼进输入”（LLaVA式）和“交叉注意力读图”（Flamingo式）两种架构孰优孰劣缺少同条件比较。 在同样的数据和骨干上系统比较两种架构，并提出结合两者的混合架构；为切块式高分辨率输入加一维“切块标签”文字；在多模态训练中掺入高质量…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/nvlm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="NVLM架构对比（2024）">
+<meta property="og:description" content="开源VLM往往在多模态训练后纯文本能力下降；而“把视觉token拼进输入”（LLaVA式）和“交叉注意力读图”（Flamingo式）两种架构孰优孰劣缺少同条件比较。 在同样的数据和骨干上系统比较两种架构，并提出结合两者的混合架构；为切块式高分辨率输入加一维“切块标签”文字；在多模态训练中掺入高质量…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/nvlm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/nvlm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:240"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/mm.html">多模态理解</a> › 开源VLM配方</div>
+<h1>NVLM架构对比</h1>
+<div class="full">NVLM: Open Frontier-Class Multimodal LLMs</div>
+<div class="meta"><span>2024.09</span><span>论文</span><span>延伸</span><span>Wenliang Dai, Nayeon Lee, Boxin Wang, Zhuolin Yang, Zihan Liu, Jon Barker, Tuomas Rintamaki, Mohammad Shoeybi et al. · NVIDIA</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2409.11402" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://huggingface.co/nvidia/NVLM-D-72B" rel="noopener">模型 ↗</a><a class="btn sm" href="../index.html#/n/nvlm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>开源VLM往往在多模态训练后纯文本能力下降；而“把视觉token拼进输入”（LLaVA式）和“交叉注意力读图”（Flamingo式）两种架构孰优孰劣缺少同条件比较。</p></div><div><h4>方法</h4><p>在同样的数据和骨干上系统比较两种架构，并提出结合两者的混合架构；为切块式高分辨率输入加一维“切块标签”文字；在多模态训练中掺入高质量纯文本与数学推理数据。</p></div><div><h4>影响</h4><p>给出了“仅解码器 vs 交叉注意力”的直接对比和“数据质量与任务多样性比规模更重要”的结论，并示范了多模态训练后文本能力不降反升的做法。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>到2024年，开源多模态大模型有两条主流架构：仅解码器式（如<a class="ln" href="../n/llava-1.5.html">LLaVA-1.5</a>，把视觉特征投影成token直接拼进语言模型的输入序列）和交叉注意力式（如<a class="ln" href="../n/flamingo.html">Flamingo</a>，语言模型通过额外的交叉注意力层去读视觉特征）。前者简单、推理统一，但高分辨率时序列很长；后者计算省，但要新增大量参数。两者缺乏同等条件下的比较。另一个普遍问题是多模态训练会让语言模型的纯文本能力退化。</p><p>NVLM 1.0给出三个版本：NVLM-D（仅解码器）、NVLM-X（交叉注意力）和结合两者的NVLM-H（混合，全局缩略图token进入解码器序列，高分辨率切块通过交叉注意力读入）。针对切块式动态高分辨率输入，论文提出一维“切块标签”：在每个切块的视觉token前插入表示它是第几块的文字标签，让语言模型知道各块的位置，摘要称这显著提升了多模态推理和OCR相关任务。数据上，作者详细公开了预训练与微调数据构成，并在多模态微调中加入高质量纯文本数据和大量多模态数学、推理数据。</p><p>摘要报告，NVLM 1.0在视觉语言任务上可与GPT-4o等领先闭源模型和Llama 3-V 405B、InternVL 2等开放模型竞争，多模态训练后纯文本性能相对其语言模型骨干反而提高；结论之一是即使在预训练阶段，数据质量和任务多样性也比规模更重要。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>72B规模的训练和推理成本很高，三种架构各有取舍，没有一种在所有任务上全面胜出。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>训练代码在发布时尚未开源，完整复现依赖后续公开。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:240" href="../n/flamingo.html">Flamingo</a><span class="yr">2022.04 · 多模态</span><div class=nt>NVLM-X代表Flamingo式交叉注意力架构；NVLM-H融合两者。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:240" href="../n/llava-1.5.html">LLaVA-1.5</a><span class="yr">2023.10 · 多模态</span><div class=nt>NVLM-D代表LLaVA式仅解码器架构，与交叉注意力式在相同条件下对比。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:240" href="../n/internvl-1.5.html">InternVL 1.5</a><span class="yr">2024.04 · 多模态</span><div class=nt>沿用切块式动态高分辨率输入，并加入一维切块标签。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/qwen2.html">Qwen2</a><span class="yr">2024.06 · LLM</span><div class=nt>72B版本的语言骨干基于Qwen2-72B-Instruct。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/image-patch.html">图像块与视觉token</a> <a class="chip c" href="../c/attention-concept.html">注意力机制</a> <a class="chip c" href="../c/instruction-tuning.html">指令微调与对话模板</a> <a class="chip c" href="../c/ablation-baseline.html">基线与消融实验</a></p>
+<h2>本篇术语</h2><ul><li><b>切块标签（tile tag）</b>　在每个高分辨率切块的视觉token前插入一段表示其序号的文字token，帮助语言模型分辨不同切块。</li></ul>
+<h2>怎么学</h2><p>先对比<a class="ln" href="../n/llava-1.5.html">LLaVA-1.5</a>与<a class="ln" href="../n/flamingo.html">Flamingo</a>两种接入方式，再读NVLM原文的架构对比图和数据表，重点看纯文本能力保持的那一节。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2409.11402" rel="noopener">https://arxiv.org/abs/2409.11402</a>（标题、作者、arXiv v1提交2024-09-17；摘要中与GPT-4o、Llama 3-V 405B、InternVL 2相当、多模态训练后文本性能优于骨干、仅解码器与交叉注意力架构的全面比较与新混合架构、切块式动态高分辨率的一维tile-tagging、数据质量与任务多样性比规模更重要、加入高质量纯文本与多模态数学推理数据、发布NVLM-D-72B权重且训练代码将开源。NVLM-D/X/H命名与混合方式、Qwen2-72B-Instruct骨干为一般了解，未逐项核对。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20NVLM%E6%9E%B6%E6%9E%84%E5%AF%B9%E6%AF%94%EF%BC%88nvlm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Anvlm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/nvlm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="emu3.html"><small>本分支上一个 · 2024.09</small><b>Emu3纯下一词预测</b></a><a class="r" href="mineru.html"><small>本分支下一个 · 2024.09</small><b>MinerU文档解析</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

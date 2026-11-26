@@ -1,0 +1,24 @@
+{
+ "id": "pissa",
+ "who": "Fanxu Meng, Zhaohui Wang, Muhan Zhang · 北京大学",
+ "venue": "NeurIPS 2024",
+ "aka": ["PiSSA", "主奇异值初始化", "principal singular values", "QPiSSA", "LoRA初始化"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2404.02948"},
+  {"label": "GitHub", "url": "https://github.com/GraphPKU/PiSSA"}
+ ],
+ "problem": "LoRA的适配器一个矩阵用高斯噪声、一个用零初始化，起步时增量为零、梯度很小，在冻结的原权重旁从零学起，收敛偏慢。",
+ "idea": "结构与LoRA完全相同，只改初始化：对原权重W做SVD，用前r个主奇异值和奇异向量初始化A、B，剩下的部分作为冻结的残差矩阵，于是训练直接更新模型最重要的分量。",
+ "impact": "改一行初始化就能替换LoRA、推理时同样可合并，已被Hugging Face PEFT库作为LoRA的初始化选项收录，也带动了一批基于SVD初始化的LoRA变体。",
+ "method": "[[lora]]的增量 `ΔW = AB` 从零开始，原权重W冻结。PiSSA把W本身拆开：做奇异值分解 `W = UΣVᵀ`，取前r个最大的奇异值与对应奇异向量，令 `A = U_r Σ_r^{1/2}`、`B = Σ_r^{1/2} V_rᵀ`，其余部分 `W_res = W − AB` 冻结。前向计算仍是 `W_res x + ABx`，与LoRA一样，初始时输出与原模型完全相同。区别在于：LoRA训练的是“噪声与零”，PiSSA训练的是模型中能量最大的主成分，冻结的是次要的残差部分，所以更新一开始就落在最有影响的方向上，作者认为这让收敛更快、效果更好。用快速随机SVD，初始化只需几秒。\n\n与[[qlora]]结合时，PiSSA只量化残差矩阵W_res（称QPiSSA）：主成分已被移到全精度适配器里，残差的数值范围更小，量化误差也更小。\n\n摘要报告：在184M到70B的12个模型、5个生成和8个理解任务上，PiSSA在相同设置下都优于LoRA；GSM8K上Mistral-7B达到72.86%，LoRA为67.7%；LLaMA-3-70B上QPiSSA为86.05%，QLoRA为81.73%。",
+ "limits": [
+  {"text": "主成分被直接改写，微调起点就偏离原模型的“主要知识”，有研究担心这会加剧遗忘；不同任务该保留哪些奇异分量仍无定论。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "lora", "type": "solves", "note": "LoRA的“噪声加零”初始化收敛慢，PiSSA用原权重的主奇异分量初始化适配器，结构不变。"},
+  {"to": "qlora", "type": "solves", "note": "QLoRA量化整个原权重，PiSSA把主成分移出后只量化残差，初始量化误差更小。"},
+  {"to": "dora", "type": "rivals", "note": "同期改进LoRA的另一路线：DoRA分解权重的幅度与方向，PiSSA改变适配器的初始化。"}
+ ],
+ "prereq": ["peft-concept", "low-rank", "eigen-svd", "quantization-concept"],
+ "check": {"source": "https://arxiv.org/abs/2404.02948", "confirmed": "标题、三位作者、v1日期2024-04-03；摘要：LoRA“噪声与零”初始化收敛慢、PiSSA与LoRA架构相同但用W的主成分初始化A和B并冻结残差、12个模型184M–70B、5个NLG与8个NLU任务、Mistral-7B GSM8K 72.86%对LoRA 67.7%、QPiSSA初始量化误差更小、LLaMA-3-70B GSM8K 86.05%对QLoRA 81.73%、快速SVD几秒初始化。A、B的具体分配公式、NeurIPS 2024、PEFT库收录与遗忘争议为一般了解。"}
+}

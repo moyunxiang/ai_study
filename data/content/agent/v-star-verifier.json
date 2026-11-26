@@ -1,0 +1,27 @@
+{
+  "id": "v-star-verifier",
+  "who": "Arian Hosseini, Xingdi Yuan, Nikolay Malkin, Aaron Courville, Alessandro Sordoni, Rishabh Agarwal · Mila / 微软研究院 / Google DeepMind",
+  "venue": "COLM 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2402.06457"}
+  ],
+  "aka": ["V-STaR", "Verifier STaR", "自学推理者的验证器", "DPO验证器", "DPO verifier", "best-of-k验证"],
+  "problem": "STaR这类自我改进方法反复让模型解题、只拿答对的解去微调自己，大量答错的解被直接扔掉，其中「怎样算错」的信息没被利用。",
+  "idea": "答对和答错的解都留下：答对的继续训练生成器，对错成对的解用DPO训练一个验证器；测试时生成器采样很多候选，由验证器挑最可能正确的那个。",
+  "impact": "在LLaMA2 7B/13B上，数学和代码任务比已有自我改进与验证方法提高4–17个百分点；把「自我改进」与「训练验证器做best-of-N」两条线接在了一起。",
+  "method": "流程迭代3轮。每一轮：\n- 用当前生成器对每道训练题采样16个解，用标准答案（数学）或测试用例（代码）判对错；\n- 答对的解加入生成器训练集，重新微调得到更强的生成器（这一半就是[[star]]）；\n- 所有解都加入验证器训练集，按「同一道题里正确解优于错误解」组成偏好对，用[[dpo]]训练验证器。\n\n测试时，生成器对每道题采样大量候选（文中最多128个），验证器用DPO模型给出的似然对候选打分，取最高的一个。作者发现，在相同数据上，用DPO训练的验证器比传统的结果奖励模型（ORM，直接训一个对错分类头）更好：候选超过4个时ORM在GSM8K上就挑不准了。\n\n实验用[[llama-2]]和[[code-llama]]的7B、13B，在[[gsm8k]]和MBPP上训练，并迁移到MATH子集和HumanEval。7B的V-STaR在GSM8K上超过了8样本提示的LLaMA2 70B。",
+  "limits": [
+    {"text": "验证器只判断整个解答对错，不能指出错在哪一步，对长推理的纠错帮助有限。", "solved_by": ["prm-lessons"]},
+    {"text": "依赖能自动判对错的题目（有标准答案或测试用例），难以用于开放式任务。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "star", "type": "solves", "note": "STaR丢弃错误解；V-STaR把错误解变成训练验证器的负样本。"},
+    {"to": "dpo", "type": "uses", "note": "用偏好优化目标训练验证器。"},
+    {"to": "llama-2", "type": "uses", "note": "主要基座模型。"},
+    {"to": "gsm8k", "type": "uses", "note": "数学推理的训练与评测集。"},
+    {"to": "prm", "type": "rivals", "note": "同为训练验证器挑候选；OpenAI的过程奖励模型用人工逐步标注，V-STaR只用自动的结果对错。"}
+  ],
+  "prereq": ["reward-design", "instruction-tuning", "decoding-sampling", "rlhf-concept"],
+  "learn": "先读[[star]]和[[dpo]] → 读原文第3节算法1与第4节验证器对比 → 动手：对一批GSM8K题采样多个解，用答案对错构造偏好对，比较多数投票与验证器挑选的准确率。",
+  "check": {"source": "https://arxiv.org/abs/2402.06457", "confirmed": "标题、作者、v1提交于2024-02-09；摘要中利用正确与错误解、DPO验证器、4%–17%提升、LLaMA2；正文（arxiv.org/html/2402.06457）核对3轮迭代、每题采样16个、测试时128个候选、DPO验证器优于ORM且ORM在4个候选以上失效、LLaMA2/CodeLLaMA 7B与13B、7B超过LLaMA2 70B八样本。venue与单位凭一般了解。"}
+}

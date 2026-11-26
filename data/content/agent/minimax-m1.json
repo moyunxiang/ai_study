@@ -1,0 +1,26 @@
+{
+  "id": "minimax-m1",
+  "who": "MiniMax",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2506.13585"},
+    {"label": "GitHub", "url": "https://github.com/MiniMax-AI/MiniMax-M1"}
+  ],
+  "aka": ["MiniMax-M1", "M1", "CISPO", "混合注意力推理模型", "hybrid-attention reasoning model", "闪电注意力推理", "百万上下文推理模型"],
+  "problem": "推理模型靠长思维链变强，但标准softmax注意力的计算量随长度平方增长，生成几万词元的思考既慢又贵，大规模强化学习训练的成本也随之飙升。",
+  "idea": "在MiniMax-01的混合架构（大部分层用线性复杂度的闪电注意力，少数层保留softmax注意力，外加MoE）上做大规模强化学习；并提出CISPO算法，裁剪重要性采样权重而不是丢弃词元的更新。",
+  "impact": "官方称是首个开放权重的大规模混合注意力推理模型，支持100万词元上下文，整个RL训练在512张H800上三周完成、租用成本约53.47万美元；成绩与原版DeepSeek-R1、Qwen3-235B相当，软件工程和长上下文任务较强。",
+  "method": "**底座**：[[minimax-01]]，总参数4560亿、每个词元激活459亿的[[c:mixture-of-experts]]模型。它的多数层用闪电注意力（一种线性注意力实现，计算量随长度线性增长），每7个闪电注意力块后接1个普通softmax注意力块保证精度。原生支持100万词元上下文，是[[deepseek-r1]]的8倍。生成很长的思考时，这种结构的计算量增长慢得多，正好适合测试时扩展。\n\n**强化学习**：题目既有可自动判分的数学、逻辑、竞赛编程，也有在沙箱里运行的真实软件工程任务。作者提出**CISPO**：PPO/[[grpo]]式的裁剪会让被裁掉的词元完全没有梯度，作者观察到「However」「Recheck」「Wait」这类概率低但关键的反思词元在第一次在策略更新后就被裁掉了；CISPO改为裁剪重要性采样权重本身、保留所有词元的梯度。在Qwen2.5-32B基座上的对照实验中，CISPO用约一半训练步数就达到[[dapo]]的效果。\n\n**结果**：发布思考预算为4万和8万词元的两个版本（前者是后者训练的中间阶段）。官方称在标准基准上与原版DeepSeek-R1、Qwen3-235B相当或更好，在复杂软件工程、工具使用和长上下文任务上优势明显。",
+  "limits": [
+    {"text": "线性注意力层对长距离精确检索的能力弱于完整softmax注意力，混合比例需要权衡，后续版本是否沿用这一结构尚无定论。", "solved_by": []},
+    {"text": "4560亿参数的模型即使计算量省，部署时的显存需求依然很高。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "minimax-01", "type": "extends", "note": "在MiniMax-01的闪电注意力混合MoE底座上训练推理能力。"},
+    {"to": "deepseek-r1", "type": "rivals", "note": "同为开放权重的大规模RL推理模型；M1靠线性注意力降低长思考的计算成本。"},
+    {"to": "dapo", "type": "rivals", "note": "CISPO与DAPO等GRPO改进针对同一问题，分歧在于裁剪对象是词元更新还是采样权重。"},
+    {"to": "grpo", "type": "extends", "note": "CISPO在GRPO式组内比较框架上修改裁剪方式。"}
+  ],
+  "prereq": ["efficient-attention", "mixture-of-experts", "reasoning-tokens", "policy-gradient-concept", "importance-sampling"],
+  "learn": "先读[[minimax-01]]了解闪电注意力，再读[[grpo]] → 读原文的CISPO一节和训练成本分析 → 动手：在GRPO损失里分别实现「裁剪比值」与「裁剪权重但保留梯度」，比较被裁词元的梯度。",
+  "check": {"source": "https://arxiv.org/abs/2506.13585", "confirmed": "标题、v1提交于2025-06-16；摘要中首个开放权重大规模混合注意力推理模型、基于MiniMax-Text-01、4560亿/459亿参数、100万上下文为R1的8倍、CISPO裁剪重要性采样权重、512张H800三周、534,700美元、4万与8万思考预算、与R1和Qwen3-235B相当。正文（arxiv.org/html/2506.13585）核对每7个闪电注意力块接1个softmax块、反思词元被裁掉的动机、CISPO与GRPO/DAPO对照及约一半步数追平DAPO。"}
+}

@@ -1,0 +1,30 @@
+{
+  "id": "bit-fusion",
+  "who": "Hardik Sharma, Jongse Park, Naveen Suda, Liangzhen Lai, Benson Chau, Joon Kyung Kim, Vikas Chandra, Hadi Esmaeilzadeh · 佐治亚理工 / Arm / UCSD等",
+  "venue": "ISCA 2018",
+  "aka": ["Bit Fusion", "BitFusion", "位宽可变加速器", "Bit-Flexible Accelerator", "混合精度加速器", "Stripes"],
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1712.01507"}
+  ],
+  "problem": "神经网络各层需要的位宽差别很大，有的层2位就够，有的层要8位；固定位宽的加速器要么按最坏情况设计、白白浪费，要么压低位宽、损失精度。",
+  "idea": "把乘法器拆成一个个2位级的“位处理单元”，运行时按每一层需要的位宽把它们动态拼起来：低位宽时同一块硬件并行做更多次乘法，高位宽时拼成更大的乘法器。",
+  "impact": "成为“按层可变精度”加速器的代表设计和常见对照，后来各家芯片对INT8/INT4/FP4等多种精度的同时支持，走的是同一个思路。",
+  "method": "出发点是一个算法观察：[[dorefa-net]]、[[xnor-net]]等工作表明，DNN运算的位宽可以大幅降低而不损失分类精度，但每个网络、甚至每一层能承受的位宽都不同。\n\nBit Fusion的核心是由位级处理单元组成的阵列。每个基本单元只做很窄的乘法；一个8位×8位的乘法可以拆成若干个窄乘法再移位相加。于是当某层只需要2位时，各单元各自独立工作，同一块面积一次完成多次乘法；当某层需要8位时，几个单元“融合”成一个更宽的乘法器。位宽由软件按层设定，计算量和数据搬运量都降到这一层真正需要的程度。\n\n作者用Verilog实现并在45nm工艺下综合，用8个真实的前馈和循环网络评估。摘要报告：在相同面积、频率和工艺下，相对[[eyeriss]]快3.9倍、节能5.1倍；在与Stripes（另一种按位串行计算的变精度加速器）相同的面积和频率下，快2.6倍、能耗降低3.9倍；按16nm工艺推算，性能接近一块使用8位向量指令、功耗250W的Titan Xp，而功耗只有895毫瓦。",
+  "limits": [
+    {"text": "只支持整数定点运算，没有覆盖训练所需的浮点和后来流行的FP8/FP4这类低位浮点格式；每层位宽要事先通过量化实验确定。", "solved_by": ["mx-formats"]}
+  ],
+  "relations": [
+    {"to": "eyeriss", "type": "rivals", "note": "主要对照基线之一：Eyeriss固定位宽、优化数据复用；Bit Fusion在相同面积下按层变换位宽。"},
+    {"to": "dorefa-net", "type": "uses", "note": "以低比特训练工作为依据：网络可以用远低于32位的位宽运行。"},
+    {"to": "xnor-net", "type": "uses", "note": "极低位宽（二值）网络说明有些层只需1–2位，这是位级拆分的动机。"}
+  ],
+  "prereq": ["quantization-concept", "matrix-multiplication", "floating-point"],
+  "terms": [
+    {"t": "位宽", "d": "一个数用多少个二进制位表示；位宽越小，乘法器越小、搬运的数据越少，但能表示的数值越粗。"}
+  ],
+  "learn": "先读[[c:quantization-concept]]，再用纸笔把一个4位×4位乘法拆成四个2位×2位乘法加移位，就能理解“融合”；然后读本文对Eyeriss和Stripes的比较。",
+  "check": {
+    "source": "https://arxiv.org/abs/1712.01507",
+    "confirmed": "arXiv核对标题、8位作者、v1日期2017-12-05与摘要：位级处理单元动态融合、8个前馈与循环网络、45nm综合、相对Eyeriss 3.9倍速度与5.1倍节能、相对Stripes 2.6倍与3.9倍、16nm下接近250W Titan Xp而功耗895mW。ISCA 2018与作者单位按一般了解写；“2位级单元”的粒度按一般了解写。"
+  }
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Clipper预测服务系统（2016） · AI脉络</title>
+<meta name="description" content="机器学习框架几乎都只管训练、不管上线；实时应用要在几十毫秒内、在高并发下给出预测，各团队只能为每个框架、每个模型各写一套服务代码。 在应用和各种机器学习框架之间加一个通用的服务层：每个模型装进独立容器，上层统一做缓存、自适应批处理和多模型选择，不改动底层框架就降低延迟、提高吞吐和准确率。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/clipper.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Clipper预测服务系统（2016）">
+<meta property="og:description" content="机器学习框架几乎都只管训练、不管上线；实时应用要在几十毫秒内、在高并发下给出预测，各团队只能为每个框架、每个模型各写一套服务代码。 在应用和各种机器学习框架之间加一个通用的服务层：每个模型装进独立容器，上层统一做缓存、自适应批处理和多模型选择，不改动底层框架就降低延迟、提高吞吐和准确率。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/clipper.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/clipper">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 推理服务引擎</div>
+<h1>Clipper预测服务系统</h1>
+<div class="full">Clipper: A Low-Latency Online Prediction Serving System</div>
+<div class="meta"><span>2016.12</span><span>论文</span><span>延伸</span><span>NSDI 2017</span><span>Daniel Crankshaw, Xin Wang, Giulio Zhou, Michael J. Franklin, Joseph E. Gonzalez, Ion Stoica · 加州大学伯克利分校</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1612.03079" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/clipper">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>机器学习框架几乎都只管训练、不管上线；实时应用要在几十毫秒内、在高并发下给出预测，各团队只能为每个框架、每个模型各写一套服务代码。</p></div><div><h4>方法</h4><p>在应用和各种机器学习框架之间加一个通用的服务层：每个模型装进独立容器，上层统一做缓存、自适应批处理和多模型选择，不改动底层框架就降低延迟、提高吞吐和准确率。</p></div><div><h4>影响</h4><p>最早被广泛引用的通用模型服务系统之一，把“按延迟目标自适应调整批大小”等做法带进学术界，是此后推理服务论文追溯的起点之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>Clipper分两层。<b>模型抽象层</b>把每个模型（来自<a class="ln" href="../n/scikit-learn.html">scikit-learn</a>、<a class="ln" href="../n/spark.html">Spark</a>、<a class="ln" href="../n/tensorflow.html">TensorFlow</a>、Caffe等）封装在独立容器里，通过统一的RPC接口调用，新增模型不必改应用代码。这一层做两件事：<b>预测缓存</b>，相同输入直接返回结果；<b>自适应批处理</b>，把多个请求攒成一批送给模型以提高吞吐，同时按服务延迟目标（SLO）用类似TCP拥塞控制的“加性增、乘性减”动态调整批大小，保证不超时。</p><p><b>模型选择层</b>同时维护多个候选模型，把它们看作多臂老虎机的臂：根据用户反馈在线调整权重，选出最好的单个模型或把多个模型的预测集成，既能提高准确率，也能在某个模型变慢或出错时降级到其他模型，使预测更稳健。</p><p>摘要报告：在四个常见机器学习基准数据集上，Clipper能满足在线服务的延迟、准确率和吞吐要求；与TensorFlow Serving相比，吞吐和延迟相当，同时额外支持模型组合与在线学习。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>以请求为单位的批处理只适合一次前向就结束的模型；生成式大模型的每个请求要迭代成百上千步，需要按迭代调度和专门的KV缓存管理。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/orca-serving.html">Orca连续批处理</a> <a class="chip hue" style="--h:192" href="../n/vllm.html">vLLM与PagedAttention</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/tensorflow.html">TensorFlow</a><span class="yr">2015.11 · 系统·效率</span><div class=nt>论文以TensorFlow Serving为对照，Clipper在吞吐与延迟相当的同时支持跨框架的模型组合。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/scikit-learn.html">scikit-learn</a><span class="yr">2010.02 · 系统·效率</span><div class=nt>支持把scikit-learn等多种框架的模型放进容器统一服务。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/spark.html">Spark</a><span class="yr">2010.06 · 系统·效率</span><div class=nt>同出伯克利AMPLab/RISELab，支持服务Spark MLlib训练出的模型。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/orca-serving.html">Orca连续批处理</a><span class="yr">2022.07 · 系统·效率</span><div class=nt>以请求为单位的批处理只适合一次前向就结束的模型；生成式大模型的每个请求要迭代成百上千步，需要按迭代调度和专门的KV缓存管理。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/vllm.html">vLLM与PagedAttention</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>以请求为单位的批处理只适合一次前向就结束的模型；生成式大模型的每个请求要迭代成百上千步，需要按迭代调度和专门的KV缓存管理。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a> <a class="chip c" href="../c/training-vs-inference.html">训练与推理的算力差别</a> <a class="chip c" href="../c/exploration-exploitation.html">探索与利用</a></p>
+<h2>本篇术语</h2><ul><li><b>SLO（服务等级目标）</b>　系统对延迟等指标的承诺，例如“99%的请求要在20毫秒内返回”。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1612.03079" rel="noopener">https://arxiv.org/abs/1612.03079</a>（标题、六位作者、v1日期2016-12-09；摘要：多数框架只管训练不管部署、通用低延迟预测服务系统、模块化架构跨框架部署、缓存/批处理/自适应模型选择、不修改底层框架、四个基准数据集、与TensorFlow Serving吞吐延迟相当并支持模型组合与在线学习。加性增乘性减的批大小调整、多臂老虎机选择、NSDI 2017为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Clipper%E9%A2%84%E6%B5%8B%E6%9C%8D%E5%8A%A1%E7%B3%BB%E7%BB%9F%EF%BC%88clipper%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aclipper%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/clipper.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="qsgd.html"><small>本分支上一个 · 2016.10</small><b>QSGD梯度量化</b></a><a class="r" href="colab.html"><small>本分支下一个 · 2017</small><b>Google Colab</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

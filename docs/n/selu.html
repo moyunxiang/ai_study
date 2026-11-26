@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SELU自归一化网络（2017） · AI脉络</title>
+<meta name="description" content="深度学习在卷积网络和循环网络上成功了，普通全连接前馈网络却大多只能做浅，层数一多就训不动；在全连接网络上又因批次统计噪声而不太好用。 设计一个激活函数SELU，让各层激活的均值和方差在层层传递中自动收敛到0和1，不需要显式的归一化层，深层全连接网络也能稳定训练。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/selu.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SELU自归一化网络（2017）">
+<meta property="og:description" content="深度学习在卷积网络和循环网络上成功了，普通全连接前馈网络却大多只能做浅，层数一多就训不动；在全连接网络上又因批次统计噪声而不太好用。 设计一个激活函数SELU，让各层激活的均值和方差在层层传递中自动收敛到0和1，不需要显式的归一化层，深层全连接网络也能稳定训练。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/selu.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/selu">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 深层训练配方</div>
+<h1>SELU自归一化网络</h1>
+<div class="full">Self-Normalizing Neural Networks</div>
+<div class="meta"><span>2017.06</span><span>论文</span><span>延伸</span><span>NeurIPS 2017</span><span>Günter Klambauer, Thomas Unterthiner, Andreas Mayr, Sepp Hochreiter · 林茨大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1706.02515" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/bioinf-jku/SNNs" rel="noopener">官方代码 ↗</a><a class="btn sm" href="../index.html#/n/selu">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>深度学习在卷积网络和循环网络上成功了，普通全连接前馈网络却大多只能做浅，层数一多就训不动；<a class="ln" href="../n/batchnorm.html">Batch Normalization</a>在全连接网络上又因批次统计噪声而不太好用。</p></div><div><h4>方法</h4><p>设计一个激活函数SELU，让各层激活的均值和方差在层层传递中自动收敛到0和1，不需要显式的归一化层，深层全连接网络也能稳定训练。</p></div><div><h4>影响</h4><p>SELU成为全连接网络和表格数据深度学习中常被尝试的激活函数，PyTorch和TensorFlow都内置了它和配套的AlphaDropout；“通过激活函数和初始化让信号自动保持归一”的思路也影响了后来的无归一化网络研究。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>SELU的形式是：x&gt;0时 <code>selu(x) = λx</code>，x≤0时 <code>selu(x) = λα(eˣ − 1)</code>，其中 <code>λ ≈ 1.0507</code>、<code>α ≈ 1.6733</code> 是解出来的固定常数。它就是把<a class="ln" href="../n/elu.html">ELU指数线性单元</a>乘了一个大于1的系数λ：负区间提供负值把均值往下拉，正区间斜率大于1可以把过小的方差放大，负区间的饱和又能压住过大的方差。</p><p>作者把“一层网络把输入激活的均值和方差映射成输出的均值和方差”看成一个映射g，并用巴拿赫不动点定理证明：在权重按均值0、方差1/n初始化（n为输入维度）的条件下，(0, 1)是g的一个吸引不动点，均值方差接近(0, 1)的激活经过很多层后会收敛到(0, 1)，即使有噪声和扰动也是如此；对于方差不接近1的情形，作者给出了方差的上下界，从而梯度不会消失或爆炸。为了在使用dropout时不破坏这个性质，论文还提出了AlphaDropout，把被丢弃的单元设为负饱和值并做仿射修正。</p><p>摘要报告：在UCI的121个任务上，自归一化网络显著优于所有对比的前馈网络方法；在Tox21药物发现数据上胜过所有对比方法（包括随机森林、SVM），在一个天文数据集上创了新纪录；获胜的网络结构往往很深。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>自归一化的证明依赖特定的权重初始化和输入近似独立的假设，换成卷积、残差或注意力结构时性质不一定成立。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>在图像和语言等主流任务上，带归一化层的残差网络和Transformer仍是主流，SELU网络没有取代它们。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/batchnorm.html">Batch Normalization</a><span class="yr">2015.02 · 基础</span><div class=nt>BN显式地用批次统计量归一化，SELU让激活函数本身把均值方差推向0和1。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/vanishing-gradient.html">梯度消失问题</a><span class="yr">1994 · 基础</span><div class=nt>证明激活方差有上下界，从而排除了深层全连接网络中的梯度消失与爆炸。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/he-init.html">He初始化与PReLU</a><span class="yr">2015.02 · 基础</span><div class=nt>自归一化性质要求按输入维度缩放方差的初始化，与He/Xavier类初始化思路一致。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/elu.html">ELU指数线性单元</a><span class="yr">2015.11 · 基础</span><div class=nt>同一实验室的ELU乘以系数λ并固定α，得到具有自归一化性质的SELU。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/neuron-activation.html">神经元与激活函数</a> <a class="chip c" href="../c/mlp.html">多层感知机</a> <a class="chip c" href="../c/initialization.html">参数初始化</a> <a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/expectation-variance.html">期望与方差</a></p>
+<h2>本篇术语</h2><ul><li><b>吸引不动点</b>　一个映射反复作用后，附近的点都会被拉向它的那个点；这里指层层传递后均值方差会收敛到(0, 1)。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/elu.html">ELU指数线性单元</a>和<a class="ln" href="../n/batchnorm.html">Batch Normalization</a>；用NumPy搭一个50层的全连接网络，输入随机高斯数据，分别用ReLU与SELU（配合方差1/n初始化）前向传播，打印每层激活的均值和方差对比。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1706.02515" rel="noopener">https://arxiv.org/abs/1706.02515</a>（标题、4位作者、arXiv v1提交于2017-06-08；摘要中普通FNN大多较浅、激活自动收敛到零均值单位方差、SELU、巴拿赫不动点定理、方差上下界排除梯度消失与爆炸、UCI 121个任务、Tox21、天文数据集新纪录、获胜结构往往很深。λ与α数值、AlphaDropout、机构与NeurIPS 2017来自一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SELU%E8%87%AA%E5%BD%92%E4%B8%80%E5%8C%96%E7%BD%91%E7%BB%9C%EF%BC%88selu%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aselu%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/selu.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="catboost.html"><small>本分支上一个 · 2017.06</small><b>CatBoost</b></a><a class="r" href="lars.html"><small>本分支下一个 · 2017.08</small><b>LARS逐层自适应</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

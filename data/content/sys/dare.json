@@ -1,0 +1,24 @@
+{
+ "id": "dare",
+ "who": "Le Yu, Bowen Yu, Haiyang Yu, Fei Huang, Yongbin Li · 阿里巴巴",
+ "venue": "ICML 2024",
+ "aka": ["DARE", "Drop And REscale", "超级马里奥合并", "Super Mario", "delta参数稀疏化", "DARE-TIES"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2311.03099"},
+  {"label": "GitHub", "url": "https://github.com/yule-BUAA/MergeLM"}
+ ],
+ "problem": "把几个从同一基座微调出来的模型合并成一个时，各自的参数改动会互相干扰，合并后的模型往往哪项能力都不如原来。",
+ "idea": "先对每个模型的增量参数（微调后减去基座）随机丢掉比例p，剩下的乘以1/(1−p)保持期望不变；增量变得极稀疏，再合并时冲突大大减少。",
+ "impact": "成为模型合并的标准预处理之一，MergeKit里的dare_ties、dare_linear合并方法直接来自它，开源社区用它拼出了大量排行榜上的合并模型。",
+ "method": "[[task-arithmetic]]把“微调后权重减去基座权重”称为任务向量，多个任务向量相加就能合并能力；[[ties-merging]]进一步通过修剪小值、解决符号冲突来减少干扰。DARE关注的是增量本身有多冗余。\n\n作者发现，监督微调得到的增量数值很小（通常在0.002以内），而且极度冗余。DARE的操作和[[dropout]]几乎一样：对增量 `δ = θ_SFT − θ_base` 的每个元素，以概率p置零，其余元素乘以 `1/(1−p)`，然后 `θ = θ_base + δ'`。实验表明，即使丢掉90%甚至99%的增量，模型的能力也几乎不受影响。\n\n把DARE用于合并：先分别稀疏化多个同源模型的增量，再用任务算术或TIES等方式融合，参数之间的重叠与冲突减少，合并模型能同时保有多种能力。论文发现模型越大这个现象越明显，合并模型有时能超过任一源模型；作者用它合并出的模型曾在Open LLM Leaderboard的7B模型中排名第一。",
+ "limits": [
+  {"text": "只适用于从同一基座微调、增量较小的模型；增量大（如继续预训练过）时随机丢弃会明显损伤性能，合并结果也难以预测。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "task-arithmetic", "type": "extends", "note": "在任务向量相加的合并框架上，先对任务向量做随机稀疏化以减少干扰。"},
+  {"to": "ties-merging", "type": "rivals", "note": "TIES按数值大小修剪并解决符号冲突，DARE改用随机丢弃加重缩放，两者常组合成DARE-TIES。"},
+  {"to": "dropout", "type": "uses", "note": "丢弃后按1/(1−p)放大保留元素的做法与Dropout相同，只是作用对象是增量参数。"}
+ ],
+ "prereq": ["pretrain-finetune", "dropout-concept", "expectation-variance"],
+ "check": {"source": "https://arxiv.org/abs/2311.03099", "confirmed": "标题、五位作者、v1日期2023-11-06；摘要：同源模型吸收能力无需重训或GPU、DARE以比例p丢弃增量参数并按1/(1−p)重缩放、SFT增量数值范围通常在0.002以内且极度冗余、可去掉90%甚至99%、合并多个任务模型、大模型中现象更明显且可能超过任一源模型、合并模型在Open LLM Leaderboard 7B中排名第一。ICML 2024、阿里巴巴机构、MergeKit中的dare方法为一般了解。"}
+}

@@ -1,0 +1,24 @@
+{
+ "id": "lookahead-decoding",
+ "who": "Yichao Fu, Peter Bailis, Ion Stoica, Hao Zhang · 加州大学圣地亚哥分校, 加州大学伯克利分校等",
+ "venue": "ICML 2024",
+ "aka": ["Lookahead", "前瞻解码", "Jacobi解码", "Jacobi decoding", "n-gram池", "无草稿模型推测解码"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2402.02057"},
+  {"label": "GitHub", "url": "https://github.com/hao-ai-lab/LookaheadDecoding"}
+ ],
+ "problem": "推测解码要先找一个和目标模型匹配的小草稿模型，或者额外训练草稿头，换一个模型就得重新准备，也不容易推广。",
+ "idea": "不要草稿模型：让大模型自己用Jacobi迭代并行地猜未来好几个位置的词，从猜测轨迹里收集n-gram放进池子，同一次前向里再验证池中候选，猜对几个就一次接受几个。",
+ "impact": "无需辅助模型、输出与原模型完全一致的并行解码代表方法，常与Medusa、EAGLE并列比较，后续的Jacobi/一致性解码工作沿着它继续推进。",
+ "method": "自回归解码每步只出一个词，GPU算力大量闲置，瓶颈在显存带宽。[[speculative-decoding]]用小模型先猜、大模型一次验证，效果好但依赖合适的草稿模型。\n\nLookahead Decoding的出发点是**Jacobi迭代**：把未来n个位置先随便填上词，让模型同时为这n个位置各预测一次，用新预测替换旧值，反复迭代，直到不再变化。单纯的Jacobi解码很少能一次猜对多个词，但迭代过程中会冒出很多正确的片段。于是每次前向同时做两件事：**前瞻分支**，在一个2D窗口里沿多个位置继续Jacobi迭代，把产生的n-gram存进n-gram池；**验证分支**，从池里挑出以当前最后一个词开头的候选n-gram，和[[blockwise-decoding]]一样用一次前向检查它们，接受最长的正确前缀。两者用特殊的注意力掩码合并进同一次前向，可以与[[flashattention]]兼容。\n\n论文指出，它用每步增加的log(FLOPs)换取总解码步数的减少。摘要报告：在MT-bench上解码最多加速1.8倍，在多GPU强扩展的代码补全任务上最多4倍。",
+ "limits": [
+  {"text": "每步都要多算大量候选，在批量较大、GPU算力已被占满的服务场景里加速明显缩小甚至变慢；加速比也通常低于训练过草稿头的方法。", "solved_by": ["eagle-2", "eagle-3"]}
+ ],
+ "relations": [
+  {"to": "speculative-decoding", "type": "solves", "note": "推测解码依赖合适的草稿模型，Lookahead用模型自身的Jacobi迭代产生候选，无需辅助模型或数据库。"},
+  {"to": "blockwise-decoding", "type": "extends", "note": "沿用“一次前向验证多个候选词、接受正确前缀”的思路，但候选来自Jacobi迭代收集的n-gram。"},
+  {"to": "flashattention", "type": "uses", "note": "前瞻与验证分支合并在一次前向里，可与FlashAttention等显存高效注意力配合。"}
+ ],
+ "prereq": ["autoregressive", "decoding-sampling", "kv-cache", "memory-bandwidth"],
+ "check": {"source": "https://arxiv.org/abs/2402.02057", "confirmed": "标题、四位作者、v1日期2024-02-03；摘要：自回归解码受显存带宽限制、现有方法需要草稿模型、Lookahead是精确并行解码且不需要辅助模型或数据库、以每步log(FLOPs)换总步数、与FlashAttention兼容、MT-bench最多1.8倍、多GPU代码补全最多4倍。Jacobi迭代、2D窗口、n-gram池、ICML 2024、机构为一般了解。"}
+}

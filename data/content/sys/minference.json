@@ -1,0 +1,25 @@
+{
+ "id": "minference",
+ "who": "Huiqiang Jiang, Yucheng Li, Chengruidong Zhang, Qianhui Wu, Xufang Luo, Surin Ahn, Zhenhua Han, Amir H. Abdi et al. · 微软",
+ "venue": "NeurIPS 2024",
+ "aka": ["MInference 1.0", "动态稀疏注意力", "dynamic sparse attention", "预填充加速", "prefill acceleration", "Vertical-Slash"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2407.02490"},
+  {"label": "项目页", "url": "https://aka.ms/MInference"}
+ ],
+ "problem": "注意力计算量随长度平方增长，单张A100上8B模型读完一百万token的提示（预填充）要约30分钟；已有的预填充加速方法用到长上下文模型上，要么精度掉得多，要么实际不快。",
+ "idea": "长上下文注意力矩阵大多稀疏且有固定形状：A形、竖线加斜线、块稀疏三种。离线为每个注意力头选定一种模式，推理时根据当前输入快速估出稀疏索引，再用专门的GPU内核只算这些位置。",
+ "impact": "长上下文预填充加速的常用基线，“竖线+斜线”稀疏模式被后续稀疏注意力与KV压缩工作反复引用，代码已接入vLLM等推理框架。",
+ "method": "用户输入一段很长的提示时，推理先要把整段提示过一遍模型、建好[[c:kv-cache]]，这一步叫预填充，计算量随长度平方增长。解码阶段的KV压缩方法（如[[streamingllm]]）只省后面的显存，帮不了预填充。\n\nMInference观察到长上下文模型的注意力矩阵绝大部分接近零，非零部分集中在三种形状：**A形**（开头的少数token加对角线附近的局部窗口，即注意力汇聚现象）、**竖线-斜线**（某些固定位置的token被所有后续token关注形成竖线，以及与当前位置保持固定间隔的斜线）、**块稀疏**（成块聚集的重要区域）。做法分两步：离线在少量样本上为每个注意力头搜索最合适的模式及其参数；在线推理时，用最后若干个query与所有key的少量计算估计出这条请求具体是哪几条竖线、斜线或哪些块，再调用基于Triton和[[flashattention-2]]思路写的稀疏内核只算这些部分。不需要修改预训练或微调模型。\n\n摘要报告：在InfiniteBench、RULER、PG-19、大海捞针等任务及LLaMA-3-1M、GLM4-1M、Yi-200K、Phi-3-128K、Qwen2-128K等模型上，A100上的预填充延迟最多降低10倍，同时保持精度。",
+ "limits": [
+  {"text": "只加速预填充，解码阶段的KV缓存仍是完整的；稀疏模式需要为每个模型离线搜索，长度较短时估计索引的开销抵消了收益。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "flashattention-2", "type": "extends", "note": "在FlashAttention式分块内核的基础上，只计算动态选出的稀疏块与竖线斜线位置。"},
+  {"to": "streamingllm", "type": "extends", "note": "A形模式即StreamingLLM发现的注意力汇聚加局部窗口，MInference把它作为三种模式之一用于预填充。"},
+  {"to": "ruler", "type": "uses", "note": "用RULER、大海捞针等长上下文基准验证稀疏化后精度不降。"},
+  {"to": "efficient-inference", "type": "solves", "note": "长提示的预填充计算随长度平方增长，MInference用动态稀疏注意力把百万token预填充的延迟降低最多10倍。"}
+ ],
+ "prereq": ["self-attention", "kv-cache", "context-window", "cpu-gpu"],
+ "check": {"source": "https://arxiv.org/abs/2407.02490", "confirmed": "标题、作者（Jiang, Li等12人）、v1日期2024-07-02；摘要：注意力二次复杂度、8B模型单张A100预填充1M token约30分钟、三种模式A-shape/Vertical-Slash/Block-Sparse、离线为每个头确定模式、推理时动态构建稀疏索引、优化的GPU内核、无需修改预训练或微调、InfiniteBench/RULER/PG-19/大海捞针、LLaMA-3-1M/GLM4-1M/Yi-200K/Phi-3-128K/Qwen2-128K、A100上预填充最多10倍加速。用最后若干query估计索引、Triton实现、NeurIPS 2024、接入vLLM为一般了解。"}
+}

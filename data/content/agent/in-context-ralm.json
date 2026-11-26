@@ -1,0 +1,79 @@
+{
+  "id": "in-context-ralm",
+  "who": "Ori Ram, Yoav Levine, Itay Dalmedigos, Dor Muhlgay, Amnon Shashua, Kevin Leyton-Brown, Yoav Shoham · AI21 Labs",
+  "venue": "TACL 2023",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2302.00083"
+    },
+    {
+      "label": "GitHub",
+      "url": "https://github.com/AI21Labs/in-context-ralm"
+    }
+  ],
+  "aka": [
+    "In-Context RALM",
+    "上下文内检索增强",
+    "RALM",
+    "retrieval-augmented language modeling",
+    "检索步长",
+    "retrieval stride",
+    "BM25检索增强语言模型"
+  ],
+  "problem": "已有的检索增强语言模型（RETRO、kNN-LM等）都要改架构或专门训练，部署麻烦，现成的预训练模型和API模型用不上。",
+  "idea": "什么都不改：生成时每隔几个词元，用最近的一段文本当查询去检索，把检索到的文档直接拼在输入前面，模型照常续写。",
+  "impact": "说明「把文档塞进上下文」这一最朴素的做法就有相当于把模型放大2–3倍的效果，并给出检索步长、查询长度等实用设置，是今天大多数RAG系统做法的直接原型。",
+  "method": "此前的[[retro]]用专门的交叉注意力模块读取检索结果，[[knn-lm]]要在输出层混入近邻分布，都需要训练或修改模型。In-Context RALM的做法只有一句话：**把检索到的文档拼到前缀前面**。\n\n几个关键设置：\n- **检索步长 s**：每生成 s 个词元就重新检索一次。越频繁效果越好但越慢，文中取 s = 4；RETRO相当于 s = 64，困惑度明显更差。\n- **查询长度 ℓ**：只用前缀最后 ℓ 个词元作查询，太短缺上下文、太长冲淡最近内容；[[bm25]]取32，稠密检索取64。\n- **检索器**：在语言建模上，简单的BM25反而胜过几种稠密检索器。\n- **重排序**：可以用一个小语言模型零样本地给候选文档打分（看它能不能更好地预测最近一段文本），也可以训练一个RoBERTa分类器专门挑「对续写有帮助」的文档，后者收益更大。\n\n结果：在WikiText-103等语料上，加检索带来的困惑度下降相当于把模型参数放大2–3倍；6.7B的OPT加检索可与66B的OPT持平；在开放域问答上LLaMA-13B的NQ精确匹配从12.0升到31.0。",
+  "limits": [
+    {
+      "text": "检索器和语言模型互不知情，检索器并不知道哪些文档真正帮助模型预测（同期的REPLUG用语言模型的反馈训练检索器来补这一点）。",
+      "solved_by": []
+    },
+    {
+      "text": "每4个词元检索一次的设置在长文本生成时开销很大，何时需要检索没有判断机制。",
+      "solved_by": [
+        "flare",
+        "self-rag"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "retro",
+      "type": "solves",
+      "note": "不需要RETRO那样的专门架构和训练，现成模型直接用，且步长更小效果更好。"
+    },
+    {
+      "to": "knn-lm",
+      "type": "rivals",
+      "note": "kNN-LM在输出分布层面混入检索，本文在输入层面拼接文档。"
+    },
+    {
+      "to": "bm25",
+      "type": "uses",
+      "note": "主力检索器，在语言建模上胜过稠密检索器。"
+    },
+    {
+      "to": "rag",
+      "type": "extends",
+      "note": "把检索—生成框架推到无需训练、对任意预训练模型即插即用。"
+    },
+    {
+      "to": "replug",
+      "type": "rivals",
+      "note": "前一天公开的同类工作：REPLUG分文档集成并用LM训练检索器，本文直接拼接、不训练检索器。"
+    }
+  ],
+  "prereq": [
+    "retrieval",
+    "language-model",
+    "perplexity",
+    "context-window"
+  ],
+  "learn": "先读[[rag]]和[[retro]] → 读原文第3节设计选择（步长、查询长度）和第5节重排序 → 动手：用BM25检索维基段落拼到GPT-2前面，测有无检索时的困惑度差别。",
+  "check": {
+    "source": "https://arxiv.org/abs/2302.00083",
+    "confirmed": "标题、作者、v1提交于2023-01-31；摘要中不改架构、前置文档、现成检索器带来大收益；正文（arxiv.org/html/2302.00083）核对 s=4、RETRO相当于s=64、BM25查询长度32/稠密64、BM25胜过稠密检索器、相当于2–3倍参数、OPT 6.7B对66B、LLaMA-13B NQ 12.0→31.0。venue凭一般了解。"
+  }
+}

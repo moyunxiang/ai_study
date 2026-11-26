@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Pharaoh短语解码器（2004） · AI脉络</title>
+<meta name="description" content="短语统计翻译模型已经提出，但要把它真正用起来，需要一个能在指数多的切分、翻译和调序组合里快速找出高分译文的解码器，当时没有公开可用的高效实现。 Pharaoh实现了短语翻译的集束搜索：从左到右逐步生成译文，每步选一段尚未翻译的源语言短语加上它的一个译法，把覆盖了同样多源词的假设放进同一个栈里按得分…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/pharaoh.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Pharaoh短语解码器（2004）">
+<meta property="og:description" content="短语统计翻译模型已经提出，但要把它真正用起来，需要一个能在指数多的切分、翻译和调序组合里快速找出高分译文的解码器，当时没有公开可用的高效实现。 Pharaoh实现了短语翻译的集束搜索：从左到右逐步生成译文，每步选一段尚未翻译的源语言短语加上它的一个译法，把覆盖了同样多源词的假设放进同一个栈里按得分…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/pharaoh.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/pharaoh">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 规则与统计翻译</div>
+<h1>Pharaoh短语解码器</h1>
+<div class="full">Pharaoh: A Beam Search Decoder for Phrase-Based Statistical Machine Translation Models</div>
+<div class="meta"><span>2004.09</span><span>系统</span><span>延伸</span><span>AMTA 2004</span><span>Philipp Koehn · 麻省理工学院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://link.springer.com/chapter/10.1007/978-3-540-30194-3_13" rel="noopener">Springer ↗</a><a class="btn sm" href="../index.html#/n/pharaoh">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>短语统计翻译模型已经提出，但要把它真正用起来，需要一个能在指数多的切分、翻译和调序组合里快速找出高分译文的解码器，当时没有公开可用的高效实现。</p></div><div><h4>方法</h4><p>Pharaoh实现了短语翻译的集束搜索：从左到右逐步生成译文，每步选一段尚未翻译的源语言短语加上它的一个译法，把覆盖了同样多源词的假设放进同一个栈里按得分加未来代价剪枝，并能输出词图供重打分。</p></div><div><h4>影响</h4><p>作为免费提供的短语翻译解码器，被大量研究组用作实验基线；它的栈解码算法、未来代价估计和词图输出直接被开源工具包Moses继承。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/phrase-smt.html">短语统计机器翻译</a>把翻译看成：把源句切成若干短语，每个短语换成目标语言短语，再调整顺序；得分由<a class="ln" href="../n/log-linear-smt.html">对数线性翻译模型</a>式的若干特征加权组合，包括短语翻译概率、语言模型、调序惩罚和长度惩罚。可能的组合数随句长指数增长，必须靠启发式搜索。</p><p>Pharaoh的解码过程：一个<b>假设</b>记录已经覆盖了哪些源词、已生成的译文和当前得分。每次扩展从未覆盖的源词里选一段连续短语，加上短语表里的一个译法。所有覆盖了k个源词的假设放进第k个<b>栈</b>，每个栈只保留得分最高的若干个（集束搜索），并合并最后几个目标词相同、覆盖相同的假设（这是动态规划式的重组）。只比当前得分会偏向先翻译容易的部分，所以每个假设还要加上对剩余源词的<b>未来代价</b>估计。搜索完成后可以输出译文的格子（词图）或n-best列表，供<a class="ln" href="../n/mert.html">最小错误率训练MERT</a>调参或更复杂的模型重打分。</p><p>摘要称它是一个免费提供的短语翻译解码器，实现了带词图生成和外部组件XML标注的高效动态规划搜索算法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>以二进制形式发布、不开源，研究者无法修改解码算法或加入新特征。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/moses.html">Moses</a></div></li><li>调序只靠距离惩罚和限制最大跳跃距离，长距离的语序差异（如中英文的定语从句）处理不好。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/hiero.html">层次短语翻译Hiero</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/phrase-smt.html">短语统计机器翻译</a><span class="yr">2003.05 · NLP</span><div class=nt>实现的就是Koehn等2003年短语翻译模型的解码。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/mert.html">最小错误率训练MERT</a><span class="yr">2003.07 · NLP</span><div class=nt>输出n-best列表，供最小错误率训练调整特征权重。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/log-linear-smt.html">对数线性翻译模型</a><span class="yr">2002.07 · NLP</span><div class=nt>译文得分是多种特征的对数线性组合，权重可以按开发集调整。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/hiero.html">层次短语翻译Hiero</a><span class="yr">2005.06 · NLP</span><div class=nt>调序只靠距离惩罚和限制最大跳跃距离，长距离的语序差异（如中英文的定语从句）处理不好。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/moses.html">Moses</a><span class="yr">2007.06 · NLP</span><div class=nt>以二进制形式发布、不开源，研究者无法修改解码算法或加入新特征。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/dynamic-programming.html">动态规划</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/word-alignment.html">噪声信道与词对齐</a> <a class="chip c" href="../c/big-o.html">时间与空间复杂度</a></p>
+<h2>本篇术语</h2><ul><li><b>栈解码</b>　按已翻译的源词数把部分译文假设分组，每组只保留得分最高的若干个，逐组向后扩展。</li><li><b>未来代价</b>　对尚未翻译的源词部分预估一个最低代价，加到当前得分上，使覆盖不同部分的假设能公平比较。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/phrase-smt.html">短语统计机器翻译</a>的讲解 → 读Koehn《Statistical Machine Translation》教材第6章「解码」 → 动手：用Moses在一个小的平行语料上训练短语表，调大调小栈大小，观察BLEU和解码时间的变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://link.springer.com/chapter/10.1007/978-3-540-30194-3_13" rel="noopener">https://link.springer.com/chapter/10.1007/978-3-540-30194-3_13</a>（Springer页：标题、作者Koehn、AMTA 2004论文集115–124页、摘要（免费提供的短语翻译解码器，高效动态规划搜索算法，词图生成，外部组件XML标注）。栈、假设重组、未来代价、n-best输出与MERT的配合按Koehn教材的一般了解写；作者当时的机构凭一般了解；不写数字。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Pharaoh%E7%9F%AD%E8%AF%AD%E8%A7%A3%E7%A0%81%E5%99%A8%EF%BC%88pharaoh%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Apharaoh%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/pharaoh.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="textrank.html"><small>本分支上一个 · 2004.07</small><b>TextRank</b></a><a class="r" href="hierarchical-softmax.html"><small>本分支下一个 · 2005</small><b>层次softmax语言模型</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Lookahead前瞻解码（2024） · AI脉络</title>
+<meta name="description" content="推测解码要先找一个和目标模型匹配的小草稿模型，或者额外训练草稿头，换一个模型就得重新准备，也不容易推广。 不要草稿模型：让大模型自己用Jacobi迭代并行地猜未来好几个位置的词，从猜测轨迹里收集n-gram放进池子，同一次前向里再验证池中候选，猜对几个就一次接受几个。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/lookahead-decoding.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Lookahead前瞻解码（2024）">
+<meta property="og:description" content="推测解码要先找一个和目标模型匹配的小草稿模型，或者额外训练草稿头，换一个模型就得重新准备，也不容易推广。 不要草稿模型：让大模型自己用Jacobi迭代并行地猜未来好几个位置的词，从猜测轨迹里收集n-gram放进池子，同一次前向里再验证池中候选，猜对几个就一次接受几个。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/lookahead-decoding.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/lookahead-decoding">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 解码与生成控制</div>
+<h1>Lookahead前瞻解码</h1>
+<div class="full">Break the Sequential Dependency of LLM Inference Using Lookahead Decoding</div>
+<div class="meta"><span>2024.02</span><span>论文</span><span>延伸</span><span>ICML 2024</span><span>Yichao Fu, Peter Bailis, Ion Stoica, Hao Zhang · 加州大学圣地亚哥分校, 加州大学伯克利分校等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2402.02057" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/hao-ai-lab/LookaheadDecoding" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/lookahead-decoding">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>推测解码要先找一个和目标模型匹配的小草稿模型，或者额外训练草稿头，换一个模型就得重新准备，也不容易推广。</p></div><div><h4>方法</h4><p>不要草稿模型：让大模型自己用Jacobi迭代并行地猜未来好几个位置的词，从猜测轨迹里收集n-gram放进池子，同一次前向里再验证池中候选，猜对几个就一次接受几个。</p></div><div><h4>影响</h4><p>无需辅助模型、输出与原模型完全一致的并行解码代表方法，常与Medusa、EAGLE并列比较，后续的Jacobi/一致性解码工作沿着它继续推进。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>自回归解码每步只出一个词，GPU算力大量闲置，瓶颈在显存带宽。<a class="ln" href="../n/speculative-decoding.html">推测解码</a>用小模型先猜、大模型一次验证，效果好但依赖合适的草稿模型。</p><p>Lookahead Decoding的出发点是<b>Jacobi迭代</b>：把未来n个位置先随便填上词，让模型同时为这n个位置各预测一次，用新预测替换旧值，反复迭代，直到不再变化。单纯的Jacobi解码很少能一次猜对多个词，但迭代过程中会冒出很多正确的片段。于是每次前向同时做两件事：<b>前瞻分支</b>，在一个2D窗口里沿多个位置继续Jacobi迭代，把产生的n-gram存进n-gram池；<b>验证分支</b>，从池里挑出以当前最后一个词开头的候选n-gram，和<a class="ln" href="../n/blockwise-decoding.html">分块并行解码</a>一样用一次前向检查它们，接受最长的正确前缀。两者用特殊的注意力掩码合并进同一次前向，可以与<a class="ln" href="../n/flashattention.html">FlashAttention</a>兼容。</p><p>论文指出，它用每步增加的log(FLOPs)换取总解码步数的减少。摘要报告：在MT-bench上解码最多加速1.8倍，在多GPU强扩展的代码补全任务上最多4倍。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每步都要多算大量候选，在批量较大、GPU算力已被占满的服务场景里加速明显缩小甚至变慢；加速比也通常低于训练过草稿头的方法。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/eagle-2.html">EAGLE-2动态草稿树</a> <a class="chip hue" style="--h:192" href="../n/eagle-3.html">EAGLE-3推测解码</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a><span class="yr">2022.05 · 系统·效率</span><div class=nt>前瞻与验证分支合并在一次前向里，可与FlashAttention等显存高效注意力配合。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/blockwise-decoding.html">分块并行解码</a><span class="yr">2018.11 · 系统·效率</span><div class=nt>沿用“一次前向验证多个候选词、接受正确前缀”的思路，但候选来自Jacobi迭代收集的n-gram。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/speculative-decoding.html">推测解码</a><span class="yr">2022.11 · 系统·效率</span><div class=nt>推测解码依赖合适的草稿模型，Lookahead用模型自身的Jacobi迭代产生候选，无需辅助模型或数据库。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/eagle-2.html">EAGLE-2动态草稿树</a><span class="yr">2024.06 · 系统·效率</span><div class=nt>每步都要多算大量候选，在批量较大、GPU算力已被占满的服务场景里加速明显缩小甚至变慢；加速比也通常低于训练过草稿头的方法。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/eagle-3.html">EAGLE-3推测解码</a><span class="yr">2025.03 · 系统·效率</span><div class=nt>每步都要多算大量候选，在批量较大、GPU算力已被占满的服务场景里加速明显缩小甚至变慢；加速比也通常低于训练过草稿头的方法。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2402.02057" rel="noopener">https://arxiv.org/abs/2402.02057</a>（标题、四位作者、v1日期2024-02-03；摘要：自回归解码受显存带宽限制、现有方法需要草稿模型、Lookahead是精确并行解码且不需要辅助模型或数据库、以每步log(FLOPs)换总步数、与FlashAttention兼容、MT-bench最多1.8倍、多GPU代码补全最多4倍。Jacobi迭代、2D窗口、n-gram池、ICML 2024、机构为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Lookahead%E5%89%8D%E7%9E%BB%E8%A7%A3%E7%A0%81%EF%BC%88lookahead-decoding%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Alookahead-decoding%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/lookahead-decoding.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="kivi.html"><small>本分支上一个 · 2024.02</small><b>KIVI两比特KV缓存</b></a><a class="r" href="bitnet.html"><small>本分支下一个 · 2024.02</small><b>1.58比特模型BitNet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

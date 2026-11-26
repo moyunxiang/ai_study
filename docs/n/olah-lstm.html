@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Olah《理解LSTM网络》（2015） · AI脉络</title>
+<meta name="description" content="2015年LSTM在语音、翻译、语言模型上几乎包揽了所有好结果，但原始论文的公式和示意图很难懂，许多入门者只会调用库，不知道门控在做什么。 用一套统一的图示把LSTM拆成“细胞状态”这条传送带和三个门，逐步讲清每一步在保留、写入和读出什么信息，再用同一套图比较几种常见变体。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/olah-lstm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Olah《理解LSTM网络》（2015）">
+<meta property="og:description" content="2015年LSTM在语音、翻译、语言模型上几乎包揽了所有好结果，但原始论文的公式和示意图很难懂，许多入门者只会调用库，不知道门控在做什么。 用一套统一的图示把LSTM拆成“细胞状态”这条传送带和三个门，逐步讲清每一步在保留、写入和读出什么信息，再用同一套图比较几种常见变体。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/olah-lstm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/olah-lstm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:30"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">环境 · 社会 › <a href="../t/biz.html">思潮、机构与产业事件</a> › 教育与入门</div>
+<h1>Olah《理解LSTM网络》</h1>
+<div class="full">Understanding LSTM Networks</div>
+<div class="meta"><span>2015.08</span><span>思想</span><span>延伸</span><span>colah&#x27;s blog, 2015-08-27</span><span>Christopher Olah</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://colah.github.io/posts/2015-08-Understanding-LSTMs/" rel="noopener">原文 ↗</a><a class="btn sm" href="../index.html#/n/olah-lstm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>2015年LSTM在语音、翻译、语言模型上几乎包揽了所有好结果，但原始论文的公式和示意图很难懂，许多入门者只会调用库，不知道门控在做什么。</p></div><div><h4>方法</h4><p>用一套统一的图示把LSTM拆成“细胞状态”这条传送带和三个门，逐步讲清每一步在保留、写入和读出什么信息，再用同一套图比较几种常见变体。</p></div><div><h4>影响</h4><p>这篇博客成为全世界学习LSTM最常用的入门材料之一，其图示风格被大量教材和课程沿用，也开创了用精心绘制的图来解释神经网络的写作传统。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>文章发布于2015年8月27日。它先讲<a class="lc" href="../c/recurrent-layer.html">循环网络与隐状态</a>：循环网络像同一个网络的多份拷贝依次传递消息，但当相关信息和使用它的位置相隔很远时，普通RNN就学不好长期依赖（参见<a class="lc" href="../c/vanishing-exploding.html">梯度消失与梯度爆炸</a>）。</p><p>接着把<a class="ln" href="../n/lstm.html">LSTM</a>的重复模块画成四个相互作用的层。核心是细胞状态，作者说它“有点像一条传送带”，信息沿着链条几乎不变地流过，由三个门来保护和控制：遗忘门决定丢掉旧状态里的什么（比如语言模型遇到新主语时忘掉旧主语的性别），输入门决定写入什么新信息，输出门决定从细胞状态里读出什么。</p><p>变体部分介绍了窥孔连接（让门直接看到细胞状态）、耦合遗忘门与输入门，以及把两者合成一个“更新门”的GRU，并引用Greff等人2015年的比较——这些变体效果大致相同，以及Jozefowicz等人测试一万多种结构、在部分任务上找到优于LSTM的结果。结尾预言下一步是注意力。它与<a class="ln" href="../n/karpathy-rnn-blog.html">《RNN不可思议的有效性》</a>同年发表，一个展示RNN能做什么，一个讲清LSTM怎么做到。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只讲直觉和前向计算，没有讲为什么门控能缓解梯度消失的数学推导，也不涉及训练细节。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>结尾预言的注意力很快让LSTM本身退出主流，文章讲解的模型在大模型时代主要只剩教学价值。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/lstm.html">LSTM</a><span class="yr">1997 · 基础</span><div class=nt>讲解对象就是LSTM，把原论文的机制改写成逐步的图解。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/lstm-forget-gate.html">LSTM遗忘门</a><span class="yr">1999.09 · 基础</span><div class=nt>文中讲的标准LSTM包含后来加入的遗忘门，这是图解里第一步。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/karpathy-rnn-blog.html">《RNN不可思议的有效性》</a><span class="yr">2015.05 · NLP</span><div class=nt>文中直接推荐Karpathy的博客展示RNN的成果，本文则专注于解释LSTM的内部机制。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>结尾预言的注意力很快让LSTM本身退出主流，文章讲解的模型在大模型时代主要只剩教学价值。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a> <a class="chip c" href="../c/gating.html">门控机制</a> <a class="chip c" href="../c/vanishing-exploding.html">梯度消失与梯度爆炸</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://colah.github.io/posts/2015-08-Understanding-LSTMs/" rel="noopener">https://colah.github.io/posts/2015-08-Understanding-LSTMs/</a>（核对了标题、作者、发布日期2015-08-27、RNN长期依赖的讲法、四个交互层、“传送带”原句、三个门与主语性别例子、窥孔连接、耦合门、GRU、Greff 2015与Jozefowicz 2015、结尾“下一步是注意力”、推荐Karpathy博客。对后来教材图示风格的影响是一般性判断。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Olah%E3%80%8A%E7%90%86%E8%A7%A3LSTM%E7%BD%91%E7%BB%9C%E3%80%8B%EF%BC%88olah-lstm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aolah-lstm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/olah-lstm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="cs231n.html"><small>本分支上一个 · 2015.01</small><b>斯坦福CS231n</b></a><a class="r" href="openai-founded.html"><small>本分支下一个 · 2015.12</small><b>OpenAI成立</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

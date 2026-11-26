@@ -1,0 +1,28 @@
+{
+  "id": "slic-hf",
+  "who": "Yao Zhao, Rishabh Joshi, Tianqi Liu, Misha Khalman, Mohammad Saleh, Peter J. Liu · Google DeepMind、Google Research",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2305.10425"}
+  ],
+  "aka": ["SLiC-HF", "SLiC", "Sequence Likelihood Calibration", "序列似然校准", "hinge偏好损失"],
+  "problem": "用人类反馈对齐语言模型通常走RLHF：先训奖励模型，再用PPO在线采样优化，实现复杂、难调、算力开销大。",
+  "idea": "把序列似然校准（SLiC）用到人类偏好上：直接用排序损失让模型给“被偏好回答”的序列似然高出“不被偏好回答”一个间隔，再加一项正则防止偏离SFT模型，不需要在线强化学习。",
+  "impact": "与约两周后公开的DPO一起，代表了“不用强化学习、直接在偏好对上做离线优化”的路线，后来的IPO、RSO等工作常把它当作对照。",
+  "method": "背景：[[summarize-hf]]和[[instructgpt]]用[[ppo]]做RLHF，需要同时维护策略、价值、奖励和参考四个模型，并在训练中不断采样新回答。作者此前提出的SLiC（序列似然校准）发现，按最大似然训练的生成模型给出的序列概率排序并不总与质量一致，可以用一个校准损失来纠正。\n\nSLiC-HF把这个思路搬到人类偏好上。对一条输入x，取一对回答：人类更偏好的y⁺和较差的y⁻，损失是 `max(0, δ − log P(y⁺|x) + log P(y⁻|x))` 加上一项正则（在SFT数据上的交叉熵），δ是希望拉开的间隔。偏好对可以有两种来源：直接用已有的人类偏好数据；或者先训一个排序模型，再用它给SFT模型自己采样出的多个回答排序配对。作者还强调，偏好数据可以来自**另一个模型**的输出，相当于离线、异策略的数据。\n\n实验在TL;DR摘要任务上进行，摘要称SLiC-HF明显超过SFT基线，与过去工作中PPO实现的RLHF相比有竞争力，而实现更简单、调参更容易、实际计算更省。",
+  "limits": [
+    {"text": "使用hinge式间隔损失和单独的正则项，没有像DPO那样从KL约束的RL目标推导出来，理论性质不清楚；实验也只在摘要任务上做，没有在通用对话助手上验证。", "solved_by": ["ipo"]}
+  ],
+  "relations": [
+    {"to": "summarize-hf", "type": "uses", "note": "使用同一个TL;DR摘要任务和人类偏好数据作为主要实验平台。"},
+    {"to": "instructgpt", "type": "solves", "note": "InstructGPT式的PPO-RLHF实现复杂、开销大，SLiC-HF用离线排序损失直接在偏好对上训练。"},
+    {"to": "ppo", "type": "rivals", "note": "以PPO实现的RLHF为主要对照，作者称效果相当而计算更省。"},
+    {"to": "dpo", "type": "rivals", "note": "约两周后公开的离线偏好优化方法，DPO从带KL约束的RL目标推出对数几率损失，SLiC-HF用间隔排序损失加SFT正则。"}
+  ],
+  "prereq": ["rlhf-concept", "loss-function", "language-model", "on-off-policy", "regularization"],
+  "terms": [
+    {"t": "序列似然校准", "d": "调整模型给整段输出序列的概率，使概率高低与输出质量的好坏一致。"},
+    {"t": "hinge损失", "d": "只在两者差距小于某个间隔时才产生损失，差距足够大后损失为零。"}
+  ],
+  "learn": "先读[[summarize-hf]]了解TL;DR上的RLHF设定和[[dpo]]的推导；读本文损失函数和两种偏好对构造方式的对比；动手：在一个偏好数据集上分别用hinge损失和DPO损失训练小模型，比较胜率与KL偏离。",
+  "check": {"source": "https://arxiv.org/abs/2305.10425", "confirmed": "标题、6位作者、arXiv首次提交2023-05-17；摘要中以往依赖RLHF与奖励模型、把SLiC用于人类偏好、可用为其他模型收集的反馈数据（类似离线异策略）、TL;DR摘要任务上明显优于SFT、与PPO RLHF竞争且更简单易调更省算力。损失函数形式、两种偏好对来源与机构为对正文的一般了解；DPO的arXiv首次提交为2023-05-29（一般了解）。"}
+}

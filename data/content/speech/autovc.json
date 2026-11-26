@@ -1,0 +1,33 @@
+{
+  "id": "autovc",
+  "who": "Kaizhi Qian, Yang Zhang, Shiyu Chang, Xuesong Yang, Mark Hasegawa-Johnson · 伊利诺伊大学厄巴纳-香槟分校、MIT-IBM Watson AI Lab",
+  "venue": "ICML 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1905.05879"}
+  ],
+  "problem": "语音转换（把A的声音变成B的声音、内容不变）当时主要靠GAN或条件VAE：GAN难训练、音质没有保证，CVAE好训练却不能保证转换后的分布像目标说话人；而且都不能转换成训练时没见过的人。",
+  "idea": "只用一个自编码器和重建损失：内容编码器的输出被刻意压得很窄（瓶颈），只能留下说了什么，说话人信息则由一个说话人嵌入单独提供；换一个说话人嵌入，就换了声音。",
+  "impact": "AutoVC以极简的训练方式实现了非平行数据的多对多语音转换，并且是第一个做零样本语音转换的工作（论文自述）；「信息瓶颈解耦内容与音色」的思路被大量后续语音转换和音色克隆工作沿用。",
+  "method": "语音转换需要把一段语音的内容和音色拆开。传统方法需要两个人说同样句子的平行数据；非平行方法如基于[[cyclegan]]或[[stargan]]的语音转换要靠对抗训练，训练复杂，且只能在训练过的说话人之间转换。\n\nAutoVC由三部分组成：**内容编码器**读入源语音的梅尔频谱（和源说话人嵌入），输出一串低维、在时间上下采样的编码；**说话人编码器**是一个预训练的说话人确认网络（[[ge2e]]式嵌入），给出目标说话人的向量；**解码器**根据内容编码和说话人向量重建梅尔频谱，再由[[wavenet]]声码器生成波形。训练时只做自重建：输入某人的话，用同一个人的嵌入重建它，损失是重建误差（见[[c:autoencoder]]）。\n\n关键在瓶颈的大小。作者从理论上证明：若瓶颈恰好小到只能容纳内容信息，解码器又能从说话人嵌入拿到音色，那么只靠重建损失训练，就等价于实现了分布匹配的风格迁移——编码里不会残留说话人信息，否则就挤占了内容的空间。推理时把说话人嵌入换成目标人（哪怕只给几句录音、训练时没见过），即可转换。摘要称AutoVC在非平行多对多语音转换上达到当时最好结果，并首次实现零样本语音转换。",
+  "limits": [
+    {"text": "瓶颈大小要手工精心调：太宽会泄漏源说话人音色，太窄会丢内容、可懂度下降。", "solved_by": []},
+    {"text": "只换音色，基频曲线和说话节奏大体保留源说话人的特点，韵律没有转换。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ge2e", "type": "uses", "note": "说话人嵌入来自用GE2E类损失预训练的说话人确认网络。"},
+    {"to": "cyclegan", "type": "solves", "note": "CycleGAN类语音转换需对抗训练且只能在训练过的说话人间转换；AutoVC只用重建损失，并支持零样本。"},
+    {"to": "stargan", "type": "rivals", "note": "StarGAN-VC用一个条件GAN做多对多转换；AutoVC用自编码器瓶颈解耦。"},
+    {"to": "wavenet", "type": "uses", "note": "转换后的梅尔频谱由WaveNet声码器生成波形。"}
+  ],
+  "prereq": ["autoencoder", "embedding", "waveform-spectrogram", "vocoder-codec", "mutual-information"],
+  "terms": [
+    {"t": "语音转换", "d": "保持说话内容不变，把一个人的声音变成另一个人的声音。"},
+    {"t": "非平行数据", "d": "源说话人和目标说话人没有说过相同句子的训练数据。"},
+    {"t": "信息瓶颈", "d": "把中间表示压到很小，迫使它只保留最必要的信息。"}
+  ],
+  "aka": ["AutoVC", "AUTOVC", "零样本语音转换", "zero-shot voice conversion", "变声"],
+  "check": {
+    "source": "https://arxiv.org/abs/1905.05879",
+    "confirmed": "arXiv官方记录：标题AUTOVC: Zero-Shot Voice Style Transfer with Only Autoencoder Loss、作者Qian/Zhang/Chang/Yang/Hasegawa-Johnson、v1提交2019-05-14；摘要关于GAN难训练、CVAE缺分布匹配、只用带精心设计瓶颈的自编码器、形式上证明自重建即可实现分布匹配风格迁移、非平行多对多转换最好、首个零样本语音转换。使用GE2E式说话人编码器与WaveNet声码器、ICML 2019、机构为一般了解。"
+  }
+}

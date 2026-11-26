@@ -1,0 +1,32 @@
+{
+  "id": "graphgps",
+  "who": "Ladislav Rampášek, Mikhail Galkin, Vijay Prakash Dwivedi, Anh Tuan Luu, Guy Wolf, Dominique Beaini · 蒙特利尔大学/Mila、南洋理工大学、Valence Discovery",
+  "venue": "NeurIPS 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2205.12454"},
+    {"label": "官方代码", "url": "https://github.com/rampasek/GraphGPS"}
+  ],
+  "aka": ["GraphGPS", "GPS", "General, Powerful, Scalable Graph Transformer", "图Transformer", "Graph Transformer", "位置编码与结构编码", "PE/SE"],
+  "problem": "消息传递GNN只能看局部邻居，存在[[gnn-oversquashing]]和表达能力上限；把[[transformer]]直接搬到图上又面临两个问题：各家位置/结构编码五花八门缺少统一认识，全连接注意力的平方复杂度也只能处理几百个节点的小图。",
+  "idea": "把图Transformer拆成三个可自由组合的部件：位置/结构编码、局部消息传递层、全局注意力层；每层并行地做局部消息传递和全局注意力再相加，全局注意力可以换成线性复杂度的近似，从而把复杂度降到 `O(N+E)`。",
+  "impact": "GraphGPS成为图Transformer的标准框架和最常用的基线之一，其模块化代码库被大量后续工作沿用；它对位置/结构编码的分类，也成为该方向讨论编码设计时的通用说法。",
+  "method": "作者先整理了已有的各种图位置编码和结构编码，把它们分成三类：局部编码（如节点所在的子结构、度数）、全局编码（如图拉普拉斯特征向量给出的“坐标”、随机游走概率）和相对编码（两节点之间的距离等）。这些编码在输入时拼接到节点特征上，告诉模型每个节点在图中的位置和角色。\n\n每个GPS层包含两条并行的分支：一条是普通的消息传递层（如GatedGCN、[[gin]]），只沿真实的边聚合邻居；另一条是全局注意力层，让每个节点和图中所有节点交互。两条分支的输出相加后再过一个MLP，都带有残差连接和归一化。由于局部的真实边结构已由消息传递分支负责，全局分支可以换成[[performer]]、BigBird这类线性注意力而不太损失表达能力——作者论证这种解耦设计在图上仍是通用函数逼近器。于是整层复杂度对节点数N和边数E是线性的 `O(N+E)`，可以扩展到大图。\n\n摘要报告：在16个基准上测试，GraphGPS在所有基准上都取得很有竞争力的结果，模块化组合不同策略带来了实际收益；它既能处理小图（如分子），也能扩展到较大的图。",
+  "limits": [
+    {"text": "线性注意力在部分任务上比完整注意力差，大图上仍需要在效率和精度间折中。", "solved_by": []},
+    {"text": "效果很依赖位置/结构编码的选择，而拉普拉斯特征向量等编码本身计算昂贵，且存在符号和基的不唯一性。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mpnn", "type": "uses", "note": "每层都保留一条局部消息传递分支，负责沿真实边聚合信息。"},
+    {"to": "transformer", "type": "extends", "note": "把Transformer的全局自注意力用到图上，并与消息传递并联。"},
+    {"to": "gnn-oversquashing", "type": "solves", "note": "全局注意力让远处节点直接交互，缓解消息传递中远程信息被挤压的问题。"},
+    {"to": "performer", "type": "uses", "note": "全局注意力可替换为Performer等线性近似，使复杂度降到O(N+E)。"},
+    {"to": "gin", "type": "extends", "note": "针对消息传递GNN受限于WL测试的表达能力，用位置/结构编码和全局注意力提升表达力。"}
+  ],
+  "prereq": ["message-passing", "self-attention", "positional-encoding", "graph-basics", "efficient-attention"],
+  "terms": [
+    {"t": "结构编码", "d": "描述节点在图中结构角色的特征，比如它属于多少个三角形、从它出发随机游走回到自身的概率。"},
+    {"t": "拉普拉斯特征向量编码", "d": "用图拉普拉斯矩阵的前几个特征向量给每个节点一组“坐标”，作为图上的位置编码。"}
+  ],
+  "learn": "先读[[mpnn]]、[[gin]]和[[transformer]]；读论文第3节的编码分类表和GPS层结构图；用官方代码在ZINC分子数据上跑只有消息传递、只有全局注意力和GPS三种配置，比较结果。",
+  "check": {"source": "https://arxiv.org/abs/2205.12454", "confirmed": "标题、6位作者、arXiv v1提交于2022-05-25；摘要中线性复杂度、编码缺乏统一基础、分为局部/全局/相对三类、以往图Transformer限于几百个节点、解耦局部真实边聚合与全连接Transformer得到O(N+E)、仍是图上通用函数逼近器、三个主要部件、16个基准上很有竞争力。机构、NeurIPS 2022与具体层结构来自一般了解。"}
+}

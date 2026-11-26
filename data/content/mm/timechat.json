@@ -1,0 +1,30 @@
+{
+  "id": "timechat",
+  "aka": ["TimeChat", "时间敏感视频大模型", "时间定位", "Temporal Grounding", "滑动视频Q-Former", "TimeIT"],
+  "who": "Shuhuai Ren, Linli Yao, Shicheng Li, Xu Sun, Lu Hou · 北京大学、华为诺亚方舟实验室",
+  "venue": "CVPR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2312.02051"},
+    {"label": "代码", "url": "https://github.com/RenShuhuai-Andy/TimeChat"}
+  ],
+  "problem": "早期视频大模型能大致描述视频内容，却说不清某件事发生在第几秒，做时间定位、密集描述、精彩片段检测时表现很差。",
+  "idea": "让帧编码器在提取每帧特征时同时读入该帧的时间戳，再用滑动窗口式的视频Q-Former按视频长短生成长度可变的视频token；配一套12.5万条、6类任务的时间敏感指令数据。",
+  "impact": "把“回答时给出时间戳”变成视频大模型的标准能力之一，其指令数据和时间定位评测设定被后续时间敏感视频大模型反复沿用。",
+  "method": "[[video-llama]]、[[videochat]]等视频大模型把采样帧编码后统一压缩成固定数量的token，帧和时间的对应关系在这一步就丢了，模型很难回答“厨师什么时候开始切洋葱”这类问题。而且固定token数对几十秒和一小时的视频一视同仁，长视频被过度压缩。\n\nTimeChat做了两处结构改动。**时间戳感知的帧编码器**：在用Q-Former提取每帧视觉特征时，把“这是第x秒的帧”这样的时间戳文本一起输入，使得每帧的视觉token自带时间信息。**滑动视频Q-Former**：在帧序列上用滑动窗口，每个窗口压缩成一组视频token，视频越长窗口越多，于是视频token的总长度随时长变化。数据方面，作者构建了一个包含6类任务（如密集描述、时间定位、精彩片段检测等）、共12.5万条样本的指令微调数据集。\n\n摘要报告，与此前最好的视频大模型相比，TimeChat在零样本设置下于YouCook2密集描述上F1提高9.2、CIDEr提高2.8，在QVHighlights精彩片段检测上HIT@1提高5.8，在Charades-STA时间定位上R@1（IoU=0.5）提高27.5。",
+  "limits": [
+    {"text": "时间戳只作为文本提示注入帧编码器，模型输出的时间仍以文字数字生成，定位精度明显低于专门的时间定位模型。", "solved_by": []},
+    {"text": "视觉骨干和语言模型规模较小，帧采样数有限，对小时级视频的细粒度定位仍然困难。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "video-llama", "type": "extends", "note": "沿用Video-LLaMA的图像Q-Former+视频Q-Former结构，并加入时间戳与滑动窗口。"},
+    {"to": "blip-2", "type": "uses", "note": "帧级特征由BLIP-2式Q-Former提取。"},
+    {"to": "videochat", "type": "solves", "note": "缓解了以VideoChat为代表的早期视频大模型缺乏时间定位能力的问题。"}
+  ],
+  "prereq": ["instruction-tuning", "attention-concept", "zero-few-shot", "iou-map"],
+  "terms": [
+    {"t": "时间定位（temporal grounding）", "d": "给一句文字描述，在视频里找出它对应的开始和结束时间；常用预测区间与真实区间的交并比（IoU）评估。"},
+    {"t": "密集视频描述", "d": "找出视频中所有事件并分别给出时间区间和一句描述。"}
+  ],
+  "learn": "先读[[video-llama]]的两级Q-Former结构，再读TimeChat第3节的时间戳编码与滑动窗口；对照Charades-STA的评测方式理解R@1(IoU=0.5)。",
+  "check": {"source": "https://arxiv.org/abs/2312.02051", "confirmed": "标题、五位作者、arXiv v1提交2023-12-04；摘要中时间戳感知帧编码器、产生可变长度视频token序列的滑动视频Q-Former、6类任务12.5万条指令数据、零样本时间定位与推理、YouCook2 F1+9.2与CIDEr+2.8、QVHighlights HIT@1+5.8、Charades-STA R@1(IoU=0.5)+27.5。基于Video-LLaMA结构、6类任务的具体名称、机构、CVPR 2024为一般了解，未逐项核对。"}
+}

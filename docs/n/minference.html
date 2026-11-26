@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MInference动态稀疏预填充（2024） · AI脉络</title>
+<meta name="description" content="注意力计算量随长度平方增长，单张A100上8B模型读完一百万token的提示（预填充）要约30分钟；已有的预填充加速方法用到长上下文模型上，要么精度掉得多，要么实际不快。 长上下文注意力矩阵大多稀疏且有固定形状：A形、竖线加斜线、块稀疏三种。离线为每个注意力头选定一种模式，推理时根据当前输入快速估…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/minference.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MInference动态稀疏预填充（2024）">
+<meta property="og:description" content="注意力计算量随长度平方增长，单张A100上8B模型读完一百万token的提示（预填充）要约30分钟；已有的预填充加速方法用到长上下文模型上，要么精度掉得多，要么实际不快。 长上下文注意力矩阵大多稀疏且有固定形状：A形、竖线加斜线、块稀疏三种。离线为每个注意力头选定一种模式，推理时根据当前输入快速估…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/minference.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/minference">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 推理服务引擎</div>
+<h1>MInference动态稀疏预填充</h1>
+<div class="full">MInference 1.0: Accelerating Pre-filling for Long-Context LLMs via Dynamic Sparse Attention</div>
+<div class="meta"><span>2024.07</span><span>论文</span><span>延伸</span><span>NeurIPS 2024</span><span>Huiqiang Jiang, Yucheng Li, Chengruidong Zhang, Qianhui Wu, Xufang Luo, Surin Ahn, Zhenhua Han, Amir H. Abdi et al. · 微软</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2407.02490" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://aka.ms/MInference" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/minference">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>注意力计算量随长度平方增长，单张A100上8B模型读完一百万token的提示（预填充）要约30分钟；已有的预填充加速方法用到长上下文模型上，要么精度掉得多，要么实际不快。</p></div><div><h4>方法</h4><p>长上下文注意力矩阵大多稀疏且有固定形状：A形、竖线加斜线、块稀疏三种。离线为每个注意力头选定一种模式，推理时根据当前输入快速估出稀疏索引，再用专门的GPU内核只算这些位置。</p></div><div><h4>影响</h4><p>长上下文预填充加速的常用基线，“竖线+斜线”稀疏模式被后续稀疏注意力与KV压缩工作反复引用，代码已接入vLLM等推理框架。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>用户输入一段很长的提示时，推理先要把整段提示过一遍模型、建好<a class="lc" href="../c/kv-cache.html">KV缓存</a>，这一步叫预填充，计算量随长度平方增长。解码阶段的KV压缩方法（如<a class="ln" href="../n/streamingllm.html">StreamingLLM与注意力汇聚</a>）只省后面的显存，帮不了预填充。</p><p>MInference观察到长上下文模型的注意力矩阵绝大部分接近零，非零部分集中在三种形状：<b>A形</b>（开头的少数token加对角线附近的局部窗口，即注意力汇聚现象）、<b>竖线-斜线</b>（某些固定位置的token被所有后续token关注形成竖线，以及与当前位置保持固定间隔的斜线）、<b>块稀疏</b>（成块聚集的重要区域）。做法分两步：离线在少量样本上为每个注意力头搜索最合适的模式及其参数；在线推理时，用最后若干个query与所有key的少量计算估计出这条请求具体是哪几条竖线、斜线或哪些块，再调用基于Triton和<a class="ln" href="../n/flashattention-2.html">FlashAttention-2</a>思路写的稀疏内核只算这些部分。不需要修改预训练或微调模型。</p><p>摘要报告：在InfiniteBench、RULER、PG-19、大海捞针等任务及LLaMA-3-1M、GLM4-1M、Yi-200K、Phi-3-128K、Qwen2-128K等模型上，A100上的预填充延迟最多降低10倍，同时保持精度。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只加速预填充，解码阶段的KV缓存仍是完整的；稀疏模式需要为每个模型离线搜索，长度较短时估计索引的开销抵消了收益。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/efficient-inference.html">KV缓存与推理扩展分析</a><span class="yr">2022.11 · 系统·效率</span><div class=nt>长提示的预填充计算随长度平方增长，MInference用动态稀疏注意力把百万token预填充的延迟降低最多10倍。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/flashattention-2.html">FlashAttention-2</a><span class="yr">2023.07 · 系统·效率</span><div class=nt>在FlashAttention式分块内核的基础上，只计算动态选出的稀疏块与竖线斜线位置。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/streamingllm.html">StreamingLLM与注意力汇聚</a><span class="yr">2023.09 · 系统·效率</span><div class=nt>A形模式即StreamingLLM发现的注意力汇聚加局部窗口，MInference把它作为三种模式之一用于预填充。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/ruler.html">RULER长上下文</a><span class="yr">2024.04 · 数据·评测</span><div class=nt>用RULER、大海捞针等长上下文基准验证稀疏化后精度不降。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/context-window.html">上下文窗口</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2407.02490" rel="noopener">https://arxiv.org/abs/2407.02490</a>（标题、作者（Jiang, Li等12人）、v1日期2024-07-02；摘要：注意力二次复杂度、8B模型单张A100预填充1M token约30分钟、三种模式A-shape/Vertical-Slash/Block-Sparse、离线为每个头确定模式、推理时动态构建稀疏索引、优化的GPU内核、无需修改预训练或微调、InfiniteBench/RULER/PG-19/大海捞针、LLaMA-3-1M/GLM4-1M/Yi-200K/Phi-3-128K/Qwen2-128K、A100上预填充最多10倍加速。用最后若干query估计索引、Triton实现、NeurIPS 2024、接入vLLM为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MInference%E5%8A%A8%E6%80%81%E7%A8%80%E7%96%8F%E9%A2%84%E5%A1%AB%E5%85%85%EF%BC%88minference%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aminference%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/minference.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ktransformers.html"><small>本分支上一个 · 2024.07</small><b>KTransformers混合推理</b></a><a class="r" href="marlin.html"><small>本分支下一个 · 2024.08</small><b>Marlin四比特推理内核</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

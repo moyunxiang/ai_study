@@ -1,0 +1,30 @@
+{
+  "id": "rloo",
+  "who": "Arash Ahmadian, Chris Cremer, Matthias Gallé, Marzieh Fadaee, Julia Kreutzer, Olivier Pietquin, Ahmet Üstün, Sara Hooker · Cohere For AI、Cohere",
+  "venue": "ACL 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2402.14740"}
+  ],
+  "aka": ["RLOO", "REINFORCE Leave-One-Out", "Back to Basics", "留一法基线", "REINFORCE for RLHF"],
+  "problem": "PPO被当作RLHF中强化学习部分的标准方法，但它要额外训练价值网络、调很多超参数，计算贵且不稳定；DPO等“免RL”方法又放弃了在线采样的好处。",
+  "idea": "回到更简单的REINFORCE：把整段回答当作一个动作，不要价值网络和裁剪；对每个提示采样k个回答，用其余k−1个回答的平均奖励作为基线来降低方差（RLOO）。",
+  "impact": "论证了PPO的许多组件在RLHF里并不必要，RLOO进入TRL等常用库，和同月提出的GRPO一样用“同一提示多次采样互为基线”的办法替代价值网络。",
+  "method": "背景：[[instructgpt]]用[[ppo]]做RLHF。PPO是为游戏、机器人等长序列、高方差的深度强化学习设计的，需要价值网络估计每一步的优势，并用裁剪限制更新幅度。作者认为语言模型的情形不同：从一个已经很好的预训练加SFT模型出发，策略本身方差不大，奖励只在整段回答结束时给出一次。\n\n他们因此回到[[reinforce]]式的策略梯度：把生成整段回答看成一个动作，梯度为 `(R(y) − b) · ∇ log π(y|x)`，b是降低方差的基线。**RLOO**的做法是对每个提示采样k个回答y₁…y_k，第i个回答的基线取其余k−1个回答的平均奖励 `b_i = (1/(k−1)) Σ_{j≠i} R(y_j)`，不需要任何学出来的价值函数。作者还系统检查了PPO各组件的作用，例如把每个token当动作、用价值网络估计优势、裁剪比率等，发现它们在RLHF设定下多半可以去掉。\n\n摘要报告：去掉PPO中不必要的部分后，更简单的REINFORCE式变体效果超过PPO，也超过DPO、RAFT等新近提出的“免RL”方法，以较低成本保留了在线RL的好处。",
+  "limits": [
+    {"text": "每个提示要采样k个回答才能构造基线，生成开销随k线性增长；实验以单轮对话和摘要类偏好任务为主，对长链推理、多轮交互等奖励更稀疏的任务是否同样不需要价值网络没有验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ppo", "type": "solves", "note": "PPO需要价值网络和大量超参数，作者论证这些组件在RLHF中多半不必要，RLOO更省且效果更好。"},
+    {"to": "reinforce", "type": "extends", "note": "直接使用REINFORCE策略梯度，用留一法多样本基线降低方差。"},
+    {"to": "instructgpt", "type": "solves", "note": "InstructGPT确立的PPO-RLHF流程计算昂贵，本文给出更简单的在线RL替代。"},
+    {"to": "dpo", "type": "rivals", "note": "DPO放弃在线RL，RLOO坚持在线采样，摘要称效果超过DPO。"},
+    {"to": "grpo", "type": "rivals", "note": "同月提出的GRPO也用同一提示的多个采样做基线、去掉价值网络，但用组内标准化和PPO式裁剪。"}
+  ],
+  "prereq": ["rlhf-concept", "policy-gradient-concept", "expectation-variance", "actor-critic", "monte-carlo"],
+  "terms": [
+    {"t": "基线（baseline）", "d": "策略梯度中从奖励里减去的一个参考值，不改变梯度的期望，但能大幅降低方差。"},
+    {"t": "留一法基线", "d": "同一提示采样k个回答时，给每个回答用另外k−1个回答的平均奖励作基线。"}
+  ],
+  "learn": "先补[[reinforce]]的策略梯度推导和基线的作用；读本文第3节逐项检查PPO组件的实验和RLOO的定义；动手：用TRL的RLOOTrainer和PPOTrainer在同一奖励模型上训练小模型，比较奖励曲线和显存占用。",
+  "check": {"source": "https://arxiv.org/abs/2402.14740", "confirmed": "标题、8位作者、arXiv首次提交2024-02-22；摘要中PPO被当作RLHF的标准RL方法、计算成本高且超参数敏感、PPO很多组件在RLHF中不必要、更简单的REINFORCE式变体超过PPO以及DPO和RAFT、以低成本获得在线RL的好处。RLOO基线公式、ACL 2024、TRL集成与机构为一般了解；GRPO的日期取自登记表。"}
+}

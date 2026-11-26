@@ -1,0 +1,29 @@
+{
+  "id": "zhang-calibration",
+  "who": "Zhengyou Zhang（张正友） · 微软研究院",
+  "venue": "IEEE TPAMI 2000",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1109/34.888718"}
+  ],
+  "aka": ["张正友标定法", "张氏标定", "Zhang's method", "棋盘格标定", "checkerboard calibration", "相机标定", "camera calibration", "平面标定"],
+  "problem": "要从图像做测量或三维重建，必须先知道相机内参（焦距、主点、畸变）；传统标定需要精密加工的三维标定物，而自标定方法又不够稳定可靠。",
+  "idea": "只用一块打印出来的平面棋盘格，从几个不同角度各拍一张：每张图给出平面到图像的单应矩阵，每个单应矩阵对内参提供两个约束，三张以上就能线性解出内参，再用最大似然非线性优化统一精化（含镜头畸变）。",
+  "impact": "让相机标定变成人人能做的事，成为事实上的标准方法：OpenCV的calibrateCamera和MATLAB标定工具箱都基于它，几乎所有视觉、机器人、AR系统的标定流程都从拍棋盘格开始。",
+  "method": "把棋盘格所在平面设为世界坐标的 Z=0 平面，平面上的点 (X, Y) 与图像点之间就是一个3×3的单应矩阵H：`s·[u, v, 1]ᵀ = K·[r₁ r₂ t]·[X, Y, 1]ᵀ`，其中K是内参矩阵，r₁、r₂是旋转矩阵的前两列，t是平移。\n\n- **估计单应**：每张图里检测到的角点与已知的棋盘坐标对应，用线性方法（加非线性精化）求出H。\n- **线性求内参**：记 `H = [h₁ h₂ h₃] = λK[r₁ r₂ t]`。因为r₁、r₂是正交的单位向量，得到两个约束：`h₁ᵀ K⁻ᵀK⁻¹ h₂ = 0` 和 `h₁ᵀ K⁻ᵀK⁻¹ h₁ = h₂ᵀ K⁻ᵀK⁻¹ h₂`。令 `B = K⁻ᵀK⁻¹`（对称，6个未知数），每张图给2个线性方程，3张以上就能用SVD解出B，再分解出K；随后每张图的外参（R、t）也能直接算出。\n- **最大似然精化**：以线性解为初值，对所有图像的所有角点最小化重投影误差，同时估计径向畸变系数，用Levenberg–Marquardt求解——这一步与[[bundle-adjustment]]的思想相同。\n\n这种方法介于需要三维标定物的摄影测量标定和完全不用标定物的自标定之间，只需要平面图案，可以手持相机或移动平面拍摄，无需知道运动。",
+  "limits": [
+    {"text": "依赖角点检测的精度和足够多不同姿态的图像，标定板几乎平行于成像面时约束退化。", "solved_by": []},
+    {"text": "需要专门拍摄标定图；对网络照片、无标定的视频，内参仍要靠其他方法估计。", "solved_by": ["unidepth", "dust3r"]}
+  ],
+  "relations": [
+    {"to": "bundle-adjustment", "type": "uses", "note": "最后一步对所有观测最小化重投影误差，与光束平差的最大似然精化思路一致。"},
+    {"to": "eight-point", "type": "extends", "note": "同样采用“先线性求解、再非线性精化”的路线，从两视图基础矩阵换成平面单应。"},
+    {"to": "multiple-view-geometry", "type": "uses", "note": "建立在针孔相机模型、单应矩阵等多视图几何基础之上。"}
+  ],
+  "prereq": ["camera-geometry", "eigen-svd", "vector-matrix", "mle"],
+  "terms": [
+    {"t": "单应矩阵", "d": "描述一个平面在两张图（或平面与图像）之间如何对应的3×3矩阵，平面上的点经它变换得到图像上的点。"},
+    {"t": "径向畸变", "d": "镜头使离画面中心越远的直线越弯（桶形或枕形），需要用几个系数建模并校正。"}
+  ],
+  "learn": "先复习针孔相机模型和齐次坐标，再读论文第2、3节约束推导；打印一张棋盘格，用手机从十几个角度拍照，用OpenCV的findChessboardCorners和calibrateCamera标定，查看重投影误差和去畸变效果。",
+  "check": {"source": "https://doi.org/10.1109/34.888718", "confirmed": "Crossref记录：标题A flexible new technique for camera calibration、作者Z. Zhang、IEEE TPAMI 2000。单应约束推导、B矩阵线性解、最大似然精化与径向畸变、OpenCV与MATLAB基于此法、机构凭一般了解写，未逐项对照原文。"}
+}

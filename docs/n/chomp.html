@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>CHOMP梯度轨迹优化（2009） · AI脉络</title>
+<meta name="description" content="RRT、PRM这类采样规划器能找到不碰撞的路径，但路径弯弯曲曲、很不平滑，通常还要另做后处理；而且每次都从零开始搜索，不能利用一条已有的粗略轨迹去改进。 把运动规划直接写成一个优化问题：代价=轨迹的不平滑程度+离障碍物有多近，用梯度下降直接改整条轨迹；关键是在“平滑度度量”下做协变的梯度更新，让一…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/chomp.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CHOMP梯度轨迹优化（2009）">
+<meta property="og:description" content="RRT、PRM这类采样规划器能找到不碰撞的路径，但路径弯弯曲曲、很不平滑，通常还要另做后处理；而且每次都从零开始搜索，不能利用一条已有的粗略轨迹去改进。 把运动规划直接写成一个优化问题：代价=轨迹的不平滑程度+离障碍物有多近，用梯度下降直接改整条轨迹；关键是在“平滑度度量”下做协变的梯度更新，让一…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/chomp.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/chomp">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 经典控制与规划</div>
+<h1>CHOMP梯度轨迹优化</h1>
+<div class="full">CHOMP: Gradient optimization techniques for efficient motion planning</div>
+<div class="meta"><span>2009.05</span><span>论文</span><span>延伸</span><span>ICRA 2009</span><span>Nathan Ratliff, Matt Zucker, J. Andrew Bagnell, Siddhartha Srinivasa · Carnegie Mellon University、Intel Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1109/robot.2009.5152817" rel="noopener">DOI ↗</a><a class="btn sm" href="https://doi.org/10.1177/0278364913488805" rel="noopener">IJRR 2013扩展版 ↗</a><a class="btn sm" href="../index.html#/n/chomp">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>RRT、PRM这类采样规划器能找到不碰撞的路径，但路径弯弯曲曲、很不平滑，通常还要另做后处理；而且每次都从零开始搜索，不能利用一条已有的粗略轨迹去改进。</p></div><div><h4>方法</h4><p>把运动规划直接写成一个优化问题：代价=轨迹的不平滑程度+离障碍物有多近，用梯度下降直接改整条轨迹；关键是在“平滑度度量”下做协变的梯度更新，让一次更新的影响平滑地扩散到整条轨迹上。</p></div><div><h4>影响</h4><p>开创了基于梯度的轨迹优化规划这一路线，此后的STOMP、TrajOpt等都以它为对照，其扩展版在2013年发表于IJRR。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>把一条轨迹离散成N个路点，每个路点是一组关节角。CHOMP的目标函数有两项：<b>平滑项</b>是相邻路点之差（速度、加速度）的平方和，惩罚抖动；<b>障碍项</b>先对环境预计算一张有符号距离场，再沿机械臂身体上的一组采样点查询它们离障碍物有多近，越近代价越大。</p><p>普通梯度下降每次只把撞到障碍的那几个路点往外推，会产生局部尖刺。CHOMP用平滑项对应的矩阵 <code>A</code> 作为度量，更新方向取 <code>A⁻¹∇U</code>：这相当于先算出普通梯度，再把它“抹平”到整条轨迹上，于是一个路点被推开时，邻近路点也一起平滑地移动。这种在函数空间里协变的梯度，使得即使从一条直接穿过障碍物的直线初始化，优化也常能收敛到平滑、无碰撞的轨迹。与<a class="ln" href="../n/rrt.html">RRT快速随机树</a>、<a class="ln" href="../n/prm-planning.html">PRM概率路图</a>相比，它可以直接把粗糙轨迹优化成平滑轨迹，但只保证局部最优。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只能找到局部最优，初始化不好时会卡在穿过障碍的局部极小值里，缺少完备性保证。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/trajopt.html">TrajOpt序列凸轨迹优化</a></div></li><li>碰撞代价用身体采样点和距离场近似，薄障碍或采样稀疏时可能漏检碰撞。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/trajopt.html">TrajOpt序列凸轨迹优化</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/rrt.html">RRT快速随机树</a><span class="yr">1998.10 · 具身·世界模型</span><div class=nt>RRT靠随机采样保证概率完备但路径不平滑；CHOMP靠梯度优化得到平滑轨迹但只局部最优。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/lqr.html">LQR最优控制</a><span class="yr">1960 · 具身·世界模型</span><div class=nt>沿用最优控制把问题写成代价最小化的思路，但针对高维机械臂与障碍物约束。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/prm-planning.html">PRM概率路图</a><span class="yr">1996.08 · 具身·世界模型</span><div class=nt>PRM预建路图再搜索；CHOMP直接对整条轨迹做连续优化，常被用来平滑采样规划器的结果。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/trajopt.html">TrajOpt序列凸轨迹优化</a><span class="yr">2013.06 · 具身·世界模型</span><div class=nt>把CHOMP中作为软代价的避碰改为线性化约束并精确计算距离，缓解局部极小和漏检碰撞的问题。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/kinematics-dof.html">自由度、运动学与本体感知</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/vector-matrix.html">向量、矩阵与张量</a></p>
+<h2>本篇术语</h2><ul><li><b>有符号距离场</b>　对空间中每个点存储它到最近障碍物表面的距离，在障碍内部为负；查询一次就知道离碰撞有多远。</li><li><b>协变梯度</b>　在特定度量（这里是轨迹平滑度）下定义的梯度方向，使更新结果不依赖轨迹如何参数化，表现为把局部修改平滑地扩散开。</li></ul>
+<h2>怎么学</h2><p>先实现一个二维点机器人的轨迹优化（平滑项+距离场障碍项），对比普通梯度与乘以A⁻¹后的更新；再读CHOMP的IJRR版本第3、4节。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1109/robot.2009.5152817" rel="noopener">https://doi.org/10.1109/robot.2009.5152817</a>（经Crossref核对：标题《CHOMP: Gradient optimization techniques for efficient motion planning》、四位作者、ICRA 2009（2009-05）；IJRR 2013扩展版标题与作者。目标函数、协变梯度等方法细节与机构为凭一般了解，未打开正文对照。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20CHOMP%E6%A2%AF%E5%BA%A6%E8%BD%A8%E8%BF%B9%E4%BC%98%E5%8C%96%EF%BC%88chomp%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Achomp%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/chomp.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ros.html"><small>本分支上一个 · 2009.05</small><b>ROS机器人操作系统</b></a><a class="r" href="gelsight.html"><small>本分支下一个 · 2009.06</small><b>GelSight视触觉</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

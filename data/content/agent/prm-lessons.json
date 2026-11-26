@@ -1,0 +1,27 @@
+{
+  "id": "prm-lessons",
+  "who": "Zhenru Zhang, Chujie Zheng, Yangzhen Wu, Beichen Zhang, Runji Lin, Bowen Yu, Dayiheng Liu, Jingren Zhou, Junyang Lin · 阿里巴巴Qwen团队",
+  "venue": "ACL 2025 Findings",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2501.07301"},
+    {"label": "Hugging Face", "url": "https://huggingface.co/Qwen/Qwen2.5-Math-PRM-7B"}
+  ],
+  "aka": ["Qwen2.5-Math-PRM", "PRM开发经验", "Lessons of Developing PRMs", "共识过滤", "consensus filtering", "蒙特卡洛标注的问题", "BoN评测偏差"],
+  "problem": "过程奖励模型（PRM）要知道每一步对不对，Math-Shepherd式的蒙特卡洛自动标注成了主流，但这样训出的PRM并不好；常用的best-of-N评测也说不清PRM到底会不会查步骤。",
+  "idea": "系统对比后指出蒙特卡洛标注不如LLM评判和人工标注；提出「共识过滤」——只保留蒙特卡洛与LLM评判在错误位置上意见一致的样本；并主张同时用逐步找错指标评测PRM。",
+  "impact": "发布的Qwen2.5-Math-PRM-7B/72B在ProcessBench上大幅超过此前开源PRM；文中关于蒙特卡洛标注和BoN评测偏差的结论被后续PRM工作广泛引用。",
+  "method": "**蒙特卡洛标注的问题**：[[math-shepherd]]的做法是从某一步出发让模型续写几次，只要能走到正确答案就认为这一步对。但模型可能从错误的中间步骤「蒙」到正确答案，也可能从正确的步骤出发却续写错，于是标签很吵。作者在相同条件下比较发现，用LLM直接评判每一步、或用人工标注（如[[prm]]的PRM800K），训出的PRM效果和泛化都更好。\n\n**BoN评测的偏差**：只看「用PRM从N个解里挑一个后准确率多少」会高估PRM：策略模型常给出过程有错但答案对的解，PRM放过它们照样得分；不少PRM把最低分集中在最后一步，实际上退化成了看答案的结果奖励模型。作者因此主张同时报告逐步找错的指标。\n\n**共识过滤**：每一步用8次续写做蒙特卡洛估计，同时让Qwen2.5-72B-Instruct逐步评判；两者指出的首个错误步骤一致才保留，约留下四成数据。过滤后用硬标签（续写全错才算错步）训练效果最好。\n\n结果：在ProcessBench（逐步找错）上，72B版本平均F1为78.3、7B版本73.5，Math-Shepherd-PRM-7B只有31.5，GPT-4o为61.9；在best-of-8上7B版本对七个数学基准都超过多数投票。",
+  "limits": [
+    {"text": "共识过滤要对每道题跑大量续写并调用72B评判模型，构建数据的成本很高，且丢掉了约六成样本。", "solved_by": []},
+    {"text": "只针对数学推理，PRM在代码、开放式写作等难以分步判断对错的领域如何构建仍未解决。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "math-shepherd", "type": "solves", "note": "指出其蒙特卡洛自动标注噪声大，用共识过滤筛出更可靠的步骤标签。"},
+    {"to": "prm", "type": "extends", "note": "沿用逐步打分的过程奖励模型，系统研究其数据构建与评测。"},
+    {"to": "process-vs-outcome", "type": "extends", "note": "进一步说明BoN优化的PRM会退化为看结果的评分。"},
+    {"to": "qwen2.5", "type": "uses", "note": "PRM从Qwen2.5-Math指令模型初始化，评判模型为Qwen2.5-72B-Instruct。"}
+  ],
+  "prereq": ["reward-design", "monte-carlo", "benchmark", "classification-metrics"],
+  "learn": "先读[[prm]]和[[math-shepherd]] → 读原文第3节两种标注方式的对比和第4节共识过滤 → 动手：对几道题的分步解答分别用续写法和LLM评判标注错步，看两者在哪里不一致。",
+  "check": {"source": "https://arxiv.org/abs/2501.07301", "confirmed": "标题、作者、v1提交于2025-01-13；摘要中MC标注不如LLM评判与人工、BoN三点偏差、共识过滤、发布新PRM；正文（arxiv.org/html/2501.07301）核对Qwen2.5-Math-PRM-7B/72B、8次续写、Qwen2.5-72B-Instruct评判、约40%保留、硬标签、ProcessBench平均F1 78.3/73.5/31.5与GPT-4o 61.9、best-of-8七个基准均超多数投票。venue凭一般了解。"}
+}

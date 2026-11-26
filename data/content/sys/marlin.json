@@ -1,0 +1,25 @@
+{
+ "id": "marlin",
+ "who": "Elias Frantar, Roberto L. Castro, Jiale Chen, Torsten Hoefler, Dan Alistarh · 奥地利科学技术研究所, 苏黎世联邦理工学院等",
+ "venue": "PPoPP 2025",
+ "aka": ["MARLIN", "Marlin内核", "W4A16内核", "混合精度矩阵乘", "mixed-precision GEMM", "Sparse-Marlin"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2408.11743"},
+  {"label": "GitHub", "url": "https://github.com/IST-DASLab/marlin"}
+ ],
+ "problem": "4比特权重量化在单用户推理时能加速，因为瓶颈是从显存读权重；但服务时一次要处理一批请求，计算量随之增大，已有的量化内核在批大小稍大时就退回甚至慢于FP16。",
+ "idea": "专门为“4比特权重×16位激活”的矩阵乘写一个GPU内核，靠异步显存访问、精细的任务调度与流水线、以及为量化格式定制的数据布局，让它在批大小16–32时仍保持接近显存带宽上限，从而拿到接近4倍的加速。",
+ "impact": "成为vLLM等推理引擎中GPTQ/AWQ类4比特模型的默认高性能内核之一，“批量服务下也能兑现权重量化加速”的问题由此得到肯定回答。",
+ "method": "解码时每个token都要读一遍全部权重，[[gptq]]、[[awq]]把权重压到4比特，读的字节少了4倍，单请求时速度能接近提高4倍。问题在批处理：批大小为b时，每读一次权重要做b倍的计算，b一大就从“受显存带宽限制”变成“受计算限制”，而且4比特权重还要在寄存器里解包、转换成FP16再进张量核心计算，这些额外开销很快吃掉收益。\n\nMARLIN（Mixed-precision Auto-Regressive LINear kernels）的目标是让内核在尽可能大的批范围内保持带宽受限。主要手段：用异步拷贝指令把权重从全局显存预取到共享内存，让读取与计算重叠；对权重做离线重排，使解包后的数据正好符合张量核心指令要求的布局，解包只需少量位运算；仔细划分线程块的工作、做多级流水线，让所有SM都忙起来并减少同步；量化的缩放系数也按相同方式安排。思路与[[cutlass]]这类高性能GEMM库一致，但完全为“低比特权重、少量token”这一推理场景定制。\n\n摘要报告：批大小16–32时可获得接近最大的4倍量化加速，64–128时加速逐渐下降但仍显著；集成进[[vllm]]后端到端推理最多加速2.8倍；还可扩展到NVIDIA的2:4稀疏格式获得额外加速。",
+ "limits": [
+  {"text": "只针对权重量化、激活仍是16位；批大小上到上百后又转为计算受限，加速明显减小，大批量服务需要权重和激活都低比特的方案。", "solved_by": ["nvfp4"]}
+ ],
+ "relations": [
+  {"to": "gptq", "type": "solves", "note": "GPTQ得到的4比特模型此前在批量服务中难以提速，MARLIN提供了批大小16–32下接近4倍加速的内核。"},
+  {"to": "cutlass", "type": "extends", "note": "借鉴CUTLASS式分块GEMM与流水线设计，专门为4比特权重、16位激活的混合精度矩阵乘定制。"},
+  {"to": "vllm", "type": "uses", "note": "集成进vLLM服务引擎，端到端推理最多加速2.8倍。"},
+  {"to": "sparsegpt", "type": "extends", "note": "支持与SparseGPT同一作者团队提出的2:4半结构化稀疏结合，进一步提速。"}
+ ],
+ "prereq": ["matrix-multiplication", "quantization-concept", "memory-bandwidth", "cpu-gpu"],
+ "check": {"source": "https://arxiv.org/abs/2408.11743", "confirmed": "标题、五位作者、v1日期2024-08-21；摘要：权重量化在单用户推理中带来加速、批量多客户端场景是否可行尚不清楚、内核需保持显存受限、批大小16–32接近最大4倍加速、64–128加速逐渐下降但仍显著、异步显存访问/复杂任务调度与流水线/定制量化支持、集成vLLM端到端最多2.8倍、可扩展到NVIDIA 2:4稀疏。离线权重重排细节、PPoPP 2025、机构为一般了解。"}
+}

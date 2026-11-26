@@ -1,0 +1,32 @@
+{
+  "id": "hlbl",
+  "who": "Andriy Mnih, Geoffrey Hinton · 多伦多大学",
+  "venue": "NeurIPS 2008",
+  "links": [
+    {"label": "NeurIPS", "url": "https://papers.nips.cc/paper_files/paper/2008/hash/1e056d2b0ebd5c878c550da6ac5d3724-Abstract.html"}
+  ],
+  "aka": ["HLBL", "Hierarchical Log-Bilinear", "层次对数双线性模型"],
+  "problem": "神经语言模型每预测一个词都要对整个词表做归一化，训练和测试都极慢；Morin和Bengio的二叉树层次模型快了两个数量级，但效果明显变差，而且词树要靠WordNet等专家知识来建。",
+  "idea": "把对数双线性语言模型放到一棵词的二叉树上，每个内部节点做一次二分类；词树不靠专家知识，而是用模型学到的词向量自动递归聚类得到，并允许一个词出现在树的多个位置。",
+  "impact": "层次模型第一次在困惑度上超过不分层的神经模型和最好的n-gram模型，说明慢的问题可以用树结构解决而不必牺牲效果；从数据中建树的思路后来被word2vec的哈夫曼树层次softmax等沿用。",
+  "method": "[[hierarchical-softmax]]的思路是：把词表里的词放在一棵二叉树的叶子上，预测一个词等于从根走到这个叶子，每经过一个内部节点就做一次「往左还是往右」的二分类，于是一次预测只需约log₂V次运算而不是V次（V是词表大小）。但Morin和Bengio用的树来自WordNet，和语言模型本身的需要不一致，困惑度比不分层的[[nplm]]差不少。\n\n这篇把树上的每个二分类器换成[[log-bilinear-lm]]的形式：用上下文词向量线性组合出一个「预测向量」，再和内部节点的向量做点积，经过sigmoid得到往某一边走的概率。关键改进在于**树从数据里学**：先用随机树训练一个模型得到词向量，再把词向量按两个高斯的混合模型递归地一分为二，构成新树后重新训练；还允许一个多义词出现在多个叶子上，词的概率是几条路径之和。\n\n摘要称，这样得到的层次模型在速度上保持层次结构的优势，困惑度则能超过不分层的神经模型和最好的n-gram模型。",
+  "limits": [
+    {"text": "建树需要先训练一遍模型拿到词向量再聚类，流程是两阶段的，树一旦固定，预测效果就受树的质量约束。", "solved_by": ["skip-gram-ns"]},
+    {"text": "仍然只用固定长度的前几个词作上下文，无法利用更长的历史。", "solved_by": ["rnnlm"]}
+  ],
+  "relations": [
+    {"to": "log-bilinear-lm", "type": "extends", "note": "把同一作者2007年的对数双线性语言模型搬到二叉树的每个内部节点上，做成层次版本。"},
+    {"to": "hierarchical-softmax", "type": "solves", "note": "Morin和Bengio的层次模型依赖WordNet建树、效果明显变差；HLBL改为从学到的词向量自动建树，效果反超不分层的模型。"},
+    {"to": "nplm", "type": "solves", "note": "针对神经概率语言模型训练和测试都要对全词表归一化的速度瓶颈。"},
+    {"to": "brown-clustering", "type": "rivals", "note": "Brown聚类也是自底向上把词组织成二叉树，但依据是n-gram互信息；HLBL用连续词向量的高斯混合做自顶向下的划分。"}
+  ],
+  "prereq": ["language-model", "softmax", "embedding", "perplexity", "big-o", "clustering"],
+  "terms": [
+    {"t": "预测向量", "d": "对数双线性模型里由上下文各词的向量各乘一个矩阵后相加得到的向量，用来和候选词（或树节点）的向量做点积打分。"}
+  ],
+  "learn": "先读[[hierarchical-softmax]]和[[log-bilinear-lm]]的讲解 → 读原文第3–4节层次模型的定义和建树算法 → 动手：用一个小语料，比较随机树、按词频建的哈夫曼树和按词向量聚类的树训练出来的层次softmax困惑度。",
+  "check": {
+    "source": "https://papers.nips.cc/paper_files/paper/2008/file/1e056d2b0ebd5c878c550da6ac5d3724-Paper.pdf",
+    "confirmed": "NeurIPS 2008论文PDF：标题、作者Mnih与Hinton（多伦多大学）、摘要（NPLM训练和测试极慢；Morin和Bengio的层次模型快两个数量级但效果差、树来自专家知识；本文提出快速层次模型和基于特征的自动建树算法，结果超过不分层神经模型与最好的n-gram模型）。高斯混合递归划分、一词多叶的细节凭一般了解，正文未写具体困惑度数字。"
+  }
+}

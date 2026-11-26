@@ -1,0 +1,28 @@
+{
+  "id": "rar",
+  "who": "Qihang Yu, Ju He, Xueqing Deng, Xiaohui Shen, Liang-Chieh Chen · 字节跳动",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2411.00776"},
+    {"label": "代码", "url": "https://github.com/bytedance/1d-tokenizer"}
+  ],
+  "aka": ["RAR", "随机顺序自回归", "Randomized AutoRegressive", "随机排列退火"],
+  "problem": "图像自回归模型照搬语言模型按光栅顺序（从左上到右下）逐个预测token，每个token只能看到“上方和左边”，而图像本身是双向相关的，所以效果不如掩码生成和扩散模型。",
+  "idea": "训练时以概率r把token序列随机打乱成别的分解顺序（加上目标位置的编码），r从1线性退火到0；模型先学会各种顺序下的预测、看到双向上下文，最后回到标准光栅顺序。",
+  "impact": "在完全保留标准“下一个token预测”框架、可直接复用语言模型基础设施的前提下，ImageNet 256上FID达到1.48，超过当时的自回归、掩码和扩散方法。",
+  "method": "自回归模型把图像的联合概率分解成`p(x) = Π p(x_i | x_<i)`，分解顺序是人为选的。光栅顺序下，第i个token看不到它右边和下方的内容，这对语言自然，对图像却是限制。\n\nRAR的做法很简单：训练每一步以概率r把序列随机排列成另一个顺序，再按新顺序做下一个token预测。为了让模型知道下一个要预测的是图上哪个位置，在输入里加上“目标位置嵌入”。r在训练开始时为1（完全随机顺序），随训练线性降到0（只用光栅顺序），作者称之为**排列退火**。这样模型实际上在最大化“所有分解顺序上的期望似然”，学会利用双向上下文；而训练结束时又收敛到固定的光栅顺序，推理时完全是标准自回归，可以用KV缓存等语言模型工具。\n\n论文在ImageNet 256×256上报告FID 1.48，超过此前最好的自回归模型（如[[llamagen]]），也超过主流的扩散模型和[[maskgit]]式掩码Transformer。",
+  "limits": [
+    {"text": "仍是逐个token串行生成，256分辨率下也要几百步，推理速度不如下一尺度预测或少步扩散。", "solved_by": []},
+    {"text": "结果主要在ImageNet类别条件上验证，文生图等大规模场景下的收益当时没有展示。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "llamagen", "type": "extends", "note": "保留LLaMA式纯解码器下一个token预测，只改训练时的分解顺序。"},
+    {"to": "maskgit", "type": "rivals", "note": "掩码Transformer靠双向注意力获得全局上下文，RAR在自回归框架内用随机顺序达到类似效果并超过它。"},
+    {"to": "var", "type": "rivals", "note": "VAR改变了“下一个预测什么”（尺度），RAR保留逐token预测、改变顺序。"}
+  ],
+  "prereq": ["autoregressive", "tokenization", "positional-encoding", "transformer-block", "generation-metrics"],
+  "terms": [
+    {"t": "分解顺序", "d": "把联合概率拆成一连串条件概率时，先生成哪个变量、后生成哪个变量的顺序。"}
+  ],
+  "learn": "先读自回归图像生成与光栅顺序 → 读本文第3节排列退火和目标位置嵌入 → 在小模型上比较固定顺序与随机顺序训练的FID。",
+  "check": {"source": "https://arxiv.org/abs/2411.00776", "confirmed": "标题、五位作者、v1日期2024-11-01、摘要中以概率r随机排列分解顺序且r从1线性退火到0、最大化所有分解顺序上的期望似然、保持与语言模型框架完全兼容、ImageNet-256 FID 1.48超过自回归/扩散/掩码Transformer方法；机构字节跳动、目标位置嵌入细节来自一般了解"}
+}

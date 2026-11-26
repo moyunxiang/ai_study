@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>ViNT视觉导航基础模型（2023） · AI脉络</title>
+<meta name="description" content="视觉导航模型通常只在一种机器人、一个数据集上训练，换个平台或任务就要从头再来，没有像语言、视觉领域那样可复用的预训练模型。 在多个不同机器人平台的导航数据上，用统一的“到达目标图像”目标训练一个Transformer导航模型；下游换新任务时，只把目标编码器换成新的模态（GPS航点、路线指令）并做类…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/vint.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ViNT视觉导航基础模型（2023）">
+<meta property="og:description" content="视觉导航模型通常只在一种机器人、一个数据集上训练，换个平台或任务就要从头再来，没有像语言、视觉领域那样可复用的预训练模型。 在多个不同机器人平台的导航数据上，用统一的“到达目标图像”目标训练一个Transformer导航模型；下游换新任务时，只把目标编码器换成新的模态（GPS航点、路线指令）并做类…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/vint.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/vint">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 语言规划与具身推理</div>
+<h1>ViNT视觉导航基础模型</h1>
+<div class="full">ViNT: A Foundation Model for Visual Navigation</div>
+<div class="meta"><span>2023.06</span><span>模型</span><span>延伸</span><span>CoRL 2023</span><span>Dhruv Shah, Ajay Sridhar, Nitish Dashora, Kyle Stachowicz, Kevin Black, Noriaki Hirose, Sergey Levine · UC Berkeley</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2306.14846" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://visualnav-transformer.github.io" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/vint">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>视觉导航模型通常只在一种机器人、一个数据集上训练，换个平台或任务就要从头再来，没有像语言、视觉领域那样可复用的预训练模型。</p></div><div><h4>方法</h4><p>在多个不同机器人平台的导航数据上，用统一的“到达目标图像”目标训练一个Transformer导航模型；下游换新任务时，只把目标编码器换成新的模态（GPS航点、路线指令）并做类似提示微调的适配。</p></div><div><h4>影响</h4><p>成为移动机器人导航领域较早的通用预训练模型之一，后续的NoMaD和导航世界模型NWM都在这一系列的数据与模型基础上发展。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>ViNT的训练目标很简单：给当前和过去几帧相机图像以及一张目标图像，预测到达目标还需要多少步，以及接下来几步该怎么走（路点）。这个目标对任何导航数据都适用，不需要额外标注，于是可以把多个数据集、多种轮式和腿式机器人共数百小时的导航记录合在一起训练。</p><p>结构上，每帧图像由一个卷积编码器压成一个令牌，目标图像（与当前图像一起）编码成目标令牌，<a class="ln" href="../n/transformer.html">Transformer</a>在这些令牌之间做注意力后输出距离和动作。实验显示它出现正迁移：混合数据训练的模型优于只在单一数据集上训练的专用模型。</p><p>两种扩展：一是配合扩散模型生成的子目标图像，在陌生环境中探索；配合长程启发式，可完成公里级的导航。二是把目标编码器换成GPS航点或路线指令的编码，嵌入到同一个目标令牌空间，少量数据即可适配新任务，作者称之为受提示微调启发的方法。这一思路延续了<a class="ln" href="../n/lm-nav.html">LM-Nav预训练模型组合导航</a>中ViNG那类目标图像条件导航策略，但走向了大规模多平台预训练。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>探索陌生环境要依赖单独的扩散模型生成子目标图像，系统复杂、推理慢。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/nomad.html">NoMaD扩散导航与探索</a></div></li><li>目标以图像为主，语言指令需要额外适配，与大语言模型的结合较弱。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>用Transformer在观测令牌和目标令牌之间做注意力。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/rt-1.html">RT-1</a><span class="yr">2022.12 · 具身·世界模型</span><div class=nt>同一时期把机器人控制做成大规模Transformer预训练；RT-1针对操作，ViNT针对移动导航。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/lm-nav.html">LM-Nav预训练模型组合导航</a><span class="yr">2022.07 · 具身·世界模型</span><div class=nt>从LM-Nav所用的单一平台目标图像导航模型，扩展为多平台预训练的导航基础模型。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/nomad.html">NoMaD扩散导航与探索</a><span class="yr">2023.10 · 具身·世界模型</span><div class=nt>ViNT探索陌生环境需要单独的扩散子目标生成器；NoMaD用目标掩码让同一策略兼做探索与目标导航。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a> <a class="chip c" href="../c/transfer-learning.html">迁移学习</a></p>
+<h2>本篇术语</h2><ul><li><b>目标图像条件策略</b>　给策略一张“目的地长什么样”的照片，策略据此决定怎么走，不需要地图或坐标。</li><li><b>正迁移</b>　在多种来源的数据上一起训练，比只在单一来源上训练效果更好。</li></ul>
+<h2>怎么学</h2><p>先读LM-Nav了解目标图像导航的用法，再读ViNT第3节的训练目标与第5节的下游适配；官方仓库提供预训练权重和部署代码。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2306.14846" rel="noopener">https://arxiv.org/abs/2306.14846</a>（标题、七位作者、v1提交日期2023-06-26；摘要中通用到达目标训练目标、Transformer结构、多平台数百小时导航数据、正迁移、扩散子目标探索、公里级导航、受提示微调启发的目标编码器替换（GPS航点、路线指令）。卷积编码器、距离与路点输出、CoRL 2023、与NWM的关系为凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ViNT%E8%A7%86%E8%A7%89%E5%AF%BC%E8%88%AA%E5%9F%BA%E7%A1%80%E6%A8%A1%E5%9E%8B%EF%BC%88vint%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Avint%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/vint.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="rvt.html"><small>本分支上一个 · 2023.06</small><b>RVT多视角操作Transformer</b></a><a class="r" href="voxposer.html"><small>本分支下一个 · 2023.07</small><b>VoxPoser</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "id": "olmocr",
+  "aka": ["olmOCR", "olmOCR-Bench", "olmOCR-mix-0225", "文档锚定", "Document Anchoring"],
+  "who": "Jake Poznanski, Aman Rangapur, Jon Borchardt, Jason Dunkelberger, Regan Huff, Daniel Lin, Christopher Wilhelm, Kyle Lo et al. · 艾伦人工智能研究所（AI2）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2502.18443"},
+    {"label": "代码", "url": "https://github.com/allenai/olmocr"}
+  ],
+  "problem": "PDF里有海量高质量文本可供训练语言模型，但开源工具抽取质量差，最好的闭源VLM又太贵（用GPT-4o处理百万页超过6240美元），或者文件不能外发。",
+  "idea": "用GPT-4o给26万页多样的PDF生成高质量转写，微调一个7B开源VLM；推理时把PDF自带的文字块和坐标作为“文档锚点”和页面图像一起喂给模型，减少幻觉。",
+  "impact": "以每百万页约176美元的成本把PDF转成按阅读顺序排列的纯文本，并完整开源模型、数据、推理管线和olmOCR-Bench，成为端到端文档解析VLM的常用基线。",
+  "method": "训练语言模型的网页文本日渐用尽，PDF被视为下一个大宝库，但版式、扫描质量、公式表格让抽取很难。[[mineru]]这样的流水线工具组合多个模型和规则，而直接调用[[gpt-4o]]这类VLM效果好但贵，论文估算GPT-4o处理一百万页要6240美元以上。\n\nolmOCR的路线是“蒸馏+锚定”。数据：从10万多个爬取的PDF中采样26万页，覆盖图表、手写、劣质扫描等情况，用GPT-4o生成按自然阅读顺序的线性化纯文本（保留章节、表格、列表、公式等结构），得到olmOCR-mix-0225。模型：在此数据上微调[[qwen2-vl]]的7B指令版。**文档锚定**：对本身带文字层的PDF，先用pypdf取出文字块和图片的位置坐标，连同原始文字一起放进提示，再附上渲染后的页面图像；作者报告这比只给图像时幻觉明显更少。推理管线针对大规模批处理优化，支持vLLM和SGLang后端。\n\n论文同时发布olmOCR-Bench：1400份PDF，专门收集公式、表格、极小字号、老旧扫描等难例。结果显示olmOCR优于GPT-4o、Gemini Flash 2和Qwen-2.5-VL等顶级VLM，转换一百万页只需约176美元。",
+  "limits": [
+    {"text": "训练标签来自GPT-4o，教师模型自身的错误和偏好会被继承。", "solved_by": []},
+    {"text": "输出是线性化纯文本，对版面坐标、复杂表格的精确结构和图片内容的保留有限，不适合需要还原版式的场景。", "solved_by": ["paddleocr-vl"]}
+  ],
+  "relations": [
+    {"to": "qwen2-vl", "type": "uses", "note": "以Qwen2-VL-7B-Instruct为基座进行微调。"},
+    {"to": "gpt-4o", "type": "uses", "note": "用GPT-4o为训练页面生成转写标签，相当于把闭源模型的能力蒸馏到7B开源模型。"},
+    {"to": "mineru", "type": "rivals", "note": "MinerU用多模型流水线加规则，olmOCR用单个微调VLM端到端转写，并与之对比。"},
+    {"to": "nougat", "type": "extends", "note": "延续端到端把页面图像转成文本的思路，从学术论文扩展到各类PDF。"}
+  ],
+  "prereq": ["knowledge-distillation", "pretrain-finetune", "hallucination", "throughput-latency"],
+  "terms": [
+    {"t": "文档锚定（document anchoring）", "d": "从PDF文字层中抽取文字块和图片的坐标，与页面图像一起作为提示输入，给模型提供可靠的文字和位置参照。"}
+  ],
+  "learn": "先读[[nougat]]和[[mineru]]了解两种文档解析路线，再读olmOCR论文的数据构造与文档锚定两节，用开源管线处理几页扫描件和原生PDF对比效果。",
+  "check": {"source": "https://arxiv.org/abs/2502.18443", "confirmed": "标题、作者、arXiv v1提交2025-02-25；摘要中PDF可提供万亿级token、GPT-4o每百万页超过6240美元、7B微调VLM、olmOCR-mix-0225为来自10万多个PDF的26万页、每百万页176美元、olmOCR-Bench含1400份PDF、优于GPT-4o/Gemini Flash 2/Qwen-2.5-VL、支持vLLM和SGLang、全部开源。arXiv HTML正文中基座为Qwen2-VL-7B-Instruct、文档锚定用pypdf抽取文字块与图片坐标并显著减少幻觉、标签由gpt-4o-2024-08-06生成。"}
+}

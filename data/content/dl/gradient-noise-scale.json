@@ -1,0 +1,28 @@
+{
+  "id": "gradient-noise-scale",
+  "who": "Sam McCandlish, Jared Kaplan, Dario Amodei, OpenAI Dota Team · OpenAI",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1812.06162"},
+    {"label": "OpenAI博客", "url": "https://openai.com/index/how-ai-training-scales/"}
+  ],
+  "aka": ["梯度噪声尺度", "Gradient Noise Scale", "临界批量", "Critical Batch Size", "An Empirical Model of Large-Batch Training", "B_noise", "B_crit"],
+  "problem": "大批量训练能加速，但不同任务能有效使用的最大批量差别很大：ImageNet几万张，Dota 2强化学习却能到几百万；没人能事先说清一个新任务该用多大的批量。",
+  "idea": "定义一个容易测量的统计量“梯度噪声尺度”——梯度各分量方差之和与梯度范数平方之比，它近似给出批量继续加大就不再划算的那个临界点。",
+  "impact": "“临界批量”成为大模型训练选择批量大小的标准参考：后来的[[scaling-laws]]直接用它估计语言模型的最优批量，并发现临界批量随损失下降而增大，这也是很多大模型在训练中逐步加大批量的依据之一。",
+  "method": "用小批量B估计梯度时，估计的噪声随B增大而减小。作者在局部二次近似下推出：用批量B走一步能让损失下降的量，相对于用完整梯度时，大约打了一个 `1/(1 + B_noise/B)` 的折扣，其中 `B_noise = tr(Σ) / |G|²`（Σ是单个样本梯度的协方差，G是真实梯度）。直观上，B远小于B_noise时梯度噪声占主导，批量翻倍几乎让每步进展翻倍（时间换算力很划算）；B远大于B_noise时梯度已经很准，再加大批量几乎没有收益，只是浪费算力。\n\n由此得到训练时间与总算力之间的权衡曲线：想用更少的步数就要付出更多样本，B_noise附近是两者折中的“临界批量”。B_noise可以在训练中用两种不同批量的梯度范数便宜地估计出来。\n\n摘要报告：这个统计量在MNIST、SVHN、CIFAR-10、ImageNet、Billion Word等监督学习任务，Atari与Dota强化学习，以及SVHN上的自编码器生成模型训练中，都能预测最大有用批量；噪声尺度在一次训练中随损失下降而增大，对模型规模的依赖主要通过模型性能的提高体现。作者还据此给出自适应批量训练收益的粗略模型。",
+  "limits": [
+    {"text": "推导依赖局部二次近似和最优学习率的假设，对Adam等自适应优化器和学习率调度的影响只做了粗略处理。", "solved_by": []},
+    {"text": "临界批量随训练变化，论文没有给出在训练中自动调整批量的完整方法。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "large-batch-sgd", "type": "extends", "note": "在ImageNet一小时训练等大批量经验的基础上，给出能跨任务预测最大有用批量的统计量。"},
+    {"to": "sharp-minima", "type": "rivals", "note": "大批量的困难被归因于尖锐极小值，本文改从梯度噪声与优化效率的角度解释批量上限。"},
+    {"to": "openai-five", "type": "uses", "note": "Dota 2强化学习实验来自OpenAI Five，批量可达百万级，是论文的关键案例。"}
+  ],
+  "prereq": ["sgd-minibatch", "batch-size-epoch", "expectation-variance", "learning-rate", "taylor-expansion"],
+  "terms": [
+    {"t": "临界批量", "d": "批量再大就主要是浪费算力、几乎不再减少训练步数的那个批量大小，约等于梯度噪声尺度。"}
+  ],
+  "learn": "先弄懂小批量梯度的方差为何随批量减小；读论文第2节的推导和附录里估计B_noise的方法；在CIFAR-10上用两种批量估计梯度范数，算出B_noise并画出训练中它的变化。",
+  "check": {"source": "https://arxiv.org/abs/1812.06162", "confirmed": "标题、作者（含OpenAI Dota Team）、arXiv v1提交于2018-12-14；摘要中批量上限从ImageNet数万到Dota数百万、梯度噪声尺度预测最大有用批量、覆盖的监督/强化学习/生成模型任务、噪声尺度随损失下降而增大并主要通过模型性能依赖模型规模、计算效率与时间效率的权衡、自适应批量的粗略模型。B_noise公式与1/(1+B_noise/B)形式、OpenAI博客链接来自一般了解。"}
+}

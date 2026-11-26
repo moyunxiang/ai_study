@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DSO直接稀疏里程计（2016） · AI脉络</title>
+<meta name="description" content="视觉里程计分两派：这类特征点法依赖关键点检测与描述子，在弱纹理处缺少特征；这类直接法直接用像素亮度，但半稠密地使用像素、加平滑先验，难以对所有参数做一致的联合优化。 直接法与稀疏采样结合：从图像中所有有亮度梯度的区域均匀采样少量像素，直接最小化光度误差，并在一个滑动窗口内对相机位姿、像素逆深度和光…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dso.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DSO直接稀疏里程计（2016）">
+<meta property="og:description" content="视觉里程计分两派：这类特征点法依赖关键点检测与描述子，在弱纹理处缺少特征；这类直接法直接用像素亮度，但半稠密地使用像素、加平滑先验，难以对所有参数做一致的联合优化。 直接法与稀疏采样结合：从图像中所有有亮度梯度的区域均匀采样少量像素，直接最小化光度误差，并在一个滑动窗口内对相机位姿、像素逆深度和光…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dso.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dso">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 多视图几何与重建</div>
+<h1>DSO直接稀疏里程计</h1>
+<div class="full">Direct Sparse Odometry</div>
+<div class="meta"><span>2016.07</span><span>论文</span><span>延伸</span><span>IEEE TPAMI 2018</span><span>Jakob Engel, Vladlen Koltun, Daniel Cremers · 慕尼黑工业大学 / 英特尔实验室</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1607.02565" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/JakobEngel/dso" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/dso">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>视觉里程计分两派：<a class="ln" href="../n/orb-slam.html">ORB-SLAM</a>这类特征点法依赖关键点检测与描述子，在弱纹理处缺少特征；<a class="ln" href="../n/lsd-slam.html">LSD-SLAM直接法</a>这类直接法直接用像素亮度，但半稠密地使用像素、加平滑先验，难以对所有参数做一致的联合优化。</p></div><div><h4>方法</h4><p>直接法与稀疏采样结合：从图像中所有有亮度梯度的区域均匀采样少量像素，直接最小化光度误差，并在一个滑动窗口内对相机位姿、像素逆深度和光度参数做完整的联合优化；同时对曝光时间、镜头暗角和相机响应做光度标定。</p></div><div><h4>影响</h4><p>摘要称在数小时视频的三个数据集上，跟踪精度和鲁棒性都明显超过当时最好的直接法与间接法，成为直接法视觉里程计的代表，衍生出双目、视觉惯性和带回环的多个版本。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><b>直接、稀疏</b>：DSO不提取特征点，而是在每个关键帧里按梯度大小、在网格中均匀地挑选约两千个像素（可以在边缘上，也可以在白墙上缓慢变化的亮度处），每个像素用参考帧中的<b>逆深度</b>表示几何。误差是该像素周围一小块在另一帧中的亮度差，经Huber鲁棒核加权。</p><p><b>完整的光度模型</b>：真实相机的亮度会随自动曝光、镜头暗角（边缘变暗）和非线性响应曲线变化，直接比较亮度会出错。DSO把曝光时间、暗角和响应函数事先标定好，并为每帧估计一个仿射亮度变换 <code>I′ = e^a·I + b</code>，把它们放进误差模型里。</p><p><b>滑动窗口联合优化</b>：维护约7个关键帧，把这些帧的位姿、光度参数和所有点的逆深度一起用高斯-牛顿优化——相当于在小窗口里做光度版的<a class="ln" href="../n/bundle-adjustment.html">光束平差综述</a>。旧帧移出窗口时用边缘化（Schur补）保留其信息。由于去掉了半稠密方法中常用的平滑先验、改为均匀采样，问题保持稀疏，能实时求解。DSO只做里程计，没有回环检测和全局重定位。</p><h2>后来的发展</h2><p>后续有双目版Stereo DSO、视觉惯性版VI-DSO和带回环的LDSO；直接法的光度误差思想也被<a class="ln" href="../n/droid-slam.html">DROID-SLAM</a>等学习式SLAM和可微渲染式SLAM继承。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>没有回环检测，长时间运行后轨迹漂移无法纠正，也无法在跟丢后重定位。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/orb-slam2.html">ORB-SLAM2</a></div></li><li>依赖光度一致性和较好的初始化，快速运动、强烈光照变化或卷帘快门下容易跟丢。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/droid-slam.html">DROID-SLAM</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/orb-slam.html">ORB-SLAM</a><span class="yr">2015.02 · 视觉</span><div class=nt>ORB-SLAM靠特征点与描述子，DSO直接用像素亮度，可利用边缘和弱纹理区域；摘要称其精度和鲁棒性超过直接与间接方法。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/bundle-adjustment.html">光束平差综述</a><span class="yr">2000 · 视觉</span><div class=nt>滑动窗口内对位姿与逆深度做光度误差的联合优化，并用边缘化保持稀疏。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/lsd-slam.html">LSD-SLAM直接法</a><span class="yr">2014.09 · 视觉</span><div class=nt>同一团队的直接法续作：从半稠密加平滑先验，改为稀疏均匀采样并对所有参数联合优化。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/orb-slam2.html">ORB-SLAM2</a><span class="yr">2016.10 · 视觉</span><div class=nt>没有回环检测，长时间运行后轨迹漂移无法纠正，也无法在跟丢后重定位。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/droid-slam.html">DROID-SLAM</a><span class="yr">2021.08 · 视觉</span><div class=nt>依赖光度一致性和较好的初始化，快速运动、强烈光照变化或卷帘快门下容易跟丢。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/image-tensor.html">图像作为张量</a></p>
+<h2>本篇术语</h2><ul><li><b>直接法</b>　不提取特征点，直接用像素亮度差作为误差来估计相机运动和场景深度。</li><li><b>逆深度</b>　用深度的倒数1/d表示点的远近，对远处点和刚初始化的点数值上更稳定。</li></ul>
+<h2>怎么学</h2><p>先读LSD-SLAM了解直接法，再读DSO论文第2、3节光度模型与滑动窗口优化；用TUM monoVO数据集运行官方代码，并对比关掉光度标定后的漂移。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1607.02565" rel="noopener">https://arxiv.org/abs/1607.02565</a>（arXiv记录：标题Direct Sparse Odometry、三位作者Engel/Koltun/Cremers、v1提交于2016-07-09；摘要中的直接稀疏视觉里程计、最小化光度误差、几何用参考帧逆深度表示、对所有模型参数一致联合优化、去掉平滑先验改为均匀采样像素、可利用边缘和白墙缓变亮度、整合曝光时间/暗角/非线性响应的光度标定、三个数据集数小时视频、跟踪精度和鲁棒性显著超过直接与间接方法。约两千点、7个关键帧、仿射亮度变换、Huber核、边缘化、TPAMI 2018、后续版本凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DSO%E7%9B%B4%E6%8E%A5%E7%A8%80%E7%96%8F%E9%87%8C%E7%A8%8B%E8%AE%A1%EF%BC%88dso%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adso%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dso.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="colmap.html"><small>本分支上一个 · 2016.06</small><b>COLMAP</b></a><a class="r" href="densenet.html"><small>本分支下一个 · 2016.08</small><b>DenseNet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

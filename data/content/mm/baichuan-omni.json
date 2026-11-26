@@ -1,0 +1,28 @@
+{
+  "id": "baichuan-omni",
+  "aka": ["Baichuan-Omni", "Baichuan-omni", "百川全模态", "Conv-GMLP"],
+  "who": "Yadong Li, Haoze Sun, Mingan Lin, Tianpeng Li, Guosheng Dong, Tao Zhang, Bowen Ding, Wei Song et al. · 百川智能等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2410.08565"}
+  ],
+  "problem": "GPT-4o展示了同时处理图像、视频、音频和文字的交互体验，但开源社区缺少一个性能够好、同时覆盖这四种模态的模型。",
+  "idea": "以7B语言模型为核心，分别接入SigLIP视觉编码器和Whisper音频编码器，先逐个模态做对齐、再全模态联合对齐，最后在跨模态多任务数据上微调。",
+  "impact": "官方称其为首个开源的7B全模态（图像、视频、音频、文本）大模型，与VITA一起成为开源全模态模型被频繁对比的早期基线，后续有Baichuan-Omni-1.5。",
+  "method": "[[gpt-4o]]发布后，开源界出现了[[vita]]等尝试，但能同时理解图像、视频、音频并保持各项性能的开源模型仍然稀少。\n\nBaichuan-Omni的结构是“编码器+投影器+语言模型”：视觉端用[[siglip]]（384像素输入，配AnyRes处理更高分辨率），投影器是两层MLP加一个2×2卷积做池化；音频端用[[whisper]]-large-v3的编码器，下采样用作者设计的卷积门控MLP（Conv-GMLP）代替简单池化。训练分两大阶段。**多模态对齐**：图像-语言分三步，依次只训投影器、解冻视觉编码器并加入OCR与图表数据、再解冻语言模型全部训练；视频-语言在冻结视觉编码器和语言模型的情况下训练视频投影器；音频-语言冻结语言模型，训练音频编码器和投影器；最后所有模块在混合的图像、视频、音频数据上一起训练做全模态对齐。**多任务微调**：约60万条、覆盖200多个任务的多模态指令数据。报告还给出了初步的流式输入方案：视觉输入边到边编码送入模型，音频在输入结束后送入。\n\n摘要称，它在多种全模态和多模态基准上表现强劲，目标是为开源社区提供一个有竞争力的全模态基线。",
+  "limits": [
+    {"text": "只能理解音频、输出文字，不能像GPT-4o那样直接生成语音，也没有端到端的全双工语音对话。", "solved_by": ["vita-1.5", "qwen-omni"]},
+    {"text": "流式交互还处于早期：音频需等用户说完才送入模型，报告没有给出延迟测量。", "solved_by": ["qwen-omni"]}
+  ],
+  "relations": [
+    {"to": "gpt-4o", "type": "extends", "note": "以GPT-4o的全模态交互为目标，提供开源的同类模型。"},
+    {"to": "vita", "type": "rivals", "note": "同为早期开源全模态模型；Baichuan-Omni以7B规模覆盖图像、视频、音频与文本。"},
+    {"to": "whisper", "type": "uses", "note": "音频编码器采用Whisper-large-v3。"},
+    {"to": "siglip", "type": "uses", "note": "视觉编码器采用SigLIP。"}
+  ],
+  "prereq": ["instruction-tuning", "waveform-spectrogram", "pretrain-finetune", "image-patch"],
+  "terms": [
+    {"t": "全模态对齐", "d": "在各模态分别与语言模型对齐之后，把图像、视频、音频数据混在一起联合训练，让模型在一个对话里同时处理多种输入。"}
+  ],
+  "learn": "先读[[vita]]了解开源全模态的起点，再读Baichuan-Omni报告的训练流程图；对照[[qwen-omni]]看后来如何加入语音输出与流式交互。",
+  "check": {"source": "https://arxiv.org/abs/2410.08565", "confirmed": "标题、作者、arXiv v1提交2024-10-11；摘要中GPT-4o缺少高性能开源对应物、首个开源7B同时处理图像/视频/音频/文本的MLLM、多模态对齐与多任务微调两阶段、作为开源竞争基线。arXiv HTML正文（https://arxiv.org/html/2410.08565v1）中SigLIP 384px与两层MLP+2×2卷积投影、AnyRes、Whisper-large-v3与Conv-GMLP、各模态对齐的冻结方式、约60万条200多个任务的SFT、早期流式方案与音频在输入结束后送入。机构为一般了解。"}
+}

@@ -1,0 +1,24 @@
+{
+ "id": "fp8-lm",
+ "who": "Houwen Peng, Kan Wu, Yixuan Wei, Guoshuai Zhao, Yuxiang Yang, Ze Liu, Yifan Xiong, Ziyue Yang et al. · 微软",
+ "aka": ["MS-AMP", "FP8混合精度训练", "FP8 mixed precision", "FP8优化器状态", "FP8梯度通信"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2310.18313"},
+  {"label": "GitHub (MS-AMP)", "url": "https://github.com/Azure/MS-AMP"}
+ ],
+ "problem": "H100支持FP8矩阵乘，NVIDIA的Transformer Engine也只把矩阵乘换成FP8，梯度、优化器状态和分布式通信仍是16或32位，大模型训练省下的显存和时间有限。",
+ "idea": "提出一套分三级逐步启用的FP8自动混合精度框架：先让梯度用FP8存储与通信，再让优化器状态用FP8，最后让分布式并行中的数据也用FP8，配合缩放技巧避免溢出。",
+ "impact": "较早系统地把FP8扩展到梯度、优化器和通信的公开工作，开源的MS-AMP成为FP8大模型训练的参考实现之一，后续的FP8训练工作常以它为对照。",
+ "method": "[[fp8]]定义了E4M3和E5M2两种8位浮点格式，硬件上在[[h100]]得到支持。8位浮点的动态范围很窄，直接存梯度容易下溢或上溢，所以此前的FP8训练只在矩阵乘里用它，其余仍按[[mixed-precision]]的16/32位处理。\n\nFP8-LM的关键观察是：LLM训练里的大多数变量，包括梯度和优化器状态，都可以用低精度格式表示，而不损失模型精度、也无需调整超参数。框架分三级：第1级，权重和梯度以FP8存储，梯度的All-Reduce通信也用FP8，采用自动缩放防止溢出；第2级，Adam的一阶、二阶动量用FP8或FP16保存，主权重保留较高精度；第3级，把FP8支持扩展到[[megatron-3d]]的张量、流水线、序列并行和[[zero]]式切分中。\n\n摘要报告：在H100上训练GPT-175B时，相比广泛使用的BF16框架Megatron-LM，实际显存降低39%、速度快75%，比Transformer Engine快37%；方法也可用于指令微调和RLHF。",
+ "limits": [
+  {"text": "FP8的动态范围仍有限，需要逐张量缩放和许多工程技巧；更低的4比特训练还需要更细粒度的块缩放格式。", "solved_by": ["nvfp4"]}
+ ],
+ "relations": [
+  {"to": "fp8", "type": "uses", "note": "使用FP8 E4M3/E5M2格式，并把它从矩阵乘推广到梯度、优化器状态与通信。"},
+  {"to": "mixed-precision", "type": "extends", "note": "沿用混合精度训练的主权重与损失缩放思路，把更多变量降到8位。"},
+  {"to": "megatron-3d", "type": "rivals", "note": "以BF16的Megatron-LM为基线，并把FP8接入其张量、流水线并行。"},
+  {"to": "zero", "type": "uses", "note": "在ZeRO式的切分优化器状态上使用FP8，进一步减少分布式训练的显存与通信。"}
+ ],
+ "prereq": ["floating-point", "distributed-training", "adaptive-optimizer", "memory-bandwidth"],
+ "check": {"source": "https://arxiv.org/abs/2310.18313", "confirmed": "标题、作者（Peng, Wu, Wei等20人）、v1日期2023-10-27；摘要：多数变量如梯度和优化器状态可用低精度格式且不改超参数、三级FP8利用（8位梯度、优化器状态、分布式学习）、H100上GPT-175B比BF16的Megatron-LM显存降39%且快75%、比Transformer Engine快37%、可用于指令微调与RLHF、MS-AMP开源。各级具体格式（一阶二阶动量的精度）与自动缩放细节为一般了解。"}
+}

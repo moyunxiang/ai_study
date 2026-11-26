@@ -1,0 +1,29 @@
+{
+  "id": "mineru",
+  "aka": ["MinerU", "PDF-Extract-Kit", "PDF转Markdown", "文档解析流水线", "Pipeline文档解析"],
+  "who": "Bin Wang, Chao Xu, Xiaomeng Zhao, Linke Ouyang, Fan Wu, Zhiyuan Zhao, Rui Xu, Kaiwen Liu et al. · 上海人工智能实验室",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2409.18839"},
+    {"label": "代码", "url": "https://github.com/opendatalab/MinerU"}
+  ],
+  "problem": "要把海量PDF（论文、教材、报告）转成干净的文本给大模型训练和检索用，现有开源工具在版面、公式、表格上质量参差，换一种文档类型就出错。",
+  "idea": "把文档解析拆成预处理、版面与公式检测、分区域识别（OCR、公式、表格）、后处理排序、格式转换五步，每一步用专门微调过的模型加规则，最后输出Markdown或JSON。",
+  "impact": "成为最常用的开源PDF解析工具之一，被大量语料构建和RAG项目采用，也是此后端到端文档解析VLM（如olmOCR、MonkeyOCR、PaddleOCR-VL）主要的对比基线。",
+  "method": "大模型时代，PDF是高质量文本的重要来源，但PDF里文字、公式、表格、图片和页眉页脚混在一起，阅读顺序也不一定等于存储顺序。纯OCR工具（如[[tesseract]]）不懂版面，[[nougat]]这类端到端模型只擅长学术论文，换到教材、报纸、试卷就不稳定。\n\nMinerU是一条“流水线式”的解析方案，模型部分来自同团队的PDF-Extract-Kit。第一步预处理：用PyMuPDF读取PDF，过滤无法处理的文件，并获取能否直接抽取文字、语言、页面尺寸等元信息。第二步内容解析：用微调过的[[layoutlmv3]]做版面检测，区分标题、正文、图、表、公式等区域；用基于YOLO的模型检测行内和行间公式；随后对不同区域分别调用PaddleOCR识别文字、UniMERNet把公式转成LaTeX、TableMaster或StructEqTable识别表格。第三步后处理：删除无效区域，处理相互重叠的框，并按阅读顺序排列内容。第四步把中间的JSON结构转换为Markdown或自定义JSON。\n\n论文报告，微调后的版面检测模型在学术论文验证集上mAP为77.6，对比基线DocXchain为52.8；公式检测在学术论文上AP50为87.7；评测集覆盖11种文档类型。",
+  "limits": [
+    {"text": "多个模型串联，任一环节出错（例如版面框错）都会传到下游，且部署要同时维护多套模型，速度较慢。", "solved_by": ["olmocr", "paddleocr-vl"]},
+    {"text": "阅读顺序和区域合并大量依赖人工规则，遇到复杂多栏、跨页表格时容易乱序。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "layoutlmv3", "type": "uses", "note": "版面检测采用微调后的LayoutLMv3。"},
+    {"to": "yolo", "type": "uses", "note": "公式检测采用基于YOLO的检测器。"},
+    {"to": "nougat", "type": "rivals", "note": "Nougat用一个端到端模型把论文页面直接转成标记文本，MinerU用多模型流水线加规则，覆盖更多文档类型。"},
+    {"to": "tesseract", "type": "solves", "note": "在传统OCR只出文字的基础上补上版面、公式、表格和阅读顺序的恢复。"}
+  ],
+  "prereq": ["vision-tasks", "iou-map", "anchor-nms", "pretrain-finetune"],
+  "terms": [
+    {"t": "流水线式与端到端文档解析", "d": "前者把版面检测、文字识别、公式和表格识别交给不同模型依次处理；后者让一个视觉语言模型直接把整页图像转成结构化文本。"}
+  ],
+  "learn": "先了解[[layoutlmv3]]的版面检测和[[nougat]]的端到端思路，再读MinerU第2节的流程图，动手用开源代码把一篇论文PDF转成Markdown并检查公式与表格。",
+  "check": {"source": "https://arxiv.org/abs/2409.18839", "confirmed": "标题、作者、arXiv v1提交2024-09-27；摘要中PDF-Extract-Kit模型与精细的预处理和后处理规则、跨文档类型高质量抽取。arXiv HTML正文（https://arxiv.org/html/2409.18839v1）中PyMuPDF预处理、微调LayoutLMv3版面检测、YOLO系公式检测、UniMERNet公式识别、PaddleOCR文字识别、TableMaster/StructEqTable表格识别、后处理去重叠与阅读顺序、Markdown/JSON输出、版面检测学术论文mAP 77.6对DocXchain 52.8、公式检测AP50 87.7、11种文档类型评测。被广泛采用并作为后续基线为一般了解。"}
+}

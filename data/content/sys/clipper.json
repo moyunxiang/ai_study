@@ -1,0 +1,24 @@
+{
+ "id": "clipper",
+ "who": "Daniel Crankshaw, Xin Wang, Giulio Zhou, Michael J. Franklin, Joseph E. Gonzalez, Ion Stoica · 加州大学伯克利分校",
+ "venue": "NSDI 2017",
+ "aka": ["预测服务", "prediction serving", "模型服务", "model serving", "自适应批处理", "adaptive batching"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1612.03079"}
+ ],
+ "problem": "机器学习框架几乎都只管训练、不管上线；实时应用要在几十毫秒内、在高并发下给出预测，各团队只能为每个框架、每个模型各写一套服务代码。",
+ "idea": "在应用和各种机器学习框架之间加一个通用的服务层：每个模型装进独立容器，上层统一做缓存、自适应批处理和多模型选择，不改动底层框架就降低延迟、提高吞吐和准确率。",
+ "impact": "最早被广泛引用的通用模型服务系统之一，把“按延迟目标自适应调整批大小”等做法带进学术界，是此后推理服务论文追溯的起点之一。",
+ "method": "Clipper分两层。**模型抽象层**把每个模型（来自[[scikit-learn]]、[[spark]]、[[tensorflow]]、Caffe等）封装在独立容器里，通过统一的RPC接口调用，新增模型不必改应用代码。这一层做两件事：**预测缓存**，相同输入直接返回结果；**自适应批处理**，把多个请求攒成一批送给模型以提高吞吐，同时按服务延迟目标（SLO）用类似TCP拥塞控制的“加性增、乘性减”动态调整批大小，保证不超时。\n\n**模型选择层**同时维护多个候选模型，把它们看作多臂老虎机的臂：根据用户反馈在线调整权重，选出最好的单个模型或把多个模型的预测集成，既能提高准确率，也能在某个模型变慢或出错时降级到其他模型，使预测更稳健。\n\n摘要报告：在四个常见机器学习基准数据集上，Clipper能满足在线服务的延迟、准确率和吞吐要求；与TensorFlow Serving相比，吞吐和延迟相当，同时额外支持模型组合与在线学习。",
+ "limits": [
+  {"text": "以请求为单位的批处理只适合一次前向就结束的模型；生成式大模型的每个请求要迭代成百上千步，需要按迭代调度和专门的KV缓存管理。", "solved_by": ["orca-serving", "vllm"]}
+ ],
+ "relations": [
+  {"to": "tensorflow", "type": "rivals", "note": "论文以TensorFlow Serving为对照，Clipper在吞吐与延迟相当的同时支持跨框架的模型组合。"},
+  {"to": "scikit-learn", "type": "uses", "note": "支持把scikit-learn等多种框架的模型放进容器统一服务。"},
+  {"to": "spark", "type": "uses", "note": "同出伯克利AMPLab/RISELab，支持服务Spark MLlib训练出的模型。"}
+ ],
+ "prereq": ["throughput-latency", "training-vs-inference", "exploration-exploitation"],
+ "terms": [{"t": "SLO（服务等级目标）", "d": "系统对延迟等指标的承诺，例如“99%的请求要在20毫秒内返回”。"}],
+ "check": {"source": "https://arxiv.org/abs/1612.03079", "confirmed": "标题、六位作者、v1日期2016-12-09；摘要：多数框架只管训练不管部署、通用低延迟预测服务系统、模块化架构跨框架部署、缓存/批处理/自适应模型选择、不修改底层框架、四个基准数据集、与TensorFlow Serving吞吐延迟相当并支持模型组合与在线学习。加性增乘性减的批大小调整、多臂老虎机选择、NSDI 2017为一般了解。"}
+}

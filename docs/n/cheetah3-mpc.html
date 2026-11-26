@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MIT Cheetah 3凸MPC（2018） · AI脉络</title>
+<meta name="description" content="四足机器人跑、跳、转向时，要实时决定每只着地的脚该往地上施加多大的力。完整的非线性动力学模型太复杂，几十毫秒内求不出最优解；而简化的ZMP类方法又只适合慢速、稳定的步态。 把整个机器人近似成一个单刚体（腿的质量忽略），在小角度假设下把动力学线性化，于是未来一段时间内的足底力规划就变成一个凸二次规划…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/cheetah3-mpc.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MIT Cheetah 3凸MPC（2018）">
+<meta property="og:description" content="四足机器人跑、跳、转向时，要实时决定每只着地的脚该往地上施加多大的力。完整的非线性动力学模型太复杂，几十毫秒内求不出最优解；而简化的ZMP类方法又只适合慢速、稳定的步态。 把整个机器人近似成一个单刚体（腿的质量忽略），在小角度假设下把动力学线性化，于是未来一段时间内的足底力规划就变成一个凸二次规划…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/cheetah3-mpc.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/cheetah3-mpc">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 腿足与全身控制</div>
+<h1>MIT Cheetah 3凸MPC</h1>
+<div class="full">Dynamic Locomotion in the MIT Cheetah 3 Through Convex Model-Predictive Control</div>
+<div class="meta"><span>2018.10</span><span>论文</span><span>延伸</span><span>IROS 2018</span><span>Jared Di Carlo, Patrick M. Wensing, Benjamin Katz, Gerardo Bledt, Sangbae Kim · MIT</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1109/iros.2018.8594448" rel="noopener">DOI ↗</a><a class="btn sm" href="../index.html#/n/cheetah3-mpc">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>四足机器人跑、跳、转向时，要实时决定每只着地的脚该往地上施加多大的力。完整的非线性动力学模型太复杂，几十毫秒内求不出最优解；而简化的ZMP类方法又只适合慢速、稳定的步态。</p></div><div><h4>方法</h4><p>把整个机器人近似成一个单刚体（腿的质量忽略），在小角度假设下把动力学线性化，于是未来一段时间内的足底力规划就变成一个凸二次规划，可以在每个控制周期快速求出全局最优解。</p></div><div><h4>影响</h4><p>这套“单刚体凸MPC”成为四足机器人基于模型控制的标准做法，被MIT Mini Cheetah开源代码和大量四足机器人沿用，也是后来学习式运动控制常用的对比基线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>四足机器人的身体比腿重得多，于是可以把它看作一个受外力的刚体：每只着地的脚给身体一个地面反作用力，决定身体的平动和转动。刚体转动本来是非线性的，论文假设俯仰和横滚角较小、角速度不大，把转动动力学在当前偏航角附近线性化，得到一个线性离散系统 <code>x_{k+1} = A_k x_k + B_k f_k</code>，状态 <code>x</code> 包括身体位置、姿态、速度和角速度，控制量 <code>f</code> 是各支撑脚的地面反作用力。</p><p>在此基础上，<a class="ln" href="../n/mpc.html">模型预测控制MPC</a>在未来若干步内最小化状态跟踪误差和力的大小，约束包括摩擦锥（力不能大到让脚打滑，线性化成摩擦金字塔）和腾空的腿不能出力。这是一个凸二次规划，求解器可在几毫秒内给出全局最优解，并以约几十赫兹的频率重新求解。脚在空中的摆动轨迹和关节力矩则由另外的控制器完成。这比依赖<a class="ln" href="../n/zmp.html">ZMP零力矩点</a>的准静态方法更适合奔跑、跳跃等动态步态，也比<a class="ln" href="../n/bigdog.html">BigDog四足机器人</a>时代依靠大量手工调参的控制更系统。论文在MIT Cheetah 3上展示了多种步态和较快的奔跑。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>单刚体与小角度假设在翻滚、后空翻等大角度动作中失效，需要非线性或全身模型。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>依赖人为设定的步态时序和平坦或已知地形，在复杂地形上不如后来的强化学习策略鲁棒。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:96" href="../n/anymal-terrain.html">ANYmal复杂地形行走</a> <a class="chip hue" style="--h:96" href="../n/rma.html">RMA快速运动适应</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/mpc.html">模型预测控制MPC</a><span class="yr">1980 · 具身·世界模型</span><div class=nt>以滚动时域优化每个周期的足底力。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/zmp.html">ZMP零力矩点</a><span class="yr">1972 · 具身·世界模型</span><div class=nt>ZMP类方法只适合准静态步态；凸MPC直接优化地面反作用力，支持奔跑、跳跃等动态运动。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/bigdog.html">BigDog四足机器人</a><span class="yr">2008 · 具身·世界模型</span><div class=nt>延续动态平衡四足机器人的路线，把控制建立在可实时求解的优化之上。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/anymal-terrain.html">ANYmal复杂地形行走</a><span class="yr">2020.10 · 具身·世界模型</span><div class=nt>依赖人为设定的步态时序和平坦或已知地形，在复杂地形上不如后来的强化学习策略鲁棒。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:96" href="../n/rma.html">RMA快速运动适应</a><span class="yr">2021.07 · 具身·世界模型</span><div class=nt>依赖人为设定的步态时序和平坦或已知地形，在复杂地形上不如后来的强化学习策略鲁棒。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/planning-mpc.html">规划与模型预测控制</a> <a class="chip c" href="../c/convexity.html">凸函数与凸优化</a> <a class="chip c" href="../c/kinematics-dof.html">自由度、运动学与本体感知</a> <a class="chip c" href="../c/control-loop.html">控制回路与控制频率</a></p>
+<h2>本篇术语</h2><ul><li><b>地面反作用力</b>　着地的脚对地面用力时，地面反过来推机器人的力；控制四足机器人本质上就是规划这些力。</li><li><b>摩擦锥</b>　脚不打滑时，地面反作用力必须落在一个以法线为轴的圆锥里，水平分量不能超过摩擦系数乘以竖直分量。</li></ul>
+<h2>怎么学</h2><p>先补二次规划和MPC的基本形式，再读论文中单刚体模型的推导；可以阅读MIT Mini Cheetah开源控制代码中凸MPC的实现。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1109/iros.2018.8594448" rel="noopener">https://doi.org/10.1109/iros.2018.8594448</a>（经Crossref核对：标题《Dynamic Locomotion in the MIT Cheetah 3 Through Convex Model-Predictive Control》、五位作者、IROS 2018（2018-10）。单刚体线性化、摩擦金字塔、求解频率与Mini Cheetah开源代码采用等细节为凭一般了解，未打开正文对照。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MIT%20Cheetah%203%E5%87%B8MPC%EF%BC%88cheetah3-mpc%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acheetah3-mpc%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/cheetah3-mpc.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="dactyl.html"><small>本分支上一个 · 2018.08</small><b>Dactyl灵巧手</b></a><a class="r" href="roboturk.html"><small>本分支下一个 · 2018.11</small><b>RoboTurk众包遥操作</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "id": "flow-pp",
+  "who": "Jonathan Ho, Xi Chen, Aravind Srinivas, Yan Duan, Pieter Abbeel · UC Berkeley / Covariant",
+  "venue": "ICML 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1902.00275"},
+    {"label": "代码", "url": "https://github.com/aravindsrinivas/flowpp"}
+  ],
+  "aka": ["Flow++", "变分去量化", "Variational Dequantization", "logistic混合耦合层"],
+  "problem": "[[realnvp]]、[[glow]]这类标准化流能精确算似然、采样也快，但在图像密度估计（每维比特数）上明显落后于[[pixelcnn-pp]]等自回归模型。",
+  "idea": "逐一检查流模型的三个设计选择并改进：用一个可学习的流来生成去量化噪声代替均匀噪声，用logistic混合分布的累积分布函数代替仿射耦合，在耦合层的条件网络里加入自注意力。",
+  "impact": "成为当时最好的非自回归图像密度模型，缩小了流与自回归模型的差距；其中“变分去量化”成了之后处理离散像素的常用做法，扩散模型的似然评测里也会借用。",
+  "method": "像素是0–255的整数，而流模型拟合的是连续密度，常见做法是给每个像素加上[0,1)均匀噪声（去量化）再训练。Flow++指出这有三个短板，并分别修补：\n- **变分去量化**：均匀噪声让模型必须把密度均匀铺满每个小方格，浪费容量。Flow++改用一个以图像为条件的辅助流q(u|x)来生成噪声u，训练目标变成离散似然的一个变分下界（同[[c:elbo]]的推导），噪声分布可以学得更贴合数据。\n- **更强的耦合变换**：[[realnvp]]的耦合层只做仿射变换`y = x·s + t`。Flow++改用logistic混合分布的累积分布函数（再接逆sigmoid和仿射），单层就能表达多峰的弯曲变换，雅可比行列式仍然好算。\n- **更强的条件网络**：耦合层里预测变换参数的网络从纯卷积换成卷积加多头自注意力的结构。\n\n论文在CIFAR-10和ImageNet 32×32/64×64上报告，Flow++成为非自回归模型中密度估计最好的一个，消融实验显示三处改动各自都有贡献，其中去量化方式影响明显。",
+  "limits": [
+    {"text": "样本的视觉质量仍远不如同期GAN，且为保持可逆，模型宽而深、参数量大。", "solved_by": ["ddpm"]},
+    {"text": "似然仍未超过最强的自回归模型，流模型在密度估计上始终没能全面反超。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "realnvp", "type": "extends", "note": "保留耦合层结构，把仿射变换换成logistic混合累积分布函数。"},
+    {"to": "glow", "type": "extends", "note": "沿用Glow的多尺度流架构，改进去量化和条件网络。"},
+    {"to": "pixelcnn-pp", "type": "rivals", "note": "以缩小与PixelCNN++等自回归模型的似然差距为目标；也借用了其logistic混合分布。"},
+    {"to": "transformer", "type": "uses", "note": "在耦合层的条件网络中加入Transformer式的多头自注意力。"}
+  ],
+  "prereq": ["normalizing-flow", "jacobian-hessian", "mle", "elbo", "self-attention"],
+  "terms": [
+    {"t": "去量化", "d": "把离散的像素整数加上噪声变成连续值，使连续密度模型的似然可以和离散似然对应起来。"},
+    {"t": "每维比特数（bits/dim）", "d": "把负对数似然换算成平均每个像素通道需要多少比特编码，越低说明密度模型越好。"}
+  ],
+  "learn": "先读RealNVP的耦合层与雅可比 → 读本文第3节三处改进和变分去量化的下界 → 对照消融表看每处改动贡献多少bits/dim。",
+  "check": {"source": "https://arxiv.org/abs/1902.00275", "confirmed": "标题、五位作者、v1日期2019-02-01、摘要中流模型密度估计落后于自回归模型、改进均匀去量化/仿射流/纯卷积条件网络三处设计、成为非自回归模型中无条件密度估计最好；机构、ICML 2019、logistic混合CDF与自注意力细节、所用数据集来自一般了解，未写具体bits/dim数字"}
+}

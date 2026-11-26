@@ -1,0 +1,29 @@
+{
+  "id": "hart",
+  "who": "Haotian Tang, Yecheng Wu, Shang Yang, Enze Xie, Junsong Chen, Junyu Chen, Zhuoyang Zhang, Han Cai, Yao Lu, Song Han · MIT / NVIDIA / 清华大学",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2410.10812"},
+    {"label": "代码", "url": "https://github.com/mit-han-lab/hart"}
+  ],
+  "aka": ["HART", "混合自回归Transformer", "Hybrid Autoregressive Transformer", "混合分词器"],
+  "problem": "自回归图像模型受两点限制：离散分词器重建质量差，细节在量化时就丢了；直接生成1024像素的图训练代价又高得难以承受。",
+  "idea": "混合分词器：把自编码器的连续隐变量拆成“离散token表示大轮廓”和“连续残差表示离散token表达不了的细节”；离散部分用可变分辨率的[[var]]式自回归模型生成，残差交给一个只有3700万参数的小扩散模块。",
+  "impact": "直接生成1024×1024图像、质量接近扩散模型而吞吐高数倍，是“离散自回归加小扩散头”混合路线的代表工作之一。",
+  "method": "HART的出发点是：纯离散token的问题主要在重建，而连续扩散的问题主要在速度，那就让两者分工。\n\n**混合分词器**：先用一个连续自编码器把图像编成隐变量z。再用多尺度残差量化（同[[var]]）把z量化成离散token，得到近似值z_d；剩下的残差`z − z_d`保留为连续值。训练时让解码器既能只用离散部分解码，也能用离散加残差解码，保证离散token单独就表达了图像的大结构。\n\n**生成**：离散token由一个可扩展分辨率的VAR式Transformer按“下一个尺度”自回归生成（文本条件来自语言模型编码）；最后用一个3700万参数的轻量残差扩散模块，以Transformer最后一层的隐状态为条件，生成连续残差，思路类似[[mar]]的扩散损失头。\n\n论文报告在MJHQ-30K上，混合分词器把重建FID从仅离散VAR分词器的2.11降到0.30，生成FID从7.85降到5.38（改善31%）；与当时最好的扩散模型相比FID和CLIP分数更好，吞吐量高4.5–7.7倍，乘加运算量少6.9–13.4倍。",
+  "limits": [
+    {"text": "整体质量和文字渲染、复杂构图能力仍不及更大的扩散文生图模型，残差扩散头的步数也增加了一点延迟。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "var", "type": "extends", "note": "离散部分沿用VAR的多尺度残差量化与下一尺度预测，并推广到1024分辨率文生图。"},
+    {"to": "mar", "type": "uses", "note": "借用MAR用小扩散头建模连续token的思路，用它生成离散token表达不了的残差。"},
+    {"to": "vqgan", "type": "solves", "note": "纯离散分词器重建差，HART用连续残差补上细节。"},
+    {"to": "fid", "type": "uses", "note": "用重建FID与生成FID衡量分词器和生成质量。"}
+  ],
+  "prereq": ["vector-quantization", "autoregressive", "diffusion-process", "latent-space", "generation-metrics"],
+  "terms": [
+    {"t": "残差token", "d": "连续隐变量减去离散量化近似之后剩下的部分，记录离散码本表达不了的细节。"}
+  ],
+  "learn": "先读VAR的多尺度残差量化和MAR的扩散损失 → 读本文第3节混合分词器的训练方式 → 用开源代码比较只用离散token与加上残差时的重建差别。",
+  "check": {"source": "https://arxiv.org/abs/2410.10812", "confirmed": "标题、十位作者、v1日期2024-10-14、摘要中离散分词器重建差与1024px训练代价、混合分词器拆分离散与连续残差、可扩展分辨率离散AR与3700万参数残差扩散模块、重建FID 2.11→0.30、生成FID 7.85→5.38（31%）、吞吐4.5–7.7倍、MACs低6.9–13.4倍、开源；机构、ICLR 2025、分词器训练细节与文本编码来自一般了解"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "spin",
+  "who": "Zixiang Chen, Yihe Deng, Huizhuo Yuan, Kaixuan Ji, Quanquan Gu · 加州大学洛杉矶分校",
+  "venue": "ICML 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2401.01335"},
+    {"label": "GitHub", "url": "https://github.com/uclaml/SPIN"}
+  ],
+  "aka": ["SPIN", "Self-Play Fine-Tuning", "自我对弈微调", "Self-Play fIne-tuNing"],
+  "problem": "SFT之后想继续提升模型，通常要收集新的人类偏好数据或用GPT-4等更强模型打分；能不能只靠原有的SFT数据，把弱模型继续变强？",
+  "idea": "让模型和上一轮的自己对弈：把SFT数据里的人类回答当作“好”，把上一轮模型自己生成的回答当作“差”，训练新模型区分并偏向人类回答；重复多轮，直到模型分布与人类数据一致。",
+  "impact": "展示了不增加任何新标注、只用SFT数据也能做类似偏好优化的迭代提升，是2024年“自我对弈/自我改进”对齐路线的代表工作之一。",
+  "method": "背景：SFT只是在人类示范数据上做最大似然，训练到一定程度后再多训几轮收益很小；[[dpo]]能继续提升，但需要成对的偏好数据，[[zephyr]]等工作的偏好数据来自GPT-4打分的[[ultrafeedback]]。\n\nSPIN的设定像一个两人博弈。**主玩家**是第t+1轮的新模型，任务是分辨一个回答来自人类数据还是来自对手；**对手**是第t轮的旧模型，它尽量生成像人类一样的回答。每一轮：用旧模型对SFT数据中的每个提示生成一个回答y′，与数据里的人类回答y组成一对，以y为“被选”、y′为“被拒”，用一个形式上与DPO很相近的对数几率损失训练新模型（参考模型就是旧模型）。训练完成后，新模型成为下一轮的对手。作者从理论上证明：这个目标的全局最优只在模型分布等于目标数据分布时达到，此时模型生成的回答与人类回答无法区分，迭代自然停止。\n\n实验从基于Mistral-7B的SFT模型（zephyr-7b-sft-full）出发，只使用其SFT数据的一部分。摘要称在HuggingFace Open LLM Leaderboard、MT-Bench和Big-Bench的数据集上显著提升，甚至超过用额外GPT-4偏好数据做DPO训练的模型。",
+  "limits": [
+    {"text": "上限是SFT数据中人类回答的水平：模型分布一旦追上人类数据，训练就停止，无法超越示范数据本身；每一轮都要对全部提示重新生成回答，迭代成本不低。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "dpo", "type": "extends", "note": "损失形式与DPO相近，但“被拒回答”来自上一轮模型自身，不需要额外的偏好标注。"},
+    {"to": "zephyr", "type": "rivals", "note": "从Zephyr的SFT模型出发，与用GPT-4偏好数据做DPO的Zephyr比较，摘要称可以超过。"},
+    {"to": "gan", "type": "extends", "note": "区分真实数据与模型生成数据、并让生成分布逼近真实分布的博弈思路与GAN相似，只是判别者和生成者是同一模型的新旧两轮。"},
+    {"to": "open-llm-leaderboard", "type": "uses", "note": "主要评测之一。"}
+  ],
+  "prereq": ["instruction-tuning", "rlhf-concept", "self-play", "kl-divergence", "nash-equilibrium"],
+  "terms": [
+    {"t": "自我对弈（self-play）", "d": "让模型与自己的旧版本对抗来产生训练信号，不需要外部对手或额外标注。"}
+  ],
+  "learn": "先读[[dpo]]的损失和[[zephyr]]的训练流程；读本文第4节的博弈表述和第5节关于全局最优的定理；动手：用一个小SFT模型在几千条指令数据上跑两轮SPIN，比较每轮生成与人类回答的对数概率差。",
+  "check": {"source": "https://arxiv.org/abs/2401.01335", "confirmed": "标题、5位作者、arXiv首次提交2024-01-02；摘要中不需要额外人类标注从弱模型得到强模型、从SFT模型出发、模型与自身实例对弈、用上一轮生成的回答与人类标注回答区分来改进、全局最优仅在策略与目标数据分布一致时达到、在Open LLM Leaderboard、MT-Bench和Big-Bench数据集上显著提升并超过额外GPT-4偏好数据的DPO。zephyr-7b-sft-full起点、损失与DPO相近的形式、机构与ICML 2024为对正文的一般了解。"}
+}

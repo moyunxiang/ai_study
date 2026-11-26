@@ -1,0 +1,30 @@
+{
+ "id": "chomp",
+ "who": "Nathan Ratliff, Matt Zucker, J. Andrew Bagnell, Siddhartha Srinivasa · Carnegie Mellon University、Intel Research",
+ "venue": "ICRA 2009",
+ "links": [
+  {"label": "DOI", "url": "https://doi.org/10.1109/robot.2009.5152817"},
+  {"label": "IJRR 2013扩展版", "url": "https://doi.org/10.1177/0278364913488805"}
+ ],
+ "aka": ["Covariant Hamiltonian Optimization for Motion Planning", "轨迹优化规划"],
+ "problem": "RRT、PRM这类采样规划器能找到不碰撞的路径，但路径弯弯曲曲、很不平滑，通常还要另做后处理；而且每次都从零开始搜索，不能利用一条已有的粗略轨迹去改进。",
+ "idea": "把运动规划直接写成一个优化问题：代价=轨迹的不平滑程度+离障碍物有多近，用梯度下降直接改整条轨迹；关键是在“平滑度度量”下做协变的梯度更新，让一次更新的影响平滑地扩散到整条轨迹上。",
+ "impact": "开创了基于梯度的轨迹优化规划这一路线，此后的STOMP、TrajOpt等都以它为对照，其扩展版在2013年发表于IJRR。",
+ "method": "把一条轨迹离散成N个路点，每个路点是一组关节角。CHOMP的目标函数有两项：**平滑项**是相邻路点之差（速度、加速度）的平方和，惩罚抖动；**障碍项**先对环境预计算一张有符号距离场，再沿机械臂身体上的一组采样点查询它们离障碍物有多近，越近代价越大。\n\n普通梯度下降每次只把撞到障碍的那几个路点往外推，会产生局部尖刺。CHOMP用平滑项对应的矩阵 `A` 作为度量，更新方向取 `A⁻¹∇U`：这相当于先算出普通梯度，再把它“抹平”到整条轨迹上，于是一个路点被推开时，邻近路点也一起平滑地移动。这种在函数空间里协变的梯度，使得即使从一条直接穿过障碍物的直线初始化，优化也常能收敛到平滑、无碰撞的轨迹。与[[rrt]]、[[prm-planning]]相比，它可以直接把粗糙轨迹优化成平滑轨迹，但只保证局部最优。",
+ "limits": [
+  {"text": "只能找到局部最优，初始化不好时会卡在穿过障碍的局部极小值里，缺少完备性保证。", "solved_by": ["trajopt"]},
+  {"text": "碰撞代价用身体采样点和距离场近似，薄障碍或采样稀疏时可能漏检碰撞。", "solved_by": ["trajopt"]}
+ ],
+ "relations": [
+  {"to": "rrt", "type": "rivals", "note": "RRT靠随机采样保证概率完备但路径不平滑；CHOMP靠梯度优化得到平滑轨迹但只局部最优。"},
+  {"to": "prm-planning", "type": "rivals", "note": "PRM预建路图再搜索；CHOMP直接对整条轨迹做连续优化，常被用来平滑采样规划器的结果。"},
+  {"to": "lqr", "type": "extends", "note": "沿用最优控制把问题写成代价最小化的思路，但针对高维机械臂与障碍物约束。"}
+ ],
+ "prereq": ["gradient-descent", "kinematics-dof", "loss-function", "vector-matrix"],
+ "terms": [
+  {"t": "有符号距离场", "d": "对空间中每个点存储它到最近障碍物表面的距离，在障碍内部为负；查询一次就知道离碰撞有多远。"},
+  {"t": "协变梯度", "d": "在特定度量（这里是轨迹平滑度）下定义的梯度方向，使更新结果不依赖轨迹如何参数化，表现为把局部修改平滑地扩散开。"}
+ ],
+ "learn": "先实现一个二维点机器人的轨迹优化（平滑项+距离场障碍项），对比普通梯度与乘以A⁻¹后的更新；再读CHOMP的IJRR版本第3、4节。",
+ "check": {"source": "https://doi.org/10.1109/robot.2009.5152817", "confirmed": "经Crossref核对：标题《CHOMP: Gradient optimization techniques for efficient motion planning》、四位作者、ICRA 2009（2009-05）；IJRR 2013扩展版标题与作者。目标函数、协变梯度等方法细节与机构为凭一般了解，未打开正文对照。"}
+}

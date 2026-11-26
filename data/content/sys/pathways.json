@@ -1,0 +1,25 @@
+{
+ "id": "pathways",
+ "who": "Paul Barham, Aakanksha Chowdhery, Jeff Dean, Sanjay Ghemawat, Steven Hand, Dan Hurt, Michael Isard, Hyeontaek Lim et al. · Google",
+ "venue": "MLSys 2022",
+ "aka": ["Pathways系统", "单控制器", "single-controller", "异步分布式数据流", "TPU Pod编排"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2203.12533"}
+ ],
+ "problem": "JAX、PyTorch的大规模训练普遍采用“多控制器”SPMD：每台主机跑同一份程序，容易扩展，但很难表达流水线、跨机群、稀疏激活等不规则的并行；TF1式的单控制器又因为调度开销太大而扩展不到上千块加速器。",
+ "idea": "用单个控制器统一调度，把计算表示成分片的异步数据流图，算子之间传递future；控制面可以先于数据就绪并行发出调度，再由每个加速器岛上的调度器成组调度，从而把单控制器的开销藏掉。",
+ "impact": "Google训练PaLM等大模型的底层编排系统，PaLM论文标题即“Scaling Language Modeling with Pathways”；它证明单控制器设计在数千块TPU上也能做到接近满载利用率。",
+ "method": "**多控制器**模式下，每台主机各自运行同一份用户程序、各自驱动本机的加速器，[[jax]]和PyTorch分布式都是这样，开销低，但每台主机都必须执行完全相同的步骤，流水线、不同子模型跑在不同设备上这类不对称计算就很难写。**单控制器**模式（如早期[[tensorflow]]）由一个客户端统一下发计算图，表达灵活，但每一步都要等控制器逐个调度，规模一大就成为瓶颈。\n\nPathways选择单控制器，并用工程设计消除瓶颈：计算被编译成由[[xla]]函数组成的分片数据流图；算子输入输出都是**future**（尚未算完的结果的占位符），控制器可以在数据就绪之前就把后续算子的调度和内存分配并行发出去；每个通过专用高速互连相连的**加速器岛**有自己的调度器，对一组需要同时启动的计算做成组调度，岛与岛之间通过数据中心网络传数据。\n\n摘要报告：在2048块[[tpu]]上运行SPMD计算时，加速器利用率约100%，与最先进的系统持平；Transformer模型切成16个流水线阶段、或分到两个通过数据中心网络相连的加速器岛上运行时，吞吐也与SPMD情形相当。",
+ "limits": [
+  {"text": "系统与TPU和Google内部基础设施深度绑定，论文没有开源实现，外部研究者无法直接使用；单控制器在GPU生态中的通用实现仍较少。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "tensorflow", "type": "extends", "note": "继承TF1单控制器统一调度的思路，并用异步数据流解决其调度开销问题，作者包括TensorFlow的核心设计者。"},
+  {"to": "jax", "type": "rivals", "note": "JAX的多控制器SPMD易扩展但表达受限，Pathways以单控制器支持不对称的并行模式，并以JAX为前端之一。"},
+  {"to": "xla", "type": "uses", "note": "数据流图中的每个计算节点是编译好的XLA函数。"},
+  {"to": "tpu", "type": "uses", "note": "在TPU Pod的加速器岛上评测，利用岛内专用互连做成组调度。"}
+ ],
+ "prereq": ["distributed-training", "interconnect", "chip-basics"],
+ "terms": [{"t": "future", "d": "代表一个将来才会算出来的结果的占位符，程序可以先拿着它往下安排工作，等真正需要数值时再等待。"}],
+ "check": {"source": "https://arxiv.org/abs/2203.12533", "confirmed": "标题、作者（Barham, Chowdhery, Dean, Ghemawat等16人）、v1日期2022-03-23；摘要：加速器的大规模编排层、分片的异步算子数据流图、算子消费与产生future、对数千块加速器成组调度异构并行计算、控制面在数据面依赖下仍可并行执行、单控制器模型、2048块TPU上SPMD约100%利用率、16段流水线和跨两个加速器岛的吞吐与SPMD相当。MLSys 2022、与PaLM的关系、未开源为一般了解（PaLM标题见登记表）。"}
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>PiSSA主奇异值初始化（2024） · AI脉络</title>
+<meta name="description" content="LoRA的适配器一个矩阵用高斯噪声、一个用零初始化，起步时增量为零、梯度很小，在冻结的原权重旁从零学起，收敛偏慢。 结构与LoRA完全相同，只改初始化：对原权重W做SVD，用前r个主奇异值和奇异向量初始化A、B，剩下的部分作为冻结的残差矩阵，于是训练直接更新模型最重要的分量。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/pissa.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PiSSA主奇异值初始化（2024）">
+<meta property="og:description" content="LoRA的适配器一个矩阵用高斯噪声、一个用零初始化，起步时增量为零、梯度很小，在冻结的原权重旁从零学起，收敛偏慢。 结构与LoRA完全相同，只改初始化：对原权重W做SVD，用前r个主奇异值和奇异向量初始化A、B，剩下的部分作为冻结的残差矩阵，于是训练直接更新模型最重要的分量。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/pissa.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/pissa">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 参数高效微调</div>
+<h1>PiSSA主奇异值初始化</h1>
+<div class="full">PiSSA: Principal Singular Values and Singular Vectors Adaptation of Large Language Models</div>
+<div class="meta"><span>2024.04</span><span>论文</span><span>延伸</span><span>NeurIPS 2024</span><span>Fanxu Meng, Zhaohui Wang, Muhan Zhang · 北京大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2404.02948" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/GraphPKU/PiSSA" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/pissa">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>LoRA的适配器一个矩阵用高斯噪声、一个用零初始化，起步时增量为零、梯度很小，在冻结的原权重旁从零学起，收敛偏慢。</p></div><div><h4>方法</h4><p>结构与LoRA完全相同，只改初始化：对原权重W做SVD，用前r个主奇异值和奇异向量初始化A、B，剩下的部分作为冻结的残差矩阵，于是训练直接更新模型最重要的分量。</p></div><div><h4>影响</h4><p>改一行初始化就能替换LoRA、推理时同样可合并，已被Hugging Face PEFT库作为LoRA的初始化选项收录，也带动了一批基于SVD初始化的LoRA变体。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/lora.html">LoRA</a>的增量 <code>ΔW = AB</code> 从零开始，原权重W冻结。PiSSA把W本身拆开：做奇异值分解 <code>W = UΣVᵀ</code>，取前r个最大的奇异值与对应奇异向量，令 <code>A = U_r Σ_r^{1/2}</code>、<code>B = Σ_r^{1/2} V_rᵀ</code>，其余部分 <code>W_res = W − AB</code> 冻结。前向计算仍是 <code>W_res x + ABx</code>，与LoRA一样，初始时输出与原模型完全相同。区别在于：LoRA训练的是“噪声与零”，PiSSA训练的是模型中能量最大的主成分，冻结的是次要的残差部分，所以更新一开始就落在最有影响的方向上，作者认为这让收敛更快、效果更好。用快速随机SVD，初始化只需几秒。</p><p>与<a class="ln" href="../n/qlora.html">QLoRA</a>结合时，PiSSA只量化残差矩阵W_res（称QPiSSA）：主成分已被移到全精度适配器里，残差的数值范围更小，量化误差也更小。</p><p>摘要报告：在184M到70B的12个模型、5个生成和8个理解任务上，PiSSA在相同设置下都优于LoRA；GSM8K上Mistral-7B达到72.86%，LoRA为67.7%；LLaMA-3-70B上QPiSSA为86.05%，QLoRA为81.73%。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>主成分被直接改写，微调起点就偏离原模型的“主要知识”，有研究担心这会加剧遗忘；不同任务该保留哪些奇异分量仍无定论。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/lora.html">LoRA</a><span class="yr">2021.06 · 系统·效率</span><div class=nt>LoRA的“噪声加零”初始化收敛慢，PiSSA用原权重的主奇异分量初始化适配器，结构不变。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/qlora.html">QLoRA</a><span class="yr">2023.05 · 系统·效率</span><div class=nt>QLoRA量化整个原权重，PiSSA把主成分移出后只量化残差，初始量化误差更小。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/dora.html">DoRA</a><span class="yr">2024.02 · 系统·效率</span><div class=nt>同期改进LoRA的另一路线：DoRA分解权重的幅度与方向，PiSSA改变适配器的初始化。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/peft-concept.html">参数高效微调</a> <a class="chip c" href="../c/low-rank.html">低秩近似</a> <a class="chip c" href="../c/eigen-svd.html">特征分解与奇异值分解</a> <a class="chip c" href="../c/quantization-concept.html">量化</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2404.02948" rel="noopener">https://arxiv.org/abs/2404.02948</a>（标题、三位作者、v1日期2024-04-03；摘要：LoRA“噪声与零”初始化收敛慢、PiSSA与LoRA架构相同但用W的主成分初始化A和B并冻结残差、12个模型184M–70B、5个NLG与8个NLU任务、Mistral-7B GSM8K 72.86%对LoRA 67.7%、QPiSSA初始量化误差更小、LLaMA-3-70B GSM8K 86.05%对QLoRA 81.73%、快速SVD几秒初始化。A、B的具体分配公式、NeurIPS 2024、PEFT库收录与遗忘争议为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20PiSSA%E4%B8%BB%E5%A5%87%E5%BC%82%E5%80%BC%E5%88%9D%E5%A7%8B%E5%8C%96%EF%BC%88pissa%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Apissa%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/pissa.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="layerskip.html"><small>本分支上一个 · 2024.04</small><b>LayerSkip自推测解码</b></a><a class="r" href="api-price-war.html"><small>本分支下一个 · 2024.05</small><b>大模型API价格战</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

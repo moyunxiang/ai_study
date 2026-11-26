@@ -1,0 +1,29 @@
+{
+  "id": "grabcut",
+  "who": "Carsten Rother, Vladimir Kolmogorov, Andrew Blake · 微软剑桥研究院",
+  "venue": "SIGGRAPH 2004（ACM TOG）",
+  "links": [
+    {"label": "维基百科", "url": "https://en.wikipedia.org/wiki/GrabCut"},
+    {"label": "DOI（重印版）", "url": "https://doi.org/10.1145/3596711.3596774"}
+  ],
+  "aka": ["GrabCut", "迭代图割", "iterated graph cuts", "框选抠图", "交互式前景提取", "interactive foreground extraction"],
+  "problem": "[[graph-cuts]]式交互分割要求用户在前景和背景上分别涂抹种子，颜色模型只用种子统计一次，复杂图像要来回修改很多次。",
+  "idea": "用户只需在物体外画一个框：框外一定是背景，框内先当作“可能是前景”；用高斯混合模型描述前景和背景的颜色，交替执行“用当前分割重估颜色模型”和“用图割重新分割”，直到收敛。",
+  "impact": "把交互式抠图简化到“画一个框”，成为最广为人知的经典分割算法之一，OpenCV从2.1版起内置实现；“框作为提示”的交互方式也延续到了[[sam]]等可提示分割模型。",
+  "method": "GrabCut在[[graph-cuts]]的能量上做了三处扩展：\n\n- **颜色模型用GMM**：前景和背景各用一个含K个分量（论文常用5个）的高斯混合模型描述彩色分布，比灰度直方图更能刻画复杂的颜色。\n- **迭代优化**：初始时框外像素标为背景，框内标为“未知”并暂当前景。然后反复执行：①把每个像素分配给对应GMM中最可能的那个高斯分量；②用分配结果重新估计GMM参数；③用图割求解新的前景/背景分割。这个过程类似[[em]]算法，每一步都使能量不增，因此会收敛。\n- **不完全标注与边界抠图**：用户只需给出框，必要时再补几笔修正误分的区域；分割完成后再对边缘做一道“边界抠图”，估计半透明的过渡带，使头发等细边缘更自然。\n\n维基百科概括为：从用户指定的边界框开始，用GMM估计目标与背景的颜色分布，以此构造像素标签上的马尔可夫随机场，用图割优化，再重复这两步直到收敛；用户可以指出误分区域后重新优化。",
+  "limits": [
+    {"text": "只依赖颜色和局部边缘，前景与背景颜色相近时（如迷彩、阴影）会分错。", "solved_by": ["sam"]},
+    {"text": "每张图都要用户画框并迭代优化，无法自动识别物体类别。", "solved_by": ["mask-rcnn"]}
+  ],
+  "relations": [
+    {"to": "graph-cuts", "type": "extends", "note": "在Boykov–Jolly交互图割上加入GMM颜色模型与迭代重估，把用户输入从前景/背景涂抹简化为一个框。"},
+    {"to": "em", "type": "uses", "note": "交替进行“分配高斯分量、重估参数”和“重新分割”，与EM算法的交替优化思想相同。"}
+  ],
+  "prereq": ["gaussian", "em-algorithm", "graph-basics", "image-tensor"],
+  "terms": [
+    {"t": "高斯混合模型（GMM）", "d": "用若干个高斯分布加权相加来描述一个复杂的概率分布，这里用来描述前景或背景的颜色。"},
+    {"t": "马尔可夫随机场", "d": "一种图模型，每个像素的标签只与相邻像素直接相关，常用来表达“相邻像素倾向于同类”。"}
+  ],
+  "learn": "先读Boykov–Jolly图割理解能量与构图，再看GrabCut论文第3节迭代过程；用OpenCV的cv2.grabCut画框分割一张人像，观察迭代次数和补笔对结果的影响。",
+  "check": {"source": "https://en.wikipedia.org/wiki/GrabCut", "confirmed": "维基百科GrabCut条目：基于图割、从用户指定边界框出发、用GMM估计目标与背景颜色分布、构造马尔可夫随机场并用图割优化、两步重复至收敛、用户可修正误分区域、OpenCV 2.1起有实现、参考文献为Rother/Kolmogorov/Blake发表于ACM Trans. Graph. 23卷（2004）；Crossref查到其在Seminal Graphics Papers中的重印版。K=5、边界抠图细节、机构、SIGGRAPH 2004月份凭一般了解写。"}
+}

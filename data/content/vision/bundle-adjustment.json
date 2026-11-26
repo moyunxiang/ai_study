@@ -1,0 +1,29 @@
+{
+  "id": "bundle-adjustment",
+  "who": "Bill Triggs, Philip F. McLauchlan, Richard I. Hartley, Andrew W. Fitzgibbon · INRIA / 萨里大学 / 通用电气 / 牛津大学",
+  "venue": "Vision Algorithms: Theory and Practice（LNCS 1883）, 2000",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1007/3-540-44480-7_21"},
+    {"label": "维基百科", "url": "https://en.wikipedia.org/wiki/Bundle_adjustment"}
+  ],
+  "aka": ["光束平差", "光束法平差", "Bundle Adjustment", "BA", "重投影误差最小化", "reprojection error", "Levenberg–Marquardt", "稀疏非线性最小二乘"],
+  "problem": "多视图重建先用线性方法（如[[eight-point]]）粗略估计相机和三维点，误差会逐步累积；摄影测量界早就用光束平差做全局精化，但计算机视觉界对它的理论和高效实现缺乏系统了解，常被视为又慢又难。",
+  "idea": "这篇综述系统阐述光束平差：把所有相机参数和三维点放在一起，最小化所有观测的重投影误差；并讲清楚如何利用问题的稀疏结构（每个点只被少数相机看到）高效求解、如何参数化、如何处理外点和评估精度。",
+  "impact": "成为计算机视觉里讲光束平差的标准参考，几乎所有SfM与SLAM系统（[[photo-tourism]]、[[ptam]]、[[colmap]]、[[orb-slam]]）都以光束平差作为最后的精化步骤。",
+  "method": "设有m台相机、n个三维点，点j在相机i中的观测为 `x_ij`。光束平差求解 `min Σ_ij ρ(‖x_ij − π(C_i, X_j)‖²)`：π是投影函数（把三维点X_j用相机参数C_i投到图像上），ρ是鲁棒核，用来减弱错误匹配的影响。名字来自几何图景：从每个三维点射向各相机光心的一束光线，被同时“调整”到与观测最一致。维基百科指出，若图像误差为零均值高斯，光束平差就是最大似然估计。\n\n求解一般用高斯-牛顿或Levenberg–Marquardt迭代，每步要解线性方程 `(JᵀJ + λI)·δ = −Jᵀr`。关键在于结构：每个观测只涉及一台相机和一个点，所以JᵀJ是高度稀疏的分块矩阵。把三维点的变量先消掉（**Schur补**），只剩下规模为相机数的“约化相机系统”，再求解，代价从与点数的三次方相关降到主要与相机数相关。论文还讨论了参数化（如旋转的局部更新）、规范自由度（整体平移、旋转、缩放不可观测）、误差模型、精度评估和网络设计等。",
+  "limits": [
+    {"text": "非线性优化需要足够好的初值，否则会陷入局部极小，必须先由增量或全局SfM给出初始相机和点。", "solved_by": ["colmap", "glomap"]},
+    {"text": "规模到上万张图像时，即使利用稀疏性，内存和时间仍很大。", "solved_by": ["building-rome"]}
+  ],
+  "relations": [
+    {"to": "eight-point", "type": "extends", "note": "线性两视图方法给出初值，光束平差在所有视图上最小化几何（重投影）误差进行精化。"},
+    {"to": "ransac", "type": "rivals", "note": "RANSAC通过抽样剔除外点，光束平差用鲁棒核在优化中降低外点权重，两者在流水线中常配合使用。"}
+  ],
+  "prereq": ["camera-geometry", "jacobian-hessian", "gradient-descent", "mle", "gaussian"],
+  "terms": [
+    {"t": "重投影误差", "d": "把估计的三维点用估计的相机投到图像上，与实际观测到的像素位置之间的距离。"},
+    {"t": "Schur补", "d": "分块矩阵求解技巧：先消去一类变量（这里是三维点），只解剩下变量（相机）的较小方程组。"}
+  ],
+  "learn": "先复习高斯-牛顿法和雅可比矩阵，再读综述第2、4、6节；用Ceres Solver的BAL示例或scipy.optimize.least_squares（带稀疏雅可比）跑一个几十台相机的小规模光束平差。",
+  "check": {"source": "https://doi.org/10.1007/3-540-44480-7_21", "confirmed": "Crossref记录：标题Bundle Adjustment — A Modern Synthesis、四位作者Triggs/McLauchlan/Hartley/Fitzgibbon、Lecture Notes in Computer Science 2000；维基百科Bundle adjustment条目：同时精化三维点、相对运动与相机光学参数，名字来自光线束，几乎总是特征法三维重建的最后一步，零均值高斯误差下为最大似然估计，起源于摄影测量。Schur补、规范自由度、各节内容、机构、LNCS卷号凭一般了解写。"}
+}

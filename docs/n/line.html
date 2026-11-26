@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>LINE大规模网络嵌入（2015） · AI脉络</title>
+<meta name="description" content="把节点嵌入到低维向量能用于可视化、节点分类和链接预测，但经典的图嵌入方法（如基于矩阵分解的流形学习）跑不动百万节点的真实网络，又只适用于无权无向图。 直接为图上的边设计两个目标：一阶相似度（有边相连的两个点向量要接近）和二阶相似度（邻居相似的两个点向量要接近），用负采样加“按边权采样边”的SGD高…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/line.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LINE大规模网络嵌入（2015）">
+<meta property="og:description" content="把节点嵌入到低维向量能用于可视化、节点分类和链接预测，但经典的图嵌入方法（如基于矩阵分解的流形学习）跑不动百万节点的真实网络，又只适用于无权无向图。 直接为图上的边设计两个目标：一阶相似度（有边相连的两个点向量要接近）和二阶相似度（邻居相似的两个点向量要接近），用负采样加“按边权采样边”的SGD高…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/line.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/line">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 图与几何深度学习</div>
+<h1>LINE大规模网络嵌入</h1>
+<div class="full">LINE: Large-scale Information Network Embedding</div>
+<div class="meta"><span>2015.03</span><span>论文</span><span>延伸</span><span>WWW 2015</span><span>Jian Tang, Meng Qu, Mingzhe Wang, Ming Zhang, Jun Yan, Qiaozhu Mei · 微软亚洲研究院、北京大学、密歇根大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1503.03578" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/tangjianpku/LINE" rel="noopener">官方代码 ↗</a><a class="btn sm" href="../index.html#/n/line">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>把节点嵌入到低维向量能用于可视化、节点分类和链接预测，但经典的图嵌入方法（如基于矩阵分解的流形学习）跑不动百万节点的真实网络，<a class="ln" href="../n/deepwalk.html">DeepWalk图嵌入</a>又只适用于无权无向图。</p></div><div><h4>方法</h4><p>直接为图上的边设计两个目标：一阶相似度（有边相连的两个点向量要接近）和二阶相似度（邻居相似的两个点向量要接近），用负采样加“按边权采样边”的SGD高效优化，适用于有向、无向和带权图。</p></div><div><h4>影响</h4><p>LINE与<a class="ln" href="../n/deepwalk.html">DeepWalk图嵌入</a>、<a class="ln" href="../n/node2vec.html">node2vec图嵌入</a>并列为图嵌入的三个经典基线，几乎所有网络表示学习论文都和它比较；“一阶/二阶相似度”的说法也成为该领域的通用术语。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><b>一阶相似度</b>：对每条边(i, j)，定义它们“相连”的概率为 <code>σ(u_iᵀu_j)</code>（σ是sigmoid），目标是让模型的边分布与观测到的边权分布在KL散度意义下接近，等价于最大化所有边上 <code>w_ij · log σ(u_iᵀu_j)</code>。这只适用于无向图。</p><p><b>二阶相似度</b>：每个节点有两套向量——作为自己的向量u_i和作为别人“上下文”的向量u′_j。对每个节点i，用softmax定义它的邻居分布 <code>p(j|i) = exp(u′_jᵀu_i) / Σ_k exp(u′_kᵀu_i)</code>，要求它接近观测到的邻居分布。这和<a class="ln" href="../n/word2vec.html">word2vec</a>的skip-gram一样：共享很多邻居的两个节点，就像出现在相似上下文中的两个词，向量会被拉近。分母要对全部节点求和，所以用负采样近似。</p><p><b>边采样</b>：带权图中边权差别很大，直接把边权乘到梯度上会让梯度尺度剧烈波动，学习率难以设定。LINE改为按边权概率抽边，抽到的边都当作二值边更新，这样梯度尺度稳定。作者把一阶和二阶两种向量分别训练后拼接作为最终表示。</p><p>摘要报告：方法在语言网络、社交网络、引用网络等多种真实网络上有效；效率很高，在一台普通机器上几小时内就能学完含数百万节点、数十亿条边的网络的嵌入。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只看一跳和两跳的邻居结构，捕捉不到更远的社区和结构角色信息。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/node2vec.html">node2vec图嵌入</a></div></li><li>每个节点学一个独立向量（直推式），新加入的节点必须重新训练，也无法利用节点自身的特征。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/graphsage.html">GraphSAGE</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/word2vec.html">word2vec</a><span class="yr">2013.01 · NLP</span><div class=nt>二阶相似度的目标与skip-gram同构，并借用负采样近似softmax。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/manifold-learning.html">流形学习Isomap/LLE</a><span class="yr">2000.12 · 基础</span><div class=nt>经典基于矩阵分解的图嵌入难以扩展到百万节点，LINE用随机梯度方法把规模推到数十亿条边。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/deepwalk.html">DeepWalk图嵌入</a><span class="yr">2014.03 · 基础</span><div class=nt>DeepWalk用随机游走序列加skip-gram，LINE直接在边上定义一阶/二阶目标，并支持带权和有向图。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/node2vec.html">node2vec图嵌入</a><span class="yr">2016.07 · 基础</span><div class=nt>只看一跳和两跳的邻居结构，捕捉不到更远的社区和结构角色信息。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/graphsage.html">GraphSAGE</a><span class="yr">2017.06 · 基础</span><div class=nt>每个节点学一个独立向量（直推式），新加入的节点必须重新训练，也无法利用节点自身的特征。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/graph-basics.html">图、树与搜索</a> <a class="chip c" href="../c/embedding.html">嵌入向量</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a></p>
+<h2>本篇术语</h2><ul><li><b>一阶相似度</b>　两个节点之间直接有边、边权越大越相似。</li><li><b>二阶相似度</b>　两个节点的邻居集合越重叠越相似，哪怕它们之间没有直接相连。</li></ul>
+<h2>怎么学</h2><p>先学<a class="ln" href="../n/word2vec.html">word2vec</a>的skip-gram与负采样；读论文第4节的两个目标和边采样；用一个引用网络数据集（如Cora）训练LINE的一阶与二阶向量，做节点分类并与DeepWalk比较。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1503.03578" rel="noopener">https://arxiv.org/abs/1503.03578</a>（标题、6位作者、arXiv v1提交于2015-03-12；摘要中大网络嵌入到低维空间、现有方法不能扩展到百万节点、适用于有向/无向/带权网络、保持局部与全局结构的目标、边采样算法解决经典SGD的局限、语言/社交/引用网络实验、单机几小时处理数百万节点数十亿边。目标函数形式、机构与WWW 2015来自一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20LINE%E5%A4%A7%E8%A7%84%E6%A8%A1%E7%BD%91%E7%BB%9C%E5%B5%8C%E5%85%A5%EF%BC%88line%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aline%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/line.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="kfac.html"><small>本分支上一个 · 2015.03</small><b>K-FAC</b></a><a class="r" href="highway.html"><small>本分支下一个 · 2015.05</small><b>Highway网络</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

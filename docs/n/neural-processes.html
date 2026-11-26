@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>神经过程NP/CNP（2018） · AI脉络</title>
+<meta name="description" content="能看几个点就推出整条函数的分布并给出不确定性，但计算量随数据点数立方增长，先验（核函数）也要人手设计；普通神经网络快，却只能对每个函数从头训练，也不给不确定性。 用神经网络直接学“从几个观测点到整条函数预测分布”的映射：编码器把每个(x, y)观测编成向量并取平均，得到描述这条函数的表示（神经过程…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/neural-processes.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="神经过程NP/CNP（2018）">
+<meta property="og:description" content="能看几个点就推出整条函数的分布并给出不确定性，但计算量随数据点数立方增长，先验（核函数）也要人手设计；普通神经网络快，却只能对每个函数从头训练，也不给不确定性。 用神经网络直接学“从几个观测点到整条函数预测分布”的映射：编码器把每个(x, y)观测编成向量并取平均，得到描述这条函数的表示（神经过程…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/neural-processes.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/neural-processes">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 概率模型与不确定性</div>
+<h1>神经过程NP/CNP</h1>
+<div class="full">Neural Processes</div>
+<div class="meta"><span>2018.07</span><span>论文</span><span>延伸</span><span>ICML 2018 Workshop</span><span>Marta Garnelo, Jonathan Schwarz, Dan Rosenbaum, Fabio Viola, Danilo J. Rezende, S. M. Ali Eslami, Yee Whye Teh · DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1807.01622" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://arxiv.org/abs/1807.01613" rel="noopener">CNP arXiv ↗</a><a class="btn sm" href="../index.html#/n/neural-processes">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/gaussian-process.html">高斯过程回归</a>能看几个点就推出整条函数的分布并给出不确定性，但计算量随数据点数立方增长，先验（核函数）也要人手设计；普通神经网络快，却只能对每个函数从头训练，也不给不确定性。</p></div><div><h4>方法</h4><p>用神经网络直接学“从几个观测点到整条函数预测分布”的映射：编码器把每个(x, y)观测编成向量并取平均，得到描述这条函数的表示（神经过程里还带一个隐变量），解码器据此在任意新x上输出预测的均值和方差。</p></div><div><h4>影响</h4><p>开启了神经过程这一模型家族，后续的注意力神经过程、卷积条件神经过程等在元学习、时空数据插补、贝叶斯优化中被广泛使用；“对观测集合编码再条件预测”的结构也与元学习和上下文学习的研究相互印证。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>同一篇arXiv上同时发布了两篇相关工作。<b>条件神经过程（CNP）</b>：给定一组上下文点 <code>{(x_i, y_i)}</code>，编码器h（一个MLP）把每个点映射成向量 <code>r_i = h(x_i, y_i)</code>，再求平均 <code>r = mean(r_i)</code>；平均操作让结果与点的顺序和数量无关（参见<a class="ln" href="../n/deep-sets.html">Deep Sets</a>）。解码器g接收r和一个目标位置x*，输出高斯分布的均值和方差。训练时从大量不同函数（例如很多条由不同核的GP采样出的曲线、很多张图片）中反复抽一些点当上下文、另一些点当目标，最大化目标点的对数似然。测试时只需前向一次，计算量随点数线性增长。</p><p><b>神经过程（NP）</b>在此基础上加入一个全局隐变量z：r用来给出z的分布，解码器以z和x*为条件输出预测；用变分推断（与<a class="ln" href="../n/vae.html">变分自编码器VAE</a>相同的ELBO）训练。由于不同的z对应不同的整条函数，从z采样就能得到彼此一致的多条函数样本，这是CNP做不到的。</p><p>摘要报告：NP像GP一样定义函数上的分布、能快速适应新观测并估计预测不确定性，又像神经网络一样训练和推断高效，并能从数据中学到先验；作者在回归和优化等任务上展示并与相关模型做了对比。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>把所有上下文点平均成一个向量，信息瓶颈严重，预测常常欠拟合，连上下文点本身都拟合不好（后来的注意力神经过程用注意力代替平均来缓解）。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>学到的先验只适用于和训练函数族相似的数据，分布外的函数上不确定性估计不可靠。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/vae.html">变分自编码器VAE</a><span class="yr">2013.12 · 生成</span><div class=nt>NP用隐变量和变分下界训练，结构类似条件VAE。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/maml.html">MAML元学习</a><span class="yr">2017.03 · 基础</span><div class=nt>同为“看几个样本就适应新任务”的元学习路线，NP用前向编码代替内循环梯度更新。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/gaussian-process.html">高斯过程回归</a><span class="yr">1995 · 基础</span><div class=nt>保留GP“函数上的分布、看少量点就能预测并给出不确定性”的特点，把立方级计算量降为线性，并从数据中学先验。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/deep-sets.html">Deep Sets</a><span class="yr">2017.03 · 基础</span><div class=nt>用逐点编码再求平均的置换不变结构汇总上下文点。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/gaussian.html">高斯分布</a> <a class="chip c" href="../c/latent-variable.html">隐变量模型</a> <a class="chip c" href="../c/elbo.html">变分推断与ELBO</a> <a class="chip c" href="../c/meta-learning.html">元学习</a> <a class="chip c" href="../c/mlp.html">多层感知机</a></p>
+<h2>本篇术语</h2><ul><li><b>上下文点与目标点</b>　神经过程里已经观测到的(x, y)叫上下文点，要预测的位置叫目标点；训练时从同一条函数里随机划分两者。</li></ul>
+<h2>怎么学</h2><p>先懂<a class="ln" href="../n/gaussian-process.html">高斯过程回归</a>回归和<a class="ln" href="../n/vae.html">变分自编码器VAE</a>的ELBO；在一维GP采样曲线上实现CNP（两个小MLP加平均），观察上下文点从3个增加到50个时预测均值和方差带的变化；再加上隐变量改成NP，采样多条函数看一致性。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1807.01622" rel="noopener">https://arxiv.org/abs/1807.01622</a>（NP：标题、7位作者、arXiv v1提交于2018-07-04；摘要中GP计算密集、NP是神经隐变量模型、定义函数分布、快速适应新观测并估计不确定性、训练与推断高效、能从数据学先验、回归与优化任务。CNP（1807.01613）：标题、9位作者、同日提交；摘要中结构为神经网络、梯度下降训练、看少量点就能准确预测、回归/分类/图像补全。编码求平均、ELBO训练与ICML研讨会来自一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E7%A5%9E%E7%BB%8F%E8%BF%87%E7%A8%8BNP/CNP%EF%BC%88neural-processes%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aneural-processes%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/neural-processes.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ntk.html"><small>本分支上一个 · 2018.06</small><b>神经正切核</b></a><a class="r" href="gin.html"><small>本分支下一个 · 2018.10</small><b>GIN与GNN表达能力</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

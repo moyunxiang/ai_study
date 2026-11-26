@@ -1,0 +1,30 @@
+{
+  "id": "llava-uhd",
+  "aka": ["LLaVA-UHD", "任意长宽比", "可变尺寸切片", "图像模块化"],
+  "who": "Ruyi Xu, Yuan Yao, Zonghao Guo, Junbo Cui, Zanlin Ni, Chunjiang Ge, Tat-Seng Chua, Zhiyuan Liu, Maosong Sun, Gao Huang · 清华大学、新加坡国立大学等",
+  "venue": "ECCV 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2403.11703"},
+    {"label": "代码", "url": "https://github.com/thunlp/LLaVA-UHD"}
+  ],
+  "problem": "多模态模型把图像缩放或切成固定形状的块，长宽比被扭曲、分辨率受限，作者还发现GPT-4V和LLaVA-1.5的视觉编码方式存在系统性缺陷。",
+  "idea": "按原图的分辨率和长宽比把图切成数量和形状可变的切片，各自编码后用压缩模块减少token，再用空间排布标记把切片组织好交给语言模型。",
+  "impact": "与LLaVA-NeXT、Monkey一起确立了“按长宽比自适应切片+压缩”的高分辨率方案，其思路被同团队的MiniCPM-V系列采用。",
+  "method": "当时的开源模型（如[[llava-1.5]]）把任何图片缩放成336×336，宽图、长图被压扁拉伸；一些切块方法又只支持几种固定网格。论文先以[[gpt-4v]]和LLaVA-1.5为例做诊断，指出它们的视觉编码策略在适应性、效率乃至正确性上都存在系统性缺陷。\n\nLLaVA-UHD由三部分组成。**图像模块化**：根据原图分辨率估计需要的切片数，再在所有可能的行列划分中选一个让每片最接近视觉编码器预训练形状的方案，切出大小可变的切片，每片在保持长宽比的前提下缩放后由ViT编码（对位置编码做插值以适应不同形状）。**压缩模块**：用共享的感知重采样器把每片的视觉token压缩成固定的少量token。**空间排布**：在切片token之间插入表示换行、分隔的特殊标记，让语言模型知道各片在原图中的位置。\n\n摘要报告，基于LLaVA-1.5 336×336构建的模型能处理6倍大（672×1088）的图像，推理计算只有原来的94%，TextVQA准确率提升6.4；在9个基准上超过用多2到3个数量级数据训练的模型，并且在8张A100上23小时即可训练完。",
+  "limits": [
+    {"text": "压缩模块用固定数量的查询读每个切片，文字特别密集时可能丢失细节；切片数也有上限。", "solved_by": ["qwen2-vl"]},
+    {"text": "切片之间分别编码，跨切片的物体和文字仍可能被切断，只靠位置标记弥补。", "solved_by": ["qwen2-vl"]}
+  ],
+  "relations": [
+    {"to": "llava-1.5", "type": "solves", "note": "在LLaVA-1.5之上解决固定336×336输入导致的分辨率不足和长宽比扭曲。"},
+    {"to": "gpt-4v", "type": "uses", "note": "以GPT-4V和LLaVA-1.5为例诊断现有视觉编码策略的系统性缺陷。"},
+    {"to": "monkey", "type": "rivals", "note": "Monkey用固定尺寸切块加逐块适配器，LLaVA-UHD用可变尺寸切片加压缩模块。"},
+    {"to": "llava-next", "type": "rivals", "note": "同期的任意分辨率方案；LLaVA-NeXT在几种预设网格中选择，LLaVA-UHD按长宽比自适应切片并压缩token。"}
+  ],
+  "prereq": ["image-patch", "positional-encoding", "vision-tasks", "instruction-tuning"],
+  "terms": [
+    {"t": "长宽比（aspect ratio）", "d": "图像宽和高的比例；强行缩放成正方形会让圆变椭圆、文字变形，影响识别。"}
+  ],
+  "learn": "先读[[llava-1.5]]了解固定分辨率的局限，再读LLaVA-UHD第3节的切片选择算法，对照[[llava-next]]和[[monkey]]画出三者的切块示意图。",
+  "check": {"source": "https://arxiv.org/abs/2403.11703", "confirmed": "标题、十位作者、arXiv v1提交2024-03-18；摘要中以GPT-4V与LLaVA-1.5揭示视觉编码系统性缺陷、可变尺寸切片的图像模块化、压缩模块、组织切片token的空间排布、9个基准超过多用2-3个数量级数据的模型、672×1088为6倍分辨率且仅用94%推理计算、TextVQA提升6.4、8张A100训练23小时（LLaVA-1.5为26小时）。切片选择细节、感知重采样器、位置编码插值、机构、ECCV 2024、MiniCPM-V采用为一般了解，未逐项核对。"}
+}

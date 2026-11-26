@@ -1,0 +1,32 @@
+{
+  "id": "freeze-omni",
+  "who": "Xiong Wang, Yangze Li, Chaoyou Fu, Yunhang Shen, Lei Xie, Ke Li, Xing Sun, Long Ma · 腾讯优图、西北工业大学等",
+  "venue": "ICML 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2411.00774"}
+  ],
+  "problem": "要让文本大模型直接听和说，常见做法是用语音数据微调整个LLM，但语音对话数据有限，微调会让LLM原有的知识和推理能力退化（灾难性遗忘），训练成本也高。",
+  "idea": "全程冻结LLM参数，只训练接在两端的语音编码器和语音解码器：输入端把语音映射到LLM能读懂的表示，输出端从LLM的隐藏状态生成语音token，再加一个预测「该不该说话」的模块实现双工对话。",
+  "impact": "Freeze-Omni只用ASR/TTS配对数据和6万条多轮文本问答、8块GPU就让文本LLM获得低延迟的语音到语音对话能力，且语音模态下的智能水平与其文本骨干相当，为资源有限的团队提供了一条可行路线。",
+  "method": "[[gpt-4o]]展示了流畅的语音实时对话后，开源社区出现了[[mini-omni]]、[[llama-omni]]等语音对话模型。它们多数要在语音数据上微调LLM本身，而语音问答数据远少于文本数据，容易损伤原有能力。\n\nFreeze-Omni的三阶段训练都不改动LLM：**语音输入**——训练一个语音编码器加适配器，先用ASR数据让它的输出能被冻结的LLM「读成」文字含义，再用多轮问答数据（问题用TTS读出来）训练LLM前面的少量可学习提示；**语音输出**——先单独训练一个把文本变成语音token的自回归解码器（语音token来自单码本编解码器，见[[c:vocoder-codec]]），再训练一个前缀解码器，让它从LLM输出的隐藏状态直接接力生成语音token，于是LLM每吐出一段文字，语音就可以流式跟上；**双工**——在LLM隐藏状态上加一个分类头，通过多任务训练判断用户是否说完、模型该打断还是继续听，从而支持边听边说的自然对话（见[[c:throughput-latency]]）。\n\n摘要报告：只用文本-语音配对数据（如ASR和TTS数据）和6万条多轮文本问答、在8块GPU上训练，即可获得语音到语音对话能力；语音模态下的智能与其文本骨干相当，同时实现低延迟的端到端语音回复。",
+  "limits": [
+    {"text": "LLM冻结意味着它看不到语音里的语调、情绪等副语言信息，回答主要依据语音的文字内容。", "solved_by": []},
+    {"text": "双工能力靠一个简单的「说/听」状态分类头，复杂的打断和附和行为仍不如真正的全双工模型自然。", "solved_by": ["moshi"]}
+  ],
+  "relations": [
+    {"to": "llama-omni", "type": "rivals", "note": "LLaMA-Omni等需在语音指令数据上微调LLM；Freeze-Omni全程冻结LLM以避免能力退化。"},
+    {"to": "mini-omni", "type": "rivals", "note": "Mini-Omni让LLM边想边说并同时输出文本和音频token；Freeze-Omni把语音生成交给外接解码器。"},
+    {"to": "gpt-4o", "type": "extends", "note": "以GPT-4o的实时语音交互为目标，用开源LLM和少量资源复现类似能力。"},
+    {"to": "moshi", "type": "rivals", "note": "Moshi从头训练全双工语音模型；Freeze-Omni在冻结的文本LLM上外挂双工判断模块。"}
+  ],
+  "prereq": ["language-model", "continual-learning", "vocoder-codec", "throughput-latency", "pretrain-finetune"],
+  "terms": [
+    {"t": "灾难性遗忘", "d": "模型在新数据上继续训练后，原来学会的能力明显下降。"},
+    {"t": "双工对话", "d": "模型能在听的同时决定是否开口、能被打断，而不是严格地你一句我一句。"}
+  ],
+  "aka": ["Freeze-Omni", "冻结LLM语音对话"],
+  "check": {
+    "source": "https://arxiv.org/abs/2411.00774",
+    "confirmed": "arXiv官方记录：标题Freeze-Omni: A Smart and Low Latency Speech-to-speech Dialogue Model with Frozen LLM、作者Wang/Li/Fu/Shen/Xie/Li/Sun/Ma、v1提交2024-11-01；摘要关于训练全程冻结LLM、三阶段训练、仅用ASR/TTS配对数据和6万条多轮文本问答、8块GPU、语音模态智能与文本骨干相当、低延迟、多任务训练实现双工、避免灾难性遗忘。各阶段细节（前缀解码器、状态分类头）、ICML 2025、机构为一般了解。"
+  }
+}

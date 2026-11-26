@@ -1,0 +1,24 @@
+{
+ "id": "layerskip",
+ "who": "Mostafa Elhoushi, Akshat Shrivastava, Diana Liskovich, Basil Hosmer, Bram Wasti, Liangzhen Lai, Anas Mahmoud, Bilge Acun et al. · Meta",
+ "venue": "ACL 2024",
+ "aka": ["自推测解码", "self-speculative decoding", "早退", "early exit", "层丢弃", "layer dropout"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2404.16710"},
+  {"label": "GitHub", "url": "https://github.com/facebookresearch/LayerSkip"}
+ ],
+ "problem": "推测解码需要额外加载一个草稿模型，占显存也要单独维护；直接让大模型在中间层提前退出又不准，因为普通训练出来的模型，前几层的输出根本不适合直接预测下一个词。",
+ "idea": "训练时对后面的层用更高的层丢弃率，并让所有层共享同一个输出头、都参与预测损失，使前几层也能单独出词；推理时用前几层当草稿、剩下的层来验证和纠正。",
+ "impact": "把早退和推测解码合到同一个模型里，不需额外草稿模型，“自推测解码”成为后续工作的常见名词，Meta也放出了用该配方训练的Llama检查点。",
+ "method": "早退思路来自[[branchynet]]：简单样本在浅层就能得出答案，不必走完全部层。用到LLM上的难点是，标准训练只在最后一层算损失，中间层的表示对输出头来说并不“可读”。\n\nLayerSkip的训练配方有两部分：一是**层丢弃**，像[[stochastic-depth]]那样训练时随机跳过某些层，浅层丢弃率低、深层丢弃率高，迫使模型不过度依赖后面的层；二是**早退损失**，所有Transformer层共享同一个语言模型输出头，每层的输出都被拿去预测下一个词并计入损失。这样训练后，模型在较浅的层退出时精度明显更高，而且不增加任何辅助模块。\n\n推理时做**自推测解码**：先只用前E层快速自回归地起草若干个词，再用剩余层一次性验证并纠正，方法与[[speculative-decoding]]相同。由于草稿和验证共用同一个模型的前几层，前几层的计算和KV缓存可以复用，显存占用低于另配草稿模型的方案。\n\n摘要报告：在不同规模Llama的从头预训练、继续预训练和微调上实验，CNN/DM摘要最多加速2.16倍，代码1.82倍，TOPv2语义解析2.0倍。",
+ "limits": [
+  {"text": "需要用专门配方训练或继续训练模型，现成的普通检查点直接套用效果差；加速比也低于专门训练草稿头的EAGLE系列。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "branchynet", "type": "extends", "note": "把早退机制推广到大语言模型，并用共享输出头和早退损失提高浅层出口的精度。"},
+  {"to": "speculative-decoding", "type": "solves", "note": "推测解码需要额外的草稿模型，LayerSkip用自己的前几层起草，省去单独的草稿模型和其显存。"},
+  {"to": "stochastic-depth", "type": "uses", "note": "训练时按深度递增的比例随机丢弃层，使模型能在浅层退出。"}
+ ],
+ "prereq": ["transformer-block", "autoregressive", "dropout-concept", "kv-cache"],
+ "check": {"source": "https://arxiv.org/abs/2404.16710", "confirmed": "标题、作者（Elhoushi等13人）、v1日期2024-04-25；摘要：训练时层丢弃（浅层低、深层高）与所有层共享出口的早退损失、提高浅层早退精度且不加辅助模块、自推测解码在浅层退出后用剩余层验证纠正、显存更少且共享计算与激活、四类训练设置、CNN/DM 2.16倍、代码1.82倍、TOPv2 2.0倍、开源代码与检查点。ACL 2024、Meta机构为一般了解。"}
+}

@@ -1,0 +1,33 @@
+{
+  "id": "mrt-nmt",
+  "who": "Shiqi Shen, Yong Cheng, Zhongjun He, Wei He, Hua Wu, Maosong Sun, Yang Liu · 清华大学、百度",
+  "venue": "ACL 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1512.02433"}
+  ],
+  "aka": ["MRT", "Minimum Risk Training", "最小风险训练"],
+  "problem": "神经机器翻译用最大似然训练，只要求逐词拟合参考译文，和最终用BLEU评价整句之间不一致；BLEU又不可微，没法直接拿来做梯度下降。",
+  "idea": "最小风险训练：把训练目标改成「模型分布下译文的期望损失」，损失可以是任意句子级指标（如1−句子BLEU）；期望在从模型里采样出的一小组候选译文上近似计算，对模型参数是可微的。",
+  "impact": "在多个语言对上显著超过最大似然训练，且与模型结构无关；它和MIXER等一起确立了「序列级训练」这一方向，后来的翻译与摘要的序列级目标常拿它作对照。",
+  "method": "最大似然训练最小化`−Σ_t log P(y_t | y_<t, x)`，每一步都以参考译文的前缀为条件（[[c:teacher-forcing]]），而评价时用的是整句BLEU。统计翻译里[[mert]]早就直接针对BLEU调参，但MERT只能调十几个特征权重，无法训练上千万参数的神经网络。\n\nMRT的目标是期望风险`R(θ) = Σ_(x,y*) Σ_y Q(y|x; θ, α) · Δ(y, y*)`，其中`Δ`是候选译文`y`相对参考`y*`的损失（如负的句子级BLEU），`Q`是在一个候选子集上重新归一化的模型分布：`Q(y|x) ∝ P(y|x; θ)^α`，`α`是控制分布尖锐程度的超参数。候选子集由从当前模型中采样得到，期望对`θ`可微，因此可以用普通的反向传播训练：模型会把概率从损失高的候选挪到损失低的候选上。实践中先用最大似然训练好模型再切换到MRT。\n\n摘要称，在多个语言对上，MRT比最大似然估计在当时最先进的NMT系统上取得显著提升；方法对网络结构透明，也可用于其他NLP任务。",
+  "limits": [
+    {"text": "每个训练样本都要采样多个候选并计算句子级指标，训练比最大似然慢得多，通常只能在预训练好的模型上微调。", "solved_by": []},
+    {"text": "句子级BLEU噪声大，且只在少量样本上近似期望，梯度估计方差较高。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "bahdanau-attention", "type": "uses", "note": "实验所用的NMT系统是带注意力的编码器-解码器（RNNsearch）。"},
+    {"to": "mert", "type": "extends", "note": "继承统计翻译中直接以评价指标为训练目标的思路，把它用于端到端训练整个神经网络。"},
+    {"to": "mixer", "type": "rivals", "note": "同期的序列级训练方法：MIXER用REINFORCE并逐步从最大似然过渡，MRT在采样子集上直接最小化期望损失。"},
+    {"to": "mbr-smt", "type": "extends", "note": "MBR在解码时最小化期望损失，MRT把同样的期望风险作为训练目标。"}
+  ],
+  "prereq": ["encoder-decoder", "mle", "expectation-variance", "teacher-forcing", "text-metrics", "loss-function"],
+  "terms": [
+    {"t": "期望风险", "d": "按模型分布对候选输出加权后的平均损失；最小化它会让模型把概率集中到损失小的输出上。"},
+    {"t": "句子级BLEU", "d": "对单个句子计算的BLEU，需要平滑以免高阶n-gram没有匹配时整句得零分。"}
+  ],
+  "learn": "先读[[mixer]]和[[mert]]的讲解 → 读原文第3节MRT目标和子集采样 → 动手：在一个预训练好的小翻译模型上，用每句采样20个候选、1−句子BLEU为损失继续训练，比较测试BLEU。",
+  "check": {
+    "source": "https://arxiv.org/abs/1512.02433",
+    "confirmed": "arXiv：标题、作者（Shen、Cheng、He、He、Wu、Sun、Liu）、2015-12-08提交、摘要（与MLE不同，可直接针对任意不必可微的评价指标优化；多个语言对上显著优于MLE；对结构透明，可用于更多网络和NLP任务）。目标函数中Q的α锐化与子集采样、先MLE再MRT、清华与百度机构、ACL 2016出处凭一般了解。"
+  }
+}

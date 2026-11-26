@@ -1,0 +1,26 @@
+{
+  "id": "vapo",
+  "who": "Yu Yue, Yufeng Yuan, Qiying Yu, Xiaochen Zuo, Ruofei Zhu, Wenyuan Xu, Jiaze Chen, Chengyi Wang et al. · 字节跳动Seed",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2504.05118"}
+  ],
+  "aka": ["VAPO", "Value-based Augmented PPO", "基于价值的推理RL", "价值预训练", "value pretraining", "长度自适应GAE", "length-adaptive GAE", "解耦GAE"],
+  "problem": "GRPO、DAPO等去掉价值模型的方法在长思维链RL里成了主流；带价值模型的PPO理论上能给每个词元更细的信用分配，但在长推理上训练不稳、常常崩溃。",
+  "idea": "回到带价值模型的PPO，针对三个具体难题逐一打补丁：价值模型初始偏差、回答长度差异极大、奖励稀疏，形成一套完整的训练配方。",
+  "impact": "在Qwen2.5-32B基座、不用任何SFT数据的条件下，AIME 2024得60.4，比DAPO和DeepSeek-R1-Zero-Qwen-32B高10分以上，5000步内达到且多次运行无崩溃；说明价值模型路线在长推理RL里依然可行。",
+  "method": "[[ppo]]用一个价值模型估计每个位置「从这里往后能拿多少奖励」，再用[[gae]]算每个词元的优势。长思维链里这套机制有三个问题，VAPO分别处理：\n\n**价值模型偏差**：价值模型从奖励模型初始化，一开始估计严重偏离。做法是**价值预训练**——先固定策略、用蒙特卡洛回报把价值模型训练约50步；再用**解耦GAE**：训练价值模型时λ取1.0（无偏），算策略优势时用较小的λ（降方差）。\n\n**长度差异**：回答从几百到上万词元不等，固定λ对长回答偏差太大、对短回答方差太大。**长度自适应GAE**令 `λ_policy = 1 − 1/(α·l)`，α = 0.05，l为回答长度，回答越长λ越接近1；同时用**词元级损失**，让长回答中每个词元与短回答中同样重要。\n\n**奖励稀疏**：沿用[[dapo]]的Clip-Higher（下裁剪0.2、上裁剪0.28）防止熵坍缩；对答对的样本额外加权重0.1的语言模型损失；每步采512道题、每题16个样本。\n\n结果：AIME 2024得60.4，DAPO为50、DeepSeek-R1-Zero-Qwen-32B为47。",
+  "limits": [
+    {"text": "需要额外维护一个与策略同规模的价值模型，显存和计算开销明显高于无价值模型的GRPO类方法。", "solved_by": []},
+    {"text": "只在数学竞赛题上报告了结果，多种技巧叠加后各自的必要性与跨任务的稳健性仍需检验。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ppo", "type": "extends", "note": "保留PPO的价值模型与GAE，专门改造以适应长思维链。"},
+    {"to": "gae", "type": "extends", "note": "提出解耦GAE和随长度自适应的λ。"},
+    {"to": "dapo", "type": "rivals", "note": "同团队的无价值模型方案；VAPO沿用其Clip-Higher与词元级损失，在同设置下高10分。"},
+    {"to": "grpo", "type": "rivals", "note": "GRPO用组内比较代替价值模型，VAPO认为细粒度价值估计在长推理里仍有优势。"},
+    {"to": "deepseek-r1", "type": "extends", "note": "以R1-Zero式从基座直接RL的设定为对照。"}
+  ],
+  "prereq": ["actor-critic", "td-error", "policy-gradient-concept", "credit-assignment", "reward-design"],
+  "learn": "先读[[ppo]]、[[gae]]和[[dapo]] → 读原文第3节三个挑战与对应技巧 → 动手：对同一组奖励序列，用不同λ和不同长度计算GAE，体会长度自适应λ的作用。",
+  "check": {"source": "https://arxiv.org/abs/2504.05118", "confirmed": "标题、作者、v1提交于2025-04-07；摘要中价值模型偏差、长度异质、奖励稀疏三挑战、Qwen 32B、AIME24 60.4、超DAPO与R1-Zero-Qwen-32B 10分以上、5000步、无崩溃；正文（arxiv.org/html/2504.05118）核对价值预训练约50步、解耦GAE、λ_policy=1−1/(αl)且α=0.05、Clip-Higher 0.2/0.28、正样本LM损失权重0.1、512题×16样本、DAPO 50与R1-Zero 47。"}
+}

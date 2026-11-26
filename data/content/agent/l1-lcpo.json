@@ -1,0 +1,28 @@
+{
+  "id": "l1-lcpo",
+  "who": "Pranjal Aggarwal, Sean Welleck · 卡内基梅隆大学",
+  "venue": "COLM 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2503.04697"},
+    {"label": "项目页", "url": "https://cmu-l3.github.io/l1"}
+  ],
+  "aka": ["L1", "LCPO", "Length Controlled Policy Optimization", "长度控制强化学习", "思考长度控制", "Think for N tokens", "SRM", "短推理模型"],
+  "problem": "推理模型想得越久往往越准，但想多久没法控制：同一道题可能写几百词元也可能写一万，用户无法按预算换取准确率；s1的「预算强制」靠硬截断或硬续写，效果损失大。",
+  "idea": "在提示里写明「思考N个词元」，用强化学习同时奖励答对和长度贴近N：奖励 = 答对与否 − α·|N − 实际长度|，让模型学会按指定预算思考。",
+  "impact": "1.5B的L1能按预算平滑地在成本与准确率之间取舍，在数学题上比s1高最多20个百分点；还发现压到很短时仍保留推理模式的「短推理模型」，在同等长度下超过GPT-4o。",
+  "method": "基座是DeepScaleR-1.5B-Preview（由[[deepseek-r1]]蒸馏出的1.5B模型再经RL训练），训练数据约4万道数学题。每道题在提示末尾加一句「Think for N tokens.」，N在100到4000之间随机抽。\n\n**LCPO**（长度控制策略优化）用[[grpo]]训练，奖励有两种：\n- **L1-Exact**：`r = 𝟙[答对] − α·|N − n_y|`，α = 0.0003，偏离目标长度越多扣分越多，要求长度尽量精确；\n- **L1-Max**：`r = 𝟙[答对] · clip(α·(N − n_y) + 0.5, 0, 1)`，只要求不超过N，越省越好，但前提是答对。\n\n结果：在512到3600词元的几档预算下，L1的准确率随预算平滑上升；与[[s1]]用截断和插入「Wait」强制长度的做法相比，同预算下在数学题上最多高出20个百分点（短预算时相对提升100%以上）。作者还发现，把预算压到几百词元时模型仍会写出自我检查等推理模式，称为短推理模型（SRM）：1.5B的L1-Max在约800个词元时平均准确率略高于输出长度相近的[[gpt-4o]]。",
+  "limits": [
+    {"text": "长度目标需要用户在提示里显式给出，模型不会自己判断一道题该想多久。", "solved_by": []},
+    {"text": "主要在1.5B模型和数学题上验证，更大模型和代码、开放任务上的效果未充分检验。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "s1", "type": "solves", "note": "s1靠截断和强制续写控制长度，L1通过RL让模型自己学会按预算思考，同预算下更准。"},
+    {"to": "grpo", "type": "uses", "note": "LCPO基于GRPO，只改了奖励函数。"},
+    {"to": "deepseek-r1", "type": "uses", "note": "基座来自R1蒸馏出的1.5B模型。"},
+    {"to": "reasoning-effort", "type": "extends", "note": "把产品中「低/中/高」几档思考强度推进到按词元数精确设定的预算。"},
+    {"to": "overthinking", "type": "solves", "note": "给出一种可控地缩短推理长度、缓解过度思考的训练方法。"}
+  ],
+  "prereq": ["reasoning-tokens", "reward-design", "policy-gradient-concept", "throughput-latency"],
+  "learn": "先读[[s1]]和[[grpo]] → 读原文第3节两种奖励公式和图1的预算—准确率曲线 → 动手：在任意GRPO代码里把奖励改成L1-Exact的形式，在小数据上观察输出长度如何向目标收敛。",
+  "check": {"source": "https://arxiv.org/abs/2503.04697", "confirmed": "标题、作者、v1提交于2025-03-06；摘要中LCPO、长度约束写在提示中、优于S1、短推理模型、1.5B超过GPT-4o；正文（arxiv.org/html/2503.04697）核对两种奖励公式与α=0.0003、δ=0.5、N取100–4000、DeepScaleR-1.5B-Preview基座、约4万道题、比S1最多高20个百分点。是否基于GRPO与venue凭一般了解。"}
+}

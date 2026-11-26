@@ -1,0 +1,30 @@
+{
+  "id": "awac",
+  "who": "Ashvin Nair, Abhishek Gupta, Murtaza Dalal, Sergey Levine · UC Berkeley",
+  "venue": "arXiv 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2006.09359"}
+  ],
+  "problem": "机器人有大量旧数据（示范或次优数据），但先离线预训练、再在线继续改进很难：离线方法（如[[bear]]）约束太死、上线后学不动；普通离策略方法（如[[sac]]）一上线就因外推误差崩溃。",
+  "idea": "critic用普通的离策略TD学习，actor不直接最大化Q，而是对数据里的动作做按优势加权的最大似然：优势越大的动作权重越大，`w = exp(A(s,a)/λ)`。",
+  "impact": "把「优势加权回归」式的策略更新确立为离线到在线微调的标准做法，后来的IQL、CRR等离线方法与机器人微调工作都沿用这种actor更新。",
+  "method": "AWAC（Advantage Weighted Actor Critic）的critic和SAC一样，用回放池（离线数据加在线新数据）做Bellman更新，学Q(s,a)。不同在于actor：它求解的是「在不偏离数据太远的前提下最大化Q」这一约束问题，其解析解是 `π*(a|s) ∝ π_β(a|s)·exp(A(s,a)/λ)`，π_β是产生数据的行为策略。把它投影回参数化策略，就变成对回放池里的(s,a)做加权最大似然：`max E[ log π(a|s) · exp(A(s,a)/λ) ]`，其中 `A = Q(s,a) − E_π[Q(s,·)]`。\n\n这样做的好处是：不需要显式估计行为策略π_β（BEAR、BCQ都需要），约束是隐式的；而且同一个更新在离线阶段和在线阶段完全相同，可以无缝切换。摘要称，AWAC能结合先验示范数据与在线经验快速学会技能，在模拟和真实机器人任务上（包括真实多指手的灵巧操作、机械臂开抽屉、转阀门）把学习时间缩短到实用的范围。",
+  "limits": [
+    {"text": "纯离线时，critic仍会查询数据外动作的Q值，有外推误差，在D4RL某些数据集上表现不如专门的离线方法。", "solved_by": ["iql", "cql"]},
+    {"text": "温度λ决定贴近数据的程度，取值对离线与在线两阶段的平衡影响很大。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "sac", "type": "uses", "note": "critic的离策略TD学习沿用SAC式的做法。"},
+    {"to": "bear", "type": "solves", "note": "BEAR需要显式估计行为策略且上线后改进慢；AWAC用隐式约束，离线预训练后能快速在线微调。"},
+    {"to": "bcq", "type": "rivals", "note": "同样限制策略不远离数据，BCQ用生成模型约束动作，AWAC用优势加权的最大似然。"},
+    {"to": "mpo", "type": "extends", "note": "沿用MPO式的「先求非参数最优分布、再投影成参数化策略」的加权最大似然更新。"}
+  ],
+  "prereq": ["offline-rl", "actor-critic", "mle", "policy-value"],
+  "terms": [
+    {"t": "优势函数", "d": "A(s,a)=Q(s,a)−V(s)，表示在状态s选动作a比平均水平好多少。"},
+    {"t": "离线到在线微调", "d": "先用旧数据离线训练策略，再让它与环境交互继续改进。"}
+  ],
+  "learn": "先读[[sac]]和[[offline-rl-tutorial]]；读原文第4节的约束问题与加权回归推导；在D4RL的AntMaze或Adroit数据上先离线训练再在线微调，对比SAC直接微调的崩溃现象。",
+  "check": {"source": "https://arxiv.org/abs/2006.09359", "confirmed": "标题、四位作者、arXiv v1于2020-06-16；摘要中用离线数据加速在线RL的困难、结合样本高效的动态规划与最大似然策略更新、AWAC能结合示范与在线经验快速学技能、真实多指手、机械臂开抽屉、转阀门。actor更新的解析形式与MPO关系按原文正文通行描述；后来IQL沿用该actor更新属一般了解。"},
+  "aka": ["AWAC", "Advantage Weighted Actor Critic", "优势加权演员评论家", "AWR", "优势加权回归"]
+}

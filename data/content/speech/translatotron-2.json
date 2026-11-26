@@ -1,0 +1,32 @@
+{
+  "id": "translatotron-2",
+  "who": "Ye Jia, Michelle Tadmor Ramanovich, Tal Remez, Roi Pomerantz · Google",
+  "venue": "ICML 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2107.08661"}
+  ],
+  "problem": "第一代Translatotron直接把源语言语音翻译成目标语言语音，但翻译质量明显不如「识别→翻译→合成」的级联系统，生成语音还会出现喃喃、重复等问题；它保留音色的方法还可能被滥用来伪造任意人的声音。",
+  "idea": "把模型分成语音编码器、语言解码器（先生成目标语言的音素序列）、声学合成器三部分，用同一个注意力模块连接；音色保留改为只迁移源语音本身的声音，而不接受任意说话人嵌入。",
+  "impact": "Translatotron 2在翻译质量上比第一代最多高15.5 BLEU，接近级联系统，表明直接语音到语音翻译可以实用；「先预测文本/音素中间表示，再合成语音」的两段式思路被UnitY等后续模型继承。",
+  "method": "[[translatotron]]用一个注意力序列到序列模型直接把源语音频谱映射成目标语音频谱，中间没有任何文字。问题是：一个解码器既要决定「译成什么」，又要决定「怎么发音」，任务太重，翻译质量和语音质量都受影响。\n\nTranslatotron 2的结构：**语音编码器**（Conformer类，见[[conformer]]）编码源语音；**语言解码器**以注意力读取编码，自回归地生成目标语言的音素序列（见[[c:attention-concept]]），专心负责「翻译内容」；**声学合成器**读取语言解码器的输出和同一份注意力上下文，按非自回归时长模型的方式生成目标语音频谱，类似TTS（见[[c:encoder-decoder]]）。三部分只共用一个注意力模块，整体端到端训练。\n\n保留音色方面，第一代用的是外部说话人嵌入，理论上可以把语音变成任意人的声音。第2版改为训练时让目标语音与源语音保持同一个声音（用跨语言TTS合成训练目标），推理时模型只能复制输入中的声音，作者称这样更保护说话人隐私、减少伪造风险，而且在说话人轮换时无需先做说话人分段。\n\n摘要报告：在三个数据集上，Translatotron 2的翻译质量（最多+15.5 BLEU）和语音生成质量都大幅超过第一代，并接近级联系统。",
+  "limits": [
+    {"text": "需要源语音、目标文本/音素和目标语音的三元组数据，这类数据稀少，往往要用TTS合成目标语音。", "solved_by": ["seamlessm4t"]},
+    {"text": "语言解码器逐个音素自回归生成，再接声学合成，延迟较高，不能同声传译。", "solved_by": ["hibiki", "seamless"]}
+  ],
+  "relations": [
+    {"to": "translatotron", "type": "solves", "note": "第一代翻译质量远落后级联系统且语音不稳定；第2版加入语言解码器作中间表示，BLEU最多提高15.5。"},
+    {"to": "conformer", "type": "uses", "note": "语音编码器采用Conformer结构。"},
+    {"to": "s2ut", "type": "rivals", "note": "S2UT预测离散语音单元再用声码器合成；Translatotron 2预测音素再用声学合成器生成频谱。"},
+    {"to": "tacotron-2", "type": "uses", "note": "声学合成部分沿用神经TTS的频谱生成设计。"}
+  ],
+  "prereq": ["encoder-decoder", "attention-concept", "phoneme-acoustic", "text-metrics", "end-to-end"],
+  "terms": [
+    {"t": "直接语音到语音翻译", "d": "不经过中间文字输出，一个模型直接把一种语言的语音变成另一种语言的语音。"},
+    {"t": "级联系统", "d": "先语音识别、再机器翻译、最后语音合成，三个独立模型串起来。"}
+  ],
+  "aka": ["Translatotron 2", "Translatotron2", "直接语音翻译"],
+  "check": {
+    "source": "https://arxiv.org/abs/2107.08661",
+    "confirmed": "arXiv官方记录：标题Translatotron 2: High-quality direct speech-to-speech translation with voice preservation、作者Jia/Tadmor Ramanovich/Remez/Pomerantz、v1提交2021-07-19；摘要关于语音编码器、语言解码器、声学合成器和单一注意力模块、三个数据集上比第一代最多+15.5 BLEU、接近级联系统、无需说话人分段的音色保留、更好保护隐私并减少伪造。Conformer编码器、音素输出、ICML 2022为一般了解。"
+  }
+}

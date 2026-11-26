@@ -1,0 +1,33 @@
+{
+  "id": "matcha-tts",
+  "who": "Shivam Mehta, Ruibo Tu, Jonas Beskow, Éva Székely, Gustav Eje Henter · 瑞典皇家理工学院KTH",
+  "venue": "ICASSP 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2309.03199"},
+    {"label": "项目页", "url": "https://shivammehta25.github.io/Matcha-TTS/"}
+  ],
+  "problem": "Grad-TTS等扩散式TTS音质好，但基于得分匹配训练，要几十上百步去噪才能生成，速度慢。",
+  "idea": "把声学模型的解码器改用最优传输条件流匹配（OT-CFM）训练，学到一条接近直线的生成路径，用很少的ODE求解步数就能生成高质量梅尔频谱。",
+  "impact": "Matcha-TTS是较早把流匹配用于TTS的开源模型之一，之后流匹配成为TTS声学模型的主流做法，CosyVoice、F5-TTS等系统的声学部分都采用了条件流匹配。",
+  "method": "[[grad-tts]]沿用[[glow-tts]]的文本编码器和单调对齐搜索，再用扩散模型（见[[c:diffusion-process]]）把一个粗糙的平均频谱逐步「去噪」成精细频谱。扩散的生成路径是弯曲的，步数少时质量明显下降。\n\n[[flow-matching]]提供了另一种训练连续生成模型的办法：直接学习一个速度场 `v(x, t)`，让样本沿着从噪声 `x₀` 到数据 `x₁` 的路径移动。最优传输（OT）版本把路径取为直线 `x_t = (1 − t)x₀ + t·x₁`（再加一个很小的噪声项），训练目标就是让网络在任意中间点 `x_t` 预测速度 `x₁ − x₀`（见[[c:ode-sde]]）。路径接近直线，推理时用很少的欧拉步就能走到终点。\n\nMatcha-TTS的结构：文本编码器加时长预测器，训练时用单调对齐搜索自行学习文本与语音帧的对齐，不需要外部对齐器；解码器是一个结合一维卷积和Transformer的U-Net，用OT-CFM训练，从噪声出发生成梅尔频谱，再交给声码器（如[[hifi-gan]]）。摘要报告：与强预训练基线相比，Matcha-TTS内存占用最小，在长句上的速度可与最快的模型相比，并在听测中获得最高的平均意见分（MOS）；它是概率式、非自回归的，从零开始学会说话。",
+  "limits": [
+    {"text": "仍依赖时长预测器和单调对齐，说话节奏由预测时长决定，表现力受限。", "solved_by": ["e2-tts", "f5-tts"]},
+    {"text": "在单说话人小数据上训练，不具备只听几秒音频就克隆新声音的零样本能力。", "solved_by": ["cosyvoice", "f5-tts"]}
+  ],
+  "relations": [
+    {"to": "grad-tts", "type": "solves", "note": "Grad-TTS基于得分匹配需要很多去噪步；Matcha改用OT-CFM，用很少的步数达到更高音质。"},
+    {"to": "flow-matching", "type": "uses", "note": "解码器用最优传输条件流匹配训练。"},
+    {"to": "glow-tts", "type": "uses", "note": "沿用Glow-TTS的单调对齐搜索，无需外部对齐。"},
+    {"to": "hifi-gan", "type": "uses", "note": "生成的梅尔频谱由HiFi-GAN一类声码器转成波形。"}
+  ],
+  "prereq": ["diffusion-process", "ode-sde", "optimal-transport", "waveform-spectrogram", "few-step-sampling"],
+  "terms": [
+    {"t": "条件流匹配", "d": "直接训练网络预测样本在每个时刻应往哪个方向移动，从而把噪声变成数据的生成方法。"},
+    {"t": "平均意见分（MOS）", "d": "让听众给合成语音打1到5分，再求平均，用来衡量自然度。"}
+  ],
+  "aka": ["Matcha-TTS", "OT-CFM TTS", "流匹配TTS", "flow matching TTS"],
+  "check": {
+    "source": "https://arxiv.org/abs/2309.03199",
+    "confirmed": "arXiv官方记录：标题Matcha-TTS: A fast TTS architecture with conditional flow matching、作者Mehta/Tu/Beskow/Székely/Henter、v1提交2023-09-06；摘要关于OT-CFM训练、ODE解码器步数少于得分匹配、概率式非自回归、无需外部对齐、内存最小、长句速度可比最快模型、听测MOS最高。U-Net结构、单调对齐搜索、ICASSP 2024、对CosyVoice等的影响为一般了解。"
+  }
+}

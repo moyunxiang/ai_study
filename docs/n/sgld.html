@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SGLD随机梯度朗之万（2011） · AI脉络</title>
+<meta name="description" content="贝叶斯方法要从参数后验分布里采样，传统每一步都要在全部数据上算一遍，数据量一大就跑不动；而随机梯度下降能处理大数据，却只给出一个点估计，没有不确定性。 在小批量随机梯度下降的每一步里，加入方差与步长相当的高斯噪声，并让步长逐渐衰减到零：早期它像普通的优化，后期它的轨迹就变成从后验分布里取出的样本。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sgld.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SGLD随机梯度朗之万（2011）">
+<meta property="og:description" content="贝叶斯方法要从参数后验分布里采样，传统每一步都要在全部数据上算一遍，数据量一大就跑不动；而随机梯度下降能处理大数据，却只给出一个点估计，没有不确定性。 在小批量随机梯度下降的每一步里，加入方差与步长相当的高斯噪声，并让步长逐渐衰减到零：早期它像普通的优化，后期它的轨迹就变成从后验分布里取出的样本。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sgld.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sgld">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 概率模型与不确定性</div>
+<h1>SGLD随机梯度朗之万</h1>
+<div class="full">Bayesian Learning via Stochastic Gradient Langevin Dynamics</div>
+<div class="meta"><span>2011.06</span><span>论文</span><span>延伸</span><span>ICML 2011</span><span>Max Welling, Yee Whye Teh · 加州大学欧文分校、伦敦大学学院Gatsby单元</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://www.stats.ox.ac.uk/~teh/research/compstats/WelTeh2011a.pdf" rel="noopener">论文PDF ↗</a><a class="btn sm" href="../index.html#/n/sgld">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>贝叶斯方法要从参数后验分布里采样，传统<a class="ln" href="../n/mcmc.html">Metropolis采样与MCMC</a>每一步都要在全部数据上算一遍，数据量一大就跑不动；而随机梯度下降能处理大数据，却只给出一个点估计，没有不确定性。</p></div><div><h4>方法</h4><p>在小批量随机梯度下降的每一步里，加入方差与步长相当的高斯噪声，并让步长逐渐衰减到零：早期它像普通的优化，后期它的轨迹就变成从后验分布里取出的样本。</p></div><div><h4>影响</h4><p>开创了“随机梯度MCMC”这一类方法，让贝叶斯采样能扩展到大数据和神经网络；后续的随机梯度HMC等方法都在它的框架上发展，也被用作贝叶斯深度学习中的基线。它与后来扩散模型里的朗之万采样共享同一个更新公式。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>朗之万动力学是一种MCMC：参数沿着对数后验的梯度方向走一步，再加一点高斯噪声，<code>Δθ = (ε/2)·∇log p(θ|数据) + η</code>，其中 <code>η ~ N(0, ε)</code>。步长足够小时，参数的分布会收敛到后验 <code>p(θ|数据)</code>。但算 <code>∇log p(θ|数据) = ∇log p(θ) + Σ_{i=1}^{N} ∇log p(x_i|θ)</code> 需要遍历全部N个样本。</p><p>SGLD把这个梯度换成小批量估计：随机取n个样本，用 <code>(N/n)·Σ_{小批量} ∇log p(x_i|θ)</code> 代替全量求和，再加上先验梯度和注入噪声；同时让步长 <code>ε_t</code> 按照随机逼近的条件（<code>Σ ε_t = ∞</code>，<code>Σ ε_t² &lt; ∞</code>）衰减。作者的论证是：步长大时，小批量梯度的随机噪声远大于注入的噪声，算法表现得像<a class="ln" href="../n/sgd.html">随机梯度下降</a>，快速走向后验的高概率区；步长变小后，注入噪声（方差为ε）主导了小批量噪声（方差约为ε²），算法就变成真正的朗之万采样，此时连Metropolis接受/拒绝步骤都可以省掉。于是同一个算法在“优化”和“采样”之间平滑过渡，最终把轨迹上的点（按步长加权）当作后验样本使用。</p><p>作者在混合高斯、逻辑回归和独立成分分析等模型上展示了这一方法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>步长衰减到零时混合非常慢，实际使用固定小步长又会让样本分布带有偏差，样本之间相关性也高。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>在高维神经网络后验上，朗之万一步一步的随机游走探索效率低，难以覆盖多个模态。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/deep-ensembles.html">深度集成</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/sgd.html">随机梯度下降</a><span class="yr">1951 · 基础</span><div class=nt>在随机梯度下降的更新上注入高斯噪声并配合步长衰减，把优化变成采样。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/mcmc.html">Metropolis采样与MCMC</a><span class="yr">1953 · 基础</span><div class=nt>用小批量梯度代替全数据梯度，解决MCMC无法扩展到大数据的问题。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/bayesian-nn.html">贝叶斯神经网络</a><span class="yr">1992 · 基础</span><div class=nt>为神经网络等大模型的贝叶斯后验推断提供可扩展的采样手段。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/variational-inference.html">变分推断</a><span class="yr">1999 · 基础</span><div class=nt>两条近似后验的路线：变分推断优化一个近似分布，SGLD直接产生（近似的）后验样本。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/nuts.html">NUTS不掉头采样器</a><span class="yr">2011.11 · 基础</span><div class=nt>同年的两条梯度MCMC路线：SGLD用小批量梯度换可扩展性，NUTS用全梯度和自适应轨迹换采样质量。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/deep-ensembles.html">深度集成</a><span class="yr">2016.12 · 基础</span><div class=nt>在高维神经网络后验上，朗之万一步一步的随机游走探索效率低，难以覆盖多个模态。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/langevin-mcmc.html">MCMC与朗之万动力学</a> <a class="chip c" href="../c/map-bayesian.html">先验、后验与贝叶斯推断</a> <a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="../c/gaussian.html">高斯分布</a> <a class="chip c" href="../c/markov-chain.html">马尔可夫性与马尔可夫链</a></p>
+<h2>本篇术语</h2><ul><li><b>朗之万动力学</b>　沿对数概率的梯度走一步再加高斯噪声的随机过程，长期运行后其位置服从目标分布。</li></ul>
+<h2>怎么学</h2><p>先学<a class="lc" href="../c/langevin-mcmc.html">MCMC与朗之万动力学</a>和贝叶斯后验；用NumPy在二维混合高斯后验上分别跑全梯度朗之万和SGLD，把样本画成散点和真实密度对比；再在逻辑回归上把SGLD样本的预测平均和普通SGD比较校准度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://www.semanticscholar.org/search?q=Bayesian%20Learning%20via%20Stochastic%20Gradient%20Langevin%20Dynamics" rel="noopener">https://www.semanticscholar.org/search?q=Bayesian%20Learning%20via%20Stochastic%20Gradient%20Langevin%20Dynamics</a>（Semantic Scholar记录：标题Bayesian Learning via Stochastic Gradient Langevin Dynamics、作者M. Welling与Y. Teh、ICML、日期2011-06-28，TLDR为在小批量随机梯度优化中加入适量噪声、迭代会收敛到真实后验的样本。作者主页PDF可下载但未能解析正文；更新公式、步长条件、实验模型与机构来自一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SGLD%E9%9A%8F%E6%9C%BA%E6%A2%AF%E5%BA%A6%E6%9C%97%E4%B9%8B%E4%B8%87%EF%BC%88sgld%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asgld%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sgld.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="adagrad.html"><small>本分支上一个 · 2011</small><b>AdaGrad</b></a><a class="r" href="ng-ml-course.html"><small>本分支下一个 · 2011.10</small><b>吴恩达机器学习公开课</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

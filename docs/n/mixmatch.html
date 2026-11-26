@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MixMatch半监督（2019） · AI脉络</title>
+<meta name="description" content="深度半监督学习有三类有效手段——一致性正则、和通用正则（如）——但各方法只用其中一两种，彼此难以叠加。 把三者合成一个流程：对无标签样本做多次增强、平均预测再“锐化”得到低熵的猜测标签；然后把有标签和无标签样本混在一起做Mixup，再分别计算损失。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/mixmatch.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MixMatch半监督（2019）">
+<meta property="og:description" content="深度半监督学习有三类有效手段——一致性正则、和通用正则（如）——但各方法只用其中一两种，彼此难以叠加。 把三者合成一个流程：对无标签样本做多次增强、平均预测再“锐化”得到低熵的猜测标签；然后把有标签和无标签样本混在一起做Mixup，再分别计算损失。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/mixmatch.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/mixmatch">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 无监督表示学习</div>
+<h1>MixMatch半监督</h1>
+<div class="full">MixMatch: A Holistic Approach to Semi-Supervised Learning</div>
+<div class="meta"><span>2019.05</span><span>论文</span><span>延伸</span><span>NeurIPS 2019</span><span>David Berthelot, Nicholas Carlini, Ian Goodfellow, Nicolas Papernot, Avital Oliver, Colin Raffel · Google Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1905.02249" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/google-research/mixmatch" rel="noopener">官方代码 ↗</a><a class="btn sm" href="../index.html#/n/mixmatch">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>深度半监督学习有三类有效手段——一致性正则、<a class="ln" href="../n/entropy-minimization.html">熵最小化半监督</a>和通用正则（如<a class="ln" href="../n/mixup.html">Mixup</a>）——但各方法只用其中一两种，彼此难以叠加。</p></div><div><h4>方法</h4><p>把三者合成一个流程：对无标签样本做多次增强、平均预测再“锐化”得到低熵的猜测标签；然后把有标签和无标签样本混在一起做Mixup，再分别计算损失。</p></div><div><h4>影响</h4><p>大幅刷新了半监督图像分类基准，CIFAR-10上250个标签的错误率从约38%降到11%，开启了Google这一系列方法（ReMixMatch、<a class="ln" href="../n/fixmatch.html">FixMatch半监督学习</a>）的迭代，也成为2019–2020年最常被比较的基线之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>每个训练步拿一批有标签样本和一批无标签样本：</p><ul><li><b>标签猜测</b>：对每个无标签样本做K次随机增强（如K=2），把模型在这K个版本上的预测分布取平均。</li><li><b>锐化</b>：对平均分布做温度锐化 <code>p_i ← p_i^(1/T) / Σ_j p_j^(1/T)</code>，T&lt;1时分布变尖，相当于隐式地做熵最小化。锐化后的分布就是这些无标签样本的猜测标签。</li><li><b>Mixup</b>：把有标签样本（带真标签）和无标签样本（带猜测标签）合在一起打乱，两两按Beta分布抽出的比例λ做线性插值（MixMatch取 <code>λ′ = max(λ, 1−λ)</code>，让混合结果更接近原样本）。</li><li><b>损失</b>：混合后来自有标签那一半的样本用交叉熵，来自无标签那一半的用预测与猜测标签之间的平方误差，后者乘以权重λ_U。</li></ul><p>测试时只用一个普通的网络。作者做了消融，拆解每个组件的贡献。</p><p>摘要报告：MixMatch在多个数据集和标签数量设定下都大幅领先，例如CIFAR-10只用250个标签时错误率从38%降到11%（降为四分之一），STL-10上错误率减半；它还能在差分隐私训练里得到明显更好的精度—隐私权衡（借助<a class="ln" href="../n/pate.html">PATE教师集成隐私学习</a>式框架）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>组件和超参数多（K、温度T、Mixup的α、无监督损失权重），后续工作发现其中一些并非必要。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/fixmatch.html">FixMatch半监督学习</a></div></li><li>猜测标签来自弱增强的平均预测，扰动强度有限，没有用上强数据增强带来的收益。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/fixmatch.html">FixMatch半监督学习</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/mean-teacher.html">Mean Teacher</a><span class="yr">2017.03 · 基础</span><div class=nt>同为一致性方法，MixMatch不用EMA教师，而用多次增强的平均预测当目标。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/entropy-minimization.html">熵最小化半监督</a><span class="yr">2004.12 · 基础</span><div class=nt>用温度锐化猜测标签，相当于隐式地最小化无标签样本的预测熵。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:312" href="../n/pate.html">PATE教师集成隐私学习</a><span class="yr">2016.10 · 安全·可解释</span><div class=nt>差分隐私实验沿用PATE式的师生框架，用MixMatch训练学生。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/mixup.html">Mixup</a><span class="yr">2017.10 · 基础</span><div class=nt>把有标签与无标签样本混在一起做Mixup，作为通用正则。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/uda.html">UDA无监督数据增强</a><span class="yr">2019.04 · 基础</span><div class=nt>同年的半监督方法：UDA靠强增强提升扰动质量，MixMatch靠多种技巧的组合。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/fixmatch.html">FixMatch半监督学习</a><span class="yr">2020.01 · 基础</span><div class=nt>组件和超参数多（K、温度T、Mixup的α、无监督损失权重），后续工作发现其中一些并非必要。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/semi-supervised.html">半监督学习与伪标签</a> <a class="chip c" href="../c/data-augmentation.html">数据增强</a> <a class="chip c" href="../c/entropy.html">信息量与熵</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/regularization.html">正则化与权重衰减</a></p>
+<h2>本篇术语</h2><ul><li><b>锐化</b>　把概率分布每个值取1/T次幂再归一化，T越小分布越尖，模型对猜测的类别越有把握。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/mixup.html">Mixup</a>和<a class="ln" href="../n/entropy-minimization.html">熵最小化半监督</a>；读论文第3节算法1；在CIFAR-10的250标签设定下实现MixMatch，依次去掉锐化、Mixup、多次增强，复现消融表看各组件的作用。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1905.02249" rel="noopener">https://arxiv.org/abs/1905.02249</a>（标题、6位作者、arXiv v1提交于2019-05-06；摘要中统一主流方法、为增强后的无标签样本猜测低熵标签、用MixUp混合有标签与无标签数据、CIFAR-10 250标签错误率由38%降到11%（4倍）、STL-10降一半、差分隐私的精度-隐私权衡更好、消融研究。算法细节（K、T、λ′）、机构、NeurIPS 2019与PATE框架来自一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MixMatch%E5%8D%8A%E7%9B%91%E7%9D%A3%EF%BC%88mixmatch%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amixmatch%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/mixmatch.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="uda.html"><small>本分支上一个 · 2019.04</small><b>UDA无监督数据增强</b></a><a class="r" href="benign-overfitting.html"><small>本分支下一个 · 2019.06</small><b>良性过拟合</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

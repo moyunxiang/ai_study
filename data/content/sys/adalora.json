@@ -1,0 +1,24 @@
+{
+ "id": "adalora",
+ "who": "Qingru Zhang, Minshuo Chen, Alexander Bukharin, Nikos Karampatziakis, Pengcheng He, Yu Cheng, Weizhu Chen, Tuo Zhao · 佐治亚理工学院, 普林斯顿大学, 微软",
+ "venue": "ICLR 2023",
+ "aka": ["AdaLoRA", "自适应秩", "adaptive rank", "秩分配", "SVD形式LoRA"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2303.10512"},
+  {"label": "GitHub", "url": "https://github.com/QingruZhang/AdaLoRA"}
+ ],
+ "problem": "LoRA给每个权重矩阵分配相同的秩r，但不同层、不同类型的矩阵（注意力的Q/K/V、前馈层）对下游任务的重要性差别很大，平均分配在参数预算紧时浪费明显。",
+ "idea": "把增量更新写成奇异值分解的形式 `ΔW = PΛQ`，训练中按重要性得分剪掉不重要的奇异值，把有限的参数预算自动集中到更重要的矩阵上。",
+ "impact": "“按重要性自适应分配LoRA秩”的代表方法，被Hugging Face PEFT库收录，是后续秩分配类LoRA变体的常用对照。",
+ "method": "[[lora]]把权重更新写成两个小矩阵的乘积 `ΔW = BA`，秩r全局统一。AdaLoRA的思路是：总预算固定时，应当给重要的矩阵多一点秩、给不重要的少一点。\n\n直接对BA做SVD来调整秩代价太高，所以AdaLoRA一开始就把增量参数化成类似SVD的三因子形式 `ΔW = PΛQ`：P、Q分别是左右奇异向量矩阵，Λ是对角的奇异值。训练时加一个正则项让P、Q接近正交，避免精确SVD的计算。每个“奇异值+对应的一对奇异向量”构成一个三元组，为它计算**重要性得分**：基于参数与其梯度乘积的敏感度，并用滑动平均平滑、考虑不确定性。训练过程中按预先设定的预算曲线，逐步把得分最低的奇异值置零（相当于降低那个矩阵的秩），被剪掉的三元组之后仍可能恢复。\n\n摘要报告：在自然语言理解、问答和生成任务上用多种预训练模型实验，AdaLoRA相对基线有明显提升，参数预算越低优势越明显。",
+ "limits": [
+  {"text": "需要额外的正交正则、重要性统计和预算调度超参数，实现与调参比LoRA复杂；在参数预算较宽松时，相对普通LoRA的优势变小。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "lora", "type": "solves", "note": "LoRA对所有矩阵使用相同的秩，AdaLoRA按重要性在矩阵之间重新分配秩预算。"},
+  {"to": "adapters", "type": "extends", "note": "沿着只训练少量增量参数的参数高效微调路线，进一步研究预算该怎样分配。"},
+  {"to": "unified-peft", "type": "extends", "note": "同一时期对参数高效微调的系统化研究之一，关注增量参数放在哪里、放多少。"}
+ ],
+ "prereq": ["peft-concept", "low-rank", "eigen-svd", "regularization"],
+ "check": {"source": "https://arxiv.org/abs/2303.10512", "confirmed": "标题、八位作者、v1日期2023-03-18；摘要：现有方法在所有权重矩阵间平均分配增量预算、忽略不同参数的重要性、按重要性得分自适应分配、增量以SVD形式参数化、剪掉不重要的奇异值以避免精确SVD、在NLU/QA/NLG上验证且低预算下提升明显。正交正则、敏感度得分与平滑、预算调度、ICLR 2023、机构为一般了解。"}
+}

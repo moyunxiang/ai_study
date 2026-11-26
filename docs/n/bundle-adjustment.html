@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>光束平差综述（2000） · AI脉络</title>
+<meta name="description" content="多视图重建先用线性方法（如）粗略估计相机和三维点，误差会逐步累积；摄影测量界早就用光束平差做全局精化，但计算机视觉界对它的理论和高效实现缺乏系统了解，常被视为又慢又难。 这篇综述系统阐述光束平差：把所有相机参数和三维点放在一起，最小化所有观测的重投影误差；并讲清楚如何利用问题的稀疏结构（每个点只被…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/bundle-adjustment.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="光束平差综述（2000）">
+<meta property="og:description" content="多视图重建先用线性方法（如）粗略估计相机和三维点，误差会逐步累积；摄影测量界早就用光束平差做全局精化，但计算机视觉界对它的理论和高效实现缺乏系统了解，常被视为又慢又难。 这篇综述系统阐述光束平差：把所有相机参数和三维点放在一起，最小化所有观测的重投影误差；并讲清楚如何利用问题的稀疏结构（每个点只被…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/bundle-adjustment.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/bundle-adjustment">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 多视图几何与重建</div>
+<h1>光束平差综述</h1>
+<div class="full">Bundle Adjustment — A Modern Synthesis</div>
+<div class="meta"><span>2000</span><span>论文</span><span>延伸</span><span>Vision Algorithms: Theory and Practice（LNCS 1883）, 2000</span><span>Bill Triggs, Philip F. McLauchlan, Richard I. Hartley, Andrew W. Fitzgibbon · INRIA / 萨里大学 / 通用电气 / 牛津大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1007/3-540-44480-7_21" rel="noopener">DOI ↗</a><a class="btn sm" href="https://en.wikipedia.org/wiki/Bundle_adjustment" rel="noopener">维基百科 ↗</a><a class="btn sm" href="../index.html#/n/bundle-adjustment">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>多视图重建先用线性方法（如<a class="ln" href="../n/eight-point.html">归一化八点法</a>）粗略估计相机和三维点，误差会逐步累积；摄影测量界早就用光束平差做全局精化，但计算机视觉界对它的理论和高效实现缺乏系统了解，常被视为又慢又难。</p></div><div><h4>方法</h4><p>这篇综述系统阐述光束平差：把所有相机参数和三维点放在一起，最小化所有观测的重投影误差；并讲清楚如何利用问题的稀疏结构（每个点只被少数相机看到）高效求解、如何参数化、如何处理外点和评估精度。</p></div><div><h4>影响</h4><p>成为计算机视觉里讲光束平差的标准参考，几乎所有SfM与SLAM系统（<a class="ln" href="../n/photo-tourism.html">Photo Tourism</a>、<a class="ln" href="../n/ptam.html">PTAM</a>、<a class="ln" href="../n/colmap.html">COLMAP</a>、<a class="ln" href="../n/orb-slam.html">ORB-SLAM</a>）都以光束平差作为最后的精化步骤。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>设有m台相机、n个三维点，点j在相机i中的观测为 <code>x_ij</code>。光束平差求解 <code>min Σ_ij ρ(‖x_ij − π(C_i, X_j)‖²)</code>：π是投影函数（把三维点X_j用相机参数C_i投到图像上），ρ是鲁棒核，用来减弱错误匹配的影响。名字来自几何图景：从每个三维点射向各相机光心的一束光线，被同时“调整”到与观测最一致。维基百科指出，若图像误差为零均值高斯，光束平差就是最大似然估计。</p><p>求解一般用高斯-牛顿或Levenberg–Marquardt迭代，每步要解线性方程 <code>(JᵀJ + λI)·δ = −Jᵀr</code>。关键在于结构：每个观测只涉及一台相机和一个点，所以JᵀJ是高度稀疏的分块矩阵。把三维点的变量先消掉（<b>Schur补</b>），只剩下规模为相机数的“约化相机系统”，再求解，代价从与点数的三次方相关降到主要与相机数相关。论文还讨论了参数化（如旋转的局部更新）、规范自由度（整体平移、旋转、缩放不可观测）、误差模型、精度评估和网络设计等。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>非线性优化需要足够好的初值，否则会陷入局部极小，必须先由增量或全局SfM给出初始相机和点。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/colmap.html">COLMAP</a> <a class="chip hue" style="--h:216" href="../n/glomap.html">GLOMAP全局SfM</a></div></li><li>规模到上万张图像时，即使利用稀疏性，内存和时间仍很大。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/building-rome.html">一天建成罗马</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/ransac.html">RANSAC</a><span class="yr">1981.06 · 视觉</span><div class=nt>RANSAC通过抽样剔除外点，光束平差用鲁棒核在优化中降低外点权重，两者在流水线中常配合使用。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/eight-point.html">归一化八点法</a><span class="yr">1997.06 · 视觉</span><div class=nt>线性两视图方法给出初值，光束平差在所有视图上最小化几何（重投影）误差进行精化。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/colmap.html">COLMAP</a><span class="yr">2016.06 · 视觉</span><div class=nt>非线性优化需要足够好的初值，否则会陷入局部极小，必须先由增量或全局SfM给出初始相机和点。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/zhang-calibration.html">张正友标定法</a><span class="yr">2000 · 视觉</span><div class=nt>最后一步对所有观测最小化重投影误差，与光束平差的最大似然精化思路一致。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/pmvs.html">PMVS多视图立体</a><span class="yr">2007.06 · 视觉</span><div class=nt>依赖经过光束平差精化的准确相机参数。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/building-rome.html">一天建成罗马</a><span class="yr">2009.09 · 视觉</span><div class=nt>规模到上万张图像时，即使利用稀疏性，内存和时间仍很大。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/dso.html">DSO直接稀疏里程计</a><span class="yr">2016.07 · 视觉</span><div class=nt>滑动窗口内对位姿与逆深度做光度误差的联合优化，并用边缘化保持稀疏。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/glomap.html">GLOMAP全局SfM</a><span class="yr">2024.07 · 视觉</span><div class=nt>非线性优化需要足够好的初值，否则会陷入局部极小，必须先由增量或全局SfM给出初始相机和点。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/mle.html">最大似然估计</a> <a class="chip c" href="../c/gaussian.html">高斯分布</a></p>
+<h2>本篇术语</h2><ul><li><b>重投影误差</b>　把估计的三维点用估计的相机投到图像上，与实际观测到的像素位置之间的距离。</li><li><b>Schur补</b>　分块矩阵求解技巧：先消去一类变量（这里是三维点），只解剩下变量（相机）的较小方程组。</li></ul>
+<h2>怎么学</h2><p>先复习高斯-牛顿法和雅可比矩阵，再读综述第2、4、6节；用Ceres Solver的BAL示例或scipy.optimize.least_squares（带稀疏雅可比）跑一个几十台相机的小规模光束平差。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1007/3-540-44480-7_21" rel="noopener">https://doi.org/10.1007/3-540-44480-7_21</a>（Crossref记录：标题Bundle Adjustment — A Modern Synthesis、四位作者Triggs/McLauchlan/Hartley/Fitzgibbon、Lecture Notes in Computer Science 2000；维基百科Bundle adjustment条目：同时精化三维点、相对运动与相机光学参数，名字来自光线束，几乎总是特征法三维重建的最后一步，零均值高斯误差下为最大似然估计，起源于摄影测量。Schur补、规范自由度、各节内容、机构、LNCS卷号凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%85%89%E6%9D%9F%E5%B9%B3%E5%B7%AE%E7%BB%BC%E8%BF%B0%EF%BC%88bundle-adjustment%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Abundle-adjustment%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/bundle-adjustment.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="multiple-view-geometry.html"><small>本分支上一个 · 2000</small><b>《多视图几何》</b></a><a class="r" href="zhang-calibration.html"><small>本分支下一个 · 2000</small><b>张正友标定法</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

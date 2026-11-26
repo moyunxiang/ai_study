@@ -1,0 +1,28 @@
+{
+  "id": "moe-llava",
+  "aka": ["MoE-LLaVA", "MoE-Tuning", "稀疏多模态大模型", "Sparse LVLM"],
+  "who": "Bin Lin, Zhenyu Tang, Yang Ye, Jinfa Huang, Junwu Zhang, Yatian Pang, Peng Jin, Munan Ning et al. · 北京大学等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2401.15947"},
+    {"label": "代码", "url": "https://github.com/PKU-YuanGroup/MoE-LLaVA"}
+  ],
+  "problem": "放大视觉语言模型能涨分，但所有参数对每个token都激活，训练和推理成本随参数量一起上涨；直接把多模态模型稀疏化又常常掉点。",
+  "idea": "提出三阶段的MoE-Tuning：先训练投影层、再全量微调稠密模型、最后把前馈层复制成多个专家并只训练专家和路由，推理时每个token只激活top-k个专家。",
+  "impact": "为稀疏的混合专家视觉语言模型给出了一个开源基线，展示了约30亿激活参数就能接近7B稠密模型的效果，后续DeepSeek-VL2等MoE多模态模型的思路与之相近。",
+  "method": "[[llava-1.5]]这类稠密模型想变强，通常是把语言模型从7B换到13B，计算量也翻倍。语言模型领域的[[sparse-moe]]和[[mixtral]]已经说明：把前馈层换成多个专家、每个token只用其中少数几个，可以在参数量很大的同时保持计算量不变。但论文指出，直接在多模态大模型上做稀疏化训练常会出现性能下降。\n\nMoE-LLaVA的解决办法是分三阶段训练（MoE-Tuning）：第一阶段只训练把视觉特征映射到语言空间的MLP投影层；第二阶段在多模态指令数据上全量微调整个稠密模型，让它先具备通用的多模态能力；第三阶段把已训练好的前馈层复制若干份作为专家的初始化，加上路由器，只训练这些MoE层。推理时路由器为每个token选择top-k个专家（如4个专家里选2个），其余专家不参与计算。\n\n摘要报告，只有约30亿稀疏激活参数的MoE-LLaVA在多个视觉理解数据集上与LLaVA-1.5-7B相当，在物体幻觉基准上甚至超过LLaVA-1.5-13B。",
+  "limits": [
+    {"text": "总参数量远大于激活参数量，部署时显存占用仍按全部专家计算，端侧不一定省内存。", "solved_by": []},
+    {"text": "专家由同一个稠密前馈层复制而来，专家之间的分工是否真正按模态或语义分化仍不清楚。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "llava-1.5", "type": "extends", "note": "在LLaVA-1.5式的结构和数据上引入稀疏专家层。"},
+    {"to": "sparse-moe", "type": "uses", "note": "用带路由的top-k稀疏专家替换前馈层。"},
+    {"to": "mixtral", "type": "uses", "note": "沿用Mixtral式的每层多个FFN专家与top-k路由设计。"}
+  ],
+  "prereq": ["mixture-of-experts", "params-flops", "instruction-tuning", "hallucination"],
+  "terms": [
+    {"t": "激活参数", "d": "处理一个token时实际参与计算的参数量；混合专家模型的总参数可以很大，但每个token只用到其中一部分。"}
+  ],
+  "learn": "先懂[[sparse-moe]]的路由和[[llava-1.5]]的训练流程，再读MoE-LLaVA原文的三阶段训练示意图和路由可视化。",
+  "check": {"source": "https://arxiv.org/abs/2401.15947", "confirmed": "标题、作者、arXiv v1提交2024-01-29；摘要中所有参数对每个token激活带来的成本、多模态稀疏学习的性能下降问题、MoE-Tuning训练策略、推理时仅激活top-k专家、约3B稀疏激活参数与LLaVA-1.5-7B相当、物体幻觉基准超过LLaVA-1.5-13B。三阶段的具体内容、专家由FFN复制初始化、4选2、北京大学、与DeepSeek-VL2思路相近为一般了解，未逐项核对。"}
+}
