@@ -1,0 +1,37 @@
+{
+  "id": "plato-dialog",
+  "who": "Siqi Bao, Huang He, Fan Wang, Hua Wu, Haifeng Wang · 百度",
+  "venue": "ACL 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1910.07931"}
+  ],
+  "aka": ["PLATO", "PLATO-2", "PLATO-XL", "百度PLATO", "离散隐变量对话预训练", "开放域对话生成", "一对多回复"],
+  "problem": "对话回复是「一对多」的：同一句「今天好累」可以回安慰、回建议、回追问。直接用最大似然训练的生成模型会把这些可能性平均掉，倾向于输出「哈哈」「我也是」这类空洞回复。",
+  "idea": "给对话预训练加入一个**离散隐变量** `z`（K个取值，代表不同的「回复意图」）：模型先根据上下文和回复推断 `z`（隐动作识别），再以上下文和 `z` 为条件生成回复；两个任务共享一个统一的Transformer，靠灵活的注意力掩码同时实现双向理解和单向生成。",
+  "impact": "PLATO系列（PLATO、PLATO-2、PLATO-XL）是中英文开放域对话预训练的代表模型之一，百度据此做了小度等产品中的闲聊能力；「用离散隐变量建模一对多」是对话生成中常被引用的做法。",
+  "background": "[[dialogpt]]在Reddit对话上继续训练GPT-2，[[blenderbot]]把规模推到更大，但它们都只学 `P(回复 | 上下文)` 的单一分布。早期研究用连续隐变量的[[vae]]（如CVAE）建模回复多样性，但连续隐变量在强解码器下容易被忽略（后验坍塌），而且难以解释。[[unilm]]展示了一个Transformer可以通过不同的注意力掩码同时做理解和生成。",
+  "method": "**输入**：上下文、回复和隐变量 `z` 的嵌入拼在一起，再加上角色嵌入（谁在说话）和轮次嵌入。\n\n**注意力掩码**：上下文内部双向可见；回复只能看见上下文、`z` 和自己左边的词（单向）。\n\n**三个训练任务（共享参数）**：\n\n1. **隐动作识别**：输入上下文和回复，在[M]位置预测 `z` 的后验 `q(z | c, r)`，`z` 取K个离散值之一（论文中K=20），用Gumbel-Softmax使采样可导；\n2. **回复生成**：给定上下文和采样的 `z`，自回归生成回复，损失为 `−log p(r | c, z)`，并加一个词袋损失让 `z` 对回复内容有足够预测力；\n3. 训练时两者交替进行。\n\n**推理**：对每个可能的 `z` 各生成一个候选回复，再用一个打分模型（评估回复与上下文的连贯性）挑出最好的。\n\n预训练语料来自Reddit和Twitter的大规模对话，并从[[bert]]初始化。",
+  "results": "摘要称：在闲聊（Persona-Chat）、知识对话和对话式问答三个公开数据集上的综合实验验证了框架的有效性和优越性。具体数字未核对。",
+  "legacy": "PLATO-2（2020）用课程学习先训一对一再训一对多，扩到16亿参数；PLATO-XL（2021）把对话模型推到110亿参数，中英文都有。ChatGPT出现后通用指令模型接管了闲聊场景，但「离散隐变量表示回复意图、生成多个候选再重排」的思路仍出现在可控对话和多样性生成研究中。",
+  "limits": [
+    {"text": "隐变量个数K是人为设定的，学到的各个取值含义不明确，难以直接控制。", "solved_by": []},
+    {"text": "推理时要为每个隐变量取值各生成一次再重排，计算量是普通生成的K倍。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "dialogpt", "type": "solves", "note": "DialoGPT只学单一的回复分布，易产出空洞回复；PLATO用离散隐变量显式建模一对多关系。"},
+    {"to": "unilm", "type": "uses", "note": "沿用统一Transformer加不同注意力掩码的设计，同时支持双向理解与单向生成。"},
+    {"to": "vae", "type": "extends", "note": "继承用隐变量建模回复多样性的思路，把连续隐变量换成离散隐变量以缓解后验坍塌。"},
+    {"to": "bert", "type": "uses", "note": "用BERT的参数初始化统一Transformer。"},
+    {"to": "persona-chat", "type": "uses", "note": "在Persona-Chat等三个对话数据集上评测。"}
+  ],
+  "prereq": ["latent-variable", "gumbel-softmax", "pretrain-finetune", "self-attention", "autoregressive"],
+  "terms": [
+    {"t": "一对多映射", "d": "同一段对话上下文可以有很多种合理回复，生成模型需要表示这种多样性，而不是只学一个平均答案。"},
+    {"t": "隐动作识别", "d": "PLATO中根据上下文和真实回复推断离散隐变量取值的任务，相当于判断这句回复属于哪一种「回复方式」。"}
+  ],
+  "learn": "先了解[[dialogpt]]和[[c:gumbel-softmax]] → 读原文第3节三个任务和注意力掩码 → 动手：用开源的PLATO-2中文或英文模型，对同一句话分别指定不同的隐变量取值生成回复，观察差异。",
+  "check": {
+    "source": "https://arxiv.org/abs/1910.07931",
+    "confirmed": "arXiv记录：标题PLATO: Pre-trained Dialogue Generation Model with Discrete Latent Variable、五位作者、v1 2019-10-17；摘要：对话生成预训练框架、支持闲聊、知识对话和对话式问答、灵活的注意力机制兼顾双向上下文与单向生成、引入离散隐变量处理一对多映射、回复生成与隐动作识别两个任务在共享网络中同时进行、三个公开数据集上验证。ACL 2020、K=20、Gumbel-Softmax、词袋损失、Reddit/Twitter语料、BERT初始化、PLATO-2/XL凭一般了解。"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "rl-token",
+  "who": "Charles Xu, Jost Tobias Springenberg, Michael Equi, Ali Amin, Adnan Esmail, Sergey Levine, Liyiming Ke · Physical Intelligence",
+  "venue": "arXiv 2026",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2604.23073"}
+  ],
+  "aka": ["RLT", "RL-Token", "RLToken", "RL令牌", "VLA在线强化学习", "π0.6在线RL", "Physical Intelligence RL token"],
+  "problem": "VLA开箱即能做很多操作，但要达到真实任务需要的精度和速度还得用RL微调；直接对几十亿参数的VLA做在线RL又太慢、太费真机样本。",
+  "idea": "让VLA额外输出一个压缩的“RL token”作状态表示，冻结VLA，只在其上训练小型actor-critic头，修正VLA给出的参考动作块。",
+  "impact": "在拧螺丝、扎带、充电器插入、网线插入四个真机任务上，几分钟到几小时练习后，最难阶段速度最高提升约3倍，部分任务超过人类遥操作速度。",
+  "method": "**卡在哪**：[[pi-star-0.6]]里描述的π0.6等VLA已有很强的通用能力，但在插网线、拧螺丝这类精细接触任务上不够快也不够稳。[[hil-serl]]这类真机RL方法样本高效，但用的是小网络、单步动作，在长时序稀疏奖励任务上学不动；对整个VLA做RL又过于笨重。\n\n**做法**：**第一步**，在VLA最后一层的token嵌入后接一个小编码器Transformer，并加入一个可学习的 `<rl>` 嵌入，该位置的输出就是RL token；再用一个解码器只凭这个token自回归重建VLA的嵌入，用平方误差训练。这个瓶颈迫使RL token保留与任务相关的预训练知识。之后VLA和编码器都冻结。**第二步**，在RL token、本体状态之上训练[[td3]]式的off-policy actor-critic：评论家看RL token、本体状态和动作块；演员额外接收VLA给出的参考动作块ã，输出修正后的动作。演员目标是 `max Q(s,a) − β‖a − ã‖²`，即在提高价值的同时别离VLA太远；训练时还以50%概率把参考动作置零，防止演员只会照抄。RL动作块长10步（VLA是50步），在50Hz下控制14维动作。\n\n**结果**：每个任务约15分钟到5小时真机数据（400–1000个回合）。拧螺丝的关键阶段成功率从20%提到65%、速度最高3倍；网线插入在保持成功率的同时完成步数减半，一半RL回合的关键阶段比所有遥操作示范都快。对比中HIL-SERL学不动，[[dagger]]成功率持平但速度受限于人类示范，DSRL成功率持平但提速明显更小。",
+  "limits": [
+    {"text": "每个任务仍要先用少量示范训练RL token的编码器，并准备真机上的成功判定，是单任务精调而不是通用改进。", "solved_by": []},
+    {"text": "RL头只能在VLA参考动作附近修正（受β正则约束），VLA完全不会的技能无法靠它学出来。", "solved_by": []},
+    {"text": "只在四个接触密集的插装任务上评测，长时序、多阶段家务任务中能否同样高效未验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "pi-star-0.6", "type": "uses", "note": "以π0.6 VLA为基座；π*0.6用离线优势条件化改进策略，RL Token改为在冻结的π0.6上接小头做在线RL。"},
+    {"to": "hil-serl", "type": "solves", "note": "HIL-SERL的小网络单步策略在长时序稀疏奖励任务上学不动；RLT借VLA表示和参考动作块解决了样本效率问题。"},
+    {"to": "td3", "type": "uses", "note": "actor-critic头采用TD3式的双Q取最小值和延迟演员更新。"},
+    {"to": "dagger", "type": "rivals", "note": "DAgger靠人类纠正数据改进，成功率与RLT持平但速度被人类示范限制；RL能超过示范者速度。"}
+  ],
+  "prereq": ["vla-concept", "actor-critic", "on-off-policy", "action-chunking", "autoencoder", "regularization"],
+  "terms": [
+    {"t": "RL token", "d": "从VLA内部表示中压缩出来的一个向量，作为小型RL网络的输入状态，既保留预训练知识又足够小，便于快速学习。"},
+    {"t": "参考动作锚定", "d": "在RL目标里加一项惩罚，让学到的动作不偏离VLA原本给出的动作太远，防止RL把策略带崩。"}
+  ],
+  "learn": "先读[[hil-serl]]了解真机off-policy RL，复习[[td3]]；再读原文第3节RL token的编码-解码训练和actor目标，看网线插入任务的消融。",
+  "check": {"source": "https://arxiv.org/abs/2604.23073", "confirmed": "标题、7位作者、v1日期2026-04-24、摘要中四个任务与最高3倍提速；HTML正文中π0.6基座、<rl>嵌入与重建瓶颈、TD3式双Q、β正则与参考动作50%丢弃、RL块长10对VLA 50、50Hz与14维、15分钟到5小时（400–1000回合）、拧螺丝20%→65%、与HIL-SERL/DAgger/DSRL对比、Physical Intelligence。"}
+}

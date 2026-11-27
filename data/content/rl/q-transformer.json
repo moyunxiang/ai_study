@@ -1,0 +1,30 @@
+{
+  "id": "q-transformer",
+  "who": "Yevgen Chebotar, Quan Vuong, Alex Irpan, Karol Hausman, Fei Xia, Yao Lu, Aviral Kumar, Tianhe Yu et al. · Google DeepMind",
+  "venue": "CoRL 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2309.10150"},
+    {"label": "项目页", "url": "https://qtransformer.github.io"}
+  ],
+  "problem": "机器人大规模多任务数据里既有人类示范也有自主采集的失败尝试；模仿学习用不好后者，而离线Q学习在高维连续动作上又难以和Transformer这样的大模型结合。",
+  "idea": "把动作的每一维离散成若干档，每一维的Q值作为一个token，像语言模型一样按维度自回归地预测；用离线TD备份加保守正则训练这个“Transformer形式的Q函数”。",
+  "impact": "展示了离线Q学习可以像RT-1那样用Transformer做规模化训练，是“大模型+价值学习”路线的一个代表，常被后来的机器人离线RL和VLA加RL的工作引用。",
+  "method": "连续动作空间里做Q学习，最大的麻烦是 `max_a Q(s, a)` 很难算。Q-Transformer的做法是把动作拆开：\n\n- 每个动作维度均匀离散成256档；\n- 把第i维的选择看成一个“token”，Transformer以状态（图像和语言指令）和前i−1维已选的值为条件，输出第i维每一档的Q值：`Q(s, a_1:i−1, a_i)`；\n- 取max时按维度依次贪心：先选第1维最好的档，再在它的条件下选第2维……把指数大的联合动作空间变成线性次数的逐维最大化。\n\n逐维的贝尔曼备份里，中间维度的目标是下一维的最大Q值，最后一维的目标才是 `r + γ max Q(s′, ·)`。为适配离线训练，作者加了几项设计：类似[[cql]]的保守正则，把没在数据里出现的动作档Q值压向0（奖励为非负的稀疏成功信号）；用蒙特卡洛回报作为Q值下界加速传播；n步回报。\n\n骨干沿用[[rt-1]]的结构。摘要称在大型多样的真实机器人操作任务集上，Q-Transformer超过了此前的离线RL算法和模仿学习方法。",
+  "limits": [
+    {"text": "逐维贪心取max只是联合最大的近似，动作维度之间强耦合时可能选不到真正最好的组合。"},
+    {"text": "依赖大量真实机器人数据和稀疏的成功奖励，在奖励更复杂或数据较少的场景下效果没有验证。"}
+  ],
+  "relations": [
+    {"to": "rt-1", "type": "uses", "note": "骨干网络和动作离散化方式沿用RT-1。"},
+    {"to": "cql", "type": "uses", "note": "加入CQL式的保守正则，压低数据外动作档的Q值。"},
+    {"to": "qt-opt", "type": "extends", "note": "同属谷歌机器人用Q学习做抓取和操作的路线，从CEM取max换成逐维自回归取max。"},
+    {"to": "decision-transformer", "type": "rivals", "note": "DT用Transformer做回报条件的模仿；Q-Transformer用Transformer表示Q函数并做TD学习。"}
+  ],
+  "prereq": ["offline-rl", "autoregressive", "bellman-equation", "transformer-block"],
+  "terms": [
+    {"t": "逐维离散化", "d": "把连续动作的每一维单独切成若干档，变成多个小的离散选择。"}
+  ],
+  "learn": "先读[[rt-1]]和[[cql]]；读Q-Transformer原文第4节的逐维备份公式；在一个二维连续动作的小环境里实现逐维取max，对比联合离散化的计算量。",
+  "check": {"source": "https://arxiv.org/abs/2309.10150", "confirmed": "标题、作者列表（共25位，前八位与Google DeepMind）、arXiv v1于2023-09-18；摘要中多任务大规模离线数据含人类示范和自主数据、Transformer表示Q函数并做离线TD备份、每个动作维度离散化并作为单独token、在大型真实机器人操作任务集上超过离线RL和模仿学习。256档、保守正则、蒙特卡洛下界等细节按原文正文通行描述；CoRL 2023按通行引用。"},
+  "aka": ["Q-Transformer", "QTransformer", "自回归Q函数", "Transformer Q函数"]
+}

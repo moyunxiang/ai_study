@@ -1,0 +1,30 @@
+{
+  "id": "randar",
+  "who": "Ziqi Pang, Tianyuan Zhang, Fujun Luan, Yunze Man, Hao Tan, Kai Zhang, William T. Freeman, Yu-Xiong Wang · UIUC、MIT、Adobe",
+  "venue": "CVPR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2412.01827"},
+    {"label": "项目页", "url": "https://rand-ar.github.io/"}
+  ],
+  "aka": ["RandAR", "随机顺序自回归", "Random-Order Autoregression", "位置指令token", "Position Instruction Token"],
+  "problem": "解码器式自回归图像模型（如LlamaGen）都按固定的光栅顺序逐个生成token。这种顺序是人为设定的归纳偏置：模型只会从左上到右下画，不能随意先画某处，也不能并行出多个token。",
+  "idea": "在每个要预测的图像token前插入一个“位置指令token”，告诉模型下一个要生成的是哪个位置；训练时把token序列随机打乱，模型就学会按任意顺序生成。",
+  "impact": "随机顺序训练在质量上与光栅顺序相当，却换来新能力：带KV缓存的并行解码提速2.5倍，并能零样本做修补、外扩和分辨率外推，说明解码器式图像模型不必绑定固定顺序。",
+  "method": "普通的光栅自回归序列是`[文本/类别, x₁, x₂, …, x_N]`，第i个token的位置隐含在它的序号里。RandAR先对每张训练图随机生成一个排列π，把token按π的顺序排好，并在每个图像token前放一个位置指令token`p_{π(i)}`（由该位置的二维坐标编码而来），序列变成`[c, p_{π(1)}, x_{π(1)}, p_{π(2)}, x_{π(2)}, …]`。模型在看到位置指令后预测该位置的token内容，训练目标仍是标准的下一个token交叉熵。\n\n因为模型已经学会“给定位置就能预测”，推理时可以一次放进多个位置指令、并行预测多个token，同时保留KV缓存，这与掩码生成模型的并行解码不同，后者通常每步都要重算整个序列。作者报告在不损失质量的前提下提速2.5倍。由于任何位置都能作为下一个目标，模型还可以零样本完成修补（先放入已知区域的token，再生成其余位置）、外扩以及生成比训练时更大的图像。\n\n在ImageNet类条件生成上，随机顺序训练的RandAR达到与同规模光栅顺序模型相当的FID。",
+  "limits": [
+    {"text": "随机顺序训练比固定顺序更难，同等计算下收敛更慢，需要更长训练才能追平。", "solved_by": []},
+    {"text": "仍依赖离散VQ分词器，生成质量上限受量化影响。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "llamagen", "type": "solves", "note": "LlamaGen只能按光栅顺序逐个生成；RandAR用位置指令去掉顺序偏置，并支持并行解码与零样本编辑。"},
+    {"to": "rar", "type": "rivals", "note": "RAR在训练中随机排列并逐渐退火回光栅顺序，推理仍按光栅顺序；RandAR推理时也保持任意顺序。"},
+    {"to": "maskgit", "type": "rivals", "note": "MaskGIT靠双向注意力的掩码预测实现并行与任意顺序；RandAR在解码器式因果模型里实现同样能力并能保留KV缓存。"}
+  ],
+  "prereq": ["autoregressive", "kv-cache", "vector-quantization", "positional-encoding", "masked-modeling"],
+  "terms": [
+    {"t": "位置指令token", "d": "插在每个图像token前面的一个特殊token，编码“下一个要生成的是第几行第几列”。"},
+    {"t": "光栅顺序", "d": "像读书一样从左到右、从上到下依次排列图像的块。"}
+  ],
+  "learn": "先读LlamaGen的光栅自回归与KV缓存 → 读本文位置指令和并行解码两节 → 在小数据集上训练随机顺序与光栅顺序两个模型对比FID与零样本修补。",
+  "check": {"source": "https://arxiv.org/abs/2412.01827", "confirmed": "标题、八位作者、v1日期2024-12-02、摘要中任意顺序生成、每个待预测token前插入表示下一位置的位置指令token、在随机排列序列上训练、性能与光栅顺序相当、带KV缓存的并行解码提速2.5倍且不损质量、零样本修补、外扩与分辨率外推；机构、CVPR 2025、序列格式的具体写法、与RAR和MaskGIT的对比、训练收敛更慢来自一般了解"}
+}

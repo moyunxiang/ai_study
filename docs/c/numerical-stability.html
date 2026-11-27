@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>数值稳定性：上溢、下溢与条件数（Numerical Stability） · AI脉络</title>
+<meta name="description" content="计算机里的数有范围和精度上限：太大会上溢成inf，太小会下溢成0，相近的数相减会丢精度。数值稳定的算法通过改写公式（如log-sum-exp技巧）避开这些坑。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/numerical-stability.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="数值稳定性：上溢、下溢与条件数（Numerical Stability）">
+<meta property="og:description" content="计算机里的数有范围和精度上限：太大会上溢成inf，太小会下溢成0，相近的数相减会丢精度。数值稳定的算法通过改写公式（如log-sum-exp技巧）避开这些坑。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/numerical-stability.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/numerical-stability">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 数学预备 · 入门</div>
+<h1>数值稳定性：上溢、下溢与条件数</h1><div class="full">Numerical Stability</div>
+<p class="muted" style="font-size:13px">也叫：数值稳定性　numerical stability　数值稳定　上溢　下溢　上溢和下溢　overflow　underflow　log-sum-exp　logsumexp　log-sum-exp trick　LSE　条件数　condition number　病态矩阵　ill-conditioned　NaN　inf　灾难性抵消　catastrophic cancellation　数值溢出　梯度NaN</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/numerical-stability">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>计算机里的数有范围和精度上限：太大会上溢成inf，太小会下溢成0，相近的数相减会丢精度。数值稳定的算法通过改写公式（如log-sum-exp技巧）避开这些坑。</b></p>
+<p class="tags">先要会：<a class="chip c" href="floating-point.html">浮点精度：FP32、FP16、BF16、INT8</a></p>
+<p>数学上正确的公式，直接照抄成代码可能得到inf或NaN。原因是浮点数（见<a class="lc" href="../c/floating-point.html">浮点精度：FP32、FP16、BF16、INT8</a>）只能表示有限范围、有限位数：FP32最大约3.4×10³⁸，FP16只到65504。训练时一出现NaN，往往整个模型就废了。</p><p><b>三类典型问题</b>。</p><ul><li><b>上溢</b>：<code>exp(100)</code>约2.7×10⁴³，超出FP32，变成inf；inf/inf就是NaN。</li><li><b>下溢</b>：很多小概率相乘，例如一句话里200个词、每个概率0.01，乘积是10⁻⁴⁰⁰，直接变成0，取对数得−inf。</li><li><b>灾难性抵消</b>：两个很接近的大数相减，有效数字大半被抵消，例如在FP32里<code>1e8 + 1 − 1e8</code>会得到0。</li></ul><p><b>标准对策</b>。</p><ul><li><b>在对数空间计算</b>：概率连乘改为对数概率相加，所以损失函数都写成负对数似然，见<a class="lc" href="../c/mle.html">最大似然估计</a>。</li><li><b>log-sum-exp技巧</b>：要算<code>log Σ exp(x_i)</code>时，先减去最大值m：<code>LSE(x) = m + log Σ exp(x_i − m)</code>。这样最大的那一项变成exp(0) = 1，不会上溢，也至少有一项不会下溢。<a class="lc" href="../c/softmax.html">Softmax与logits</a>、交叉熵、<a class="lc" href="../c/hmm-concept.html">隐马尔可夫模型</a>的前向算法都这样实现；<a class="ln" href="../n/online-softmax.html">Online Softmax</a>把它改写成分块、逐块更新最大值的形式，<a class="ln" href="../n/flashattention.html">FlashAttention</a>依赖的正是这一点。</li><li><b>加小常数</b>：除法和开方前加ε，如<a class="lc" href="../c/normalization-layer.html">归一化层</a>里的<code>√(σ² + ε)</code>和Adam的分母。</li><li><b>损失缩放</b>：<a class="ln" href="../n/mixed-precision.html">混合精度训练</a>训练时把损失乘一个大数，防止FP16的梯度下溢为0，更新前再除回去。</li></ul><p><b>条件数</b>。另一类不稳定来自问题本身：矩阵A的条件数<code>κ(A) = σ_max / σ_min</code>（最大与最小奇异值之比，见<a class="lc" href="../c/eigen-svd.html">特征分解与奇异值分解</a>）衡量输入的相对误差在解<code>Ax = b</code>时最多被放大多少倍。κ = 10⁶时，FP32约7位有效数字只剩1位可信。病态的海森矩阵也让<a class="lc" href="../c/gradient-descent.html">梯度下降</a>收敛极慢，这是预条件和<a class="lc" href="../c/adaptive-optimizer.html">自适应学习率优化器</a>要解决的问题。</p>
+<div class="example"><h4>例子</h4><p>logits为(1000, 1001, 1002)。直接算exp(1000)溢出，softmax得到NaN。减去最大值1002后变成(−2, −1, 0)，exp为(0.135, 0.368, 1)，和为1.503，softmax = (0.090, 0.245, 0.665)，与数学结果一致。</p><p>LSE = 1002 + log 1.503 ≈ 1002.41。</p></div>
+<h2>容易误解的地方</h2><ul><li>先算softmax、再对结果取log，比直接调用<code>log_softmax</code>更不稳定：小概率先下溢成0，再取log就是−inf。</li><li>训练中途出现NaN，未必是学习率太大，也可能是某处除以0、对负数开方或取log(0)；可以打开框架的异常检测逐层定位。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

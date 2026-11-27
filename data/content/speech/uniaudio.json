@@ -1,0 +1,75 @@
+{
+  "id": "uniaudio",
+  "who": "Dongchao Yang, Jinchuan Tian, Xu Tan, Rongjie Huang, Songxiang Liu, Xuankai Chang, Jiatong Shi, Sheng Zhao et al. · 香港中文大学、卡内基梅隆大学、微软、浙江大学等",
+  "venue": "ICML 2024",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2310.00704"
+    },
+    {
+      "label": "GitHub",
+      "url": "https://github.com/yangdongchao/UniAudio"
+    }
+  ],
+  "problem": "语音合成、语音转换、歌声合成、文生音效、文生音乐等任务各有专用模型；能不能像文本大模型那样，用一个模型做所有音频生成任务？",
+  "idea": "把所有目标音频和各种条件（文本、音素、参考语音、描述）都变成离散token，拼成「条件+目标」的一条序列，用一个语言模型做下一个token预测；为RVQ编解码器带来的超长序列设计多尺度Transformer。",
+  "impact": "较早把「一个LLM统一音频生成」做到11个任务、16.5万小时、10亿参数，并能通过简单微调支持新任务，是音频生成基础模型方向常被比较的工作。",
+  "method": "[[vall-e]]用编解码器token加语言模型做TTS，[[musicgen]]、[[audiogen]]用同样思路做音乐和音效，但每个任务一个模型。UniAudio把它们并起来：\n\n**统一序列格式**：每种模态先分词——目标音频用神经编解码器（类似[[encodec]]的RVQ）变成多层token，文本用音素或文字token，参考语音也是编解码器token，描述文字用预训练文本编码器的输出。一个任务就是一条序列「任务标记+条件token+目标token」，训练时统一做下一个token预测。\n\n**多尺度Transformer**：RVQ每一帧有多个码本层的token，摊平后序列长度翻好几倍。UniAudio借鉴[[megabyte]]的做法，用一个大的全局Transformer在帧级别建模帧与帧之间的依赖，再用一个小的局部Transformer在帧内部逐个生成各层token，降低长序列的计算量。\n\n**规模**：训练覆盖语音、音效、音乐、歌声等11个生成任务，16.5万小时音频，10亿参数。摘要报告：在大多数任务上达到最好或有竞争力的结果，并能通过简单微调支持没训练过的新音频生成任务。",
+  "limits": [
+    {
+      "text": "多任务共享一个模型的容量，摘要只说「多数任务上最好或有竞争力」，单个任务能否追上专门优化的系统并不确定。",
+      "solved_by": []
+    },
+    {
+      "text": "只做生成，不包含音频理解；也不能和文本大模型的对话能力结合。",
+      "solved_by": [
+        "kimi-audio"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "vall-e",
+      "type": "extends",
+      "note": "把VALL-E的编解码器语言模型从TTS推广到11个音频生成任务。"
+    },
+    {
+      "to": "megabyte",
+      "type": "uses",
+      "note": "借用全局加局部两级Transformer处理RVQ带来的超长序列。"
+    },
+    {
+      "to": "encodec",
+      "type": "uses",
+      "note": "用RVQ神经编解码器把各类音频变成离散token。"
+    },
+    {
+      "to": "musicgen",
+      "type": "rivals",
+      "note": "MusicGen为音乐单独训练模型；UniAudio用一个模型统一音乐、语音和音效。"
+    }
+  ],
+  "prereq": [
+    "language-model",
+    "autoregressive",
+    "vector-quantization",
+    "vocoder-codec",
+    "tokenization"
+  ],
+  "terms": [
+    {
+      "t": "多尺度Transformer",
+      "d": "全局Transformer负责帧与帧之间，局部Transformer负责一帧之内多个码本层token的两级结构。"
+    }
+  ],
+  "aka": [
+    "UniAudio",
+    "统一音频生成",
+    "音频生成基础模型"
+  ],
+  "check": {
+    "source": "https://arxiv.org/abs/2310.00704",
+    "confirmed": "arXiv官方记录：标题UniAudio: An Audio Foundation Model Toward Universal Audio Generation、Yang等12位作者、v1提交2023-10-01；摘要中生成语音/声音/音乐/歌声、对目标音频和条件分词、拼接源-目标为单序列、下一个token预测、为RVQ长序列提出多尺度Transformer、165K小时与1B参数、11个任务上最好或有竞争力、简单微调支持新任务。MegaByte启发、各模态分词细节、机构、ICML 2024为一般了解。"
+  }
+}

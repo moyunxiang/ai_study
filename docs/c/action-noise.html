@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>连续动作的探索噪声（Exploration Noise for Continuous Actions） · AI脉络</title>
+<meta name="description" content="确定性策略自己不会探索，要在它输出的动作上加噪声：独立的高斯噪声、时间上相关的OU噪声，或者直接扰动网络参数。TD3还在目标动作上加噪声来平滑价值估计。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/action-noise.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="连续动作的探索噪声（Exploration Noise for Continuous Actions）">
+<meta property="og:description" content="确定性策略自己不会探索，要在它输出的动作上加噪声：独立的高斯噪声、时间上相关的OU噪声，或者直接扰动网络参数。TD3还在目标动作上加噪声来平滑价值估计。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/action-noise.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/action-noise">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>连续动作的探索噪声</h1><div class="full">Exploration Noise for Continuous Actions</div>
+<p class="muted" style="font-size:13px">也叫：探索噪声　exploration noise　动作噪声　action noise　高斯探索噪声　Gaussian exploration　OU噪声　OU noise　Ornstein-Uhlenbeck noise　Ornstein-Uhlenbeck过程　参数空间噪声　parameter space noise　目标策略平滑　target policy smoothing　target smoothing</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/action-noise">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>确定性策略自己不会探索，要在它输出的动作上加噪声：独立的高斯噪声、时间上相关的OU噪声，或者直接扰动网络参数。TD3还在目标动作上加噪声来平滑价值估计。</b></p>
+<p class="tags">先要会：<a class="chip c" href="policy-parameterization.html">策略的参数化：离散动作与连续动作</a> <a class="chip c" href="exploration-exploitation.html">探索与利用</a></p>
+<p><a class="ln" href="../n/dpg.html">确定性策略梯度DPG</a>、<a class="ln" href="../n/ddpg.html">DDPG</a>、<a class="ln" href="../n/td3.html">TD3</a>这类方法的策略输出一个确定的动作<code>a = μ_θ(s)</code>（见<a class="lc" href="../c/policy-parameterization.html">策略的参数化：离散动作与连续动作</a>）。不加处理的话，同一个状态永远做同一件事，学不到别的动作好不好。离散动作可以用<a class="lc" href="../c/epsilon-greedy.html">ε-贪心与玻尔兹曼探索</a>，连续动作则通常往动作上加噪声。由于这些算法是离策略的，加了噪声的行为策略和要学的确定性目标策略可以不同，见<a class="lc" href="../c/on-off-policy.html">on-policy与off-policy</a>。</p><p><b>高斯噪声</b>。<code>a = clip(μ(s) + ε, a_low, a_high)</code>，ε ~ N(0, σ²)，每步独立采样。<a class="ln" href="../n/td3.html">TD3</a>发现σ=0.1的简单高斯噪声就够用。</p><p><b>OU噪声</b>（Ornstein–Uhlenbeck过程）。一种会回到均值的随机过程：</p><p class="formula"><code>x_{t+1} = x_t + θ·(μ − x_t)·Δt + σ·√Δt·ε_t</code></p><p>相邻时刻的噪声相关，动作在一段时间内朝同一方向偏，适合有惯性的物理系统（独立噪声在高频控制下会相互抵消，机器人只是原地抖动）。<a class="ln" href="../n/ddpg.html">DDPG</a>原文用θ=0.15、σ=0.2的OU噪声。后来的经验是：多数基准上它并不明显优于高斯噪声。</p><p><b>参数空间噪声</b>。不扰动动作，而扰动策略网络的权重，在一整个回合里保持同一组扰动，行为更一致、更有“个性”。<a class="ln" href="../n/noisynet.html">NoisyNet噪声网络</a>把噪声的幅度也作为可学习的参数，用于DQN系列的离散动作探索。</p><p><b>目标策略平滑</b>。这是用在<b>价值目标</b>上的噪声，不是为了探索。TD3在计算目标时对下一步动作加裁剪过的噪声：<code>a&#x27; = clip(μ&#x27;(s&#x27;) + clip(ε, −c, c))</code>，ε ~ N(0, 0.2²)，c=0.5，相当于要求Q在动作的一个小邻域内平滑，防止策略钻某个尖锐高估峰的空子，配合<a class="lc" href="../c/maximization-bias.html">过估计与最大化偏差</a>里的双critic一起使用。</p>
+<div class="example"><h4>例子</h4><p>一维动作，μ(s)恒为0，取OU参数θ=0.15、σ=0.2、Δt=1。从x=0开始，若前三步的标准正态采样都是+1，噪声依次为0.2、0.37、0.51：一段时间内持续朝正方向偏。若是独立高斯噪声σ=0.2，三步就是0.2、0.2、0.2，各步之间没有累积；遇到不同符号的采样时会立刻来回跳。</p></div>
+<h2>容易误解的地方</h2><ul><li>噪声尺度要与动作范围匹配：动作在[−1, 1]时σ=0.1约是全范围的5%，动作范围若是[−100, 100]，同样的σ几乎不起作用。</li><li>评估时要关掉探索噪声，否则报告的是行为策略而不是学到的策略的表现。</li><li>目标策略平滑和探索噪声是两回事，前者只出现在critic的目标里。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

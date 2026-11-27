@@ -1,0 +1,30 @@
+{
+  "id": "rebrac",
+  "who": "Denis Tarasov, Vladislav Kurenkov, Alexander Nikulin, Sergey Kolesnikov · Tinkoff",
+  "venue": "NeurIPS 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2305.09836"},
+    {"label": "CORL库", "url": "https://github.com/tinkoff-ai/CORL"}
+  ],
+  "problem": "离线RL新方法层出不穷，但很多提升其实来自层归一化、更大批量、更深网络这类不起眼的设计选择，基线没有用上这些选择，比较并不公平。",
+  "idea": "把这些设计选择回装到极简的TD3+BC上：评论家也加行为正则、加层归一化、大批量、更深网络、调整折扣，得到不用Q集成的ReBRAC，并做数千次消融看哪些选择真正起作用。",
+  "impact": "成为无集成离线RL的强基线，后续OGBench、FQL等工作和CORL库都把它列入对比；也让领域更重视“实现细节对结果的影响”。",
+  "method": "[[td3-bc]]的做法是在[[td3]]的策略目标里加一项行为克隆：`π = argmax E[λQ(s, π(s)) − (π(s) − a)²]`，只改了一行代码。ReBRAC（Revisited BRAC，名字来自[[brac]]）在这个底座上加了几处改动：\n\n- 行为惩罚不只加在演员上，也加在评论家的目标里：`y = r + γ(Q(s′, a′) − β₂ (a′ − a′_data)²)`，演员和评论家的惩罚系数分开调；\n- 网络里加层归一化（LayerNorm），减小分布外动作上Q值的外推；\n- 用更大的批量（如1024）和更深的网络；\n- 针对不同数据集调整折扣因子等少量超参数。\n\n这些都是近年其他离线方法论文里出现过、但通常没被单独评估的选择。作者在D4RL和图像版的V-D4RL共51个数据集上评测，摘要称ReBRAC在离线和离线转在线两种设定下都是不用集成的方法中最好的，并做了上千次实验规模的消融和超参数敏感性分析，说明哪一项贡献最大。",
+  "limits": [
+    {"text": "演员和评论家两个惩罚系数对不同数据集都比较敏感，论文是在每个任务族上搜索得到的，换新数据集仍要调参。"},
+    {"text": "策略仍是确定性的单峰高斯式输出，数据里动作多峰时表达能力不够。", "solved_by": ["fql"]}
+  ],
+  "relations": [
+    {"to": "td3-bc", "type": "extends", "note": "以TD3+BC为底座，加入评论家惩罚、层归一化、大批量等设计。"},
+    {"to": "brac", "type": "extends", "note": "沿用BRAC在价值和策略上都做行为正则的思路，名字即“重访BRAC”。"},
+    {"to": "edac", "type": "rivals", "note": "EDAC靠几十个Q网络的集成做保守估计；ReBRAC不用集成，在多数任务上接近或超过它，开销小得多。"},
+    {"to": "d4rl", "type": "uses", "note": "在D4RL与V-D4RL的51个数据集上评测。"}
+  ],
+  "prereq": ["offline-rl", "actor-critic", "normalization-layer", "ablation-baseline"],
+  "terms": [
+    {"t": "离线转在线（offline-to-online）", "d": "先用离线数据训练，再与环境交互继续微调的设定。"}
+  ],
+  "learn": "先读[[td3-bc]]（一页就能读完）；读ReBRAC原文第3节列出的每个设计选择和第5节消融；在CORL里分别关闭层归一化或评论家惩罚，看分数变化。",
+  "check": {"source": "https://arxiv.org/abs/2305.09836", "confirmed": "标题、四位作者、arXiv v1于2023-05-16；摘要中设计选择影响未被研究、在TD3+BC上整合得到ReBRAC、D4RL与V-D4RL共51个数据集、无集成方法中离线和离线转在线最好、数千次实验规模的消融与敏感性分析。具体设计项（评论家惩罚、LayerNorm、大批量、深网络、折扣）按原文正文通行描述；NeurIPS 2023与单位按通行引用。"},
+  "aka": ["ReBRAC", "Revisited BRAC", "重访BRAC", "TD3+BC改进"]
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SimulST同声语音翻译（2020） · AI脉络</title>
+<meta name="description" content="同声翻译要求边听边译。文本同传已有wait-k、单调多头注意力等「什么时候读、什么时候写」的策略，但它们以词为单位做决策；语音输入是连续的帧，没有现成的词边界。 在端到端语音翻译模型里加一个「预决策」模块：先把连续的语音帧切成段（固定长度或按预测的边界灵活切），每到一段末尾才调用文本同传的读写策略…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/simulst.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SimulST同声语音翻译（2020）">
+<meta property="og:description" content="同声翻译要求边听边译。文本同传已有wait-k、单调多头注意力等「什么时候读、什么时候写」的策略，但它们以词为单位做决策；语音输入是连续的帧，没有现成的词边界。 在端到端语音翻译模型里加一个「预决策」模块：先把连续的语音帧切成段（固定长度或按预测的边界灵活切），每到一段末尾才调用文本同传的读写策略…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/simulst.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/simulst">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:168"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/speech.html">语音与音频</a> › 语音翻译</div>
+<h1>SimulST同声语音翻译</h1>
+<div class="full">SimulMT to SimulST: Adapting Simultaneous Text Translation to End-to-End Simultaneous Speech Translation</div>
+<div class="meta"><span>2020.11</span><span>论文</span><span>延伸</span><span>AACL 2020</span><span>Xutai Ma, Juan Pino, Philipp Koehn · 约翰斯·霍普金斯大学、Facebook AI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2011.02048" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/simulst">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>同声翻译要求边听边译。文本同传已有wait-k、单调多头注意力等「什么时候读、什么时候写」的策略，但它们以词为单位做决策；语音输入是连续的帧，没有现成的词边界。</p></div><div><h4>方法</h4><p>在端到端语音翻译模型里加一个「预决策」模块：先把连续的语音帧切成段（固定长度或按预测的边界灵活切），每到一段末尾才调用文本同传的读写策略，从而把wait-k和单调注意力搬到语音上。</p></div><div><h4>影响</h4><p>把文本同传的读写策略系统地接到端到端语音翻译上，并提出考虑计算时间的延迟指标；代码随fairseq公开，此后的流式语音翻译工作常沿用这套预决策加读写策略的分析框架。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>文本同传的经典策略有两类：<b>固定策略</b>如wait-k，先读k个词，之后每读一个词写一个词；<b>灵活策略</b>如单调多头注意力，由模型自己学什么时候停下来输出。它们都以源语言的「词」为读写单位。可端到端语音翻译（如<a class="ln" href="../n/seq2seq-st.html">序列到序列直接语音翻译</a>）的输入是每10毫秒一帧的声学特征，一个词可能对应几十帧，没有现成的分界。</p><p>作者加了一个<b>预决策模块</b>，决定在哪些帧位置值得做一次读写决策：</p><ul><li><b>固定预决策</b>：每隔固定数量的帧（例如若干百毫秒）做一次决策；</li><li><b>灵活预决策</b>：只在源语言的词或音素边界处做决策；论文用的是由对齐得到的理想（oracle）边界，用来研究按词边界决策的潜力。</li></ul><p>在每个决策点上，再用文本的读写策略（wait-k或单调多头注意力）决定是继续听还是输出一个目标词。论文分析了四种组合（固定或灵活预决策 × 固定或灵活策略）下延迟和质量的权衡，并在Average Lagging（平均滞后）的基础上设计了<b>考虑计算时间的延迟指标</b>：除了等待输入的时间，还把模型计算本身花的时间计入延迟。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只输出文字译文，没有直接生成译语语音；同声语音到语音翻译要等后续工作。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/streamspeech.html">StreamSpeech同声翻译</a> <a class="chip hue" style="--h:168" href="../n/hibiki.html">Hibiki同声传译</a></div></li><li>读写策略和翻译模型分开设计，策略较为启发式，延迟与质量的平衡需要人工调参。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/seamless.html">Seamless流式表现力翻译</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>翻译模型与单调多头注意力都基于Transformer。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:168" href="../n/seq2seq-st.html">序列到序列直接语音翻译</a><span class="yr">2017.03 · 语音</span><div class=nt>在端到端直接语音翻译模型上加入同声传译的读写决策。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/seamless.html">Seamless流式表现力翻译</a><span class="yr">2023.12 · 语音</span><div class=nt>读写策略和翻译模型分开设计，策略较为启发式，延迟与质量的平衡需要人工调参。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/streamspeech.html">StreamSpeech同声翻译</a><span class="yr">2024.06 · 语音</span><div class=nt>只输出文字译文，没有直接生成译语语音；同声语音到语音翻译要等后续工作。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/hibiki.html">Hibiki同声传译</a><span class="yr">2025.02 · 语音</span><div class=nt>只输出文字译文，没有直接生成译语语音；同声语音到语音翻译要等后续工作。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a> <a class="chip c" href="../c/attention-concept.html">注意力机制</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a> <a class="chip c" href="../c/text-metrics.html">文本生成的自动指标</a></p>
+<h2>本篇术语</h2><ul><li><b>wait-k</b>　同传的固定读写策略：先读入k个源词，之后每读一个源词就输出一个目标词。</li><li><b>Average Lagging</b>　平均滞后，衡量同传系统输出每个词时比理想的同步翻译落后了多少输入。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2011.02048" rel="noopener">https://arxiv.org/abs/2011.02048</a>（arXiv官方记录：标题SimulMT to SimulST: Adapting Simultaneous Text Translation to End-to-End Simultaneous Speech Translation、Ma/Pino/Koehn三位作者、v1提交2020-11-03；摘要中把wait-k与单调多头注意力等文本同传方法适配到端到端同声语音翻译、引入预决策模块、固定与灵活预决策和固定与灵活策略组合的延迟-质量分析、基于Average Lagging的计算感知延迟指标。另读PDF正文确认：代码在fairseq仓库公开、作者含约翰斯·霍普金斯大学、灵活预决策使用词或音素级的oracle边界、平均词长约271ms。后续工作的沿用、Facebook机构与AACL 2020为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SimulST%E5%90%8C%E5%A3%B0%E8%AF%AD%E9%9F%B3%E7%BF%BB%E8%AF%91%EF%BC%88simulst%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asimulst%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/simulst.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="emformer.html"><small>本分支上一个 · 2020.10</small><b>Emformer流式Transformer</b></a><a class="r" href="gslm.html"><small>本分支下一个 · 2021.02</small><b>GSLM无文本语言模型</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

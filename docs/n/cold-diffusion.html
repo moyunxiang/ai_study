@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>冷扩散：不用噪声（2022） · AI脉络</title>
+<meta name="description" content="扩散模型的理论解释都离不开高斯噪声：要么是Langevin动力学里的随机项，要么是变分推断里的高斯后验。那噪声本身是不是必需的？ 把“加噪”换成任意的确定性退化（模糊、遮挡、下采样、混入别的图），训练一个网络把退化图复原；采样时用一个改进的迭代规则，从完全退化的图一步步复原出新图。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/cold-diffusion.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="冷扩散：不用噪声（2022）">
+<meta property="og:description" content="扩散模型的理论解释都离不开高斯噪声：要么是Langevin动力学里的随机项，要么是变分推断里的高斯后验。那噪声本身是不是必需的？ 把“加噪”换成任意的确定性退化（模糊、遮挡、下采样、混入别的图），训练一个网络把退化图复原；采样时用一个改进的迭代规则，从完全退化的图一步步复原出新图。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/cold-diffusion.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/cold-diffusion">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 扩散与流匹配</div>
+<h1>冷扩散：不用噪声</h1>
+<div class="full">Cold Diffusion: Inverting Arbitrary Image Transforms Without Noise</div>
+<div class="meta"><span>2022.08</span><span>论文</span><span>延伸</span><span>NeurIPS 2023</span><span>Arpit Bansal, Eitan Borgnia, Hong-Min Chu, Jie S. Li, Hamid Kazemi, Furong Huang, Micah Goldblum, Jonas Geiping et al. · 马里兰大学、纽约大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2208.09392" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/arpitbansal297/Cold-Diffusion-Models" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/cold-diffusion">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>扩散模型的理论解释都离不开高斯噪声：要么是Langevin动力学里的随机项，要么是变分推断里的高斯后验。那噪声本身是不是必需的？</p></div><div><h4>方法</h4><p>把“加噪”换成任意的确定性退化（模糊、遮挡、下采样、混入别的图），训练一个网络把退化图复原；采样时用一个改进的迭代规则，从完全退化的图一步步复原出新图。</p></div><div><h4>影响</h4><p>实验表明完全不加噪声也能得到可用的生成模型，直接挑战了“扩散模型靠噪声工作”的理解，引出了后续对“广义扩散”、模糊扩散和逆热方程生成的一系列讨论。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>设退化算子D(x, t)随t增大逐步加重，比如t步高斯模糊，t=T时整张图糊成一个颜色。训练一个复原网络R，使<code>R(D(x,t), t) ≈ x</code>，损失就是复原误差。</p><p>采样时最朴素的做法是反复“复原一次、再退化到t−1”，但作者发现这样误差会累积、效果差，于是提出改进的更新：<code>x_{t−1} = x_t − D(x̂₀, t) + D(x̂₀, t−1)</code>，其中x̂₀是R的预测。它只用退化前后两级的差来修正x_t，对复原网络的误差更不敏感。作者还对线性退化做了分析，说明这一规则对复原网络的误差更稳健。</p><p>在模糊、遮挡修补、下采样、ImageNet-C的“加雪”、逐渐混入一张随机动物图（animorphosis）等多种退化上都训练出了能生成样本的模型。完全确定的退化起点只有一个，所以要生成多样的图，需要在初始图（如模糊后的纯色块）上加少量随机性；画质也普遍不如高斯噪声扩散，这本身说明噪声在保证多样性上仍有作用。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>确定性退化让起点几乎唯一，样本多样性差，需要额外注入随机性，且FID明显落后于高斯噪声扩散。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>改进采样规则缺少像DDPM那样的概率解释，无法计算似然。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/ddpm.html">DDPM</a><span class="yr">2020.06 · 生成</span><div class=nt>把DDPM的加噪—去噪框架推广到任意确定性退化，检验噪声是否必要。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/unet.html">U-Net</a><span class="yr">2015.05 · 视觉</span><div class=nt>复原网络沿用扩散模型常用的U-Net结构。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/ddim.html">DDIM</a><span class="yr">2020.10 · 生成</span><div class=nt>其改进采样规则与DDIM一样基于“预测x₀再映射回下一级”的确定性更新。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/convolution-op.html">卷积运算</a> <a class="chip c" href="../c/autoencoder.html">自编码器</a> <a class="chip c" href="../c/noise-schedule.html">噪声调度与采样步数</a></p>
+<h2>本篇术语</h2><ul><li><b>退化算子</b>　把干净图变坏的确定性操作，如模糊、遮住一块、降低分辨率。</li></ul>
+<h2>怎么学</h2><p>先读DDPM和DDIM的采样规则 → 读本文第3节两种采样算法的对比和线性退化下的推导 → 在MNIST上用高斯模糊作退化训练小模型，比较朴素采样与改进采样。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://ar5iv.org/abs/2208.09392" rel="noopener">https://ar5iv.org/abs/2208.09392</a>（标题、作者、v1日期2022-08-19、摘要中生成行为不强烈依赖退化方式、完全确定的退化（模糊、遮挡等）也能构造生成模型、质疑基于Langevin或变分推断的理解、提出广义扩散；ar5iv正文图1中的加雪与animorphosis退化、复原网络用ℓp损失；机构、NeurIPS 2023、改进采样公式、具体退化种类、多样性需额外随机性来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%86%B7%E6%89%A9%E6%95%A3%EF%BC%9A%E4%B8%8D%E7%94%A8%E5%99%AA%E5%A3%B0%EF%BC%88cold-diffusion%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acold-diffusion%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/cold-diffusion.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="automatic1111.html"><small>本分支上一个 · 2022.08</small><b>AUTOMATIC1111 WebUI</b></a><a class="r" href="dreambooth.html"><small>本分支下一个 · 2022.08</small><b>DreamBooth与个性化</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

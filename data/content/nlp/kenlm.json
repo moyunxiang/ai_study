@@ -1,0 +1,92 @@
+{
+  "id": "kenlm",
+  "who": "Kenneth Heafield · 卡内基梅隆大学",
+  "venue": "WMT 2011",
+  "links": [
+    {
+      "label": "ACL Anthology",
+      "url": "https://aclanthology.org/W11-2123/"
+    },
+    {
+      "label": "代码",
+      "url": "https://github.com/kpu/kenlm"
+    }
+  ],
+  "aka": [
+    "KenLM",
+    "Heafield 2011",
+    "lmplz",
+    "KenLM PROBING",
+    "KenLM TRIE",
+    "n-gram语言模型查询库"
+  ],
+  "problem": "统计机器翻译解码时要对海量候选反复查询n-gram语言模型概率，当时通用的SRILM查询慢、内存占用大，大模型常常装不进内存，语言模型查询成了解码速度的瓶颈。",
+  "idea": "只做“查询”这一件事，并为它专门设计两种数据结构：用线性探测哈希表追求速度的PROBING，和用按位压缩的有序字典树加插值查找追求省内存的TRIE。",
+  "impact": "开源、线程安全，很快被Moses、cdec、Joshua等主流翻译系统集成，成为n-gram语言模型的标准查询库；后来的估计工具lmplz与Python接口让它在语音识别、数据过滤中也被广泛使用。",
+  "background": "回退式n-gram语言模型查询 `p(w_n|w_1…w_{n−1})` 时，要先找最长的已出现历史，找不到就乘上回退权重 `b(·)` 退到更短的历史。翻译解码器每生成一个候选片段都要查好几次，一句话的解码可能涉及上百万次查询。论文对比的[[srilm]]基于指针密集的字典树，速度和内存都不理想；IRSTLM、RandLM等替代方案或省内存但慢，或用有损的随机结构换空间。",
+  "method": "KenLM把查询改写成：找到 `w_f…w_n` 这一最长匹配，返回 `p(w_n|w_f…w_{n−1}) · Π_{i<f} b(w_i…w_{n−1})`，并为存储这两类数值设计两种结构。\n\n- **PROBING**：每一阶n元组各用一张线性探测哈希表，键是n元组的64位哈希值，值是概率和回退权重。哈希冲突时顺序往后找空位，内存访问集中，速度快。\n- **TRIE**：按词序排序的字典树，每个节点存词号、概率、回退权重和子节点区间指针，全部按位紧凑打包；查找某个词时在有序数组上用插值查找（按词号大小估计位置）而不是二分查找；还可以把概率和回退权重量化成少量比特进一步压缩。\n\n此外它在查询之间缓存状态：解码器每次只追加一个词，KenLM返回下次查询需要的最短历史，避免重复查找。",
+  "results": "论文报告：PROBING比当时广泛使用的SRILM快2.4倍，内存只用后者的57%；TRIE的内存比最小的无损基线还少，CPU耗时又比最快的基线还低。代码已集成进Moses、cdec和Joshua三个翻译系统。",
+  "legacy": "KenLM取代SRILM成为[[moses]]等系统的默认语言模型后端，WMT评测中的n-gram语言模型基线几乎都由它查询。2013年作者又加入了用磁盘排序估计修正版[[kneser-ney]]模型的lmplz，可在单机上训练很大的模型。神经网络时代它仍被用于语音识别的浅融合解码、CCNet等网页语料的困惑度过滤，以及[[infini-gram]]这类大规模n-gram研究的对照。",
+  "limits": [
+    {
+      "text": "只加速查询和存储，模型本身仍是固定阶数的回退n-gram，捕捉不了超过几个词的依赖。",
+      "solved_by": [
+        "lstm-lm",
+        "infini-gram"
+      ]
+    },
+    {
+      "text": "PROBING用哈希值代替原始n元组，内存仍随n元组数量线性增长，万亿词级语料需要剪枝或分布式方案。",
+      "solved_by": [
+        "infini-gram"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "srilm",
+      "type": "solves",
+      "note": "针对SRILM查询慢、占内存的问题重写数据结构：PROBING速度为其2.4倍、内存为其57%。"
+    },
+    {
+      "to": "kneser-ney",
+      "type": "uses",
+      "note": "查询的对象通常就是修正版Kneser-Ney平滑的回退模型，ARPA格式中的回退权重直接进入查询公式。"
+    },
+    {
+      "to": "moses",
+      "type": "uses",
+      "note": "作为语言模型后端被集成进Moses，在解码器里每扩展一个短语就查询一次。"
+    },
+    {
+      "to": "large-lm-mt",
+      "type": "rivals",
+      "note": "Google用分布式计数和Stupid Backoff在集群上处理万亿词模型；KenLM走单机路线，用紧凑结构把尽可能大的标准回退模型装进内存。"
+    }
+  ],
+  "prereq": [
+    "language-model",
+    "n-gram",
+    "big-o",
+    "perplexity"
+  ],
+  "terms": [
+    {
+      "t": "线性探测哈希",
+      "d": "哈希冲突时依次查看后面的槽位直到找到空位或目标，访问连续内存，缓存友好。"
+    },
+    {
+      "t": "插值查找",
+      "d": "在有序数组上按目标值的大小比例估计位置再查找，数据分布均匀时比二分查找更快。"
+    },
+    {
+      "t": "回退权重",
+      "d": "回退式语言模型从长历史退到短历史时乘上的系数，保证概率总和为1。"
+    }
+  ],
+  "learn": "先了解回退式n-gram模型和ARPA格式（[[srilm]]）→ 读原文第2节两种数据结构 → 动手：pip安装kenlm，用lmplz在小语料上训练5-gram，再用Python接口逐词打印对数概率，体会状态缓存的接口设计。",
+  "check": {
+    "source": "https://aclanthology.org/W11-2123/",
+    "confirmed": "ACL Anthology：标题、作者Kenneth Heafield、WMT 2011（2011年7月，Edinburgh）；原文PDF摘要与第1节：PROBING用线性探测哈希表、比SRILM快2.4倍且内存57%，TRIE为按位打包的有序字典树加插值查找和可选量化、内存低于最小无损基线且CPU低于最快基线，开源、线程安全，已集成进Moses、cdec、Joshua；对比对象SRILM、IRSTLM、MITLM、RandLM。lmplz（2013）与在CCNet中做困惑度过滤凭一般了解。"
+  }
+}

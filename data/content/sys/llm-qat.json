@@ -1,0 +1,24 @@
+{
+ "id": "llm-qat",
+ "who": "Zechun Liu, Barlas Oguz, Changsheng Zhao, Ernie Chang, Pierre Stock, Yashar Mehdad, Yangyang Shi, Raghuraman Krishnamoorthi et al. · Meta",
+ "aka": ["LLM-QAT", "无数据量化感知训练", "data-free QAT", "自生成数据蒸馏", "KV缓存量化"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2305.17888"}
+ ],
+ "problem": "训练后量化（PTQ）在8比特上表现很好，但把权重、激活都压到4比特时就失效；量化感知训练（QAT）效果更好，可大模型的原始预训练数据通常拿不到。",
+ "idea": "用预训练模型自己生成的文本做训练数据，以原模型为老师做蒸馏，对LLM做量化感知训练；同时把权重、激活和KV缓存一起量化。",
+ "impact": "是较早把量化感知训练用到LLaMA规模模型上的工作，“用模型自生成数据蒸馏”的无数据做法被后续QAT与端侧量化工作沿用，Meta后来发布的量化版Llama也采用了QAT路线。",
+ "method": "[[smoothquant]]、[[gptq]]等PTQ方法不训练，只用少量校准数据调整量化参数；当比特数降到4比特权重加4比特激活时，误差无法再靠校准补回来。[[integer-quant]]式的量化感知训练在训练中模拟量化，让权重适应低精度，但需要大量有代表性的训练数据。\n\nLLM-QAT的做法：从预训练模型出发，用它自己采样生成文本——第一个词随机抽取，之后按模型分布逐词生成（论文比较了贪心、采样以及混合策略），得到一批与原训练分布相近的数据；然后以全精度模型为老师、量化模型为学生，用逐词的软标签做[[distillation]]，训练中用直通估计（见[[ste]]）传梯度。量化对象除了权重和激活，还包括KV缓存，因为长序列和大批量时KV缓存是显存和吞吐的关键。权重按通道、激活和KV按词做对称的MinMax量化。\n\n摘要报告：在LLaMA的7B、13B、30B上做到最低4比特，相对免训练方法有大幅提升，低比特设置下尤其明显。",
+ "limits": [
+  {"text": "QAT需要对整个模型做蒸馏训练，计算成本远高于训练后量化，难以对每个新模型都做一遍。", "solved_by": []},
+  {"text": "激活中的离群值仍让4比特激活量化困难，后续用旋转等方法先消除离群值。", "solved_by": ["quarot", "spinquant"]}
+ ],
+ "relations": [
+  {"to": "smoothquant", "type": "solves", "note": "SmoothQuant等训练后量化在8比特以下失效，LLM-QAT用量化感知训练推到4比特权重、激活和KV缓存。"},
+  {"to": "integer-quant", "type": "extends", "note": "把量化感知训练从视觉模型推广到LLaMA规模的语言模型，并解决没有训练数据的问题。"},
+  {"to": "distillation", "type": "uses", "note": "以全精度模型为老师，在自生成数据上做逐词软标签蒸馏。"},
+  {"to": "llama-1", "type": "uses", "note": "在LLaMA 7B、13B、30B上实验。"}
+ ],
+ "prereq": ["quantization-concept", "knowledge-distillation", "kv-cache", "floating-point"],
+ "check": {"source": "https://arxiv.org/abs/2305.17888", "confirmed": "标题、作者（Liu等九位）、v1日期2023-05-29；摘要：多种PTQ方法在8比特表现良好但在更低比特失效、研究LLM的量化感知训练、利用预训练模型生成数据的无数据蒸馏、可量化任何生成模型而不依赖其训练数据、除权重激活外还量化KV缓存、LLaMA 7B/13B/30B上最低4比特、低比特设置下大幅优于免训练方法。生成策略细节、对称MinMax量化粒度、机构Meta、Meta量化版Llama采用QAT为一般了解。"}
+}

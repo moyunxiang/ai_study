@@ -1,0 +1,33 @@
+{
+  "id": "nbsvm",
+  "who": "Sida Wang, Christopher D. Manning · 斯坦福大学",
+  "venue": "ACL 2012",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/P12-2018/"}
+  ],
+  "aka": ["NBSVM", "NB-SVM", "Baselines and Bigrams", "朴素贝叶斯特征SVM", "MNB"],
+  "problem": "朴素贝叶斯和支持向量机常被当作文本分类和情感分析的基线，但它们的表现随模型变体、特征和数据集差异很大，研究者往往随手选一个弱配置当基线，使新方法看起来比实际更好。",
+  "idea": "系统比较多种NB和SVM变体，得出三点：加入词二元组（bigram）在情感任务上稳定有效；短文本情感任务上NB反而比SVM好，长文档则相反；提出NBSVM——把NB的对数计数比当作SVM的特征值，再在NB与SVM的权重之间插值，在各种任务上都表现稳定。",
+  "impact": "简单的NB和SVM变体在多个情感数据集上超过当时大多数已发表结果，有时创下新纪录；NBSVM成为此后几年句子与文档分类论文（包括TextCNN、段落向量、ULMFiT等）必比的强基线，「先把基线调好」也成了被反复引用的教训。",
+  "method": "**记号**。每个文本表示成特征计数向量`f`（词或二元组出现次数），也可以二值化为`f̂ = 1{f > 0}`。对正负两类分别累加计数并加平滑`α`：`p = α + Σ_{y=1} f`，`q = α + Σ_{y=−1} f`，**对数计数比**`r = log((p/‖p‖₁) / (q/‖q‖₁))`，它衡量每个特征偏向正类还是负类的程度。\n\n**多项式朴素贝叶斯（MNB）**就是线性分类器`y = sign(wᵀx + b)`，其中`w = r`，`b = log(N₊/N₋)`。作者确认了二值化的MNB比标准MNB好。\n\n**NBSVM**：把每个样本的特征换成`x̃ = r ∘ f̂`（逐元素相乘，即用NB的对数计数比给特征缩放），再训练线性SVM。作者发现这在长文档上很好，而在所有文档上表现最好的是再加一步插值：`w′ = (1−β)·w̄ + β·w`，其中`w̄ = ‖w‖₁/|V|`是权重的平均幅度，`β ∈ [0,1]`。作者把它解释为一种正则化：除非SVM非常有把握，否则就相信NB。实验统一用`α = 1, C = 1, β = 0.25`。\n\n**实验**覆盖电影短评（RT-s）、主观性分类（Subj）、商品评论、IMDB五万条长影评以及20 Newsgroups的若干主题对。主要发现：二元组对情感任务一致有帮助、对主题分类有好有坏；短片段情感任务上MNB优于SVM；NBSVM加二元组在IMDB上准确率91.22%，在多个数据集上超过当时发表的神经网络和复杂模型。",
+  "limits": [
+    {"text": "仍是词袋加二元组，无法表示长距离的否定、转折和组合语义。", "solved_by": ["rntn", "kim-cnn"]},
+    {"text": "特征都是离散的词和词组，没有共享的语义表示，同义词之间不能互相泛化。", "solved_by": ["doc2vec"]}
+  ],
+  "relations": [
+    {"to": "svm-textcat", "type": "extends", "note": "在Joachims的SVM文本分类基础上，用朴素贝叶斯的对数计数比缩放特征并与NB权重插值。"},
+    {"to": "sentiment-ml", "type": "extends", "note": "Pang等比较了NB、最大熵和SVM做影评情感分类；本文系统梳理了变体与数据长度的影响，并给出更强的组合。"},
+    {"to": "svm", "type": "uses", "note": "NBSVM的分类器是线性支持向量机。"},
+    {"to": "tf-idf", "type": "rivals", "note": "TF-IDF按文档频率给词加权；NBSVM按词在正负类间的对数计数比加权，属于有监督的特征加权。"}
+  ],
+  "prereq": ["conditional-bayes", "logistic-regression", "kernel-trick", "n-gram", "regularization", "ablation-baseline"],
+  "terms": [
+    {"t": "对数计数比", "d": "某个特征在正类中的（平滑后的）相对频率与在负类中的相对频率之比再取对数，正值表示偏向正类。"},
+    {"t": "二值化特征", "d": "只记录某个词是否出现，不记录出现了几次。"}
+  ],
+  "learn": "先读[[svm-textcat]]和[[sentiment-ml]]的讲解 → 读原文第2节三种模型的公式 → 动手：在IMDB上用scikit-learn实现MNB、线性SVM和NBSVM（带与不带二元组），复现「长文档上SVM类更好」的结论。",
+  "check": {
+    "source": "https://aclanthology.org/P12-2018.pdf",
+    "confirmed": "ACL Anthology PDF：标题、作者Wang与Manning（斯坦福）、ACL 2012短文、摘要（NB和SVM变体常作基线但表现差异大；二元组在情感任务上一致有益；短片段情感任务NB优于SVM、长文档相反；以NB对数计数比为特征值的SVM变体在各任务上表现稳定；超过多数已发表结果，有时为最好）、正文：p、q、r公式(2)、MNB中w=r与b=log(N+/N−)、二值化MNB更好、x̃=r̂∘f̂、插值w′=(1−β)w̄+βw与w̄定义、「除非SVM很有把握否则相信NB」、α=1、C=1、β=0.25、RT-s/Subj/IMDB等数据、IMDB上NBSVM-bi 91.22。后续被TextCNN等用作基线凭一般了解。"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "rewrite-retrieve-read",
+  "who": "Xinbei Ma, Yeyun Gong, Pengcheng He, Hai Zhao, Nan Duan · 上海交通大学 / 微软",
+  "venue": "EMNLP 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2305.14283"},
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/2023.emnlp-main.322/"}
+  ],
+  "aka": ["Rewrite-Retrieve-Read", "RRR", "query rewriting", "query rewrite", "查询改写", "查询重写", "改写-检索-阅读"],
+  "problem": "检索增强问答直接拿用户原问题去搜，但问题的写法和所需知识之间常有差距，搜回来的内容不对，阅读它的LLM又是冻结的黑盒，没法跟着调。",
+  "idea": "在“检索—阅读”前加一步改写：先把问题改写成更适合搜索引擎的查询；改写器可以是提示LLM，也可以是用阅读器答题结果做奖励、经强化学习训练的小模型。",
+  "impact": "把“查询本身也要适配”变成RAG流水线里的标准一环，查询改写、多查询扩展后来成为RAG框架的常见组件。",
+  "method": "此前改进[[rag]]的工作要么调检索器，要么调阅读器。当阅读器是ChatGPT这样只能调用接口的LLM时，后者行不通。[[hyde]]让LLM先写一篇假想答案文档再去做向量检索；本文则直接改写搜索查询。\n\n**流水线**。改写器把输入改写成一条或几条查询；用Bing搜索引擎检索，取搜索摘要或用[[bm25]]从网页中筛出的片段；冻结的阅读器（gpt-3.5-turbo或Vicuna-13B）据此作答。\n\n**可训练改写器**。用T5-large（770M）。先热身：让LLM生成伪查询，只保留能让阅读器答对的那些作为监督数据微调T5。再用[[ppo]]强化学习：阅读器答案的EM、F1以及“答案是否出现在检索结果里”组合成奖励，并加KL惩罚防止偏离初始化太远。\n\n**结果**（ChatGPT阅读器，EM）。HotpotQA上直接回答32.36，普通检索后反而降到30.47，LLM改写32.80，可训练改写34.38；AmbigNQ上分别为42.10、45.80、46.40、47.80。PopQA上LLM改写最好（46.00），可训练改写为45.72。",
+  "limits": [
+    {"text": "改写只在检索前做一次，模型看到检索结果后不能再根据新线索改写查询，多跳问题上提升有限。", "solved_by": ["search-r1"]},
+    {"text": "强化学习的奖励依赖阅读器在有标准答案的问答数据上的EM/F1，开放式任务没有现成奖励。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "rag", "type": "extends", "note": "在“先检索后阅读”的RAG流水线前加入查询改写一步，把适配对象从检索器、阅读器换成查询本身。"},
+    {"to": "hyde", "type": "rivals", "note": "HyDE用LLM写假想文档再做向量检索；本文让改写器生成面向搜索引擎的查询，并可用阅读器反馈训练。"},
+    {"to": "ppo", "type": "uses", "note": "用PPO训练小改写器，奖励来自冻结阅读器的答题表现。"},
+    {"to": "bm25", "type": "uses", "note": "从Bing返回的网页中用BM25筛选与查询相关的片段交给阅读器。"}
+  ],
+  "prereq": ["retrieval", "policy-gradient-concept", "reward-design", "kl-divergence", "language-model"],
+  "learn": "先读[[rag]]和[[hyde]] → 读原文第3节（改写器、热身与PPO奖励）和表1 → 动手：对20个HotpotQA问题分别用原问题和LLM改写后的查询去搜索，比较答案出现在前5条结果里的比例。",
+  "check": {"source": "https://arxiv.org/abs/2305.14283", "confirmed": "标题、5位作者、v1提交于2023-05-23；ACL Anthology确认EMNLP 2023；正文（arxiv.org/html/2305.14283）核对Bing检索与BM25筛选、gpt-3.5-turbo与Vicuna-13B阅读器、T5-large 770M、热身与PPO、EM/F1/命中组合奖励与KL惩罚、HotpotQA 32.36/30.47/32.80/34.38、AmbigNQ 42.10/45.80/46.40/47.80、PopQA 46.00与45.72、上交与微软单位。"}
+}

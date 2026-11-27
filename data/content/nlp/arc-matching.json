@@ -1,0 +1,36 @@
+{
+  "id": "arc-matching",
+  "who": "Baotian Hu, Zhengdong Lu, Hang Li, Qingcai Chen · 哈尔滨工业大学深圳研究生院、华为诺亚方舟实验室",
+  "venue": "NeurIPS 2014",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1503.03244"}
+  ],
+  "aka": ["ARC-I", "ARC-II", "ARC", "卷积文本匹配", "文本匹配", "Text Matching", "语义匹配", "Semantic Matching", "句子匹配", "Sentence Matching", "表示型匹配", "交互型匹配"],
+  "problem": "判断两段文字是否匹配（问题与回答、微博与回复、两句话是不是同义）以前靠人工特征或词袋相似度，抓不住句子内部的结构，也抓不住两句之间词与词的细粒度对应。",
+  "idea": "提出两种卷积网络：**ARC-I**先用卷积把两句各自压成向量再比较（表示型）；**ARC-II**先在两句的所有词对上构造交互，再在这张「交互图」上做二维卷积和池化（交互型），能在不同层次上捕捉匹配模式。",
+  "impact": "ARC-I/ARC-II把神经文本匹配分成「表示型」和「交互型」两条路线，这个分类一直沿用到后来的MatchPyramid、ESIM和BERT交叉编码器，「文本匹配」也因此成为中文NLP里一个独立的方向。",
+  "background": "语义匹配是问答、检索、复述识别和对话回复选择的共同核心。[[dssm]]用词袋式的全连接网络把查询和文档各自映射成向量，忽略词序；[[kim-cnn]]、[[dcnn]]说明卷积网络能有效表示单个句子，但如何建模两句之间的交互还没有好的方案。",
+  "method": "**ARC-I（表示型）。** 两句各自经过「卷积—最大池化」多层堆叠得到固定长度向量 `v_x`、`v_y`，拼接后送进多层感知机输出匹配分数。缺点是两句在最后才见面，句内信息压缩时已经丢失了与对方相关的细节。\n\n**ARC-II（交互型）。** 第一层就让两句交互：对句子x的每个窗口i和句子y的每个窗口j，把两个窗口的词向量拼起来做一维卷积，得到一张二维特征图\n\n`z_{i,j} = σ(W · [x_{i:i+k}; y_{j:j+k}] + b)`\n\n之后像处理图片一样在这张图上做二维的「卷积—池化」，逐层组合出更大范围的匹配模式，最后用感知机打分。这样，局部的词—词匹配和更大片段之间的对应都能被捕捉，同时保留了词序信息。\n\n训练用排序损失：让正确配对的得分比随机负例高出一个间隔 `max(0, 1 + s(x, y⁻) − s(x, y⁺))`。",
+  "results": "摘要称在多种匹配任务上的实验表明模型有效，并优于对比的其他模型。论文的任务包括句子补全、微博回复匹配和复述识别（MSRP），具体数字未核对。",
+  "legacy": "此后表示型路线发展为孪生LSTM、[[infersent]]和[[sentence-bert]]这类句向量双塔，适合大规模检索；交互型路线发展为MatchPyramid、[[decomposable-attention]]、[[esim]]，直到BERT把两句拼在一起做交叉编码。实际系统常把两者结合：双塔做召回，交互模型做精排。",
+  "limits": [
+    {"text": "卷积的感受野有限，长句之间的远距离对应关系难以捕捉。", "solved_by": ["esim"]},
+    {"text": "交互型的ARC-II必须对每一对句子单独计算，无法像ARC-I那样提前算好向量做大规模检索。", "solved_by": ["sentence-bert"]}
+  ],
+  "relations": [
+    {"to": "dssm", "type": "extends", "note": "DSSM用词袋全连接网络做表示型匹配，ARC-I用卷积保留词序，ARC-II进一步改为交互型。"},
+    {"to": "kim-cnn", "type": "extends", "note": "把卷积句子建模从单句分类扩展到两句之间的匹配。"},
+    {"to": "dcnn", "type": "rivals", "note": "同期的卷积句子模型；ARC关注的是两个句子之间的匹配结构。"},
+    {"to": "collobert-weston", "type": "uses", "note": "沿用以词向量为输入、在词窗口上做卷积的神经NLP建模方式。"}
+  ],
+  "prereq": ["conv-layer", "embedding", "mlp", "loss-function", "dot-product"],
+  "terms": [
+    {"t": "表示型匹配", "d": "先把两段文本分别编码成向量，再用余弦或网络比较两个向量；适合提前建索引做检索（双塔）。"},
+    {"t": "交互型匹配", "d": "一开始就让两段文本的词相互比较，在交互矩阵上提取匹配特征；更准但每对都要单独计算。"}
+  ],
+  "learn": "先了解[[dssm]]和[[kim-cnn]] → 读原文第3–4节两种结构 → 动手：在一个问题对相似度数据集（如LCQMC或Quora）上分别实现双塔CNN与交互矩阵+二维CNN，比较准确率和推理速度。",
+  "check": {
+    "source": "https://arxiv.org/abs/1503.03244",
+    "confirmed": "arXiv记录：标题Convolutional Neural Network Architectures for Matching Natural Language Sentences、作者Hu、Lu、Li、Chen、v1 2015-03-11；摘要：语义匹配的重要性、需建模语言对象内部结构及交互、借鉴视觉与语音的卷积策略、逐层组合与池化表示层次结构、捕捉不同层次的匹配模式、通用不需语言先验、多任务实验有效并优于对比模型。NeurIPS 2014出处、ARC-I/ARC-II名称与公式、排序损失、三个任务名称、作者单位凭一般了解。"
+  }
+}

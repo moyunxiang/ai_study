@@ -1,0 +1,30 @@
+{
+  "id": "i-resnet",
+  "who": "Jens Behrmann, Will Grathwohl, Ricky T. Q. Chen, David Duvenaud, Jörn-Henrik Jacobsen · 不来梅大学、多伦多大学、Vector研究所",
+  "venue": "ICML 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1811.00995"}
+  ],
+  "aka": ["i-ResNet", "可逆残差网络", "Invertible ResNet", "Invertible Residual Networks"],
+  "problem": "标准化流要求网络可逆、雅可比行列式好算，于是只能用耦合层（把维度一分为二）或自回归结构这类受限设计，表达力和通用性都打了折扣；而最常用的ResNet本身不可逆。",
+  "idea": "只要让残差块里那一支的Lipschitz常数小于1（训练时加一步谱归一化），`y = x + g(x)`就一定可逆，可用不动点迭代求逆；雅可比对数行列式则用幂级数展开加随机迹估计近似。",
+  "impact": "同一个标准ResNet结构既能当分类器又能当基于最大似然训练的流模型，两种任务上都有竞争力；它对行列式的有偏近似由几个月后的Residual Flows改成无偏估计。",
+  "method": "残差块`F(x) = x + g(x)`。若g的Lipschitz常数`Lip(g) < 1`，那么对任意y，映射`x ↦ y − g(x)`是压缩映射，由巴拿赫不动点定理，迭代`x_{k+1} = y − g(x_k)`收敛到唯一解，所以F可逆，而且求逆只要迭代几次。保证`Lip(g) < 1`的办法是对g中每层卷积的权重做谱归一化（[[spectral-norm]]），再乘一个小于1的系数，这在常见框架里只是一行代码。\n\n用作流模型时需要`log|det J_F(x)|`。作者利用`log det(I + J_g) = tr(log(I + J_g)) = Σ_{k≥1} (−1)^{k+1} tr(J_g^k)/k`，把幂级数截断到有限项，每一项的迹用Hutchinson随机估计（只需向量—雅可比乘积）计算，从而避免显式求行列式。\n\n实验表明，同一个i-ResNet在图像分类上与标准ResNet相当，在密度估计上与当时的流模型相当，作者称此前还没有单一架构同时做到这两点。",
+  "limits": [
+    {"text": "截断幂级数使对数似然估计有偏，训练目标不精确，截断项数需要权衡。", "solved_by": ["residual-flows"]},
+    {"text": "Lipschitz约束限制了每块的表达力，需要堆很多块；求逆要迭代，生成比耦合层流慢。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "resnet", "type": "extends", "note": "证明普通ResNet在残差支路Lipschitz小于1时即可逆，可直接用作生成模型。"},
+    {"to": "realnvp", "type": "rivals", "note": "RealNVP靠维度切分的耦合层保证可逆和易算行列式；i-ResNet不切分维度，用Lipschitz约束和随机迹估计实现。"},
+    {"to": "spectral-norm", "type": "uses", "note": "用谱归一化把残差支路的Lipschitz常数压到1以下。"},
+    {"to": "ffjord", "type": "uses", "note": "与FFJORD一样用Hutchinson随机迹估计处理雅可比相关的项。"}
+  ],
+  "prereq": ["normalizing-flow", "residual-connection", "jacobian-hessian", "mle", "monte-carlo"],
+  "terms": [
+    {"t": "Lipschitz常数", "d": "函数输出变化与输入变化之比的上界；小于1意味着函数会把任意两点的距离缩小。"},
+    {"t": "Hutchinson迹估计", "d": "用随机向量v计算`vᵀAv`的期望来估计矩阵A的迹，只需矩阵—向量乘积，不必写出整个矩阵。"}
+  ],
+  "learn": "先补标准化流的换元公式和RealNVP → 读本文第2节可逆性证明与第3节对数行列式的幂级数估计 → 在二维数据上实现一个小i-ResNet并用不动点迭代求逆。",
+  "check": {"source": "https://arxiv.org/abs/1811.00995", "confirmed": "标题、五位作者、v1日期2018-11-02、摘要中标准ResNet可变为可逆、同一模型可用于分类、密度估计与生成、只需训练时加一个简单的归一化步骤、引入残差块雅可比对数行列式的可处理近似、分类与流模型上都有竞争力且此前单一架构未能做到；机构、ICML 2019、谱归一化、不动点迭代、幂级数与Hutchinson估计的具体形式来自一般了解"}
+}

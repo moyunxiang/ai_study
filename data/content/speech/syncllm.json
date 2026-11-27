@@ -1,0 +1,33 @@
+{
+  "id": "syncllm",
+  "who": "Bandhav Veluri, Benjamin N Peloquin, Bokai Yu, Hongyu Gong, Shyamnath Gollakota · 华盛顿大学、Meta",
+  "venue": "EMNLP 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2409.15594"},
+    {"label": "项目页", "url": "https://syncllm.cs.washington.edu/"}
+  ],
+  "problem": "多数语音对话模型是半双工的：你说完它再说，靠检测静音或打断来轮换。人类对话却是全双工的，会插话、重叠、随口「嗯嗯」附和。难点在于预训练LLM没有「时间」的概念。",
+  "idea": "Synchronous LLM：在Llama3-8B里加入时间信息，让模型按真实时钟的节拍同步运行，每个时间片同时预测双方的语音单元；用由文本对话合成的21.2万小时语音对话数据训练，再用2千小时真实对话微调。",
+  "impact": "给出一种不改LLM主干结构、让它「跟着时钟走」的全双工语音对话做法；还演示了两个不同数据训练的模型在最多240毫秒网络延迟下互相对话。",
+  "method": "[[dgslm]]用双通道模型同时生成对话双方的语音单元，能做出自然的重叠和附和，但模型从零训练，说的内容常常没有意义。[[moshi]]也走全双工路线，用多流结构同时建模用户和自己的语音。\n\nSyncLLM的思路是**把时间写进序列**：把对话按固定时长切成时间块，每个块里交替放两位说话人的[[hubert]]类离散语音单元，并插入表示时间推进的同步标记。这样LLM每生成一个块，就对应真实世界里过去了相同的时长；推理时模型预测自己这一侧的单元，同时预测对方接下来可能说什么，再用对方实际到达的语音替换预测，从而跟上真实时钟，也能容忍网络延迟。\n\n**数据**：真实的双人语音对话数据很少。作者先用文本对话数据加TTS合成了21.2万小时的语音对话，让模型学会对话内容，再用约2千小时的真实对话（如Fisher电话语料）学习真实的轮换和重叠。主干是[[llama-3]]的8B模型。\n\n摘要报告：在对话内容的有意义程度上超过当时最好的方法，同时保持自然度。",
+  "limits": [
+    {"text": "依赖合成对话学习内容，合成语音的轮换和韵律与真人有差距，真实全双工行为主要来自较小的真实数据。", "solved_by": []},
+    {"text": "时间块的长度固定，响应粒度和延迟受块长限制。", "solved_by": ["personaplex"]}
+  ],
+  "relations": [
+    {"to": "dgslm", "type": "solves", "note": "dGSLM从零训练双通道模型，对话内容意义弱；SyncLLM以文本LLM为主干并用合成对话学习内容。"},
+    {"to": "llama-3", "type": "uses", "note": "以Llama3-8B为主干并加入时间同步机制。"},
+    {"to": "moshi", "type": "rivals", "note": "同期全双工语音对话模型；Moshi用多流并行建模，SyncLLM用带时间标记的交错块序列。"},
+    {"to": "hubert", "type": "uses", "note": "用自监督语音特征聚类得到的离散单元表示语音。"}
+  ],
+  "prereq": ["language-model", "autoregressive", "tokenization", "throughput-latency"],
+  "terms": [
+    {"t": "全双工", "d": "双方可以同时说和听，像打电话一样能插话、重叠；半双工则必须轮流说。"},
+    {"t": "附和语", "d": "backchannel，听的一方在对方说话时发出的「嗯」「对」之类短回应。"}
+  ],
+  "aka": ["SyncLLM", "Synchronous LLM", "同步大语言模型", "全双工对话LLM"],
+  "check": {
+    "source": "https://arxiv.org/abs/2409.15594",
+    "confirmed": "arXiv官方记录：标题Beyond Turn-Based Interfaces: Synchronous LLMs as Full-Duplex Dialogue Agents、Veluri等5位作者、v1提交2024-09-23；摘要中半双工与全双工的区别、LLM缺少时间概念、把时间信息集成进Llama3-8b使其与真实时钟同步、21.2万小时由文本对话合成的语音对话数据与2千小时真实数据、对话有意义程度超过SOTA并保持自然度、两个不同数据训练的代理互相对话、最高240毫秒延迟。时间块与同步标记的具体设计、预测对方语音、Fisher语料、机构与EMNLP 2024为一般了解。"
+  }
+}

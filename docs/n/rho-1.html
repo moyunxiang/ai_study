@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Rho-1选择性语言建模（2024） · AI脉络</title>
+<meta name="description" content="预训练对语料里每个token一视同仁地算下一词预测损失，但很多token是噪声或早已学会的，白白消耗算力。 先用高质量数据训一个参考模型，给每个token打分，只对“参考模型认为该学、当前模型还没学会”的token计算损失。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/rho-1.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Rho-1选择性语言建模（2024）">
+<meta property="og:description" content="预训练对语料里每个token一视同仁地算下一词预测损失，但很多token是噪声或早已学会的，白白消耗算力。 先用高质量数据训一个参考模型，给每个token打分，只对“参考模型认为该学、当前模型还没学会”的token计算损失。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/rho-1.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/rho-1">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 规模定律与数据</div>
+<h1>Rho-1选择性语言建模</h1>
+<div class="full">Rho-1: Not All Tokens Are What You Need</div>
+<div class="meta"><span>2024.04</span><span>论文</span><span>延伸</span><span>NeurIPS 2024 Oral</span><span>Zhenghao Lin, Zhibin Gou, Yeyun Gong, Xiao Liu, Yelong Shen, Ruochen Xu, Chen Lin, Yujiu Yang 等 · 厦门大学、清华大学、微软</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2404.07965" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/rho-1">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>预训练对语料里每个token一视同仁地算下一词预测损失，但很多token是噪声或早已学会的，白白消耗算力。</p></div><div><h4>方法</h4><p>先用高质量数据训一个参考模型，给每个token打分，只对“参考模型认为该学、当前模型还没学会”的token计算损失。</p></div><div><h4>影响</h4><p>在数学语料上续训，用约3%的预训练token就追平了DeepSeekMath；把数据筛选从文档级细化到token级。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>此前的数据工作（如<a class="ln" href="../n/textbooks.html">教科书级数据phi-1</a>、<a class="ln" href="../n/doremi.html">DoReMi数据配比优化</a>）都在文档或数据源层面挑选，选中的文档里每个token仍然全部参与训练。作者分析训练动态发现，token的损失曲线分成几类：有的一直很低（已学会），有的一直很高且波动（多为噪声），只有一部分是从高到低、真正在被学习的。</p><h2>方法</h2><p>选择性语言建模（SLM）分三步：</p><p>1. 用一小份高质量数据训练<b>参考模型</b>（RM），它代表“想要的分布”。 2. 对预训练语料里的每个token计算<b>超额损失</b> <code>ΔL(x_i) = L_θ(x_i) − L_RM(x_i)</code>，即当前模型比参考模型差多少。 3. 每个批次只保留超额损失最高的前k%个token参与反向传播，其余token的损失被屏蔽：</p><p class="formula"><code>L_SLM = −(1/(N·k%)) Σ_i I_{k%}(x_i) · log P_θ(x_i | x_{&lt;i})</code></p><p>直觉是：参考模型也学不会的token多半是噪声，当前模型早已学会的token再学没有价值，差距大的才最值得学。</p><h2>结果</h2><p>摘要报告：在150亿token的<a class="ln" href="../n/openwebmath.html">OpenWebMath数学网页</a>上续训，Rho-1在9个数学任务上的少样本准确率最多提升30个百分点；微调后Rho-1-1B和7B在MATH上分别达到40.6%和51.8%，与DeepSeekMath相当而只用了其3%的预训练token；在800亿通用token上续训，15个任务平均提升6.8%。</p><h2>后来的发展</h2><p>它让“不是所有token都值得学”成为常被引用的观点，入选NeurIPS 2024口头报告，后续不少token级加权、筛选的预训练与蒸馏方法以它为基线。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要先训练一个参考模型，并且对每个token额外做一次前向打分，增加了数据处理成本。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>效果依赖参考数据的选择，参考模型的偏好会被直接放大到大规模预训练中。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/textbooks.html">教科书级数据phi-1</a><span class="yr">2023.06 · LLM</span><div class=nt>把“数据质量比数量重要”从文档级筛选细化到token级。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/doremi.html">DoReMi数据配比优化</a><span class="yr">2023.05 · LLM</span><div class=nt>DoReMi也用参考模型的超额损失，但用于调整数据源配比；Rho-1用于逐token取舍。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/minillm.html">MiniLLM反向KL蒸馏</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>同样借助参考或教师模型改写训练目标，但Rho-1不做蒸馏，只决定哪些token参与损失。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/openwebmath.html">OpenWebMath数学网页</a><span class="yr">2023.10 · 数据·评测</span><div class=nt>在OpenWebMath数学网页语料上续训验证。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/cross-entropy.html">交叉熵</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a></p>
+<h2>本篇术语</h2><ul><li><b>超额损失</b>　当前模型在一个token上的损失减去参考模型在同一token上的损失，越大说明越“该学而没学会”。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/doremi.html">DoReMi数据配比优化</a>理解参考模型的用法；读Rho-1第2节token损失的四类动态；动手：在小语料上用一个参考模型给token打分，只训练前60%，对比全量训练的验证损失。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2404.07965" rel="noopener">https://arxiv.org/abs/2404.07965</a>（标题、作者、arXiv首次提交2024-04-11；摘要中SLM、参考模型打分、15B OpenWebMath续训9任务最多+30%、1B/7B在MATH上40.6%/51.8%、3%预训练token、80B通用token平均+6.8%；NeurIPS 2024 oral见paper copilot列表。损失公式写法与机构为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Rho-1%E9%80%89%E6%8B%A9%E6%80%A7%E8%AF%AD%E8%A8%80%E5%BB%BA%E6%A8%A1%EF%BC%88rho-1%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Arho-1%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/rho-1.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="infini-attention.html"><small>本分支上一个 · 2024.04</small><b>Infini-attention</b></a><a class="r" href="dno.html"><small>本分支下一个 · 2024.04</small><b>DNO直接纳什优化</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

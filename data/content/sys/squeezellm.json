@@ -1,0 +1,26 @@
+{
+ "id": "squeezellm",
+ "who": "Sehoon Kim, Coleman Hooper, Amir Gholami, Zhen Dong, Xiuyu Li, Sheng Shen, Michael W. Mahoney, Kurt Keutzer · 加州大学伯克利分校",
+ "venue": "ICML 2024",
+ "aka": ["SqueezeLLM", "非均匀量化", "non-uniform quantization", "稠密加稀疏分解", "Dense-and-Sparse"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2306.07629"},
+  {"label": "GitHub", "url": "https://github.com/SqueezeAILab/SqueezeLLM"}
+ ],
+ "problem": "单请求生成时LLM推理的瓶颈是从显存读权重，而不是计算；把权重压到3比特能大幅提速，但当时的均匀量化在这么低的比特下困惑度明显变差。",
+ "idea": "两点：按二阶信息（每个权重对损失的敏感度）做非均匀量化，让量化格点集中在敏感权重附近；再把少量离群和最敏感的权重拆出来用稀疏格式按全精度保存，其余稠密部分安心压到低比特。",
+ "impact": "“稠密加稀疏”的离群值处理与基于敏感度的非均匀码本，成为后续低比特权重量化与KV缓存量化（如同组的KVQuant）的常用思路。",
+ "method": "论文先用屋顶线分析说明：批大小为1的生成，每出一个词都要把全部权重从显存读一遍，速度几乎只取决于权重占多少字节，所以减少比特数就能直接提速。[[gptq]]、[[awq]]等方法用均匀量化（格点等间隔），在3比特下与FP16差距仍大。\n\nSqueezeLLM的第一招是**基于敏感度的非均匀量化**：对每个输出通道，用Fisher信息近似每个权重对最终损失的二阶敏感度（思路源自[[obd]]），再做加权k-means聚类得到这一通道的码本，敏感权重附近的格点更密；推理时用查表把3比特索引还原成数值。第二招是**稠密加稀疏分解**：像[[llm-int8]]发现的那样，少数权重数值特别大，会拉宽量化范围；把这些离群值和最敏感的一小部分权重（约0.5%以内）抽出来以稀疏矩阵按FP16存储，剩下的稠密矩阵范围变窄、更好量化。\n\n摘要报告：在LLaMA上，同等显存下3比特量化与FP16的困惑度差距比当时最好的方法缩小最多2.1倍；在A6000上相对基线最多加速2.3倍。",
+ "limits": [
+  {"text": "查表式非均匀量化只对权重有效，计算仍以FP16进行，在大批次、计算受限的服务场景下收益有限。", "solved_by": ["qserve"]}
+ ],
+ "relations": [
+  {"to": "gptq", "type": "rivals", "note": "GPTQ用均匀量化加二阶误差补偿，SqueezeLLM用敏感度加权的非均匀码本，3比特下困惑度差距更小。"},
+  {"to": "llm-int8", "type": "extends", "note": "延续把离群值单独拆出用高精度处理的思路，改为对权重做稠密加稀疏分解。"},
+  {"to": "obd", "type": "uses", "note": "用二阶（Fisher）信息估计每个权重的敏感度，思想源自OBD。"},
+  {"to": "awq", "type": "rivals", "note": "同期的低比特权重量化方法，AWQ按激活缩放保护重要通道，SqueezeLLM用非均匀码本与稀疏离群值。"}
+ ],
+ "prereq": ["quantization-concept", "memory-bandwidth", "jacobian-hessian", "clustering"],
+ "terms": [{"t": "非均匀量化", "d": "量化格点不等间隔，而是从数据中学出一张码本，把格点放在权重密集或重要的位置。"}],
+ "check": {"source": "https://arxiv.org/abs/2306.07629", "confirmed": "标题、八位作者、v1日期2023-06-13；摘要：单批生成推理瓶颈是显存带宽而非计算、基于二阶信息的敏感度非均匀量化、稠密加稀疏分解把离群与敏感权重以稀疏格式存储、LLaMA上3比特困惑度差距最多缩小2.1倍、A6000上最多加速2.3倍。加权k-means、Fisher近似、0.5%比例、ICML 2024为一般了解。"}
+}

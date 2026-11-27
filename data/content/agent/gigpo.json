@@ -1,0 +1,75 @@
+{
+  "id": "gigpo",
+  "who": "Lang Feng, Zhenghai Xue, Tingcong Liu, Bo An · 南洋理工大学",
+  "venue": "NeurIPS 2025",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2505.10978"
+    },
+    {
+      "label": "verl-agent",
+      "url": "https://github.com/langfengQ/verl-agent"
+    }
+  ],
+  "aka": [
+    "GiGPO",
+    "Group-in-Group Policy Optimization",
+    "组中组策略优化",
+    "verl-agent",
+    "anchor state grouping",
+    "锚点状态分组"
+  ],
+  "problem": "GRPO这类组相对方法只给整条回答一个优势值；智能体任务要走几十步、奖励到最后才出现，无法分辨哪一步做得好、哪一步做错了。",
+  "idea": "在整条轨迹的组相对优势之外，再找出不同轨迹里重复出现的相同环境状态，把从同一状态出发的动作归成一组，算出步骤级的相对优势——不需要评论家，也不需要额外采样。",
+  "impact": "给“无评论家的组相对RL怎样做多轮智能体的逐步信用分配”提供了一个简单可用的答案，配套的verl-agent成为常用的智能体RL代码库。",
+  "method": "[[grpo]]对同一道题采样一组回答，用组内相对奖励当优势，省掉了[[ppo]]的评论家。搬到多轮智能体任务上，一条轨迹包含很多步动作，却只有一个最终奖励，所有步骤共享同一个优势，信用分配很粗。\n\nGiGPO用两层分组估计优势：\n- **轨迹级（宏观）**：和GRPO一样，同一任务的若干条完整轨迹之间比较总回报；\n- **步骤级（微观）**：关键观察是，同一任务的多条轨迹常常会经过**完全相同的环境状态**（比如同一个网页、同一间屋子）。GiGPO事后把这些重复状态找出来当“锚点”，把从同一锚点出发采取的不同动作归为一组，用它们各自之后得到的回报相对比较，得到每一步的优势。\n两者加权合在一起更新策略。分组只是对已有rollout的重新整理，几乎不增加时间和显存。\n\n论文用Qwen2.5-1.5B/3B/7B-Instruct训练，摘要报告在[[alfworld]]和[[webshop]]上比GRPO分别高出12%以上和9%以上；在搜索增强问答这类工具推理任务上3B和7B模型分别达到42.1%和47.2%。",
+  "limits": [
+    {
+      "text": "步骤级分组依赖不同轨迹恰好经过相同状态；在状态空间很大、几乎不会重复的开放环境（如真实网页、长篇对话）里，能形成的步骤组会很少。",
+      "solved_by": []
+    },
+    {
+      "text": "仍然只用结果奖励，不评价思考内容本身，无法直接解决模型写出与动作无关的思考的问题。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "grpo",
+      "type": "extends",
+      "note": "保留组相对、无评论家的结构，在轨迹级分组之外加了一层步骤级分组。"
+    },
+    {
+      "to": "ragen",
+      "type": "solves",
+      "note": "RAGEN指出多轮RL缺少细粒度奖励就难以学好，GiGPO用锚点状态分组给出无需额外模型的步骤级信号。"
+    },
+    {
+      "to": "archer",
+      "type": "rivals",
+      "note": "ArCHer靠训练轮次级评论家做跨轮信用分配，GiGPO不需要评论家，只在已有轨迹里比较。"
+    },
+    {
+      "to": "alfworld",
+      "type": "uses",
+      "note": "主要评测环境之一，多步文字家务任务。"
+    },
+    {
+      "to": "verl",
+      "type": "uses",
+      "note": "配套代码verl-agent基于verl训练框架扩展而来。"
+    }
+  ],
+  "prereq": [
+    "policy-gradient-concept",
+    "credit-assignment",
+    "mdp",
+    "reward-return"
+  ],
+  "learn": "先读[[grpo]]和[[ragen]] → 读原文第4节两级优势的定义与锚点分组的伪代码 → 动手：在一个小网格迷宫里采样8条轨迹，找出重复经过的格子，按GiGPO的方法算步骤级优势并与整条轨迹的优势对比。",
+  "check": {
+    "source": "https://arxiv.org/abs/2505.10978",
+    "confirmed": "标题、作者、v1提交于2025-05-16；摘要中两级优势结构、锚点状态分组、无评论家与低显存、ALFWorld超过GRPO 12%以上与WebShop 9%以上、QA任务3B为42.1%与7B为47.2%、Qwen2.5-1.5B/3B/7B-Instruct；正文（arxiv.org/html/2505.10978）核对开源代码verl-agent。机构、NeurIPS 2025、verl-agent基于verl凭一般了解。"
+  }
+}

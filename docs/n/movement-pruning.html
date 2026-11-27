@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Movement Pruning运动剪枝（2020） · AI脉络</title>
+<meta name="description" content="按权重绝对值大小剪枝在从头训练时很有效，但在“预训练+微调”的迁移学习里效果差：微调时权重变化很小，剪掉的其实是预训练阶段就小的权重，与下游任务无关。 不看权重现在有多大，而看它在微调过程中往哪个方向移动：朝远离零方向移动的保留，朝零移动的剪掉；用一阶梯度信息在微调时学出每个权重的重要性分数。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/movement-pruning.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Movement Pruning运动剪枝（2020）">
+<meta property="og:description" content="按权重绝对值大小剪枝在从头训练时很有效，但在“预训练+微调”的迁移学习里效果差：微调时权重变化很小，剪掉的其实是预训练阶段就小的权重，与下游任务无关。 不看权重现在有多大，而看它在微调过程中往哪个方向移动：朝远离零方向移动的保留，朝零移动的剪掉；用一阶梯度信息在微调时学出每个权重的重要性分数。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/movement-pruning.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/movement-pruning">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 模型压缩与蒸馏</div>
+<h1>Movement Pruning运动剪枝</h1>
+<div class="full">Movement Pruning: Adaptive Sparsity by Fine-Tuning</div>
+<div class="meta"><span>2020.05</span><span>论文</span><span>延伸</span><span>NeurIPS 2020</span><span>Victor Sanh, Thomas Wolf, Alexander M. Rush · Hugging Face, 康奈尔大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2005.07683" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/movement-pruning">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>按权重绝对值大小剪枝在从头训练时很有效，但在“预训练+微调”的迁移学习里效果差：微调时权重变化很小，剪掉的其实是预训练阶段就小的权重，与下游任务无关。</p></div><div><h4>方法</h4><p>不看权重现在有多大，而看它在微调过程中往哪个方向移动：朝远离零方向移动的保留，朝零移动的剪掉；用一阶梯度信息在微调时学出每个权重的重要性分数。</p></div><div><h4>影响</h4><p>说明了迁移学习场景下剪枝准则需要改变，成为BERT类模型稀疏化的标准基线之一，并进入Hugging Face的剪枝实践；高稀疏度时配合蒸馏只保留3%参数仍损失很小。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/deep-compression.html">剪枝与量化压缩</a>式的幅值剪枝依据是“绝对值小的权重不重要”，这在从头训练时成立。但<a class="ln" href="../n/bert.html">BERT</a>这样的预训练模型在下游微调时，权重只移动很小一段，幅值主要由预训练决定，因此幅值剪枝会保留大量对当前任务没用的权重。</p><p>运动剪枝给每个权重一个重要性分数S，在微调中与权重一起学习。前向时只保留分数最高的若干权重（或分数超过阈值的权重）；反向时用直通估计（见<a class="ln" href="../n/ste.html">直通估计器STE</a>）让梯度穿过这个离散的选择。推导可得分数的更新近似为 <code>S ← S − η·Σₜ (∂L/∂W)·W</code>：如果权重W为正而梯度推动它继续增大（或W为负继续减小），也就是在远离零的方向“运动”，分数就增加。这样保留的是在当前任务上正在变得更重要的权重，而不是原本就大的权重。论文还给出“软”版本，用正则项控制整体稀疏度，并与零阶（幅值）和其他一阶方法做了数学上的对比。</p><p>摘要报告：剪枝大型预训练语言模型时，高稀疏度下明显优于幅值剪枝；与<a class="ln" href="../n/distillation.html">知识蒸馏</a>结合，只保留3%的参数也只有很小的精度损失。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>得到的是非结构化稀疏，在普通GPU上难以兑现实际加速，需要专门的稀疏内核或改成结构化剪枝。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:72" href="../n/sparse-tensor-core.html">2:4结构化稀疏Tensor Core</a> <a class="chip hue" style="--h:192" href="../n/sheared-llama.html">Sheared-LLaMA结构化剪枝</a></div></li><li>需要在微调过程中一起学习分数，对上百亿参数的LLM成本太高，后来转向一次性的训练后剪枝。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/sparsegpt.html">SparseGPT一次性剪枝</a> <a class="chip hue" style="--h:192" href="../n/wanda.html">Wanda权重乘激活剪枝</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/bert.html">BERT</a><span class="yr">2018.10 · LLM</span><div class=nt>主要在BERT类预训练模型的下游微调中做剪枝实验。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/distillation.html">知识蒸馏</a><span class="yr">2015.03 · 系统·效率</span><div class=nt>与知识蒸馏结合，在只保留3%参数时仍接近原模型精度。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/ste.html">直通估计器STE</a><span class="yr">2013.08 · 基础</span><div class=nt>用直通估计让梯度穿过取Top-k的离散掩码，从而学习重要性分数。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/deep-compression.html">剪枝与量化压缩</a><span class="yr">2015.10 · 系统·效率</span><div class=nt>幅值剪枝在预训练+微调场景下失效，运动剪枝改用微调中权重的移动方向作为准则。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:72" href="../n/sparse-tensor-core.html">2:4结构化稀疏Tensor Core</a><span class="yr">2021.04 · 硬件</span><div class=nt>得到的是非结构化稀疏，在普通GPU上难以兑现实际加速，需要专门的稀疏内核或改成结构化剪枝。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/sparsegpt.html">SparseGPT一次性剪枝</a><span class="yr">2023.01 · 系统·效率</span><div class=nt>需要在微调过程中一起学习分数，对上百亿参数的LLM成本太高，后来转向一次性的训练后剪枝。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/wanda.html">Wanda权重乘激活剪枝</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>需要在微调过程中一起学习分数，对上百亿参数的LLM成本太高，后来转向一次性的训练后剪枝。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/sheared-llama.html">Sheared-LLaMA结构化剪枝</a><span class="yr">2023.10 · 系统·效率</span><div class=nt>得到的是非结构化稀疏，在普通GPU上难以兑现实际加速，需要专门的稀疏内核或改成结构化剪枝。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/transfer-learning.html">迁移学习</a> <a class="chip c" href="../c/derivative-gradient.html">导数、偏导与梯度</a> <a class="chip c" href="../c/knowledge-distillation.html">知识蒸馏</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2005.07683" rel="noopener">https://arxiv.org/abs/2005.07683</a>（标题、三位作者、v1日期2020-05-15；摘要：幅值剪枝在纯监督学习中广泛使用但在迁移学习场景效果较差、运动剪枝是简单确定性的一阶权重剪枝方法、更适应预训练模型微调、给出数学基础并与零阶和一阶方法比较、高稀疏度下显著提升、结合蒸馏只保留3%参数精度损失很小。分数更新公式、直通估计、软运动剪枝、NeurIPS 2020、机构为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Movement%20Pruning%E8%BF%90%E5%8A%A8%E5%89%AA%E6%9E%9D%EF%BC%88movement-pruning%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amovement-pruning%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/movement-pruning.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mindspore.html"><small>本分支上一个 · 2020.03</small><b>华为MindSpore</b></a><a class="r" href="ansor.html"><small>本分支下一个 · 2020.06</small><b>Ansor自动生成张量程序</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

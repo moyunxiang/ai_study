@@ -1,0 +1,28 @@
+{
+  "id": "lio-sam",
+  "who": "Tixiao Shan, Brendan Englot, Drew Meyers, Wei Wang, Carlo Ratti, Daniela Rus · MIT、史蒂文斯理工学院",
+  "venue": "IROS 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2007.00258"},
+    {"label": "代码", "url": "https://github.com/TixiaoShan/LIO-SAM"}
+  ],
+  "aka": ["LIO-SAM", "LIOSAM", "LIO SAM", "激光惯性里程计", "Lidar Inertial Odometry", "激光雷达IMU紧耦合", "因子图SLAM"],
+  "problem": "纯激光雷达里程计（如LOAM）在快速运动时点云会畸变、容易跟丢；把IMU、GPS、回环等多种测量融合进同一个优化框架又不够实时。",
+  "idea": "把激光-惯性里程计写成因子图优化：IMU预积分、激光里程计、GPS和回环都作为因子加入；只在局部的关键帧滑窗里做扫描匹配以保证实时。",
+  "impact": "开源后成为激光雷达+IMU建图的常用基线和工程起点，与滤波路线的FAST-LIO一起，是激光SLAM里被最多比较的两类方法之一。",
+  "method": "[[loam]]只用激光雷达做里程计和建图，车或机器人转得快时，一帧扫描期间自身在动，点云会扭曲；单独用IMU又会快速漂移。LIO-SAM把两者**紧耦合**：IMU在两帧之间的测量先做预积分，用估出的运动给点云去畸变，并作为激光里程计优化的初值；激光里程计的结果反过来估计IMU的零偏。\n\n所有约束放在一个**因子图**里——IMU预积分因子、激光里程计因子、GPS因子、回环因子——用增量平滑方法（iSAM2）在线优化，这是[[slam-probabilistic]]以来“把定位建图写成概率推断”的思路的一种高效实现。为了实时，它不把新扫描和整张全局地图匹配，而是只和最近固定数量的“子关键帧”拼成的局部地图匹配，并有选择地插入关键帧、边缘化旧的扫描。论文在三个平台、多种尺度和环境的数据上做了评测。",
+  "limits": [
+    {"text": "依赖特征提取（边缘点、平面点）和较准的IMU-激光外参标定，在退化场景（长走廊、空旷地）中仍可能失效。", "solved_by": ["fast-lio"]}
+  ],
+  "relations": [
+    {"to": "loam", "type": "extends", "note": "沿用LOAM的边缘/平面特征激光里程计，并加入IMU紧耦合与因子图优化。"},
+    {"to": "vins-mono", "type": "extends", "note": "借鉴视觉-惯性紧耦合与IMU预积分的思路，把视觉换成激光雷达。"},
+    {"to": "slam-probabilistic", "type": "uses", "note": "把定位与建图写成概率图上的最大后验估计，用因子图求解。"}
+  ],
+  "prereq": ["kinematics-dof", "graphical-model", "map-bayesian", "3d-representation"],
+  "terms": [
+    {"t": "IMU预积分", "d": "把两帧之间成百上千个IMU读数提前积分成一个相对位姿约束，优化时不必反复重新积分。"},
+    {"t": "因子图", "d": "把待估计的位姿当节点、每个测量当连接节点的“因子”，整体求使所有测量最吻合的位姿。"}
+  ],
+  "check": {"source": "https://arxiv.org/abs/2007.00258", "confirmed": "标题、6位作者、arXiv v1 2020-07-01；摘要中因子图、IMU预积分去畸变与初值、激光里程计估IMU零偏、局部子关键帧滑窗匹配、三个平台的数据。iSAM2求解器、机构、IROS 2020与“最多比较”判断凭一般了解。"}
+}

@@ -1,0 +1,9 @@
+{
+  "key": "repetition-penalty",
+  "short": "在解码时压低已经出现过的token的分数，防止模型车轱辘话来回说。常见的有重复惩罚（按比例缩放）、频率惩罚和存在惩罚（按出现次数减分），以及禁止重复n元组。",
+  "body": "语言模型解码时很容易陷入重复：同一句话、同一个短语一遍遍出现（见[[c:text-degeneration]]）。在不改模型的前提下，最直接的补救是在每一步采样之前修改logits（见[[c:softmax]]），让已经说过的内容不那么容易再被选中。这是一类“logits处理器”，与温度、top-p一起作用（见[[c:decoding-sampling]]）。\n\n**重复惩罚**（repetition penalty）。由条件生成模型CTRL的论文（2019）提出：对已经出现过的token，把它的logit除以一个θ > 1（论文建议约1.2）。直接相除只对正的logit有效（负数除以θ反而变大），所以Hugging Face的实现改成：\n\n- logit为正时除以θ，\n- logit为负时乘以θ，\n\n两种情况都让该token的logit变小。参数`repetition_penalty`就是这个θ，1.0表示不惩罚。\n\n**频率惩罚与存在惩罚**。OpenAI等API采用的加法形式。设token j到目前为止出现了c_j次：\n\n`logit_j ← logit_j − c_j · α_frequency − 1[c_j > 0] · α_presence`\n\n- **频率惩罚**随出现次数线性增加，越常说的词越被压，主要减少逐字重复。\n- **存在惩罚**只看出现过与否，出现一次就扣一个固定值，作用是鼓励引入新话题、新词汇。\n\n**禁止重复n元组**。`no_repeat_ngram_size = n`：如果当前前缀接上某个token会产生一个此前出现过的n元组，就把它的概率直接设为0。摘要和翻译的束搜索里常用n = 3，防止整句重复。代价是合理的重复也被禁止（比如文章里两次提到“北京大学”）。\n\n**训练上的解决**。解码时的惩罚只是补丁。也有工作从训练目标入手，直接惩罚模型给重复token的概率（unlikelihood training），或者用对比式解码在“高概率”和“与上文不相似”之间取平衡。指令微调和RLHF之后的模型（见[[c:rlhf-concept]]）重复问题本身轻了很多，惩罚参数一般设得很小或不用。",
+  "example": "某一步的logits：“好” 3.0、“很” 2.0、“的” −0.5，其中“好”和“的”前文出现过。\n\n- 重复惩罚θ = 1.2：“好”3.0/1.2 = 2.5；“的”−0.5×1.2 = −0.6；“很”不变。\n- 频率惩罚0.5、存在惩罚0.3，“好”出现过3次、“的”出现过1次：“好”3.0 − 3×0.5 − 0.3 = 1.2；“的”−0.5 − 0.5 − 0.3 = −1.3；“很”2.0。这时“很”反超“好”成为最可能的token。\n- no_repeat_ngram_size = 2：前文出现过“非常 好”，当前最后一个词是“非常”，则“好”的概率被直接置0。",
+  "pitfalls": "- 惩罚会作用到所有出现过的token上，包括标点、代码里的变量名、必须重复的专有名词；写代码或做结构化输出时惩罚过大会生成错误内容。\n- 不同框架的同名参数含义和取值范围不同：有的乘、有的减，有的只看生成部分、有的连提示也算，迁移设置时要看文档。",
+  "aka": ["repetition penalty", "重复惩罚", "repetition_penalty", "frequency penalty", "频率惩罚", "frequency_penalty", "presence penalty", "存在惩罚", "presence_penalty", "no_repeat_ngram_size", "n-gram阻断", "n-gram blocking", "logits processor", "logits处理器", "防重复"],
+  "needs": ["decoding-sampling", "softmax"]
+}

@@ -1,0 +1,32 @@
+{
+  "id": "safevla",
+  "who": "Borong Zhang, Yuhao Zhang, Jiaming Ji, Yingshan Lei, Yishuai Cai, Josef Dai, Yuanpei Chen, Yaodong Yang · 北京大学人工智能研究院",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2503.03480"},
+    {"label": "项目主页", "url": "https://pku-safevla.github.io"}
+  ],
+  "aka": ["Safe VLA", "Safe-VLA", "ISA", "Integrated Safety Approach", "Safety-CHORES", "VLA安全对齐", "安全VLA", "约束强化学习VLA"],
+  "problem": "VLA只被训练去完成任务，部署时会撞墙、碰倒无关物体、乱动危险物品；以往做法要么不管安全，要么把安全揉进奖励里，无法明确保证约束。",
+  "idea": "把VLA安全对齐写成约束马尔可夫决策过程：先建模安全要求、在大量场景里诱发不安全行为，再用拉格朗日式min-max安全RL训练，最后做针对性评测。",
+  "impact": "在仿真移动操作基准上，安全违规的累积代价比此前最好方法平均降低83.58%，任务成功率还提高3.85%，把LLM安全对齐里的约束RL思路带到了VLA。",
+  "method": "**卡在哪**：VLA用[[c:imitation-learning]]或普通RL训练，目标只有“完成任务”。作者在大规模多样场景里评测现有模型，看到它们会推倒、损坏或误用无关物体，反复撞击固定结构。若把安全写成奖励里的扣分项，扣多少要手调，而且只能在平均意义上折中，无法给出“违规不超过某个上限”的保证（见[[c:reward-design]]）。\n\n**做法**：论文称为集成安全方法ISA，分四步：建模安全要求、诱发不安全行为、约束策略、评测保证。约束用约束马尔可夫决策过程表示：除了奖励r，还定义代价c——碰倒、移动与任务无关的物体记0/1/2分，撞到会损伤机器人本体的物体记1分。目标是 `max_π E[Σr]  s.t.  E[Σc] ≤ d`，用拉格朗日乘子改写成 `min_λ≥0 max_π  E[Σr] − λ(E[Σc] − d)`（见[[c:lagrange-duality]]）：违规多了λ自动变大，策略就更重视安全。策略和λ交替更新，代理损失用[[ppo]]式截断（ε=0.1），整体沿用[[safe-rlhf]]在语言模型上的做法。基座是在AI2-THOR里训练的导航操作模型SPOC，场景来自ProcTHOR房屋和[[objaverse]]物体。\n\n**结果**：作者构建了Safety-CHORES基准（物体导航、拾取、取物三类任务）。与此前最好的FLaRe相比，三类任务的成功率都略高（如Safety-Fetch 0.637比0.605），机器人碰撞代价从41.4降到7.9，物体代价从1.96降到0.15。",
+  "limits": [
+    {"text": "论文v1的全部实验在AI2-THOR仿真中完成，真机上的安全性没有验证，作者把它列为后续工作。", "solved_by": []},
+    {"text": "安全约束是人工定义的几类物体和碰撞代价，现实中没被预先写进代价函数的危险仍无法约束。", "solved_by": []},
+    {"text": "约束只在期望意义上满足，单次部署中仍可能出现违规，不是硬性保证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "safe-rlhf", "type": "extends", "note": "把Safe RLHF中奖励与代价分开、用拉格朗日乘子做约束优化的思路，从语言模型搬到VLA的具身任务上。"},
+    {"to": "ppo", "type": "uses", "note": "策略更新采用PPO式截断代理目标，与拉格朗日乘子交替优化。"},
+    {"to": "ai2-thor", "type": "uses", "note": "基座模型和Safety-CHORES基准都建在AI2-THOR仿真上。"},
+    {"to": "objaverse", "type": "uses", "note": "场景中的大量3D物体来自Objaverse，用来覆盖多样的长尾危险情形。"}
+  ],
+  "prereq": ["mdp", "reward-return", "policy-gradient-concept", "lagrange-duality", "vla-concept", "reward-design"],
+  "terms": [
+    {"t": "约束马尔可夫决策过程（CMDP）", "d": "在普通MDP上再加一个代价信号，要求策略在最大化奖励的同时，让期望累积代价不超过给定阈值。"},
+    {"t": "安全代价", "d": "与奖励分开记账的违规分数，例如碰倒无关物体记分；它不直接扣奖励，而是作为约束。"}
+  ],
+  "learn": "先补[[c:lagrange-duality]]和[[ppo]]，再读[[safe-rlhf]]理解奖励与代价分离；然后看原文第4节的CMDP建模和第5节的Safety-CHORES结果表。",
+  "check": {"source": "https://arxiv.org/abs/2503.03480", "confirmed": "标题、8位作者、v1日期2025-03-05、摘要中83.58%与3.85%；HTML正文中北大人工智能研究院、SPOC基座、AI2-THOR/ProcTHOR/Objaverse、Safety-CHORES三类任务、代价定义（物体0/1/2、机器人1）、PPO截断ε=0.1、对比FLaRe的成功率与代价数字、仅仿真的局限。"}
+}

@@ -1,0 +1,31 @@
+{
+  "id": "milvus",
+  "who": "Jianguo Wang, Xiaomeng Yi, Rentong Guo, Hai Jin, Peng Xu, Shengjun Li, Xiangyu Wang, Xiangzhou Guo et al. · Zilliz / 普渡大学",
+  "venue": "SIGMOD 2021",
+  "links": [
+    {"label": "论文PDF", "url": "https://www.cs.purdue.edu/homes/csjgwang/pubs/SIGMOD21_Milvus.pdf"},
+    {"label": "ACM DL", "url": "https://doi.org/10.1145/3448016.3457550"},
+    {"label": "GitHub", "url": "https://github.com/milvus-io/milvus"}
+  ],
+  "aka": ["Milvus", "向量数据库", "vector database", "vector DB", "Zilliz", "向量数据管理系统"],
+  "problem": "FAISS这类向量检索库假设数据全部装进内存、建好索引后不再变化，也不支持“相似且价格低于100元”这种带条件的查询；在关系数据库里加一列向量又跑不快。",
+  "idea": "专门为向量设计一个数据管理系统：在FAISS之上加入动态插入删除、属性过滤、多向量查询、CPU/GPU协同和多机分布式，并提供SDK和REST接口。",
+  "impact": "论文发表时已被数百个组织使用，并进入LF AI & Data基金会孵化；以它为代表的“向量数据库”后来成为RAG系统存放嵌入的常用部件。",
+  "method": "[[word2vec]]之后，图片、文本、商品、分子都被表示成向量，应用要在上亿个向量里找最相似的几个，即近似[[knn]]。[[faiss]]、微软SPTAG等是算法库：数据须常驻内存、难以增删、不能跨机器；Elasticsearch、阿里AnalyticDB-V等通用数据库加向量列，又无法针对向量做底层优化。\n\n**设计**。Milvus在FAISS之上构建，支持量化类索引（如IVF）和[[hnsw]]等图索引，并留出接口方便加入新索引。数据增删用LSM式结构：新数据先写入内存，再分段落盘、合并，查询时以快照隔离保证结果一致。异构计算方面，CPU侧做缓存感知和SIMD（AVX512等）优化，GPU侧设计了CPU与GPU混合的索引，并支持多块GPU调度。查询方面加入属性过滤（先按条件分区再做向量检索）和多向量查询（一个对象由人脸、姿态等多个向量描述）。系统可部署在多节点上。\n\n**结果**。论文与Vearch、SPTAG两个开源系统和三个商用系统比较，官方称最多快两个数量级，相对Vearch快6.4到47倍；并在其上搭了以图搜图、化学结构分析、新冠论文检索、问答等10个应用。",
+  "limits": [
+    {"text": "向量检索本身只看语义相似，专有名词、编号等精确匹配需求要另配关键词检索，再做结果融合。", "solved_by": []},
+    {"text": "近似索引在召回率、内存占用和更新速度之间需要人工选型调参，没有一种索引在所有数据规模上都最好。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "faiss", "type": "uses", "note": "以FAISS为底层向量检索库，补上动态数据、属性过滤、分布式等FAISS缺少的数据管理能力。"},
+    {"to": "hnsw", "type": "uses", "note": "把HNSW等图索引作为可选索引类型之一。"},
+    {"to": "knn", "type": "extends", "note": "要解决的核心问题仍是海量高维向量上的最近邻搜索，只是改用近似索引并做成数据库服务。"}
+  ],
+  "prereq": ["embedding", "k-nearest-neighbors", "vector-quantization", "cpu-gpu", "throughput-latency"],
+  "terms": [
+    {"t": "属性过滤", "d": "向量检索时同时满足结构化条件，例如只在价格低于100元的商品向量里找最相似的。"},
+    {"t": "LSM结构", "d": "日志结构合并树：写入先进内存，攒够后批量写成不可变的段，后台再合并；写入快，适合频繁插入。"}
+  ],
+  "learn": "先读[[faiss]]和[[hnsw]]，理解近似最近邻索引 → 读论文第2节（系统设计）和第4节（属性过滤、多向量查询） → 动手：用Milvus或FAISS给10万条句向量建IVF和HNSW两种索引，比较召回率和查询延迟。",
+  "check": {"source": "https://www.cs.purdue.edu/homes/csjgwang/pubs/SIGMOD21_Milvus.pdf", "confirmed": "标题、作者（Zilliz与普渡大学）、SIGMOD’21（2021年6月20–25日）、DOI；摘要中10个应用、与Vearch和SPTAG及三个商用系统比较、最多快两个数量级、数百个组织使用；正文第1节核对表1对比系统、基于FAISS构建、LSM与快照隔离、SIMD与GPU混合索引、属性过滤与多向量查询、比Vearch快6.4–47倍、2020年1月进入LF AI & Data孵化。"}
+}

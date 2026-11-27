@@ -1,0 +1,31 @@
+{
+  "id": "chain-of-code",
+  "who": "Chengshu Li, Jacky Liang, Andy Zeng, Xinyun Chen, Karol Hausman, Dorsa Sadigh, Sergey Levine, Li Fei-Fei et al. · 斯坦福大学 / Google DeepMind / UC伯克利",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2312.04474"},
+    {"label": "项目页", "url": "https://chain-of-code.github.io"}
+  ],
+  "aka": ["CoC", "Chain of Code", "Chain-of-Code", "代码链", "代码思维链", "LMulator", "语言模型模拟解释器"],
+  "problem": "让模型写程序再交给解释器执行，算术和逻辑很准，但遇到“判断这句话是不是讽刺”这类语义子任务，根本写不出可执行的函数，整段程序就跑不起来。",
+  "idea": "让模型照常写代码，解释器逐行执行；某一行执行失败（比如调用了未定义的is_sarcastic函数），就交给LM假装成解释器，直接写出这一行运行后的变量值，再接着往下跑。",
+  "impact": "在BIG-Bench Hard上达到84%，比思维链高12个点，超过人类评分者平均的68%，把“用代码推理”从纯计算题扩展到计算与语义混合的题。",
+  "method": "以论文中的例子说明：问题是“这篇文章里有几处讽刺”。模型写出伪代码：`answer = 0`，然后对每句话`answer += is_sarcastic(句子)`，最后输出answer。Python解释器逐行用try/except执行，并维护一份共享的程序状态（各变量当前的值）。第一行能执行，正常更新状态；`is_sarcastic`没有定义，执行报错，这时把问题、之前的代码和状态交给LM，让它充当**LMulator**（LM模拟的解释器），直接给出这一行执行后的状态，比如判断这句是讽刺、answer加1；然后再交还给解释器继续执行，直到answer被赋值。\n\n这样，能精确计算的部分交给真解释器，说不清规则的语义判断交给模型，两者在同一段程序里交替进行，模型写代码时也不必担心每个函数都能真正实现。相比之下，[[pal]]要求整段代码都能执行，[[cot]]则全部用自然语言推理、计算容易出错。\n\n在[[bbh]]上（text-davinci-003，单任务示例）：直接回答55%、思维链72%、Chain of Code 84%，人类评分者平均68%；换用PaLM 2-S*时，三者分别为49%、61%、78%。作者还在一台机械臂上测试了七个抓取放置任务，如按饮食禁忌分拣物品。",
+  "limits": [
+    {"text": "LMulator写出的变量值没有任何校验，模型模拟错了，后续计算会照样沿用错误的状态；哪些行交给模型、哪些交给解释器，完全取决于代码能否执行。", "solved_by": []},
+    {"text": "跨任务示例下提升明显变小：text-davinci-003上只比思维链高6个点，PaLM 2-S*上与思维链持平，说明效果依赖与任务匹配的示例。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "pal", "type": "solves", "note": "PAL要求程序整段可执行，遇到语义子任务就失效；CoC让LM在执行失败的行上模拟解释器，补上了这一块。"},
+    {"to": "cot", "type": "extends", "note": "把推理链从自然语言换成可部分执行的代码，在BBH上比思维链高12个点。"},
+    {"to": "faithful-cot", "type": "rivals", "note": "Faithful CoT把问题完整翻译成符号程序交给求解器；CoC允许代码中混有只能由LM判断的部分，覆盖面更广但不保证忠实。"},
+    {"to": "bbh", "type": "uses", "note": "以BIG-Bench Hard为主要评测，并与人类评分者的平均和最好成绩对比。"},
+    {"to": "code-as-policies", "type": "extends", "note": "同样让LM写代码来控制机器人，CoC在机器人任务中允许代码里出现需要语义判断的未定义函数。"}
+  ],
+  "prereq": ["in-context-learning", "reasoning-tokens", "tool-calling", "autoregressive"],
+  "terms": [
+    {"t": "LMulator", "d": "由语言模型扮演的“解释器”：遇到不能真正执行的代码行时，由模型直接写出这一行执行后变量应有的值。"},
+    {"t": "程序状态", "d": "程序运行到某一行时所有变量的当前取值，CoC在解释器和LM之间来回传递它。"}
+  ],
+  "learn": "先读[[cot]]和[[pal]] → 读原文第2节的执行流程和图2、表1 → 动手：写一个逐行exec的小解释器，捕获NameError时把上下文交给LLM生成该行结果，在“数讽刺句”这类题上试一试。",
+  "check": {"source": "https://arxiv.org/abs/2312.04474", "confirmed": "标题、10位作者、v1提交于2023-12-07；摘要中detect_sarcasm例子、BBH 84%比CoT高12%；arxiv.org/html/2312.04474v4核对单位、逐行执行与LMulator交接流程、text-davinci-003单任务55/72/84、跨任务50/55/61、人类平均68%与最好95%、PaLM 2-S*单任务49/61/78与跨任务45/47/47、机械臂七个任务；页面未确认正式发表处。"}
+}

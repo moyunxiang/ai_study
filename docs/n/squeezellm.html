@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SqueezeLLM稠密加稀疏量化（2023） · AI脉络</title>
+<meta name="description" content="单请求生成时LLM推理的瓶颈是从显存读权重，而不是计算；把权重压到3比特能大幅提速，但当时的均匀量化在这么低的比特下困惑度明显变差。 两点：按二阶信息（每个权重对损失的敏感度）做非均匀量化，让量化格点集中在敏感权重附近；再把少量离群和最敏感的权重拆出来用稀疏格式按全精度保存，其余稠密部分安心压到低…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/squeezellm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SqueezeLLM稠密加稀疏量化（2023）">
+<meta property="og:description" content="单请求生成时LLM推理的瓶颈是从显存读权重，而不是计算；把权重压到3比特能大幅提速，但当时的均匀量化在这么低的比特下困惑度明显变差。 两点：按二阶信息（每个权重对损失的敏感度）做非均匀量化，让量化格点集中在敏感权重附近；再把少量离群和最敏感的权重拆出来用稀疏格式按全精度保存，其余稠密部分安心压到低…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/squeezellm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/squeezellm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 低比特量化</div>
+<h1>SqueezeLLM稠密加稀疏量化</h1>
+<div class="full">SqueezeLLM: Dense-and-Sparse Quantization</div>
+<div class="meta"><span>2023.06</span><span>论文</span><span>延伸</span><span>ICML 2024</span><span>Sehoon Kim, Coleman Hooper, Amir Gholami, Zhen Dong, Xiuyu Li, Sheng Shen, Michael W. Mahoney, Kurt Keutzer · 加州大学伯克利分校</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2306.07629" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/SqueezeAILab/SqueezeLLM" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/squeezellm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>单请求生成时LLM推理的瓶颈是从显存读权重，而不是计算；把权重压到3比特能大幅提速，但当时的均匀量化在这么低的比特下困惑度明显变差。</p></div><div><h4>方法</h4><p>两点：按二阶信息（每个权重对损失的敏感度）做非均匀量化，让量化格点集中在敏感权重附近；再把少量离群和最敏感的权重拆出来用稀疏格式按全精度保存，其余稠密部分安心压到低比特。</p></div><div><h4>影响</h4><p>“稠密加稀疏”的离群值处理与基于敏感度的非均匀码本，成为后续低比特权重量化与KV缓存量化（如同组的KVQuant）的常用思路。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>论文先用屋顶线分析说明：批大小为1的生成，每出一个词都要把全部权重从显存读一遍，速度几乎只取决于权重占多少字节，所以减少比特数就能直接提速。<a class="ln" href="../n/gptq.html">GPTQ训练后量化</a>、<a class="ln" href="../n/awq.html">AWQ激活感知量化</a>等方法用均匀量化（格点等间隔），在3比特下与FP16差距仍大。</p><p>SqueezeLLM的第一招是<b>基于敏感度的非均匀量化</b>：对每个输出通道，用Fisher信息近似每个权重对最终损失的二阶敏感度（思路源自<a class="ln" href="../n/obd.html">最优脑损伤OBD剪枝</a>），再做加权k-means聚类得到这一通道的码本，敏感权重附近的格点更密；推理时用查表把3比特索引还原成数值。第二招是<b>稠密加稀疏分解</b>：像<a class="ln" href="../n/llm-int8.html">LLM.int8()与离群特征</a>发现的那样，少数权重数值特别大，会拉宽量化范围；把这些离群值和最敏感的一小部分权重（约0.5%以内）抽出来以稀疏矩阵按FP16存储，剩下的稠密矩阵范围变窄、更好量化。</p><p>摘要报告：在LLaMA上，同等显存下3比特量化与FP16的困惑度差距比当时最好的方法缩小最多2.1倍；在A6000上相对基线最多加速2.3倍。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>查表式非均匀量化只对权重有效，计算仍以FP16进行，在大批次、计算受限的服务场景下收益有限。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/qserve.html">QServe W4A8KV4量化服务</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/obd.html">最优脑损伤OBD剪枝</a><span class="yr">1989.11 · 系统·效率</span><div class=nt>用二阶（Fisher）信息估计每个权重的敏感度，思想源自OBD。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/llm-int8.html">LLM.int8()与离群特征</a><span class="yr">2022.08 · 系统·效率</span><div class=nt>延续把离群值单独拆出用高精度处理的思路，改为对权重做稠密加稀疏分解。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/gptq.html">GPTQ训练后量化</a><span class="yr">2022.10 · 系统·效率</span><div class=nt>GPTQ用均匀量化加二阶误差补偿，SqueezeLLM用敏感度加权的非均匀码本，3比特下困惑度差距更小。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/awq.html">AWQ激活感知量化</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>同期的低比特权重量化方法，AWQ按激活缩放保护重要通道，SqueezeLLM用非均匀码本与稀疏离群值。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/kvquant.html">KVQuant KV缓存量化</a><span class="yr">2024.01 · 系统·效率</span><div class=nt>同一团队把敏感度加权非均匀量化与稠密加稀疏分解从权重推广到KV缓存。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/qserve.html">QServe W4A8KV4量化服务</a><span class="yr">2024.05 · 系统·效率</span><div class=nt>查表式非均匀量化只对权重有效，计算仍以FP16进行，在大批次、计算受限的服务场景下收益有限。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/quantization-concept.html">量化</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a> <a class="chip c" href="../c/clustering.html">聚类</a></p>
+<h2>本篇术语</h2><ul><li><b>非均匀量化</b>　量化格点不等间隔，而是从数据中学出一张码本，把格点放在权重密集或重要的位置。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2306.07629" rel="noopener">https://arxiv.org/abs/2306.07629</a>（标题、八位作者、v1日期2023-06-13；摘要：单批生成推理瓶颈是显存带宽而非计算、基于二阶信息的敏感度非均匀量化、稠密加稀疏分解把离群与敏感权重以稀疏格式存储、LLaMA上3比特困惑度差距最多缩小2.1倍、A6000上最多加速2.3倍。加权k-means、Fisher近似、0.5%比例、ICML 2024为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SqueezeLLM%E7%A8%A0%E5%AF%86%E5%8A%A0%E7%A8%80%E7%96%8F%E9%87%8F%E5%8C%96%EF%BC%88squeezellm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asqueezellm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/squeezellm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="zero-pp.html"><small>本分支上一个 · 2023.06</small><b>ZeRO++通信压缩</b></a><a class="r" href="vllm.html"><small>本分支下一个 · 2023.06</small><b>vLLM与PagedAttention</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

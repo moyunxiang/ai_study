@@ -1,0 +1,31 @@
+{
+  "id": "orb-slam3",
+  "who": "Carlos Campos, Richard Elvira, Juan J. Gómez Rodríguez, José M. M. Montiel, Juan D. Tardós · 萨拉戈萨大学",
+  "venue": "IEEE T-RO 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2007.11898"},
+    {"label": "代码", "url": "https://github.com/UZ-SLAMLab/ORB_SLAM3"}
+  ],
+  "aka": ["ORB-SLAM3", "ORB SLAM 3", "多地图SLAM", "multi-map SLAM", "Atlas", "视觉惯性SLAM"],
+  "problem": "[[orb-slam2]]只支持纯视觉，没有IMU；[[vins-mono]]等视觉惯性系统又大多是只看最近几秒的里程计，跟丢后之前的地图就作废，回到旧地点也无法复用历史信息。",
+  "idea": "在ORB-SLAM2的特征点框架上加入紧耦合的视觉-惯性SLAM，连IMU初始化都用最大后验（MAP）估计来做；再加一个多地图系统（Atlas）：跟丢时开一张新地图，之后回到已建图区域时用改进的地点识别把新旧地图无缝合并。",
+  "impact": "第一个同时支持单目、双目、RGB-D相机，针孔和鱼眼镜头，纯视觉、视觉惯性和多地图的开源SLAM库，成为特征点SLAM事实上的标准实现和最常用的基线之一。",
+  "method": "ORB-SLAM3有两个主要新东西：\n\n- **基于MAP的视觉惯性SLAM**：IMU读数在关键帧之间预积分，与ORB特征的重投影误差一起放进局部和全局的[[bundle-adjustment]]。不同于先粗估再细化的做法，IMU的初始化（尺度、重力方向、偏置）也被写成一个最大后验估计问题，一开始就把各种不确定性考虑进去，摘要称初始化阶段就很快很准；\n- **多地图（Atlas）**：系统同时保存多张互不相连的地图。视觉信息变差、跟踪丢失时，不是停下来等重定位，而是马上开新地图继续建；当新地图里的地点被识别为属于某张旧地图时，两张地图被合并。论文为此改进了地点识别方法，提高召回率。\n\n因为能复用全部历史信息，局部BA里可以加入在时间上相隔很远、甚至来自上一次建图会话的共视关键帧，这些高视差的观测进一步提升精度。摘要报告：在各种传感器配置下都与已有最好系统一样鲁棒且更准，双目惯性SLAM在EuRoC无人机数据上平均误差3.6厘米，在TUM-VI的快速手持运动房间序列上为9毫米；视觉惯性部分比之前的方法准2到5倍。",
+  "limits": [
+    {"text": "依赖ORB手工特征，弱纹理、强光照变化和运动模糊下仍会失效；只输出稀疏点地图，不能直接得到稠密几何。", "solved_by": ["droid-slam", "mast3r-slam"]},
+    {"text": "假设场景静态，动态物体多时精度下降。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "orb-slam2", "type": "extends", "note": "沿用ORB-SLAM2的特征、跟踪-建图-回环三线程框架，加入IMU和多地图。"},
+    {"to": "vins-mono", "type": "solves", "note": "VINS-Mono是单地图、以滑动窗口为主的视觉惯性系统，跟丢后无法复用旧地图；ORB-SLAM3用多地图合并复用全部历史，精度高2到5倍。"},
+    {"to": "bundle-adjustment", "type": "uses", "note": "局部和全局优化都是加入IMU残差的光束平差。"},
+    {"to": "orb", "type": "uses", "note": "前端特征仍是ORB角点和二进制描述子。"}
+  ],
+  "prereq": ["camera-geometry", "map-bayesian", "kinematics-dof", "gradient-descent"],
+  "terms": [
+    {"t": "多地图（Atlas）", "d": "同时维护多张互不相连的地图，跟丢就开新图，认出旧地点时再把它们合并。"},
+    {"t": "地点识别", "d": "判断当前画面是不是以前来过的地方，用于回环检测和地图合并。"}
+  ],
+  "learn": "先读ORB-SLAM2了解三线程结构，再读本文第5节IMU初始化和第6节多地图；用开源代码在EuRoC上分别跑单目、单目惯性、双目惯性三种配置，比较轨迹误差。",
+  "check": {"source": "https://arxiv.org/abs/2007.11898", "confirmed": "arXiv记录：标题、五位作者、v1提交于2020-07-23；摘要中的单目/双目/RGB-D、针孔与鱼眼、紧耦合视觉惯性且IMU初始化也用MAP估计、比以往方法准2到5倍、多地图与改进召回率的地点识别、复用全部历史信息、EuRoC平均3.6 cm、TUM-VI快速手持9 mm、开源。T-RO 2021、Atlas名称、机构凭一般了解写。"}
+}

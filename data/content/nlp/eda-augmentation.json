@@ -1,0 +1,37 @@
+{
+  "id": "eda-augmentation",
+  "who": "Jason Wei, Kai Zou · Protago Labs、达特茅斯学院、乔治城大学",
+  "venue": "EMNLP-IJCNLP 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1901.11196"},
+    {"label": "代码", "url": "https://github.com/jasonwei20/eda_nlp"}
+  ],
+  "aka": ["EDA", "Easy Data Augmentation", "文本数据增强", "Text Data Augmentation", "NLP数据增强", "同义词替换", "Synonym Replacement", "随机插入", "随机交换", "随机删除"],
+  "problem": "图像领域翻转、裁剪就能扩充数据，文本却很难做数据增强：改一个词可能改变句意；回译、生成式改写又要额外训练翻译或语言模型，小团队用不起。",
+  "idea": "只用四个不需要任何模型的简单操作：**同义词替换**（用WordNet换掉n个非停用词）、**随机插入**（在随机位置插入某个词的同义词）、**随机交换**（随机交换两个词的位置）、**随机删除**（以概率p删掉每个词），对每条训练句子生成若干变体。",
+  "impact": "EDA因为简单、几乎零成本，成为文本分类小数据场景下最常用的增强基线，后续的文本增强综述和方法几乎都拿它对比。",
+  "background": "在计算机视觉里，数据增强是标准做法，[[alexnet]]就靠随机裁剪和翻转减轻过拟合。NLP中已有的增强方法包括[[back-translation]]（先译成外语再译回来）、用语言模型预测替换词、按同义词典替换，但前两种需要训练好的模型、计算开销大，系统性的比较也很少。对只有几百条标注样本的文本分类任务，过拟合尤其严重。",
+  "method": "对一条长度为 `l` 的句子，按增强强度参数 `α` 计算要改动的词数 `n = α·l`，然后随机选择以下操作之一：\n\n- **SR 同义词替换**：随机选 `n` 个非停用词，各自换成[[wordnet]]里的一个随机同义词；\n- **RI 随机插入**：随机找一个非停用词的同义词，插到句中随机位置，重复 `n` 次；\n- **RS 随机交换**：随机挑两个词交换位置，重复 `n` 次；\n- **RD 随机删除**：每个词以概率 `p = α` 被删除。\n\n每条原句生成 `n_aug` 条增强句（训练集越小，生成越多），与原句一起训练。例如「这部电影的剧情非常精彩」经SR可能变成「这部影片的剧情非常出色」。作者在五个分类任务（SST-2、CR、SUBJ、TREC、PC）上，用RNN和[[kim-cnn]]两类模型做了系统实验和消融，并给出 `α` 与 `n_aug` 的推荐取值。",
+  "results": "摘要报告：在五个文本分类任务上，EDA对卷积和循环网络都有提升，在小数据集上效果尤其明显；平均而言，只用50%训练数据加EDA，就能达到用全部数据正常训练的准确率。",
+  "legacy": "EDA之后出现了基于预训练语言模型的上下文替换、UDA（用回译做一致性正则）、AEDA（只插标点）等方法。预训练模型普及后，研究发现EDA对BERT等大模型的提升明显变小，甚至可能有害；但在资源受限、无法调用大模型的场景下，它仍常被当作第一步尝试。",
+  "limits": [
+    {"text": "替换、插入和删除可能改变句子的标签（例如删掉「不」会让否定句变成肯定句）。", "solved_by": []},
+    {"text": "对预训练的Transformer模型提升很小，增强出的句子也常常不通顺。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "back-translation", "type": "rivals", "note": "回译需要训练好的翻译模型来生成改写句，EDA只用规则操作，几乎零成本。"},
+    {"to": "wordnet", "type": "uses", "note": "同义词替换和随机插入都从WordNet查同义词。"},
+    {"to": "kim-cnn", "type": "uses", "note": "用TextCNN和RNN作为被增强训练的分类模型。"},
+    {"to": "alexnet", "type": "extends", "note": "把视觉中「对输入做随机扰动以扩充数据、减轻过拟合」的数据增强思路搬到文本分类。"}
+  ],
+  "prereq": ["data-augmentation", "regularization", "supervised-learning", "train-val-test"],
+  "terms": [
+    {"t": "文本数据增强", "d": "对已有的训练句子做改写、替换、扰动，生成新的带标签样本，以扩大训练集、减轻过拟合。"},
+    {"t": "停用词", "d": "「的」「了」「the」「is」这类出现极频繁、单独几乎不携带内容的词，很多文本处理会把它们排除在外。"}
+  ],
+  "learn": "先了解[[c:data-augmentation]] → 读原文第2节四个操作和第4节消融 → 动手：在一个只有500条样本的情感分类数据上，对比加不加EDA训练的TextCNN准确率，再换成BERT看提升是否还在。",
+  "check": {
+    "source": "https://arxiv.org/abs/1901.11196",
+    "confirmed": "arXiv记录：标题EDA: Easy Data Augmentation Techniques for Boosting Performance on Text Classification Tasks、作者Jason Wei与Kai Zou、v1 2019-01-31；摘要：四个操作（同义词替换、随机插入、随机交换、随机删除）、五个文本分类任务、对CNN和RNN都有提升、小数据集上效果更强、平均只用50%训练集加EDA达到全数据正常训练的准确率、消融与参数建议。EMNLP-IJCNLP 2019、作者单位、n=α·l、五个数据集名称、对BERT提升变小的后续结论凭一般了解。"
+  }
+}

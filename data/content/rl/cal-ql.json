@@ -1,0 +1,31 @@
+{
+  "id": "cal-ql",
+  "who": "Mitsuhiko Nakamoto, Yuexiang Zhai, Anikait Singh, Max Sobol Mark, Yi Ma, Chelsea Finn, Aviral Kumar, Sergey Levine · UC Berkeley / Stanford",
+  "venue": "NeurIPS 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2303.05479"},
+    {"label": "项目页", "url": "https://nakamotoo.github.io/Cal-QL"}
+  ],
+  "problem": "先离线预训练、再在线微调本是离线RL最有用的场景，但CQL这类保守方法一转到在线，回报往往先大幅下跌，要很久才恢复。",
+  "idea": "指出原因是保守的Q值被压得比真实尺度低太多，在线数据一来就要先“纠偏”；于是要求离线学到的Q值既是策略真实价值的下界、又不低于某个参考策略（如行为策略）的价值，这叫校准。",
+  "impact": "成为离线转在线微调的标准基线之一，在CQL上只改一行代码；CORL、后来的WSRL等工作都拿它对比。",
+  "method": "[[cql]]在离线时把分布外动作的Q值往下压，得到一个保守的下界。问题是这个下界可能低得离谱：Q值的尺度和真实回报差很多。一开始在线微调，新收集的数据给出的回报远高于这些Q值，策略就会被误导去尝试一些看起来“没那么差”的动作，表现先跌一大截，这就是论文说的初期“遗忘”。\n\nCal-QL的办法是让Q值“校准”：学到的Q值应满足 `V_ref(s) ≤ Q_θ(s, π(s)) ≤ V_π(s)` 的意义上，不高于学到的策略的真实价值，同时不低于某个参考策略的价值。实现上，参考策略取行为策略，用数据里蒙特卡洛回报估计它的价值 `V_μ`；在CQL把分布外动作Q值往下压的那一项里，把被压的Q值和 `V_μ` 取较大值：`max(Q_θ(s, a), V_μ(s))`。这样Q值不会被压到行为策略价值之下。论文称这只是在CQL上改一行代码。\n\n摘要称Cal-QL在所研究的11个微调基准任务中的9个上超过当时最好的方法。",
+  "limits": [
+    {"text": "需要数据里的完整轨迹来算蒙特卡洛回报作为参考值，数据是零散转移或回报很稀疏时参考值不好估。"},
+    {"text": "仍沿用CQL的保守正则，在线阶段也要保留并回放离线数据，微调时的计算和存储开销不小。", "solved_by": ["wsrl"]}
+  ],
+  "relations": [
+    {"to": "cql", "type": "extends", "note": "在CQL的保守正则上加一个下限，只改一行代码。"},
+    {"to": "awac", "type": "rivals", "note": "AWAC用优势加权回归做离线转在线；Cal-QL保留CQL式保守价值但修正其尺度。"},
+    {"to": "iql", "type": "rivals", "note": "IQL也常用于离线转在线，论文把它作为主要对比基线之一。"},
+    {"to": "d4rl", "type": "uses", "note": "在D4RL的AntMaze、Adroit、Kitchen等任务上做离线转在线评测。"}
+  ],
+  "prereq": ["offline-rl", "actor-critic", "monte-carlo", "distribution-shift"],
+  "terms": [
+    {"t": "校准（calibration）", "d": "这里指Q值的尺度合理：不高于当前策略的真实价值，也不低于参考策略的价值。"},
+    {"t": "离线转在线微调", "d": "先用固定数据集训练，再让策略与环境交互继续学习。"}
+  ],
+  "learn": "先读[[cql]]；读Cal-QL原文第4节看在线初期的“遗忘”现象和校准的定义；在CORL里对比CQL与Cal-QL在antmaze上的微调曲线。",
+  "check": {"source": "https://arxiv.org/abs/2303.05479", "confirmed": "标题、八位作者、arXiv v1于2023-03-09；摘要中现有离线方法微调表现差、保守且校准的价值初始化、校准的定义（策略价值下界与参考策略价值上界）、参考策略可取行为策略、在CQL上一行代码、11个微调任务中9个最好。max(Q, V_μ)的实现形式按原文正文通行描述；NeurIPS 2023按通行引用。"},
+  "aka": ["Cal-QL", "CalQL", "Calibrated Q-Learning", "校准Q学习", "离线转在线微调"]
+}

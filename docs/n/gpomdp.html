@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>GPOMDP无限时域策略梯度（2001） · AI脉络</title>
+<meta name="description" content="价值函数方法在部分可观测环境里容易失效，策略还可能在训练中变差；式的直接策略搜索不依赖状态，但只适用于有明确回合结束的任务，在没有终点的长期任务（平均回报）上怎样估计梯度并不清楚。 GPOMDP只用一条持续运行的轨迹在线估计平均回报的梯度：维护一条按β折扣的「资格迹」累计 ∇log π，每一步把当…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/gpomdp.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="GPOMDP无限时域策略梯度（2001）">
+<meta property="og:description" content="价值函数方法在部分可观测环境里容易失效，策略还可能在训练中变差；式的直接策略搜索不依赖状态，但只适用于有明确回合结束的任务，在没有终点的长期任务（平均回报）上怎样估计梯度并不清楚。 GPOMDP只用一条持续运行的轨迹在线估计平均回报的梯度：维护一条按β折扣的「资格迹」累计 ∇log π，每一步把当…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/gpomdp.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/gpomdp">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 策略梯度与演员评论家</div>
+<h1>GPOMDP无限时域策略梯度</h1>
+<div class="full">Infinite-Horizon Policy-Gradient Estimation</div>
+<div class="meta"><span>2001</span><span>论文</span><span>延伸</span><span>JAIR 2001</span><span>Jonathan Baxter, Peter L. Bartlett · 澳大利亚国立大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1106.0665" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/gpomdp">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>价值函数方法在部分可观测环境里容易失效，策略还可能在训练中变差；<a class="ln" href="../n/reinforce.html">REINFORCE策略梯度</a>式的直接策略搜索不依赖状态，但只适用于有明确回合结束的任务，在没有终点的长期任务（平均回报）上怎样估计梯度并不清楚。</p></div><div><h4>方法</h4><p>GPOMDP只用一条持续运行的轨迹在线估计平均回报的梯度：维护一条按β折扣的「资格迹」累计 ∇log π，每一步把当前奖励乘上这条迹加到梯度估计里；β在偏差与方差之间权衡，并与系统的混合时间相关。</p></div><div><h4>影响</h4><p>GPOMDP与同期的<a class="ln" href="../n/pg-theorem.html">策略梯度定理</a>一起奠定了现代策略梯度估计的形式；「只用与奖励时间上相关的那部分对数概率梯度」这一降方差思路（常被称作GPOMDP估计量）至今是策略梯度和方差分析文献中的标准对照。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>设策略π_θ(u|y)根据观测y随机选控制u，智能体在POMDP里一直运行下去，目标是<b>平均回报</b> <code>η(θ) = lim (1/T) E[Σ_t r_t]</code>。GPOMDP每一步做两件事：</p><ul><li>更新资格迹 <code>z_{t+1} = β z_t + ∇_θ log π_θ(u_t | y_t)</code>；</li><li>更新梯度估计 <code>Δ_{t+1} = Δ_t + (1/(t+1))·[r(x_{t+1}) z_{t+1} − Δ_t]</code>。</li></ul><p>直观上，z把过去的「如果当时更可能选那个动作」的方向按β^k衰减地记下来，当前奖励只归功于最近的动作，越久远的动作分到的功劳越少。β=1时估计无偏但方差随时间爆炸；β&lt;1时方差可控，但引入偏差，偏差大小取决于系统忘掉过去的速度——作者证明，β的合适选择与受控POMDP的<b>混合时间</b>有关：β越接近1，越能处理混合慢的系统，代价是方差更大。</p><p>算法只需要存两倍于策略参数数目的数（z和Δ），只有一个自由参数β，而且完全不需要知道底层状态。作者证明了收敛性，并简要讨论了推广到连续状态/观测/控制、多智能体、高阶导数以及带内部状态的随机策略。摘要也指出，Kimura、Yamamura与Kobayashi在1995年提出过类似算法；配套论文展示了如何把这些梯度估计用于随机梯度和共轭梯度优化。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只用一条轨迹的蒙特卡洛式估计，方差仍然很大，样本效率低。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/gae.html">广义优势估计GAE</a></div></li><li>按普通梯度方向更新，对策略参数化方式敏感，步长难选。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/natural-pg.html">自然策略梯度</a> <a class="chip hue" style="--h:120" href="../n/trpo.html">TRPO</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/pg-theorem.html">策略梯度定理</a><span class="yr">1999 · RL</span><div class=nt>同期工作：策略梯度定理从价值函数近似的角度给出梯度形式，GPOMDP从仿真估计的角度给出无需状态的估计器。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/td-learning.html">时序差分学习</a><span class="yr">1988 · RL</span><div class=nt>折扣的资格迹与TD(λ)中的资格迹是同一种机制，这里用来分配梯度而不是价值误差。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/reinforce.html">REINFORCE策略梯度</a><span class="yr">1992 · RL</span><div class=nt>REINFORCE按回合估计梯度；GPOMDP用折扣的资格迹在无终点的单条轨迹上在线估计平均回报梯度。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/pomdp.html">POMDP规划</a><span class="yr">1998 · RL</span><div class=nt>问题设定是策略只看到观测的部分可观测MDP。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/natural-pg.html">自然策略梯度</a><span class="yr">2001 · RL</span><div class=nt>按普通梯度方向更新，对策略参数化方式敏感，步长难选。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/gae.html">广义优势估计GAE</a><span class="yr">2015.06 · RL</span><div class=nt>只用一条轨迹的蒙特卡洛式估计，方差仍然很大，样本效率低。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/trpo.html">TRPO</a><span class="yr">2015.02 · RL</span><div class=nt>按普通梯度方向更新，对策略参数化方式敏感，步长难选。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/markov-chain.html">马尔可夫性与马尔可夫链</a> <a class="chip c" href="../c/bias-variance.html">偏差-方差权衡</a> <a class="chip c" href="../c/state-action-observation.html">状态、观测与动作</a></p>
+<h2>本篇术语</h2><ul><li><b>平均回报</b>　长期运行下每一步奖励的平均值，适用于没有回合结束的持续任务。</li><li><b>混合时间</b>　马尔可夫链从任意起点出发后，状态分布接近平稳分布所需的步数；越长，过去的动作对现在影响越久。</li><li><b>资格迹</b>　对过去各步某个量（这里是对数概率梯度）按指数衰减求和的记忆，用来把当前信号分配给之前的决策。</li></ul>
+<h2>怎么学</h2><p>先学<a class="ln" href="../n/reinforce.html">REINFORCE策略梯度</a>；读原文第3节算法与第4节收敛定理的陈述；在一个小的持续型马尔可夫链上实现GPOMDP，画出不同β下梯度估计的偏差与方差。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1106.0665" rel="noopener">https://arxiv.org/abs/1106.0665</a>（标题Infinite-Horizon Policy-Gradient Estimation、两位作者、arXiv记录（v1于2011-06-03，为JAIR 2001论文的存档）；摘要中GPOMDP对参数化随机策略控制的POMDP估计平均回报梯度、估计有偏、Kimura等1995年的类似算法、只需两倍参数数目的存储、一个参数β∈[0,1)与偏差-方差权衡、不需要知道底层状态、证明收敛、β与混合时间的关系、多种推广、配套论文的梯度与共轭梯度优化。更新公式按原文正文；JAIR 2001和机构按通行引用，日期按JAIR发表年份写作2001。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20GPOMDP%E6%97%A0%E9%99%90%E6%97%B6%E5%9F%9F%E7%AD%96%E7%95%A5%E6%A2%AF%E5%BA%A6%EF%BC%88gpomdp%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Agpomdp%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/gpomdp.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="natural-pg.html"><small>本分支上一个 · 2001</small><b>自然策略梯度</b></a><a class="r" href="cpi.html"><small>本分支下一个 · 2002</small><b>保守策略迭代CPI</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

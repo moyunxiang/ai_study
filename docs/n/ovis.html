@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Ovis结构化视觉嵌入（2024） · AI脉络</title>
+<meta name="description" content="主流MLLM用MLP把视觉编码器的连续特征直接塞进LLM，而文字是查嵌入表得到的离散嵌入，两种嵌入方式结构不一致，融合不够顺畅。 给视觉端也配一张可学习的“视觉嵌入表”：每个图像块输出一个对视觉词表的概率分布，再按概率加权表中的嵌入，模仿文字查表的方式生成视觉嵌入。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ovis.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Ovis结构化视觉嵌入（2024）">
+<meta property="og:description" content="主流MLLM用MLP把视觉编码器的连续特征直接塞进LLM，而文字是查嵌入表得到的离散嵌入，两种嵌入方式结构不一致，融合不够顺畅。 给视觉端也配一张可学习的“视觉嵌入表”：每个图像块输出一个对视觉词表的概率分布，再按概率加权表中的嵌入，模仿文字查表的方式生成视觉嵌入。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ovis.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ovis">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:240"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/mm.html">多模态理解</a> › 开源VLM配方</div>
+<h1>Ovis结构化视觉嵌入</h1>
+<div class="full">Ovis: Structural Embedding Alignment for Multimodal Large Language Model</div>
+<div class="meta"><span>2024.05</span><span>论文</span><span>延伸</span><span>Shiyin Lu, Yang Li, Qing-Guo Chen, Zhao Xu, Weihua Luo, Kaifu Zhang, Han-Jia Ye · 阿里巴巴国际数字商业集团 / 南京大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2405.20797" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/AIDC-AI/Ovis" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/ovis">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>主流MLLM用MLP把视觉编码器的连续特征直接塞进LLM，而文字是查嵌入表得到的离散嵌入，两种嵌入方式结构不一致，融合不够顺畅。</p></div><div><h4>方法</h4><p>给视觉端也配一张可学习的“视觉嵌入表”：每个图像块输出一个对视觉词表的概率分布，再按概率加权表中的嵌入，模仿文字查表的方式生成视觉嵌入。</p></div><div><h4>影响</h4><p>同规模下超过当时的开源MLLM并整体超过Qwen-VL-Plus；之后迭代出Ovis1.5、1.6、2、2.5一个持续更新的开源VLM系列。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/llava-1.5.html">LLaVA-1.5</a>一类模型的标准接法是：视觉编码器给每个图像块一个连续向量，经过MLP投影后当作“词”喂给语言模型。可语言模型里的真正的词，是用离散的token编号去嵌入表里查一行得到的。Ovis认为这两种嵌入的产生方式不对称，是视觉和文字融合不充分的原因之一。</p><p>Ovis的改法是在视觉端加一张<b>视觉嵌入表</b>（大小类似一个视觉词表）。视觉编码器之后接一个小头，对每个图像块输出一个在视觉词表上的<a class="lc" href="../c/softmax.html">Softmax与logits</a>概率分布；最终的视觉嵌入是表中各行按这个概率的加权和。概率很尖时就退化为查表取一行，等价于离散的“视觉单词”；概率平滑时则是多个视觉单词的混合，既保留结构化的查表形式，又能端到端训练。</p><p>摘要报告，Ovis在多个多模态基准上超过同参数规模的开源MLLM，整体上也超过闭源的Qwen-VL-Plus（<a class="ln" href="../n/qwen-vl.html">Qwen-VL</a>的商用版本）。代码、数据和模型均已开源，后续版本换用更强的SigLIP类编码器和Qwen系列语言模型。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>第一版输入分辨率有限，对高分辨率文档和小物体不如采用切图或原生分辨率的模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:240" href="../n/qwen2-vl.html">Qwen2-VL与开源VLM</a></div></li><li>视觉嵌入表带来的收益与更换编码器、数据等其他改动纠缠在一起，结构本身贡献多少缺少大规模独立验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/vq-vae.html">VQ-VAE</a><span class="yr">2017.11 · 生成</span><div class=nt>视觉嵌入表与离散视觉码本思路相近，但用软概率组合代替硬量化，保持可微。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:240" href="../n/llava-1.5.html">LLaVA-1.5</a><span class="yr">2023.10 · 多模态</span><div class=nt>LLaVA-1.5用MLP把连续视觉特征直接投影给LLM，Ovis改为概率加权查视觉嵌入表。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:240" href="../n/qwen-vl.html">Qwen-VL</a><span class="yr">2023.08 · 多模态</span><div class=nt>论文以Qwen-VL的商用版Qwen-VL-Plus为主要闭源对比对象，并报告整体超过它。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:240" href="../n/qwen2-vl.html">Qwen2-VL与开源VLM</a><span class="yr">2024.09 · 多模态</span><div class=nt>第一版输入分辨率有限，对高分辨率文档和小物体不如采用切图或原生分辨率的模型。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/embedding.html">嵌入向量</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/tokenization.html">分词与token</a> <a class="chip c" href="../c/vector-quantization.html">向量量化与离散token</a> <a class="chip c" href="../c/instruction-tuning.html">指令微调与对话模板</a></p>
+<h2>本篇术语</h2><ul><li><b>视觉嵌入表（visual embedding table）</b>　一张可学习的矩阵，每一行代表一个“视觉单词”；图像块按概率选取并加权这些行，得到喂给语言模型的嵌入。</li></ul>
+<h2>怎么学</h2><p>先懂<a class="ln" href="../n/llava-1.5.html">LLaVA-1.5</a>的MLP连接器和语言模型的词嵌入查表，再读Ovis论文第3节，把“概率加权查表”与<a class="ln" href="../n/vq-vae.html">VQ-VAE</a>的硬量化对比着理解。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2405.20797" rel="noopener">https://arxiv.org/abs/2405.20797</a>（标题、七位作者、v1提交2024-05-31；摘要：两种嵌入方式不一致、可学习视觉嵌入表、每个图像块多次索引并概率组合、超过同规模开源MLLM并整体超过Qwen-VL-Plus。GitHub页确认Ovis1.0于2024-06发布及Ovis1.5、1.6、2、2.5的版本序列与Ovis2.5采用SigLIP2+Qwen3。机构为一般了解；“概率由softmax小头产生”的细节为对摘要的转述。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Ovis%E7%BB%93%E6%9E%84%E5%8C%96%E8%A7%86%E8%A7%89%E5%B5%8C%E5%85%A5%EF%BC%88ovis%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aovis%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ovis.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="rlaif-v.html"><small>本分支上一个 · 2024.05</small><b>RLAIF-V开源AI反馈对齐</b></a><a class="r" href="uni-moe.html"><small>本分支下一个 · 2024.05</small><b>Uni-MoE多模态专家</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

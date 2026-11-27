@@ -1,0 +1,78 @@
+{
+  "id": "aether",
+  "who": "Aether Team: Haoyi Zhu, Yifan Wang, Jianjun Zhou, Wenzheng Chang, Yang Zhou, Zizun Li, Junyi Chen, Chunhua Shen et al.（含Jiangmiao Pang、Tong He） · 上海人工智能实验室",
+  "venue": "arXiv 2025",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2503.18945"
+    }
+  ],
+  "aka": [
+    "Aether",
+    "Aether世界模型",
+    "几何感知世界模型",
+    "统一几何世界模型",
+    "4D重建+视频预测+视觉规划",
+    "raymap动作"
+  ],
+  "problem": "视频世界模型只生成像素，不知道场景的深度和相机怎么动；三维重建模型懂几何却不会预测未来。两者分开做，世界模型的预测就缺少几何约束。",
+  "idea": "在CogVideoX上加深度和相机光线图通道，一个模型通过随机遮挡条件同时学会4D重建、以相机轨迹为动作的视频预测、以及给定目标图的视觉规划；只用合成数据训练。",
+  "impact": "从没见过真实数据，KITTI视频深度Abs Rel却达0.056，优于CUT3R的0.118；说明把几何当训练目标能让世界模型零样本迁移到真实画面，并以相机轨迹为通用动作。",
+  "method": "**卡在哪**：[[cosmos]]、[[unisim]]这类视频世界模型输出的是二维画面，画面看着合理，但物体的远近、相机怎么移动并没有被显式建模；[[dust3r]]、[[monst3r]]、[[cut3r]]能从视频恢复深度和相机位姿，却只看过去、不预测未来。导航、具身智能体真正需要的是在三维空间里预测“我这样移动会看到什么”。\n\n**做法**：Aether在图生视频模型[[cogvideox]]-5B上做后训练，输入输出各加两组通道并零初始化：**深度**转成视差、归一化后复制成三通道，用原有3D VAE编码；**相机**的内外参转成6通道的光线图（每个像素的光线方向和起点，见[[c:camera-geometry]]），下采样对齐潜空间。相机轨迹同时被当作“动作”。训练时随机遮挡不同条件，同一个模型就能做三件事：给视频，输出深度和位姿（重建）；给首帧和相机轨迹，生成视频（动作条件预测）；给首帧和目标帧，生成中间路径（视觉规划）。训练数据全是合成RGB-D视频，用自动流程标注相机位姿。\n\n**结果**：零样本用于真实视频，KITTI深度Abs Rel 0.056，CUT3R为0.118；Sintel相机轨迹误差在前馈方法中最低（0.189对0.213），但ScanNet上不如CUT3R（0.176对0.099）。VBench评分的视频预测略高于原始CogVideoX（80.04对78.51）；去掉深度目标后规划质量下降，说明几何监督对预测和规划有帮助。",
+  "limits": [
+    {
+      "text": "动作只是相机轨迹，适合导航和自由视角移动，不能直接表达机械臂、夹爪这类机器人动作。",
+      "solved_by": []
+    },
+    {
+      "text": "只用合成数据训练，室内场景重建明显差于室外，相机位姿估计也不如专门的重建模型；作者推测光线图与视频扩散先验不够契合。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "cogvideox",
+      "type": "uses",
+      "note": "在CogVideoX-5B图生视频模型上加深度与光线图通道做后训练，沿用其3D VAE。"
+    },
+    {
+      "to": "cut3r",
+      "type": "rivals",
+      "note": "CUT3R是专门的在线重建模型；Aether用生成式视频模型做重建，KITTI深度更好，ScanNet位姿更差。"
+    },
+    {
+      "to": "monst3r",
+      "type": "rivals",
+      "note": "MonST3R从动态视频恢复几何；Aether把同类任务和视频预测放进一个生成模型，Sintel深度Abs Rel 0.324对0.378。"
+    },
+    {
+      "to": "cosmos",
+      "type": "extends",
+      "note": "同为在视频生成模型上构建世界模型，Aether额外把深度和相机位姿作为联合预测目标。"
+    }
+  ],
+  "prereq": [
+    "world-model-concept",
+    "diffusion-process",
+    "camera-geometry",
+    "3d-representation",
+    "latent-space",
+    "pretrain-finetune"
+  ],
+  "terms": [
+    {
+      "t": "光线图（raymap）",
+      "d": "给每个像素记录一条从相机出发的光线（起点和方向），把相机内外参变成和图像同样大小的张量，便于视频模型处理。"
+    },
+    {
+      "t": "Abs Rel",
+      "d": "深度估计的平均绝对相对误差：|预测深度−真实深度|÷真实深度，再对所有像素取平均，越低越好。"
+    }
+  ],
+  "learn": "先补[[c:camera-geometry]]的内参、外参和深度概念，再读[[dust3r]]了解前馈式三维重建；然后读原文第3节的深度与光线图编码、第4节的重建表和规划消融。",
+  "check": {
+    "source": "https://arxiv.org/abs/2503.18945",
+    "confirmed": "标题、作者（Aether Team等11位）、arXiv v1 2025-03-24、摘要中三项能力与零样本合成到真实；HTML正文中CogVideoX-5b-I2V、零初始化新通道、视差与6通道raymap、相机轨迹作动作、仅合成RGB-D训练、KITTI Abs Rel 0.056对CUT3R 0.118、Sintel 0.324对MonST3R 0.378、Sintel ATE 0.189对0.213、ScanNet 0.176对0.099、VBench 80.04对78.51、去深度消融、作者所列局限；机构上海人工智能实验室。"
+  }
+}

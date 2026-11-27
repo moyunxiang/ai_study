@@ -1,0 +1,27 @@
+{
+  "id": "sigmoid-attention",
+  "who": "Jason Ramapuram, Federico Danieli, Eeshan Dhekane, Floris Weers, Dan Busbridge, Pierre Ablin 等 · Apple",
+  "venue": "arXiv 2024",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2409.04431"}],
+  "aka": ["Sigmoid Attention", "sigmoid自注意力", "FlashSigmoid", "SigmoidAttn", "softmax-free attention"],
+  "problem": "softmax注意力要求一行权重和为1，每个查询都得在整行上做归一化；此前用sigmoid替换softmax的尝试训练不稳、效果不如softmax。",
+  "idea": "逐个元素用sigmoid算注意力权重，再配上与序列长度相关的偏置来压住训练初期过大的注意力范数，并写专门的高效内核。",
+  "impact": "证明正确归一化的sigmoid注意力可以在语言、视觉、语音上追平softmax，并给出比FlashAttention-2快17%的推理内核。",
+  "background": "[[transformer]]的注意力权重来自对一整行logit做[[c:softmax]]。这让各个键互相竞争，也让实现必须先知道整行的最大值和总和。用sigmoid（`σ(x)=1/(1+e^{−x})`）逐元素打分没有这种耦合，但以往的尝试在大规模训练时容易发散。",
+  "method": "注意力改写为 `Attn = σ(QKᵀ/√d + b) · V`，每个权重独立地落在(0,1)之间，一行之和不再固定为1。论文从理论上证明这样的Transformer仍是万能函数逼近器，并且比softmax版本有更好的正则性。经验上的关键发现是：训练初期注意力输出的范数过大会导致不稳定，加一个大约为 `b = −log n`（n为序列长度）的偏置、并配合层归一化，就能稳住。\n\n工程上，作者实现了FlashSigmoid：沿用[[flashattention-2]]的分块与IO感知思路，但因为不需要在线维护行最大值和归一化常数，内核更简单。",
+  "results": "摘要报告FlashSigmoid在H100上的推理内核比FlashAttention-2快17%；在语言、视觉、语音多个领域和规模上，正确归一化的sigmoid注意力达到与softmax注意力相当的效果。",
+  "legacy": "它与[[gated-attention]]等工作一起，让“注意力权重不必和为1”成为可行选项，也为消除attention sink现象提供了一个角度。",
+  "limits": [
+    {"text": "需要与序列长度相关的偏置和合适的归一化才能稳定训练，换到新的长度或架构时要重新确认。", "solved_by": []},
+    {"text": "主流开源大模型仍以softmax注意力为主，sigmoid版本在超大规模预训练上的收益没有公开验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "rivals", "note": "用逐元素sigmoid替换整行softmax来计算注意力权重。"},
+    {"to": "flashattention-2", "type": "uses", "note": "FlashSigmoid沿用其分块IO感知的内核设计并更快。"},
+    {"to": "linear-attention", "type": "rivals", "note": "同样去掉softmax，但线性注意力改用核特征分解，sigmoid注意力仍保留平方复杂度的精确计算。"},
+    {"to": "vit", "type": "uses", "note": "在视觉Transformer上验证sigmoid注意力的通用性。"}
+  ],
+  "prereq": ["self-attention", "softmax", "neuron-activation", "normalization-layer"],
+  "learn": "先复习[[c:softmax]]和注意力；读论文第3节的偏置与稳定性分析；动手：把小模型的softmax换成sigmoid加−log n偏置，比较有无偏置时的训练曲线。",
+  "check": {"source": "https://arxiv.org/abs/2409.04431", "confirmed": "标题、作者、arXiv首次提交2024-09-06；摘要中万能逼近证明、初期注意力范数稳定是关键、FlashSigmoid比FlashAttention-2快17%（H100）。"}
+}

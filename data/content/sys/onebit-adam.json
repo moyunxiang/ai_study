@@ -1,0 +1,24 @@
+{
+ "id": "onebit-adam",
+ "who": "Hanlin Tang, Shaoduo Gan, Ammar Ahmad Awan, Samyam Rajbhandari, Conglong Li, Xiangru Lian, Ji Liu, Ce Zhang, Yuxiong He · 微软, 罗切斯特大学, 苏黎世联邦理工学院等",
+ "venue": "ICML 2021",
+ "aka": ["1-bit Adam", "1比特Adam", "误差补偿压缩", "error-compensated compression", "0/1 Adam", "1-bit LAMB"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2102.02888"}
+ ],
+ "problem": "在普通TCP网络上训练BERT这类大模型，梯度通信是主要瓶颈；带误差补偿的1比特压缩对SGD有效，但Adam的更新与梯度是非线性关系，直接压缩会破坏收敛。",
+ "idea": "发现Adam的二阶矩（方差）在预热阶段后基本稳定：先用正常Adam跑一段预热，然后冻结方差当作固定的预条件，余下训练只压缩一阶动量并做误差补偿，此时更新又变成线性的，1比特压缩就能用了。",
+ "impact": "把1比特通信压缩从SGD推广到Adam，作为DeepSpeed的优化器发布，后续又有1-bit LAMB、0/1 Adam等扩展。",
+ "method": "[[qsgd]]、[[dgc]]等梯度压缩方法配合**误差补偿**（把每次压缩丢掉的部分累计起来，下一步加回去）后，即使每个元素只传1比特（符号加一个缩放系数），SGD和动量SGD也能保持原来的收敛速度。原因在于这些优化器的更新是梯度的线性函数，误差补偿可以把压缩误差“还回来”。[[adam]]的更新 `m / (√v + ε)` 中，`v` 是梯度平方的滑动平均，压缩误差进入 `v` 后会被非线性放大，误差补偿失效。\n\n1-bit Adam的关键观察是：训练预热结束后，`v` 变化很小。于是训练分两段：**预热阶段**用全精度通信跑标准Adam；**压缩阶段**冻结 `v`，只在各卡间同步一阶动量 `m`，并对 `m` 做带误差补偿的1比特压缩。由于 `v` 固定，更新相对 `m` 是线性的，误差补偿的理论保证重新成立。论文也给出了收敛性分析。\n\n摘要报告：通信量最多减少5倍，收敛速度与未压缩的Adam相同；在最多256张GPU上，BERT-Large预训练吞吐最多提高3.3倍，SQuAD微调提高2.9倍。",
+ "limits": [
+  {"text": "依赖预热后方差稳定的假设，预热长度需要调；冻结方差后对训练后期分布变化的适应变差。", "solved_by": ["demo-optim"]}
+ ],
+ "relations": [
+  {"to": "adam", "type": "solves", "note": "Adam的非线性更新使误差补偿压缩失效，1-bit Adam通过冻结方差让压缩重新可用。"},
+  {"to": "qsgd", "type": "extends", "note": "把梯度量化压缩通信的思路推广到Adam优化器。"},
+  {"to": "dgc", "type": "extends", "note": "沿用误差累积与补偿的做法，压缩对象换成Adam的动量。"}
+ ],
+ "prereq": ["adaptive-optimizer", "distributed-training", "quantization-concept", "momentum"],
+ "terms": [{"t": "误差补偿", "d": "把压缩时丢掉的残差记下来，在下一步通信前加回到要压缩的量上，使长期来看没有信息被系统性丢掉。"}],
+ "check": {"source": "https://arxiv.org/abs/2102.02888", "confirmed": "标题、九位作者、v1日期2021-02-04；摘要：通信是瓶颈尤其在TCP互连的普通系统上、误差补偿压缩在1比特下仍有稳健收敛、只适用于对梯度线性的SGD与动量SGD而不适用于Adam、发现Adam方差在预热后稳定可作为固定预条件、通信量最多减少5倍、收敛速度与未压缩Adam相同、256 GPU上BERT-Large预训练吞吐最多3.3倍、SQuAD微调2.9倍、有理论分析。两阶段流程细节、ICML 2021、机构、后续1-bit LAMB/0/1 Adam为一般了解。"}
+}

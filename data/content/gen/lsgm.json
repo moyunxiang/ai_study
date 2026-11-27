@@ -1,0 +1,28 @@
+{
+  "id": "lsgm",
+  "who": "Arash Vahdat, Karsten Kreis, Jan Kautz · NVIDIA",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2106.05931"},
+    {"label": "项目页", "url": "https://nvlabs.github.io/LSGM"}
+  ],
+  "aka": ["LSGM", "潜空间分数生成模型", "Latent Score-based Generative Model", "潜空间扩散"],
+  "problem": "分数扩散模型直接在像素空间上训练和采样，要上千次网络计算才能出一张图，也只能处理连续数据。能不能把扩散搬到一个更小、更平滑的隐空间里？",
+  "idea": "把扩散模型当作VAE的先验：编码器把图像压成隐变量，隐空间里跑一个分数生成模型，解码器再还原成图像，三者端到端联合训练；为此提出适配的分数匹配目标、相对标准高斯的残差参数化和多种降方差技巧。",
+  "impact": "在CIFAR-10上取得2.10的FID，并在CelebA-HQ-256上把采样时间缩短两个数量级；与几个月后的潜扩散LDM一起确立了“在隐空间做扩散”的思路，区别是LDM改为先固定自编码器再训扩散。",
+  "method": "LSGM的整体是一个VAE：编码器q(z|x)、解码器p(x|z)，但先验p(z)不再是标准高斯，而是一个在z空间定义的[[score-sde]]式分数模型。训练目标是VAE的[[c:elbo]]，其中先验项−log p(z)的交叉熵无法直接计算，作者推导出它可以写成隐空间上的去噪分数匹配损失加常数，从而三部分可以一起端到端优化。\n\n两个关键设计：一是让分数网络只建模“隐变量分布与标准高斯之差”的残差部分，如果编码器已把z压得接近高斯，分数模型就只需学一点修正，SDE也更平滑、采样步数更少；二是对训练目标里随机时间t的采样做多种重要性加权，降低端到端训练时的方差。\n\n隐空间更小更平滑，所以表达力更强、采样更快，还能通过编码器处理二值图这样的非连续数据。CIFAR-10上FID 2.10，在CelebA-HQ-256上画质与像素空间分数模型相当而采样快两个数量级，在二值化OMNIGLOT上取得当时最好的似然。",
+  "limits": [
+    {"text": "编码器、解码器和扩散先验联合训练不稳定，需要多种降方差技巧，难以扩展到大规模文生图。", "solved_by": ["ldm"]}
+  ],
+  "relations": [
+    {"to": "nvae", "type": "uses", "note": "编码器和解码器沿用同一团队的分层VAE（NVAE）结构。"},
+    {"to": "score-sde", "type": "uses", "note": "隐空间中的先验就是分数SDE式的连续时间扩散模型。"},
+    {"to": "vae", "type": "extends", "note": "把VAE的标准高斯先验换成可学习的扩散先验，整体仍按ELBO训练。"}
+  ],
+  "prereq": ["latent-space", "elbo", "diffusion-process", "score-function", "importance-sampling"],
+  "terms": [
+    {"t": "残差参数化", "d": "让网络只输出与标准高斯分数之间的差，而不是从零开始预测整个分数。"}
+  ],
+  "learn": "先读VAE和分数SDE → 读本文第3节交叉熵项化为分数匹配的推导 → 对比LDM两阶段训练的取舍。",
+  "check": {"source": "https://arxiv.org/abs/2106.05931", "confirmed": "标题、三位作者、v1日期2021-06-10、摘要中在VAE框架下于隐空间训练分数模型、新的分数匹配目标、相对正态分布失配的分数参数化、多种降方差技巧、CIFAR-10 FID 2.10、CelebA-HQ-256上采样快两个数量级、二值化OMNIGLOT似然最好；机构、NeurIPS 2021、编码器沿用NVAE、与LDM的对比来自一般了解"}
+}

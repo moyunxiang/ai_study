@@ -1,0 +1,30 @@
+{
+  "id": "u-palm",
+  "who": "Yi Tay, Jason Wei, Hyung Won Chung, Vinh Q. Tran, David R. So, Siamak Shakeri, Xavier Garcia, Huaixiu Steven Zheng et al. · Google",
+  "venue": "EMNLP 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2210.11399"}
+  ],
+  "aka": ["U-PaLM", "UL2R", "UL2 Restore", "Transcending Scaling Laws", "混合去噪续训"],
+  "problem": "改进大模型的常规办法是加大模型或数据，成本按数量级增长；已经训好的PaLM 540B花费了数百万TPU小时，能否用极少的额外算力让它明显变强？",
+  "idea": "UL2R：在已训练好的PaLM上，用UL2的混合去噪目标（短跨度去噪、长跨度/高掩码率去噪、前缀语言建模三者混合，并配模式切换标记）再继续训练很少的步数，约占原始预训练算力的0.1%，不加新数据。",
+  "impact": "U-PaLM 540B只用约一半的计算预算就达到PaLM 540B最终的效果（约节省440万TPUv4小时），说明预训练目标而不只是规模影响规模曲线；U-PaLM之后与Flan指令微调结合成Flan-U-PaLM。",
+  "method": "背景：[[palm]]是纯因果语言模型（从左到右预测下一个词）。[[ul2]]提出“混合去噪器”（Mixture-of-Denoisers）预训练目标：R-去噪（常规的短跨度掩码，类似T5）、X-去噪（长跨度或高掩码比例的极端去噪）、S-去噪（前缀语言模型，给定前缀生成后续），并在输入前加 [NLU]/[NLG]/[S2S] 等标记告诉模型当前是哪种模式。UL2在20B规模上表现很好，但从头训练一个540B的UL2代价太大。\n\n**UL2R**：拿已经训好的PaLM检查点，在同一份预训练数据上，以UL2的混合去噪目标继续训练少量步数（论文称额外计算约为原始训练的0.1%）。为了在纯解码器结构上实现去噪，输入中被掩的跨度用哨兵标记替换，目标是在后面依次生成被掩的内容；前缀部分使用双向注意力（前缀语言模型）。作者在8B、62B和540B三个规模上做了这一续训，得到U-PaLM。\n\n结果：摘要称在540B规模上，U-PaLM在约一半计算预算时就达到PaLM 540B最终模型的表现，约节省440万TPUv4小时；在若干BIG-Bench难任务上出现了“涌现”式的提升，有些任务上U-PaLM 62B就做到了PaLM 540B才能做到的效果。U-PaLM在英语常识推理与问答、带思维链的推理（GSM8K）、多语言任务（MGSM、TydiQA）、MMLU和BIG-Bench难任务的少样本设置中都超过PaLM。由于学过去噪目标，U-PaLM还能做单个和多个跨度的填空（infilling）。",
+  "limits": [
+    {"text": "改进只在PaLM一个模型族上验证，续训的步数、去噪器配比如何选择缺少系统的消融，后来的开源大模型大多没有采用混合去噪续训。", "solved_by": []},
+    {"text": "结论以少样本基准为主，续训后的模型仍需指令微调才能好用；U-PaLM本身未公开权重，难以复现。", "solved_by": ["flan-t5"]}
+  ],
+  "relations": [
+    {"to": "palm", "type": "extends", "note": "在已训练好的PaLM检查点上续训，得到8B、62B、540B三个U-PaLM。"},
+    {"to": "ul2", "type": "uses", "note": "续训目标直接使用UL2的混合去噪器与模式切换标记。"},
+    {"to": "emergent-abilities", "type": "extends", "note": "报告续训后在BIG-Bench难任务上出现涌现式提升，小模型提前获得大模型的能力。"},
+    {"to": "chinchilla", "type": "rivals", "note": "Chinchilla通过调整参数与数据配比改善算力效率，U-PaLM通过改变训练目标改善规模曲线。"}
+  ],
+  "prereq": ["masked-modeling", "autoregressive", "scaling-law-concept", "pretrain-finetune", "zero-few-shot"],
+  "terms": [
+    {"t": "混合去噪器（Mixture-of-Denoisers）", "d": "UL2的预训练目标：随机在几种不同长度和比例的掩码填空任务及前缀续写任务之间切换。"},
+    {"t": "填空（infilling）", "d": "给定前后文，补全中间缺失的一段文字，而不只是在末尾续写。"}
+  ],
+  "learn": "先读[[ul2]]理解三种去噪器；读原文第2节UL2R的训练设置和第4节规模曲线图；对照[[flan-t5]]了解U-PaLM后续的指令微调版本。",
+  "check": {"source": "https://arxiv.org/abs/2210.11399", "confirmed": "标题、作者、arXiv v1提交日2022-10-20；摘要中UL2R以相对极少的额外算力改进现有模型及其规模曲线、在PaLM上用UL2混合去噪目标续训少量步数且无新数据、8B/62B/540B三个U-PaLM、540B规模约2倍算力节省（约440万TPUv4小时）、BIG-Bench难任务上的涌现与62B优于540B的例子、常识推理/问答/CoT GSM8K/MGSM/TydiQA/MMLU/BIG-Bench上超过PaLM、单跨度与多跨度填空。0.1%出自标题，三种去噪器与模式标记、实现细节、EMNLP 2023为一般了解。"}
+}

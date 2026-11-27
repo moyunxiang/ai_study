@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>OCRNet物体上下文分割（2019） · AI脉络</title>
+<meta name="description" content="语义分割要靠上下文判断一个像素是什么，但的金字塔池化和式注意力汇集的是“周围所有像素”，其中混着大量别的物体的信息。 一个像素的标签就是它所属物体的类别，所以应该用“物体”来做上下文：先粗分出每一类的物体区域，把区域内像素特征平均成区域表示，再按像素与各区域的相似度加权汇总，拼回像素特征。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ocrnet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OCRNet物体上下文分割（2019）">
+<meta property="og:description" content="语义分割要靠上下文判断一个像素是什么，但的金字塔池化和式注意力汇集的是“周围所有像素”，其中混着大量别的物体的信息。 一个像素的标签就是它所属物体的类别，所以应该用“物体”来做上下文：先粗分出每一类的物体区域，把区域内像素特征平均成区域表示，再按像素与各区域的相似度加权汇总，拼回像素特征。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ocrnet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ocrnet">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 图像分割</div>
+<h1>OCRNet物体上下文分割</h1>
+<div class="full">Object-Contextual Representations for Semantic Segmentation</div>
+<div class="meta"><span>2019.09</span><span>论文</span><span>延伸</span><span>ECCV 2020</span><span>Yuhui Yuan, Xiaokang Chen, Xilin Chen, Jingdong Wang · 微软亚洲研究院 / 中科院计算所</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1909.11065" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/openseg-group/openseg.pytorch" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/ocrnet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>语义分割要靠上下文判断一个像素是什么，但<a class="ln" href="../n/pspnet.html">PSPNet</a>的金字塔池化和<a class="ln" href="../n/non-local.html">Non-local网络</a>式注意力汇集的是“周围所有像素”，其中混着大量别的物体的信息。</p></div><div><h4>方法</h4><p>一个像素的标签就是它所属物体的类别，所以应该用“物体”来做上下文：先粗分出每一类的物体区域，把区域内像素特征平均成区域表示，再按像素与各区域的相似度加权汇总，拼回像素特征。</p></div><div><h4>影响</h4><p>OCR模块简单、可以接在任意骨干后面，“HRNet+OCR”在Cityscapes等基准上长期是强基线；论文后来把这种像素-区域注意力改写成Transformer编码器-解码器的形式。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>OCR模块分三步：</p><ul><li><b>软物体区域</b>：在骨干特征上接一个辅助分割头，输出K张（K=类别数）粗分割图，用真值监督；</li><li><b>区域表示</b>：对第k张软区域图，用它当权重把所有像素特征加权平均，得到第k类物体的一个向量 <code>f_k</code>；</li><li><b>物体上下文</b>：对每个像素i，算它与各区域表示的相似度并做<a class="lc" href="../c/softmax.html">Softmax与logits</a>得到权重 <code>w_ik</code>，物体上下文 <code>y_i = Σ_k w_ik · φ(f_k)</code>；最后把 <code>y_i</code> 与原像素特征拼接，再预测最终类别。</li></ul><p>与<a class="ln" href="../n/non-local.html">Non-local网络</a>让每个像素看所有像素不同，这里每个像素只看K个区域向量，计算量从“像素×像素”降到“像素×类别”，而且汇集的是同类物体的信息。论文在<a class="ln" href="../n/hrnet.html">HRNet</a>和ResNet骨干上做实验，摘要报告在Cityscapes、ADE20K、LIP、PASCAL-Context和COCO-Stuff上都有竞争力，“HRNet + OCR + SegFix”提交时在Cityscapes排行榜第一。</p><p>之后的<a class="ln" href="../n/maskformer.html">MaskFormer</a>、<a class="ln" href="../n/mask2former.html">Mask2Former通用分割</a>把“用少量类别或物体向量去与像素交互”做成了基于查询的掩码分类，OCR可以看成这条路线的前身之一。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>软物体区域按类别划分，同一类的多个实例被合成一个区域表示，无法区分个体，也不直接给出实例或全景分割。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/maskformer.html">MaskFormer</a> <a class="chip hue" style="--h:216" href="../n/mask2former.html">Mask2Former通用分割</a></div></li><li>依赖一个辅助粗分割头和高分辨率骨干，整体推理仍然偏重。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/segformer.html">SegFormer</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/refinenet.html">RefineNet多路径细化</a><span class="yr">2016.11 · 视觉</span><div class=nt>上下文只靠局部池化链来汇集，对整张图级别的全局关系建模有限。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/pspnet.html">PSPNet</a><span class="yr">2016.12 · 视觉</span><div class=nt>金字塔池化按固定窗口汇集上下文，混入别的物体；OCR改为按所属物体区域汇集。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/deeplabv3.html">DeepLabv3与ASPP</a><span class="yr">2017.06 · 视觉</span><div class=nt>DeepLabv3用ASPP的多空洞率卷积获取多尺度上下文；OCR用物体区域表示，两者在Cityscapes等基准上长期并列比较。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/non-local.html">Non-local网络</a><span class="yr">2017.11 · 视觉</span><div class=nt>同样是注意力式上下文聚合，但把“像素对像素”换成“像素对物体区域”，更省也更有针对性。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/hrnet.html">HRNet</a><span class="yr">2019.02 · 视觉</span><div class=nt>主要实验以HRNet为骨干，HRNet+OCR成为常用组合。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/mask2former.html">Mask2Former通用分割</a><span class="yr">2021.12 · 视觉</span><div class=nt>软物体区域按类别划分，同一类的多个实例被合成一个区域表示，无法区分个体，也不直接给出实例或全景分割。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/segformer.html">SegFormer</a><span class="yr">2021.05 · 视觉</span><div class=nt>依赖一个辅助粗分割头和高分辨率骨干，整体推理仍然偏重。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/maskformer.html">MaskFormer</a><span class="yr">2021.07 · 视觉</span><div class=nt>软物体区域按类别划分，同一类的多个实例被合成一个区域表示，无法区分个体，也不直接给出实例或全景分割。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/attention-concept.html">注意力机制</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/iou-map.html">IoU与mAP</a></p>
+<h2>本篇术语</h2><ul><li><b>软物体区域</b>　每一类一张、取值在0到1之间的粗分割图，表示每个像素属于这一类物体的程度。</li></ul>
+<h2>怎么学</h2><p>先理解Non-local注意力的计算方式，再读本文第3节的三步公式；可在mmsegmentation里对比OCRNet与PSPNet的配置和精度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1909.11065" rel="noopener">https://arxiv.org/abs/1909.11065</a>（arXiv记录：四位作者、v1提交于2019-09-24；最新版标题加了前缀“Segmentation Transformer:”，登记用ECCV版原题；摘要中的三步做法（真值监督的物体区域、区域表示、像素与区域的关系加权）、五个基准、HRNet+OCR+SegFix在Cityscapes排名第一、改写为Transformer编码器-解码器。ECCV 2020、机构、K=类别数等细节凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20OCRNet%E7%89%A9%E4%BD%93%E4%B8%8A%E4%B8%8B%E6%96%87%E5%88%86%E5%89%B2%EF%BC%88ocrnet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aocrnet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ocrnet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="randaugment.html"><small>本分支上一个 · 2019.09</small><b>RandAugment</b></a><a class="r" href="noisy-student.html"><small>本分支下一个 · 2019.11</small><b>Noisy Student自训练</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

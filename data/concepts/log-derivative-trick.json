@@ -1,0 +1,9 @@
+{
+  "key": "log-derivative-trick",
+  "short": "求“期望对分布参数的梯度”的通用办法：∇E[f(x)] = E[f(x)·∇log p_θ(x)]。f不需要可导、x可以是离散的，只要能采样并算出对数概率的梯度，代价是方差大。",
+  "body": "很多目标的形式是`J(θ) = E_{x~p_θ}[f(x)]`：参数θ决定采样分布，f给样本打分。强化学习里x是轨迹、f是回报；语言模型的RL微调里x是一段生成的文本、f是奖励模型或验证器的打分。困难在于f往往不可导（环境、编译器、人类评分），x又是离散的，无法把梯度从f穿过采样传回θ。\n\n**推导**。只用一个恒等式`∇p = p · ∇log p`：\n\n`∇_θ J = ∇_θ Σ_x p_θ(x) f(x) = Σ_x p_θ(x) · ∇_θ log p_θ(x) · f(x) = E_{x~p_θ}[f(x) · ∇_θ log p_θ(x)]`\n\n右边是一个期望，可以用采样估计：采N个样本，对`f(x_i)·∇log p_θ(x_i)`取平均。`∇log p_θ(x)`在统计学里叫**得分函数**（score function），所以这个估计也叫得分函数估计、似然比估计，在强化学习里叫REINFORCE估计。\n\n**直观含义**。把得分高的样本的对数概率往上推、得分低的往下推，推的力度与得分成正比。\n\n**基线**。因为`E[∇log p_θ(x)] = Σ_x ∇p_θ(x) = ∇1 = 0`，从f里减去任何与x无关的常数b都不改变期望，却能大幅降低方差，见[[c:pg-variance-reduction]]。\n\n**它出现在哪里**。[[reinforce]]和[[pg-theorem]]把它用到序列决策上，见[[c:policy-gradient-concept]]；[[rloo]]等大模型RL方法用同组其他样本的平均奖励作基线。离散隐变量的变分推断也用它。另一条路是[[c:reparameterization]]：把采样写成`x = g(θ, ε)`，让梯度直接穿过f，方差通常小得多，但要求f可导、x连续；离散情形的近似办法见[[c:gumbel-softmax]]。",
+  "example": "伯努利变量x ∈ {0, 1}，`p_θ(x=1) = σ(θ)`，f(1)=1、f(0)=0，于是J = σ(θ)，真实梯度为σ(θ)(1−σ(θ))。θ=0时p=0.5，真实梯度0.25。得分函数估计：采到x=1（概率0.5）时，`∇log σ(θ) = 1 − σ(θ) = 0.5`，乘f=1得0.5；采到x=0时f=0，估计为0。平均0.25，无偏；但单个样本只会是0或0.5，方差为0.0625，与均值同一量级。",
+  "pitfalls": "- 无偏不等于好用：f的取值范围大（例如回报在几百上千）时，单样本的梯度方向几乎是随机的，不加基线和归一化很难训练。\n- 估计要求样本真的来自p_θ。用旧参数的样本估计新参数的梯度，必须加[[c:importance-sampling]]修正，这就是PPO里概率比的来源。",
+  "needs": ["derivative-gradient", "expectation-variance", "monte-carlo"],
+  "aka": ["对数导数技巧", "log-derivative trick", "得分函数估计", "score function estimator", "score function gradient", "似然比", "似然比技巧", "likelihood ratio trick", "likelihood ratio gradient", "REINFORCE estimator", "REINFORCE估计", "似然比梯度估计"]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "adaptive-rag",
+  "who": "Soyeong Jeong, Jinheon Baek, Sukmin Cho, Sung Ju Hwang, Jong C. Park · KAIST",
+  "venue": "NAACL 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2403.14403"},
+    {"label": "GitHub", "url": "https://github.com/starsuzi/Adaptive-RAG"}
+  ],
+  "aka": ["AdaptiveRAG", "Adaptive RAG", "自适应RAG", "自适应检索增强", "按问题复杂度选择检索策略", "query complexity routing"],
+  "problem": "简单问题不必检索，复杂多跳问题却要反复检索推理；固定用一种策略，要么简单问题白白多花算力，要么复杂问题答不好。",
+  "idea": "先用一个小分类器判断问题有多难，再在“不检索、检索一次、多步交替检索”三种策略里选一种去回答。",
+  "impact": "把“按难度路由检索策略”做成一个可训练的小模块，此后的RAG系统常在前面加一个类似的复杂度判断或路由器。",
+  "method": "当时的检索增强问答有两种极端：[[rag]]式的单步检索又快又省，但多跳问题（要先查A再据A查B）常答错；[[ircot]]把[[c:retrieval]]和思维链交替进行，多跳问题答得好，但每题要多次调用LLM和检索器。[[flare]]、[[self-rag]]等自适应方法让模型自己决定何时检索，但没有按问题整体难度切换策略。\n\nAdaptive-RAG定义三档：A不检索，LLM直接答；B检索一次再答；C用IRCoT多步迭代。一个T5-Large（770M）分类器读入问题，预测该走哪一档。训练标签不靠人工：用三种策略实际去答，最简单就能答对的策略作为标签；三种都答错的，来自单跳数据集的标为B，来自多跳数据集的标为C。\n\n在SQuAD、NQ、TriviaQA三个单跳和MuSiQue、HotpotQA、2WikiMultiHopQA三个多跳数据集上，以GPT-3.5为读者，Adaptive-RAG平均F1为50.91，多步方法为50.87；耗时（以单步检索为1）从3.33降到1.46。换成FLAN-T5-XL时，F1略低于多步方法（46.94对48.85），耗时从8.81降到3.60。",
+  "limits": [
+    {"text": "分类器只在少数开放域问答数据集上训练，标签部分来自“出自单跳还是多跳数据集”这一偏置，换到真实用户问题时判断可能不准。", "solved_by": []},
+    {"text": "只有三档固定策略，判断在答题前一次完成，无法在推理途中根据新信息改变检索次数。", "solved_by": ["search-r1"]}
+  ],
+  "relations": [
+    {"to": "ircot", "type": "uses", "note": "把IRCoT作为最复杂的C档策略，只在分类器判定为多跳难题时才调用。"},
+    {"to": "self-rag", "type": "rivals", "note": "Self-RAG训练生成模型本身用反思token决定是否检索；Adaptive-RAG不改生成模型，用外置小分类器按问题难度选策略。"},
+    {"to": "flare", "type": "rivals", "note": "FLARE在生成途中按token置信度决定何时检索；Adaptive-RAG在答题前按整体难度一次性决定检索深度。"},
+    {"to": "rag", "type": "solves", "note": "缓解了单步RAG在多跳问题上答不好、而全部换用多步方法又太贵的两难。"}
+  ],
+  "prereq": ["retrieval", "classification-metrics", "language-model", "supervised-learning"],
+  "learn": "先读[[rag]]和[[ircot]] → 读原文第3节（三档策略与标签构造）和表1的F1与耗时 → 动手：用一个小分类器给100道问答题分成三档，统计每档实际需要的检索次数。",
+  "check": {"source": "https://arxiv.org/abs/2403.14403", "confirmed": "标题、5位作者、v1提交于2024-03-21；GitHub README注明NAACL 2024；正文（arxiv.org/html/2403.14403）核对三档策略与IRCoT、T5-Large 770M分类器、自动标签规则、六个数据集、GPT-3.5下F1 50.91对50.87与耗时1.46对3.33、FLAN-T5-XL下46.94对48.85与3.60对8.81、KAIST单位。"}
+}

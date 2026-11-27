@@ -1,0 +1,30 @@
+{
+  "id": "coatnet",
+  "who": "Zihang Dai, Hanxiao Liu, Quoc V. Le, Mingxing Tan · Google Brain",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2106.04803"}
+  ],
+  "aka": ["CoAtNet", "卷积注意力混合网络", "Convolution and Attention", "相对注意力", "relative attention", "混合骨干", "hybrid backbone"],
+  "problem": "Transformer容量大，但缺少卷积的归纳偏置，数据少时泛化不如卷积网络；卷积网络泛化好，数据极多时容量又不够。2021年的视觉Transformer在中等数据上仍落后于最好的卷积网络。",
+  "idea": "两点观察：深度卷积和自注意力都是对邻域加权求和，可以用“相对注意力”合成一个运算；按“前面卷积、后面注意力”的方式纵向堆叠两种层，能同时得到好的泛化和大的容量。",
+  "impact": "CoAtNet在从ImageNet-1K到JFT-3B的各种数据规模上都取得当时最好的精度，以JFT-3B预训练达到ImageNet 90.88% top-1，是“卷积在前、注意力在后”混合骨干的代表作。",
+  "method": "**统一卷积与注意力**：深度卷积的输出是 `y_i = Σ_{j∈局部} w_{i−j} x_j`，权重只取决于相对位置i−j，与内容无关；自注意力 `y_i = Σ_j softmax(x_iᵀx_j) x_j` 的权重取决于内容，范围是全局。CoAtNet把两者合起来：注意力的打分加上一个随相对位置变化的可学习偏置 `x_iᵀx_j + w_{i−j}`，再做softmax。这样既有卷积的平移等变偏好，又保留内容自适应和全局感受野。\n\n**纵向堆叠**：网络分五个阶段（S0到S4），分辨率逐级减半。作者比较了多种排列，结论是前面高分辨率的阶段用卷积（[[efficientnet]]里的MBConv块），后面低分辨率的阶段用带相对注意力的Transformer块，例如C-C-T-T（两段卷积、两段Transformer）在泛化和容量之间平衡最好。高分辨率时注意力太贵，卷积正合适；低分辨率时token少，全局注意力负担得起。\n\n摘要报告：不用额外数据时ImageNet top-1为86.0%；用ImageNet-21K的1300万张图预训练达到88.56%，与用JFT-300M（3亿张）预训练的ViT-Huge持平而数据少23倍；进一步用JFT-3B扩大规模后达到90.88%。",
+  "legacy": "同组的[[maxvit]]在此基础上把注意力改成可在高分辨率使用的多轴形式；“前卷积后注意力”的混合布局也出现在许多后续骨干和多模态视觉编码器中。2022年后大规模预训练的朴素ViT（[[eva]]、[[dinov2]]）重新成为大模型的主流视觉骨干。",
+  "limits": [
+    {"text": "前几个阶段只有卷积，全局信息要到网络后半段才能交互；最大的模型依赖不公开的JFT-3B数据，难以复现。", "solved_by": ["maxvit"]}
+  ],
+  "relations": [
+    {"to": "vit", "type": "solves", "note": "ViT在中等数据上泛化不如卷积网络；CoAtNet用相对注意力和卷积在前的布局，在各种数据规模上都超过ViT。"},
+    {"to": "efficientnet", "type": "uses", "note": "卷积阶段采用EfficientNet的MBConv块。"},
+    {"to": "relative-position", "type": "extends", "note": "把相对位置表示引入视觉注意力，并说明它与深度卷积的等价联系。"},
+    {"to": "cvt", "type": "rivals", "note": "同期的卷积-Transformer混合：CvT把卷积嵌进每个Transformer块，CoAtNet按阶段纵向分配卷积层和注意力层。"}
+  ],
+  "prereq": ["self-attention", "conv-layer", "inductive-bias", "generalization", "positional-encoding"],
+  "terms": [
+    {"t": "相对注意力", "d": "注意力打分里加一项只取决于两个位置相对偏移的可学习偏置，使注意力带有卷积式的位置偏好。"},
+    {"t": "MBConv", "d": "MobileNetV2和EfficientNet使用的倒残差块：先1×1升维、再深度卷积、再1×1降维。"}
+  ],
+  "learn": "先理解深度卷积与自注意力的公式，再读CoAtNet第2节把两者合并的推导和不同堆叠方式的对比表；用timm里的CoAtNet实现训练一个小模型，对比C-C-T-T与C-T-T-T。",
+  "check": {"source": "https://arxiv.org/abs/2106.04803", "confirmed": "arXiv记录：标题、四位作者、v1提交于2021-06-09；摘要中Transformer容量大但缺乏归纳偏置导致泛化差、深度卷积与自注意力可通过相对注意力统一、纵向堆叠卷积层与注意力层有效、无额外数据86.0%、ImageNet-21K的1300万图预训练88.56%与JFT-300M预训练的ViT-Huge持平且数据少23倍、JFT-3B扩展到90.88%。公式写法、五阶段结构与C-C-T-T、MBConv、NeurIPS 2021凭一般了解写。"}
+}

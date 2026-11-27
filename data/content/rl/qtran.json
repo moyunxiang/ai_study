@@ -1,0 +1,33 @@
+{
+  "id": "qtran",
+  "who": "Kyunghwan Son, Daewoo Kim, Wan Ju Kang, David Earl Hostallero, Yung Yi · KAIST",
+  "venue": "ICML 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1905.05408"}
+  ],
+  "problem": "[[vdn]]把团队Q值写成个体Q值之和，[[qmix]]要求团队Q值对每个个体Q值单调；这些结构限制只能表示一部分可分解的协作任务，遇到“必须一起做才划算”的收益结构就学错。",
+  "idea": "不直接限制团队Q值的形式，而是给出个体Q值之和与团队Q值之间满足的一组线性条件，只要条件成立，各自贪心选出的动作就恰好是团队最优动作；训练时把这组条件作为额外损失。",
+  "impact": "明确提出了值分解应满足的IGM（个体最优即全局最优）条件，并给出比加性、单调更宽的充分条件，成为后续[[qplex]]、Weighted QMIX等工作讨论表示能力时的出发点。",
+  "background": "合作多智能体的值方法要解决一个矛盾：训练时最好学一个团队的联合Q值 `Q_jt(τ, u)`（τ是所有人的观测历史，u是联合动作），执行时每个智能体却只能根据自己的 `Q_i(τ_i, u_i)` 各自取argmax。只有当“各自取最优”拼起来等于“联合取最优”时，这样做才不吃亏。[[vdn]]用 `Q_jt = Σ Q_i`、[[qmix]]用单调混合保证了这一点，但代价是很多真实存在的收益结构根本表示不出来。",
+  "method": "QTRAN先把这个要求写成IGM条件：`argmax_u Q_jt(τ,u) = (argmax_{u_1} Q_1, …, argmax_{u_n} Q_n)`。然后证明一个充分条件：设 `ū_i` 是各自的贪心动作，定义 `V_jt(τ) = max_u Q_jt(τ,u) − Σ_i Q_i(τ_i, ū_i)`，只要\n\n`Σ_i Q_i(τ_i,u_i) − Q_jt(τ,u) + V_jt(τ) = 0`（当 u = ū）\n`Σ_i Q_i(τ_i,u_i) − Q_jt(τ,u) + V_jt(τ) ≥ 0`（当 u ≠ ū）\n\n就满足IGM。直观地说：个体Q值之和加一个修正项V，在贪心联合动作上要和团队Q值相等，在其他动作上不能比团队Q值小。\n\n网络上同时学三样东西：不受结构限制的联合Q网络 `Q_jt`（用普通TD损失训练）、各个体Q网络、以及状态价值网络 `V_jt`。上面的等式和不等式分别变成两项平方惩罚损失 `L_opt` 和 `L_nopt`，与TD损失加权相加。这样团队Q值本身可以是任意函数，只是通过约束让个体Q值“对齐”它。",
+  "results": "摘要称，在多域高斯挤压（Gaussian squeeze）和修改版捕食者-猎物任务上表现优于VDN和QMIX，在对不协作行为惩罚越重的游戏里优势越大。",
+  "legacy": "QTRAN的条件在理论上更一般，但在实践中两个约束只是软惩罚，在[[smac]]这类复杂任务上往往不如QMIX稳定。随后[[qplex]]用对偶的“优势”分解把IGM直接写进网络结构，Weighted QMIX则从“QMIX在做什么投影”的角度修正单调分解，这两条路线被用得更多。",
+  "limits": [
+    {"text": "IGM条件只以平方惩罚的形式近似满足，约束越松，学到的个体Q值越可能与联合Q值不一致；在复杂的星际任务上表现不稳定。", "solved_by": ["qplex"]},
+    {"text": "联合Q网络的输入是全部智能体的联合动作，动作空间随智能体数指数增长，难以扩展到很多智能体。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "vdn", "type": "solves", "note": "VDN的加性分解表示不了需要协同的收益；QTRAN用一组线性约束代替加性结构，覆盖更多可分解任务。"},
+    {"to": "qmix", "type": "solves", "note": "QMIX的单调性约束同样只覆盖部分任务；QTRAN证明了比单调更宽的充分条件。"},
+    {"to": "dqn-nature", "type": "uses", "note": "联合Q网络与个体Q网络都用DQN式的TD目标和目标网络训练。"},
+    {"to": "independent-q", "type": "extends", "note": "执行时仍然是每个智能体按自己的Q值独立贪心，但训练时用联合Q值保证这种独立执行不失最优。"}
+  ],
+  "prereq": ["policy-value", "bellman-equation", "td-error", "credit-assignment", "loss-function"],
+  "terms": [
+    {"t": "IGM条件", "d": "Individual-Global-Max：每个智能体各自按自己的Q值取最优动作，拼起来恰好是让团队Q值最大的联合动作。值分解方法能分散执行的前提。"},
+    {"t": "值分解", "d": "把团队的联合Q值拆成每个智能体各自的Q值的某种组合，使训练集中、执行分散成为可能。"}
+  ],
+  "learn": "先读[[vdn]]和[[qmix]]，用一个2×2的矩阵博弈（只有两人都选A才得高分）手算加性分解为什么失败；再读原文第3节的定理与证明；最后看[[qplex]]怎样把同一条件改写成网络结构。",
+  "check": {"source": "https://arxiv.org/abs/1905.05408", "confirmed": "标题、五位作者、arXiv v1于2019-05-14；摘要中VDN与QMIX受加性/单调性结构约束只覆盖部分可分解任务、QTRAN把联合Q值变换为易分解且最优动作相同的形式、多域高斯挤压与修改版捕食者-猎物实验、对不协作惩罚越重优势越大。IGM条件与两条约束的公式、三个损失项按原文正文通行描述；ICML 2019、KAIST、在SMAC上不稳定的评价按后续文献的通行说法。"},
+  "aka": ["QTRAN", "IGM", "Individual-Global-Max"]
+}

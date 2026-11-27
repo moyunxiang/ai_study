@@ -1,0 +1,31 @@
+{
+  "id": "pengi",
+  "who": "Soham Deshmukh, Benjamin Elizalde, Rita Singh, Huaming Wang · 微软、卡内基梅隆大学",
+  "venue": "NeurIPS 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2305.11834"}
+  ],
+  "problem": "CLAP之类的音频模型能做零样本分类和检索，但只能在给定选项里打分，不能生成语言，因此做不了音频描述、音频问答这类开放式任务。",
+  "idea": "把所有音频任务都表述成文本生成：音频编码器和文本编码器各自输出连续嵌入，拼在一起作为前缀，去提示一个冻结的预训练语言模型生成自由文本。",
+  "impact": "较早的「音频语言模型」之一：一个结构、不加任务专用模块，就能处理分类、描述、问答等开放和封闭任务；之后LTU、SALMONN、Qwen-Audio把这条「音频编码器+LLM」路线做大。",
+  "method": "[[clap]]用对比学习把音频和文本放进同一空间，可以零样本分类，但它是判别式的：只能比较「这段声音和哪句话更像」，不能自己写一句话。[[gpt-3]]式的语言模型擅长生成，但听不见声音。\n\nPengi把两者接起来，并把任务统一成「输入音频和一段文本提示，输出一段文本」：\n- **音频编码器**：用CLAP式的预训练音频编码器把录音变成一串连续嵌入，再经一个小的映射网络调整到语言模型的维度。\n- **文本编码器**：把任务提示（如「这段声音是什么？」「为这段音频写一句描述」）也编码成嵌入。\n- **冻结的语言模型**：两段嵌入拼起来作为**前缀**，送入一个参数冻结的预训练语言模型（[[gpt-2]]），由它自回归地生成答案。训练时只更新映射网络等少量部分。\n\n因为所有任务都是文本生成，分类就是生成类别名，描述就是生成一句话，问答就是生成答案，不需要为每个任务加专门的输出层。在22个下游任务上评测，Pengi在其中若干个上达到当时最好。",
+  "limits": [
+    {"text": "语言模型很小（GPT-2级别），推理和对话能力有限，回答以短文本为主。", "solved_by": ["ltu", "salmonn", "qwen-audio"]},
+    {"text": "主要面向声音事件和音乐，几乎不涉及语音内容的理解。", "solved_by": ["salmonn", "qwen-audio"]}
+  ],
+  "relations": [
+    {"to": "clap", "type": "solves", "note": "CLAP只能在候选中打分；Pengi把音频接到语言模型上，可以生成开放式文本答案。"},
+    {"to": "gpt-2", "type": "uses", "note": "用冻结的预训练语言模型根据音频前缀生成文本。"},
+    {"to": "gpt-3", "type": "extends", "note": "借用以提示和前缀统一多任务的生成式做法。"}
+  ],
+  "prereq": ["contrastive-learning", "language-model", "transfer-learning", "embedding", "zero-few-shot"],
+  "terms": [
+    {"t": "前缀提示", "d": "把非文本信息（这里是音频嵌入）当作语言模型输入序列最前面的一段，让模型接着生成。"},
+    {"t": "音频描述", "d": "audio captioning，为一段声音写出自然语言描述，比如「雨中有汽车驶过」。"}
+  ],
+  "aka": ["Pengi", "音频语言模型", "Audio Language Model", "ALM"],
+  "check": {
+    "source": "https://arxiv.org/abs/2305.11834",
+    "confirmed": "arXiv官方记录：标题Pengi: An Audio Language Model for Audio Tasks、Deshmukh/Elizalde/Singh/Wang四位作者、v1提交2023-05-19；摘要中现有模型不能生成开放式任务所需的语言、把所有音频任务表述为文本生成、音频编码器与文本编码器的连续嵌入拼接为前缀提示冻结的预训练语言模型、无需额外微调或任务专用扩展、22个下游任务中若干个SOTA。用CLAP式音频编码器、GPT-2、只训练映射网络、机构、NeurIPS 2023为一般了解。"
+  }
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>全字符级NMT（2016） · AI脉络</title>
+<meta name="description" content="几乎所有翻译系统都在词或子词上工作，依赖显式的分词与切分，因而会遇到未登录词，难以处理罕见的形态变体；而直接逐字符处理时序列长了好几倍，注意力和循环网络都慢得难以训练。 源端和目标端都只用字符：编码器先用多种宽度的字符卷积捕捉局部模式，再以步长5做不重叠的最大池化把序列压短，经过高速网络层和双向G…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/char2char-nmt.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="全字符级NMT（2016）">
+<meta property="og:description" content="几乎所有翻译系统都在词或子词上工作，依赖显式的分词与切分，因而会遇到未登录词，难以处理罕见的形态变体；而直接逐字符处理时序列长了好几倍，注意力和循环网络都慢得难以训练。 源端和目标端都只用字符：编码器先用多种宽度的字符卷积捕捉局部模式，再以步长5做不重叠的最大池化把序列压短，经过高速网络层和双向G…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/char2char-nmt.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/char2char-nmt">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 神经机器翻译与生成</div>
+<h1>全字符级NMT</h1>
+<div class="full">Fully Character-Level Neural Machine Translation without Explicit Segmentation</div>
+<div class="meta"><span>2016.10</span><span>论文</span><span>延伸</span><span>TACL 2017</span><span>Jason Lee, Kyunghyun Cho, Thomas Hofmann · 苏黎世联邦理工学院、纽约大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1610.03017" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/char2char-nmt">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>几乎所有翻译系统都在词或子词上工作，依赖显式的分词与切分，因而会遇到未登录词，难以处理罕见的形态变体；而直接逐字符处理时序列长了好几倍，注意力和循环网络都慢得难以训练。</p></div><div><h4>方法</h4><p>源端和目标端都只用字符：编码器先用多种宽度的字符卷积捕捉局部模式，再以步长5做不重叠的最大池化把序列压短，经过高速网络层和双向GRU得到表示；解码器是带注意力的字符级循环网络，整个系统不做任何切分。</p></div><div><h4>影响</h4><p>在WMT’15德英、捷英上超过子词编码器的基线，芬英、俄英上相当；同一个字符编码器能被德、捷、芬、俄四种源语言共享，多语言模型在全部语对上明显好于子词编码器，在三个语对上甚至超过单语对专门训练的模型。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><b>背景</b>。<a class="ln" href="../n/bpe.html">BPE子词切分</a>把罕见词切成子词，缓解了未登录词问题，但仍要先学一套切分规则；Chung等此前做了子词编码器加字符解码器（bpe2char）。完全的字符到字符（char2char）翻译面临的困难是：句子按字符计长度是按词的五六倍，注意力的计算量与源序列长度成正比，循环编码器也要多走很多步。</p><p><b>编码器</b>（借鉴<a class="ln" href="../n/char-aware-lm.html">字符感知语言模型</a>和<a class="ln" href="../n/char-cnn-text.html">字符级CNN文本分类</a>用卷积处理字符的做法）：字符嵌入→一层带多种滤波器宽度的卷积（相当于抽取各种长度的字符n-gram特征）→<b>带步长的最大池化</b>：把卷积输出切成宽度为s=5的不重叠段，每段取最大值，序列长度缩短为五分之一，每个位置可以看作一个自动学出来的「伪词片段」→四层<a class="ln" href="../n/highway.html">Highway网络</a>网络→双向GRU。解码器在这个缩短的序列上做注意力，逐个生成目标字符。</p><p><b>多语言</b>。由于欧洲语言的字母表大量重叠，字符编码器天然可以共享。作者用四种语言到英语的全部WMT’15数据训练一个多对一模型，不需要标记源语言，参数量也不增加。</p><p><b>结果</b>。双语设置下，char2char在德英和捷英上超过bpe2char基线，芬英和俄英上相当；多语言设置下，字符编码器在全部四个语对上明显超过子词编码器，在捷英、芬英、俄英上无论BLEU还是人工评价都超过了专门训练的双语模型。案例分析显示模型能正确翻译德语长复合数词「Siebentausendzweihundertvierundfünfzig」（七千二百五十四）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>字符序列很长，训练和解码仍比子词模型慢，解码器逐字符生成时尤其明显。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>池化步长固定为5，「伪词片段」的边界与真实的语素边界无关，对不同语言并非最优。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/bahdanau-attention.html">注意力机制</a><span class="yr">2014.09 · NLP</span><div class=nt>解码器是带注意力的循环网络，只是输入输出都换成了字符。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/highway.html">Highway网络</a><span class="yr">2015.05 · 基础</span><div class=nt>卷积与池化之后接四层高速网络。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/bpe.html">BPE子词切分</a><span class="yr">2015.08 · NLP</span><div class=nt>子词方法要先学切分规则；char2char完全不切分，在德英、捷英上超过子词编码器的基线。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/char-aware-lm.html">字符感知语言模型</a><span class="yr">2015.08 · NLP</span><div class=nt>沿用字符卷积加高速网络得到词级表示的做法，并用带步长的池化把它推广到不切词的整句。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/char-cnn-text.html">字符级CNN文本分类</a><span class="yr">2015.09 · NLP</span><div class=nt>字符级CNN文本分类表明卷积能直接从字符学到有用特征，本文把它用作翻译编码器的第一层。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a> <a class="chip c" href="../c/attention-concept.html">注意力机制</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a> <a class="chip c" href="../c/tokenization.html">分词与token</a> <a class="chip c" href="../c/text-metrics.html">文本生成的自动指标</a></p>
+<h2>本篇术语</h2><ul><li><b>带步长的最大池化</b>　把序列切成固定宽度、互不重叠的段，每段只保留最大值，序列长度按步长成倍缩短。</li><li><b>多对一翻译</b>　一个模型同时把多种源语言翻译成同一种目标语言。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/bpe.html">BPE子词切分</a>和<a class="ln" href="../n/char-aware-lm.html">字符感知语言模型</a>的讲解 → 读原文第3节编码器结构（卷积、池化、高速网络） → 动手：在一个小的德英数据上，比较步长为3、5、7时的训练速度和BLEU。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1610.03017" rel="noopener">https://arxiv.org/abs/1610.03017</a>（arXiv：标题、作者Lee、Cho、Hofmann、2016-10-10提交、摘要（不切分的字符到字符NMT；编码器用字符卷积加最大池化缩短表示、速度与子词模型相当；德英、捷英上超过子词编码器基线，芬英、俄英相当；多对一共享字符编码器在所有语对显著优于子词编码器；捷英、芬英、俄英上超过单语对模型，BLEU与人工评价均是）；PDF正文：卷积、池化、高速网络层、步长5的不重叠最大池化、四层高速网络、双向GRU、bpe2char基线、四种语言WMT’15数据、Siebentausendzweihundertvierundfünfzig例子。机构与TACL出处凭一般了解；多种滤波器宽度为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%85%A8%E5%AD%97%E7%AC%A6%E7%BA%A7NMT%EF%BC%88char2char-nmt%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Achar2char-nmt%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/char2char-nmt.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="bytenet.html"><small>本分支上一个 · 2016.10</small><b>ByteNet卷积翻译</b></a><a class="r" href="drmm.html"><small>本分支下一个 · 2016.10</small><b>DRMM深度相关性匹配</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

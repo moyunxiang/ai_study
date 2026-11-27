@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SPPO自我对弈偏好优化（2024） · AI脉络</title>
+<meta name="description" content="Bradley-Terry奖励表达不了不传递、不理性的人类偏好；NLHF把对齐写成偏好博弈，但它的Nash-MD算法要从几何混合策略采样，在大模型上难以实现。 把对齐看成两人常和博弈，用乘性权重更新逐轮逼近纳什均衡：每一轮让模型和上一轮的自己对弈，用偏好模型估计每个回答对当前策略的胜率，再用一个简…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sppo.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SPPO自我对弈偏好优化（2024）">
+<meta property="og:description" content="Bradley-Terry奖励表达不了不传递、不理性的人类偏好；NLHF把对齐写成偏好博弈，但它的Nash-MD算法要从几何混合策略采样，在大模型上难以实现。 把对齐看成两人常和博弈，用乘性权重更新逐轮逼近纳什均衡：每一轮让模型和上一轮的自己对弈，用偏好模型估计每个回答对当前策略的胜率，再用一个简…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sppo.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sppo">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 指令与偏好对齐</div>
+<h1>SPPO自我对弈偏好优化</h1>
+<div class="full">Self-Play Preference Optimization for Language Model Alignment</div>
+<div class="meta"><span>2024.05</span><span>论文</span><span>延伸</span><span>ICLR 2025</span><span>Yue Wu, Zhiqing Sun, Huizhuo Yuan, Kaixuan Ji, Yiming Yang, Quanquan Gu · UCLA、CMU</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2405.00675" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/uclaml/SPPO" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/sppo">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Bradley-Terry奖励表达不了不传递、不理性的人类偏好；NLHF把对齐写成偏好博弈，但它的Nash-MD算法要从几何混合策略采样，在大模型上难以实现。</p></div><div><h4>方法</h4><p>把对齐看成两人常和博弈，用乘性权重更新逐轮逼近纳什均衡：每一轮让模型和上一轮的自己对弈，用偏好模型估计每个回答对当前策略的胜率，再用一个简单的平方损失把对数概率比拟合到“胜率减1/2”。</p></div><div><h4>影响</h4><p>第一次让纳什式偏好优化在7B–8B开源模型上跑出当时领先的AlpacaEval 2.0成绩，而且只用了6万条提示和一个0.4B的偏好模型，不依赖GPT-4标注，成为迭代DPO之外常用的自我对弈对齐基线。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/dpo.html">DPO直接偏好优化</a>和<a class="ln" href="../n/ipo.html">IPO与ΨPO框架</a>是离线方法，偏好对来自别的模型；<a class="ln" href="../n/spin.html">SPIN自我对弈微调</a>让模型和自己对弈，但对手是人类写的回答，并不使用偏好反馈。<a class="ln" href="../n/nlhf.html">NLHF纳什学习</a>提出把对齐目标定义为偏好博弈 <code>max_π min_π′ P(π≻π′)</code> 的纳什均衡，绕开Bradley-Terry假设，但它的求解依赖对参考策略的几何混合，难以用于大语言模型。</p><h2>方法</h2><p><b>乘性权重更新</b>：博弈论里求两人常和博弈均衡的经典办法是每一轮按收益指数加权： <code>π_{t+1}(y|x) ∝ π_t(y|x) · exp(η · P(y≻π_t|x))</code> 其中 <code>P(y≻π_t|x) = E_{y′∼π_t} P(y≻y′|x)</code> 是回答y对当前策略的平均胜率，η是步长。作者证明这样迭代的平均策略逼近纳什均衡。</p><p><b>可训练的目标</b>：上式两边取对数，归一化常数近似处理后，等价于让对数概率比等于胜率的线性函数。于是每一轮最小化平方损失 <code>L(θ) = E_{x, y∼π_t} [ ( log(π_θ(y|x)/π_t(y|x)) − η·(P̂(y≻π_t|x) − 1/2) )² ]</code> 胜率高于一半的回答概率被抬高，低于一半的被压低，幅度与胜率差成正比。与DPO只看一对回答的相对差不同，SPPO对每个回答单独给出目标值，被选中和被拒绝的回答都有明确的“该涨多少、该跌多少”。</p><p><b>流程</b>：每轮对每个提示从当前模型采样几条回答，用偏好模型PairRM两两比较，估计每条回答的胜率P̂，再做上面的回归，得到下一轮模型；共迭代三轮。</p><h2>结果</h2><p>只用UltraFeedback的6万条提示（不用其中的回答），偏好模型是0.4B参数的PairRM，从Mistral-7B-Instruct-v0.2出发，在AlpacaEval 2.0上对GPT-4-Turbo的长度控制胜率达到28.53%；在MT-Bench、Arena-Hard和Open LLM Leaderboard上也超过（迭代）DPO和IPO。从Llama-3-8B-Instruct出发，长度控制胜率达到38.77%。全程没有用GPT-4等更强模型提供回答或偏好。</p><h2>后来的发展</h2><p>SPPO和同期的<a class="ln" href="../n/dno.html">DNO直接纳什优化</a>一起，把“偏好博弈+自我对弈”推成迭代对齐的主流写法之一；后续工作沿着它做更好的胜率估计、更换偏好模型、加长度控制，也把同样的平方损失形式用到推理任务的偏好优化上。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>胜率P̂由小偏好模型PairRM估计，模型的偏差（例如偏爱更长、更客气的回答）会被逐轮放大；论文的提升主要体现在以模型评判为主的榜单上。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>理论保证的是乘性权重迭代的平均策略逼近均衡，而实际只保留最后一轮模型、只迭代三轮，平方损失也近似掉了归一化常数，理论与实践之间有差距。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/dpo.html">DPO直接偏好优化</a><span class="yr">2023.05 · LLM</span><div class=nt>DPO只约束一对回答的相对差；SPPO给每个回答一个独立的目标值，实验中超过迭代DPO。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/ipo.html">IPO与ΨPO框架</a><span class="yr">2023.10 · LLM</span><div class=nt>同样直接优化偏好概率并用平方损失回归对数概率比；SPPO把目标从固定偏好对换成对当前策略的胜率，并在线迭代。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/ultrafeedback.html">UltraFeedback AI反馈数据</a><span class="yr">2023.10 · LLM</span><div class=nt>只取UltraFeedback的6万条提示，不用其回答与标注。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/nlhf.html">NLHF纳什学习</a><span class="yr">2023.12 · LLM</span><div class=nt>NLHF的Nash-MD需从几何混合策略采样，难以落地；SPPO改用乘性权重自我对弈和简单平方损失，在7B模型上实现了纳什式对齐。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/spin.html">SPIN自我对弈微调</a><span class="yr">2024.01 · LLM</span><div class=nt>SPIN的对手是人类示范，SPPO的对手是上一轮自己，并用偏好模型判断输赢。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/rlhf-concept.html">人类反馈强化学习</a> <a class="chip c" href="../c/nash-equilibrium.html">博弈论基础与纳什均衡</a> <a class="chip c" href="../c/self-play.html">自我对弈</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/logistic-regression.html">逻辑回归</a></p>
+<h2>本篇术语</h2><ul><li><b>乘性权重更新</b>　每一轮把每个选项的概率乘上exp(η×收益)再归一化；收益高的选项越来越常被选，是求博弈均衡的经典在线算法。</li><li><b>胜率</b>　这里指一个回答与当前模型随机采样的回答相比，被偏好模型判为更好的概率；正好一半表示与当前模型持平。</li><li><b>PairRM</b>　一个约0.4B参数的成对排序模型，同时读两个回答并判断哪个更好，常被当作廉价的偏好评判器。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/nlhf.html">NLHF纳什学习</a>的博弈表述和<a class="ln" href="../n/ipo.html">IPO与ΨPO框架</a>的平方损失；读本文第3节乘性权重推导和SPPO损失；动手：在一个只有4个回答、偏好成环的表格问题上跑几轮乘性权重，看平均策略如何趋近均衡。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2405.00675" rel="noopener">https://arxiv.org/abs/2405.00675</a>（标题、6位作者、arXiv首次提交2024-05-01；摘要中BT模型无法刻画不传递和非理性偏好、常和两人博弈求纳什均衡、迭代更新可证明逼近纳什均衡、新的SPPO目标、6万条UltraFeedback提示无回答无增广、0.4B的PairRM、Mistral-7B-Instruct-v0.2在AlpacaEval 2.0对GPT-4-Turbo长度控制胜率28.53%、超过迭代DPO与IPO（MT-Bench、Arena-Hard、Open LLM Leaderboard）、Llama-3-8B-Instruct得38.77%、不需GPT-4的外部监督。乘性权重公式、平方损失形式、迭代三轮、ICLR 2025与机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SPPO%E8%87%AA%E6%88%91%E5%AF%B9%E5%BC%88%E5%81%8F%E5%A5%BD%E4%BC%98%E5%8C%96%EF%BC%88sppo%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asppo%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sppo.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="yoco.html"><small>本分支上一个 · 2024.05</small><b>YOCO只缓存一次</b></a><a class="r" href="rlhf-workflow.html"><small>本分支下一个 · 2024.05</small><b>RLHF Workflow在线迭代DPO</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

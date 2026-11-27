@@ -1,0 +1,90 @@
+{
+  "id": "worldeval",
+  "who": "Yaxuan Li, Yichen Zhu, Junjie Wen, Chaomin Shen, Yi Xu · 美的集团、华东师范大学",
+  "venue": "arXiv 2025",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2505.19017"
+    }
+  ],
+  "aka": [
+    "WorldEval",
+    "World Eval",
+    "World-Eval",
+    "Policy2Vec",
+    "世界模型评测策略",
+    "世界模型当策略评测器",
+    "生成式策略评测"
+  ],
+  "problem": "通用机器人策略越来越多，每换一个任务、环境就要在真机上跑几十次才能比出好坏；仿真评测又与真实画面差距大，排序常常不准。",
+  "idea": "微调Wan 2.1当世界模拟器，不直接喂原始动作，而取策略在动作解码前的潜表示（Policy2Vec）作条件，生成该策略执行的视频，再让Gemini判断成败。",
+  "impact": "在双臂真机五个任务上，世界模型评测与真机成功率的皮尔逊相关平均0.942，而仿真式real-to-sim评测只有0.411；还能区分同一策略的不同检查点。",
+  "method": "**卡在哪**：[[pi0]]、[[openvla]]这类通用策略的评测主要靠真机，[[1x-world-model]]提出用世界模型代替真机评测但没有公开系统方法；[[simpler]]式real-to-sim把真实场景搬进仿真，画面和物理仍有差距。WorldEval的作者还发现，把机器人原始动作直接输入视频模型，或用高维编码方式输入，生成的视频常常不跟着动作走。\n\n**做法**：底座是140亿参数的图生视频扩散Transformer [[wan]] 2.1，用[[lora]]在约1400条真机轨迹上微调。**Policy2Vec**：被评测的策略看到当前画面后，取它在动作解码器输出最终动作之前的内部表示，投影、乘一个可学习的缩放系数，加到语言嵌入上送入视频模型；视频模型据此加首帧和指令生成这一段执行过程，生成的末帧又作为下一步输入，形成闭环在线评测。成败由[[gemini-2.0]]看生成视频判定。被评测的策略包括[[diffusion-policy]]、OpenVLA、[[dexvla]]和π0。\n\n**结果**：在AgileX双臂机器人上的收桌子、放杯子、递方块等五个任务、合计超过1000次真机试验的成对比较中，放杯子、敲方块、递方块的相关系数分别为0.958、0.887、0.980，平均0.942；对照的real-to-sim方法平均只有0.411，排序误差指标MMRV为0.044对0.261。作者还展示了一个例子：某策略做出双臂乱举的危险动作时，生成视频崩成马赛克，可据此提前拦截。",
+  "limits": [
+    {
+      "text": "只在一个双臂平台、五个任务上验证，每个任务的世界模型都要用该平台的真机数据微调，换机器人或场景要重新训练。",
+      "solved_by": []
+    },
+    {
+      "text": "成败判定依赖Gemini看视频，存在误判；安全检测只有一个定性样例，没有系统的检出率统计。",
+      "solved_by": [
+        "veo-robot-eval"
+      ]
+    },
+    {
+      "text": "Policy2Vec要读取策略内部表示，闭源或结构未知的策略无法直接接入。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "wan",
+      "type": "uses",
+      "note": "以Wan 2.1的14B图生视频模型为底座，LoRA微调成动作条件的世界模拟器。"
+    },
+    {
+      "to": "simpler",
+      "type": "solves",
+      "note": "SIMPLER式real-to-sim评测有画面与物理差距；WorldEval在同三个任务上相关系数0.942对0.411。"
+    },
+    {
+      "to": "1x-world-model",
+      "type": "extends",
+      "note": "把1X提出的“用世界模型评测机器人策略”落成可复现的流程，并用真机成对实验量化相关性。"
+    },
+    {
+      "to": "pi0",
+      "type": "uses",
+      "note": "π0是被评测的策略之一，Policy2Vec从其动作解码前的表示取条件。"
+    },
+    {
+      "to": "lora",
+      "type": "uses",
+      "note": "只用LoRA轻量微调视频模型，主要训练投影层。"
+    }
+  ],
+  "prereq": [
+    "world-model-concept",
+    "diffusion-process",
+    "vla-concept",
+    "benchmark",
+    "statistical-significance",
+    "peft-concept"
+  ],
+  "terms": [
+    {
+      "t": "Policy2Vec",
+      "d": "不把关节角等原始动作喂给视频模型，而是取策略网络内部在输出动作前的特征向量作为条件，作者发现这样生成的视频更跟随动作。"
+    },
+    {
+      "t": "MMRV",
+      "d": "Mean Maximum Rank Violation，衡量用代理评测给多个策略排序时与真实排序的偏离程度，越低越好。"
+    }
+  ],
+  "learn": "先读[[simpler]]了解real-to-sim评测和相关系数、MMRV指标，再读[[1x-world-model]]的评测动机；然后读原文第3节Policy2Vec和第4节相关性图表。",
+  "check": {
+    "source": "https://arxiv.org/abs/2505.19017",
+    "confirmed": "标题、5位作者、arXiv v1 2025-05-25、摘要中Policy2Vec与和real-to-sim对比；HTML正文中WAN 2.1 14B I2V、LoRA秩16、1400条真机轨迹、动作解码前潜表示加到语言嵌入、Gemini-2.0判定成败、四种被评测策略、AgileX双臂五任务与超1000次真机试验、相关系数0.958/0.887/0.980平均0.942、real-to-sim 0.411、MMRV 0.044对0.261、单例安全检测、机构美的集团与华东师大。"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "id": "adaptive-softmax",
+  "who": "Edouard Grave, Armand Joulin, Moustapha Cissé, David Grangier, Hervé Jégou · Facebook AI Research",
+  "venue": "ICML 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1609.04309"},
+    {"label": "GitHub", "url": "https://github.com/facebookresearch/adaptive-softmax"}
+  ],
+  "aka": ["Adaptive Softmax", "自适应softmax", "Efficient softmax approximation for GPUs"],
+  "problem": "大词表语言模型（One Billion Word的词表约80万）每一步都要算一个与词表一样大的softmax；层次softmax、采样类方法要么测试时仍需完整softmax，要么在GPU上并不快，要么效果下降。",
+  "idea": "利用词频的齐普夫分布：把少数高频词和几个「尾部簇」的代表放在第一层softmax里直接预测，低频词分到若干尾部簇中、只在需要时再计算；簇的大小按GPU上矩阵乘法的真实耗时模型优化，尾部簇用降维投影减小容量。",
+  "impact": "比标准softmax快2到10倍，精度接近完整softmax；在One Billion Word上单GPU训练5天达到困惑度48。它成为大词表语言模型的常用输出层，Transformer-XL等模型在WikiText-103和One Billion Word上都采用了它的变体。",
+  "method": "**观察一：词频极不均衡**。在Penn Treebank里，20%的词覆盖了87%的文本。如果把词表分成高频的头部`V_h`和低频的尾部`V_t`，绝大多数时候只用到头部。**观察二：GPU上的耗时不是线性的**。作者实测，隐状态矩阵（批大小×d）乘以词向量矩阵（d×k）的耗时在k较小时几乎不变，k超过某个阈值后才线性增长；因此把计算拆成太多很小的块反而不划算。\n\n**结构**。第一层（根节点）是一个短名单：包含头部所有词加上每个尾部簇各一个「簇记号」。若目标词在头部，概率就是根节点softmax给出的值；若在第i个尾部簇，则`p(w|h) = p₁(簇i|h) × p₂(w|簇i, h)`，第二个因子只在该簇内做softmax。与把所有簇都放在叶子上的两层树不同，高频词只经过一次softmax，作者指出把所有词都放进叶子会带来5%–10%左右的效果下降。\n\n**按代价优化**。给定词频分布和耗时模型`g(k, d)`，期望计算时间约为`g(k_h + J, d) + Σ_i p_i·g(k_i, d_i)`（J为尾部簇数，p_i为第i簇的概率质量），据此用动态规划选出各簇的边界。由于尾部词见得少，不需要高容量，尾部簇先把隐状态投影到更低维（如d/4）再做softmax，进一步加速。\n\n**结果**。在Text8、Europarl和One Billion Word上，相对标准softmax有2–10倍加速，且在最大语料上同等训练数据下精度没有损失；比同样改进过的层次softmax快2–3倍。",
+  "limits": [
+    {"text": "簇的划分依赖训练语料的词频，换领域后高频词变化时需要重新划分。", "solved_by": []},
+    {"text": "仍然要在每步计算头部的完整softmax，词表结构固定，不能处理训练时没有的新词。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "hierarchical-softmax", "type": "solves", "note": "层次softmax把所有词放到树叶上，效果下降且不贴合GPU；自适应softmax让高频词留在根节点、按GPU耗时设计簇，速度更快且效果接近完整softmax。"},
+    {"to": "nce-lm", "type": "rivals", "note": "NCE等采样方法只在训练时近似，测试仍要完整softmax；自适应softmax训练和测试都快。"},
+    {"to": "lm-limits", "type": "extends", "note": "在One Billion Word这一大词表基准上，把单GPU训练LSTM语言模型的成本降到数天。"},
+    {"to": "lstm-lm", "type": "uses", "note": "实验中被加速的语言模型是LSTM语言模型，词类分解输出层是它的前身。"},
+    {"to": "brown-clustering", "type": "extends", "note": "延续基于词类分解softmax的思路，但按词频和计算代价而不是分布相似性分簇。"}
+  ],
+  "prereq": ["softmax", "language-model", "cpu-gpu", "matrix-multiplication", "dynamic-programming", "perplexity"],
+  "terms": [
+    {"t": "齐普夫分布", "d": "词的频率大致与其频率排名成反比：极少数词非常常见，绝大多数词很罕见。"},
+    {"t": "短名单", "d": "放在第一层直接预测的高频词集合，罕见词通过簇记号间接预测。"}
+  ],
+  "learn": "先读[[hierarchical-softmax]]和[[nce-lm]]的讲解 → 读原文第4节GPU耗时模型和簇的优化 → 动手：用PyTorch的AdaptiveLogSoftmaxWithLoss在WikiText-103上训练一个LSTM语言模型，比较与完整softmax的每步耗时。",
+  "check": {
+    "source": "https://arxiv.org/abs/1609.04309",
+    "confirmed": "arXiv：标题、五位作者、2016-09-14提交、摘要（利用不平衡词分布形成显式最小化期望计算时间的簇、利用GPU矩阵运算特点、EuroParl与One Billion Word上大幅提效且精度接近完整softmax）；PDF正文：One Billion Word约80万词表、PTB中20%的词覆盖87%文本、K40/Maxwell实测耗时、头部作为根节点短名单、全部放叶子约5–10%下降、尾部投影降容量、2×–10×加速、比改进的层次softmax快2–3倍、单GPU五个epoch约5天困惑度48。期望代价公式按论文思路概括，d/4的投影比例和Transformer-XL采用其变体凭一般了解；ICML 2017出处凭一般了解。"
+  }
+}

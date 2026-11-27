@@ -1,0 +1,23 @@
+{
+ "id": "mediapipe",
+ "who": "Camillo Lugaresi, Jiuqiang Tang, Hadon Nash, Chris McClanahan, Esha Uboweja, Michael Hays, Fan Zhang, Chuo-Ling Chang et al. · Google",
+ "aka": ["MediaPipe", "感知流水线", "perception pipeline", "MediaPipe Hands", "MediaPipe Face Mesh", "端侧视觉流水线"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1906.08172"},
+  {"label": "GitHub", "url": "https://github.com/google/mediapipe"}
+ ],
+ "problem": "在手机上做实时的人脸、手势、物体跟踪，不只是跑一个模型：还要接相机、做预处理、串联检测与跟踪、在GPU和CPU之间搬数据、同步多路数据流，每个应用都重写这套胶水，还很难在不同设备上复现性能。",
+ "idea": "把感知应用写成一张由“计算器”节点组成的有向图，数据以带时间戳的数据包在图中流动；框架负责调度、同步和跨平台执行，开发者组合现成组件就能从原型走到跨平台应用，并测量目标设备上的性能和资源占用。",
+ "impact": "成为谷歌端侧实时感知的基础框架，开源的手部关键点、人脸网格、人体姿态等方案被大量AR、健身、手语识别等应用和研究使用，后来演变为MediaPipe Solutions并与端侧LLM推理接口整合。",
+ "method": "论文开头列出构建感知应用的四步：选择并开发机器学习模型；搭一系列原型和演示；在资源消耗与效果之间取舍；找出并修复问题样例。MediaPipe试图在一个框架里支持这四步。\n\n核心抽象是**图**：每个节点是一个计算器（Calculator），比如解码视频帧、缩放图像、运行一个[[tflite]]模型、把检测框转成关键点、做跟踪或渲染；节点之间通过流传递带时间戳的数据包，框架按时间戳对齐多路输入，并在线程池上并行调度节点。图用配置文件描述，同一张图可以在桌面、Android、iOS上运行，部分计算器直接在GPU上处理图像，减少CPU—GPU拷贝。一个典型做法是“检测+跟踪”：只在部分帧上跑较重的检测模型，其余帧用轻量的跟踪或关键点模型沿用上一帧结果，从而在手机上做到实时。框架还带有可视化与性能追踪工具，用于在目标平台上测量延迟和资源。\n\n论文称这些特性让开发者能专注于算法或模型本身，并得到跨设备、跨平台可复现的结果；代码随后在GitHub开源。",
+ "limits": [
+  {"text": "图与计算器的写法偏底层、学习成本高，自定义模型和复杂逻辑的集成需要大量C++工作。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "tflite", "type": "uses", "note": "图中的模型推理节点主要调用TensorFlow Lite在手机端运行。"},
+  {"to": "opencv", "type": "rivals", "note": "OpenCV提供图像处理函数库，MediaPipe在其之上提供面向实时多路数据流的图式调度框架。"},
+  {"to": "mobilenet", "type": "uses", "note": "检测与关键点模型多基于MobileNet一类轻量骨干，以满足手机上的实时要求。"}
+ ],
+ "prereq": ["graph-basics", "vision-tasks", "throughput-latency", "cpu-gpu"],
+ "check": {"source": "https://arxiv.org/abs/1906.08172", "confirmed": "标题、作者（Lugaresi等14人）、v1日期2019-06-14；摘要：构建感知应用的四项挑战（选择开发模型、搭原型与演示、平衡资源与质量、发现和缓解问题样例）、组合现有感知组件做原型并推进到跨平台应用、在目标平台测量性能与资源消耗、跨设备平台可复现、将在GitHub开源。计算器图与时间戳数据包、检测加跟踪、GPU计算器、手部/人脸网格等方案及后续演变为一般了解。"}
+}

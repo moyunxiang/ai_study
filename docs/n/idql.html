@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>IDQL隐式扩散Q学习（2023） · AI脉络</title>
+<meta name="description" content="只用数据中的动作训练Q函数，避开了外推误差，但它学到的Q值到底对应哪个策略并不清楚；它再用式的加权回归拟合一个高斯策略，可能与Q函数隐含的策略不一致。 把IQL重新解释为actor-critic：推广它的critic损失后可以证明，每种损失都对应一个“行为正则化的隐式策略”，这个策略可能是多峰的。…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/idql.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="IDQL隐式扩散Q学习（2023）">
+<meta property="og:description" content="只用数据中的动作训练Q函数，避开了外推误差，但它学到的Q值到底对应哪个策略并不清楚；它再用式的加权回归拟合一个高斯策略，可能与Q函数隐含的策略不一致。 把IQL重新解释为actor-critic：推广它的critic损失后可以证明，每种损失都对应一个“行为正则化的隐式策略”，这个策略可能是多峰的。…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/idql.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/idql">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 离线RL与序列建模</div>
+<h1>IDQL隐式扩散Q学习</h1>
+<div class="full">IDQL: Implicit Q-Learning as an Actor-Critic Method with Diffusion Policies</div>
+<div class="meta"><span>2023.04</span><span>论文</span><span>延伸</span><span>Philippe Hansen-Estruch, Ilya Kostrikov, Michael Janner, Jakub Grudzien Kuba, Sergey Levine · UC Berkeley</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2304.10573" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/philippe-eecs/IDQL" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/idql">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/iql.html">隐式Q学习IQL</a>只用数据中的动作训练Q函数，避开了外推误差，但它学到的Q值到底对应哪个策略并不清楚；它再用<a class="ln" href="../n/awr.html">AWR优势加权回归</a>式的加权回归拟合一个高斯策略，可能与Q函数隐含的策略不一致。</p></div><div><h4>方法</h4><p>把IQL重新解释为actor-critic：推广它的critic损失后可以证明，每种损失都对应一个“行为正则化的隐式策略”，这个策略可能是多峰的。于是不再拟合高斯策略，而是用扩散模型学行为策略，采样多个候选动作，再按critic算出的权重重新抽样，近似这个隐式策略。</p></div><div><h4>影响</h4><p>澄清了IQL的价值函数与策略之间的关系，给出了一个实现简单、对超参数稳健的扩散策略离线RL方法，是“扩散行为模型+价值重加权”路线的代表。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/iql.html">隐式Q学习IQL</a>的做法是：用期望分位数回归（expectile regression）在数据动作上学一个偏向高分位的价值函数 <code>V(s)</code>，再用它做Q的TD目标，整个过程不查询数据外动作；最后用<a class="ln" href="../n/awr.html">AWR优势加权回归</a>的指数优势权重拟合一个高斯策略。这个方法稳定、效果好，但两个问题悬而未决：Q函数代表的究竟是哪个策略的价值？用单峰高斯去拟合是否丢掉了什么？另一方面，<a class="ln" href="../n/diffusion-ql.html">Diffusion-QL扩散策略</a>证明了扩散策略的表达力，但需要通过整条去噪链反向传播Q梯度，训练慢且不稳定。</p><h2>方法</h2><p>作者把IQL的价值损失推广为 <code>L_V = E_{(s,a)∼D}[ f(Q(s,a) − V(s)) ]</code>，f是某个凸函数（期望分位数损失是其中一例），并证明在最优点，V对应的策略是一个隐式的行为正则化策略：</p><p class="formula"><code>π_imp(a|s) ∝ μ(a|s) · w(s,a)</code></p><p>其中μ是行为策略，权重 <code>w</code> 由f的导数和优势 <code>Q(s,a) − V(s)</code> 决定。不同的f给出不同的“奖励最大化”与“贴近行为策略”之间的权衡。由于μ本身可能多峰，这个隐式策略也可能多峰，用高斯拟合会出问题。</p><p>IDQL因此分两部分：（1）用推广的IQL目标训练Q和V；（2）用扩散模型拟合行为策略μ（只做普通的去噪行为克隆，不加Q项）。执行时，对当前状态从扩散模型采样N个候选动作，按权重w计算重要性权重，再从中重新抽样（或取权重最大的）作为最终动作。</p><h2>结果</h2><p>摘要称，IDQL保持了IQL易于实现的优点，同时超过了以往的离线RL方法，并表现出对超参数的鲁棒性。</p><h2>后来的发展</h2><p>IDQL说明了“价值学习”和“策略提取”可以分开看待：价值用不查询数据外动作的方式学，策略提取交给表达力强的生成模型加重加权。后来关于离线RL瓶颈的分析也发现，策略提取方式对最终性能的影响常常不亚于价值学习本身。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>执行时每一步都要用扩散模型采样多个候选动作，推理开销比单个高斯策略大得多。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>候选动作只能来自行为策略的支撑集，数据覆盖不到的好动作无法被选出，离线到在线微调时改进受限。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/ddpm.html">DDPM</a><span class="yr">2020.06 · 生成</span><div class=nt>行为策略用DDPM式扩散模型表示。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/iql.html">隐式Q学习IQL</a><span class="yr">2021.10 · RL</span><div class=nt>推广IQL的价值损失，并证明其对应一个行为正则化的隐式策略。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/awr.html">AWR优势加权回归</a><span class="yr">2019.10 · RL</span><div class=nt>AWR式加权回归拟合单峰高斯策略，会丢失隐式策略的多峰性；IDQL改用扩散行为模型加重要性重采样。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/diffusion-ql.html">Diffusion-QL扩散策略</a><span class="yr">2022.08 · RL</span><div class=nt>Diffusion-QL要通过去噪链反向传播Q梯度，训练慢且敏感；IDQL的扩散模型只做行为克隆，用critic权重在采样后重选动作。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/fql.html">FQL流Q学习</a><span class="yr">2025.02 · RL</span><div class=nt>IDQL用扩散策略加重采样选动作，推理需多次去噪；FQL推理只需一步。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/offline-rl.html">离线强化学习</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/importance-sampling.html">重要性采样</a> <a class="chip c" href="../c/convexity.html">凸函数与凸优化</a></p>
+<h2>本篇术语</h2><ul><li><b>期望分位数回归</b>　对正负误差用不同权重的平方损失，权重偏向正误差时，拟合出的是数据分布的高分位附近而不是均值；IQL用它近似数据动作中的最大Q值。</li><li><b>隐式策略</b>　没有被单独参数化、而是由价值函数和行为策略共同确定的策略；IDQL证明IQL的价值函数对应这样一个策略。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/iql.html">隐式Q学习IQL</a>和<a class="ln" href="../n/diffusion-ql.html">Diffusion-QL扩散策略</a>；读原文第3节关于推广critic目标与隐式策略的推导；在一个D4RL任务上把IQL的高斯策略换成“扩散采样N个候选+按权重选择”，观察N的影响。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2304.10573" rel="noopener">https://arxiv.org/abs/2304.10573</a>（标题、五位作者、arXiv v1于2023-04-20；摘要中IQL只用数据动作训练Q、不清楚哪个策略实现这些值、把IQL重新解释为actor-critic并推广critic目标、与行为正则化隐式actor相联系、损失选择决定权衡、隐式actor可能复杂多峰、质疑AWR拟合条件高斯、用扩散参数化的行为策略样本加critic权重重要性采样、易实现、优于以往方法、对超参数稳健。隐式策略的具体形式与推理时候选数按原文正文通行描述；机构按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20IDQL%E9%9A%90%E5%BC%8F%E6%89%A9%E6%95%A3Q%E5%AD%A6%E4%B9%A0%EF%BC%88idql%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aidql%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/idql.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ivr.html"><small>本分支上一个 · 2023.03</small><b>IVR隐式价值正则（SQL/EQL）</b></a><a class="r" href="bbf.html"><small>本分支下一个 · 2023.05</small><b>BBF</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DeconvNet反卷积分割（2015） · AI脉络</title>
+<meta name="description" content="只用一层双线性上采样把粗糙的得分图放大回原图，物体细节和边界丢失严重；感受野固定，过大或过小的物体容易被切碎或漏掉。 在VGG-16卷积部分后面接一个镜像对称、同样深的“反卷积网络”：用记住最大值位置的反池化层和可学习的反卷积层一级级恢复分辨率，并对每个候选框分别预测掩码再合并。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/deconvnet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DeconvNet反卷积分割（2015）">
+<meta property="og:description" content="只用一层双线性上采样把粗糙的得分图放大回原图，物体细节和边界丢失严重；感受野固定，过大或过小的物体容易被切碎或漏掉。 在VGG-16卷积部分后面接一个镜像对称、同样深的“反卷积网络”：用记住最大值位置的反池化层和可学习的反卷积层一级级恢复分辨率，并对每个候选框分别预测掩码再合并。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/deconvnet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/deconvnet">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 图像分割</div>
+<h1>DeconvNet反卷积分割</h1>
+<div class="full">Learning Deconvolution Network for Semantic Segmentation</div>
+<div class="meta"><span>2015.05</span><span>论文</span><span>延伸</span><span>ICCV 2015</span><span>Hyeonwoo Noh, Seunghoon Hong, Bohyung Han · 浦项工科大学（POSTECH）</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1505.04366" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/deconvnet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/fcn.html">全卷积网络FCN</a>只用一层双线性上采样把粗糙的得分图放大回原图，物体细节和边界丢失严重；感受野固定，过大或过小的物体容易被切碎或漏掉。</p></div><div><h4>方法</h4><p>在VGG-16卷积部分后面接一个镜像对称、同样深的“反卷积网络”：用记住最大值位置的反池化层和可学习的反卷积层一级级恢复分辨率，并对每个候选框分别预测掩码再合并。</p></div><div><h4>影响</h4><p>把语义分割做成对称的编码器-解码器结构，和同期的<a class="ln" href="../n/unet.html">U-Net</a>、后来的<a class="ln" href="../n/segnet.html">SegNet</a>一起确立了“逐级上采样恢复细节”的解码器设计。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>FCN的问题是解码太浅：最后的特征图只有原图的1/32大小，一次放大32倍，边界自然模糊。DeconvNet把解码部分也做深：编码器是<a class="ln" href="../n/vgg.html">VGG</a>的13个卷积层，解码器是与之镜像的一串<b>反池化</b>和<b>反卷积</b>层。</p><p>反池化的做法是：编码器每次做最大池化时记下每个窗口里最大值来自哪个位置（“开关”），解码时把值放回那个位置、其余填0，于是物体的空间结构被原样还原；随后的反卷积层（转置卷积）把稀疏的图填密。这样网络逐级从7×7恢复到原分辨率。</p><p>为了照顾不同大小的物体，论文不是整图推理，而是对每张图先取约几十个物体候选框，每个框缩放到固定大小单独分割，再把所有结果合起来。摘要报告在PASCAL VOC 2012上与FCN集成后达到72.5%，是当时不用外部数据的方法里最好的。</p><p>后来<a class="ln" href="../n/segnet.html">SegNet</a>沿用“记住池化位置”的反池化但去掉了候选框，<a class="ln" href="../n/deeplabv3plus.html">DeepLabv3+</a>等则改用轻量解码器加空洞卷积，逐框推理的做法没有流传下来。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>对每个候选框单独跑一遍分割网络，推理很慢，而且要靠和FCN集成才拿到最好成绩。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/segnet.html">SegNet</a> <a class="chip hue" style="--h:216" href="../n/deeplabv3plus.html">DeepLabv3+</a></div></li><li>解码器参数量与编码器一样大，训练要分两阶段、依赖批归一化才能收敛。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/deeplabv3plus.html">DeepLabv3+</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/vgg.html">VGG</a><span class="yr">2014.09 · 视觉</span><div class=nt>编码器直接取VGG-16的13个卷积层，解码器与之镜像对称。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/unet.html">U-Net</a><span class="yr">2015.05 · 视觉</span><div class=nt>同年的U-Net用跳连把编码器特征直接拼到解码器；DeconvNet不用跳连，只靠池化位置还原结构，后来跳连路线更普及。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/zfnet.html">卷积网络可视化</a><span class="yr">2013.11 · 视觉</span><div class=nt>反池化时记录最大值位置的“开关”做法来自卷积网络可视化工作，这里把它变成可训练的解码器。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/fcn.html">全卷积网络FCN</a><span class="yr">2014.11 · 视觉</span><div class=nt>FCN一次32倍上采样导致边界粗糙；DeconvNet用深层反池化加反卷积逐级恢复细节。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/segnet.html">SegNet</a><span class="yr">2015.11 · 视觉</span><div class=nt>对每个候选框单独跑一遍分割网络，推理很慢，而且要靠和FCN集成才拿到最好成绩。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/deeplabv3plus.html">DeepLabv3+</a><span class="yr">2018.02 · 视觉</span><div class=nt>对每个候选框单独跑一遍分割网络，推理很慢，而且要靠和FCN集成才拿到最好成绩。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a> <a class="chip c" href="../c/iou-map.html">IoU与mAP</a></p>
+<h2>本篇术语</h2><ul><li><b>反池化（unpooling）</b>　最大池化的近似逆操作：把值放回池化时记下的最大值位置，其余位置填0。</li><li><b>反卷积（转置卷积）</b>　把卷积的输入输出关系倒过来用，让特征图变大的一种可学习上采样层。</li></ul>
+<h2>怎么学</h2><p>先看FCN的上采样方式，再读本文第3节的反池化与反卷积示意图；用PyTorch的MaxPool2d(return_indices=True)和MaxUnpool2d试一次池化再还原。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1505.04366" rel="noopener">https://arxiv.org/abs/1505.04366</a>（arXiv记录：标题、三位作者、v1提交于2015-05-17；摘要中的VGG-16编码器、反卷积与反池化层、逐候选框预测再合并、与FCN集成在VOC 2012上72.5%。ICCV 2015、机构、两阶段训练与批归一化等细节凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DeconvNet%E5%8F%8D%E5%8D%B7%E7%A7%AF%E5%88%86%E5%89%B2%EF%BC%88deconvnet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adeconvnet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/deconvnet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="context-prediction.html"><small>本分支上一个 · 2015.05</small><b>上下文预测前置任务</b></a><a class="r" href="unet.html"><small>本分支下一个 · 2015.05</small><b>U-Net</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

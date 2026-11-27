@@ -1,0 +1,31 @@
+{
+  "id": "evoprompt",
+  "who": "Qingyan Guo, Rui Wang, Junliang Guo, Bei Li, Kaitao Song, Xu Tan, Guoqing Liu, Jiang Bian et al. · 微软研究院 / 清华大学 / 东北大学",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2309.08532"},
+    {"label": "GitHub", "url": "https://github.com/beeevita/EvoPrompt"}
+  ],
+  "aka": ["EvoPrompt", "Evo-Prompt", "进化提示优化", "进化算法提示优化", "LLM+进化算法", "evolutionary prompt optimization"],
+  "problem": "离散提示必须是通顺可读的句子，传统进化算法逐词随机交叉、变异会把句子改坏；而已有的LLM改写方法缺少系统的全局搜索。",
+  "idea": "保留进化算法的框架（种群、选择、淘汰），但把交叉和变异这两步交给LLM按指令在句子层面完成，分别实现了遗传算法和差分进化两个版本。",
+  "impact": "在31个数据集上，官方称明显超过人写提示和APE、APO等自动方法，BBH上单任务最多提升25%，说明经典优化算法和LLM结合是一条可行的提示优化路线。",
+  "method": "传统进化算法直接在词上交叉和变异，比如把两句提示各切一半拼起来，很容易得到不通顺、意思混乱的句子。EvoPrompt的办法是保持算法流程不变，只把这两步写成给LLM的指令，让它产出通顺的新提示。\n\n种群初始化时混合人写提示（手写指令、前人常用指令的改写）和LLM生成的变体，在开发集上打分。\n\n**遗传算法版**：按得分用轮盘赌选出两条父代提示，让LLM先把两者“交叉”成一条新提示，再随机“变异”；每轮产生的新提示与旧种群合并，只保留得分最高的N条。\n\n**差分进化版**：差分进化的核心是`a + F(b − c)`——用两个个体的差异去扰动第三个。这里让LLM先找出两条供体提示的不同之处、只改写这些部分，再把改动嫁接到当前最好的提示上，最后与基础提示交叉，新旧择优保留。消融实验中只改写差异部分得75.55%，改写全部内容只有69.87%（Subj数据集）。\n\n主实验种群10条、迭代10轮，优化GPT-3.5和Alpaca-7b的提示。在[[bbh]]的23个任务上平均准确率：初始提示71.49%、[[ape]]71.85%、遗传算法版74.18%、差分进化版75.03%；Alpaca-7b上七个理解任务平均，差分进化版77.05%，APE为73.80%。",
+  "limits": [
+    {"text": "每轮都要对新提示在开发集上逐条评测，成本随种群、轮数和开发集大小增长；得分只是一个数字，LLM改写时不知道具体哪些样本错了。", "solved_by": ["gepa"]},
+    {"text": "只优化单条任务指令，面对由多步LLM调用组成的程序或智能体时，不知道该改哪一步。", "solved_by": ["dspy", "gepa"]}
+  ],
+  "relations": [
+    {"to": "ape", "type": "solves", "note": "APE只做生成加筛选、缺少迭代的全局搜索；EvoPrompt用种群进化持续改进，在BBH等任务上超过APE。"},
+    {"to": "genetic-algorithm", "type": "uses", "note": "沿用遗传算法的轮盘赌选择、交叉、变异和精英保留，只是让LLM在句子层面执行交叉与变异。"},
+    {"to": "opro", "type": "rivals", "note": "同月发表、都让LLM参与提示搜索：OPRO让LLM看着历史得分直接提议新提示，EvoPrompt把LLM嵌入经典进化算法的算子里。"},
+    {"to": "alpaca", "type": "uses", "note": "以Alpaca-7b作为开源被优化模型之一，与闭源的GPT-3.5对照。"}
+  ],
+  "prereq": ["in-context-learning", "zero-few-shot", "exploration-exploitation", "train-val-test"],
+  "terms": [
+    {"t": "差分进化", "d": "一种进化算法：用两个个体之差乘上系数去扰动第三个个体，生成新候选，再与原个体比较择优。"},
+    {"t": "轮盘赌选择", "d": "按得分比例抽样选父代，分数越高越容易被选中，但低分个体也有机会。"}
+  ],
+  "learn": "先读[[ape]]，再补[[genetic-algorithm]]和差分进化的基本步骤 → 读原文第3节两种算子的提示模板和表1、表4 → 动手：把论文给出的交叉、变异模板套在一个情感分类任务上，跑3轮看最好提示的变化。",
+  "check": {"source": "https://arxiv.org/abs/2309.08532", "confirmed": "标题、作者、v1提交于2023-09-15；摘要中31个数据集、GPT-3.5与Alpaca、BBH最多25%；arxiv.org/html/2309.08532v3核对单位、GA与DE算子步骤、种群10与迭代10轮、BBH平均71.49/71.85/74.18/75.03、Alpaca七任务77.05对APE 73.80、Subj消融75.55对69.87；GitHub README注明ICLR 2024。"}
+}

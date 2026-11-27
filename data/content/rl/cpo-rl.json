@@ -1,0 +1,29 @@
+{
+  "id": "cpo-rl",
+  "who": "Joshua Achiam, David Held, Aviv Tamar, Pieter Abbeel · UC Berkeley",
+  "venue": "ICML 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1705.10528"}
+  ],
+  "problem": "TRPO、A3C、DDPG等深度策略搜索能训练高维控制策略，但都不考虑约束；而和人或设备交互的系统需要在整个训练过程中都满足安全约束。",
+  "idea": "在TRPO的信赖域更新里再加一组代价约束：每一步在KL信赖域内最大化回报的替代目标，同时要求代价的替代估计不超过阈值，近似求解这个小的凸问题。",
+  "impact": "第一个面向约束RL的通用深度策略搜索算法，此后几乎所有安全RL论文（PCPO、FOCOPS、CRPO、Safety Gym基准）都拿CPO作基线。",
+  "method": "问题设定是[[cmdp]]：最大化回报 `J_R(π)`，同时要求代价 `J_C(π) ≤ d`。CPO（Constrained Policy Optimization）的理论基础是作者证明的一个新界：两个策略的期望回报之差，可以用新策略下旧策略的优势函数加上一个与两策略平均KL散度相关的误差项来界定。这比[[trpo]]用的最大KL界更紧，对代价函数也同样成立。\n\n据此，每次迭代解下面这个问题：\n\n`max_θ  g^T(θ − θ_k)`\n`s.t.  b^T(θ − θ_k) + (J_C(π_k) − d) ≤ 0，  ½(θ − θ_k)^T H (θ − θ_k) ≤ δ`\n\n其中g、b是回报和代价替代目标的梯度，H是KL散度的Fisher矩阵（同[[natural-pg]]）。这是一个只有一个线性约束和一个二次约束的凸问题，可以用对偶法解出闭式更新。若当前策略已经违反约束、问题不可行，就改为沿着降低代价的方向做恢复更新。\n\n作者证明每次更新近似满足约束（“接近约束满足”的保证），并在模拟机器人运动任务（如限制在安全区域内跑动）上演示。",
+  "limits": [
+    {"text": "需要二阶信息（Fisher矩阵）和线搜索，实现复杂、计算贵，且线性化近似误差大时仍会违反约束。", "solved_by": ["focops", "pcpo"]},
+    {"text": "只保证期望代价近似满足，单条轨迹仍可能严重违规。", "solved_by": ["saute-rl"]}
+  ],
+  "relations": [
+    {"to": "trpo", "type": "extends", "note": "在TRPO的KL信赖域更新上增加代价约束。"},
+    {"to": "cmdp", "type": "solves", "note": "为CMDP提供了可用于深度神经网络策略、每步近似满足约束的策略搜索算法。"},
+    {"to": "natural-pg", "type": "uses", "note": "用Fisher矩阵近似KL约束，与自然策略梯度相同。"},
+    {"to": "cpi", "type": "extends", "note": "沿用保守策略迭代以来的策略性能差界思路，给出更紧的平均KL界。"}
+  ],
+  "prereq": ["policy-gradient-concept", "kl-divergence", "lagrange-duality", "convexity"],
+  "terms": [
+    {"t": "替代目标", "d": "用旧策略数据估计的、新策略回报或代价的一阶近似，信赖域内足够准确。"}
+  ],
+  "learn": "先读[[trpo]]；读CPO原文第5–6节的界与更新推导；用OmniSafe里的CPO在Safety-Gymnasium的PointGoal任务上训练，观察代价曲线。",
+  "check": {"source": "https://arxiv.org/abs/1705.10528", "confirmed": "标题、四位作者、arXiv v1于2017-05-30；摘要中奖励加约束的设定、已有策略搜索不考虑约束、首个通用约束RL策略搜索算法、每次迭代近似满足约束的保证、关于两策略期望回报与平均散度的新界、模拟机器人运动任务。更新问题的具体形式和不可行时的恢复步骤按原文正文通行描述；ICML 2017按通行引用。"},
+  "aka": ["CPO", "Constrained Policy Optimization", "约束策略优化"]
+}

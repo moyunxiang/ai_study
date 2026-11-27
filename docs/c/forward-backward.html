@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>前向算法与前向-后向算法（Forward and Forward–Backward Algorithms） · AI脉络</title>
+<meta name="description" content="在HMM、CRF这类链式模型上用动态规划高效求和的算法：前向算法算出整条观测序列的概率，前向-后向算法进一步算出每个位置取每个隐状态的后验概率，是训练这些模型的核心步骤。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/forward-backward.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="前向算法与前向-后向算法（Forward and Forward–Backward Algorithms）">
+<meta property="og:description" content="在HMM、CRF这类链式模型上用动态规划高效求和的算法：前向算法算出整条观测序列的概率，前向-后向算法进一步算出每个位置取每个隐状态的后验概率，是训练这些模型的核心步骤。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/forward-backward.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/forward-backward">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>前向算法与前向-后向算法</h1><div class="full">Forward and Forward–Backward Algorithms</div>
+<p class="muted" style="font-size:13px">也叫：forward algorithm　前向算法　backward algorithm　后向算法　forward-backward algorithm　前向-后向算法　前向后向算法　alpha-beta递推　HMM评估问题　配分函数计算</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/forward-backward">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>在HMM、CRF这类链式模型上用动态规划高效求和的算法：前向算法算出整条观测序列的概率，前向-后向算法进一步算出每个位置取每个隐状态的后验概率，是训练这些模型的核心步骤。</b></p>
+<p class="tags">先要会：<a class="chip c" href="hmm-concept.html">隐马尔可夫模型</a> <a class="chip c" href="dynamic-programming.html">动态规划</a></p>
+<p><a class="lc" href="../c/hmm-concept.html">隐马尔可夫模型</a>有三个基本问题：给定模型，一条观测序列出现的概率是多少（评估）？最可能的隐状态序列是什么（解码）？怎样从数据学出参数（学习）？解码由<a class="ln" href="../n/viterbi.html">Viterbi算法</a>算法解决；评估和学习靠的就是<b>前向算法</b>和<b>前向-后向算法</b>。</p><p><b>为什么需要它</b>。观测序列的概率要对所有可能的隐状态路径求和：<code>P(o) = Σ_路径 P(o, 路径)</code>。N个隐状态、长度T的序列有N^T条路径，直接枚举不可行。但HMM有<a class="lc" href="../c/markov-chain.html">马尔可夫性与马尔可夫链</a>结构，可以用<a class="lc" href="../c/dynamic-programming.html">动态规划</a>把求和逐步拆开。</p><p><b>前向算法</b>。定义<code>α_t(j)</code>为“看到前t个观测、且第t步处在状态j”的概率：</p><p class="formula"><code>α_1(j) = π_j · b_j(o_1)</code></p><p class="formula"><code>α_t(j) = [Σ_i α_(t−1)(i) · a_ij] · b_j(o_t)</code></p><p class="formula"><code>P(o) = Σ_j α_T(j)</code></p><p>其中π是初始概率，a_ij是转移概率，b_j(o)是发射概率。复杂度从N^T降到N²·T。它和Viterbi几乎一样，只是把“取最大”换成了“求和”。</p><p><b>后向算法与后验</b>。对称地定义<code>β_t(i)</code>为“第t步在状态i的条件下，看到后面所有观测”的概率，从后往前递推。两者相乘就得到每个位置的后验：</p><p class="formula"><code>P(第t步在状态i | o) = α_t(i)·β_t(i) / P(o)</code></p><p>类似地可以求出相邻两步的状态对的后验。</p><p><b>用在哪里</b>。</p><ul><li><b>训练HMM</b>：<a class="ln" href="../n/baum-welch.html">Baum-Welch算法</a>算法是<a class="lc" href="../c/em-algorithm.html">EM算法</a>在HMM上的特例：E步用前向-后向算出状态后验和转移后验的期望计数，M步按计数重新估计参数。这是统计语音识别（<a class="ln" href="../n/hmm-asr.html">HMM统计语音识别</a>）的训练基础，<a class="ln" href="../n/hmm-tutorial.html">Rabiner的HMM教程</a>是经典讲解。</li><li><b>训练CRF</b>：<a class="ln" href="../n/crf.html">条件随机场</a>的对数似然需要配分函数（所有标签序列打分之和），同样用前向算法计算；梯度中的期望由前向-后向算出。</li><li><b>CTC</b>：<a class="ln" href="../n/ctc.html">CTC</a>用同样的前向-后向递推，对所有可能的对齐路径求和（见<a class="lc" href="../c/sequence-alignment.html">输入输出不等长时的对齐</a>）。</li></ul>
+<div class="example"><h4>例子</h4><p>两个隐状态：热H、冷C。初始概率π = (0.6, 0.4)。转移：H→H 0.7、H→C 0.3、C→H 0.4、C→C 0.6。观测“吃冰淇淋的个数”，第1天吃3个：b_H(3) = 0.4、b_C(3) = 0.1；第2天吃1个：b_H(1) = 0.2、b_C(1) = 0.5。</p><ul><li>第1天：α_1(H) = 0.6×0.4 = 0.24，α_1(C) = 0.4×0.1 = 0.04。</li><li>第2天：α_2(H) = (0.24×0.7 + 0.04×0.4)×0.2 = 0.184×0.2 = 0.0368；α_2(C) = (0.24×0.3 + 0.04×0.6)×0.5 = 0.096×0.5 = 0.048。</li><li>P(“3, 1”) = 0.0368 + 0.048 = 0.0848。</li></ul><p>枚举全部4条路径求和，结果完全一样；但序列长度为100时，枚举要2^100条路径，前向算法只需约400次乘加。</p></div>
+<h2>容易误解的地方</h2><ul><li>连乘很多小于1的概率会下溢为0，实际实现要在对数空间计算（用log-sum-exp）或每步做归一化缩放。</li><li>前向-后向给出的是<b>每个位置</b>最可能的状态，把它们拼起来不一定是一条合法或整体最优的路径；要整体最优的路径应该用Viterbi。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>风险敏感强化学习与CVaR（Risk-Sensitive RL and CVaR） · AI脉络</title>
+<meta name="description" content="不只优化回报的平均值，还在乎回报的分布形状：方差多大、最坏的那部分结果有多坏。常用的风险度量有方差惩罚、指数效用和CVaR（最差α比例结果的平均）。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/risk-sensitive-rl.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="风险敏感强化学习与CVaR（Risk-Sensitive RL and CVaR）">
+<meta property="og:description" content="不只优化回报的平均值，还在乎回报的分布形状：方差多大、最坏的那部分结果有多坏。常用的风险度量有方差惩罚、指数效用和CVaR（最差α比例结果的平均）。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/risk-sensitive-rl.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/risk-sensitive-rl">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>风险敏感强化学习与CVaR</h1><div class="full">Risk-Sensitive RL and CVaR</div>
+<p class="muted" style="font-size:13px">也叫：风险敏感强化学习　risk-sensitive RL　risk-sensitive reinforcement learning　风险厌恶　risk-averse RL　CVaR　条件风险价值　conditional value at risk　VaR　风险价值　均值-方差　mean-variance　指数效用　exponential utility　风险度量　risk measure　尾部风险</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/risk-sensitive-rl">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>不只优化回报的平均值，还在乎回报的分布形状：方差多大、最坏的那部分结果有多坏。常用的风险度量有方差惩罚、指数效用和CVaR（最差α比例结果的平均）。</b></p>
+<p class="tags">先要会：<a class="chip c" href="reward-return.html">奖励、回报与折扣</a> <a class="chip c" href="expectation-variance.html">期望与方差</a></p>
+<p>标准强化学习最大化<b>期望</b>回报。但两个策略期望相同，一个每次都稳稳拿10分，另一个大多数时候拿12分、偶尔摔得粉碎，在金融、医疗、自动驾驶、机器人里我们显然更想要前者。<b>风险敏感强化学习</b>把回报分布的形状纳入目标。</p><p><b>几种风险度量</b>。设G是随机回报。</p><ul><li><b>均值-方差</b>：<code>max E[G] − λ·Var[G]</code>，直观但方差不满足Bellman式的递推，优化起来麻烦，而且好的波动和坏的波动一起被惩罚。</li><li><b>指数效用</b>：<code>(1/β)·log E[exp(β·G)]</code>。β&lt;0时厌恶风险，β&gt;0时偏好风险，β→0时退化为期望。它有很好的递推结构，是控制理论中风险敏感控制的经典形式。</li><li><b>CVaR</b>（条件风险价值）：<code>CVaR_α(G)</code>是最差的α比例结果的平均值。α=1就是期望，α越小越关注尾部。它只惩罚坏的一侧，含义直观，是近年最常用的选择。</li></ul><p><b>怎么实现</b>。要估计尾部，就需要知道回报的整个分布，而不只是均值。<a class="lc" href="../c/distributional-rl.html">分布式价值RL（Distributional RL）</a>（<a class="ln" href="../n/c51.html">分布式RL C51</a>、<a class="ln" href="../n/qr-dqn.html">分位数回归QR-DQN</a>、<a class="ln" href="../n/iqn.html">隐式分位数网络IQN</a>）学的正是回报分布，在其上换一种动作评价方式即可得到风险敏感策略：<a class="ln" href="../n/iqn.html">隐式分位数网络IQN</a>就演示了通过对分位数重新加权，用同一个网络得到风险厌恶或风险偏好的行为。另一类方法在策略梯度里直接估计CVaR目标的梯度，只用最差那部分轨迹来更新。</p><p><b>与相近概念的区别</b>。风险敏感处理的是<b>已知</b>环境本身的随机性（偶然的不确定性）；对模型参数本身没把握（例如仿真器的摩擦系数不准）时，考虑的是认知上的不确定性，常用<a class="lc" href="../c/robust-mdp.html">鲁棒MDP与鲁棒强化学习</a>的最坏情形来处理。两者在数学上有联系：CVaR等价于在某个扰动集合里的最坏期望。对“违规次数”这类代价设上限则属于<a class="lc" href="../c/constrained-rl.html">约束MDP与安全强化学习</a>。</p>
+<div class="example"><h4>例子</h4><p>策略A每次回报都是10；策略B有90%的概率得12、10%的概率得−10，期望为<code>0.9×12 + 0.1×(−10) = 9.8</code>。按期望，两者几乎一样（A略好）。按CVaR_0.1（最差10%的平均），A为10，B为−10，差距一目了然。若再看策略C：90%得11、10%得5，期望10.4，CVaR_0.1为5；风险厌恶的智能体会在A与C之间权衡，而只看期望的智能体会选C。</p></div>
+<h2>容易误解的地方</h2><ul><li>风险敏感的最优策略通常不是“马尔可夫”的：是否冒险可能取决于目前已经积累了多少回报，需要把累计回报纳入状态。</li><li>训练时用的回报分布来自有限样本，尾部估计尤其不准，小α的CVaR对样本量要求很高。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

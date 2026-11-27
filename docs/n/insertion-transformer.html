@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Insertion Transformer（2019） · AI脉络</title>
+<meta name="description" content="自回归模型只能从左到右一个词一个词地生成，n个词要n步；非自回归模型一次并行生成全部词，又因为忽略词之间的依赖而质量明显下降。 把生成改成反复“插入”：每一步模型对当前部分序列的每个空隙预测“插入哪个词或不插”，可以一次只插一个（退化为任意顺序的自回归），也可以在多个空隙同时插入；按平衡二叉树顺序…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/insertion-transformer.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Insertion Transformer（2019）">
+<meta property="og:description" content="自回归模型只能从左到右一个词一个词地生成，n个词要n步；非自回归模型一次并行生成全部词，又因为忽略词之间的依赖而质量明显下降。 把生成改成反复“插入”：每一步模型对当前部分序列的每个空隙预测“插入哪个词或不插”，可以一次只插一个（退化为任意顺序的自回归），也可以在多个空隙同时插入；按平衡二叉树顺序…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/insertion-transformer.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/insertion-transformer">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 非自回归与扩散</div>
+<h1>Insertion Transformer</h1>
+<div class="full">Insertion Transformer: Flexible Sequence Generation via Insertion Operations</div>
+<div class="meta"><span>2019.02</span><span>论文</span><span>延伸</span><span>ICML 2019</span><span>Mitchell Stern, William Chan, Jamie Kiros, Jakob Uszkoreit · Google Brain、加州大学伯克利分校</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1902.03249" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/insertion-transformer">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>自回归模型只能从左到右一个词一个词地生成，n个词要n步；非自回归模型一次并行生成全部词，又因为忽略词之间的依赖而质量明显下降。</p></div><div><h4>方法</h4><p>把生成改成反复“插入”：每一步模型对当前部分序列的每个空隙预测“插入哪个词或不插”，可以一次只插一个（退化为任意顺序的自回归），也可以在多个空隙同时插入；按平衡二叉树顺序训练时，长度为n的序列只需约log₂n步。</p></div><div><h4>影响</h4><p>说明生成顺序可以由模型自己选、并且部分并行就能接近自回归质量；与同期的Levenshtein Transformer一起，开辟了“编辑/插入式”非自回归生成，这条线后来延伸到扩散语言模型中可变长度、任意顺序生成的研究。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/transformer.html">Transformer</a>解码器按固定的从左到右顺序生成，延迟与长度成正比。<a class="ln" href="../n/non-autoregressive-nmt.html">非自回归翻译NAT</a>一次性并行输出所有词，速度快但要预测目标长度，并且同一位置的多种合理译法会混在一起（多峰问题），BLEU明显下降。</p><p><b>插入操作</b>：设当前已生成的部分序列为ŷ（开始时为空），它有 |ŷ|+1 个空隙（包括首尾）。模型是一个去掉因果掩码的Transformer解码器，读入源句和ŷ，为每个空隙l和每个词c输出插入概率 <code>p(c, l | x, ŷ)</code>，词表中还包括一个“此处不再插入”的结束标记。解码时可以：</p><ul><li><b>贪心串行</b>：每步只在概率最高的一个(词, 位置)插入，相当于任意顺序的自回归；</li><li><b>并行</b>：每一步在所有未结束的空隙中各插入一个最可能的词，所有空隙都输出结束标记时停止。</li></ul><p><b>训练顺序</b>：给定目标句，任何部分序列都能用多种顺序补全。作者比较了从左到右、平衡二叉树（优先插入每段剩余内容的中间那个词）和均匀（对所有合法插入最大化熵）几种损失设计。平衡二叉树顺序下，每一步能让每段待补内容减半，因此并行解码只需约 <code>⌈log₂ n⌉+1</code> 步。</p><p>结果：在WMT 2014英德翻译上，摘要称Insertion Transformer在相当或更高的并行度下优于此前多种非自回归方法，并且只用对数级的解码迭代次数就恢复了原始Transformer的翻译质量（作者使用了从自回归模型做序列级知识蒸馏的数据）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只能插入不能删除，一旦插错就无法修改；而且每步仍需完整地重新编码整个部分序列，实际墙钟加速比步数减少要小。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/levenshtein-transformer.html">Levenshtein Transformer</a> <a class="chip hue" style="--h:0" href="../n/remdm.html">ReMDM重掩码采样</a></div></li><li>接近自回归质量依赖从自回归教师做序列级知识蒸馏得到的训练数据，直接在原始数据上训练效果较差。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>用去掉因果掩码的Transformer解码器为每个空隙打分，把从左到右生成推广为任意位置插入。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/wmt.html">WMT机器翻译评测</a><span class="yr">2006.06 · 数据·评测</span><div class=nt>在WMT 2014英德翻译任务上评测。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/seq-kd.html">序列级知识蒸馏</a><span class="yr">2016.06 · NLP</span><div class=nt>训练数据使用自回归教师的序列级蒸馏结果，缓解多峰问题。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/non-autoregressive-nmt.html">非自回归翻译NAT</a><span class="yr">2017.11 · LLM</span><div class=nt>完全并行的NAT质量下降明显，插入式部分并行生成用对数级步数恢复了自回归质量。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/levenshtein-transformer.html">Levenshtein Transformer</a><span class="yr">2019.05 · LLM</span><div class=nt>只能插入不能删除，一旦插错就无法修改；而且每步仍需完整地重新编码整个部分序列，实际墙钟加速比步数减少要小。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/remdm.html">ReMDM重掩码采样</a><span class="yr">2025.03 · LLM</span><div class=nt>插入式与掩码式并行生成都存在“写下就不能改”的问题，ReMDM给出掩码扩散中的修正机制。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/entropy.html">信息量与熵</a></p>
+<h2>本篇术语</h2><ul><li><b>空隙（slot）</b>　部分序列中两个相邻词之间（以及首尾）可以插入新词的位置，长度为k的序列有k+1个。</li><li><b>多峰问题（multimodality）</b>　同一输入有多种正确输出时，并行独立预测每个位置会把不同答案的词混在一起，得到不通顺的结果。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/non-autoregressive-nmt.html">非自回归翻译NAT</a>理解并行生成的难点；读原文第3节插入概率的两种分解和第4节训练顺序；动手：手工模拟一句8个词的句子按平衡二叉树顺序插入，数一数需要几步。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1902.03249" rel="noopener">https://arxiv.org/abs/1902.03249</a>（标题、4位作者、arXiv v1提交日2019-02-08；摘要中基于插入操作的迭代、部分自回归生成，可在序列任意位置插入，可训练成从左到右、二叉树遍历或最大化所有合法插入的熵，同时支持一次一个插入与多位置同时插入，WMT 2014英德上在相当或更高并行度下优于先前非自回归方法，仅用对数级迭代恢复原Transformer性能。插入概率的形式、结束标记、序列级蒸馏、ICML 2019为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Insertion%20Transformer%EF%BC%88insertion-transformer%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ainsertion-transformer%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/insertion-transformer.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="transformer-xl.html"><small>本分支上一个 · 2019.01</small><b>Transformer-XL</b></a><a class="r" href="gpt-2.html"><small>本分支下一个 · 2019.02</small><b>GPT-2</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

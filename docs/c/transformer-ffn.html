@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Transformer的前馈层（Transformer Feed-Forward Layer） · AI脉络</title>
+<meta name="description" content="Transformer每一层里接在注意力后面的两层全连接网络，对每个token独立地“升维—非线性—降维”。它占了模型约三分之二的参数，被认为存储了大量事实知识。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/transformer-ffn.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Transformer的前馈层（Transformer Feed-Forward Layer）">
+<meta property="og:description" content="Transformer每一层里接在注意力后面的两层全连接网络，对每个token独立地“升维—非线性—降维”。它占了模型约三分之二的参数，被认为存储了大量事实知识。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/transformer-ffn.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/transformer-ffn">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 入门</div>
+<h1>Transformer的前馈层</h1><div class="full">Transformer Feed-Forward Layer</div>
+<p class="muted" style="font-size:13px">也叫：FFN　feed-forward network　前馈网络　前馈层　position-wise feed-forward　逐位置前馈网络　MLP块　MLP block　MLP层　intermediate layer　中间层维度　SwiGLU FFN　键值记忆　key-value memories</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/transformer-ffn">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>Transformer每一层里接在注意力后面的两层全连接网络，对每个token独立地“升维—非线性—降维”。它占了模型约三分之二的参数，被认为存储了大量事实知识。</b></p>
+<p class="tags">先要会：<a class="chip c" href="mlp.html">多层感知机</a> <a class="chip c" href="transformer-block.html">Transformer层的结构</a> <a class="chip c" href="neuron-activation.html">神经元与激活函数</a></p>
+<p>注意力负责让token之间交换信息，但它本质上是对值向量做加权平均，非线性很弱。每个Transformer块（见<a class="lc" href="../c/transformer-block.html">Transformer层的结构</a>）在注意力之后都接一个<b>前馈网络</b>（feed-forward network，FFN，也叫MLP块），对每个位置单独做一次非线性变换。</p><p><b>标准形式</b>（<a class="ln" href="../n/transformer.html">Transformer</a>原文）：</p><p class="formula"><code>FFN(x) = W_2 · ReLU(W_1 · x + b_1) + b_2</code></p><p>W_1把d维升到d_ff维（通常<code>d_ff = 4d</code>），经过激活函数，W_2再降回d维。“逐位置”的意思是：同一套权重分别作用在序列的每个token上，token之间在这里不交流。它就是一个两层的<a class="lc" href="../c/mlp.html">多层感知机</a>。</p><p><b>门控变体</b>。现代大模型多用<a class="ln" href="../n/swiglu.html">GLU变体与SwiGLU</a>：</p><p class="formula"><code>FFN(x) = W_2 · (SiLU(W_1·x) ⊙ (W_3·x))</code></p><p>⊙是逐元素相乘，W_3·x充当一个“门”（见<a class="lc" href="../c/gating.html">门控机制</a>）。因为多了一个矩阵，为保持参数量不变，d_ff常取约<code>8d/3</code>。<a class="ln" href="../n/llama-1.html">LLaMA</a>等模型都采用这种结构。激活函数从ReLU换成<a class="ln" href="../n/gelu.html">GELU</a>或SiLU，也是常见改动（见<a class="lc" href="../c/neuron-activation.html">神经元与激活函数</a>）。</p><p><b>参数和计算的大头</b>。每层注意力约<code>4d²</code>参数，FFN约<code>8d²</code>，FFN占三分之二（见<a class="lc" href="../c/model-dimensions.html">模型尺寸超参数：维度、层数与头数</a>）。<a class="lc" href="../c/mixture-of-experts.html">混合专家</a>正是把FFN换成多个“专家”FFN、每个token只用其中几个，从而在不增加每token计算量的前提下扩大参数。</p><p><b>它在做什么</b>。<a class="ln" href="../n/ffn-key-value.html">FFN即键值记忆</a>提出一种有影响的解释：把FFN看作<b>键值记忆</b>：W_1的每一行是一个“键”，检测输入中是否出现某种模式；对应的W_2的列是“值”，在模式出现时往表示里加入相应内容。<a class="ln" href="../n/rome.html">ROME知识定位与编辑</a>等知识编辑工作发现，修改中间层FFN的少量权重就能改变模型对某条事实的回答（见<a class="lc" href="../c/knowledge-editing.html">知识编辑</a>）。这类解释仍在研究中，并不完整。</p>
+<div class="example"><h4>例子</h4><p>d = 4，d_ff = 16。某token的向量x是4维的：</p><p>1. W_1（16×4）把它变成16维，例如前几维是[2.1, −0.5, 0.3, −1.2, …]。 2. ReLU把负数置0：[2.1, 0, 0.3, 0, …]。只有部分“神经元”被激活。 3. W_2（4×16）把这16维加权求和回4维。</p><p>参数量：W_1和W_2各64个，共128个（不计偏置），而同一层注意力的Q、K、V、输出矩阵共4×16 = 64个，FFN正好是注意力的两倍。</p></div>
+<h2>容易误解的地方</h2><ul><li>FFN对每个token独立计算，所以它的计算量随序列长度线性增长；序列很长时，注意力的平方项才会超过它。</li><li>“FFN存储知识、注意力负责路由”是一种简化的说法，两者的分工没有这么干净。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

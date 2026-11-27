@@ -1,0 +1,25 @@
+{
+  "id": "sophia",
+  "who": "Hong Liu, Zhiyuan Li, David Hall, Percy Liang, Tengyu Ma · 斯坦福大学",
+  "venue": "ICLR 2024",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2305.14342"}],
+  "aka": ["Sophia优化器", "Second-order Clipped Stochastic Optimization", "二阶裁剪随机优化"],
+  "problem": "Adam及其变体统治语言模型预训练多年；更精细的二阶（基于Hessian）优化器每一步开销太大，难以用在大模型上。",
+  "idea": "只估计Hessian的对角线、每隔几步才估一次，把它当作预条件：更新等于梯度的滑动平均除以Hessian估计的滑动平均，再逐元素裁剪防止步子过大。",
+  "impact": "给“轻量二阶优化器能否替代Adam”提供了一个具体方案并引发了大量复现与比较；后续独立的大规模对比中优势并不稳定，讨论仍在继续。",
+  "method": "Adam用梯度平方的滑动平均来缩放每个坐标的步长，但这只是对曲率的粗略代替。Sophia直接估计损失对每个参数的二阶导（Hessian对角线）：论文给了两种轻量估计器（Hutchinson随机估计和基于高斯-牛顿的估计），每隔k步（如10步）才计算一次，平均下来每步的时间和显存开销几乎可以忽略。\n\n更新规则是：`m ← β₁m + (1−β₁)g`，`h ← β₂h + (1−β₂)ĥ`（ĥ为新估计），`θ ← θ − η·clip(m / max(γh, ε), 1)`。逐元素裁剪把每一维的更新限制在固定范围内，用来对付非凸区域Hessian为负或沿轨迹剧烈变化的情况。理论上，作者在简化设定下证明它能适应不同维度的曲率差异，运行时间界不依赖损失的条件数。\n\n摘要报告：在125M到1.5B参数的GPT模型上，Sophia达到与Adam相同困惑度所需的步数、总算力和墙钟时间都约减半。",
+  "limits": [
+    {"text": "加速效果主要在1.5B以下的GPT-2规模上报告；后续独立基准对更大规模和更长训练的复现结果不一。", "solved_by": []},
+    {"text": "引入了Hessian估计间隔、裁剪阈值等新超参数。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "adam", "type": "rivals", "note": "用对角Hessian估计取代Adam的梯度平方作为预条件，目标是替代Adam做LLM预训练。"},
+    {"to": "adamw", "type": "rivals", "note": "主要对比基线是带权重衰减的AdamW。"},
+    {"to": "hessian-free", "type": "extends", "note": "同样利用二阶信息，但只取对角线并稀疏地估计，避免Hessian-free优化每步解线性系统的开销。"},
+    {"to": "gpt-2", "type": "uses", "note": "实验在GPT-2系列结构上进行。"}
+  ],
+  "prereq": ["adaptive-optimizer", "jacobian-hessian", "momentum", "learning-rate"],
+  "terms": [{"t": "Hutchinson估计", "d": "用随机向量u计算 u⊙(Hu) 来无偏估计矩阵对角线，只需一次Hessian-向量积，不用显式构造Hessian。"}],
+  "learn": "先懂[[adam]]里“按坐标缩放步长”的意思和Hessian的含义；读论文第2节的算法框图；动手在nanoGPT上替换优化器，对比相同步数下的验证损失。",
+  "check": {"source": "https://arxiv.org/abs/2305.14342", "confirmed": "标题、5位作者、arXiv v1 2023-05-23；摘要中对角Hessian预条件、梯度滑动平均除以Hessian滑动平均再逐元素裁剪、每隔几步估计一次、125M–1.5B GPT上步数/算力/时间约减半、不依赖条件数的理论。两种估计器的名称、k=10、公式写法、ICLR 2024、后续复现结论凭一般了解。"}
+}

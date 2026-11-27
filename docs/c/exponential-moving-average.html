@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>指数移动平均（Exponential Moving Average） · AI脉络</title>
+<meta name="description" content="只用一个变量维护的加权平均：每来一个新值，旧平均乘β再加(1−β)倍新值，越近的值权重越大。动量、Adam、BatchNorm统计量和目标网络都靠它。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/exponential-moving-average.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="指数移动平均（Exponential Moving Average）">
+<meta property="og:description" content="只用一个变量维护的加权平均：每来一个新值，旧平均乘β再加(1−β)倍新值，越近的值权重越大。动量、Adam、BatchNorm统计量和目标网络都靠它。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/exponential-moving-average.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/exponential-moving-average">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 优化与训练 · 入门</div>
+<h1>指数移动平均</h1><div class="full">Exponential Moving Average</div>
+<p class="muted" style="font-size:13px">也叫：指数移动平均　指数滑动平均　指数加权平均　exponential moving average　EMA　exponentially weighted moving average　EWMA　移动平均　滑动平均　moving average　running average　running mean　偏差修正　bias correction　软更新　soft update　目标网络软更新　EMA权重　EMA model</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/exponential-moving-average">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>只用一个变量维护的加权平均：每来一个新值，旧平均乘β再加(1−β)倍新值，越近的值权重越大。动量、Adam、BatchNorm统计量和目标网络都靠它。</b></p>
+<p class="tags">先要会：<a class="chip c" href="expectation-variance.html">期望与方差</a></p>
+<p>训练时经常需要一个“最近一段时间的平均值”：平均梯度方向、平均的梯度大小、激活值的平均统计量、平滑后的损失曲线。存下最近1000个值再求平均太浪费，<b>指数移动平均（EMA）</b>只用一个变量就能做到。</p><p><b>定义</b>。</p><p class="formula"><code>m_t = β·m_{t−1} + (1 − β)·x_t</code></p><p>展开后，<code>m_t = (1 − β)·Σ_k β^k·x_{t−k}</code>：k步之前的值权重按β^k指数衰减。β越接近1，平均得越久、越平滑，但对变化的反应越慢。粗略地说，它相当于对最近约<code>1/(1 − β)</code>个值求平均：β = 0.9约10步，β = 0.999约1000步。</p><p><b>偏差修正</b>。m₀通常初始化为0，前几步的平均会被拉向0。<a class="ln" href="../n/adam.html">Adam</a>用<code>m̂_t = m_t / (1 − β^t)</code>修正：第1步时除以<code>1 − β</code>，正好还原出x₁本身。</p><p><b>它出现在哪里</b>。</p><ul><li><b>动量</b>：<a class="lc" href="../c/momentum.html">动量</a>本质上是对梯度做EMA，沿一致的方向积累速度，抵消来回震荡的分量。</li><li><b>自适应优化器</b>：<a class="ln" href="../n/rmsprop.html">RMSProp</a>对梯度平方做EMA，Adam对梯度和梯度平方各做一个（默认β₁ = 0.9、β₂ = 0.999），见<a class="lc" href="../c/adaptive-optimizer.html">自适应学习率优化器</a>。</li><li><b>BatchNorm的推理统计量</b>：训练时用当前批次的均值方差，同时用EMA维护一份全局估计，推理时使用它，见<a class="lc" href="../c/normalization-layer.html">归一化层</a>。</li><li><b>目标网络</b>：<a class="ln" href="../n/ddpg.html">DDPG</a>、<a class="ln" href="../n/td3.html">TD3</a>等用“软更新”<code>θ_target ← τθ + (1 − τ)θ_target</code>让目标网络缓慢跟随，稳定<a class="lc" href="../c/td-error.html">时序差分与自举</a>的学习目标；<a class="ln" href="../n/moco.html">MoCo</a>、<a class="ln" href="../n/byol.html">BYOL</a>和<a class="ln" href="../n/mean-teacher.html">Mean Teacher</a>用参数的EMA构造“教师”网络。</li><li><b>权重EMA</b>：对模型参数本身做EMA，评估时用平均后的参数，通常比最后一步的参数更好、更稳；扩散模型训练（如<a class="ln" href="../n/edm.html">EDM设计空间</a>）几乎都这样做，见<a class="lc" href="../c/weight-averaging.html">权重平均</a>和<a class="ln" href="../n/polyak-averaging.html">Polyak平均与EMA</a>。</li><li><b>画训练曲线</b>：TensorBoard的平滑滑块就是对损失做EMA。</li></ul>
+<div class="example"><h4>例子</h4><p>β = 0.9，m₀ = 0，依次观测到x = 10、10、10。m₁ = 1，m₂ = 0.9 + 1 = 1.9，m₃ = 1.71 + 1 = 2.71，离真实平均10还很远。偏差修正后：m̂₁ = 1/0.1 = 10，m̂₂ = 1.9/0.19 = 10，m̂₃ = 2.71/0.271 = 10，都还原到了10。</p></div>
+<h2>容易误解的地方</h2><ul><li>EMA有滞后：β = 0.999时，信号突变后要上千步平均值才跟上；训练初期或学习率很大时，用太大的β评估会得到过时的模型。</li><li>“移动平均”在不同框架里的系数约定不同：PyTorch的BatchNorm参数momentum = 0.1表示新值权重为0.1，即上式中的β = 0.9。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

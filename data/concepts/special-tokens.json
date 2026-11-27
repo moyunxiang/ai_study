@@ -1,0 +1,9 @@
+{
+  "key": "special-tokens",
+  "short": "词表里不对应任何普通文字、专门用来标记结构的token，如开头BOS、结尾EOS、填充PAD、分类CLS、分隔SEP，以及对话模板里的角色标记。",
+  "body": "模型看到的只是一串token编号（见[[c:tokenization]]）。可很多信息不是文字本身：一段话从哪开始、到哪结束、两个句子的分界在哪、这几个位置是不是凑长度用的空位、这一段是用户说的还是助手说的。把这些“结构信息”也编成token放进序列，是最简单的办法，这些token就叫**特殊token**。\n\n**常见的几种**。\n\n- **BOS / `<s>`**：序列开始。给自回归模型一个固定的起点，第一个真实token也有“前文”可依。\n- **EOS / `</s>` / `<|endoftext|>`**：序列结束。生成时模型输出它就停止（见[[c:stopping-criteria]]）；预训练把多篇文档拼接时也用它隔开。\n- **PAD**：填充。把一批长短不一的序列补齐成同样长度，配合attention_mask让模型忽略（见[[c:padding-attention-mask]]）。\n- **UNK**：未知词。词级词表遇到表外词时的替身；字节级子词词表基本用不到它。\n- **CLS、SEP、MASK**：[[bert]]的设计。CLS放在最前面，它最后一层的向量被当作整句的表示拿去做分类；SEP分隔句子对；MASK标出被遮住、要预测的位置（见[[c:masked-modeling]]）。\n- **对话与工具标记**：如`<|im_start|>`、`<|im_end|>`，以及表示工具调用、思考段落开始和结束的标记。它们构成对话模板（见[[c:instruction-tuning]]）。\n\n**实现上**。特殊token在词表里各占一个编号，有自己的嵌入向量，和普通token一起训练。分词器会保证它们不被拆开，也通常不允许用户输入的普通文字被切成它们，否则用户可以伪造“系统”或“助手”的身份，这和[[c:prompt-injection-concept]]直接相关。新增特殊token时，要扩充嵌入矩阵，新行的向量一开始是随机或平均初始化的，需要经过微调才有意义。",
+  "example": "BERT处理句子对“我爱北京”和“天安门很大”，输入是：`[CLS] 我 爱 北 京 [SEP] 天 安 门 很 大 [SEP]`，共12个token，其中3个是特殊token。token_type_ids标出前6个属于第一句（0）、后6个属于第二句（1）。做句子对分类时，只取[CLS]位置最后一层的向量，接一个线性层输出类别。\n\nGPT-2的词表只有一个特殊token `<|endoftext|>`（编号50256），它同时充当文档分隔、开始和结束标记。",
+  "pitfalls": "- 同一个名字在不同模型里编号不同、用法也不同：有的模型把BOS和EOS设成同一个token，有的没有PAD，只能拿EOS凑。混用分词器和模型会出错。\n- 用文字“<|im_end|>”写进提示，不一定会被切成那个特殊token；反过来，如果分词器允许，这就是一个注入漏洞。\n- 微调时若没有让模型学会在回答末尾输出EOS，它会一直生成下去。",
+  "aka": ["special tokens", "特殊符号", "控制token", "BOS", "EOS", "PAD token", "[CLS]", "[SEP]", "[MASK]", "CLS token", "开始符", "结束符", "endoftext", "im_start", "token_type_ids", "segment ids"],
+  "needs": ["tokenization", "embedding"]
+}

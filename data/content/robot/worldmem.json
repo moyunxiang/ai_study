@@ -1,0 +1,28 @@
+{
+  "id": "worldmem",
+  "who": "Zeqi Xiao, Yushi Lan, Yifan Zhou, Wenqi Ouyang, Shuai Yang, Yanhong Zeng, Xingang Pan · 南洋理工大学S-Lab等",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2504.12369"}
+  ],
+  "aka": ["WorldMem", "World Mem", "世界模型记忆", "记忆增强世界模型", "长期一致世界模拟"],
+  "problem": "视频世界模型只能看最近几十帧，玩家转一圈再回头，原来的房子就变了样，长时间探索时三维空间前后对不上。",
+  "idea": "给世界模型配一个记忆库：存下历史帧及其相机位姿和时间戳，生成新帧时用记忆注意力检索相关的旧帧，让看过的场景能被还原。",
+  "impact": "把“世界模型要有长期记忆”变成一个明确的问题和可比较的做法，后续交互式世界模型普遍把记忆模块当作标配来讨论。",
+  "method": "**卡在哪**：[[genie-2]]、[[oasis]]、[[gamengen]]这类交互式视频世界模型按自回归方式一帧帧往后生成，每次只能把有限长度的历史帧放进上下文。超出窗口的内容就被“忘掉”：在Minecraft里走远再走回来，同一个位置会长出不同的地形。这对用世界模型做训练环境或规划是硬伤，因为环境自己前后矛盾。\n\n**做法**：WorldMem在[[diffusion-forcing]]式的视频扩散骨干上加一个**记忆库**，每个条目是一帧画面加上它的状态——相机位姿和时间戳。生成新帧时，先按位姿和时间的相关程度从库里挑出若干帧，再通过专门的记忆注意力把它们作为条件，让模型“参考”当时看到的样子来画当前视角。因为状态里带着时间戳，模型还能区分“过去这里是这样”和“现在这里已经变了”，从而表示世界随时间的变化（比如作物长大）。\n\n**结果**：在用MineDojo搭的Minecraft基准上，超出上下文窗口后再回到旧场景，纯Diffusion Forcing基线的PSNR只有18.04，WorldMem为25.32（LPIPS从0.4376降到0.1429）；在真实房屋视频RealEstate10K上转一圈回到原视角，PSNR从基线的8.4提到20.2。",
+  "limits": [
+    {"text": "记忆库随探索时间线性增长，检索和注意力开销也随之上升，几小时级的长时探索还没有验证。", "solved_by": []},
+    {"text": "检索依赖准确的相机位姿；真实场景里位姿要另行估计，估错就会取回错误的记忆。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "diffusion-forcing", "type": "uses", "note": "以Diffusion Forcing式的逐帧加噪视频扩散作为自回归生成骨干。"},
+    {"to": "oasis", "type": "solves", "note": "Oasis等Minecraft世界模型只靠短上下文，走回原处场景会变；WorldMem用记忆检索缓解这一点。"},
+    {"to": "genie-2", "type": "extends", "note": "同样是动作可控的交互式世界模型，补上了长期空间一致性。"},
+    {"to": "gamengen", "type": "rivals", "note": "GameNGen靠更长的历史帧上下文维持一致，WorldMem改为显式存取带位姿的记忆。"}
+  ],
+  "prereq": ["world-model-concept", "diffusion-process", "attention-concept", "camera-geometry", "autoregressive"],
+  "terms": [
+    {"t": "记忆注意力（memory attention）", "d": "生成当前帧时，让模型用注意力去看从记忆库里取回的旧帧及其位姿，相当于翻看相册再作画。"}
+  ],
+  "check": {"source": "https://arxiv.org/abs/2504.12369", "confirmed": "标题、7位作者、arXiv v1 2025-04-16；摘要中记忆库存帧与位姿、时间戳，记忆注意力检索；HTML正文中条件DiT+Diffusion Forcing骨干、MineDojo Minecraft基准与RealEstate10K、超窗口PSNR 18.04→25.32、LPIPS 0.4376→0.1429、RealEstate10K PSNR 8.396→20.19，机构S-Lab NTU等。"}
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>HAC多层后见分层RL（2017） · AI脉络</title>
+<meta name="description" content="分层RL想同时训练多层策略：上层给子目标、下层去实现；但下层策略在不断变化，上层看到的“给出子目标后会发生什么”也随之变化，相当于在一个非平稳的环境里学习，多层并行训练很不稳定。 让每一层都假装下层已经是最优的来训练：用式的后见之明重标注，把上层发出的子目标改写成下层实际到达的状态，于是上层的经验…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/hac.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="HAC多层后见分层RL（2017）">
+<meta property="og:description" content="分层RL想同时训练多层策略：上层给子目标、下层去实现；但下层策略在不断变化，上层看到的“给出子目标后会发生什么”也随之变化，相当于在一个非平稳的环境里学习，多层并行训练很不稳定。 让每一层都假装下层已经是最优的来训练：用式的后见之明重标注，把上层发出的子目标改写成下层实际到达的状态，于是上层的经验…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/hac.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/hac">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 分层、表示与元学习</div>
+<h1>HAC多层后见分层RL</h1>
+<div class="full">Learning Multi-Level Hierarchies with Hindsight</div>
+<div class="meta"><span>2017.12</span><span>论文</span><span>延伸</span><span>ICLR 2019</span><span>Andrew Levy, George Konidaris, Robert Platt, Kate Saenko · 布朗大学 / 东北大学 / 波士顿大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1712.00948" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/hac">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>分层RL想同时训练多层策略：上层给子目标、下层去实现；但下层策略在不断变化，上层看到的“给出子目标后会发生什么”也随之变化，相当于在一个非平稳的环境里学习，多层并行训练很不稳定。</p></div><div><h4>方法</h4><p>让每一层都假装下层已经是最优的来训练：用<a class="ln" href="../n/her.html">后见经验回放HER</a>式的后见之明重标注，把上层发出的子目标改写成下层实际到达的状态，于是上层的经验看起来就像来自一个完美执行的下层；再配合“子目标测试”惩罚下层确实到不了的子目标。</p></div><div><h4>影响</h4><p>首次在连续状态和动作空间里成功地并行学习三层层次结构，并与同期的<a class="ln" href="../n/hiro.html">HIRO离策略分层RL</a>一起成为目标条件分层RL的代表方法和常用基线。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>分层RL的思想可以追溯到<a class="ln" href="../n/feudal-rl.html">封建式分层RL</a>和<a class="ln" href="../n/options.html">Options时间抽象框架</a>：把长任务拆成子目标，上层在更粗的时间尺度上决策。深度RL时代的<a class="ln" href="../n/h-dqn.html">h-DQN分层DQN</a>、<a class="ln" href="../n/feudal-networks.html">FeUdal Networks</a>做了尝试，但多层联合训练时，下层策略一变，上层同一个子目标动作带来的结果就变了，上层的经验回放很快过时。几个月后发表的<a class="ln" href="../n/hiro.html">HIRO离策略分层RL</a>则用离策略修正（重新挑选与下层行为一致的子目标）处理同一问题。</p><h2>方法</h2><p>HAC是一个k层的目标条件策略层次。第i层策略 <code>π_i(s, g_i)</code> 输出一个子目标 <code>g_{i−1}</code>（对最底层则输出原始动作），下层最多用H步去达到它。每层都用目标条件的离策略算法（DDPG配合<a class="ln" href="../n/uvfa.html">通用值函数近似UVFA</a>式的目标输入）训练，奖励是稀疏的“到达目标为0、否则为−1”。三种转移让各层独立学习：</p><p><b>后见动作转移</b>：上层的经验里，把它当时发出的子目标替换成下层H步后<b>实际到达的状态</b>，这样这条经验就像是在一个最优下层下产生的，上层的转移函数变得平稳。</p><p><b>后见目标转移</b>：与<a class="ln" href="../n/her.html">后见经验回放HER</a>相同，把整段经验的目标替换成之后实际到达的状态，缓解稀疏奖励。</p><p><b>子目标测试转移</b>：以一定概率让下层不加探索噪声地执行上层的子目标；如果下层没有到达，就给上层一个大的惩罚（−H），让上层学会只提出下层力所能及的子目标。</p><h2>结果</h2><p>摘要称，在网格世界和模拟机器人领域，HAC相对非分层和其他分层方法显著加快了学习；它是第一个在连续状态和动作空间任务中成功并行学习三层层次结构的框架。</p><h2>后来的发展</h2><p>HAC与<a class="ln" href="../n/hiro.html">HIRO离策略分层RL</a>把“子目标即状态”和后见重标注确立为目标条件分层RL的标准组件；后来的离线分层方法（如HIQL）把同样的结构用于离线目标条件RL。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>子目标定义在原始状态空间（或手选的子空间）里，高维观测（如图像）下子目标空间过大，难以直接使用。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>依赖目标条件的稀疏奖励形式，对不能写成“到达某个状态”的任务不直接适用。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/her.html">后见经验回放HER</a><span class="yr">2017.07 · RL</span><div class=nt>把后见重标注从“替换目标”推广到“替换上层发出的子目标动作”，使多层并行训练变得平稳。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/uvfa.html">通用值函数近似UVFA</a><span class="yr">2015.07 · RL</span><div class=nt>每一层都是以目标为额外输入的价值函数与策略。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/ddpg.html">DDPG</a><span class="yr">2015.09 · RL</span><div class=nt>各层在连续动作上用DDPG训练。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/feudal-networks.html">FeUdal Networks</a><span class="yr">2017.03 · RL</span><div class=nt>以往的多层方法联合训练不稳定；HAC通过假设下层最优让各层独立学习，可扩展到三层。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a> <a class="chip c" href="../c/reward-design.html">奖励设计与奖励投机</a> <a class="chip c" href="../c/mdp.html">马尔可夫决策过程</a></p>
+<h2>本篇术语</h2><ul><li><b>子目标</b>　上层策略给下层设定的中间目标，通常是一个希望在若干步内到达的状态。</li><li><b>后见之明重标注</b>　事后把经验里的目标改成实际达到的结果，使原本失败的经验变成“成功达到另一个目标”的有用数据。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/her.html">后见经验回放HER</a>，再对照稍后的<a class="ln" href="../n/hiro.html">HIRO离策略分层RL</a>；读原文第4节三种转移的定义；用官方代码在一个连续导航任务上比较一层、两层、三层的学习速度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1712.00948" rel="noopener">https://arxiv.org/abs/1712.00948</a>（标题、四位作者、arXiv v1于2017-12-04；摘要中分层智能体可把任务拆成短决策序列、需要多层策略并行学习、某层策略变化会改变上层的转移与奖励而导致不稳定、提出HAC、每层训练时假设下层已最优、网格世界与模拟机器人中显著加速、首个在连续状态与动作空间并行学习三层层次的框架。三种转移、子目标测试惩罚−H、DDPG按原文正文通行描述；ICLR 2019与机构按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20HAC%E5%A4%9A%E5%B1%82%E5%90%8E%E8%A7%81%E5%88%86%E5%B1%82RL%EF%BC%88hac%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ahac%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/hac.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="rllib.html"><small>本分支上一个 · 2017.12</small><b>RLlib</b></a><a class="r" href="alphazero.html"><small>本分支下一个 · 2017.12</small><b>AlphaZero</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

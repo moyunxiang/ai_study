@@ -1,0 +1,32 @@
+{
+  "id": "world-gymnast",
+  "who": "Ansh Kumar Sharma, Yixiang Sun, Ninghao Lu, Yunzhe Zhang, Jiarao Liu, Sherry Yang · 纽约大学、上海纽约大学、UC Berkeley",
+  "venue": "arXiv 2026",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2602.02454"}
+  ],
+  "aka": ["World-Gymnast", "WorldGymnast", "World Gymnast", "世界模型健身房", "在世界模型里用RL训练机器人", "视频世界模型RL微调VLA"],
+  "problem": "机器人学习受限于物理交互成本：监督微调受示范数量限制，在软件仿真器里做RL又有操作任务的仿真到现实差距。",
+  "idea": "在一个用真实视频-动作数据学出的动作条件视频世界模型里rollout VLA策略，由GPT-4o判断每条想象轨迹是否成功并给奖励，用GRPO做RL微调。",
+  "impact": "在Bridge真机上，某任务成功率比SFT最多高18倍、比在SIMPLER仿真器里做RL最多高2倍；还展示了新场景测试时训练、世界模型与策略交替迭代。",
+  "method": "**卡在哪**：真机在线RL太贵；在[[simpler]]这类软件仿真器里训练，接触和外观上的差距会让策略到了真机打折扣。[[unisim]]等工作说明可以从真实视频里学出交互式模拟器，[[wmpo]]也已在仿真任务里证明在视频世界模型里做RL可行。World-Gymnast要回答：在世界模型里训练，真机效果能否超过SFT和软件仿真？\n\n**做法**：策略是在[[bridgedata-v2]]上微调的[[openvla-oft]]，关掉本体感知和第二个相机，并改回用语言模型头输出离散动作token，以便得到动作概率。环境是WorldGym，一个在[[open-x]]上预训练的约6亿参数动作条件视频生成模型，用KV缓存把rollout时间降到约十分之一。每条想象轨迹最多40步，由[[gpt-4o]]看视频给出0/1的完成奖励。优化用[[grpo]]，PPO式裁剪、不加KL惩罚、动态采样（沿用[[dapo]]的做法），在4张H200上训练1–2天。\n\n**结果**：在AutoEval的WidowX真机评测中，“把茄子放进蓝色水槽”从SFT的4%提到72%（约18倍），“放进黄篮子”从8%到78%；同样两个任务若在SIMPLER里做RL只有32%和40%。但并非全面占优：关抽屉任务世界模型训练为62%，低于SIMPLER的74%。测试时训练只用新场景的第一帧和指令在世界模型里练，关抽屉从62%到100%，但其他任务普遍下降，作者认为是过拟合单一任务。收集约每任务100条真实轨迹微调世界模型后再训练，关抽屉达到95%。",
+  "limits": [
+    {"text": "奖励来自GPT-4o对生成视频的判断，世界模型画错或VLM判错都会被策略利用；不同任务上的表现不稳定，个别任务不如软件仿真器。", "solved_by": []},
+    {"text": "只评测了Bridge平台上的少数几个短任务，策略还去掉了腕部相机和本体状态，复杂长时序或多相机任务未验证。", "solved_by": []},
+    {"text": "测试时训练会过拟合单一任务、损害其他任务，如何在持续适应中不遗忘仍未解决。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "openvla-oft", "type": "uses", "note": "以Bridge数据微调的OpenVLA-OFT为策略，改用语言模型头输出离散动作以便计算概率。"},
+    {"to": "wmpo", "type": "extends", "note": "同样在动作条件视频世界模型里做GRPO；World-Gymnast用通用预训练世界模型加VLM奖励，并重点验证真机效果和场景泛化。"},
+    {"to": "simpler", "type": "rivals", "note": "直接与在SIMPLER仿真器中做RL比较，两个放置任务上真机成功率约高2倍。"},
+    {"to": "unisim", "type": "extends", "note": "UniSim提出从真实数据学交互式模拟器，World-Gymnast把这类模拟器当作VLA的RL训练场。"},
+    {"to": "grpo", "type": "uses", "note": "用GRPO的组内归一化优势更新策略，去掉KL惩罚。"}
+  ],
+  "prereq": ["vla-concept", "world-model-concept", "model-based-rl", "policy-gradient-concept", "sim2real", "reward-design"],
+  "terms": [
+    {"t": "测试时训练", "d": "部署到新场景后，用该场景的少量信息（这里只用第一帧画面）现场继续训练模型。"},
+    {"t": "AutoEval", "d": "一种自动化真机评测装置，能自动重置场景并判断成败，让真机测试可以大批量进行。"}
+  ],
+  "learn": "先读[[wmpo]]和[[unisim]]了解在视频世界模型里训练策略，再看原文表1、表2的真机对比和测试时训练一节。",
+  "check": {"source": "https://arxiv.org/abs/2602.02454", "confirmed": "标题、6位作者、v1日期2026-02-02、摘要中18倍与2倍；HTML v1：机构、OpenVLA-OFT（Bridge、去本体感知与副相机、LM头）、WorldGym约600M、OXE预训练、KV缓存约10倍、GPT-4o二元奖励、40步、GRPO无KL+动态采样、4×H200 1–2天、表1/表2数字（4→72、8→78、32、40、关抽屉74对62）、测试时训练62→100、约100条/任务迭代后95%。"}
+}

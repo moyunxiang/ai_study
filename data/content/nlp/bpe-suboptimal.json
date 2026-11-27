@@ -1,0 +1,36 @@
+{
+  "id": "bpe-suboptimal",
+  "who": "Kaj Bostrom, Greg Durrett · 德克萨斯大学奥斯汀分校",
+  "venue": "Findings of EMNLP 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2004.03720"}
+  ],
+  "aka": ["BPE次优", "BPE vs Unigram", "分词对预训练的影响", "Tokenization for Pretraining", "Unigram LM分词"],
+  "problem": "预训练语言模型普遍使用BPE、WordPiece或Unigram语言模型来切分子词，但没有人在其他条件完全相同的情况下直接比较过：分词方法本身会不会影响预训练模型的下游效果？",
+  "idea": "固定模型结构、语料和训练设置，只换分词器：分别用BPE和Unigram LM分词预训练两个相同的掩码语言模型，比较切分结果与形态学的吻合程度和微调后的任务表现。",
+  "impact": "发现Unigram LM切出的子词更贴近词素、避免了BPE贪心合并带来的怪异切分，并且在英语和日语的下游任务上与BPE持平或更好，这是「分词器选择影响预训练效果」最常被引用的证据之一。",
+  "background": "[[bpe]]（Sennrich等，2015）从字符开始反复合并最频繁的相邻对，是GPT系列和RoBERTa的选择；[[wordpiece]]用于BERT；[[subword-regularization]]（Kudo，2018）提出的Unigram LM方法反过来做：从一个很大的候选词表出发，按删除后对语料似然的影响逐步剪掉子词，[[sentencepiece]]同时实现了两者。这些分词器通常被当作无关紧要的预处理，选择多半出于习惯。",
+  "method": "**两种分词的区别。** BPE是贪心的「自底向上」合并：一旦把某两个单元合并，后面就再也拆不开，所以常见片段会被优先吞掉，留下没有意义的残片。Unigram LM把每个子词看作独立出现的单元，词表V上每个子词x有概率p(x)，一个词的切分 x₁…x_m 的概率为 `Π p(x_i)`，取概率最大的切分（用Viterbi求解）；词表通过EM估计p(x)并反复删去对总似然影响最小的子词得到。\n\n**分析切分质量。** 作者在英语上比较了两种分词器的输出：例如BPE可能把「destabilizing」切成不对应词素的碎片，而Unigram LM更倾向于切出de-、stabiliz-、-ing这样的语素；统计上，Unigram LM的切分与人工形态切分更一致，BPE词表里有更多只在合并过程中出现、几乎不单独使用的中间片段。\n\n**控制实验。** 用相同大小的词表、相同的语料和超参数，分别预训练英语和日语的掩码语言模型（RoBERTa式），然后在相同的下游任务上微调比较。",
+  "results": "摘要称：Unigram LM恢复的子词单位与形态学更吻合，并避免了BPE贪心构造带来的问题；在多个下游任务和两种语言（英语与日语）上，使用Unigram LM分词的模型与BPE持平或更好。",
+  "legacy": "这篇论文常被用来论证分词器值得认真选择；之后的T5、ALBERT、XLNet、mT5等模型使用了SentencePiece的Unigram LM，而GPT系列和LLaMA 3等仍坚持字节级BPE，说明工程上的取舍（速度、无未知符号、与已有词表兼容）同样重要。后续研究进一步把分词质量与压缩率、Rényi效率、跨语言公平性等指标联系起来。",
+  "limits": [
+    {"text": "实验规模只有中等大小的模型和两种语言，结论在更大模型和更多语言上是否成立没有验证。", "solved_by": []},
+    {"text": "只比较了两种分词器的最终效果，没有解释形态吻合度与下游性能之间是否存在因果关系。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "bpe", "type": "rivals", "note": "直接比较BPE与Unigram LM，指出BPE的贪心合并带来与形态不符的切分。"},
+    {"to": "subword-regularization", "type": "uses", "note": "所比较的Unigram LM分词方法来自Kudo的子词正则化论文。"},
+    {"to": "sentencepiece", "type": "uses", "note": "两种分词器都可用SentencePiece在相同设置下训练。"},
+    {"to": "roberta", "type": "uses", "note": "在相同结构的掩码语言模型上分别预训练，只改变分词器。"}
+  ],
+  "prereq": ["tokenization", "masked-modeling", "pretrain-finetune", "ablation-baseline", "em-algorithm"],
+  "terms": [
+    {"t": "词素（morpheme）", "d": "语言中最小的有意义单位，如un-happi-ness中的三个部分。"},
+    {"t": "Unigram LM分词", "d": "给每个子词一个概率，取使整词概率最大的切分，并用EM和剪枝得到词表的方法。"}
+  ],
+  "learn": "先读[[bpe]]和[[subword-regularization]] → 读原文第3节切分比较和第4节预训练实验 → 动手：用SentencePiece在同一语料上分别训练BPE和Unigram（词表都设为8000），找几十个带前后缀的英语长词，比较两种切分是否对齐词素。",
+  "check": {
+    "source": "https://arxiv.org/abs/2004.03720",
+    "confirmed": "arXiv：标题、作者Bostrom与Durrett、v1提交2020-04-07；摘要：预训练LM使用多种子词分词方法（BPE、WordPiece、Unigram LM）、文献中尚无分词对预训练影响的直接评估、分析BPE与Unigram LM的差异、后者恢复的子词更贴近形态并避免BPE贪心构造的问题、比较相同的Transformer掩码语言模型、在英语与日语多个下游任务上Unigram LM持平或优于BPE。切分示例、模型规模、Findings of EMNLP 2020发表处与后续模型采用情况凭一般了解。"
+  }
+}

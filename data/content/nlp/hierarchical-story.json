@@ -1,0 +1,36 @@
+{
+  "id": "hierarchical-story",
+  "who": "Angela Fan, Mike Lewis, Yann Dauphin · Facebook AI Research",
+  "venue": "ACL 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1805.04833"}
+  ],
+  "aka": ["WritingPrompts", "分层故事生成", "故事生成", "Story Generation", "top-k采样", "Top-k Sampling", "Fan et al. 2018", "融合模型", "Fusion Model"],
+  "problem": "让模型根据一个题目写一篇几百词的故事：已有生成模型写长文时容易离题、前后不连贯，而且用束搜索解码会生成重复、乏味的句子。",
+  "idea": "从Reddit写作版收集30万个「写作提示-故事」对（WritingPrompts数据集），先生成一句提示（前提），再以它为条件生成全文；用「融合」把第二个模型叠加在预训练好的第一个模型上以提高切题度；解码时改用**top-k随机采样**。",
+  "impact": "WritingPrompts成为开放式长文本生成的标准数据集；论文推广的top-k采样（每步只在概率最高的k个词里随机抽）成了GPT-2等模型的默认解码方式之一，后来被nucleus采样进一步改进。",
+  "background": "[[seq2seq]]与[[convs2s]]在翻译、摘要这类输出由输入大致决定的任务上表现很好。故事生成不同：同一个题目可以写出无数种故事，输出比输入长一个数量级，需要长距离的连贯性。用最大似然训练、束搜索解码的模型会挑「最保险」的高频句子，生成大量重复；纯随机采样又会采到低概率的怪词。",
+  "method": "**分层。** 把故事生成拆成两步：先用一个卷积语言模型生成一句提示（premise），再用一个序列到序列模型以提示为输入生成整篇故事。\n\n**模型。** 在[[convs2s]]的基础上加入**门控多尺度自注意力**：多个自注意力头分别在不同的下采样尺度上看前文，用来建模长距离上下文。\n\n**融合（fusion）。** 先单独训练一个seq2seq模型，冻结它，再训练第二个seq2seq模型，并把两者的隐藏状态用门控拼起来。第一个模型已经学会了流畅的语言建模，第二个模型就被迫更多地关注提示，从而提高故事与题目的相关性。\n\n**top-k采样。** 每一步把概率分布截断到最高的 `k` 个词（文中 `k=10`），重新归一化后随机抽样：\n\n`P'(w) = P(w) / Σ_{w'∈Top-k} P(w')，w∈Top-k`\n\n它比束搜索生成的文本更多样，比全分布采样更少出现怪词。",
+  "results": "摘要报告：收集了30万篇人写的故事与写作提示配对；自动指标和人工评测都大幅优于强基线；人类评审更偏好本方法生成的故事，与强力的非分层模型相比为二比一。",
+  "legacy": "WritingPrompts被后续的长文本生成、可控生成和解码研究反复使用。top-k采样被GPT-2的样例生成采用，2019年Holtzman等人指出固定k在分布尖锐和平坦时都不合适，提出nucleus（top-p）采样。分层「先规划再展开」的思路也延续到后来的情节规划、大纲生成等工作。",
+  "limits": [
+    {"text": "固定的k在不同位置不合适：分布很尖时k=10仍可能采到不合理的词，分布很平时又截掉了合理候选。", "solved_by": []},
+    {"text": "生成的故事仍常出现人物、情节前后矛盾，模型没有显式的人物和事件状态。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "convs2s", "type": "extends", "note": "以卷积序列到序列模型为骨干，加入门控多尺度自注意力以处理长文本。"},
+    {"to": "mmi-diversity", "type": "rivals", "note": "同样针对生成单调重复的问题，MMI改训练目标，本文改解码方式为top-k采样。"},
+    {"to": "gated-cnn-lm", "type": "uses", "note": "生成提示的第一步使用门控卷积语言模型。"},
+    {"to": "scheduled-sampling", "type": "rivals", "note": "都在应对最大似然训练的生成模型解码时的问题，前者改训练过程，本文改采样策略。"}
+  ],
+  "prereq": ["language-model", "decoding-sampling", "encoder-decoder", "self-attention", "softmax"],
+  "terms": [
+    {"t": "top-k采样", "d": "每一步只保留概率最高的k个候选词，重新归一化后随机抽一个，用来在多样性和质量之间折中。"},
+    {"t": "WritingPrompts", "d": "从Reddit写作版r/WritingPrompts收集的约30万对「写作提示—人写故事」数据，用于开放式故事生成。"}
+  ],
+  "learn": "先复习[[c:decoding-sampling]]里的贪心、束搜索和温度 → 读原文第3节分层与融合、第5节解码比较 → 动手：用GPT-2对同一个开头分别做贪心、束搜索、top-k=10采样，比较重复率。",
+  "check": {
+    "source": "https://arxiv.org/abs/1805.04833",
+    "confirmed": "arXiv记录：标题Hierarchical Neural Story Generation、作者Fan、Lewis、Dauphin、v1 2018-05-13；摘要：故事生成、从在线论坛收集30万人写故事与写作提示、先生成前提再转为文本的分层生成、新的模型融合提高切题度、门控多尺度自注意力、自动与人工评测大幅提升、人类偏好比例二比一。ACL 2018、Reddit来源、k=10、融合的门控细节、GPT-2采用top-k与Holtzman后续凭一般了解。"
+  }
+}

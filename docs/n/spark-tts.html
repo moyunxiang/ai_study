@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Spark-TTS单流解耦TTS（2025） · AI脉络</title>
+<meta name="description" content="基于大语言模型的零样本TTS大多要多阶段处理（LLM出语义token、再用流匹配或扩散补声学细节），或者要同时预测多个码本，结构复杂、效率低，也不方便与通用LLM整合。 设计一个单码本的语音编解码器BiCodec，把语音拆成两类token：低码率的语义token表示内容，固定长度的全局token表…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/spark-tts.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark-TTS单流解耦TTS（2025）">
+<meta property="og:description" content="基于大语言模型的零样本TTS大多要多阶段处理（LLM出语义token、再用流匹配或扩散补声学细节），或者要同时预测多个码本，结构复杂、效率低，也不方便与通用LLM整合。 设计一个单码本的语音编解码器BiCodec，把语音拆成两类token：低码率的语义token表示内容，固定长度的全局token表…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/spark-tts.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/spark-tts">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:168"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/speech.html">语音与音频</a> › 声音克隆与零样本合成</div>
+<h1>Spark-TTS单流解耦TTS</h1>
+<div class="full">Spark-TTS: An Efficient LLM-Based Text-to-Speech Model with Single-Stream Decoupled Speech Tokens</div>
+<div class="meta"><span>2025.03</span><span>论文</span><span>延伸</span><span>Xinsheng Wang, Mingqi Jiang, Ziyang Ma, Ziyu Zhang, Songxiang Liu, Linqin Li, Zheng Liang, Qixi Zheng et al. · 香港科技大学、上海交通大学等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2503.01710" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/SparkAudio/Spark-TTS" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/spark-tts">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>基于大语言模型的零样本TTS大多要多阶段处理（LLM出语义token、再用流匹配或扩散补声学细节），或者要同时预测多个码本，结构复杂、效率低，也不方便与通用LLM整合。</p></div><div><h4>方法</h4><p>设计一个单码本的语音编解码器BiCodec，把语音拆成两类token：低码率的语义token表示内容，固定长度的全局token表示说话人属性；LLM（Qwen2.5）直接预测这两类token，BiCodec一步还原波形。</p></div><div><h4>影响</h4><p>Spark-TTS以只用一个LLM、单流token的极简结构做到了有竞争力的零样本克隆，并能按性别、音高、语速等属性「捏」出新声音；开源后在社区里被大量使用和二次开发。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/cosyvoice-2.html">CosyVoice 2</a>等系统用LLM生成语义token，再由流匹配模型补上声学细节，属于两阶段；<a class="ln" href="../n/vall-e.html">VALL-E</a>系列则要预测多层残差码本。<a class="ln" href="../n/llasa.html">Llasa</a>已经尝试用单层码本和纯LLM完成合成。</p><p>Spark-TTS的核心是编解码器<b>BiCodec</b>：它把一段语音编码成两种互补的离散token——<b>语义token</b>码率低、随时间变化，主要承载说的内容；<b>全局token</b>数量固定，与语音长度无关，承载音色、性别、风格等说话人属性。生成时，<a class="ln" href="../n/qwen2.5.html">Qwen2.5</a>按文本（和可选的属性说明）先预测全局token，再预测语义token，BiCodec解码器直接把两者合成波形，不需要额外的声学模型。论文把先预测粗粒度属性（性别、风格）、再预测细粒度数值（具体音高、语速）、最后生成token的过程称为<b>思维链式生成</b>（借用<a class="ln" href="../n/cot.html">思维链CoT</a>的说法），从而支持不用参考录音、按属性描述直接创造新声音。</p><p>作者同时发布了VoxBox：一个10万小时、带完整属性标注的语料。摘要称Spark-TTS在零样本克隆上达到当时最好的水平，并能生成超出参考录音限制的高度定制化声音；代码、预训练模型和示例全部开源。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>单码本、低码率的语义token牺牲了一部分声学细节，在情感丰富或非常规发声的语音上表现有限。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>自回归LLM生成仍有吞字、重复等稳定性问题，长文本需要分段。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:336" href="../n/cot.html">思维链CoT</a><span class="yr">2022.01 · 推理·智能体</span><div class=nt>借用思维链的说法：先预测属性、再预测具体数值、最后生成token。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/snac.html">SNAC多尺度编解码</a><span class="yr">2024.10 · 语音</span><div class=nt>码仍然是纯声学的，缺少显式语义信息。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/qwen2.5.html">Qwen2.5</a><span class="yr">2024.12 · LLM</span><div class=nt>以Qwen2.5作为预测语音token的语言模型。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/cosyvoice-2.html">CosyVoice 2</a><span class="yr">2024.12 · 语音</span><div class=nt>CosyVoice 2需要LLM加流匹配两阶段；Spark-TTS用单流解耦token让LLM输出可直接解码为波形。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:168" href="../n/llasa.html">Llasa</a><span class="yr">2025.02 · 语音</span><div class=nt>同为单码本加纯LLM的TTS；Llasa研究训练和推理的扩展规律，Spark-TTS侧重把说话人属性解耦为全局token以便控制。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/vector-quantization.html">向量量化与离散token</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/zero-few-shot.html">零样本与少样本</a> <a class="chip c" href="../c/vocoder-codec.html">声码器与音频编解码</a></p>
+<h2>本篇术语</h2><ul><li><b>全局token</b>　数量固定、与语音长短无关的离散码，用来概括整段语音的说话人属性。</li><li><b>单流token</b>　每个时间步只有一个离散码（只用一个码本），LLM可以像生成文字一样逐个生成。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2503.01710" rel="noopener">https://arxiv.org/abs/2503.01710</a>（arXiv官方记录：标题Spark-TTS: An Efficient LLM-Based Text-to-Speech Model with Single-Stream Decoupled Speech Tokens、Wang等25位作者、v1提交2025-03-03；摘要中多阶段或多码本的局限、BiCodec单流、低码率语义token与固定长度全局token、Qwen2.5、CoT生成、粗粒度与细粒度控制、VoxBox 10万小时、零样本克隆SOTA、开源。生成顺序细节、机构、社区使用情况为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Spark-TTS%E5%8D%95%E6%B5%81%E8%A7%A3%E8%80%A6TTS%EF%BC%88spark-tts%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aspark-tts%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/spark-tts.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="diffrhythm.html"><small>本分支上一个 · 2025.03</small><b>DiffRhythm整首歌生成</b></a><a class="r" href="kimi-audio.html"><small>本分支下一个 · 2025.04</small><b>Kimi-Audio</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>RegMix回归式数据配比（2024） · AI脉络</title>
+<meta name="description" content="预训练数据配比对效果影响很大，但大规模试错太贵；DoReMi等方法要训练参考模型和代理模型，计算不小，而且领域间的相互作用往往违反直觉，人工判断容易出错。 把找配比当成回归问题：用大量随机配比训练许多极小的模型（如512个1M参数模型各训练10亿token），拟合“配比→目标损失”的回归模型（如L…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/regmix.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RegMix回归式数据配比（2024）">
+<meta property="og:description" content="预训练数据配比对效果影响很大，但大规模试错太贵；DoReMi等方法要训练参考模型和代理模型，计算不小，而且领域间的相互作用往往违反直觉，人工判断容易出错。 把找配比当成回归问题：用大量随机配比训练许多极小的模型（如512个1M参数模型各训练10亿token），拟合“配比→目标损失”的回归模型（如L…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/regmix.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/regmix">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 规模定律与数据</div>
+<h1>RegMix回归式数据配比</h1>
+<div class="full">RegMix: Data Mixture as Regression for Language Model Pre-training</div>
+<div class="meta"><span>2024.07</span><span>论文</span><span>延伸</span><span>ICLR 2025</span><span>Qian Liu, Xiaosen Zheng, Niklas Muennighoff, Guangtao Zeng, Longxu Dou, Tianyu Pang, Jing Jiang, Min Lin · Sea AI Lab、新加坡管理大学等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2407.01492" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/sail-sg/regmix" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/regmix">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>预训练数据配比对效果影响很大，但大规模试错太贵；DoReMi等方法要训练参考模型和代理模型，计算不小，而且领域间的相互作用往往违反直觉，人工判断容易出错。</p></div><div><h4>方法</h4><p>把找配比当成回归问题：用大量随机配比训练许多极小的模型（如512个1M参数模型各训练10亿token），拟合“配比→目标损失”的回归模型（如LightGBM），在回归模型上搜索最优配比，直接用它训练大1000倍的模型。</p></div><div><h4>影响</h4><p>用DoReMi约10%的计算就达到或超过它的效果，并给出几条实用结论：配比影响显著、网页数据（而非维基百科这类“高质量”数据）与下游表现相关性最强、领域相互作用复杂、配比效应超出规模定律的刻画；成为数据配比研究的常用对比方法。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/doremi.html">DoReMi数据配比优化</a>用小代理模型配合分组鲁棒优化求配比；<a class="ln" href="../n/data-mixing-laws.html">数据配比定律</a>用参数化函数拟合配比与损失的关系。两者都假设小模型上的规律能迁移到大模型。</p><p><b>RegMix流程</b>：</p><ul><li><b>采样配比</b>：在Pile的各个领域上，以某种先验分布（如按领域token数调整的狄利克雷分布）随机生成数百个配比。</li><li><b>训练小模型</b>：为每个配比训练一个极小的模型，论文中是512个1M参数的模型，各训练10亿token，记录它们在目标验证集（如Pile-CC网页数据）上的损失。</li><li><b>回归</b>：以配比向量为输入、验证损失为输出，拟合线性回归或LightGBM回归模型。</li><li><b>搜索与迁移</b>：在回归模型上大量模拟随机配比，取预测损失最低的若干个求平均作为最终配比，直接用来训练大模型。</li></ul><p>核心假设是<b>配比的排序在不同规模间保持一致</b>：小模型上更好的配比在大模型上也更好，即使绝对损失不同。</p><p>结果：用预测的配比训练1B参数、250亿token的模型（比代理模型大1000倍、长25倍），它在64个用不同配比训练的1B候选模型中表现最好。在最大7B参数、1000亿token的实验中，RegMix始终优于人工选择的配比，并以DoReMi约10%的计算达到或超过它。作者还观察到：网页语料与下游表现的正相关最强，强于维基百科等通常被认为高质量的数据；领域之间的相互作用常常违反常识；配比带来的效应不能被规模定律解释。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>依赖“小模型上的配比排序可以迁移到大1000倍的模型”这一假设，论文最大只验证到7B；当大模型能更好地利用难数据时排序可能改变。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>领域需要预先划分，回归的输入维度随领域数增加，领域很细时需要更多小模型；目标仍是单一验证集损失，与多项下游能力的权衡没有直接建模。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/scaling-laws.html">语言模型的规模定律</a><span class="yr">2020.01 · LLM</span><div class=nt>沿用以小模型预测大模型的思路，但作者观察到配比效应不能被规模定律解释。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/the-pile.html">The Pile与开放预训练语料</a><span class="yr">2020.12 · 数据·评测</span><div class=nt>在Pile的各领域上做配比实验，以Pile-CC等为目标验证集。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/doremi.html">DoReMi数据配比优化</a><span class="yr">2023.05 · LLM</span><div class=nt>DoReMi需要参考模型和代理模型、计算开销较大，RegMix用约10%的计算达到或超过它。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/data-mixing-laws.html">数据配比定律</a><span class="yr">2024.03 · LLM</span><div class=nt>数据配比定律拟合指数形式的参数化函数，RegMix用非参数的回归模型直接从大量小实验中学习。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/linear-regression.html">线性回归</a> <a class="chip c" href="../c/ensemble.html">集成学习</a> <a class="chip c" href="../c/scaling-law-concept.html">幂律与规模定律</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/hyperparameter.html">超参数与调参</a></p>
+<h2>本篇术语</h2><ul><li><b>代理模型（proxy model）</b>　为了便宜地估计某个选择的效果而训练的小模型，结论再迁移到真正要训练的大模型上。</li><li><b>LightGBM</b>　一种常用的梯度提升决策树实现，擅长从表格型特征中学习非线性关系。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/doremi.html">DoReMi数据配比优化</a>和<a class="ln" href="../n/data-mixing-laws.html">数据配比定律</a>；读原文第2节方法和第4节关于网页数据与领域相互作用的发现；动手：用RegMix开源代码在几个领域上跑一遍小规模配比搜索，比较线性回归和LightGBM的预测精度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2407.01492" rel="noopener">https://arxiv.org/abs/2407.01492</a>（标题、8位作者、arXiv v1提交日2024-07-01；摘要中把配比确定表述为回归任务、训练多个小模型并用回归预测未见配比、512个1M参数模型各训练1B token、用于训练大1000倍且长25倍的1B/25B token模型并在64个候选中最好、最大7B/100B token时优于人工选择、以10%计算匹配或超过DoReMi、四点发现（配比影响显著、网页而非维基百科与下游相关最强、领域相互作用违反常识、配比效应超越规模定律）。狄利克雷采样、LightGBM、取预测最好的若干配比平均、ICLR 2025、机构为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20RegMix%E5%9B%9E%E5%BD%92%E5%BC%8F%E6%95%B0%E6%8D%AE%E9%85%8D%E6%AF%94%EF%BC%88regmix%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aregmix%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/regmix.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mistral-large-2.html"><small>本分支上一个 · 2024.07</small><b>Mistral Large 2</b></a><a class="r" href="aux-loss-free.html"><small>本分支下一个 · 2024.08</small><b>无辅助损失负载均衡</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

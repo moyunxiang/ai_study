@@ -1,0 +1,31 @@
+{
+  "id": "ivector-adaptation",
+  "who": "George Saon, Hagen Soltau, David Nahamoo, Michael Picheny · IBM",
+  "venue": "ASRU 2013",
+  "links": [
+    {"label": "IEEE", "url": "https://doi.org/10.1109/asru.2013.6707705"}
+  ],
+  "problem": "GMM时代的说话人自适应（MLLR、fMLLR）是为高斯模型设计的线性变换，搬到DNN声学模型上效果有限，而且要先解码一遍再估变换。",
+  "idea": "把说话人识别里的i-vector（一个概括「这个人、这个信道」的低维向量）直接拼到DNN每一帧的输入特征后面，让网络自己学会按说话人调整。",
+  "impact": "i-vector输入成为DNN-HMM识别系统做说话人自适应的标准办法，Kaldi的nnet3/chain配方默认在线提取i-vector并拼进声学模型输入，沿用到TDNN时代结束。",
+  "method": "[[i-vector]]原本是说话人验证的技术：用一个通用背景模型和因子分析，把一整段语音压缩成几百维的向量，里面同时包含说话人和录音信道的信息。在深度网络接管声学建模（[[cd-dnn-hmm]]）之后，原来为GMM设计的自适应方法——如[[fmllr]]——仍可以作为特征变换使用，但需要两遍解码，而且它的线性形式与DNN并不匹配。\n\nSaon等人的做法非常简单：对每个说话人（或每段话）提取i-vector，把它原封不动地**拼接到每一帧声学特征的后面**作为额外输入，再正常训练DNN。网络从数据里学到「看到这类i-vector时，该怎样修正对音素的判断」，相当于一种隐式的、非线性的说话人归一化。它不需要先解码，也可以用前面一小段语音在线估计。\n\n论文在IBM的Switchboard电话语音系统上报告，加入i-vector输入比不加的DNN有明显的相对词错误率下降，并能与特征变换类自适应叠加使用（具体数字未核对）。这一做法后来被[[kaldi]]采纳为在线自适应的默认环节，常与[[tdnn-kaldi]]一起使用。",
+  "limits": [
+    {"text": "i-vector需要额外训练通用背景模型和提取器，流程繁琐；在短语音上估计不准。", "solved_by": []},
+    {"text": "端到端模型训练数据规模足够大后，显式说话人自适应的收益大幅缩小，这一环节逐渐被省去。", "solved_by": ["whisper"]}
+  ],
+  "relations": [
+    {"to": "i-vector", "type": "uses", "note": "直接使用说话人识别中的i-vector作为说话人与信道的表示。"},
+    {"to": "cd-dnn-hmm", "type": "extends", "note": "在DNN-HMM混合声学模型上增加说话人向量输入，实现自适应。"},
+    {"to": "fmllr", "type": "rivals", "note": "fMLLR是为GMM设计的线性特征变换且需两遍解码；i-vector输入由网络非线性地利用，无需先解码，两者也可叠加。"}
+  ],
+  "prereq": ["mlp", "feature-representation", "latent-variable", "phoneme-acoustic", "word-error-rate"],
+  "terms": [
+    {"t": "说话人自适应", "d": "让识别模型适应某个具体说话人的嗓音和录音条件，以降低错误率。"},
+    {"t": "在线i-vector", "d": "只用当前时刻之前的音频边听边估计i-vector，使自适应可用于实时识别。"}
+  ],
+  "aka": ["i-vector自适应", "i-vector输入", "speaker adaptation with i-vectors"],
+  "check": {
+    "source": "https://doi.org/10.1109/asru.2013.6707705",
+    "confirmed": "Crossref记录：标题Speaker adaptation of neural network acoustic models using i-vectors、作者Saon/Soltau/Nahamoo/Picheny、2013 IEEE ASRU（2013-12）。拼接方式、Switchboard实验、Kaldi在线i-vector为一般了解，论文中的具体错误率未写。"
+  }
+}

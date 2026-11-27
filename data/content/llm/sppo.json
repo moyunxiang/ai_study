@@ -1,0 +1,36 @@
+{
+  "id": "sppo",
+  "who": "Yue Wu, Zhiqing Sun, Huizhuo Yuan, Kaixuan Ji, Yiming Yang, Quanquan Gu · UCLA、CMU",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2405.00675"},
+    {"label": "代码", "url": "https://github.com/uclaml/SPPO"}
+  ],
+  "aka": ["SPPO", "Self-Play Preference Optimization", "自我对弈偏好优化", "自博弈偏好优化", "Self-Play PO"],
+  "problem": "Bradley-Terry奖励表达不了不传递、不理性的人类偏好；NLHF把对齐写成偏好博弈，但它的Nash-MD算法要从几何混合策略采样，在大模型上难以实现。",
+  "idea": "把对齐看成两人常和博弈，用乘性权重更新逐轮逼近纳什均衡：每一轮让模型和上一轮的自己对弈，用偏好模型估计每个回答对当前策略的胜率，再用一个简单的平方损失把对数概率比拟合到“胜率减1/2”。",
+  "impact": "第一次让纳什式偏好优化在7B–8B开源模型上跑出当时领先的AlpacaEval 2.0成绩，而且只用了6万条提示和一个0.4B的偏好模型，不依赖GPT-4标注，成为迭代DPO之外常用的自我对弈对齐基线。",
+  "background": "[[dpo]]和[[ipo]]是离线方法，偏好对来自别的模型；[[spin]]让模型和自己对弈，但对手是人类写的回答，并不使用偏好反馈。[[nlhf]]提出把对齐目标定义为偏好博弈 `max_π min_π′ P(π≻π′)` 的纳什均衡，绕开Bradley-Terry假设，但它的求解依赖对参考策略的几何混合，难以用于大语言模型。",
+  "method": "**乘性权重更新**：博弈论里求两人常和博弈均衡的经典办法是每一轮按收益指数加权：\n`π_{t+1}(y|x) ∝ π_t(y|x) · exp(η · P(y≻π_t|x))`\n其中 `P(y≻π_t|x) = E_{y′∼π_t} P(y≻y′|x)` 是回答y对当前策略的平均胜率，η是步长。作者证明这样迭代的平均策略逼近纳什均衡。\n\n**可训练的目标**：上式两边取对数，归一化常数近似处理后，等价于让对数概率比等于胜率的线性函数。于是每一轮最小化平方损失\n`L(θ) = E_{x, y∼π_t} [ ( log(π_θ(y|x)/π_t(y|x)) − η·(P̂(y≻π_t|x) − 1/2) )² ]`\n胜率高于一半的回答概率被抬高，低于一半的被压低，幅度与胜率差成正比。与DPO只看一对回答的相对差不同，SPPO对每个回答单独给出目标值，被选中和被拒绝的回答都有明确的“该涨多少、该跌多少”。\n\n**流程**：每轮对每个提示从当前模型采样几条回答，用偏好模型PairRM两两比较，估计每条回答的胜率P̂，再做上面的回归，得到下一轮模型；共迭代三轮。",
+  "results": "只用UltraFeedback的6万条提示（不用其中的回答），偏好模型是0.4B参数的PairRM，从Mistral-7B-Instruct-v0.2出发，在AlpacaEval 2.0上对GPT-4-Turbo的长度控制胜率达到28.53%；在MT-Bench、Arena-Hard和Open LLM Leaderboard上也超过（迭代）DPO和IPO。从Llama-3-8B-Instruct出发，长度控制胜率达到38.77%。全程没有用GPT-4等更强模型提供回答或偏好。",
+  "legacy": "SPPO和同期的[[dno]]一起，把“偏好博弈+自我对弈”推成迭代对齐的主流写法之一；后续工作沿着它做更好的胜率估计、更换偏好模型、加长度控制，也把同样的平方损失形式用到推理任务的偏好优化上。",
+  "limits": [
+    {"text": "胜率P̂由小偏好模型PairRM估计，模型的偏差（例如偏爱更长、更客气的回答）会被逐轮放大；论文的提升主要体现在以模型评判为主的榜单上。", "solved_by": []},
+    {"text": "理论保证的是乘性权重迭代的平均策略逼近均衡，而实际只保留最后一轮模型、只迭代三轮，平方损失也近似掉了归一化常数，理论与实践之间有差距。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "nlhf", "type": "solves", "note": "NLHF的Nash-MD需从几何混合策略采样，难以落地；SPPO改用乘性权重自我对弈和简单平方损失，在7B模型上实现了纳什式对齐。"},
+    {"to": "ipo", "type": "extends", "note": "同样直接优化偏好概率并用平方损失回归对数概率比；SPPO把目标从固定偏好对换成对当前策略的胜率，并在线迭代。"},
+    {"to": "spin", "type": "extends", "note": "SPIN的对手是人类示范，SPPO的对手是上一轮自己，并用偏好模型判断输赢。"},
+    {"to": "dpo", "type": "rivals", "note": "DPO只约束一对回答的相对差；SPPO给每个回答一个独立的目标值，实验中超过迭代DPO。"},
+    {"to": "ultrafeedback", "type": "uses", "note": "只取UltraFeedback的6万条提示，不用其回答与标注。"}
+  ],
+  "prereq": ["rlhf-concept", "nash-equilibrium", "self-play", "kl-divergence", "logistic-regression"],
+  "terms": [
+    {"t": "乘性权重更新", "d": "每一轮把每个选项的概率乘上exp(η×收益)再归一化；收益高的选项越来越常被选，是求博弈均衡的经典在线算法。"},
+    {"t": "胜率", "d": "这里指一个回答与当前模型随机采样的回答相比，被偏好模型判为更好的概率；正好一半表示与当前模型持平。"},
+    {"t": "PairRM", "d": "一个约0.4B参数的成对排序模型，同时读两个回答并判断哪个更好，常被当作廉价的偏好评判器。"}
+  ],
+  "learn": "先读[[nlhf]]的博弈表述和[[ipo]]的平方损失；读本文第3节乘性权重推导和SPPO损失；动手：在一个只有4个回答、偏好成环的表格问题上跑几轮乘性权重，看平均策略如何趋近均衡。",
+  "check": {"source": "https://arxiv.org/abs/2405.00675", "confirmed": "标题、6位作者、arXiv首次提交2024-05-01；摘要中BT模型无法刻画不传递和非理性偏好、常和两人博弈求纳什均衡、迭代更新可证明逼近纳什均衡、新的SPPO目标、6万条UltraFeedback提示无回答无增广、0.4B的PairRM、Mistral-7B-Instruct-v0.2在AlpacaEval 2.0对GPT-4-Turbo长度控制胜率28.53%、超过迭代DPO与IPO（MT-Bench、Arena-Hard、Open LLM Leaderboard）、Llama-3-8B-Instruct得38.77%、不需GPT-4的外部监督。乘性权重公式、平方损失形式、迭代三轮、ICLR 2025与机构为对正文的一般了解。"}
+}

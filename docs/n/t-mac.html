@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>T-MAC查表低比特推理（2024） · AI脉络</title>
+<meta name="description" content="低比特量化模型推理时要做“低比特权重×高精度激活”的混合精度矩阵乘，CPU没有这种原生指令，只能先把权重反量化回高精度再算，开销大，比特数降低也换不来相应的提速。 把乘法变成查表：权重按比特拆开，每一比特只有0/1两种取值，预先把激活的各种组合和算好放进一张小表，计算时用权重比特直接查表累加，不再…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/t-mac.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="T-MAC查表低比特推理（2024）">
+<meta property="og:description" content="低比特量化模型推理时要做“低比特权重×高精度激活”的混合精度矩阵乘，CPU没有这种原生指令，只能先把权重反量化回高精度再算，开销大，比特数降低也换不来相应的提速。 把乘法变成查表：权重按比特拆开，每一比特只有0/1两种取值，预先把激活的各种组合和算好放进一张小表，计算时用权重比特直接查表累加，不再…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/t-mac.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/t-mac">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 本地与端侧部署</div>
+<h1>T-MAC查表低比特推理</h1>
+<div class="full">T-MAC: CPU Renaissance via Table Lookup for Low-Bit LLM Deployment on Edge</div>
+<div class="meta"><span>2024.06</span><span>论文</span><span>延伸</span><span>EuroSys 2025</span><span>Jianyu Wei, Shijie Cao, Ting Cao, Lingxiao Ma, Lei Wang, Yanyong Zhang, Mao Yang · 微软亚洲研究院, 中国科学技术大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2407.00088" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/microsoft/T-MAC" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/t-mac">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>低比特量化模型推理时要做“低比特权重×高精度激活”的混合精度矩阵乘，CPU没有这种原生指令，只能先把权重反量化回高精度再算，开销大，比特数降低也换不来相应的提速。</p></div><div><h4>方法</h4><p>把乘法变成查表：权重按比特拆开，每一比特只有0/1两种取值，预先把激活的各种组合和算好放进一张小表，计算时用权重比特直接查表累加，不再反量化、也几乎不做乘法。</p></div><div><h4>影响</h4><p>让CPU上的低比特推理速度随比特数线性提升，是微软bitnet.cpp等1比特推理内核的技术基础之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>端侧部署通常把权重量化到4比特、2比特甚至1.58比特（如<a class="ln" href="../n/bitnet.html">1.58比特模型BitNet</a>），激活仍是8或16比特。<a class="ln" href="../n/llama-cpp.html">llama.cpp与本地推理</a>等框架在CPU上的做法是先把一块权重反量化成高精度，再做普通的乘加；比特数再低，乘加次数也不变，所以速度提升有限。</p><p>T-MAC把一个n比特权重拆成n个1比特平面：<code>W = Σ_i 2^i · W_i</code>，每个 <code>W_i</code> 的元素只取0或1。对一组g个激活（如g=4），它们与任意0/1向量的点积只有 <code>2^g</code> 种可能，可以先算出来存成一张查找表。于是“权重×激活”变成：用每个比特平面上连续g个比特拼成索引去查表，再按 <code>2^i</code> 加权累加。乘法被消除，加法也大为减少；计算量随比特数线性下降。论文还针对CPU的SIMD查表指令、表的存放位置和数据布局做了优化。</p><p>摘要报告：在低比特Llama和BitNet模型上，相比llama.cpp吞吐最多提高4倍、能耗降低70%；BitNet-b1.58-3B在M2-Ultra上单核每秒30个词、八核71个词，在树莓派5上每秒11个词。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>查表法在解码这类矩阵-向量乘中优势明显，预填充的大批量矩阵乘仍可能更适合传统的反量化加GEMM；也依赖CPU的SIMD查表指令。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/bitnet-cpp.html">bitnet.cpp三值模型推理</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/llama-cpp.html">llama.cpp与本地推理</a><span class="yr">2023.03 · 系统·效率</span><div class=nt>llama.cpp在CPU上要先反量化权重再计算，T-MAC用查表直接做混合精度矩阵乘，吞吐最多提高4倍。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/gguf.html">GGUF与k-quants</a><span class="yr">2023.08 · 系统·效率</span><div class=nt>面向GGUF/k-quants一类的低比特权重格式，提供更快的CPU计算内核。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/bitnet.html">1.58比特模型BitNet</a><span class="yr">2024.02 · 系统·效率</span><div class=nt>以BitNet b1.58等极低比特模型作为主要评测对象。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/bitnet-cpp.html">bitnet.cpp三值模型推理</a><span class="yr">2024.10 · 系统·效率</span><div class=nt>借鉴T-MAC的查表式低比特矩阵乘内核。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/quantization-concept.html">量化</a> <a class="chip c" href="../c/matrix-multiplication.html">矩阵乘法与线性变换</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a></p>
+<h2>本篇术语</h2><ul><li><b>查找表（LUT）</b>　把所有可能输入对应的计算结果预先算好存起来，计算时直接按索引读取结果，用存储换计算。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2407.00088" rel="noopener">https://arxiv.org/abs/2407.00088</a>（标题、七位作者、v1日期2024-06-25；摘要：低比特LLM需要混合精度矩阵乘、现有系统只能反量化、基于查找表的方法直接支持mpGEMM无需反量化并消除乘法减少加法、把数据类型为中心的乘法转为按比特查表、内核随比特宽度线性扩展、对比llama.cpp吞吐最多4倍能耗降70%、BitNet-b1.58-3B在M2-Ultra单核30 tokens/s八核71 tokens/s、树莓派5上11 tokens/s。比特平面分解公式与g=4、EuroSys 2025、机构为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20T-MAC%E6%9F%A5%E8%A1%A8%E4%BD%8E%E6%AF%94%E7%89%B9%E6%8E%A8%E7%90%86%EF%BC%88t-mac%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9At-mac%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/t-mac.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="powerinfer-2.html"><small>本分支上一个 · 2024.06</small><b>PowerInfer-2手机大模型推理</b></a><a class="r" href="flashattention-3.html"><small>本分支下一个 · 2024.07</small><b>FlashAttention-3</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

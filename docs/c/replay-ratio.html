@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>回放比与UTD比（Replay Ratio and Update-to-Data Ratio） · AI脉络</title>
+<meta name="description" content="离策略算法每与环境交互一步，做几次梯度更新（或重放多少个样本）。比值越高越“榨干”每条数据、样本效率越高，但更容易过拟合早期数据和丧失可塑性。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/replay-ratio.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="回放比与UTD比（Replay Ratio and Update-to-Data Ratio）">
+<meta property="og:description" content="离策略算法每与环境交互一步，做几次梯度更新（或重放多少个样本）。比值越高越“榨干”每条数据、样本效率越高，但更容易过拟合早期数据和丧失可塑性。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/replay-ratio.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/replay-ratio">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>回放比与UTD比</h1><div class="full">Replay Ratio and Update-to-Data Ratio</div>
+<p class="muted" style="font-size:13px">也叫：回放比　replay ratio　UTD　UTD比　UTD ratio　update-to-data ratio　更新数据比　更新与数据比　高UTD　数据复用率</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/replay-ratio">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>离策略算法每与环境交互一步，做几次梯度更新（或重放多少个样本）。比值越高越“榨干”每条数据、样本效率越高，但更容易过拟合早期数据和丧失可塑性。</b></p>
+<p class="tags">先要会：<a class="chip c" href="on-off-policy.html">on-policy与off-policy</a> <a class="chip c" href="generalization.html">泛化与过拟合</a></p>
+<p>带<a class="ln" href="../n/experience-replay.html">经验回放</a>的算法有两个可以独立调的速度：收集数据的速度和用数据训练的速度。真实机器人或昂贵模拟器上，交互是瓶颈，算力相对便宜，自然希望每条数据多学几遍。描述这个比例的量有两种叫法。</p><p><b>定义</b>。</p><ul><li><b>UTD比</b>（update-to-data ratio）：每收集1个环境步，做多少次梯度更新。</li><li><b>回放比</b>（replay ratio）：每收集1个环境步，从缓冲区里重放多少个样本（=UTD × 批大小）。也有论文把每步更新次数直接叫回放比，读时要看定义。</li></ul><p><b>典型取值</b>。<a class="ln" href="../n/dqn-nature.html">DQN（Nature版）</a>每4个环境步做一次批大小32的更新，UTD=0.25，相当于每步重放8个样本。连续控制里SAC常用UTD=1。为了样本效率，<a class="ln" href="../n/redq.html">REDQ随机集成双Q</a>把UTD提到20，<a class="ln" href="../n/droq.html">DroQ dropout Q函数</a>用dropout在类似设定下降低计算量。</p><p><b>为什么不能无限提高</b>。UTD越高，网络越早就在少量数据上反复训练：价值估计过拟合到最初的几千条转移，高估累积，网络还会失去继续学习新数据的能力。<a class="ln" href="../n/primacy-bias.html">首因偏差与网络重置</a>发现定期重置网络最后几层（甚至全部参数）能显著缓解，并让更高的回放比变得可用；<a class="ln" href="../n/bbf.html">BBF</a>把重置、更大的网络和高回放比结合，大幅提高了Atari 100k上的成绩；<a class="ln" href="../n/crossq.html">CrossQ批归一化RL</a>则走另一条路，在UTD=1时靠归一化获得高样本效率。可塑性问题的更一般讨论见<a class="ln" href="../n/loss-of-plasticity.html">可塑性丧失</a>，回放比与数据效率的关系见<a class="lc" href="../c/sample-efficiency.html">样本效率与样本复杂度</a>。</p>
+<div class="example"><h4>例子</h4><p>预算是10万个环境步。UTD=1时共做10万次更新；UTD=20时做200万次，计算量是20倍，但一条数据平均被用到的次数也多了20倍（批大小256时，每个样本平均被抽中约256×20=5120次）。若训练曲线前期上升很快、后期停滞甚至下降，常见原因就是回放比过高导致的过拟合与可塑性丧失。</p></div>
+<h2>容易误解的地方</h2><ul><li>比较两篇论文的样本效率时，只看环境步数不够，还要看它们的UTD和网络大小，否则计算预算可能差几十倍。</li><li>同策略算法（如PPO）没有“回放比”，但每批数据训练的轮数（epochs）起着类似作用，调大同样会使新旧策略偏离过远。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

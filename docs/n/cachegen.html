@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>CacheGen KV缓存编码传输（2023） · AI脉络</title>
+<meta name="description" content="长上下文要先全部预填充完才能出第一个词；把某段上下文的KV缓存存起来给别的请求复用可以省掉预填充，但KV张量很大，从远端存储经网络取回来本身就很慢。 把KV缓存当作一种媒体数据来压缩：利用KV值的分布特点设计专门的编码器，把它压成紧凑的比特流；再像视频流一样按当前带宽为不同片段选压缩档位，带宽太低…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/cachegen.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CacheGen KV缓存编码传输（2023）">
+<meta property="og:description" content="长上下文要先全部预填充完才能出第一个词；把某段上下文的KV缓存存起来给别的请求复用可以省掉预填充，但KV张量很大，从远端存储经网络取回来本身就很慢。 把KV缓存当作一种媒体数据来压缩：利用KV值的分布特点设计专门的编码器，把它压成紧凑的比特流；再像视频流一样按当前带宽为不同片段选压缩档位，带宽太低…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/cachegen.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/cachegen">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 推理服务引擎</div>
+<h1>CacheGen KV缓存编码传输</h1>
+<div class="full">CacheGen: KV Cache Compression and Streaming for Fast Large Language Model Serving</div>
+<div class="meta"><span>2023.10</span><span>论文</span><span>延伸</span><span>SIGCOMM 2024</span><span>Yuhan Liu, Hanchen Li, Yihua Cheng, Siddhant Ray, Yuyang Huang, Qizheng Zhang, Kuntai Du, Jiayi Yao et al. · 芝加哥大学, 微软</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2310.07240" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/UChi-JCL/CacheGen" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/cachegen">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>长上下文要先全部预填充完才能出第一个词；把某段上下文的KV缓存存起来给别的请求复用可以省掉预填充，但KV张量很大，从远端存储经网络取回来本身就很慢。</p></div><div><h4>方法</h4><p>把KV缓存当作一种媒体数据来压缩：利用KV值的分布特点设计专门的编码器，把它压成紧凑的比特流；再像视频流一样按当前带宽为不同片段选压缩档位，带宽太低时甚至改为现场重算。</p></div><div><h4>影响</h4><p>把“KV缓存可以跨机器存取和传输”变成一个独立的系统问题，同一团队随后做了CacheBlend并汇总成LMCache缓存层。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>复用KV缓存的想法是：同一份文档、同一段系统提示被许多请求共用时，只做一次预填充，把得到的<a class="lc" href="../c/kv-cache.html">KV缓存</a>存起来，其他请求直接取用（如<a class="ln" href="../n/vllm.html">vLLM与PagedAttention</a>的前缀共享）。但缓存往往放在别的机器或存储里；一个几千token的上下文的KV张量有数GB之大，经网络取回的时间可能比重新预填充还长。</p><p>CacheGen做两件事。一是<b>定制的张量编码器</b>：根据KV缓存的分布特性（例如相邻token的KV值相近、不同层对精度的敏感度不同），先做差分与分层量化，再用算术编码压成比特流，解码开销很小。二是<b>按带宽自适应</b>：把上下文切成若干片段，每段准备多个压缩档位，像视频流选码率那样根据实时带宽为每段挑档位，以控制加载延迟和生成质量；带宽太差时可改为在GPU上直接重算这一段。</p><p>摘要报告：与当时复用KV缓存的系统相比，KV缓存大小减少3.5–4.3倍，取回并处理上下文的总延迟降低3.2–3.7倍，对回答质量影响可以忽略。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只能复用作为前缀出现的上下文；RAG里多段检索文本拼接时，非前缀片段的KV缺少与前文的交叉注意力，不能直接拼接复用。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/cacheblend.html">CacheBlend非前缀KV复用</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:336" href="../n/rag.html">检索增强生成RAG</a><span class="yr">2020.05 · 推理·智能体</span><div class=nt>主要面向检索增强等带长上下文的场景，复用文档的KV缓存来缩短首词延迟。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/vllm.html">vLLM与PagedAttention</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>在单机前缀KV共享的基础上，把KV缓存的复用扩展到跨网络的存储与传输。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/h2o.html">H2O KV缓存淘汰</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>H2O靠丢弃token缩小KV，CacheGen保留全部token、用编码与量化压缩比特数。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/cacheblend.html">CacheBlend非前缀KV复用</a><span class="yr">2024.05 · 系统·效率</span><div class=nt>CacheGen只能复用前缀上下文，CacheBlend用选择性重算让非前缀片段的KV也能复用。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/quantization-concept.html">量化</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a> <a class="chip c" href="../c/context-window.html">上下文窗口</a></p>
+<h2>本篇术语</h2><ul><li><b>算术编码</b>　一种无损熵编码，出现概率高的符号用更少的比特表示，压缩率可以逼近信息熵。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2310.07240" rel="noopener">https://arxiv.org/abs/2310.07240</a>（标题、作者（14位）、v1日期2023-10-11；摘要：长上下文需处理完才能生成、复用KV缓存可降延迟但网络取回大张量带来额外延迟、定制张量编码器利用KV分布特性编成紧凑比特流、按带宽变化调整各部分压缩级别、带宽下降时可现场重算、KV缓存缩小3.5–4.3倍、取回与处理总延迟降低3.2–3.7倍。差分与分层量化的细节、SIGCOMM 2024、机构为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20CacheGen%20KV%E7%BC%93%E5%AD%98%E7%BC%96%E7%A0%81%E4%BC%A0%E8%BE%93%EF%BC%88cachegen%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acachegen%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/cachegen.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="vera.html"><small>本分支上一个 · 2023.10</small><b>VeRA共享随机矩阵适配</b></a><a class="r" href="punica.html"><small>本分支下一个 · 2023.10</small><b>Punica多LoRA服务</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

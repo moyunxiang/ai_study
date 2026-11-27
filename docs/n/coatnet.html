@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>CoAtNet混合骨干（2021） · AI脉络</title>
+<meta name="description" content="Transformer容量大，但缺少卷积的归纳偏置，数据少时泛化不如卷积网络；卷积网络泛化好，数据极多时容量又不够。2021年的视觉Transformer在中等数据上仍落后于最好的卷积网络。 两点观察：深度卷积和自注意力都是对邻域加权求和，可以用“相对注意力”合成一个运算；按“前面卷积、后面注意力…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/coatnet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CoAtNet混合骨干（2021）">
+<meta property="og:description" content="Transformer容量大，但缺少卷积的归纳偏置，数据少时泛化不如卷积网络；卷积网络泛化好，数据极多时容量又不够。2021年的视觉Transformer在中等数据上仍落后于最好的卷积网络。 两点观察：深度卷积和自注意力都是对邻域加权求和，可以用“相对注意力”合成一个运算；按“前面卷积、后面注意力…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/coatnet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/coatnet">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › ViT与新架构</div>
+<h1>CoAtNet混合骨干</h1>
+<div class="full">CoAtNet: Marrying Convolution and Attention for All Data Sizes</div>
+<div class="meta"><span>2021.06</span><span>论文</span><span>延伸</span><span>NeurIPS 2021</span><span>Zihang Dai, Hanxiao Liu, Quoc V. Le, Mingxing Tan · Google Brain</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2106.04803" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/coatnet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Transformer容量大，但缺少卷积的归纳偏置，数据少时泛化不如卷积网络；卷积网络泛化好，数据极多时容量又不够。2021年的视觉Transformer在中等数据上仍落后于最好的卷积网络。</p></div><div><h4>方法</h4><p>两点观察：深度卷积和自注意力都是对邻域加权求和，可以用“相对注意力”合成一个运算；按“前面卷积、后面注意力”的方式纵向堆叠两种层，能同时得到好的泛化和大的容量。</p></div><div><h4>影响</h4><p>CoAtNet在从ImageNet-1K到JFT-3B的各种数据规模上都取得当时最好的精度，以JFT-3B预训练达到ImageNet 90.88% top-1，是“卷积在前、注意力在后”混合骨干的代表作。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><b>统一卷积与注意力</b>：深度卷积的输出是 <code>y_i = Σ_{j∈局部} w_{i−j} x_j</code>，权重只取决于相对位置i−j，与内容无关；自注意力 <code>y_i = Σ_j softmax(x_iᵀx_j) x_j</code> 的权重取决于内容，范围是全局。CoAtNet把两者合起来：注意力的打分加上一个随相对位置变化的可学习偏置 <code>x_iᵀx_j + w_{i−j}</code>，再做softmax。这样既有卷积的平移等变偏好，又保留内容自适应和全局感受野。</p><p><b>纵向堆叠</b>：网络分五个阶段（S0到S4），分辨率逐级减半。作者比较了多种排列，结论是前面高分辨率的阶段用卷积（<a class="ln" href="../n/efficientnet.html">EfficientNet</a>里的MBConv块），后面低分辨率的阶段用带相对注意力的Transformer块，例如C-C-T-T（两段卷积、两段Transformer）在泛化和容量之间平衡最好。高分辨率时注意力太贵，卷积正合适；低分辨率时token少，全局注意力负担得起。</p><p>摘要报告：不用额外数据时ImageNet top-1为86.0%；用ImageNet-21K的1300万张图预训练达到88.56%，与用JFT-300M（3亿张）预训练的ViT-Huge持平而数据少23倍；进一步用JFT-3B扩大规模后达到90.88%。</p><h2>后来的发展</h2><p>同组的<a class="ln" href="../n/maxvit.html">MaxViT多轴注意力</a>在此基础上把注意力改成可在高分辨率使用的多轴形式；“前卷积后注意力”的混合布局也出现在许多后续骨干和多模态视觉编码器中。2022年后大规模预训练的朴素ViT（<a class="ln" href="../n/eva.html">EVA</a>、<a class="ln" href="../n/dinov2.html">DINOv2</a>）重新成为大模型的主流视觉骨干。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>前几个阶段只有卷积，全局信息要到网络后半段才能交互；最大的模型依赖不公开的JFT-3B数据，难以复现。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/maxvit.html">MaxViT多轴注意力</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/vit.html">Vision Transformer</a><span class="yr">2020.10 · 视觉</span><div class=nt>ViT在中等数据上泛化不如卷积网络；CoAtNet用相对注意力和卷积在前的布局，在各种数据规模上都超过ViT。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/relative-position.html">相对位置表示</a><span class="yr">2018.03 · LLM</span><div class=nt>把相对位置表示引入视觉注意力，并说明它与深度卷积的等价联系。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/efficientnet.html">EfficientNet</a><span class="yr">2019.05 · 视觉</span><div class=nt>卷积阶段采用EfficientNet的MBConv块。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/cvt.html">CvT卷积ViT</a><span class="yr">2021.03 · 视觉</span><div class=nt>同期的卷积-Transformer混合：CvT把卷积嵌进每个Transformer块，CoAtNet按阶段纵向分配卷积层和注意力层。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/maxvit.html">MaxViT多轴注意力</a><span class="yr">2022.04 · 视觉</span><div class=nt>CoAtNet高分辨率阶段只用卷积、看不到全局；MaxViT的多轴注意力是线性复杂度，在每个阶段都能做全局交互。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/inductive-bias.html">归纳偏置</a> <a class="chip c" href="../c/generalization.html">泛化与过拟合</a> <a class="chip c" href="../c/positional-encoding.html">位置编码</a></p>
+<h2>本篇术语</h2><ul><li><b>相对注意力</b>　注意力打分里加一项只取决于两个位置相对偏移的可学习偏置，使注意力带有卷积式的位置偏好。</li><li><b>MBConv</b>　MobileNetV2和EfficientNet使用的倒残差块：先1×1升维、再深度卷积、再1×1降维。</li></ul>
+<h2>怎么学</h2><p>先理解深度卷积与自注意力的公式，再读CoAtNet第2节把两者合并的推导和不同堆叠方式的对比表；用timm里的CoAtNet实现训练一个小模型，对比C-C-T-T与C-T-T-T。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2106.04803" rel="noopener">https://arxiv.org/abs/2106.04803</a>（arXiv记录：标题、四位作者、v1提交于2021-06-09；摘要中Transformer容量大但缺乏归纳偏置导致泛化差、深度卷积与自注意力可通过相对注意力统一、纵向堆叠卷积层与注意力层有效、无额外数据86.0%、ImageNet-21K的1300万图预训练88.56%与JFT-300M预训练的ViT-Huge持平且数据少23倍、JFT-3B扩展到90.88%。公式写法、五阶段结构与C-C-T-T、MBConv、NeurIPS 2021凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20CoAtNet%E6%B7%B7%E5%90%88%E9%AA%A8%E5%B9%B2%EF%BC%88coatnet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acoatnet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/coatnet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="video-swin.html"><small>本分支上一个 · 2021.06</small><b>Video Swin视频骨干</b></a><a class="r" href="uformer.html"><small>本分支下一个 · 2021.06</small><b>Uformer复原Transformer</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

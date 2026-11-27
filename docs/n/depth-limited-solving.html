@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>不完全信息博弈的深度受限求解（2018） · AI脉络</title>
+<meta name="description" content="完全信息游戏里，搜索到一定深度就用评估函数给叶子打分；不完全信息博弈里，一个状态的价值取决于双方在之后采用什么策略，叶子没有确定的值，所以只能把子博弈一直解到终局，要用超级计算机。 在深度上限处不给叶子一个固定值，而是让对手在若干套「后续策略」中任选一套：每套策略对应一组不同的叶子值，求解时智能体…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/depth-limited-solving.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="不完全信息博弈的深度受限求解（2018）">
+<meta property="og:description" content="完全信息游戏里，搜索到一定深度就用评估函数给叶子打分；不完全信息博弈里，一个状态的价值取决于双方在之后采用什么策略，叶子没有确定的值，所以只能把子博弈一直解到终局，要用超级计算机。 在深度上限处不给叶子一个固定值，而是让对手在若干套「后续策略」中任选一套：每套策略对应一组不同的叶子值，求解时智能体…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/depth-limited-solving.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/depth-limited-solving">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 不完全信息博弈</div>
+<h1>不完全信息博弈的深度受限求解</h1>
+<div class="full">Depth-Limited Solving for Imperfect-Information Games</div>
+<div class="meta"><span>2018.05</span><span>论文</span><span>延伸</span><span>NeurIPS 2018</span><span>Noam Brown, Tuomas Sandholm, Brandon Amos · 卡内基梅隆大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1805.08195" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/depth-limited-solving">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>完全信息游戏里，搜索到一定深度就用评估函数给叶子打分；不完全信息博弈里，一个状态的价值取决于双方在之后采用什么策略，叶子没有确定的值，所以<a class="ln" href="../n/libratus.html">Libratus</a>只能把子博弈一直解到终局，要用超级计算机。</p></div><div><h4>方法</h4><p>在深度上限处不给叶子一个固定值，而是让对手在若干套「后续策略」中任选一套：每套策略对应一组不同的叶子值，求解时智能体必须对对手所有这些选择都稳健。</p></div><div><h4>影响</h4><p>据此构建的扑克AI Modicum只用一台4核CPU、16GB内存的电脑就击败了两个此前的顶级无限注德扑程序；这种「对手可选多套续策略」的叶子处理是后来<a class="ln" href="../n/pluribus.html">Pluribus多人扑克</a>实时搜索的核心组件。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>设想在德扑里只往前搜几步。如果在深度上限处给每个叶子固定一个值（比如假设之后双方都按某个蓝图策略打），对手就可以利用这一点：它在叶子之后完全可以换成别的打法，于是我们按固定值算出的策略可能被针对。</p><p>作者的做法是：在深度上限处，允许<b>对手</b>在k套预先准备好的续策略（例如蓝图策略，以及把它往「更爱跟注」「更爱弃牌」「更爱加注」等方向偏置的几个版本）中做选择；我们这一方在叶子之后固定为蓝图策略。这样每个叶子节点就变成对手的一个额外决策点：对手选第j套续策略，叶子值就是在该续策略下的期望收益。然后对这个扩展了的、有深度上限的子博弈用<a class="ln" href="../n/cfr.html">反事实遗憾最小化CFR</a>类算法求解。由于对手可以在叶子处挑最有利于自己的续策略，求出的策略必须对所有这些选择都稳健，从而避免了固定叶子值带来的可被利用性。续策略的叶子值可以离线预先算好，在线求解只涉及很浅的树。</p><p>摘要称，用这种方法构建的大师级无限注德扑AI，在只用4核CPU和16GB内存的条件下击败了两个此前的顶级智能体，而以往构建这样强的智能体需要超级计算机。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只考虑对手在少数几套预设续策略中选择，若对手的真实后续偏离这些选项，稳健性保证会减弱。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/rebel.html">ReBeL</a></div></li><li>续策略与叶子值依赖事先算好的蓝图，扩展到新游戏需要重新离线计算。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/rebel.html">ReBeL</a> <a class="chip hue" style="--h:120" href="../n/student-of-games.html">Student of Games</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/cfr.html">反事实遗憾最小化CFR</a><span class="yr">2007 · RL</span><div class=nt>在扩展后的深度受限子博弈上用CFR类算法求解。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/deepstack.html">DeepStack</a><span class="yr">2017.01 · RL</span><div class=nt>DeepStack用神经网络对给定双方信念估计叶子值；本文让对手在多套续策略中选择来定义叶子值，不需要训练价值网络。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/libratus.html">Libratus</a><span class="yr">2017.12 · RL</span><div class=nt>Libratus的子博弈求解要一直解到终局、依赖超级计算机；深度受限求解只搜几步就停，用普通电脑实时完成。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/safe-subgame-solving.html">安全嵌套子博弈求解</a><span class="yr">2017.05 · RL</span><div class=nt>沿用安全子博弈求解保证不被利用的思想，把它推广到有深度上限的子博弈。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/rebel.html">ReBeL</a><span class="yr">2020.07 · RL</span><div class=nt>只考虑对手在少数几套预设续策略中选择，若对手的真实后续偏离这些选项，稳健性保证会减弱。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/student-of-games.html">Student of Games</a><span class="yr">2021.12 · RL</span><div class=nt>续策略与叶子值依赖事先算好的蓝图，扩展到新游戏需要重新离线计算。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/nash-equilibrium.html">博弈论基础与纳什均衡</a> <a class="chip c" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a> <a class="chip c" href="../c/self-play.html">自我对弈</a> <a class="chip c" href="../c/expectation-variance.html">期望与方差</a></p>
+<h2>本篇术语</h2><ul><li><b>深度受限求解</b>　只向前搜索有限步数，在截断处用某种方式估计叶子的价值，而不是一直搜到终局。</li><li><b>续策略</b>　在搜索截断之后，一方假定采用的后续打法；不同续策略给出不同的叶子价值。</li><li><b>蓝图策略</b>　离线对整个博弈的抽象版本预先求解得到的全局策略，在线搜索以它为起点细化。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/cfr.html">反事实遗憾最小化CFR</a>和<a class="ln" href="../n/safe-subgame-solving.html">安全嵌套子博弈求解</a>；读原文第3节多续策略的构造和第5节Modicum实验；在Leduc扑克上实现一个两步深度上限的子博弈，比较固定叶子值和多续策略两种做法的可利用度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1805.08195" rel="noopener">https://arxiv.org/abs/1805.08195</a>（标题、三位作者、arXiv v1于2018-05-21；摘要中不完全信息博弈状态没有明确定义的值、单智能体与完全信息博弈的深度受限搜索不适用、在深度上限处让对手在若干策略中选择、每个策略对应一组叶子值、迫使智能体对对手不同策略稳健、构建了大师级无限注德扑AI、仅用4核CPU与16GB内存击败两个此前的顶级智能体、以往需要超级计算机。Modicum名称、续策略的偏置构造、在Pluribus中的使用按原文正文与通行描述；NeurIPS 2018按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E4%B8%8D%E5%AE%8C%E5%85%A8%E4%BF%A1%E6%81%AF%E5%8D%9A%E5%BC%88%E7%9A%84%E6%B7%B1%E5%BA%A6%E5%8F%97%E9%99%90%E6%B1%82%E8%A7%A3%EF%BC%88depth-limited-solving%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adepth-limited-solving%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/depth-limited-solving.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="hiro.html"><small>本分支上一个 · 2018.05</small><b>HIRO离策略分层RL</b></a><a class="r" href="bco.html"><small>本分支下一个 · 2018.05</small><b>BCO从观测行为克隆</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "id": "reinforce-pp",
+  "who": "Jian Hu, Jason Klein Liu, Haotian Xu, Wei Shen · OpenRLHF团队",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2501.03262"},
+    {"label": "OpenRLHF", "url": "https://github.com/OpenRLHF/OpenRLHF"}
+  ],
+  "aka": ["REINFORCE++", "Reinforce++", "REINFORCE plus plus", "全局优势归一化", "global advantage normalization"],
+  "problem": "PPO要额外训练一个评论家网络，开销大；GRPO、RLOO等无评论家方法改在每道题的一小组回答里做优势归一化，但组太小时估计不准、容易过拟合。",
+  "idea": "仍然不用评论家，但把优势的归一化从“每道题一组”改到“整个批次”上做，得到随批次变大偏差趋于零的估计，并给出适合复杂推理的带组基线变体。",
+  "impact": "作为OpenRLHF里的默认可选算法被很多推理RL复现采用，和GRPO、RLOO、DAPO一起构成无评论家策略优化的常用对照组。",
+  "method": "[[ppo]]用评论家网络估计每个词元的优势，显存和计算都要多出一份模型。[[grpo]]和[[rloo]]去掉评论家：对同一道题采样一组回答，用组内平均奖励当基线，GRPO还会除以组内标准差。作者指出，这种**按题目的局部归一化**在组很小时会放大噪声——一道题四个回答全对或全错时尤其不稳定——并论证它是有偏估计。\n\nREINFORCE++的核心是**全局优势归一化**：先算每条回答的回报（含与参考模型的KL惩罚），再在整个训练批次的所有样本上减均值、除标准差。批次越大，这个估计的偏差越小。它保留了PPO的一些稳定技巧（比如对更新比率做截断），但不需要价值网络。论文给出两个版本：\n- **REINFORCE++**：每题可只采1条回答，适合一般的RLHF；\n- **REINFORCE++ w/ baseline**：每题采多条，先减组内均值再做全局归一化，适合数学推理这类复杂任务。\n摘要称两者在各自场景下更稳定，在复杂的智能体任务上甚至超过PPO。",
+  "limits": [
+    {"text": "仍是序列级的结果奖励，对长推理链和多轮智能体任务中“哪一步做对了”的细粒度信用分配帮助有限。", "solved_by": ["gigpo"]},
+    {"text": "与GRPO、DAPO等方法的优劣在不同模型、数据和超参数下结论不一，社区复现结果并不完全一致。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "reinforce", "type": "extends", "note": "以经典REINFORCE策略梯度为基础，加上全局归一化与PPO式截断等稳定技巧。"},
+    {"to": "grpo", "type": "solves", "note": "针对GRPO按题目做局部优势归一化带来的偏差和过拟合，改为在整个批次上归一化。"},
+    {"to": "rloo", "type": "rivals", "note": "同为无评论家方法，RLOO用留一基线，REINFORCE++用全局归一化。"},
+    {"to": "ppo", "type": "rivals", "note": "去掉PPO的评论家网络以节省开销，同时保留截断等稳定性设计。"},
+    {"to": "openrlhf", "type": "uses", "note": "在OpenRLHF框架中实现并作为可选算法发布。"}
+  ],
+  "prereq": ["policy-gradient-concept", "reward-return", "expectation-variance", "kl-divergence", "rlhf-concept"],
+  "learn": "先读[[grpo]]和[[rloo]] → 读原文第3节两种归一化的对比与偏差分析 → 动手：在同一批模拟奖励上分别算组内归一化和全局归一化的优势，观察组大小为2和16时两者方差的差别。",
+  "check": {"source": "https://arxiv.org/abs/2501.03262", "confirmed": "标题、作者、v1提交于2025-01-04（当前v9）；摘要中PPO评论家开销、GRPO/RLOO的局部归一化有偏、全局优势归一化随批次增大偏差消失、两个变体及适用场景、在复杂智能体设置中超过PPO。PPO式截断与KL惩罚的具体做法、作者团队归属凭一般了解。"}
+}

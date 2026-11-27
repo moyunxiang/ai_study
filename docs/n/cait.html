@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>CaiT与LayerScale（2021） · AI脉络</title>
+<meta name="description" content="和加深到二十多层以后精度就不再上涨，甚至训练不稳定；视觉Transformer“怎么优化得更深”几乎没人研究过。 两处结构改动： LayerScale 给每个残差分支的输出乘一个按通道可学习、初始值很小的缩放系数，让深层网络一开始接近恒等映射、训练更稳； 类注意力 把分类token推迟到最后几层才…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/cait.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CaiT与LayerScale（2021）">
+<meta property="og:description" content="和加深到二十多层以后精度就不再上涨，甚至训练不稳定；视觉Transformer“怎么优化得更深”几乎没人研究过。 两处结构改动： LayerScale 给每个残差分支的输出乘一个按通道可学习、初始值很小的缩放系数，让深层网络一开始接近恒等映射、训练更稳； 类注意力 把分类token推迟到最后几层才…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/cait.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/cait">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › ViT与新架构</div>
+<h1>CaiT与LayerScale</h1>
+<div class="full">Going deeper with Image Transformers</div>
+<div class="meta"><span>2021.03</span><span>论文</span><span>延伸</span><span>ICCV 2021</span><span>Hugo Touvron, Matthieu Cord, Alexandre Sablayrolles, Gabriel Synnaeve, Hervé Jégou · Facebook AI Research / 索邦大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2103.17239" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/facebookresearch/deit" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/cait">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/vit.html">Vision Transformer</a>和<a class="ln" href="../n/deit.html">DeiT</a>加深到二十多层以后精度就不再上涨，甚至训练不稳定；视觉Transformer“怎么优化得更深”几乎没人研究过。</p></div><div><h4>方法</h4><p>两处结构改动：<b>LayerScale</b>给每个残差分支的输出乘一个按通道可学习、初始值很小的缩放系数，让深层网络一开始接近恒等映射、训练更稳；<b>类注意力</b>把分类token推迟到最后几层才加入，前面的层只让图块互相注意，后面几层只让分类token去读图块。</p></div><div><h4>影响</h4><p>CaiT把视觉Transformer做到几十层且精度持续上涨，在不用额外数据的设置下取得ImageNet 86.5% top-1；LayerScale后来成为<a class="ln" href="../n/convnext.html">ConvNeXt</a>、<a class="ln" href="../n/dinov2.html">DINOv2</a>等大量模型的标准组件。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><b>LayerScale</b>：残差块原本是 <code>x ← x + F(x)</code>。CaiT改成 <code>x ← x + diag(λ) · F(x)</code>，λ是每个通道一个的可学习向量，初始化为很小的数（深模型如1e-5或1e-6，浅一些的模型取0.1左右）。这样网络初始时每个块的贡献极小，深层叠加不会让信号爆炸；与之前只用一个标量缩放的做法相比，按通道缩放给了更多自由度。作者比较了几种稳定深层训练的方法（如Fixup、ReZero式的标量缩放），按通道的LayerScale效果最好。</p><p><b>类注意力（class-attention）</b>：ViT从第一层就把分类token和图块token放在一起做自注意力，分类token既要帮着处理图块，又要汇总全局信息，两个目标互相牵制。CaiT的前面若干层（如36层）只有图块token做自注意力；最后两层才插入分类token，并且只更新分类token：它作为查询去注意所有图块，图块本身不再变化。这部分计算量很小。</p><p>训练沿用DeiT的数据增强和蒸馏。摘要称这些改动让模型性能不会随深度过早饱和，不用外部数据时ImageNet top-1达到86.5%，以更少的FLOPs和参数刷新当时最好结果；在ImageNet-ReaL和ImageNet-V2匹配频率版本上也取得无额外数据设置下的最好结果。</p><h2>后来的发展</h2><p>LayerScale被<a class="ln" href="../n/convnext.html">ConvNeXt</a>、<a class="ln" href="../n/dinov2.html">DINOv2</a>、<a class="ln" href="../n/eva.html">EVA</a>等广泛采用，成为训练大型视觉骨干的常用稳定化技巧；“分类token晚加入”的类注意力思想也出现在后来的注意力池化头里。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>深度带来的精度提升伴随较高的推理延迟，高分辨率下全局注意力的计算量仍随token数平方增长。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/swin-v2.html">Swin Transformer V2</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/resnet.html">ResNet</a><span class="yr">2015.12 · 视觉</span><div class=nt>LayerScale作用在残差分支上，延续“深网络初始时接近恒等映射”的残差网络思想。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/vit.html">Vision Transformer</a><span class="yr">2020.10 · 视觉</span><div class=nt>ViT加深后训练不稳、精度饱和；LayerScale与类注意力让几十层的模型仍能持续变好。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/deit.html">DeiT</a><span class="yr">2020.12 · 视觉</span><div class=nt>同一团队在DeiT的训练方案上把视觉Transformer加深，解决加深后精度饱和的问题。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/swin-v2.html">Swin Transformer V2</a><span class="yr">2021.11 · 视觉</span><div class=nt>深度带来的精度提升伴随较高的推理延迟，高分辨率下全局注意力的计算量仍随token数平方增长。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/residual-connection.html">残差连接</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/initialization.html">参数初始化</a> <a class="chip c" href="../c/vanishing-exploding.html">梯度消失与梯度爆炸</a></p>
+<h2>本篇术语</h2><ul><li><b>LayerScale</b>　给每个残差分支的输出乘一组按通道、初值很小的可学习系数，让很深的网络更容易训练。</li><li><b>分类token</b>　ViT额外加入的一个可学习token，最后用它的输出做图像分类。</li></ul>
+<h2>怎么学</h2><p>先读DeiT和ViT的结构，再读CaiT第2节LayerScale与几种替代方案的对比，以及第3节类注意力；在timm里找到LayerScale的实现，把λ初值改大后训练一个小模型，观察是否发散。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2103.17239" rel="noopener">https://arxiv.org/abs/2103.17239</a>（arXiv记录：标题、五位作者、v1提交于2021-03-31；摘要中构建并优化更深的图像Transformer、研究结构与优化的相互作用、两处结构改动显著提升深层模型精度、性能不随深度过早饱和、无外部数据ImageNet 86.5% top-1、以更少FLOPs与参数刷新SOTA、ImageNet-ReaL与ImageNet-V2匹配频率上无额外数据最好。LayerScale与类注意力的具体形式、初值、层数、对比方法、ICCV 2021凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20CaiT%E4%B8%8ELayerScale%EF%BC%88cait%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acait%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/cait.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="cvt.html"><small>本分支上一个 · 2021.03</small><b>CvT卷积ViT</b></a><a class="r" href="swin.html"><small>本分支下一个 · 2021.03</small><b>Swin Transformer</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

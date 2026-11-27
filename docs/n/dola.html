@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DoLa层间对比解码（2023） · AI脉络</title>
+<meta name="description" content="减少幻觉通常要么检索外部知识，要么额外微调；能不能不加任何外部资源、不改参数，只在解码时让模型更多地说出它已经学到的事实？ 把较早层和最后一层的隐状态都投影到词表上，用最后一层的对数概率减去早期层的对数概率作为新的打分；事实性知识主要在后面的层里才“长出来”，相减能突出这部分信息。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dola.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DoLa层间对比解码（2023）">
+<meta property="og:description" content="减少幻觉通常要么检索外部知识，要么额外微调；能不能不加任何外部资源、不改参数，只在解码时让模型更多地说出它已经学到的事实？ 把较早层和最后一层的隐状态都投影到词表上，用最后一层的对数概率减去早期层的对数概率作为新的打分；事实性知识主要在后面的层里才“长出来”，相减能突出这部分信息。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dola.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dola">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 能力的机理</div>
+<h1>DoLa层间对比解码</h1>
+<div class="full">DoLa: Decoding by Contrasting Layers Improves Factuality in Large Language Models</div>
+<div class="meta"><span>2023.09</span><span>论文</span><span>延伸</span><span>ICLR 2024</span><span>Yung-Sung Chuang, Yujia Xie, Hongyin Luo, Yoon Kim, James Glass, Pengcheng He · MIT、微软</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2309.03883" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/voidism/DoLa" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/dola">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>减少幻觉通常要么检索外部知识，要么额外微调；能不能不加任何外部资源、不改参数，只在解码时让模型更多地说出它已经学到的事实？</p></div><div><h4>方法</h4><p>把较早层和最后一层的隐状态都投影到词表上，用最后一层的对数概率减去早期层的对数概率作为新的打分；事实性知识主要在后面的层里才“长出来”，相减能突出这部分信息。</p></div><div><h4>影响</h4><p>一个即插即用的解码方法，在TruthfulQA上让LLaMA系列提升12–17个百分点，成为后续“对比解码减少幻觉”系列方法的常用基线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/logit-lens.html">Logit Lens</a>式的分析显示，把Transformer中间层的隐状态直接乘上输出层（“提前退出”），也能得到一个词表分布；<a class="ln" href="../n/rome.html">ROME知识定位与编辑</a>等工作发现事实知识集中在特定的层。观察是：对“华盛顿州的首府是”这类问题，早期层给出的多是语法上合理但不具体的词，事实性的正确答案往往在后面的层里概率才明显升高。</p><p><b>做法</b>：设最后一层为N（“成熟层”），在若干候选早期层中选一个M（“早熟层”）。对下一个词x，分别得到两层的分布 <code>q_N(x)</code> 和 <code>q_M(x)</code>，新分数为 <code>F(x) = log q_N(x) − log q_M(x)</code>， 然后在F上做softmax作为最终分布。直观上，这放大了“从早期层到最后层概率涨得最多”的词，而那些在早期层就已经很高的通用词（如“the”、标点）被压低。</p><p>两个细节：</p><ul><li><b>动态选层</b>：每生成一个词，都从候选早期层中挑出与最后一层分布差异最大的那一层（用JS散度衡量），因为差异大意味着这一步还在“补充事实信息”；</li><li><b>自适应合理性约束</b>：只在最后一层概率不低于最大概率某个比例的词中做对比，防止把最后层认为不合理的冷门词抬高。</li></ul><p>摘要报告：DoLa不需要检索外部知识也不需要额外微调，在多项选择和开放式生成任务上都持续提升真实性，例如让LLaMA家族模型在<a class="ln" href="../n/truthfulqa.html">TruthfulQA</a>上提升12–17个百分点。</p><h2>后来的发展</h2><p>后续不少解码期抑制幻觉的方法（包括多模态模型中的视觉对比解码）沿用“对比两个分布、突出差异”的思路，DoLa常被当作对照。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>提升主要体现在TruthfulQA这类真实性基准上，对需要推理或长篇写作的任务效果有限，个别任务上会损害流畅性。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只能把模型已经学过的知识更好地说出来，模型本来不知道的事实依然无能为力。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/rome.html">ROME知识定位与编辑</a><span class="yr">2022.02 · LLM</span><div class=nt>借用“事实知识集中在特定层”的发现作为动机。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/llama-1.html">LLaMA</a><span class="yr">2023.02 · LLM</span><div class=nt>主要实验对象。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:312" href="../n/logit-lens.html">Logit Lens</a><span class="yr">2020.08 · 安全·可解释</span><div class=nt>把中间层隐状态投影到词表得到早期层分布，是层间对比的前提。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:264" href="../n/truthfulqa.html">TruthfulQA</a><span class="yr">2021.09 · 数据·评测</span><div class=nt>在TruthfulQA上让LLaMA系列模型的真实性提升12–17个百分点。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/hallucination.html">幻觉</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a></p>
+<h2>本篇术语</h2><ul><li><b>提前退出</b>　不等到最后一层，把某个中间层的隐状态直接送进输出层，得到一个词表上的概率分布。</li><li><b>JS散度</b>　衡量两个概率分布差异的对称指标，取值在0到log2之间，是KL散度的对称平滑版本。</li></ul>
+<h2>怎么学</h2><p>先了解<a class="ln" href="../n/logit-lens.html">Logit Lens</a>和<a class="lc" href="../c/kl-divergence.html">KL散度</a>；读本文第2节对比公式、动态选层和合理性约束；动手：在一个7B开源模型上实现DoLa，比较普通贪心解码与DoLa在TruthfulQA若干题上的输出。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2309.03883" rel="noopener">https://arxiv.org/abs/2309.03883</a>（标题、6位作者、arXiv首次提交2023-09-07；摘要中不需检索外部知识也不需额外微调、对比后层与早层投影到词表的logits差异、利用事实知识集中于特定层、在多项选择和开放生成任务上提升真实性、LLaMA家族TruthfulQA提升12–17个百分点。分数公式、JS散度动态选层、自适应合理性约束、ICLR 2024与机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DoLa%E5%B1%82%E9%97%B4%E5%AF%B9%E6%AF%94%E8%A7%A3%E7%A0%81%EF%BC%88dola%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adola%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dola.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="longlora.html"><small>本分支上一个 · 2023.09</small><b>LongLoRA高效长上下文微调</b></a><a class="r" href="sudden-drops.html"><small>本分支下一个 · 2023.09</small><b>损失骤降与句法习得</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

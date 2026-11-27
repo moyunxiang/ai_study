@@ -1,0 +1,24 @@
+{
+ "id": "zero-offload",
+ "who": "Jie Ren, Samyam Rajbhandari, Reza Yazdani Aminabadi, Olatunji Ruwase, Shuangyan Yang, Minjia Zhang, Dong Li, Yuxiong He · 微软, 加州大学默塞德分校",
+ "venue": "USENIX ATC 2021",
+ "aka": ["ZeRO-Offload", "CPU卸载", "CPU offload", "优化器卸载", "DeepSpeed Offload", "单卡训百亿模型"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2101.06840"}
+ ],
+ "problem": "混合精度Adam训练时，每个参数要占约16字节（FP16权重和梯度、FP32主权重和两个动量），单张32GB的V100用原生PyTorch最多训约14亿参数，再大就得改模型做模型并行，还要买昂贵的集群。",
+ "idea": "把优化器状态、梯度和参数更新这些“占显存多、计算量小”的部分卸载到CPU内存和CPU上算，前向和反向这些计算密集的部分留在GPU；精心安排数据流动，让GPU—CPU之间的传输量最小并与计算重叠。",
+ "impact": "让只有一张GPU的人也能训练或微调百亿参数模型，作为DeepSpeed的一项功能被广泛使用；它的卸载思路随后扩展到NVMe（ZeRO-Infinity），也影响了大模型微调和推理里各种CPU卸载方案。",
+ "method": "[[zero]]把优化器状态、梯度、参数在多张卡之间切分来省显存，但前提是有很多张卡。ZeRO-Offload面向卡少的情形：CPU内存通常比GPU显存大一个数量级，但CPU算力弱、PCIe带宽有限，关键是把什么放在哪里。\n\n论文把训练看成一张数据流图，以“GPU—CPU通信量最小、CPU计算量最小、GPU显存节省最大”为目标分析出唯一合理的划分：FP16参数和前向、反向计算留在GPU；FP16梯度在反向时逐块传到CPU；FP32主权重、Adam动量和参数更新全部放在CPU，用高度优化的CPU版Adam（向量化、多线程）计算；更新后的FP16参数再传回GPU。为了掩盖CPU更新的耗时，还提供“延迟一步”的参数更新选项，让CPU更新与下一步的GPU计算重叠。多卡时与ZeRO的切分结合，各卡只卸载自己那一份。\n\n摘要报告：单张V100上可训练超过130亿参数的模型，是PyTorch的10倍；10B模型上达到40 TFLOPS/GPU，而PyTorch单卡最大只能训1.4B模型、约30 TFLOPS；最多128张GPU近线性扩展；与模型并行结合，单台DGX-2可训练超过700亿参数的模型。",
+ "limits": [
+  {"text": "受CPU内存容量限制，模型再大就放不下；PCIe带宽也限制了每步训练速度。", "solved_by": ["zero-infinity"]}
+ ],
+ "relations": [
+  {"to": "zero", "type": "extends", "note": "在ZeRO的状态切分之上，把优化器状态与更新进一步卸载到CPU，面向只有少量GPU的用户。"},
+  {"to": "mixed-precision", "type": "uses", "note": "按混合精度训练的显存构成划分：FP16参数与计算在GPU，FP32主权重与Adam状态在CPU。"},
+  {"to": "megatron", "type": "uses", "note": "可与Megatron式模型并行结合，在单台DGX-2上训练超过700亿参数的模型。"},
+  {"to": "v100", "type": "uses", "note": "主要实验平台为32GB V100，单卡训练超过130亿参数。"}
+ ],
+ "prereq": ["adaptive-optimizer", "floating-point", "cpu-gpu", "memory-bandwidth", "distributed-training"],
+ "check": {"source": "https://arxiv.org/abs/2101.06840", "confirmed": "标题、八位作者、v1日期2021-01-18；摘要：单GPU可训练超过130亿参数、比PyTorch大10倍、无需修改模型、把数据和计算卸载到CPU、最小化GPU与CPU之间的数据移动并减少CPU计算时间、单张V100上10B模型40 TFLOPS对比PyTorch 1.4B模型30 TFLOPS、最多128 GPU近线性加速、与模型并行结合单台DGX-2训练超过700亿参数、比单用模型并行大4.5倍。每参数16字节的显存账、数据流图划分、CPU Adam、延迟一步更新、ATC 2021、机构为一般了解。"}
+}

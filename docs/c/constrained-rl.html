@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>约束MDP与安全强化学习（Constrained MDPs and Safe RL） · AI脉络</title>
+<meta name="description" content="安全强化学习最常用的形式化：在最大化回报的同时，要求某个“代价”的期望累计值不超过阈值（约束MDP）。常用拉格朗日乘子把约束变成可自动调节的惩罚，也可以在执行时用安全盾直接拦下危险动作。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/constrained-rl.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="约束MDP与安全强化学习（Constrained MDPs and Safe RL）">
+<meta property="og:description" content="安全强化学习最常用的形式化：在最大化回报的同时，要求某个“代价”的期望累计值不超过阈值（约束MDP）。常用拉格朗日乘子把约束变成可自动调节的惩罚，也可以在执行时用安全盾直接拦下危险动作。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/constrained-rl.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/constrained-rl">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>约束MDP与安全强化学习</h1><div class="full">Constrained MDPs and Safe RL</div>
+<p class="muted" style="font-size:13px">也叫：安全强化学习　safe RL　safe reinforcement learning　约束MDP　constrained MDP　CMDP　约束强化学习　constrained RL　拉格朗日松弛　Lagrangian relaxation　PPO-Lagrangian　原始-对偶方法　primal-dual　代价函数　cost function　安全盾　shielding　安全探索　safe exploration　CPO　约束策略优化</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/constrained-rl">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>安全强化学习最常用的形式化：在最大化回报的同时，要求某个“代价”的期望累计值不超过阈值（约束MDP）。常用拉格朗日乘子把约束变成可自动调节的惩罚，也可以在执行时用安全盾直接拦下危险动作。</b></p>
+<p class="tags">先要会：<a class="chip c" href="mdp.html">马尔可夫决策过程</a> <a class="chip c" href="lagrange-duality.html">拉格朗日乘子、约束优化与对偶</a> <a class="chip c" href="reward-return.html">奖励、回报与折扣</a></p>
+<p>把“别撞人”“别超速”“能耗不超标”写进奖励里，最直接的做法是加一个负的惩罚项。但惩罚该多大？太小，智能体为了多拿奖励宁可违规；太大，它什么都不敢做。而且换个任务就要重调。更自然的说法是：<b>在满足约束的前提下</b>尽量做好。</p><p><b>约束MDP</b>（CMDP）。在<a class="lc" href="../c/mdp.html">马尔可夫决策过程</a>之外再加一个代价函数c(s, a)和阈值d：</p><p class="formula"><code>max_π J_r(π)  s.t.  J_c(π) = E_π[Σ_t γ^t c(s_t, a_t)] ≤ d</code></p><p>代价可以是碰撞次数、危险区域停留时间、违规输出等。与普通MDP不同，CMDP的最优策略<b>可能必须是随机的</b>：例如在两个方案之间按比例混合，恰好把期望代价用到阈值。</p><p><b>拉格朗日方法</b>。用<a class="lc" href="../c/lagrange-duality.html">拉格朗日乘子、约束优化与对偶</a>把约束问题变成一个极小极大问题：</p><p class="formula"><code>max_π min_{λ≥0}  J_r(π) − λ·(J_c(π) − d)</code></p><p>实践中交替更新：策略按奖励<code>r − λc</code>用普通RL算法（如PPO）训练；乘子按<code>λ ← max(0, λ + η·(J_c − d))</code>更新——代价超标就加大惩罚，长期满足约束就放松。λ相当于一个被自动调好的惩罚系数，但训练过程中常出现振荡，约束在学习期间会被反复违反。</p><p><b>其他路线</b>。</p><ul><li><b>信赖域式</b>：在每次更新的信赖域内显式保证约束近似满足（见<a class="lc" href="../c/trust-region-rl.html">信赖域与代理目标</a>），代表是约束策略优化CPO。</li><li><b>安全盾</b>（shielding）：<a class="ln" href="../n/shielding.html">Shielding安全盾</a>在执行时用一个基于形式化规约的监视器检查智能体的动作，违反规约就替换成安全动作，训练和部署期间都能保证约束。</li><li><b>安全探索</b>：限制学习过程中的风险，而不只是最终策略，见<a class="ln" href="../n/concrete-problems.html">AI安全的具体问题</a>的讨论。</li><li>风险而不是期望的约束见<a class="lc" href="../c/risk-sensitive-rl.html">风险敏感强化学习与CVaR</a>。</li></ul><p>在大模型对齐中，<a class="ln" href="../n/safe-rlhf.html">Safe RLHF约束对齐</a>把“有用”作为奖励、“有害”作为代价，用拉格朗日方法在两者间平衡。</p>
+<div class="example"><h4>例子</h4><p>一个配送机器人：每次准时送达奖励+1，每次进入行人密集区代价+1，要求每个回合平均代价不超过0.1。若当前策略平均代价为0.3，λ=2、学习率η=0.5，则λ更新为<code>2 + 0.5×(0.3 − 0.1) = 2.1</code>，有效奖励变成<code>r − 2.1·c</code>，策略会更倾向于绕路。几轮后若代价降到0.05，λ又会逐渐减小。</p></div>
+<h2>容易误解的地方</h2><ul><li>期望代价约束只约束平均值，平均0.1次碰撞可能是大多数回合零碰撞、少数回合多次碰撞，对安全关键场景这可能不够，见<a class="lc" href="../c/risk-sensitive-rl.html">风险敏感强化学习与CVaR</a>。</li><li>拉格朗日方法通常只保证训练收敛时约束满足，训练过程中的违规并不受控；在真实系统上要配合仿真预训练或安全盾。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

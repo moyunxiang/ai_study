@@ -1,0 +1,23 @@
+{
+ "id": "streaming-diloco",
+ "who": "Arthur Douillard, Yanislav Donchev, Keith Rush, Satyen Kale, Zachary Charles, Zachary Garrett, Gabriel Teston, Dave Lacey et al. · Google DeepMind, Google Research",
+ "aka": ["Streaming DiLoCo", "流式DiLoCo", "分片同步", "重叠通信", "overlapping communication", "跨数据中心训练"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2501.18512"}
+ ],
+ "problem": "DiLoCo让各组加速器各自训练很多步才同步一次，平均带宽需求大降；但每次同步都要一次性交换全部参数，峰值带宽并没有降低，同步时所有人还得停下来等。",
+ "idea": "三处改进：参数分成若干片按顺序轮流同步，而不是一次全同步；同步期间各组继续训练，通信与计算重叠；交换的数据再做量化。",
+ "impact": "把跨地域、低带宽的大模型训练所需带宽再降两个数量级，是“分布式免费午餐”路线的代表工作，被跨数据中心训练与去中心化训练项目广泛引用和跟进。",
+ "method": "常规数据并行每一步都要all-reduce梯度，所以所有加速器必须放在同一个高带宽、低延迟的集群里。[[diloco]]把加速器分成若干“工人”组，组内正常训练，组间每隔H步（如几百步）才把参数差作为“外层梯度”平均一次并用外层优化器更新，于是组与组之间可以用慢得多的网络连接，[[intellect-1]]就是这样跨洲训练的。但每次外层同步，仍要在同一时刻传输完整的模型参数，网络峰值需求和原来一样，传输期间计算还被阻塞。\n\nStreaming DiLoCo做了三件事。第一，**分片流式同步**：把模型参数（例如按层）切成若干片，各片的同步时间错开，每一时刻只传一片，峰值带宽降为原来的几分之一。第二，**重叠通信**：某片开始同步后，工人不等结果、继续用本地参数训练，若干步后结果到达再与本地的进展合并，通信延迟被计算掩盖。第三，**量化外层梯度**：交换的数据改用低比特表示，进一步压缩。\n\n摘要报告：在十亿参数规模的训练中，三者结合能达到与之前相近的质量，同时把所需带宽降低两个数量级。",
+ "limits": [
+  {"text": "实验主要在十亿参数级别，更大模型和更多工人下的稳定性、外层优化器超参数的敏感性仍需验证。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "diloco", "type": "solves", "note": "DiLoCo每次外层同步要一次性交换全部参数、峰值带宽不降；Streaming DiLoCo分片轮流同步并与计算重叠。"},
+  {"to": "intellect-1", "type": "extends", "note": "INTELLECT-1已用DiLoCo式方法跨地域训练，Streaming DiLoCo进一步降低这类场景对网络带宽的要求。"},
+  {"to": "qsgd", "type": "uses", "note": "沿用通信量化的思路，对工人间交换的外层梯度做低比特量化。"}
+ ],
+ "prereq": ["distributed-training", "adaptive-optimizer", "quantization-concept", "interconnect"],
+ "terms": [{"t": "外层梯度", "d": "DiLoCo中一组工人本地训练若干步后，参数相对上次同步点的变化量，各组平均后当作一次“梯度”去更新全局参数。"}],
+ "check": {"source": "https://arxiv.org/abs/2501.18512", "confirmed": "标题、作者（Douillard等14人）、v1日期2025-01-30；摘要：常规训练每步交换梯度要求设备共址、DiLoCo放宽共址约束让工人间不频繁同步、但同步仍需要相同的峰值带宽、三处改进为按顺序只同步参数子集以降低峰值带宽、同步时继续训练以减少墙钟时间、量化工人间交换的数据、十亿参数规模达到相近质量且所需带宽降低两个数量级。按层分片方式、机构为一般了解。"}
+}

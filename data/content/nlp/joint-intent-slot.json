@@ -1,0 +1,37 @@
+{
+  "id": "joint-intent-slot",
+  "who": "Bing Liu, Ian Lane · 卡内基梅隆大学",
+  "venue": "Interspeech 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1609.01454"}
+  ],
+  "aka": ["Joint Intent Detection and Slot Filling", "意图识别", "Intent Detection", "Intent Classification", "槽填充", "槽位填充", "Slot Filling", "口语理解", "SLU", "Spoken Language Understanding", "ATIS", "Liu & Lane 2016"],
+  "problem": "口语理解要同时做两件事：判断用户的意图（查航班还是查票价）和从话里抽出槽位（出发地、目的地、日期）。以往两者分开建模，彼此的信息用不上。",
+  "idea": "用一个带注意力的双向RNN同时完成两个任务：槽填充是逐词的序列标注（每个词一个BIO标签），意图识别是对整句分类，两者共享编码器并联合训练；还比较了把显式对齐信息加入编码器-解码器的多种方式。",
+  "impact": "这类「共享编码器、意图分类+槽位标注联合训练」的结构成了口语理解的标准做法，ATIS和SNIPS上的联合模型（包括后来的BERT联合模型）大多沿用它的设定。",
+  "background": "语音助手和任务型对话系统的第一步是**口语理解（SLU）**。在航空订票数据集ATIS上，意图识别通常用SVM或深度网络做句子分类，槽填充用[[crf]]或RNN做序列标注（例如把「from Boston to Denver」标成 `O B-fromloc O B-toloc`）。2015–2016年[[bahdanau-attention]]式的编码器-解码器在翻译中很成功，但槽填充与翻译不同：输入和输出一一对齐，长度相同。",
+  "method": "**编码器-解码器版本。** 双向LSTM编码句子；解码器逐词输出槽位标签，每一步既看对齐位置的编码器状态 `h_i`（显式对齐），又看注意力得到的上下文向量 `c_i = Σ_j α_ij h_j`。意图由编码器最后状态（加注意力）经过一个单独的分类层预测。\n\n**基于对齐的RNN版本。** 不用解码器，直接在双向RNN的每个位置输出槽标签 `P(y_i | h_i, c_i)`，并对所有位置的隐藏状态做注意力加权求和来预测意图：\n\n`P(intent) = softmax(W · Σ_i α_i h_i)`\n\n**联合训练。** 两个任务的交叉熵损失相加 `L = L_slot + L_intent`，共享底层表示，一起反向传播。",
+  "results": "摘要报告：单任务模型在ATIS基准上取得当时最好的意图识别错误率和槽填充F1；联合训练进一步使意图识别错误率绝对降低0.56%（相对23.8%），槽填充F1绝对提升0.23%。",
+  "legacy": "后续的槽门控（Slot-Gated）、Stack-Propagation等模型探索两个任务之间更紧的信息流；BERT出现后，「用[CLS]分类意图、用各token标槽位」的联合BERT成为强基线。今天的大模型助手多用函数调用代替显式的意图-槽位体系，但在车载、客服等受限场景中这套结构仍大量使用。",
+  "limits": [
+    {"text": "意图和槽位只是共享编码器，两个任务之间没有显式的相互约束，预测出的意图与槽位可能互相矛盾。", "solved_by": []},
+    {"text": "ATIS领域单一、句子短，在多领域、多意图的真实对话中效果没有验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "bahdanau-attention", "type": "uses", "note": "把编码器-解码器中的注意力用于槽填充和意图分类。"},
+    {"to": "bilstm-crf", "type": "rivals", "note": "槽填充同为序列标注；BiLSTM-CRF在输出层加转移约束，本文改为注意力与多任务联合。"},
+    {"to": "lstm", "type": "uses", "note": "编码器是双向LSTM。"},
+    {"to": "wen-e2e-dialog", "type": "extends", "note": "任务型对话系统的理解模块：把意图识别与槽填充合到一个网络里，为后续状态追踪提供输入。"}
+  ],
+  "prereq": ["recurrent-layer", "attention-concept", "softmax", "cross-entropy", "classification-metrics"],
+  "terms": [
+    {"t": "意图识别（intent detection）", "d": "判断用户这句话想做什么，例如「查航班」「订酒店」，本质是句子分类。"},
+    {"t": "槽填充（slot filling）", "d": "从用户话语中抽出完成任务所需的参数（出发地、日期等），通常用BIO标签做序列标注。"},
+    {"t": "口语理解（SLU）", "d": "对话系统中把用户话语转成结构化语义（意图+槽位）的模块。"}
+  ],
+  "learn": "先了解序列标注与BIO标签（[[bilstm-crf]]） → 读原文第3节两种模型结构 → 动手：在ATIS或SNIPS上用一个BiLSTM同时输出意图与槽位，对比分开训练与联合训练的效果。",
+  "check": {
+    "source": "https://arxiv.org/abs/1609.01454",
+    "confirmed": "arXiv记录：标题Attention-Based Recurrent Neural Network Models for Joint Intent Detection and Slot Filling、作者Bing Liu与Ian Lane、v1 2016-09-06；摘要：注意力编码器-解码器用于联合意图识别与槽填充、槽填充对齐是显式的、探索加入对齐信息的策略、在基于对齐的RNN中引入注意力、单任务模型在ATIS上达SOTA、联合模型意图错误率绝对降0.56%（相对23.8%）、槽填充F1绝对提升0.23%。Interspeech 2016出处与公式细节凭一般了解。"
+  }
+}

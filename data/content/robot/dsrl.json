@@ -1,0 +1,32 @@
+{
+  "id": "dsrl",
+  "who": "Andrew Wagenmaker, Mitsuhiko Nakamoto, Yunchu Zhang, Seohong Park, Waleed Yagoub, Anusha Nagabandi, Abhishek Gupta, Sergey Levine · UC Berkeley、华盛顿大学、Amazon",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2506.15799"}
+  ],
+  "aka": ["DSRL", "DSRL-NA", "Diffusion Steering via Reinforcement Learning", "diffusion steering", "扩散策略潜空间RL", "潜噪声空间强化学习", "噪声空间RL", "扩散引导强化学习"],
+  "problem": "行为克隆得到的扩散策略效果不够时只能再采示范；直接用RL微调扩散策略要穿过多步去噪反传梯度，又不稳定又费样本，大模型还常拿不到权重。",
+  "idea": "冻结扩散策略，只学一个小策略去选它的初始噪声w：把“状态→噪声”当成新的动作空间做RL，扩散模型当黑盒，输出动作随噪声改变而改变。",
+  "impact": "样本效率比DPPO等扩散RL方法高5–10倍；真机上约40个回合把成功率从2/10提到9/10，并在真机上对π0做了RL微调，后来被GR-RL等工作沿用。",
+  "method": "**卡在哪**：[[diffusion-policy]]和[[pi0]]这类策略从高斯噪声出发、一步步去噪生成动作。要用RL改进它们，[[dppo]]把每个去噪步当成一步MDP用[[ppo]]更新，需要大量交互；[[rlpd]]等off-policy方法在这种初始效果差的设置下几乎学不动。\n\n**做法**：观察到同一个状态下，不同初始噪声w会被去噪成不同动作，于是把w本身当成要学的动作。新的潜动作MDP里，智能体看状态s，选噪声w，环境执行 `a = 扩散策略(s, w)` 并给奖励。这样只需对扩散策略做前向调用，不碰权重和中间去噪步。直接在这个MDP上跑[[sac]]叫DSRL-SAC；论文主推的DSRL-NA（噪声混叠）维护两个评论家：`Q^A(s,a)` 在真实动作上用时序差分训练，因此能吃离线数据；`Q^W(s,w)` 被训练去拟合 `Q^A(s, 扩散策略(s,w))`，噪声策略再去最大化 `Q^W`。噪声被限制在 `[−b, b]` 内（在线时b取1到3），防止推到训练分布之外。\n\n**结果**：在[[robomimic]]和Gym任务上样本效率比DPPO、IDQL等至少高5–10倍；DSRL-NA比DSRL-SAC在Square任务上省约一半样本。Franka真机拾放任务只用10条示范，基础策略2/10，经约40个回合（3500步）达到9/10，RLPD为0/10。对3.3B参数的π0，LIBERO拾放从约20%提到约100%；在真机DROID设置下，烤面包机任务从5/20到18/20（80个回合）。",
+  "limits": [
+    {"text": "只能在基础策略已经能产生的动作范围内挑选，基础策略完全不会的动作模式，换噪声也变不出来。", "solved_by": []},
+    {"text": "仍需要每个任务的奖励或成功判定，真机实验依赖人工给出成功信号。", "solved_by": []},
+    {"text": "策略离VLA原动作很近，速度和精度的提升幅度有限；后来的RL Token在以太网插接任务上观察到DSRL提速明显小于直接修正动作的方法。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "diffusion-policy", "type": "extends", "note": "以行为克隆训练的扩散策略为被改进对象，不改权重，只控制其初始噪声。"},
+    {"to": "pi0", "type": "uses", "note": "把潜噪声RL用到3.3B参数的π0上，在仿真和DROID真机设置中提升成功率。"},
+    {"to": "dppo", "type": "solves", "note": "DPPO要在去噪链上做策略梯度、样本需求大；DSRL把RL移到噪声空间，样本效率高5–10倍。"},
+    {"to": "sac", "type": "uses", "note": "在潜动作MDP上用SAC类off-policy算法训练噪声策略。"},
+    {"to": "rlpd", "type": "rivals", "note": "RLPD直接在动作空间做off-policy RL，在少示范的真机任务上0/10；DSRL借助扩散策略先验达到9/10。"}
+  ],
+  "prereq": ["diffusion-process", "imitation-learning", "actor-critic", "on-off-policy", "latent-space", "td-error"],
+  "terms": [
+    {"t": "潜动作MDP", "d": "把扩散策略的初始噪声当作智能体的动作，环境变成“扩散策略+真实环境”的组合。"},
+    {"t": "噪声混叠（noise aliasing）", "d": "不同噪声可能被去噪成同一个动作；DSRL-NA用动作空间评论家把这些噪声的价值关联起来，从而能利用离线数据。"}
+  ],
+  "learn": "先读[[diffusion-policy]]了解从噪声生成动作的过程，再复习[[sac]]；然后读原文第4节DSRL-NA的两个评论家，看真机π0实验。",
+  "check": {"source": "https://arxiv.org/abs/2506.15799", "confirmed": "标题、8位作者、v1日期2025-06-18、摘要；HTML正文中DSRL-SAC与DSRL-NA两个评论家、噪声界b、比DPPO等样本效率高5–10倍、Franka真机2/10→9/10（约40回合、3500步）与RLPD 0/10、π0 3.3B、LIBERO约20%→约100%、烤面包机5/20→18/20、作者机构。"}
+}

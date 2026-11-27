@@ -1,0 +1,31 @@
+{
+  "id": "glat",
+  "who": "Lihua Qian, Hao Zhou, Yu Bao, Mingxuan Wang, Lin Qiu, Weinan Zhang, Yong Yu, Lei Li · 字节跳动AI Lab、上海交通大学",
+  "venue": "ACL 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2008.07905"}
+  ],
+  "aka": ["GLAT", "Glancing Transformer", "Glancing Language Model", "一瞥采样", "glancing sampling", "单步非自回归翻译"],
+  "problem": "非自回归翻译要么像原始NAT那样一次并行输出、质量明显落后于Transformer，要么像Mask-Predict那样多轮迭代修改、质量好了但加速比下降。",
+  "idea": "训练时先让模型并行预测一遍，按它错得多少，从参考译文中随机“让它瞥见”相应数量的正确词，再训练它根据这些词预测其余词；错得越多给的提示越多，逐渐学会词之间的依赖。推理时仍只需一次并行解码。",
+  "impact": "单步并行解码就把与Transformer的差距缩小到0.25到0.9 BLEU、提速8到15倍，成为单步非自回归翻译最常比较的强基线；“一瞥采样”这种按难度自适应的课程式掩码，后来被用到多种并行生成模型的训练中。",
+  "method": "背景：[[non-autoregressive-nmt]]独立预测每个目标位置，无法建模目标词之间的依赖，质量差；[[mask-predict]]借鉴[[bert]]的掩码语言模型，推理时反复掩掉低置信度的词再预测，需要多轮迭代。作者希望保留单次并行解码的速度，同时在训练中学到词间依赖。\n\n**一瞥语言模型（GLM）训练**分两次前向：\n\n- 第一次：解码器输入为源句的复制嵌入（不含目标词），并行预测整句ŷ，与参考译文Y比较，计算两者的距离 `d(ŷ, Y)`（如汉明距离，即不一致的位置数）。\n- 一瞥采样：从Y中随机选出 `S = f_ratio · d(ŷ, Y)` 个位置，把这些位置的正确词嵌入替换到解码器输入里（模型“瞥见”了这些词），其余位置仍是源句复制的输入。\n- 第二次：在这种部分可见的输入下，只对未被瞥见的位置计算交叉熵损失。\n\n训练初期模型错得多，瞥见的词就多，任务接近“填空”；模型变强后瞥见的词越来越少，最终接近完全并行预测，形成一种自适应课程。推理时不需要任何参考词，只做一次并行解码。\n\n结果：摘要称GLAT只用单次并行解码就能以8到15倍的速度生成高质量译文，在多个WMT语言方向上超过此前所有单次非自回归方法，与Transformer的差距缩小到0.25到0.9 BLEU。论文实验同样使用了自回归教师的序列级知识蒸馏数据。",
+  "limits": [
+    {"text": "仍需预先预测目标长度，并依赖自回归教师的蒸馏数据来缓解多峰问题；在不蒸馏的原始数据上差距更大。", "solved_by": []},
+    {"text": "一次并行输出后无法再修改错误，生成文本较长或任务更开放（如对话、摘要）时质量下降明显，后来的离散扩散模型改用多步去噪。", "solved_by": ["mdlm", "llada"]}
+  ],
+  "relations": [
+    {"to": "non-autoregressive-nmt", "type": "solves", "note": "原始NAT独立预测各位置、质量差，GLAT用一瞥采样在训练中学习词间依赖，单步解码接近Transformer。"},
+    {"to": "mask-predict", "type": "rivals", "note": "Mask-Predict靠推理时多轮迭代提升质量，GLAT把迭代挪到训练中，推理只需一步。"},
+    {"to": "seq-kd", "type": "uses", "note": "训练数据使用自回归教师的序列级知识蒸馏结果。"},
+    {"to": "bert", "type": "extends", "note": "一瞥采样后的预测类似掩码语言模型，但掩码比例随模型当前错误数自适应变化。"},
+    {"to": "levenshtein-transformer", "type": "rivals", "note": "Levenshtein Transformer用多轮插入删除编辑，GLAT坚持单次并行。"}
+  ],
+  "prereq": ["autoregressive", "encoder-decoder", "masked-modeling", "cross-entropy", "decoding-sampling"],
+  "terms": [
+    {"t": "一瞥采样（glancing sampling）", "d": "训练时根据模型第一次预测错了多少，随机把相应数量的正确目标词透露给模型，再让它预测剩下的词。"},
+    {"t": "汉明距离", "d": "两个等长序列中对应位置不相同的个数。"}
+  ],
+  "learn": "先读[[non-autoregressive-nmt]]和[[mask-predict]]；读原文第3节两次前向与采样数量的公式；动手：在一个小翻译数据上实现一瞥采样，画出训练过程中平均瞥见比例随步数的变化。",
+  "check": {"source": "https://arxiv.org/abs/2008.07905", "confirmed": "标题、8位作者、arXiv v1提交日2020-08-18；摘要中现有NAT要么不如Transformer要么需要多次解码、提出一瞥语言模型学习单次并行生成的词间依赖、GLAT单次并行解码8–15倍加速、多个WMT方向超过所有先前单次非自回归方法、与Transformer差距0.25–0.9 BLEU。两次前向与采样数公式、序列级蒸馏、ACL 2021、机构为一般了解。"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "dpok",
+  "who": "Ying Fan, Olivia Watkins, Yuqing Du, Hao Liu, Moonkyung Ryu, Craig Boutilier, Pieter Abbeel, Mohammad Ghavamzadeh et al. · Google Research、威斯康星大学麦迪逊分校、UC Berkeley",
+  "venue": "NeurIPS 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2305.16381"}
+  ],
+  "aka": ["DPOK", "Diffusion Policy Optimization with KL", "扩散模型在线强化学习", "KL正则化扩散RL"],
+  "problem": "用奖励模型改进文生图，此前只有拒绝采样或奖励加权的监督微调这类离线做法，提升有限，而且容易偏离原模型、画质下降。",
+  "idea": "把去噪过程看成一个多步决策过程，用在线策略梯度去最大化奖励模型的分数，同时加入相对预训练模型的KL正则，限制模型偏离太远。",
+  "impact": "与同期的DDPO一起把在线强化学习引入扩散模型微调，并系统分析了KL正则在RL微调与监督微调中的作用；后来的扩散RL工作普遍保留了某种KL约束。",
+  "method": "每一步去噪`p_θ(x_{t−1}|x_t, z)`是一个高斯分布，可以看作策略在状态(x_t, t, z)下采取动作x_{t−1}；整条去噪链跑完得到图像x₀，奖励r(x₀, z)来自人类偏好模型（如ImageReward），只在终点给出。于是可以用策略梯度估计`∇E[r] = E[r·Σ_t ∇log p_θ(x_{t−1}|x_t,z)]`在线更新模型：每轮用当前模型采样、打分、更新。\n\nDPOK的关键是加KL正则：目标是`E[r(x₀,z)] − β·KL(p_θ‖p_pre)`。整条轨迹的KL可以拆成每一步两个高斯之间KL的和，而高斯之间的KL有闭式，计算很便宜。作者比较了在RL微调和监督微调中加KL的效果，发现在线RL加KL在图文对齐和画质上普遍优于监督微调，也更不容易出现奖励刷分。实验以Stable Diffusion为底座、用LoRA微调。",
+  "limits": [
+    {"text": "策略梯度只用终点奖励，方差大、需要大量采样，每条提示都要训练较长时间。", "solved_by": ["draft", "alignprop"]},
+    {"text": "KL系数需要手工调：太小会刷分、太大则几乎学不动。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "t2i-human-feedback", "type": "solves", "note": "同一团队此前用离线的奖励加权似然微调，DPOK改为在线强化学习，提升更大。"},
+    {"to": "ppo", "type": "uses", "note": "沿用策略梯度加KL约束的思路，类似RLHF中PPO对参考策略的KL惩罚。"},
+    {"to": "imagereward", "type": "uses", "note": "以ImageReward这类人类偏好模型作为奖励。"},
+    {"to": "ddpo", "type": "rivals", "note": "同月提出的另一种扩散模型RL方法，DDPO不加KL、更关注重要性采样的策略梯度估计；DPOK强调KL正则的作用。"}
+  ],
+  "prereq": ["policy-gradient-concept", "kl-divergence", "rlhf-concept", "diffusion-process", "mdp", "peft-concept"],
+  "terms": [
+    {"t": "终点奖励", "d": "只在一条完整轨迹结束时给出的奖励；这里是整条去噪链生成出最终图像后才打分。"}
+  ],
+  "learn": "先弄懂REINFORCE与RLHF里的KL惩罚 → 读本文第4节把去噪写成MDP以及KL上界的推导 → 和DDPO论文对照两者的目标函数。",
+  "check": {"source": "https://arxiv.org/abs/2305.16381", "confirmed": "标题、作者、v1日期2023-05-25、摘要中用在线RL微调文生图扩散模型、把微调定义为RL问题、用策略梯度最大化反馈训练的奖励、结合KL正则、分析KL在RL与监督微调中的作用、在图文对齐与画质上优于监督微调；机构、NeurIPS 2023、ImageReward作奖励、LoRA、逐步高斯KL的闭式拆分来自一般了解"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "bge-m3",
+  "who": "Jianlv Chen, Shitao Xiao, Peitian Zhang, Kun Luo, Defu Lian, Zheng Liu · 北京智源人工智能研究院（BAAI） / 中国科学技术大学",
+  "venue": "Findings of ACL 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2402.03216"},
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/2024.findings-acl.137/"},
+    {"label": "Hugging Face", "url": "https://huggingface.co/BAAI/bge-m3"}
+  ],
+  "aka": ["BGE-M3", "bge m3", "BGEM3", "M3-Embedding", "M3 Embedding", "多语言多功能嵌入", "稠密稀疏多向量混合检索"],
+  "problem": "多语言、长文档检索要分别用不同模型；稠密向量、稀疏词权重、多向量后期交互三种检索方式各有长处，却要训练和部署三个模型。",
+  "idea": "一个编码器同时输出稠密向量、每个词的稀疏权重和每个token的向量，三种分数加权相加当“老师”，再反过来蒸馏每一种检索方式。",
+  "impact": "开源后成为多语言RAG里最常用的嵌入模型之一，“一个模型同时给稠密和稀疏检索结果”的混合检索做法也随之普及。",
+  "method": "[[bge]]主要面向中英文、短文本。M3指三个“多”：100多种语言、三种检索功能、最长8192 token的输入。\n\n**一个模型三种分数**。底座是扩展到8192位置的XLM-RoBERTa。稠密检索用归一化后的[CLS]向量做内积；稀疏检索为每个token学一个非负权重（重复出现的词取最大值），查询与文档共有词的权重相乘求和，类似[[splade]]；多向量检索把所有token的输出投影后做[[colbert]]式的后期交互。最终排序可以用三者的加权和。\n\n**自知识蒸馏**。三种分数的加权和比任何单一分数都准，于是把它当教师信号，让每种检索方式的分数分布去拟合它，再与普通对比学习损失平均。训练数据包括约12亿对无监督文本对（194种语言）和多语言标注数据。\n\n**结果**。MIRACL多语言检索上，三者合用的平均nDCG@10为71.5，仅稠密为69.2，mE5-large为66.6，[[bm25]]为31.9。在长文档MLDR上，单用稠密只有52.5、低于BM25的53.6，稀疏为62.2，合用为65.0，说明长文档里词匹配信号仍然重要。",
+  "limits": [
+    {"text": "多向量模式要为每个token存一个向量，索引体积和检索开销比单向量大得多，实际部署多数只用稠密或稠密加稀疏。", "solved_by": []},
+    {"text": "长文档上单靠稠密向量仍不如BM25，长文本被压缩成一个向量时信息损失明显。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "bge", "type": "extends", "note": "同一团队的BGE系列从中英文短文本扩展到100多种语言、8192长度，并加入稀疏与多向量输出。"},
+    {"to": "colbert", "type": "uses", "note": "多向量检索部分采用ColBERT的逐token后期交互打分。"},
+    {"to": "splade", "type": "extends", "note": "沿用SPLADE用神经网络学习词权重做稀疏检索的思路，但与稠密、多向量共享一个编码器联合训练。"},
+    {"to": "e5", "type": "rivals", "note": "以多语言E5（mE5-large）为主要开源对照，MIRACL上平均nDCG@10高出约5个点。"},
+    {"to": "bm25", "type": "rivals", "note": "在长文档检索上，单用稠密向量不如BM25，加入学习式稀疏分数后才超过它。"}
+  ],
+  "prereq": ["embedding", "contrastive-learning", "knowledge-distillation", "retrieval", "self-attention"],
+  "learn": "先读[[colbert]]和[[splade]]，弄清三种检索方式的区别 → 读原文第3节（三种打分与自知识蒸馏）和MLDR长文档表 → 动手：用开源模型对同一批文档分别取稠密、稀疏、合用分数，比较召回率差异。",
+  "check": {"source": "https://arxiv.org/abs/2402.03216", "confirmed": "标题、6位作者、v1提交于2024-02-05；ACL Anthology确认Findings of ACL 2024；正文（arxiv.org/html/2402.03216）核对XLM-RoBERTa扩展到8192、三种打分方式、自知识蒸馏、约12亿对194种语言、MIRACL 71.5/69.2/mE5 66.6/BM25 31.9、MLDR稠密52.5/BM25 53.6/稀疏62.2/合用65.0、BAAI与中科大单位。"}
+}

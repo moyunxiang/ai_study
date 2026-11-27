@@ -1,0 +1,28 @@
+{
+  "id": "memorag",
+  "who": "Hongjin Qian, Zheng Liu, Peitian Zhang, Kelong Mao, Defu Lian, Zhicheng Dou, Tiejun Huang · 北京智源人工智能研究院 / 北京大学 / 中国人民大学等",
+  "venue": "WWW 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2409.05591"},
+    {"label": "GitHub", "url": "https://github.com/qhjqhj00/MemoRAG"}
+  ],
+  "aka": ["MemoRAG", "Memo-RAG", "记忆增强检索", "全局记忆RAG", "RLGF", "memory-augmented RAG"],
+  "problem": "普通RAG要求问题本身能直接拿去搜、知识能切块索引；但“书里主要人物之间是什么关系”这类意图隐含、需要通读全文的问题，用原问题检索找不到对的片段。",
+  "idea": "先让一个轻量的长上下文模型把整份长文压缩成全局记忆；来了问题，记忆模型先写出线索草稿，用线索去检索原文片段，再交给更强的模型生成答案。",
+  "impact": "把“先对全文形成整体印象、再据此检索”的人类读书方式做成可训练的双系统RAG，在长文档问答和摘要上同时超过普通RAG和直接喂全文的长上下文模型。",
+  "method": "[[rag]]的检索器只看问题字面，遇到“总结主要人物”这类没有明确检索词的任务就失灵；直接把十几万token塞给长上下文模型又贵，效果也未必好（参见[[rag-vs-long-context]]）。\n\n**双系统**。记忆模型（主实验基于Mistral-7B-Instruct-32K）逐窗口读入长文，每个窗口后插入少量记忆token，只保留这些记忆token的[[c:kv-cache]]、丢弃原文的，主实验压缩比为4。来了问题，记忆模型凭这份全局记忆生成几条线索（类似草稿答案或改写后的查询），检索器（BGE-M3）用线索在原文512 token的分块里取前3段，生成器（Phi-3-mini-128K）据此作答。用草稿去引导检索，与[[hyde]]写假想文档的思路相近。\n\n**训练**。先在约20亿token上预训练记忆压缩，再用约1.7万条样本监督微调线索生成，最后做RLGF：按线索最终带来的答案质量排序，用偏好损失强化好线索。\n\n**结果**。在LongBench、InfiniteBench和自建的UltraDomain上，主表平均分MemoRAG为40.2，直接喂全文的长上下文模型为35.0，普通BGE-M3检索为29.7，[[graphrag]]为29.4。",
+  "limits": [
+    {"text": "全局记忆要为每份长文单独预先计算并缓存，文档一旦更新就要重建，难以用于频繁变动的大规模知识库。", "solved_by": []},
+    {"text": "线索质量取决于小记忆模型对全文的理解，压缩比越高信息损失越大；记忆模型本身也需专门训练。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "rag", "type": "solves", "note": "缓解了标准RAG在查询意图隐含、知识无结构时检索不到相关片段的问题：先用全局记忆生成线索再检索。"},
+    {"to": "memgpt", "type": "rivals", "note": "MemGPT像操作系统一样把上下文换入换出；MemoRAG把整份长文压缩成KV形式的全局记忆，只用它来生成检索线索。"},
+    {"to": "hyde", "type": "extends", "note": "同样先生成草稿再检索，但草稿来自读过全文的记忆模型，而不是凭空假想。"},
+    {"to": "graphrag", "type": "rivals", "note": "GraphRAG用知识图谱和社区摘要回答全局性问题；MemoRAG改用压缩记忆，主表平均分高约11分。"},
+    {"to": "rag-vs-long-context", "type": "extends", "note": "在“RAG还是长上下文”之争里给出混合方案：长上下文模型负责形成记忆，检索负责取证。"}
+  ],
+  "prereq": ["retrieval", "kv-cache", "context-window", "embedding", "language-model"],
+  "learn": "先读[[rag]]、[[hyde]]和[[graphrag]] → 读原文第3节（记忆模块与线索生成）和表1 → 动手：对一本小说先让LLM写一页全书梗概，再用梗概里的线索去检索原文，比较与直接用问题检索的命中率。",
+  "check": {"source": "https://arxiv.org/abs/2409.05591", "confirmed": "标题、7位作者、v1提交于2024-09-09；正文（arxiv.org/html/2409.05591v3）核对WWW ’25、作者单位、Mistral-7B-Instruct-32K记忆模型、记忆token与KV压缩、压缩比4、BGE-M3检索512 token分块取前3、Phi-3-mini-128K生成器、20亿token预训练与17,116条SFT与RLGF、三个评测集、表1平均分40.2/35.0/29.7/29.4、隐含意图与无结构知识两个问题。"}
+}

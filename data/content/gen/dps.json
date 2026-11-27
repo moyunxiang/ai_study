@@ -1,0 +1,31 @@
+{
+  "id": "dps",
+  "who": "Hyungjin Chung, Jeongsol Kim, Michael T. McCann, Marc L. Klasky, Jong Chul Ye · KAIST、Los Alamos国家实验室",
+  "venue": "ICLR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2209.14687"},
+    {"label": "代码", "url": "https://github.com/DPS2022/diffusion-posterior-sampling"}
+  ],
+  "aka": ["DPS", "扩散后验采样", "Diffusion Posterior Sampling", "扩散模型反问题", "Inverse Problems with Diffusion"],
+  "problem": "去模糊、超分、补全这类“反问题”要从退化观测y恢复图像x。用预训练扩散模型当先验的做法大多只处理无噪声的线性退化，靠每步把结果硬投影回“满足观测”的集合，一有噪声就失效。",
+  "idea": "把每一步要用的似然梯度∇log p(y|x_t)近似成∇log p(y|x̂₀)：先用去噪网络估出干净图x̂₀，再对观测误差‖y−A(x̂₀)‖²求梯度，加在普通扩散采样步上，不做硬投影。",
+  "impact": "给出了一个只要退化算子可微就能用的通用做法，能处理高斯与泊松噪声、相位恢复等非线性问题，成为扩散模型解反问题最常被比较和改进的基线。",
+  "method": "反问题的目标是从后验p(x|y)采样。由贝叶斯公式，后验的分数可拆成两项：`∇log p(x_t|y) = ∇log p(x_t) + ∇log p(y|x_t)`。第一项就是预训练扩散模型学到的[[c:score-function]]；难的是第二项，因为观测y只和干净图x₀直接相关，和带噪的x_t之间隔着一个积分。\n\nDPS的近似很简单：用Tweedie公式从x_t估出后验均值x̂₀（也就是去噪网络的输出），假设`p(y|x_t) ≈ p(y|x̂₀)`。若观测是`y = A(x) + 高斯噪声`，这一项的梯度就是`−∇_{x_t}‖y − A(x̂₀(x_t))‖²`乘一个步长，通过自动微分穿过去噪网络算出来。采样时每一步先按[[ddpm]]正常去噪，再沿这个梯度方向修正一下。\n\n和此前把每步结果投影到“严格满足观测”的方法相比，它不强求一致性，在有噪声时路径更自然；把平方误差换成泊松似然即可处理泊松噪声，A是非线性的（如傅里叶相位恢复、非均匀去模糊）也照样可用。代价是每一步都要对网络反传一次，比普通采样慢不少。",
+  "limits": [
+    {"text": "每一步都要穿过去噪网络求梯度，显存和时间开销是普通采样的数倍，在潜空间大模型上更慢。", "solved_by": []},
+    {"text": "p(y|x_t)≈p(y|x̂₀)的近似在高噪声阶段很粗糙，步长需要逐任务调，结果对超参数敏感。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "score-sde", "type": "extends", "note": "在分数SDE的条件生成框架里，把条件项换成任意可微退化算子的观测似然。"},
+    {"to": "ddpm", "type": "uses", "note": "以预训练的DDPM作为图像先验，逐步去噪时加入似然梯度修正。"},
+    {"to": "repaint", "type": "rivals", "note": "RePaint这类方法靠把已知区域直接替换回去来满足观测，只适用于无噪声的线性掩码；DPS用软的梯度修正，覆盖带噪和非线性问题。"},
+    {"to": "denoising-score-matching", "type": "uses", "note": "去噪网络给出的x̂₀即Tweedie公式下的后验均值，DPS用它近似似然。"}
+  ],
+  "prereq": ["diffusion-process", "score-function", "conditional-bayes", "gaussian", "chain-rule"],
+  "terms": [
+    {"t": "反问题", "d": "已知退化过程A和观测y=A(x)+噪声，反推原始信号x。去模糊、超分辨率、CT重建都属于这一类。"},
+    {"t": "Tweedie公式", "d": "对加了高斯噪声的变量，其干净值的条件期望可以由噪声版本的分数直接算出；扩散模型的去噪输出就是这个期望。"}
+  ],
+  "learn": "先弄懂分数SDE中条件生成的分数分解 → 读本文第3节的近似推导与算法1 → 在预训练的人脸扩散模型上实现DPS做高斯去模糊，改变步长观察效果。",
+  "check": {"source": "https://arxiv.org/abs/2209.14687", "confirmed": "标题、五位作者、v1日期2022-09-29、摘要中扩展到带噪的线性与非线性反问题、近似后验采样、不做严格观测一致性投影、可处理高斯与泊松噪声、相位恢复与非均匀去模糊；机构、ICLR 2023、Tweedie近似的具体写法与计算开销来自一般了解"}
+}

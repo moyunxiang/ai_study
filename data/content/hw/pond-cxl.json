@@ -1,0 +1,31 @@
+{
+  "id": "pond-cxl",
+  "who": "Huaicheng Li, Daniel S. Berger, Stanko Novakovic, Lisa Hsu, Dan Ernst, Pantea Zardoshti, Monish Shah, Samir Rajadnya et al. · Microsoft Azure / 卡内基梅隆大学 / 威斯康星大学麦迪逊分校",
+  "venue": "ASPLOS 2023",
+  "aka": ["Pond", "CXL内存池化", "Memory Pooling", "内存池", "CXL Memory Pool"],
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2203.00241"}
+  ],
+  "problem": "云服务器的成本里内存是大头，但每台服务器的内存按峰值配置、平时大量闲置；把多台机器的内存放进共享池能提高利用率，可远端内存延迟高，云上的虚拟机又要求性能不能明显下降。",
+  "idea": "基于[[cxl]]做一个小规模内存池：只在8到16个CPU插槽之间共享，保持访问延迟低；再用机器学习模型预测每台虚拟机该给多少本地内存、多少池内存，让性能接近全用本地内存。",
+  "impact": "第一批用云厂商真实生产数据论证CXL内存池化可行性的论文之一，常被CXL内存扩展与分层研究引用，也影响了后来服务器内存池的设计讨论。",
+  "method": "论文先分析了Azure生产集群的轨迹，得出两个关键观察。第一，内存池不需要很大：在8到16个CPU插槽之间共享就能拿到大部分好处，池小意味着CXL交换层级少、访问延迟低。第二，可以训练机器学习模型，根据虚拟机的历史和特征预测它实际会用到多少内存、对延迟有多敏感，从而决定本地内存与池内存的比例，让虚拟机的性能接近“所有内存都在同一个NUMA节点上”。\n\nPond通过CXL的load/store语义访问池内存——CPU像访问普通内存一样直接读写，不需要像RDMA那样走网络协议栈。对没有预测好、性能受影响的虚拟机，系统会在运行时把它迁回本地内存。\n\n在158个负载上的评估显示，Pond把DRAM成本降低7%，性能与同NUMA节点分配相比只差1%到5%。",
+  "limits": [
+    {"text": "池化的收益只有个位数百分比，而CXL控制器和交换芯片本身有成本与延迟开销；对延迟敏感的负载仍需靠预测和迁移兜底。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "cxl", "type": "uses", "note": "以CXL标准提供的缓存一致、load/store语义的远端内存访问作为内存池的基础。"},
+    {"to": "memory-wall", "type": "extends", "note": "从“带宽跟不上”转向“容量配置浪费”，用池化提高内存的利用率。"},
+    {"to": "dram", "type": "solves", "note": "缓解每台服务器按峰值配置DRAM造成的大量闲置与成本。"}
+  ],
+  "prereq": ["memory-bandwidth", "chip-basics", "throughput-latency"],
+  "terms": [
+    {"t": "NUMA", "d": "非一致内存访问：多插槽服务器里，CPU访问自己插槽上的内存快，访问另一个插槽上的内存慢。"},
+    {"t": "内存池化", "d": "把多台机器的部分内存集中成一个共享池，按需分配给不同的机器或虚拟机。"}
+  ],
+  "learn": "先读[[cxl]]了解CXL.mem；再读本文对Azure轨迹的分析和池大小的选择，计算一下8插槽共享时比每台独立配置能省下多少峰值冗余。",
+  "check": {
+    "source": "https://arxiv.org/abs/2203.00241",
+    "confirmed": "arXiv记录核对标题、作者（Huaicheng Li等13位，含Mark D. Hill）、v1 2022-03-01与摘要：首个满足云性能目标并降低DRAM成本的池化系统、基于CXL load/store、8–16插槽、机器学习预测本地与池内存比例、158个负载、DRAM成本降低7%、性能差1–5%。ASPLOS 2023发表处、作者单位、运行时迁回本地内存的机制按一般了解写。"
+  }
+}

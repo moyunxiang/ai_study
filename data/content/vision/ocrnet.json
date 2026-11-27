@@ -1,0 +1,30 @@
+{
+  "id": "ocrnet",
+  "who": "Yuhui Yuan, Xiaokang Chen, Xilin Chen, Jingdong Wang · 微软亚洲研究院 / 中科院计算所",
+  "venue": "ECCV 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1909.11065"},
+    {"label": "代码", "url": "https://github.com/openseg-group/openseg.pytorch"}
+  ],
+  "aka": ["OCRNet", "OCR", "物体上下文表示", "Object-Contextual Representations", "HRNet+OCR", "Segmentation Transformer"],
+  "problem": "语义分割要靠上下文判断一个像素是什么，但[[pspnet]]的金字塔池化和[[non-local]]式注意力汇集的是“周围所有像素”，其中混着大量别的物体的信息。",
+  "idea": "一个像素的标签就是它所属物体的类别，所以应该用“物体”来做上下文：先粗分出每一类的物体区域，把区域内像素特征平均成区域表示，再按像素与各区域的相似度加权汇总，拼回像素特征。",
+  "impact": "OCR模块简单、可以接在任意骨干后面，“HRNet+OCR”在Cityscapes等基准上长期是强基线；论文后来把这种像素-区域注意力改写成Transformer编码器-解码器的形式。",
+  "method": "OCR模块分三步：\n\n- **软物体区域**：在骨干特征上接一个辅助分割头，输出K张（K=类别数）粗分割图，用真值监督；\n- **区域表示**：对第k张软区域图，用它当权重把所有像素特征加权平均，得到第k类物体的一个向量 `f_k`；\n- **物体上下文**：对每个像素i，算它与各区域表示的相似度并做[[c:softmax]]得到权重 `w_ik`，物体上下文 `y_i = Σ_k w_ik · φ(f_k)`；最后把 `y_i` 与原像素特征拼接，再预测最终类别。\n\n与[[non-local]]让每个像素看所有像素不同，这里每个像素只看K个区域向量，计算量从“像素×像素”降到“像素×类别”，而且汇集的是同类物体的信息。论文在[[hrnet]]和ResNet骨干上做实验，摘要报告在Cityscapes、ADE20K、LIP、PASCAL-Context和COCO-Stuff上都有竞争力，“HRNet + OCR + SegFix”提交时在Cityscapes排行榜第一。\n\n之后的[[maskformer]]、[[mask2former]]把“用少量类别或物体向量去与像素交互”做成了基于查询的掩码分类，OCR可以看成这条路线的前身之一。",
+  "limits": [
+    {"text": "软物体区域按类别划分，同一类的多个实例被合成一个区域表示，无法区分个体，也不直接给出实例或全景分割。", "solved_by": ["maskformer", "mask2former"]},
+    {"text": "依赖一个辅助粗分割头和高分辨率骨干，整体推理仍然偏重。", "solved_by": ["segformer"]}
+  ],
+  "relations": [
+    {"to": "pspnet", "type": "solves", "note": "金字塔池化按固定窗口汇集上下文，混入别的物体；OCR改为按所属物体区域汇集。"},
+    {"to": "non-local", "type": "extends", "note": "同样是注意力式上下文聚合，但把“像素对像素”换成“像素对物体区域”，更省也更有针对性。"},
+    {"to": "hrnet", "type": "uses", "note": "主要实验以HRNet为骨干，HRNet+OCR成为常用组合。"},
+    {"to": "deeplabv3", "type": "rivals", "note": "DeepLabv3用ASPP的多空洞率卷积获取多尺度上下文；OCR用物体区域表示，两者在Cityscapes等基准上长期并列比较。"}
+  ],
+  "prereq": ["vision-tasks", "conv-layer", "attention-concept", "softmax", "iou-map"],
+  "terms": [
+    {"t": "软物体区域", "d": "每一类一张、取值在0到1之间的粗分割图，表示每个像素属于这一类物体的程度。"}
+  ],
+  "learn": "先理解Non-local注意力的计算方式，再读本文第3节的三步公式；可在mmsegmentation里对比OCRNet与PSPNet的配置和精度。",
+  "check": {"source": "https://arxiv.org/abs/1909.11065", "confirmed": "arXiv记录：四位作者、v1提交于2019-09-24；最新版标题加了前缀“Segmentation Transformer:”，登记用ECCV版原题；摘要中的三步做法（真值监督的物体区域、区域表示、像素与区域的关系加权）、五个基准、HRNet+OCR+SegFix在Cityscapes排名第一、改写为Transformer编码器-解码器。ECCV 2020、机构、K=类别数等细节凭一般了解写。"}
+}

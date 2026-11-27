@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>重复惩罚、频率惩罚与存在惩罚（Repetition, Frequency and Presence Penalties） · AI脉络</title>
+<meta name="description" content="在解码时压低已经出现过的token的分数，防止模型车轱辘话来回说。常见的有重复惩罚（按比例缩放）、频率惩罚和存在惩罚（按出现次数减分），以及禁止重复n元组。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/repetition-penalty.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="重复惩罚、频率惩罚与存在惩罚（Repetition, Frequency and Presence Penalties）">
+<meta property="og:description" content="在解码时压低已经出现过的token的分数，防止模型车轱辘话来回说。常见的有重复惩罚（按比例缩放）、频率惩罚和存在惩罚（按出现次数减分），以及禁止重复n元组。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/repetition-penalty.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/repetition-penalty">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 入门</div>
+<h1>重复惩罚、频率惩罚与存在惩罚</h1><div class="full">Repetition, Frequency and Presence Penalties</div>
+<p class="muted" style="font-size:13px">也叫：repetition penalty　重复惩罚　repetition_penalty　frequency penalty　频率惩罚　frequency_penalty　presence penalty　存在惩罚　presence_penalty　no_repeat_ngram_size　n-gram阻断　n-gram blocking　logits processor　logits处理器　防重复</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/repetition-penalty">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>在解码时压低已经出现过的token的分数，防止模型车轱辘话来回说。常见的有重复惩罚（按比例缩放）、频率惩罚和存在惩罚（按出现次数减分），以及禁止重复n元组。</b></p>
+<p class="tags">先要会：<a class="chip c" href="decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="softmax.html">Softmax与logits</a></p>
+<p>语言模型解码时很容易陷入重复：同一句话、同一个短语一遍遍出现（见<a class="lc" href="../c/text-degeneration.html">文本退化与重复循环</a>）。在不改模型的前提下，最直接的补救是在每一步采样之前修改logits（见<a class="lc" href="../c/softmax.html">Softmax与logits</a>），让已经说过的内容不那么容易再被选中。这是一类“logits处理器”，与温度、top-p一起作用（见<a class="lc" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a>）。</p><p><b>重复惩罚</b>（repetition penalty）。由条件生成模型CTRL的论文（2019）提出：对已经出现过的token，把它的logit除以一个θ &gt; 1（论文建议约1.2）。直接相除只对正的logit有效（负数除以θ反而变大），所以Hugging Face的实现改成：</p><ul><li>logit为正时除以θ，</li><li>logit为负时乘以θ，</li></ul><p>两种情况都让该token的logit变小。参数<code>repetition_penalty</code>就是这个θ，1.0表示不惩罚。</p><p><b>频率惩罚与存在惩罚</b>。OpenAI等API采用的加法形式。设token j到目前为止出现了c_j次：</p><p class="formula"><code>logit_j ← logit_j − c_j · α_frequency − 1[c_j &gt; 0] · α_presence</code></p><ul><li><b>频率惩罚</b>随出现次数线性增加，越常说的词越被压，主要减少逐字重复。</li><li><b>存在惩罚</b>只看出现过与否，出现一次就扣一个固定值，作用是鼓励引入新话题、新词汇。</li></ul><p><b>禁止重复n元组</b>。<code>no_repeat_ngram_size = n</code>：如果当前前缀接上某个token会产生一个此前出现过的n元组，就把它的概率直接设为0。摘要和翻译的束搜索里常用n = 3，防止整句重复。代价是合理的重复也被禁止（比如文章里两次提到“北京大学”）。</p><p><b>训练上的解决</b>。解码时的惩罚只是补丁。也有工作从训练目标入手，直接惩罚模型给重复token的概率（unlikelihood training），或者用对比式解码在“高概率”和“与上文不相似”之间取平衡。指令微调和RLHF之后的模型（见<a class="lc" href="../c/rlhf-concept.html">人类反馈强化学习</a>）重复问题本身轻了很多，惩罚参数一般设得很小或不用。</p>
+<div class="example"><h4>例子</h4><p>某一步的logits：“好” 3.0、“很” 2.0、“的” −0.5，其中“好”和“的”前文出现过。</p><ul><li>重复惩罚θ = 1.2：“好”3.0/1.2 = 2.5；“的”−0.5×1.2 = −0.6；“很”不变。</li><li>频率惩罚0.5、存在惩罚0.3，“好”出现过3次、“的”出现过1次：“好”3.0 − 3×0.5 − 0.3 = 1.2；“的”−0.5 − 0.5 − 0.3 = −1.3；“很”2.0。这时“很”反超“好”成为最可能的token。</li><li>no_repeat_ngram_size = 2：前文出现过“非常 好”，当前最后一个词是“非常”，则“好”的概率被直接置0。</li></ul></div>
+<h2>容易误解的地方</h2><ul><li>惩罚会作用到所有出现过的token上，包括标点、代码里的变量名、必须重复的专有名词；写代码或做结构化输出时惩罚过大会生成错误内容。</li><li>不同框架的同名参数含义和取值范围不同：有的乘、有的减，有的只看生成部分、有的连提示也算，迁移设置时要看文档。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

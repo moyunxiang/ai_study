@@ -1,0 +1,36 @@
+{
+  "id": "conve",
+  "who": "Tim Dettmers, Pasquale Minervini, Pontus Stenetorp, Sebastian Riedel · 伦敦大学学院",
+  "venue": "AAAI 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1707.01476"}
+  ],
+  "aka": ["ConvE", "卷积知识图谱嵌入", "WN18RR", "测试集泄漏", "Inverse Relation Leakage"],
+  "problem": "知识图谱补全模型（TransE、DistMult、ComplEx）都是浅层模型，表达力有限；同时常用的WN18和FB15k数据有严重的测试集泄漏：大量测试三元组的逆关系就在训练集里。",
+  "idea": "把头实体和关系的向量拼成二维「图片」，用卷积和全连接层提取交互特征，再与所有候选尾实体打分；并量化了逆关系泄漏，构造出去掉泄漏的WN18RR等数据集。",
+  "impact": "ConvE是第一批被广泛采用的深层知识图谱嵌入模型；它提出的WN18RR和对FB15k泄漏的分析，让后来的工作基本都改用FB15k-237和WN18RR评测。",
+  "background": "[[transe]]、[[distmult]]、[[complex]]都是一两次逐元素运算的浅层打分，参数随实体数线性增长，想提高表达力就只能加大维度。当时最流行的基准WN18、FB15k来自[[transe]]论文，被人注意到存在逆关系（如「上位词」与「下位词」）跨训练/测试的问题，但影响多大没人量化过。",
+  "method": "对三元组 `(h, r, ?)`，把 `h` 和 `r` 的 `d` 维向量各自重排成 `m×n` 的矩阵，上下拼接成一张「二维图」，然后：\n\n`ψ(h, r) = f( vec( f([h̄; r̄] * ω) ) W )`\n\n`*` 是二维卷积，`ω` 是卷积核，`f` 为ReLU，`W` 把特征投影回 `d` 维。最后与尾实体向量做内积并过sigmoid：`p(t | h, r) = σ(ψ(h, r) · t)`。\n\n训练时采用「1-N打分」：一次前向把 `(h, r)` 与全部实体打分，用二元交叉熵同时监督所有标签，比逐个负采样快得多。论文还做了一个只看逆关系的简单规则基线：若训练集中有 `(t, r', h)` 且 `r'` 是 `r` 的逆，就预测 `t`。这个规则在WN18和FB15k上就能达到当时最好水平，说明这两份数据被泄漏严重污染；作者因此从WN18去掉逆关系得到**WN18RR**，并推荐使用已有的FB15k-237。",
+  "results": "摘要报告：ConvE在多个数据集上取得当时最好的平均倒数排名（MRR）；参数效率高，达到与DistMult、R-GCN相同效果时参数分别少8倍和17倍；对入度高的节点尤其有效。",
+  "legacy": "ConvE之后，ConvKB、InteractE等卷积模型以及CompGCN等图神经网络方法陆续出现。WN18RR与FB15k-237成为知识图谱补全的默认基准。后续也有工作指出，浅层模型配好训练技巧后能追平ConvE，提醒大家比较时要统一训练设置。",
+  "limits": [
+    {"text": "把向量重排成二维图片再卷积缺乏明确的语义依据，交互形式依赖拼接方式。", "solved_by": []},
+    {"text": "与浅层模型一样只能处理训练时见过的实体，不能用文本描述归纳新实体。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "distmult", "type": "extends", "note": "DistMult只做逐元素乘法，ConvE用卷积和全连接层学习更丰富的头实体-关系交互，参数却更少。"},
+    {"to": "complex", "type": "rivals", "note": "同期的强基线；ConvE在多数去泄漏数据集上MRR更高。"},
+    {"to": "transe", "type": "solves", "note": "TransE论文发布的WN18/FB15k存在逆关系泄漏，ConvE量化了这一问题并给出WN18RR。"},
+    {"to": "alexnet", "type": "uses", "note": "借用图像领域的二维卷积、ReLU和dropout来提取特征。"}
+  ],
+  "prereq": ["embedding", "conv-layer", "cross-entropy", "train-val-test", "graph-basics"],
+  "terms": [
+    {"t": "测试集泄漏", "d": "测试数据的信息以别的形式出现在训练集中，模型靠记忆就能答对，测出来的效果虚高。"},
+    {"t": "1-N打分", "d": "一次计算某个（头实体，关系）对与图中所有实体的得分，而不是一次只算一个候选。"}
+  ],
+  "learn": "先读[[distmult]]和[[complex]] → 读原文第4节模型和第5节逆关系分析 → 动手：用逆关系规则在FB15k和FB15k-237上各跑一次Hits@10，体会泄漏的影响。",
+  "check": {
+    "source": "https://arxiv.org/abs/1707.01476",
+    "confirmed": "arXiv记录：标题Convolutional 2D Knowledge Graph Embeddings、四位作者、v1 2017-07-05；摘要：多层卷积链接预测模型、与DistMult和R-GCN同效时参数少8倍和17倍、对高入度节点有效、WN18与FB15k测试集逆关系泄漏严重、简单规则即达SOTA、构造稳健变体、多数数据集MRR最好。AAAI 2018、打分公式、1-N打分、WN18RR命名凭一般了解。"
+  }
+}

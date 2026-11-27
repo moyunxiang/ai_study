@@ -1,0 +1,89 @@
+{
+  "id": "lm-smoothing-ir",
+  "who": "ChengXiang Zhai（翟成祥）, John Lafferty · 卡内基梅隆大学",
+  "venue": "SIGIR 2001",
+  "links": [
+    {
+      "label": "DOI",
+      "url": "https://doi.org/10.1145/383952.384019"
+    }
+  ],
+  "aka": [
+    "Dirichlet平滑",
+    "Dirichlet Prior Smoothing",
+    "Jelinek-Mercer平滑",
+    "JM平滑",
+    "检索语言模型平滑",
+    "Zhai-Lafferty",
+    "查询似然平滑"
+  ],
+  "problem": "语言模型检索要为每篇文档估一个词分布，再算查询在其中出现的概率；可查询词只要有一个没在文档里出现，概率就是0，平滑方法怎么选、参数怎么设，对检索效果影响多大，没人系统研究过。",
+  "idea": "在多个TREC测试集上系统比较Jelinek-Mercer插值、Dirichlet先验和绝对折扣三种平滑方法及其参数敏感性，并从公式上说明平滑同时起到了类似IDF和文档长度归一化的作用。",
+  "impact": "发现检索效果对平滑极其敏感，Dirichlet先验平滑在短查询上通常最好，从此成为查询似然模型的默认设置（Indri、Lucene等系统都实现了它）；也解释了语言模型方法为何能和TF-IDF、BM25同样有效。",
+  "background": "[[query-likelihood]]（Ponte与Croft，1998）提出用语言模型做检索：把每篇文档d看成一个词分布 `p(w|d)`，按查询q在其中出现的概率 `p(q|d) = Π_{w∈q} p(w|d)` 给文档排序。最简单的估计是极大似然 `p_ml(w|d) = c(w;d)/|d|`，但它给没出现的词概率0。语音识别里的[[ngram-smoothing]]早已有成熟的平滑技术，可检索场景下哪种平滑合适、参数取多少，此前只有零散经验。",
+  "method": "论文比较三种把文档模型与整个语料库的「背景模型」`p(w|C)` 混合的方法：\n\n- **Jelinek-Mercer（线性插值）**：`p(w|d) = (1−λ) p_ml(w|d) + λ p(w|C)`，λ固定；\n- **Dirichlet先验**：`p(w|d) = ( c(w;d) + μ p(w|C) ) / ( |d| + μ )`，相当于先往文档里加μ个按背景分布撒的「伪词」，文档越长平滑越少；\n- **绝对折扣**：从每个出现过的词的计数中减去常数δ，把省下的概率按背景分布分给其他词。\n\n作者还给出一个通用改写：对任何这类平滑，`log p(q|d) = Σ_{w∈q, c(w;d)>0} log[ p_s(w|d) / (α_d p(w|C)) ] + |q| log α_d + Σ_{w∈q} log p(w|C)`，其中最后一项与文档无关。第一项里除以 `p(w|C)` 让常见词贡献变小——这就是IDF的作用；α_d 与文档长度有关，起到长度归一化的作用。于是语言模型方法里的「TF-IDF加长度归一化」是平滑自然推出的，而不是另外加的启发式规则。",
+  "results": "在多个TREC集合上的实验显示：检索效果对平滑参数非常敏感；Dirichlet先验在标题型短查询上通常最好，Jelinek-Mercer在冗长查询上更有优势；作者观察到平滑在长查询和短查询上扮演的角色不同，这引出了他们2002年的「两阶段平滑」。",
+  "legacy": "Dirichlet平滑的查询似然成为语言模型检索的标准基线，与[[bm25]]并列出现在几乎所有传统检索实验中；Lemur/Indri工具包把它作为默认模型。翟成祥后来与Lafferty提出基于KL散度的检索框架和两阶段平滑，[[relevance-model]]等查询扩展方法也建立在平滑后的文档模型之上。",
+  "limits": [
+    {
+      "text": "只改进了文档模型的估计，仍假设查询词相互独立、只按字面匹配，词汇不匹配（同义词、改写）问题没有解决。",
+      "solved_by": [
+        "relevance-model",
+        "dssm",
+        "drmm"
+      ]
+    },
+    {
+      "text": "最佳平滑参数随集合和查询类型变化，需要在每个集合上调参。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "query-likelihood",
+      "type": "extends",
+      "note": "在Ponte-Croft查询似然框架下，系统研究文档语言模型应如何平滑。"
+    },
+    {
+      "to": "ngram-smoothing",
+      "type": "uses",
+      "note": "把语音和语言建模中的插值、折扣等平滑技术移植到文档模型上。"
+    },
+    {
+      "to": "tf-idf",
+      "type": "solves",
+      "note": "从平滑公式推出了IDF和长度归一化效应，给TF-IDF式启发式权重提供了概率解释。"
+    },
+    {
+      "to": "trec",
+      "type": "uses",
+      "note": "在多个TREC测试集合上做实验比较。"
+    }
+  ],
+  "prereq": [
+    "language-model",
+    "mle",
+    "map-bayesian",
+    "probability-basics",
+    "n-gram"
+  ],
+  "terms": [
+    {
+      "t": "背景模型",
+      "d": "整个语料库的词频分布p(w|C)，平滑时用它给文档里没出现的词分配概率。"
+    },
+    {
+      "t": "Dirichlet先验平滑",
+      "d": "相当于往每篇文档里加入μ个按背景分布出现的伪词，再做极大似然估计。"
+    },
+    {
+      "t": "Jelinek-Mercer平滑",
+      "d": "用固定权重λ把文档的极大似然分布和背景分布线性混合。"
+    }
+  ],
+  "learn": "先读[[query-likelihood]] → 读原文第2–3节三种平滑方法和第4节的推导 → 动手：用Pyserini在一个小TREC集合上分别跑Dirichlet和JM平滑，画出MAP随μ或λ变化的曲线。",
+  "check": {
+    "source": "https://doi.org/10.1145/383952.384019",
+    "confirmed": "OpenAlex：标题、作者Zhai与Lafferty、SIGIR 2001（2001-09）；摘要：语言模型检索为每篇文档估计语言模型再按查询似然排序、平滑用来纠正数据稀疏导致的极大似然不准、研究平滑及其对检索效果的影响、考察对平滑参数的敏感性并在不同测试集上比较几种常用平滑方法。三种平滑公式、IDF与长度归一化的推导、Dirichlet对短查询更好的结论、两阶段平滑和μ取值范围凭一般了解（教材Manning等《信息检索导论》第12章与Zhai的综述）。"
+  }
+}

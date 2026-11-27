@@ -1,0 +1,32 @@
+{
+  "id": "slam-asr",
+  "who": "Ziyang Ma, Guanrou Yang, Yifan Yang, Zhifu Gao, Jiaming Wang, Zhihao Du, Fan Yu, Qian Chen et al. · 上海交通大学、阿里巴巴",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2402.08846"},
+    {"label": "SLAM-LLM", "url": "https://github.com/X-LANG/SLAM-LLM"}
+  ],
+  "problem": "把语音编码器接到大语言模型上做识别时，已有工作设计都很复杂：要在时间上压缩编码器输出、专门做模态对齐、还要用参数高效微调改LLM，到底哪些设计是必要的并不清楚。",
+  "idea": "只用现成的语音编码器加现成的LLM，两者都冻结，中间只训练一个线性投影层；系统比较不同编码器和LLM的组合，找出最优搭配，称为SLAM-ASR。",
+  "impact": "以极简结构在LibriSpeech上取得当时基于LLM的识别模型中最好的结果，成为「编码器+投影+LLM」语音识别的常用基线；配套的SLAM-LLM工具包被不少后续语音LLM工作使用。",
+  "method": "[[salmonn]]、[[qwen-audio]]等音频大模型用Q-Former、多层适配器、LoRA等组件把语音接到LLM上，结构越来越复杂。SLAM-ASR反过来问：最简单的做法够不够？\n\n**结构**只有三部分：\n- **语音编码器**：现成的预训练模型，如[[whisper]]编码器或在LibriSpeech上微调过的[[hubert]]、[[wavlm]]，参数冻结。编码器输出先按固定倍数拼接相邻帧做降采样。\n- **线性投影层**：唯一可训练的部分，把语音特征映射到LLM的词嵌入维度。\n- **LLM**：现成的开源模型，如[[vicuna]]，参数冻结，接在投影后的语音嵌入和一句「请转写这段语音」的提示后面，直接生成文字。\n\n作者系统比较了多种编码器和LLM的组合，发现在合适的搭配下这个极简结构就够了：在LibriSpeech上取得当时基于LLM的识别模型中最好的成绩，甚至超过用大规模成对数据训练的通用音频大模型。论文还观察到训练过程中存在「能力突现」：投影层训练到某一步时，识别准确率会突然大幅提升，说明模态对齐是一个突变式的过程。",
+  "limits": [
+    {"text": "只在LibriSpeech这类干净的英文朗读语音上验证，噪声、口音、长音频和多语言下的效果没有充分检验。", "solved_by": ["seed-asr", "fireredasr"]},
+    {"text": "LLM解码比CTC或转导器慢得多，还可能产生幻觉文字，不适合低延迟流式识别。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "salmonn", "type": "rivals", "note": "SALMONN用双编码器加Q-Former等复杂连接；SLAM-ASR证明只训练一个线性投影层也能取得更好的识别成绩。"},
+    {"to": "whisper", "type": "uses", "note": "可选的冻结语音编码器之一。"},
+    {"to": "vicuna", "type": "uses", "note": "可选的冻结LLM之一，负责根据语音嵌入生成文字。"},
+    {"to": "hubert", "type": "uses", "note": "微调过的HuBERT/WavLM等自监督模型作编码器。"},
+    {"to": "wavlm", "type": "uses", "note": "WavLM作为可选的冻结语音编码器参与比较。"}
+  ],
+  "prereq": ["language-model", "transfer-learning", "word-error-rate", "embedding", "pretrain-finetune"],
+  "terms": [
+    {"t": "线性投影层", "d": "一个矩阵乘法加偏置，把一种维度的向量变成另一种维度，这里用来把语音特征对齐到LLM的词向量空间。"}
+  ],
+  "aka": ["SLAM-ASR", "SLAM-LLM", "LLM-based ASR", "大模型语音识别", "编码器+投影+LLM"],
+  "check": {
+    "source": "https://arxiv.org/abs/2402.08846",
+    "confirmed": "arXiv官方记录：标题An Embarrassingly Simple Approach for LLM with Strong ASR Capacity、Ma等11位作者、v1提交2024-02-13；摘要中以往工作在时间压缩、投影器模态对齐、LLM参数高效微调上设计复杂、现成编码器+LLM+只训练线性投影即可、比较多种组合、命名SLAM-ASR、LibriSpeech上LLM识别模型最好、超过用大量成对数据训练的通用音频模型、探索模态对齐中的能力涌现。编码器与LLM都冻结、帧拼接降采样、Vicuna与WavLM/HuBERT的具体组合、SLAM-LLM工具包、机构为一般了解。"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "ngpt",
+  "who": "Ilya Loshchilov, Cheng-Ping Hsieh, Simeng Sun, Boris Ginsburg · NVIDIA",
+  "venue": "arXiv 2024",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2410.01131"}],
+  "aka": ["nGPT", "Normalized Transformer", "归一化Transformer", "超球面Transformer", "hypersphere transformer"],
+  "problem": "Transformer里隐藏状态和权重的范数会随训练漂移，靠归一化层、权重衰减和学习率预热来稳住，训练步数多、调参繁琐。",
+  "idea": "把嵌入、注意力和MLP的权重以及隐藏状态全部归一化到单位球面上，每一层只是在球面上朝目标方向挪一小步。",
+  "impact": "在相同精度下把训练步数减少到原来的1/4到1/20，给“归一化放在哪、放多少”提供了一个极端但干净的答案。",
+  "background": "标准的[[pre-ln]] Transformer只在每个子层的输入处做一次[[c:normalization-layer]]，残差流本身的范数会随层数和训练不断变大，于是需要[[c:regularization]]里的权重衰减、学习率预热和精心的初始化来防止数值失控。后来的[[qk-norm]]等改进只给局部加归一化，问题没有被系统地处理。",
+  "method": "nGPT的做法是“所有向量都住在单位球面上”：词嵌入矩阵、注意力的Q/K/V/O投影矩阵、MLP矩阵的每一行（或列）在每步更新后都重新归一化为单位范数，隐藏状态也一样。残差更新改写成在球面上做插值：\n\n`h ← Norm(h + α_A ⊙ (h_A − h))`\n\n`h ← Norm(h + α_M ⊙ (h_M − h))`\n\n其中 `h_A`、`h_M` 是注意力块和MLP块的输出（同样被归一化），`α` 是可学习的逐维步长，类似“每层往目标方向走多远”。因为向量都是单位长度，点积直接就是余弦相似度，注意力logit改用可学习的缩放因子代替 `1/√d`。这样就不再需要权重衰减，也基本不需要学习率预热。",
+  "results": "官方称在语言建模上，nGPT达到同样精度所需的训练步数比基线Transformer少4到20倍，且序列越长加速越明显。",
+  "legacy": "它是“把归一化推到极致”的代表方案，常和[[peri-ln]]等归一化位置研究一起被讨论；但每步额外的归一化开销以及与现有大模型训练栈的兼容性，使它暂未成为主流配方。",
+  "limits": [
+    {"text": "每步都要对所有权重矩阵重新归一化，单步计算和实现复杂度上升，步数省下的时间不能直接等同于墙钟时间。", "solved_by": []},
+    {"text": "实验规模在十亿参数量级，是否在百亿以上和超长训练中保持优势尚无公开验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "extends", "note": "保留注意力加MLP的结构，只把所有向量约束到单位球面上。"},
+    {"to": "pre-ln", "type": "solves", "note": "Pre-LN残差流范数持续增长、依赖预热和权重衰减；nGPT让隐藏状态始终是单位长度。"},
+    {"to": "qk-norm", "type": "extends", "note": "QK归一化只归一化查询和键，nGPT把同样的想法推广到所有权重和隐藏状态。"},
+    {"to": "layernorm", "type": "rivals", "note": "不再在子层前后插归一化层，而是把归一化变成参数和状态本身的约束。"}
+  ],
+  "prereq": ["normalization-layer", "residual-connection", "self-attention", "dot-product", "norm"],
+  "terms": [{"t": "单位超球面", "d": "所有长度为1的向量构成的集合；向量都在上面时，点积就等于夹角余弦。"}],
+  "learn": "先弄懂[[pre-ln]]里残差流怎样累加；读nGPT第2节的球面插值更新；动手：在nanoGPT里把权重每步重新归一化，比较去掉预热后的训练曲线。",
+  "check": {"source": "https://arxiv.org/abs/2410.01131", "confirmed": "标题、作者、arXiv首次提交2024-10-01；摘要中所有向量单位范数、训练步数减少4到20倍且依序列长度而定。"}
+}

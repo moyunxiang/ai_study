@@ -1,0 +1,28 @@
+{
+  "id": "diffpool",
+  "who": "Rex Ying, Jiaxuan You, Christopher Morris, Xiang Ren, William L. Hamilton, Jure Leskovec · 斯坦福大学、多特蒙德工业大学、南加州大学",
+  "venue": "NeurIPS 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1806.08804"}
+  ],
+  "aka": ["DiffPool", "Differentiable Pooling", "可微图池化", "层次图池化", "图池化", "Graph Pooling"],
+  "problem": "给整张图分类（如判断一个分子是否有毒）时，已有的图神经网络是“扁平”的：做完几层消息传递后，把所有节点表示简单求和或求平均得到图表示，丢掉了图的层次结构；而CNN靠池化逐层提取由小到大的结构。",
+  "idea": "在GNN的每一层额外学一个软聚类分配矩阵，把节点软分配到少数几个簇，簇作为下一层的“粗化图”的节点；这样一层层把图缩小，得到层次化的图表示，整个过程可微、可端到端训练。",
+  "impact": "开启了“可学习的层次图池化”这一方向，SAGPool、TopKPool、MinCutPool等后续方法都以它为主要比较对象；它的软分配思想也被用于图的粗化和分割。",
+  "method": "在第l层，用两个GNN分别作用在当前图上：一个是嵌入GNN，产生节点表示 `Z = GNN_embed(A, X)`；另一个是池化GNN，输出分配矩阵 `S = softmax(GNN_pool(A, X))`，S是 `n_l × n_{l+1}` 的矩阵，每一行表示节点被分配到各个簇的概率。\n\n粗化后的新图为：簇的特征 `X' = Sᵀ Z`，簇之间的邻接 `A' = Sᵀ A S`，簇的个数通常设为上一层节点数的一定比例（例如25%）。重复几次后只剩一个节点，它的表示就是整张图的表示，再接分类器。\n\n只靠分类损失，分配矩阵很难学好，作者加入两个辅助项：链接预测损失 `‖A − S Sᵀ‖`，鼓励相连的节点分到同一个簇；以及分配的熵正则，鼓励每个节点明确属于一个簇。\n\n摘要报告：把DiffPool与已有GNN组合，在图分类基准上平均比所有已有池化方法准确率高5%–10%，在5个基准中的4个上达到当时最好。",
+  "limits": [
+    {"text": "分配矩阵是稠密的n×k矩阵，邻接计算Sᵀ A S的显存与时间随节点数平方增长，难以用于大图；训练也常不稳定，依赖辅助损失。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "graphsage", "type": "uses", "note": "实验中用GraphSAGE作为嵌入与池化的基础GNN。"},
+    {"to": "gcn", "type": "solves", "note": "解决GCN类网络只能把节点表示扁平求和、不能学习层次图表示的问题。"},
+    {"to": "spectral-clustering", "type": "extends", "note": "把图聚类从固定的预处理变成网络内部可学习、可微的软聚类。"}
+  ],
+  "prereq": ["graph-basics", "message-passing", "clustering", "softmax", "conv-layer"],
+  "terms": [
+    {"t": "图分类", "d": "对整张图而不是单个节点给出标签，例如预测一个分子图的化学性质。"},
+    {"t": "软分配矩阵", "d": "每个节点按概率分属多个簇，而不是硬性归入一个，因此可以对它求梯度。"}
+  ],
+  "learn": "先读[[graphsage]]和[[spectral-clustering]]；读论文第3节分配矩阵与粗化公式；用PyTorch Geometric的dense_diff_pool在PROTEINS或ENZYMES数据集上与全局平均池化比较图分类准确率。",
+  "check": {"source": "https://arxiv.org/abs/1806.08804", "confirmed": "标题、6位作者、arXiv v1提交于2018-06-22；摘要中现有GNN是扁平的、对图分类不利、DiffPool为每层节点学可微软聚类分配并形成下一层粗化输入、可与多种GNN结构组合端到端训练、图分类基准上比已有池化方法平均高5–10%准确率、5个中4个达到最好。粗化公式、辅助损失、25%簇比例、GraphSAGE作为基础网络、机构与NeurIPS 2018来自一般了解。"}
+}

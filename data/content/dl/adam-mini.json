@@ -1,0 +1,25 @@
+{
+  "id": "adam-mini",
+  "who": "Yushun Zhang, Congliang Chen, Ziniu Li, Tian Ding, Chenwei Wu, Diederik P. Kingma, Yinyu Ye, Zhi-Quan Luo et al. · 香港中文大学（深圳）、深圳大数据研究院等",
+  "venue": "ICLR 2025",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2406.16793"}],
+  "aka": ["Adam mini", "AdamMini", "省显存Adam"],
+  "problem": "AdamW要给每个参数存一份二阶矩v（每个参数一个“学习率”），大模型训练时这部分优化器状态占了大量显存。",
+  "idea": "按Hessian的块结构把参数分块，每块只用一个学习率（块内v取平均），砍掉了99.9%以上的v，显存减少约一半而效果不降。",
+  "impact": "说明Adam里逐坐标的学习率大多是冗余的，为“按块共享二阶矩”的省显存优化器提供了依据，常与Adafactor、GaLore一起被比较。",
+  "method": "Adam的更新里，`1/√v` 相当于给每个参数单独配一个学习率。作者研究了Transformer的Hessian，发现它近似分块对角：同一个注意力头的Q、K参数、同一个输出神经元的权重等，各自构成一个稠密块，块与块之间关联很弱。在这样的结构下，块内用一个统一的好学习率就够了。\n\n做法：(1) 按这一原则把参数划分成块（如按注意力头、按输出神经元；嵌入层和输出层保留逐坐标的v）；(2) 每个块的二阶矩取块内梯度平方的平均，只存一个数。一阶动量m照常保留。这样v的存储几乎消失，优化器状态从2份降到约1份，整体显存约减少一半。\n\n摘要报告：在39M到13B参数的语言模型上做预训练、监督微调和RLHF，效果与AdamW持平或更好；显存减少还降低了GPU间通信，在2张A800-80GB上预训练Llama 2-7B吞吐提高49.6%，墙钟时间节省33%。",
+  "limits": [
+    {"text": "分块原则针对Transformer设计，换到其他结构需要重新确定分块方式。", "solved_by": []},
+    {"text": "一阶动量m仍是逐参数存储，显存最多减半。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "adamw", "type": "solves", "note": "去掉AdamW中绝大多数逐坐标二阶矩，显存约减半而效果持平。"},
+    {"to": "adafactor", "type": "rivals", "note": "同为压缩二阶矩：Adafactor用行列因子分解，Adam-mini按Hessian块取平均。"},
+    {"to": "galore", "type": "rivals", "note": "另一条省优化器显存的路线：GaLore把梯度投影到低秩子空间。"},
+    {"to": "llama-2", "type": "uses", "note": "吞吐实验在Llama 2-7B预训练上进行。"}
+  ],
+  "prereq": ["adaptive-optimizer", "jacobian-hessian", "memory-bandwidth"],
+  "terms": [{"t": "分块对角Hessian", "d": "Hessian矩阵近似由若干方块沿对角线排列组成，块外元素接近零，意味着不同参数块之间的曲率几乎互不影响。"}],
+  "learn": "先懂[[adam]]的v为何占显存；读论文第2节对Hessian块结构的分析和算法1的分块规则；动手在一个小GPT上比较AdamW与Adam-mini的显存和损失曲线。",
+  "check": {"source": "https://arxiv.org/abs/2406.16793", "confirmed": "标题、作者（9位，列前8位）、arXiv v1 2024-06-24；摘要中显存减少50%、≥99.9%学习率可移除、按Hessian结构分块且每块一个学习率、39M–13B预训练/SFT/RLHF、2×A800上Llama 2-7B吞吐+49.6%与时间-33%。具体分块方式（按头、嵌入层保留）、ICLR 2025、机构凭一般了解。"}
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>EDAC/SAC-N集成离线RL（2021） · AI脉络</title>
+<meta name="description" content="离线RL主流做法要么估计行为策略再加约束，要么专门采样分布外动作来压低Q值，这些步骤本身就不容易做准，而且容易把策略压得离数据太近。 发现只要把SAC的Q网络数量加到几十个、目标取它们的最小值（记作SAC-N），就能自动压低不确定性大的分布外动作的Q值；再加一项让各Q网络梯度彼此分散的正则，把所需…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/edac.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="EDAC/SAC-N集成离线RL（2021）">
+<meta property="og:description" content="离线RL主流做法要么估计行为策略再加约束，要么专门采样分布外动作来压低Q值，这些步骤本身就不容易做准，而且容易把策略压得离数据太近。 发现只要把SAC的Q网络数量加到几十个、目标取它们的最小值（记作SAC-N），就能自动压低不确定性大的分布外动作的Q值；再加一项让各Q网络梯度彼此分散的正则，把所需…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/edac.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/edac">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 离线RL与序列建模</div>
+<h1>EDAC/SAC-N集成离线RL</h1>
+<div class="full">Uncertainty-Based Offline Reinforcement Learning with Diversified Q-Ensemble</div>
+<div class="meta"><span>2021.10</span><span>论文</span><span>延伸</span><span>NeurIPS 2021</span><span>Gaon An, Seungyong Moon, Jang-Hyun Kim, Hyun Oh Song · 首尔大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2110.01548" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/snu-mllab/EDAC" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/edac">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>离线RL主流做法要么估计行为策略再加约束，要么专门采样分布外动作来压低Q值，这些步骤本身就不容易做准，而且容易把策略压得离数据太近。</p></div><div><h4>方法</h4><p>发现只要把SAC的Q网络数量加到几十个、目标取它们的最小值（记作SAC-N），就能自动压低不确定性大的分布外动作的Q值；再加一项让各Q网络梯度彼此分散的正则，把所需网络数降到十分之一左右（EDAC）。</p></div><div><h4>影响</h4><p>SAC-N和EDAC成了「基于不确定性」一类离线RL的代表基线，CORL、OfflineRL-Kit等库都收录，后续的RORL、PBRL等常拿它们比较。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>在线RL里常用的“截断双Q”（取两个Q估计的最小值）本来是为了对付高估。论文观察到：如果把Q网络增加到N个、目标取N个里的最小值 <code>y = r + γ (min_j Q_j(s′, a′) − α log π(a′|s′))</code>，那么在数据覆盖到的动作上各网络意见一致，最小值和均值差不多；在数据没见过的动作上各网络分歧很大，最小值就会被拉得很低。这样不需要估计行为策略、也不需要专门生成分布外动作，就自动形成了与不确定性成正比的惩罚。这个直接把<a class="ln" href="../n/sac.html">SAC</a>的评论家数加大的做法叫SAC-N，论文在D4RL上用N从10到500不等。</p><p>N太大计算代价高。论文分析发现，若各Q网络对动作的梯度方向很相似，分布外动作上的分歧就不够大，需要更多网络才能起作用。于是EDAC加了一项多样化正则：最小化不同Q网络关于动作的梯度两两之间的余弦相似度，迫使它们在数据外“意见不同”。摘要称这样把所需的网络数降到朴素集成的约十分之一，并在所考察的大多数D4RL任务上取得当时最好成绩。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要几十个Q网络并行训练，显存和算力开销远大于单策略约束方法，在大网络或图像输入上不容易扩展。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/rebrac.html">ReBRAC重访极简离线RL</a></div></li><li>惩罚强度靠网络数N间接控制，不同数据集上最合适的N相差很大，仍要逐个调。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/sac.html">SAC</a><span class="yr">2018.01 · RL</span><div class=nt>直接在SAC上把评论家数从2个加到N个，目标取最小值，就是SAC-N。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/bear.html">BEAR自举误差约束</a><span class="yr">2019.06 · RL</span><div class=nt>BEAR需要估计行为策略并做分布约束，EDAC完全不估计数据分布。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/d4rl.html">D4RL离线RL基准</a><span class="yr">2020.04 · RL</span><div class=nt>在D4RL的MuJoCo和Adroit数据集上评测。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/cql.html">离线强化学习CQL</a><span class="yr">2020.06 · RL</span><div class=nt>CQL要显式采样分布外动作并压低其Q值；EDAC改用集成分歧隐式惩罚，不需要采样。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/redq.html">REDQ随机集成双Q</a><span class="yr">2021.01 · RL</span><div class=nt>REDQ在在线RL里用大集成取子集最小值提高样本效率，EDAC把类似的集成取小用于离线下的保守估计。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/pbrl.html">PBRL悲观自举离线RL</a><span class="yr">2022.02 · RL</span><div class=nt>EDAC靠大集成取最小值隐式惩罚；PBRL显式减去标准差惩罚并额外采样分布外动作。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/rebrac.html">ReBRAC重访极简离线RL</a><span class="yr">2023.05 · RL</span><div class=nt>EDAC靠几十个Q网络的集成做保守估计；ReBRAC不用集成，在多数任务上接近或超过它，开销小得多。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/offline-rl.html">离线强化学习</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/ensemble.html">集成学习</a> <a class="chip c" href="../c/distribution-shift.html">分布偏移</a></p>
+<h2>本篇术语</h2><ul><li><b>SAC-N</b>　把SAC的两个Q网络换成N个、目标取最小值的离线RL基线。</li><li><b>分布外动作（OOD）</b>　数据集中这个状态下从没出现过的动作，网络在它上面的Q值没有数据约束。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/cql.html">离线强化学习CQL</a>和<a class="ln" href="../n/td3.html">TD3</a>的截断双Q；读原文第3–4节看N增大时分布外动作Q值的变化和梯度多样化正则；用CORL里的SAC-N在halfcheetah-medium上试N=2、10、50的差别。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2110.01548" rel="noopener">https://arxiv.org/abs/2110.01548</a>（标题、四位作者、arXiv v1于2021-10-04；摘要中现有方法依赖行为策略估计或OOD采样、截断Q学习可惩罚高不确定的OOD点、增加Q网络数即可大幅超越、集成多样化演员-评论家把所需网络降到十分之一并在多数D4RL任务上最好。N的取值范围、梯度余弦正则的形式按原文正文通行描述；NeurIPS 2021按通行引用；作者单位按通行信息。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20EDAC/SAC-N%E9%9B%86%E6%88%90%E7%A6%BB%E7%BA%BFRL%EF%BC%88edac%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aedac%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/edac.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="iql.html"><small>本分支上一个 · 2021.10</small><b>隐式Q学习IQL</b></a><a class="r" href="urlb.html"><small>本分支下一个 · 2021.10</small><b>URLB无监督RL基准</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

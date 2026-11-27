@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>BTM分支训练合并（2022） · AI脉络</title>
+<meta name="description" content="训练一个大语言模型需要成百上千块GPU在每一步同步梯度，通信开销大、对集群要求高；而且训练完成后想为新领域补充数据，只能整体重新训练或继续训练。 把模型拆成一组互相独立的领域专家语言模型（ELM）：从已有专家（的平均）分支出新模型，只在某个领域的数据上训练，训练完合并回专家集合。各专家完全并行、互…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/btm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="BTM分支训练合并（2022）">
+<meta property="og:description" content="训练一个大语言模型需要成百上千块GPU在每一步同步梯度，通信开销大、对集群要求高；而且训练完成后想为新领域补充数据，只能整体重新训练或继续训练。 把模型拆成一组互相独立的领域专家语言模型（ELM）：从已有专家（的平均）分支出新模型，只在某个领域的数据上训练，训练完合并回专家集合。各专家完全并行、互…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/btm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/btm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 混合专家</div>
+<h1>BTM分支训练合并</h1>
+<div class="full">Branch-Train-Merge: Embarrassingly Parallel Training of Expert Language Models</div>
+<div class="meta"><span>2022.08</span><span>论文</span><span>延伸</span><span>Margaret Li, Suchin Gururangan, Tim Dettmers, Mike Lewis, Tim Althoff, Noah A. Smith, Luke Zettlemoyer · 华盛顿大学、Meta AI、Allen Institute for AI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2208.03306" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/btm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>训练一个大语言模型需要成百上千块GPU在每一步同步梯度，通信开销大、对集群要求高；而且训练完成后想为新领域补充数据，只能整体重新训练或继续训练。</p></div><div><h4>方法</h4><p>把模型拆成一组互相独立的领域专家语言模型（ELM）：从已有专家（的平均）分支出新模型，只在某个领域的数据上训练，训练完合并回专家集合。各专家完全并行、互不通信；用时可以集成，也可以把参数平均成单个模型。</p></div><div><h4>影响</h4><p>提出“分别训练领域专家再合并”的易并行训练范式；后续的c-BTM把领域换成无监督聚类，Branch-Train-MiX则把这些专家的FFN拼成MoE层并学习token级路由。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/sparse-moe.html">稀疏门控MoE层</a>、<a class="ln" href="../n/switch-transformer.html">稀疏MoE大模型</a>把专家放在同一个模型里联合训练，仍需全局同步；<a class="ln" href="../n/dont-stop-pretraining.html">领域与任务自适应预训练</a>表明在领域数据上继续预训练能显著提升该领域效果；<a class="ln" href="../n/model-soups.html">Model Soups权重平均</a>表明从同一起点微调出的多个模型可以直接平均参数。</p><p><b>BTM的三步</b>（对每个新领域重复）：</p><ul><li><b>分支（Branch）</b>：新专家的初始参数取当前专家集合中若干专家参数的加权平均（第一轮从一个在混合数据上训练的种子模型开始）。</li><li><b>训练（Train）</b>：只用这个领域的数据（如科学论文、法律文本）独立训练，不与其他专家通信。</li><li><b>合并（Merge）</b>：把训练好的专家加入集合。</li></ul><p><b>使用方式</b>：推理时可以把多个专家的输出按该输入属于各领域的后验概率加权集成；或者直接对专家参数做加权平均，坍缩成一个普通大小的模型，推理成本与单个模型相同。专家也可以随时增删，以更新模型覆盖的数据。</p><p>结果：在控制训练成本相同时，BTM在领域内和领域外的困惑度都优于GPT式Transformer语言模型。作者发现这一效果对专家的初始化方式不敏感，但要求专家确实按领域专门化——用随机切分的数据训练的集成效果不好。扩展到64个领域（共1920亿个以空格分隔的词）时，总参数22.4B的BTM模型与用2.5倍算力训练的Transformer语言模型效果相当，且收益随领域数增加而增大。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要预先把数据按领域划分并为每个输入估计领域归属，领域定义依赖元数据，对没有标签的网页数据不方便。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>集成时每个参与的专家都要做一次前向计算，推理成本随专家数增长；而参数平均成单模型又会损失一部分专门化的收益，缺少token级的细粒度组合。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/btx.html">BTX专家拼装MoE</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/sparse-moe.html">稀疏门控MoE层</a><span class="yr">2017.01 · LLM</span><div class=nt>MoE把专家放在同一模型中联合训练并需全局同步，BTM的专家各自独立训练、完全并行。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/dont-stop-pretraining.html">领域与任务自适应预训练</a><span class="yr">2020.04 · LLM</span><div class=nt>在领域数据上继续预训练的思路被系统化为分支出领域专家。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/switch-transformer.html">稀疏MoE大模型</a><span class="yr">2021.01 · LLM</span><div class=nt>同为扩大总参数量而控制计算的路线，Switch依赖大规模同步训练，BTM追求易并行。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/model-soups.html">Model Soups权重平均</a><span class="yr">2022.03 · 系统·效率</span><div class=nt>借用从同一起点训练的模型可以参数平均的性质，把多个专家合成单个模型。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/btx.html">BTX专家拼装MoE</a><span class="yr">2024.03 · LLM</span><div class=nt>BTM合并后没有token级路由，只能集成或平均，BTX把专家拼成MoE层并学习路由。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/ensemble.html">集成学习</a> <a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/perplexity.html">困惑度</a> <a class="chip c" href="../c/mixture-of-experts.html">混合专家</a></p>
+<h2>本篇术语</h2><ul><li><b>易并行（embarrassingly parallel）</b>　子任务之间完全不需要通信，可以分别在不同机器上同时运行。</li><li><b>领域专家语言模型（ELM）</b>　BTM中只在某一个领域数据上训练的完整语言模型。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/dont-stop-pretraining.html">领域与任务自适应预训练</a>和<a class="ln" href="../n/model-soups.html">Model Soups权重平均</a>；读原文第2节BTM算法和第4节随机切分对照实验；动手：从同一个小GPT分别在两个领域上继续训练，比较两者的输出集成与参数平均在各领域上的困惑度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2208.03306" rel="noopener">https://arxiv.org/abs/2208.03306</a>（标题、7位作者、arXiv v1提交日2022-08-05；摘要中BTM通信高效、易并行地独立训练不同数据子集上的子模型、领域专家ELM可增删、集成或平均成单个LM、从现有ELM（混合）分支并在新领域训练后合并、在控制训练成本下领域内外困惑度优于GPT式Transformer、对初始化稳健但需要领域专门化而随机切分不好、64个领域1920亿词时22.4B参数模型与用2.5倍算力的Transformer相当、收益随领域数增大。按后验加权集成的细节、c-BTM后续为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20BTM%E5%88%86%E6%94%AF%E8%AE%AD%E7%BB%83%E5%90%88%E5%B9%B6%EF%BC%88btm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Abtm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/btm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="icl-function-classes.html"><small>本分支上一个 · 2022.08</small><b>上下文学习函数类</b></a><a class="r" href="sparrow.html"><small>本分支下一个 · 2022.09</small><b>Sparrow规则奖励</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

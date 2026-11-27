@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>动态评估（2017） · AI脉络</title>
+<meta name="description" content="训练好的语言模型参数在测试时固定不变，而一篇文档里刚出现过的人名、术语和句式很可能再次出现；缓存类方法只能复制见过的词，不能让模型整体适应当前文本。 测试时边读边学：把测试序列切成小段，每段先用当前参数打分，再用这一段的损失对参数做一步梯度更新，然后去预测下一段；改进了Mikolov的原始做法，用…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dynamic-eval.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="动态评估（2017）">
+<meta property="og:description" content="训练好的语言模型参数在测试时固定不变，而一篇文档里刚出现过的人名、术语和句式很可能再次出现；缓存类方法只能复制见过的词，不能让模型整体适应当前文本。 测试时边读边学：把测试序列切成小段，每段先用当前参数打分，再用这一段的损失对参数做一步梯度更新，然后去预测下一段；改进了Mikolov的原始做法，用…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dynamic-eval.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dynamic-eval">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 语言模型</div>
+<h1>动态评估</h1>
+<div class="full">Dynamic Evaluation of Neural Sequence Models</div>
+<div class="meta"><span>2017.09</span><span>论文</span><span>延伸</span><span>ICML 2018</span><span>Ben Krause, Emmanuel Kahembwe, Iain Murray, Steve Renals · 爱丁堡大学信息学院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1709.07432" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/dynamic-eval">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>训练好的语言模型参数在测试时固定不变，而一篇文档里刚出现过的人名、术语和句式很可能再次出现；缓存类方法只能复制见过的词，不能让模型整体适应当前文本。</p></div><div><h4>方法</h4><p>测试时边读边学：把测试序列切成小段，每段先用当前参数打分，再用这一段的损失对参数做一步梯度更新，然后去预测下一段；改进了Mikolov的原始做法，用多步反向传播、指向训练参数的全局衰减先验和RMS式的自适应步长。</p></div><div><h4>影响</h4><p>把Penn Treebank和WikiText-2的词级困惑度推到51.1和44.3，text8和Hutter Prize字符级交叉熵推到1.19和1.08 bit/字符，均为当时最好；动态评估成为语言模型「测试时训练」的经典参照，后来的测试时适应、在线学习研究常以它为基线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><b>动机</b>。可以把一段文本看成来自一个随位置变化的局部分布<code>P_l(x)</code>，而训练得到的是全局平均的分布。<a class="ln" href="../n/neural-cache-lm.html">神经缓存语言模型</a>用最近的隐状态做指针复制，<a class="ln" href="../n/cache-lm.html">缓存语言模型</a>用最近的词频插值，都只能利用「词」层面的重复；动态评估让参数本身追踪局部分布。</p><p><b>做法</b>。把测试序列切成段<code>s₁, s₂, …</code>（词级每段5个词，字符级20个字符）。处理第i段时，先用当前参数<code>θ_{i−1}</code>计算这一段的对数概率，算完后用它的损失<code>L(s_i)</code>更新参数，再处理下一段。因为每一段都是在更新前打分的，模型只利用了已经预测过的内容，得到的仍是合法的对数概率。Mikolov等2010年的原始做法每个词更新一次、只反传一步；本文改为按段更新以获得更准确的梯度，并加入<b>全局衰减先验</b>：<code>θ_i ← θ_{i−1} − η∇L(s_i) + λ(θ_g − θ_{i−1})</code>，其中<code>θ_g</code>是训练得到的参数，使早先的适应按指数衰减、模型不会漂离太远。最终版本再把SGD换成按训练集上的平均平方梯度缩放步长的RMS规则，衰减率也按各参数的RMS梯度调整。</p><p><b>结果</b>。在标准LSTM和复现的<a class="ln" href="../n/awd-lstm.html">AWD-LSTM</a>上都显著优于神经缓存；摘要给出PTB 51.1、WikiText-2 44.3的困惑度，以及text8 1.19、Hutter Prize 1.08 bit/字符。计算开销是对数据多做一次梯度计算。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>测试时要反向传播并更新参数，推理成本约为普通评估的两倍以上，部署时每个用户或文档都要保存一份适应后的参数。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>学习率、衰减率等超参数需要在验证集上调，设置不当会让模型在长文档上漂移甚至变差。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/rnnlm.html">RNN语言模型</a><span class="yr">2010.09 · NLP</span><div class=nt>动态评估最早由Mikolov等在RNN语言模型中提出，本文改进了它的更新规则。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/rmsprop.html">RMSProp</a><span class="yr">2012 · 基础</span><div class=nt>最终的更新规则借用RMSprop用平方梯度均值缩放步长的思路。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/awd-lstm.html">AWD-LSTM</a><span class="yr">2017.08 · NLP</span><div class=nt>在复现的AWD-LSTM上应用动态评估，得到当时最好的PTB困惑度。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/cache-lm.html">缓存语言模型</a><span class="yr">1990.06 · NLP</span><div class=nt>继承「近期出现的模式更可能再出现」的缓存思想，但适应的是整个模型而不只是词频。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/neural-cache-lm.html">神经缓存语言模型</a><span class="yr">2016.12 · NLP</span><div class=nt>神经缓存靠复制最近的隐状态适应局部文本；动态评估直接更新参数，在PTB和WikiText-2上结果更好。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/adaptive-optimizer.html">自适应学习率优化器</a> <a class="chip c" href="../c/perplexity.html">困惑度</a> <a class="chip c" href="../c/continual-learning.html">持续学习与灾难性遗忘</a> <a class="chip c" href="../c/regularization.html">正则化与权重衰减</a></p>
+<h2>本篇术语</h2><ul><li><b>全局衰减先验</b>　每次更新都把参数往训练得到的原始参数拉回一点，使早先的适应逐渐失效，防止模型漂移。</li><li><b>bit/字符</b>　字符级语言模型的交叉熵，以2为底；数值越低说明模型压缩文本的能力越强。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/neural-cache-lm.html">神经缓存语言模型</a>和<a class="ln" href="../n/awd-lstm.html">AWD-LSTM</a>的讲解 → 读原文第3节方法和第5节更新规则 → 动手：在一个训练好的小LSTM语言模型上实现按段SGD的动态评估，画出测试困惑度随学习率的变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1709.07432" rel="noopener">https://arxiv.org/abs/1709.07432</a>（arXiv：标题、四位作者、2017-09-21提交、摘要（梯度下降适应近期历史、优于现有适应方法、PTB与WikiText-2困惑度51.1与44.3、text8与Hutter Prize 1.19与1.08 bit/char）；PDF正文：爱丁堡大学、局部分布P_l、每段先打分再更新故仍是合法对数概率、改进Mikolov等(2010)、词级段长5与字符级20、全局衰减先验公式(4)、RMS更新与RMS全局先验、AWD-LSTM复现、优于神经缓存、计算代价为一次前向加一次梯度。ICML 2018出处凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%8A%A8%E6%80%81%E8%AF%84%E4%BC%B0%EF%BC%88dynamic-eval%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adynamic-eval%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dynamic-eval.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="deepl.html"><small>本分支上一个 · 2017.08</small><b>DeepL翻译上线</b></a><a class="r" href="muse.html"><small>本分支下一个 · 2017.10</small><b>无平行语料的词翻译MUSE</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

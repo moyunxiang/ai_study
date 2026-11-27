@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>ListNet列表式排序（2007） · AI脉络</title>
+<meta name="description" content="Ranking SVM、RankNet等成对方法把排序拆成一对对文档的比较，但排序本质上是对整个列表的预测：成对损失忽略了每对文档在列表中的位置，查询之间文档对的数量差异也会扭曲训练。 直接以整个文档列表为训练单位：用排列概率把一组打分变成「排列上的概率分布」，再用交叉熵比较模型分数和真实相关度诱…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/listnet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ListNet列表式排序（2007）">
+<meta property="og:description" content="Ranking SVM、RankNet等成对方法把排序拆成一对对文档的比较，但排序本质上是对整个列表的预测：成对损失忽略了每对文档在列表中的位置，查询之间文档对的数量差异也会扭曲训练。 直接以整个文档列表为训练单位：用排列概率把一组打分变成「排列上的概率分布」，再用交叉熵比较模型分数和真实相关度诱…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/listnet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/listnet">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 检索与文本挖掘</div>
+<h1>ListNet列表式排序</h1>
+<div class="full">Learning to rank: from pairwise approach to listwise approach</div>
+<div class="meta"><span>2007.06</span><span>论文</span><span>延伸</span><span>ICML 2007</span><span>Zhe Cao, Tao Qin（秦涛）, Tie-Yan Liu（刘铁岩）, Ming-Feng Tsai, Hang Li（李航）· 微软亚洲研究院、清华大学、台湾大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1145/1273496.1273513" rel="noopener">DOI ↗</a><a class="btn sm" href="../index.html#/n/listnet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Ranking SVM、RankNet等成对方法把排序拆成一对对文档的比较，但排序本质上是对整个列表的预测：成对损失忽略了每对文档在列表中的位置，查询之间文档对的数量差异也会扭曲训练。</p></div><div><h4>方法</h4><p>直接以整个文档列表为训练单位：用排列概率把一组打分变成「排列上的概率分布」，再用交叉熵比较模型分数和真实相关度诱导出的两个分布；实际用其中的Top-1概率，计算就退化为一次softmax。</p></div><div><h4>影响</h4><p>提出并命名了「列表式（listwise）」学习排序，与「逐点」「成对」并称三大类；ListNet的softmax交叉熵损失至今仍是推荐和检索排序中最常用的损失之一。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>学习排序在2000年代成为搜索引擎的核心技术。逐点方法把每篇文档的相关度当作回归或分类目标；成对方法（<a class="ln" href="../n/ranksvm.html">Ranking SVM点击学排序</a>、<a class="ln" href="../n/ranknet.html">RankNet排序学习</a>、RankBoost）学习「A应排在B前面」。成对方法效果更好，但它优化的是逆序对的数量，而评价指标（NDCG、MAP）看的是整个列表、并且重视前几名；此外，文档多的查询会产生多得多的文档对，主导训练。</p><h2>方法</h2><p><b>排列概率。</b> 给定一个查询下n篇文档的分数 s = (s_1, …, s_n)，对一个排列π（π(j)表示排第j位的文档），用Plackett-Luce模型定义其概率：<code>P_s(π) = Π_{j=1}^{n} exp(s_{π(j)}) / Σ_{k=j}^{n} exp(s_{π(k)})</code>。直观上，先按softmax从所有文档里抽出第一名，再在剩下的里抽第二名，依此类推。分数越高的文档越可能排在前面，所有排列的概率之和为1。</p><p><b>Top-1概率。</b> 对n!个排列求和太贵，论文改用每篇文档「排在第一位」的概率，它恰好是softmax：<code>P_s(j) = exp(s_j) / Σ_k exp(s_k)</code>。</p><p><b>损失。</b> 把人工相关度标签 y 也当作「分数」，得到真实的Top-1分布 P_y；模型输出分数 z = f(x) 得到 P_z。损失是两者的交叉熵：<code>L(y, z) = −Σ_j P_y(j) log P_z(j)</code>。每个查询只贡献一个损失，与它有多少篇文档无关。打分函数f用线性神经网络，梯度下降训练。</p><h2>结果</h2><p>在TREC、OHSUMED和一个商业搜索数据集上，ListNet的NDCG等指标优于Ranking SVM、RankBoost和RankNet（论文报告，具体数字未逐项核对）。</p><h2>后来的发展</h2><p>同一团队随后提出ListMLE（直接最大化真实排列的似然），并建立了LETOR基准；Burges等的<a class="ln" href="../n/lambdamart.html">LambdaRank与LambdaMART</a>则从另一个方向把列表指标引入梯度，成为工业界主力。在神经推荐和稠密检索中，「对一组候选做softmax交叉熵」的列表式损失（常称为sampled softmax或InfoNCE式损失）与ListNet的Top-1形式本质相同。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>Top-1近似只关心谁排第一，对第二名以后的顺序约束很弱，与NDCG@k等指标并不完全一致。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/lambdamart.html">LambdaRank与LambdaMART</a></div></li><li>把相关度标签直接当分数做softmax，标签的刻度选择会影响目标分布，缺乏理论依据。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/backprop.html">反向传播</a><span class="yr">1986 · 基础</span><div class=nt>打分函数是一个（线性）神经网络，列表损失对参数的梯度用反向传播计算，梯度下降训练。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/ranksvm.html">Ranking SVM点击学排序</a><span class="yr">2002.07 · NLP</span><div class=nt>成对方法忽略位置、受文档对数量不均影响，列表式损失以查询为单位并直接作用于整个列表。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/ranknet.html">RankNet排序学习</a><span class="yr">2005.08 · NLP</span><div class=nt>同样用神经网络打分、梯度下降训练，但把成对的交叉熵损失推广为整个列表上的交叉熵。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/lambdamart.html">LambdaRank与LambdaMART</a><span class="yr">2010.06 · NLP</span><div class=nt>Top-1近似只关心谁排第一，对第二名以后的顺序约束很弱，与NDCG@k等指标并不完全一致。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/cross-entropy.html">交叉熵</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/probability-basics.html">随机变量与概率分布</a></p>
+<h2>本篇术语</h2><ul><li><b>列表式方法</b>　以一个查询下的整个候选文档列表为训练样本，损失直接定义在排列或列表上。</li><li><b>Plackett-Luce模型</b>　按分数依次无放回抽取，给每一种排列赋予概率的模型。</li><li><b>NDCG</b>　归一化折损累计增益，越靠前的相关文档贡献越大，是评价排序的常用指标。</li></ul>
+<h2>怎么学</h2><p>先懂<a class="ln" href="../n/ranknet.html">RankNet排序学习</a>的成对损失 → 读原文第3–4节排列概率与Top-1概率的推导 → 动手：在一个学习排序数据集上分别实现逐点MSE、成对RankNet损失和ListNet损失，比较NDCG@10。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1145/1273496.1273513" rel="noopener">https://doi.org/10.1145/1273496.1273513</a>（OpenAlex：标题、五位作者、ICML 2007（2007-06-20）；摘要：已有学习排序方法以文档对为实例（称为成对方法）、忽略了排序是对对象列表的预测、主张列表式方法、引入排列概率和top k概率两种概率模型定义列表式损失、用神经网络与梯度下降。Plackett-Luce公式、Top-1交叉熵形式、实验数据集与比较结果、作者机构、ListMLE与LETOR后续凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ListNet%E5%88%97%E8%A1%A8%E5%BC%8F%E6%8E%92%E5%BA%8F%EF%BC%88listnet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Alistnet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/listnet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="cube-pruning.html"><small>本分支上一个 · 2007.06</small><b>立方剪枝与森林重打分</b></a><a class="r" href="dbpedia.html"><small>本分支下一个 · 2007.11</small><b>DBpedia</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

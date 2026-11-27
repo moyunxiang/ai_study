@@ -1,0 +1,25 @@
+{
+ "id": "kvquant",
+ "who": "Coleman Hooper, Sehoon Kim, Hiva Mohammadzadeh, Michael W. Mahoney, Yakun Sophia Shao, Kurt Keutzer, Amir Gholami · 加州大学伯克利分校",
+ "venue": "NeurIPS 2024",
+ "aka": ["KVQuant", "KV缓存量化", "KV cache quantization", "Pre-RoPE量化", "逐通道Key量化"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2401.18079"},
+  {"label": "GitHub", "url": "https://github.com/SqueezeAILab/KVQuant"}
+ ],
+ "problem": "上下文一长，KV缓存就超过模型权重成为显存的最大占用；量化KV缓存是自然的办法，但已有方法压到4比特以下时精度损失明显。",
+ "idea": "针对键和值的数值分布逐项对症：Key按通道量化、在加旋转位置编码之前量化；按层敏感度学出非均匀码本；每个向量单独拆出离群值用稀疏格式保存。",
+ "impact": "把KV缓存量化推到3比特、单卡百万级上下文，和同期的KIVI一起奠定了“Key逐通道、Value逐token”的KV量化常识。",
+ "method": "[[c:kv-cache]]的大小与上下文长度成正比：以LLaMA-7B为例，百万token的上下文需要的KV远超一张80GB显卡。直接对KV做逐token均匀量化，在4比特以下误差很大。KVQuant分析了Key和Value的分布，提出四项技术：\n- **逐通道量化Key**：Key激活的离群值集中在少数固定通道上，沿通道方向分组量化能避免某个通道把整组的范围拉宽。\n- **在RoPE之前量化Key**：[[rope]]按位置旋转Key，会把不同通道的数值混在一起、破坏通道结构；先量化再在计算时施加旋转，误差更小。\n- **非均匀量化**：沿用同组[[squeezellm]]的思路，按每层的敏感度加权求出非均匀数据类型。\n- **逐向量稠密加稀疏**：每个向量单独找出离群值，以稀疏格式按高精度保存，减小量化范围的偏斜。\n\n摘要报告：在LLaMA、Llama-2、Llama-3和Mistral上，3比特量化在Wikitext-2和C4上困惑度损失小于0.1；LLaMA-7B在单张A100-80GB上可服务最长100万token上下文，在8卡系统上可达1000万；定制CUDA内核相对FP16矩阵-向量乘最多加速约1.7倍。",
+ "limits": [
+  {"text": "需要离线校准各层的码本与离群阈值，并为稀疏离群值写专门内核，工程集成比简单的逐组均匀量化更复杂。", "solved_by": ["kivi"]}
+ ],
+ "relations": [
+  {"to": "squeezellm", "type": "extends", "note": "同一团队把敏感度加权非均匀量化与稠密加稀疏分解从权重推广到KV缓存。"},
+  {"to": "rope", "type": "solves", "note": "旋转位置编码会打乱Key的通道结构、加大量化误差，KVQuant改为在施加RoPE之前量化Key。"},
+  {"to": "llm-int8", "type": "extends", "note": "沿用激活中存在固定离群通道的观察，用于设计Key的逐通道量化。"}
+ ],
+ "prereq": ["kv-cache", "quantization-concept", "positional-encoding", "context-window"],
+ "terms": [{"t": "逐通道量化", "d": "沿特征维度的每个通道各用一套缩放系数，而不是每个token各用一套。"}],
+ "check": {"source": "https://arxiv.org/abs/2401.18079", "confirmed": "标题、七位作者、v1日期2024-01-31；摘要：长上下文下KV缓存成为显存主要来源、现有方法4比特以下不准、四项技术（逐通道Key量化、Pre-RoPE Key量化、非均匀KV量化、逐向量稠密加稀疏）、LLaMA/Llama-2/Llama-3/Mistral上3比特困惑度损失<0.1、单A100-80GB百万上下文、8卡千万上下文、约1.7倍加速。NeurIPS 2024为一般了解。"}
+}

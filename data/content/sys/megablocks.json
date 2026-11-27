@@ -1,0 +1,26 @@
+{
+ "id": "megablocks",
+ "who": "Trevor Gale, Deepak Narayanan, Cliff Young, Matei Zaharia · 斯坦福大学, 微软研究院, Google",
+ "venue": "MLSys 2023",
+ "aka": ["MegaBlocks", "dMoE", "dropless MoE", "无丢弃MoE", "块稀疏MoE", "block-sparse MoE"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2211.15841"},
+  {"label": "GitHub", "url": "https://github.com/databricks/megablocks"}
+ ],
+ "problem": "MoE路由是动态的，每个专家分到的token数各不相同；已有框架为了套进固定形状的批量矩阵乘，给每个专家设容量上限，超出的token被直接丢弃，不足的用零填充，在模型质量与算力浪费之间二选一。",
+ "idea": "把整个MoE层重新表述为一次块稀疏矩阵乘：每个专家处理多少token就占多少块，不必对齐到同一容量；为此写了能高效处理这种动态稀疏的GPU块稀疏内核。",
+ "impact": "让“不丢token”的MoE训练在GPU上变得高效，成为开源MoE训练的常用组件，被Databricks的DBRX等模型使用，也影响了后来分组GEMM式的MoE内核设计。",
+ "method": "[[sparse-moe]]、[[gshard]]、[[switch-transformer]]里，每个token由路由器选择少数专家。为了用批量矩阵乘一次算完所有专家，实现上要给每个专家固定一个容量 `capacity = 容量因子 × token数/专家数`：分到的token超过容量就丢弃（这些token跳过该层），少于容量就补零。容量因子设小了丢token伤质量，设大了浪费算力和显存。\n\nMegaBlocks把各专家的计算拼成一个大矩阵：token按所分配的专家排序后，第一层专家权重的乘法就是一个**块稀疏矩阵乘**，非零块的分布由当次路由决定，每个专家占的块数正好等于它分到的token数（向上取整到块大小）。论文设计了新的块稀疏GPU内核和配套的稀疏格式，能在每一步重新构造稀疏结构时依然高效，并支持前向、反向需要的几种转置组合。这样既不丢token，也不做无用的填充计算。\n\n摘要报告：端到端训练比基于当时最先进的Tutel库训练的MoE快最多40%，比用高度优化的[[megatron]]框架训练的稠密模型（达到同等质量）快2.4倍。",
+ "limits": [
+  {"text": "主要解决单卡（或专家并行组内）的计算效率，跨机器的专家并行all-to-all通信仍是大规模MoE训练的瓶颈。", "solved_by": ["deepseek-infra-week"]}
+ ],
+ "relations": [
+  {"to": "switch-transformer", "type": "solves", "note": "Switch等实现靠容量因子丢弃或填充token，MegaBlocks用块稀疏计算实现不丢token且不浪费算力。"},
+  {"to": "gshard", "type": "solves", "note": "GShard式固定专家容量带来的丢token问题，被块稀疏表述消除。"},
+  {"to": "megatron", "type": "rivals", "note": "论文以Megatron-LM训练的稠密模型为对照，同等质量下MoE训练快2.4倍。"},
+  {"to": "cutlass", "type": "extends", "note": "在高性能GEMM内核的基础上，针对动态块稀疏结构设计新的GPU内核。"}
+ ],
+ "prereq": ["mixture-of-experts", "matrix-multiplication", "cpu-gpu", "params-flops"],
+ "terms": [{"t": "专家容量", "d": "MoE实现中每个专家一批最多处理的token数，超出部分被丢弃，不足部分补零。"}],
+ "check": {"source": "https://arxiv.org/abs/2211.15841", "confirmed": "标题、四位作者、v1日期2022-11-29；摘要：现有框架为满足软硬件约束而限制MoE动态路由、迫使用户在丢弃token与填充浪费之间权衡、把MoE计算重新表述为块稀疏操作、开发新的块稀疏GPU内核处理MoE的动态性、从不丢token、端到端比Tutel训练的MoE最多快40%、比Megatron-LM训练的DNN快2.4倍。MLSys 2023、机构、DBRX使用、容量因子公式为一般了解。"}
+}

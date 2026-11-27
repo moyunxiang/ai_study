@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>策略评估、策略迭代与价值迭代（Policy Evaluation, Policy Iteration and Value Iteration） · AI脉络</title>
+<meta name="description" content="已知环境模型时求最优策略的两种经典动态规划：策略迭代交替做“评估当前策略”和“对价值取贪心来改进策略”；价值迭代直接反复套用最优Bellman方程。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/policy-iteration-concept.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="策略评估、策略迭代与价值迭代（Policy Evaluation, Policy Iteration and Value Iteration）">
+<meta property="og:description" content="已知环境模型时求最优策略的两种经典动态规划：策略迭代交替做“评估当前策略”和“对价值取贪心来改进策略”；价值迭代直接反复套用最优Bellman方程。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/policy-iteration-concept.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/policy-iteration-concept">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 入门</div>
+<h1>策略评估、策略迭代与价值迭代</h1><div class="full">Policy Evaluation, Policy Iteration and Value Iteration</div>
+<p class="muted" style="font-size:13px">也叫：策略评估　policy evaluation　策略改进　policy improvement　策略改进定理　policy improvement theorem　策略迭代　policy iteration　价值迭代　值迭代　value iteration　广义策略迭代　generalized policy iteration　GPI　预测与控制　prediction and control</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/policy-iteration-concept">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>已知环境模型时求最优策略的两种经典动态规划：策略迭代交替做“评估当前策略”和“对价值取贪心来改进策略”；价值迭代直接反复套用最优Bellman方程。</b></p>
+<p class="tags">先要会：<a class="chip c" href="bellman-equation.html">Bellman方程</a> <a class="chip c" href="dynamic-programming.html">动态规划</a> <a class="chip c" href="policy-value.html">策略与价值函数</a></p>
+<p>如果<a class="lc" href="../c/mdp.html">马尔可夫决策过程</a>的转移和奖励完全已知，求最优策略就是一个纯计算问题，用<a class="lc" href="../c/dynamic-programming.html">动态规划</a>解。这两种算法本身只适用于小规模、已知模型的问题，但几乎所有强化学习算法都可以看成它们的近似版本，所以是理解后面一切的基础。</p><p><b>策略评估</b>（policy evaluation）。给定策略π，求它的价值V^π。把Bellman期望方程当作更新规则反复套用：</p><p class="formula"><code>V(s) ← Σ_a π(a|s) Σ_{s&#x27;} P(s&#x27;|s,a)·[r + γ·V(s&#x27;)]</code></p><p>从任意初值出发都会收敛到V^π，原因见<a class="lc" href="../c/bellman-operator.html">Bellman算子与压缩映射</a>。</p><p><b>策略改进</b>（policy improvement）。有了V^π，在每个状态换成一步贪心的动作：<code>π&#x27;(s) = argmax_a Σ_{s&#x27;} P(s&#x27;|s,a)·[r + γ·V^π(s&#x27;)]</code>。<b>策略改进定理</b>保证：如果对所有s都有<code>Q^π(s, π&#x27;(s)) ≥ V^π(s)</code>，那么π&#x27;在每个状态上都不比π差；若一步贪心不再带来任何改进，π已经是最优策略。</p><p><b>策略迭代</b>。评估→改进→评估→改进……有限MDP里策略的个数有限，每轮都严格变好或停止，所以有限轮内收敛，实践中往往几轮就够。这一算法由<a class="ln" href="../n/howard-policy-iteration.html">Howard策略迭代</a>系统提出。</p><p><b>价值迭代</b>。不必把每个策略都评估到收敛，每次只做一步，而且直接取max：</p><p class="formula"><code>V(s) ← max_a Σ_{s&#x27;} P(s&#x27;|s,a)·[r + γ·V(s&#x27;)]</code></p><p>收敛后对V取贪心即得最优策略，见<a class="lc" href="../c/optimal-policy.html">最优策略与最优价值函数</a>。</p><p><b>广义策略迭代</b>（GPI）。<a class="ln" href="../n/sutton-barto.html">《Reinforcement Learning: An Introduction》</a>把“评估”和“改进”两个过程以任意粒度交替进行的一切方法统称为GPI：价值迭代、<a class="ln" href="../n/q-learning.html">Q-learning</a>、Actor-Critic都是。<a class="ln" href="../n/alphago-zero.html">AlphaGo Zero</a>也被描述为一种策略迭代：MCTS给出比当前网络更强的策略（改进），自我对弈的结果用来训练网络（评估）。</p>
+<div class="example"><h4>例子</h4><p>一条走廊：A → B → 终点，γ=0.9。在A向右到B，奖励0；在B向右到终点，奖励1，回合结束；向左都撞墙原地不动，奖励0。价值迭代：初始V(A)=V(B)=0。第1轮：V(B)=max(右:1, 左:0+0.9×0)=1，V(A)=max(右:0+0.9×0, 左:0)=0（按上一轮的值同步更新）。第2轮：V(B)=1，V(A)=0.9×1=0.9。第3轮不再变化。最优策略：两处都向右。</p></div>
+<h2>容易误解的地方</h2><ul><li>这两种算法都要求遍历所有状态、知道转移概率，状态一多（围棋约10^170种局面）就不可行，这就是要用采样和<a class="lc" href="../c/function-approximation-rl.html">强化学习中的函数逼近</a>的原因。</li><li>策略迭代的轮数少，但每轮评估很贵；价值迭代每轮便宜，但轮数多。二者之间可以折中，只做k步评估，叫修正的策略迭代。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

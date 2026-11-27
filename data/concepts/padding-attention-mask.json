@@ -1,0 +1,9 @@
+{
+  "key": "padding-attention-mask",
+  "short": "把一批长短不一的序列补齐（padding）或截短（truncation）成同样长度，再用attention_mask标出哪些位置是真实token、哪些是凑数的空位，让模型忽略后者。",
+  "body": "GPU擅长处理形状规整的张量（见[[c:vector-matrix]]）。一批文本切成token后长度各不相同，要拼成一个`[batch, seq_len]`的矩阵，就得补齐或截短。这一步看似是工程细节，处理不好会悄悄改变模型的输出。\n\n**三个配套的输入**。以Hugging Face的分词器为例，返回的字典里通常有：\n\n- **input_ids**：token编号序列。\n- **attention_mask**：与input_ids等长，真实token为1，填充位置为0。\n- **token_type_ids**（部分模型才有）：句子对任务中标出每个token属于第一句还是第二句。\n\n**填充**。把短序列用PAD token补到这批里最长的长度（动态填充），或补到固定长度。模型内部，attention_mask会被转换成加在注意力分数上的偏置：允许的位置加0，填充位置加一个很大的负数（如−10^9），经过[[c:softmax]]后权重几乎为0，于是任何真实token都不会从填充位置读取信息。计算损失时，填充位置的标签设为忽略值（PyTorch惯例是−100），不计入平均。\n\n**左填充还是右填充**。BERT这类编码器常用右填充。**自回归生成时要用左填充**：模型从序列最右端继续写，如果右边是一串PAD，新token就会接在PAD后面，位置编号也被打乱。所以批量生成前要把分词器设为左填充，并相应地调整位置编号。\n\n**截断**。超过[[c:context-window]]或设定的max_length的部分要截掉，可以截尾部、截头部，或者对长文档用滑动窗口切成几段分别处理（抽取式问答的常见做法）。\n\n**与因果掩码的关系**。attention_mask处理的是“哪些位置是空的”，[[c:causal-mask]]处理的是“不许看未来”，自回归模型里两者会合并成一个掩码同时生效。预训练时常用[[c:sequence-packing]]把多条短文本拼满一整行，避免大量填充浪费算力。",
+  "example": "两句话切成token后长度分别为3和5，右填充到5：\n\n`input_ids = [[101, 7592, 102, 0, 0], [101, 2023, 2003, 2307, 102]]`\n`attention_mask = [[1, 1, 1, 0, 0], [1, 1, 1, 1, 1]]`\n\n第一句的第3个位置算注意力时，对5个位置的原始分数是 [2.0, 1.0, 0.5, 0.3, 0.8]，加上掩码偏置后变成 [2.0, 1.0, 0.5, −10^9, −10^9]，softmax结果约为 [0.63, 0.23, 0.14, 0, 0]，两个填充位置被完全忽略。",
+  "pitfalls": "- 忘了传attention_mask时，模型会把PAD当成正常token读进去，输出随填充长度变化，而且不报错。\n- 自回归模型批量生成时用右填充，是“单条生成正常、批量生成变差”的常见原因。\n- 有的模型没有专门的PAD token，常用EOS代替；这时训练标签要特别小心，别把真正的EOS也当成填充忽略掉，否则模型学不会停止。",
+  "aka": ["padding", "填充", "补齐", "truncation", "截断", "attention_mask", "注意力掩码", "input_ids", "token_type_ids", "左填充", "右填充", "left padding", "padding side", "动态填充", "dynamic padding", "max_length"],
+  "needs": ["tokenization", "attention-concept"]
+}

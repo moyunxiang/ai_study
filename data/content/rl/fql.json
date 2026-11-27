@@ -1,0 +1,31 @@
+{
+  "id": "fql",
+  "who": "Seohong Park, Qiyang Li, Sergey Levine · UC Berkeley",
+  "venue": "ICML 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2502.02538"},
+    {"label": "项目页", "url": "https://seohong.me/projects/fql/"}
+  ],
+  "problem": "离线数据里的动作分布常常是多峰的，高斯策略表达不了；改用扩散或流匹配策略又很难用RL训练，因为要对多步迭代生成过程反传梯度，既不稳又慢。",
+  "idea": "分两个策略：一个流匹配策略只做行为克隆、负责表达数据分布；另一个一步策略用RL最大化Q值，同时被蒸馏得贴近流策略的输出。执行时只用一步策略。",
+  "impact": "2025年起成为离线和离线转在线RL的常用强基线，Q-chunking、视界缩减等后续工作直接以它为底座。",
+  "method": "[[diffusion-ql]]等方法把扩散模型当策略，再对整条去噪链反传Q值梯度来改进它，链越长越不稳、越慢。FQL（Flow Q-Learning）换了个思路，把“表达力”和“RL优化”交给两个网络：\n\n1. **流策略** `μ_θ(s, z)`：用[[flow-matching]]在离线数据上做行为克隆，从噪声z出发经过若干步积分得到动作，能表达任意复杂的数据分布，但它本身不做RL。\n2. **一步策略** `π_ω(s, z)`：输入同样的噪声z，一次前向直接输出动作，损失是\n\n`L(ω) = E[ −Q(s, π_ω(s, z)) + α‖π_ω(s, z) − μ_θ(s, z)‖² ]`\n\n第一项让动作价值高，第二项把流策略对同一噪声给出的动作蒸馏过来，相当于一个“贴近数据分布”的正则。\n\n3. 评论家照常用TD学习，目标里的下一动作由一步策略给出。\n\n这样RL梯度只经过一步策略，不需要穿过迭代生成过程；测试时也只要一次前向。摘要称在73个基于状态和像素的OGBench与D4RL任务上，离线和离线转在线都取得很强表现。",
+  "limits": [
+    {"text": "蒸馏系数α需要按任务族调，太大退化成行为克隆，太小又会跑出数据分布。"},
+    {"text": "在长视界、数据量极大的任务上，价值学习本身仍随视界增长而变难，单靠更强的策略类解决不了。", "solved_by": ["horizon-reduction"]}
+  ],
+  "relations": [
+    {"to": "flow-matching", "type": "uses", "note": "用流匹配训练表达数据分布的行为克隆策略。"},
+    {"to": "diffusion-ql", "type": "solves", "note": "Diffusion-QL要对整条去噪链反传Q梯度；FQL改为只训练一步策略，避免递归反传。"},
+    {"to": "td3-bc", "type": "extends", "note": "保留“最大化Q加贴近数据”的极简形式，但把贴近的对象从数据动作换成流策略的输出。"},
+    {"to": "idql", "type": "rivals", "note": "IDQL用扩散策略加重采样选动作，推理需多次去噪；FQL推理只需一步。"},
+    {"to": "rebrac", "type": "rivals", "note": "ReBRAC用单峰确定性策略，FQL用流模型提供多峰的行为正则。"}
+  ],
+  "prereq": ["offline-rl", "actor-critic", "knowledge-distillation", "generative-modeling"],
+  "terms": [
+    {"t": "一步策略", "d": "一次前向就从噪声直接输出动作的策略网络，不需要多步积分。"}
+  ],
+  "learn": "先懂[[flow-matching]]和[[td3-bc]]；读FQL原文第4节的三个损失；用官方代码在OGBench的cube或puzzle任务上调α看效果。",
+  "check": {"source": "https://arxiv.org/abs/2502.02538", "confirmed": "标题、三位作者、arXiv v1于2025-02-04；摘要中利用流匹配策略建模复杂动作分布、用RL训练一步策略而非直接引导迭代流策略、避免递归反传和迭代生成、73个基于状态和像素的OGBench与D4RL任务、离线和离线转在线。损失的具体形式按原文正文通行描述；ICML 2025按通行引用。"},
+  "aka": ["FQL", "Flow Q-Learning", "流Q学习", "流匹配策略离线RL", "flow policy RL"]
+}

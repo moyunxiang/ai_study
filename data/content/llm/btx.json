@@ -1,0 +1,30 @@
+{
+  "id": "btx",
+  "who": "Sainbayar Sukhbaatar, Olga Golovneva, Vasu Sharma, Hu Xu, Xi Victoria Lin, Baptiste Rozière, Jacob Kahn, Daniel Li et al. · Meta FAIR",
+  "venue": "COLM 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2403.07816"}
+  ],
+  "aka": ["BTX", "Branch-Train-MiX", "分支训练混合", "专家拼装MoE"],
+  "problem": "想让一个模型同时擅长代码、数学、世界知识等多个领域：分别训练领域专家（BTM）可以易并行，但合并时只能集成或参数平均，没有token级路由；直接训练MoE或从稠密模型升级（Upcycling）又要全程同步训练，专家也不一定专门化。",
+  "idea": "先从种子模型分支出几份副本，在各自领域数据上异步训练成专家；再把各专家的FFN作为MoE层里的不同专家拼起来，注意力等其余参数取平均，最后做一段MoE微调，让路由器学会按token选择专家。",
+  "impact": "把BTM和稀疏升级统一成一个框架：没有MoE微调就是BTM，跳过专家异步训练就是Upcycling；论文称在准确率与效率的权衡上优于这些替代方案，是“领域专家合并成MoE”路线的代表工作。",
+  "method": "背景：[[btm]]让领域专家完全并行地训练，通信成本低，但合并后要么推理时跑所有专家，要么参数平均损失专门化。[[sparse-upcycling]]把一个训练好的稠密模型的FFN复制成多个专家再继续训练MoE，能复用已有算力，但所有专家起点相同、需要同步训练。[[mixtral]]则说明了top-2路由的MoE在开放模型中的实用性。\n\n**BTX的三步**：\n\n- **分支与训练**：从种子模型（论文中为[[llama-2]] 7B）复制出若干份，分别在数学、代码、维基百科等领域数据上继续预训练，各份之间不通信、吞吐高。\n- **混合（MiX）**：在每一层，把各领域专家的FFN作为一个MoE层的不同专家；自注意力、嵌入等非FFN参数则对各专家取平均。路由器新初始化，采用top-k路由。\n- **MoE微调**：在所有领域的混合数据上继续训练整个MoE，让路由器学习token级的路由。\n\n这一框架包含两个特例：去掉MoE微调阶段、只做集成或平均，就是Branch-Train-Merge；去掉专家异步训练阶段、直接从同一个稠密模型复制专家，就是稀疏升级。\n\n结果：摘要称与这些替代方法相比，BTX取得最好的准确率与效率的权衡。论文中合并后的模型在数学、代码和知识类任务上同时接近或超过对应的领域专家，并保留了通用能力（具体数字见原文）。",
+  "limits": [
+    {"text": "非FFN参数直接平均，当各领域专家训练得较久、参数差异较大时平均会损失信息；论文只合并了少数几个领域专家，大量专家时的效果未验证。", "solved_by": []},
+    {"text": "合并后仍需要一段MoE微调，且推理时总参数是种子模型的数倍，部署成本与普通MoE相同；领域划分仍需人工指定。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "btm", "type": "solves", "note": "BTM合并后没有token级路由，只能集成或平均，BTX把专家拼成MoE层并学习路由。"},
+    {"to": "sparse-upcycling", "type": "extends", "note": "稀疏升级是BTX跳过专家异步训练时的特例，BTX让专家从不同领域训练出差异。"},
+    {"to": "mixtral", "type": "uses", "note": "采用Mixtral式的top-k路由MoE层作为合并后的结构。"},
+    {"to": "llama-2", "type": "uses", "note": "以Llama 2 7B作为种子模型分支出领域专家。"}
+  ],
+  "prereq": ["mixture-of-experts", "pretrain-finetune", "distributed-training", "params-flops"],
+  "terms": [
+    {"t": "种子模型", "d": "所有领域专家共同的出发点，即被复制、分支的那个已经训练好的模型。"},
+    {"t": "稀疏升级（sparse upcycling）", "d": "把稠密模型的FFN复制成多份当作MoE专家，再继续训练，复用已有模型的训练成本。"}
+  ],
+  "learn": "先读[[btm]]和[[sparse-upcycling]]；读原文第2节方法图和对两个特例的讨论；动手：从一个小GPT分支出两个领域专家，把两者的FFN拼成2专家的MoE、平均其余参数，微调路由后比较各领域困惑度。",
+  "check": {"source": "https://arxiv.org/abs/2403.07816", "confirmed": "标题、作者、arXiv v1提交日2024-03-12；摘要中从种子模型分支并以易并行方式高吞吐低通信地训练专家、异步训练后把FFN参数作为MoE层专家并平均其余参数、MoE微调阶段学习token级路由、BTX推广了无MoE微调的Branch-Train-Merge与省略异步专家训练的稀疏升级两个特例、相对替代方案取得最好的准确率效率权衡。种子为Llama 2 7B、数学/代码/维基百科三个领域、COLM 2024为一般了解；具体评测数字未写。"}
+}

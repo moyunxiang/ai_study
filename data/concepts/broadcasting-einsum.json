@@ -1,0 +1,9 @@
+{
+  "key": "broadcasting-einsum",
+  "short": "张量代码的两条基本语法：广播让形状不同的数组自动对齐后逐元素运算；einsum用一串下标字母一次写清楚“哪些维相乘、哪些维求和”。",
+  "body": "深度学习代码里几乎没有显式的for循环，所有计算都写成对整块张量的运算（见[[c:vector-matrix]]）。读懂这些代码，要先会两样东西。\n\n**广播（broadcasting）**。两个形状不同的数组做逐元素运算时，框架会自动把较小的那个“虚拟复制”到匹配的形状，而不真的占用内存。规则（[[numpy]]、[[pytorch]]、[[jax]]相同）：从最后一维往前逐维对比，两维相等、或其中一个是1，就能对齐；维数少的一方在最前面补1。\n\n例子：一批激活x的形状是(32, 768)，偏置b是(768,)，`x + b`时b被看成(1, 768)，再沿第0维复制32份。注意力里的掩码常是(1, 1, T, T)，加到(B, H, T, T)的分数上，对所有样本和所有头共用。\n\n**einsum（爱因斯坦求和约定）**。用一个字符串描述运算：输入每一维起一个字母，输出里没出现的字母就被求和。\n\n- `einsum('ij,jk->ik', A, B)`：矩阵乘法，j被求和。\n- `einsum('bhqd,bhkd->bhqk', Q, K)`：批量、多头的注意力分数`QKᵀ`，见[[c:self-attention]]。\n- `einsum('i,j->ij', u, v)`：外积，见[[c:tensor-products]]。\n- `einsum('ii->', A)`：迹，见[[c:rank-trace-determinant]]。\n\n好处是不用记一堆transpose、reshape和bmm的组合，维度含义一目了然；很多论文的伪代码直接写einsum。\n\n**它为什么重要**。向量化的运算能交给GPU上高度优化的矩阵乘法内核（见[[c:cpu-gpu]]），比Python循环快几个数量级；而广播错误（两个本不该对齐的维度恰好能广播）是训练代码里最隐蔽的bug之一：程序不报错，结果却悄悄错了。",
+  "example": "预测pred形状(32, 1)，标签y形状(32,)。`pred − y`不会报错：y被看成(1, 32)，pred沿第1维复制，结果是(32, 32)的矩阵，均值也照算不误，损失完全错了。正确写法是先`pred.squeeze(-1)`让两者都是(32,)。\n\n批量矩阵乘：Q形状(2, 8, 10, 64)，K同形。`einsum('bhqd,bhkd->bhqk', Q, K)`输出(2, 8, 10, 10)，等价于`Q @ K.transpose(-1, -2)`。",
+  "pitfalls": "- 广播只“虚拟复制”，但运算结果是真实的大张量；一不小心把(N, 1)和(1, N)相加，会得到N×N的数组，N大时直接爆显存。\n- einsum的字母顺序决定输出的维度顺序，`->ik`和`->ki`结果互为转置。",
+  "needs": ["vector-matrix", "matrix-multiplication"],
+  "aka": ["广播", "广播机制", "broadcasting", "einsum", "爱因斯坦求和", "爱因斯坦求和约定", "Einstein summation", "Einstein notation", "向量化", "vectorization", "张量形状", "tensor shape", "reshape", "transpose", "squeeze", "unsqueeze", "维度变换"]
+}

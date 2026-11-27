@@ -1,0 +1,33 @@
+{
+  "id": "sky-t1",
+  "who": "NovaSky团队 · 加州大学伯克利分校Sky Computing Lab",
+  "links": [
+    {"label": "官方博客", "url": "https://novasky-ai.github.io/posts/sky-t1/"},
+    {"label": "GitHub（SkyThought）", "url": "https://github.com/NovaSky-AI/SkyThought"}
+  ],
+  "aka": ["Sky-T1", "Sky-T1-32B-Preview", "450美元推理模型", "SkyThought", "开源o1复现", "推理蒸馏", "NovaSky"],
+  "problem": "o1、Gemini 2.0 Flash Thinking这类推理模型的技术细节和权重都不公开；学术界和开源社区能否以极低的成本训练出同等水平的推理模型，并且把数据、代码、权重全部公开？",
+  "idea": "用开源推理模型QwQ-32B-Preview生成约1.7万道数学、编程、科学题的长推理轨迹，丢掉答错的，再用GPT-4o-mini把轨迹改写成整齐的格式；然后对不会推理的Qwen2.5-32B-Instruct做普通监督微调。",
+  "impact": "8张H100训练19小时、按云价约450美元，在数学和编程基准上与o1-preview相当，且数据、代码、权重全部开源；它和随后的Bespoke-Stratos、s1等一起，引发了2025年初“低成本蒸馏推理模型”的热潮。",
+  "background": "2024年底，[[o1]]让“先长时间思考再回答”成为新方向，阿里发布了开源的[[qwq]]预览版，但完整的训练配方仍不透明。此前的开源复现（如Still-2）主要集中在数学。NovaSky团队想同时覆盖数学和编程，并把一切公开。",
+  "method": "**数据**：用QwQ-32B-Preview对题目生成推理轨迹，做拒绝采样——数学题与标准答案精确匹配，编程题运行数据集自带的单元测试，答错的一律丢弃。之后借鉴Still-2，用GPT-4o-mini把杂乱的QwQ输出改写成格式统一、便于解析的版本。作者举例：在APPs编程题上，不改写时只能假定最后一个代码块是答案，QwQ只有约25%正确；改写后正确识别答案，正确率超过90%。最终数据为来自APPs与TACO的5千道编程题、来自NuminaMATH中AIME/MATH/奥赛子集的1万道数学题，以及来自Still-2的1千道科学与谜题。\n\n**训练**：对Qwen2.5-32B-Instruct训练3个epoch，学习率1e-5，批大小96，用DeepSpeed ZeRO-3和Llama-Factory，8张H100用时19小时。\n\n**结果**：MATH500 82.4（o1-preview 81.4）、AIME2024 43.3（o1-preview 40.0，起点模型16.7）、LiveCodeBench中等难度56.8（o1-preview 54.9）；GPQA-Diamond 56.8，明显低于o1-preview的75.2。\n\n**经验**：模型规模很重要——7B、14B模型提升有限，输出常出现重复；数据配比很重要——只用数学数据时AIME24达到43.3，混入编程数据后降到36.7，加入更难的数学题和编程题后两者才兼顾。",
+  "legacy": "几天后[[deepseek-r1]]发布并开源了大规模蒸馏模型，蒸馏路线迅速普及；[[s1]]、[[limo]]把所需样本进一步减到一千条左右。团队之后又发布了用RL训练的Sky-T1后续版本及SkyRL框架。",
+  "limits": [
+    {"text": "能力上限受教师模型QwQ限制，AIME上仍低于QwQ本身（43.3对50.0），科学题与o1-preview差距很大。", "solved_by": ["deepseek-r1"]},
+    {"text": "只做监督微调，模型学到的是模仿老师的推理格式，没有通过强化学习自我改进。", "solved_by": ["deepscaler"]},
+    {"text": "以博客发布，评测项目较少，没有系统的消融和方差报告。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "qwq", "type": "uses", "note": "训练数据的推理轨迹由QwQ-32B-Preview生成。"},
+    {"to": "qwen2.5", "type": "uses", "note": "以Qwen2.5-32B-Instruct为基础模型做监督微调。"},
+    {"to": "o1", "type": "rivals", "note": "以o1-preview为对照，数学与编程相当，科学题明显落后。"},
+    {"to": "gpt-4o", "type": "uses", "note": "用GPT-4o-mini把推理轨迹改写成统一格式。"}
+  ],
+  "prereq": ["knowledge-distillation", "pretrain-finetune", "reasoning-tokens", "distributed-training"],
+  "terms": [
+    {"t": "拒绝采样（数据筛选）", "d": "让模型生成答案，只保留经过检验是正确的那些作为训练数据。"},
+    {"t": "推理蒸馏", "d": "用强推理模型写出的长思考过程作为示范，让另一个模型通过监督学习去模仿。"}
+  ],
+  "learn": "先读[[qwq]]和[[c:knowledge-distillation]] → 读博客的Recipes和Other findings两节 → 动手：用开源的SkyThought脚本，取几百道数学题做一次小规模的“生成—筛选—微调”，观察数据混入编程题前后的数学成绩变化。",
+  "check": {"source": "https://novasky-ai.github.io/posts/sky-t1/", "confirmed": "官方博客核对标题、伯克利NovaSky团队、与o1-preview相当、训练成本低于450美元、全部开源、QwQ-32B-Preview生成、拒绝采样（数学精确匹配、编程跑单元测试）、GPT-4o-mini改写、APPs上约25%与超过90%、5k编程+10k数学+1k科学谜题、Qwen2.5-32B-Instruct、3 epoch与学习率1e-5与批大小96、8张H100用时19小时、评测表各项数字、模型规模与数据配比两条发现（43.3降到36.7）；HN帖子日期2025-01-13。“1.7万道”由5k+10k+1k加总并与博客所称17K一致；后续SkyRL凭一般了解。"}
+}

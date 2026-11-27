@@ -1,0 +1,29 @@
+{
+  "id": "bigcodec",
+  "who": "Detai Xin, Xu Tan, Shinnosuke Takamichi, Hiroshi Saruwatari · 东京大学、微软亚洲研究院",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2409.05377"}
+  ],
+  "problem": "神经语音编解码器在码率降到1 kb/s左右时音质明显变差；当时流行的编解码器只有约1000万参数，模型容量本身也成了瓶颈。",
+  "idea": "把编解码器放大到1.59亿参数，在卷积结构里加入序列模型捕捉时间依赖，并用低维向量量化保证码本利用率，只用单个码本做到1.04 kb/s。",
+  "impact": "证明了「放大模型」对低码率语音编码同样有效：单码本、约1 kb/s下的质量接近高4–6倍码率的常用编解码器，为后来面向语音大模型的单码本分词器提供了参照。",
+  "method": "[[encodec]]、[[dac]]这类神经编解码器用卷积编码器把波形压成低帧率特征，再用残差向量量化（多层码本）离散化，解码器还原波形。码率越低，能用的码本层数越少，音质下降越快。对于语音大模型，最理想的是只用一个码本、码率很低，这样每一帧只对应一个token，序列又短。\n\nBigCodec的做法很直接：\n- **放大模型**：参数量从常见的约1000万提高到1.59亿，十倍以上。\n- **加入序列模型**：在传统卷积编码器和解码器里插入序列建模层，更好地捕捉时间上的依赖。\n- **低维向量量化**：先把特征投影到很低的维度再查码本（与DAC的做法类似），避免很多码字从来用不到，提高码本利用率。\n\n摘要报告：在1.04 kb/s下，BigCodec在客观和主观评测中都明显优于多种低码率编解码器，客观指标可与码率高4–6倍的常用编解码器相当，主观听感甚至优于原始录音。",
+  "limits": [
+    {"text": "只针对语音、单码本声学token，语义信息不显式，直接给语言模型建模时可懂度和内容一致性依赖下游补救。", "solved_by": ["llasa"]},
+    {"text": "1.59亿参数的编解码器推理开销比常见编解码器大很多，端侧部署受限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "dac", "type": "extends", "note": "沿用DAC一类卷积编解码器与低维码本查找的思路，把模型放大十倍以上并压到单码本。"},
+    {"to": "encodec", "type": "solves", "note": "EnCodec类编解码器在约1 kb/s时音质严重下降；BigCodec靠放大容量和低维量化在同等码率下保住音质。"},
+    {"to": "soundstream", "type": "extends", "note": "仍是编码器、量化器、解码器端到端联合训练的神经编解码框架。"}
+  ],
+  "prereq": ["vector-quantization", "vocoder-codec", "waveform-spectrogram", "conv-layer", "adversarial-training"],
+  "terms": [
+    {"t": "码本利用率", "d": "向量量化里码本中实际被用到的码字比例；利用率低说明很多码字浪费了，等于降低了有效容量。"}
+  ],
+  "aka": ["BigCodec", "低码率语音编解码", "单码本语音codec"],
+  "check": {
+    "source": "https://arxiv.org/abs/2409.05377",
+    "confirmed": "arXiv官方记录：标题BigCodec: Pushing the Limits of Low-Bitrate Neural Speech Codec、Xin/Tan/Takamichi/Saruwatari四位作者、v1提交2024-09-09；摘要中约1 kbps时性能显著下降、模型放大到159M参数（常见约10M）、在卷积结构中加入序列模型、低维向量量化提高码本利用率、1.04 kbps、客观指标可比4–6倍码率的编解码器、主观感知优于原始录音。单码本、机构、与DAC做法的类比为一般了解。"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "perflow",
+  "who": "Hanshu Yan, Xingchao Liu, Jiachun Pan, Jun Hao Liew, Qiang Liu, Jiashi Feng · 字节跳动、德州大学奥斯汀分校、新加坡国立大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2405.07510"},
+    {"label": "代码", "url": "https://github.com/magic-research/piecewise-rectified-flow"}
+  ],
+  "aka": ["PeRFlow", "分段整流流", "Piecewise Rectified Flow", "分段Reflow"],
+  "problem": "整流流的reflow操作能把采样轨迹拉直、从而用很少步数生成，但对整条轨迹做reflow需要先用教师模型完整模拟大量噪声—图像对，代价高，而且一次拉直整条弯曲轨迹很难。",
+  "idea": "把采样时间切成几个窗口，在每个窗口内单独做reflow、把这一段拉直，整体逼近一条分段线性的流；并设计参数化让模型直接继承预训练扩散模型的权重。",
+  "impact": "得到的少步模型训练收敛快、迁移性好，可以作为“即插即用加速器”直接替换到基于同一底座的各种工作流（LoRA、ControlNet等）里，是整流流路线在文生图加速上的代表实践之一。",
+  "method": "[[rectified-flow]]的reflow：用当前模型从噪声z模拟出图像x，再以(z, x)为配对重新训练，让模型沿直线从z走到x；直线轨迹一步就能走完。问题是要模拟整条轨迹的配对，且弯曲很大的轨迹难以一次拉直。\n\nPeRFlow把时间区间[0,1]分成K个窗口（如4段）。在每个窗口内，只需用教师模型从窗口起点模拟到窗口终点（步数少得多），得到这一段的起止配对，然后训练学生在这一段内走直线。所有窗口拉直后，整条轨迹近似分段线性：每段一步，总共K步即可生成。\n\n为了继承预训练模型的知识，作者让学生直接从教师（如Stable Diffusion）的权重初始化，并调整参数化，使学生预测的“速度”与教师原本的噪声预测形式兼容，因此训练很快收敛；得到的权重差还可以作为一个“加速增量”加到同底座的其他微调模型上，实现即插即用。",
+  "limits": [
+    {"text": "步数降到1–2步时质量仍明显下降，分段数与质量之间需要折中。", "solved_by": ["dmd2", "sana-sprint"]}
+  ],
+  "relations": [
+    {"to": "rectified-flow", "type": "extends", "note": "把整流流对整条轨迹的reflow改成按时间窗口分段reflow，更容易拉直、模拟代价更低。"},
+    {"to": "instaflow", "type": "solves", "note": "InstaFlow对整条轨迹reflow后再蒸馏，训练代价高；PeRFlow分段reflow并继承教师权重，收敛更快、可即插即用。"},
+    {"to": "stable-diffusion", "type": "uses", "note": "以Stable Diffusion系列为教师和初始化，产出可替换的加速权重。"}
+  ],
+  "prereq": ["few-step-sampling", "ode-sde", "knowledge-distillation", "diffusion-process"],
+  "terms": [
+    {"t": "reflow", "d": "用模型自己生成的噪声—样本配对重新训练流模型，使新的采样轨迹更接近直线。"}
+  ],
+  "learn": "先读Rectified Flow的reflow与InstaFlow → 读本文分段窗口的训练流程 → 在二维数据上比较整段reflow与分段reflow的轨迹弯曲度。",
+  "check": {"source": "https://arxiv.org/abs/2405.07510", "confirmed": "标题、六位作者、v1日期2024-05-13、摘要中把生成流的采样过程分成若干时间窗口、在每个区间内用reflow拉直轨迹逼近分段线性流、少步生成性能好、专门的参数化使其继承预训练扩散模型知识、训练收敛快、迁移性好、可作为兼容多种工作流的通用即插即用加速器；机构、窗口数示例、权重增量迁移的具体做法来自一般了解"}
+}

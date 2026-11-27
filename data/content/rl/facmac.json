@@ -1,0 +1,30 @@
+{
+  "id": "facmac",
+  "who": "Bei Peng, Tabish Rashid, Christian A. Schroeder de Witt, Pierre-Alexandre Kamienny, Philip H. S. Torr, Wendelin Böhmer, Shimon Whiteson · Oxford",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2003.06709"}
+  ],
+  "problem": "合作多智能体里，QMIX式值分解只适用于离散动作，MADDPG能处理连续动作，但它的集中式评论家是一个整体网络，而且每个智能体只沿自己的动作方向求梯度，协调性差。",
+  "idea": "演员-评论家里用“分解的集中式评论家”：先给每个智能体一个效用，再用混合网络组合成联合Q值（可以不单调）；策略梯度在整个联合动作上计算，而不是每个智能体各自求导（FACMAC）。",
+  "impact": "把值分解思想推广到连续动作的多智能体策略梯度，并提出了多智能体MuJoCo（MAMuJoCo）基准，后者成为合作MARL连续控制的常用测试平台。",
+  "method": "FACMAC（FACtored Multi-Agent Centralised policy gradients）沿用[[maddpg]]的确定性策略梯度框架，每个智能体a有自己的确定性策略 `μ_a(τ_a)`。改动在评论家和梯度两处：\n\n- **分解的评论家**：每个智能体有一个效用网络 `Q_a(τ_a, u_a)`，再用一个以全局状态为条件的混合网络组合：`Q_tot(τ, u, s) = g_ψ(s, Q_1(τ_1, u_1), …, Q_n(τ_n, u_n))`。混合方式可以像[[qmix]]那样要求单调，但因为这里不需要对Q_tot做分散的argmax（策略由演员给出），所以单调约束不再必要，论文也用了非单调的混合，表达能力更强；\n- **集中式策略梯度**：MADDPG更新智能体a时只把a的动作换成当前策略的输出，其他智能体用回放池里的旧动作；FACMAC对所有智能体同时代入当前策略的动作再求梯度：\n\n`∇_θ J = E[ ∇_θ μ(τ) · ∇_u Q_tot(τ, u, s) |_(u = μ(τ)) ]`\n\n这样各智能体的更新考虑了彼此当前的策略，更新更协调。\n\n作者在多智能体粒子环境（MPE）的变体、新提出的多智能体MuJoCo基准（把一个机器人的各个关节分给不同智能体控制）和星际争霸II微操任务上评测，摘要称FACMAC优于MADDPG等基线。",
+  "limits": [
+    {"text": "集中式梯度需要在训练时同时访问所有智能体的当前策略，智能体数量很多时计算与通信开销大。"},
+    {"text": "非单调混合网络失去了QMIX的分散贪心一致性保证，训练稳定性更依赖超参数。"}
+  ],
+  "relations": [
+    {"to": "maddpg", "type": "solves", "note": "MADDPG的评论家是整体网络且梯度各自计算；FACMAC用分解评论家和联合动作上的集中梯度。"},
+    {"to": "qmix", "type": "extends", "note": "沿用QMIX的混合网络分解，并放宽单调约束。"},
+    {"to": "ddpg", "type": "uses", "note": "以确定性策略梯度训练各智能体的演员。"},
+    {"to": "smac", "type": "uses", "note": "在星际争霸II微操任务上评测。"}
+  ],
+  "prereq": ["actor-critic", "ctde", "credit-assignment", "policy-gradient-concept"],
+  "terms": [
+    {"t": "多智能体MuJoCo（MAMuJoCo）", "d": "把一个MuJoCo机器人的不同关节分给不同智能体控制的合作基准。"},
+    {"t": "值分解", "d": "把团队的联合价值拆成各智能体效用的组合，便于分散执行和信用分配。"}
+  ],
+  "learn": "先读[[maddpg]]和[[qmix]]；读FACMAC原文第4节集中梯度的推导；在MAMuJoCo的2x3 HalfCheetah上比较MADDPG与FACMAC。",
+  "check": {"source": "https://arxiv.org/abs/2003.06709", "confirmed": "标题、七位作者、arXiv v1于2020-03-14；摘要中合作MARL离散与连续动作、像MADDPG用确定性策略梯度、像QMIX用非线性单调函数组合各智能体效用的分解评论家、不受单调约束并用非单调分解、在整个联合动作空间优化的集中式策略梯度、MPE变体、新的多智能体MuJoCo基准、星际II微操、优于MADDPG等。梯度公式按原文正文通行描述；NeurIPS 2021按通行引用。"},
+  "aka": ["FACMAC", "Factored Multi-Agent Centralised Policy Gradients", "分解集中式策略梯度", "MAMuJoCo", "Multi-Agent MuJoCo", "多智能体MuJoCo"]
+}

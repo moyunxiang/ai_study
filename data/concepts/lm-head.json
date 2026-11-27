@@ -1,0 +1,9 @@
+{
+  "key": "lm-head",
+  "short": "语言模型的最后一层：把d维隐状态线性映射成V个logits（V是词表大小），经softmax得到下一个token的分布。也叫输出投影或unembedding。",
+  "body": "Transformer的各层一直在d维的向量上工作（见[[c:transformer-block]]）。要“说出”下一个词，必须把最后一层某个位置的d维隐状态h变成词表上的一个概率分布。完成这一步的就是**语言模型头**（LM head）。\n\n**定义**。\n\n`logits = h · W_U + b`，其中`W_U`是d×V的矩阵（偏置b常省略）\n\n`p(下一个token = i) = softmax(logits)_i`\n\nW_U的第i列可以看作token i的“输出向量”，logit就是h与它的点积（见[[c:dot-product]]）：隐状态越接近某个token的输出向量，这个token的概率越高。所以它也被叫作**unembedding**，与把token编号变成向量的输入嵌入（见[[c:token-embedding]]）方向正好相反。\n\n**权重共享**。输入嵌入矩阵E是V×d的，W_U是d×V的，形状正好互为转置。[[weight-tying]]提出让`W_U = Eᵀ`，同一个词的输入和输出用同一个向量，参数量少一大块，在中小模型上还常有正则化效果。[[gpt-2]]、[[t5]]等用了共享；不少大模型（如[[llama-1]]系列）则不共享，输入和输出各有自己的矩阵。\n\n**“头”的一般含义**。在Hugging Face等库里，“头”泛指接在主干网络上、针对具体任务的最后一层：分类头输出类别数个logits，token分类头对每个位置输出标签logits，奖励模型的头输出一个标量（见[[c:reward-model]]）。LM head只是其中预测下一个token的那一种。\n\n**它在哪里出现**。[[logit-lens]]把LM head直接套在中间层的隐状态上，看模型在每一层“打算”输出什么，是可解释性研究的常用工具。[[mos-softmax]]指出，单个softmax输出层的表达能力受d远小于V的限制（“softmax瓶颈”）。[[c:vocabulary-size]]很大时，这一层的计算和显存都很可观；训练时还会出现logits数值过大导致不稳定的问题，见[[c:z-loss]]。",
+  "example": "d = 4，V = 3（词表只有“猫”“狗”“鱼”）。最后隐状态`h = [1, 0, 2, −1]`，三个token的输出向量：猫`[0.5, 0, 1, 0]`，狗`[0, 1, 0, 1]`，鱼`[1, 1, 0.5, 0]`。\n\nlogits：猫 = 0.5 + 2 = 2.5；狗 = 0 + 0 + 0 − 1 = −1；鱼 = 1 + 0 + 1 + 0 = 2。softmax得约 [0.61, 0.02, 0.37]，模型最倾向于输出“猫”。\n\n规模：d = 4096、V = 128,000时，W_U有约5.2亿参数；每生成一个token都要做一次4096×128,000的矩阵-向量乘法。",
+  "pitfalls": "- 推理时只需要最后一个位置的logits，但训练时每个位置都要算，所以训练中这一层的显存占用（batch × 序列长度 × V）可能非常大，常用分块计算交叉熵来缓解。\n- 共享权重后，修改嵌入矩阵会同时影响输入和输出，微调时扩充词表要注意两边一起改。",
+  "aka": ["LM head", "language modeling head", "语言模型头", "输出层", "output layer", "输出投影", "output projection", "unembedding", "反嵌入", "vocab projection", "词表投影", "lm_head", "classification head", "任务头", "模型头"],
+  "needs": ["softmax", "embedding", "matrix-multiplication"]
+}

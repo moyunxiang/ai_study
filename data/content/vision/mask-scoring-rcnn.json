@@ -1,0 +1,30 @@
+{
+  "id": "mask-scoring-rcnn",
+  "who": "Zhaojin Huang, Lichao Huang, Yongchao Gong, Chang Huang, Xinggang Wang · 华中科技大学 / 地平线",
+  "venue": "CVPR 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1903.00241"},
+    {"label": "代码", "url": "https://github.com/zjhuang22/maskscoring_rcnn"}
+  ],
+  "aka": ["MS R-CNN", "Mask Scoring R-CNN", "MaskIoU", "掩码质量打分", "mask quality score"],
+  "problem": "[[mask-rcnn]]用分类置信度当作掩码的得分，但“这是一只猫”的把握和“猫的轮廓抠得准不准”往往不相关，评测时按得分排序，抠得差的掩码可能排在前面。",
+  "idea": "加一个小的MaskIoU分支：把实例特征和预测出的掩码一起输入，回归这张掩码与真值的IoU；最终得分改为“分类分数×预测的掩码IoU”。",
+  "impact": "在不同骨干上给Mask R-CNN带来稳定的AP提升，让“预测自身质量”成为实例分割和检测里常见的附加分支。",
+  "method": "COCO的掩码AP会按得分从高到低遍历预测结果，所以得分必须反映掩码质量。论文统计发现，Mask R-CNN的分类分数与掩码IoU的相关性很弱。\n\n做法是在Mask R-CNN的掩码头之后接一个**MaskIoU头**：把RoI特征与预测掩码（经最大池化缩到同样大小）拼接，经过几层卷积和全连接，输出每一类的掩码IoU估计。训练时目标就是预测掩码与真值掩码的实际IoU，用回归损失监督；推理时把它与分类分数相乘作为最终掩码得分，掩码本身不变。\n\n摘要称在COCO上对不同模型都带来一致且明显的提升，超过当时的Mask R-CNN。这个改动只影响排序，不改变掩码形状，代价是一个很小的额外分支。",
+  "legacy": "“让网络为自己的输出打质量分”在检测中也很常见，例如[[fcos]]的中心度分支和后来的IoU感知分类；在分割里，[[sam]]同样为每个候选掩码输出一个预测的IoU，用来在多个候选之间挑选。",
+  "limits": [
+    {"text": "只是重新打分，不改善掩码本身：28×28的RoI掩码分辨率低、边界粗糙的问题仍在。", "solved_by": ["pointrend"]},
+    {"text": "仍是两阶段、依赖检测框和RoI操作的框架，速度受限。", "solved_by": ["solo", "condinst"]}
+  ],
+  "relations": [
+    {"to": "mask-rcnn", "type": "solves", "note": "Mask R-CNN用分类置信度给掩码打分，与掩码质量脱节；MS R-CNN学一个掩码IoU来校正得分。"},
+    {"to": "cascade-rcnn", "type": "rivals", "note": "Cascade R-CNN靠逐级提高IoU阈值来提升框的质量；MS R-CNN不改预测本身，而是让网络估计掩码质量、修正排序。"},
+    {"to": "fpn", "type": "uses", "note": "沿用Mask R-CNN的ResNet+FPN骨干和RoI特征，MaskIoU头接在掩码头之后。"}
+  ],
+  "prereq": ["vision-tasks", "iou-map", "anchor-nms", "conv-layer"],
+  "terms": [
+    {"t": "MaskIoU", "d": "预测掩码与真值掩码的交并比，这里被当作网络要预测的“掩码质量分”。"}
+  ],
+  "learn": "先弄清COCO的AP如何按得分排序计算，再读本文第3节MaskIoU头的输入与损失；用mmdetection里的ms_rcnn配置对比加不加这个分支的AP。",
+  "check": {"source": "https://arxiv.org/abs/1903.00241", "confirmed": "arXiv记录：标题、五位作者、v1提交于2019-03-01；摘要中的分类置信度与掩码质量不相关、学习掩码IoU的网络块、输入为实例特征与预测掩码、COCO上一致提升并超过Mask R-CNN。CVPR 2019、机构、得分相乘与最大池化等细节凭一般了解写。"}
+}

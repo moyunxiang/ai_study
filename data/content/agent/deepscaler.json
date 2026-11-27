@@ -1,0 +1,33 @@
+{
+  "id": "deepscaler",
+  "who": "Michael Luo, Sijun Tan, Justin Wong, Xiaoxiang Shi, William Tang, Manan Roongta, Colin Cai, Jeffrey Luo et al.（导师Li Erran Li, Raluca Ada Popa, Ion Stoica） · 加州大学伯克利分校Agentica项目",
+  "links": [
+    {"label": "博客", "url": "https://pretty-radio-b75.notion.site/DeepScaleR-Surpassing-O1-Preview-with-a-1-5B-Model-by-Scaling-RL-19681902c1468005bed8ca303013a4e2"},
+    {"label": "Hugging Face模型卡", "url": "https://huggingface.co/agentica-org/DeepScaleR-1.5B-Preview"}
+  ],
+  "aka": ["DeepScaleR", "DeepScaleR-1.5B-Preview", "迭代加长上下文", "iterative context lengthening", "小模型推理RL", "Agentica", "rLLM"],
+  "problem": "DeepSeek-R1公开了“用强化学习练推理”的结论，但训练配方和系统没公开；作者估算，照R1的设置（32K以上上下文、约8000步）复现，哪怕只是1.5B的小模型，也要至少7万A100 GPU小时，学术团队负担不起。",
+  "idea": "从已经蒸馏过的DeepSeek-R1-Distill-Qwen-1.5B出发，用GRPO和只看答案对错的奖励训练，并且分阶段逐步加长上下文：先在8K上练到瓶颈，再放到16K，最后24K。",
+  "impact": "官方称只用约3800个A100小时（约4500美元）就让1.5B模型在AIME 2024上达到43.1%，超过o1-preview的40.0%，并开源数据、代码和训练日志；“逐步加长上下文”的做法随后被Skywork-OR1等多份RL报告直接采用。",
+  "background": "[[deepseek-r1]]证明[[grpo]]加可验证奖励能练出长思维链，并发布了从R1蒸馏出的一系列小模型。另一条路是[[s1]]、[[limo]]这类只用少量高质量轨迹做监督微调。问题是：小模型在蒸馏之后，还能不能靠RL继续明显变强，代价是多少？",
+  "method": "**数据**：约4万道带答案的竞赛数学题，来自1984–2023年的AIME、2023年前的AMC、Omni-MATH和Still数据集。\n\n**算法与奖励**：标准GRPO——同一道题采样多份回答，用组内平均作基线算优势，再加KL正则。奖励极简：答案通过LaTeX/Sympy等价检查得1分，错误或格式不对得0分，不用过程奖励模型，也没有中间反馈。\n\n**迭代加长上下文**：作者观察到，一开始就给很长的上下文，模型会写出大量冗长、无效的思考，既浪费算力又学得慢。于是：\n- 第0–1040步，8K上下文（8张A100）：AIME 2024从22.9%到33%；\n- 第1040–1520步，16K上下文（32张A100）：33%到43%；\n- 第1520步之后，24K上下文：在38%到43%之间继续提升。\n短上下文阶段先逼模型学会更高效的推理，再逐步放开长度让它解更难的题。\n\n**结果**（每题采样16次取平均pass@1）：AIME 2024 43.1%（起点模型28.8%），MATH-500 87.8%，AMC 2023 73.6%，五项平均57.0%，高于起点的48.9%和7B级别的rStar-Math、SimpleRL等。",
+  "legacy": "它让“在蒸馏模型上继续做RL”成为2025年开源推理模型的主流路线之一；团队随后在同一框架下推出了编码模型DeepCoder和编码智能体DeepSWE。[[skywork-or1]]明确沿用了多阶段加长上下文。",
+  "limits": [
+    {"text": "起点已经是从R1蒸馏的模型，成绩里有多少来自RL、多少来自蒸馏数据，没有严格分开；从未蒸馏的基础模型出发效果如何未验证。", "solved_by": []},
+    {"text": "只在数学题上训练和评测，Minerva Math上提升很小（26.5到30.2），向其他领域的迁移不清楚。", "solved_by": []},
+    {"text": "以博客与模型卡发布，没有正式论文和系统的消融实验，加长时机等超参数靠经验设定。", "solved_by": ["skywork-or1"]}
+  ],
+  "relations": [
+    {"to": "deepseek-r1", "type": "uses", "note": "以DeepSeek-R1-Distill-Qwen-1.5B为起点，复现并扩展R1的RL做法。"},
+    {"to": "grpo", "type": "uses", "note": "训练算法为GRPO，奖励只看答案对错。"},
+    {"to": "o1", "type": "rivals", "note": "以o1-preview为对照，1.5B模型在AIME 2024上43.1%对40.0%。"},
+    {"to": "s1", "type": "rivals", "note": "s1用约1000条轨迹监督微调加预算强制，DeepScaleR用大规模RL；两者都是低成本复现推理能力的开源尝试。"}
+  ],
+  "prereq": ["policy-gradient-concept", "reward-design", "reasoning-tokens", "context-window", "knowledge-distillation"],
+  "terms": [
+    {"t": "迭代加长上下文", "d": "RL训练时先限制模型最多生成较短的长度，成绩到瓶颈后再放宽，分阶段加长。"},
+    {"t": "pass@1（多次平均）", "d": "每道题采样多次，把每次是否答对的比例平均，作为单次作答的期望正确率。"}
+  ],
+  "learn": "先读[[grpo]]和[[deepseek-r1]] → 读博客的训练配方与“迭代加长”一节，看模型卡上的分阶段数字 → 动手：用开源的rLLM代码在小数学集上跑8K上下文的GRPO，观察回答长度随训练的变化。",
+  "check": {"source": "https://huggingface.co/agentica-org/DeepScaleR-1.5B-Preview", "confirmed": "博客页（Notion）核对标题、作者与导师、43.1%对o1-preview 40.0%、4万题、3800 A100小时约4500美元、复现R1需至少7万A100小时、18.42倍缩减；模型卡核对数据来源、GRPO加KL、0/1奖励无PRM、8K/16K/24K三阶段与对应步数和AIME数字、GPU数、评测表（起点28.8、MATH-500 87.8、AMC 73.6、Minerva 26.5→30.2、平均57.0对48.9）；HN帖子日期2025-02-10。“长上下文起步会写冗长无效思考”的动机、DeepCoder/DeepSWE后续凭一般了解。"}
+}

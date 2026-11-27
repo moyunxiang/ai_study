@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>AWR优势加权回归（2019） · AI脉络</title>
+<meta name="description" content="主流离策略深度RL算法（、）要同时训练互相依赖的actor和critic，超参数敏感、实现复杂；简单稳定的监督学习式算法又通常只能用on-policy数据。 把RL拆成两个普通的回归问题：先回归一个价值函数，再对数据中的动作做加权最大似然——权重是优势的指数 exp(A/β) ，比平均更好的动作被…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/awr.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="AWR优势加权回归（2019）">
+<meta property="og:description" content="主流离策略深度RL算法（、）要同时训练互相依赖的actor和critic，超参数敏感、实现复杂；简单稳定的监督学习式算法又通常只能用on-policy数据。 把RL拆成两个普通的回归问题：先回归一个价值函数，再对数据中的动作做加权最大似然——权重是优势的指数 exp(A/β) ，比平均更好的动作被…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/awr.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/awr">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 离线RL与序列建模</div>
+<h1>AWR优势加权回归</h1>
+<div class="full">Advantage-Weighted Regression: Simple and Scalable Off-Policy Reinforcement Learning</div>
+<div class="meta"><span>2019.10</span><span>论文</span><span>延伸</span><span>Xue Bin Peng, Aviral Kumar, Grace Zhang, Sergey Levine · UC Berkeley</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1910.00177" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/awr">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>主流离策略深度RL算法（<a class="ln" href="../n/sac.html">SAC</a>、<a class="ln" href="../n/td3.html">TD3</a>）要同时训练互相依赖的actor和critic，超参数敏感、实现复杂；简单稳定的监督学习式算法又通常只能用on-policy数据。</p></div><div><h4>方法</h4><p>把RL拆成两个普通的回归问题：先回归一个价值函数，再对数据中的动作做加权最大似然——权重是优势的指数 <code>exp(A/β)</code>，比平均更好的动作被模仿得更多。两步都是收敛的监督学习，可以直接用回放池里的离策略数据。</p></div><div><h4>影响</h4><p>“优势加权回归”成为离线RL里从价值函数提取策略的标准方式之一，<a class="ln" href="../n/awac.html">AWAC优势加权</a>、<a class="ln" href="../n/crr.html">CRR评论家正则化回归</a>、<a class="ln" href="../n/iql.html">隐式Q学习IQL</a>等方法都用了这种指数加权的策略更新。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>早在2007年，奖励加权回归（RWR）就提出过用“回报加权的行为克隆”来做策略改进，但只适用于on-policy数据。深度RL的离策略算法样本效率高，但critic与actor之间的耦合使训练不稳定，复现困难（<a class="ln" href="../n/deep-rl-matters.html">《Deep RL that Matters》复现性批评</a>）。作者希望得到一个只调用标准监督学习、却能利用经验回放的简单算法。</p><h2>方法</h2><p>AWR从一个约束的策略改进问题出发：在不偏离数据采样策略 μ 太远（KL约束）的前提下最大化期望改进。这个问题的解析解是 <code>π*(a|s) ∝ μ(a|s) · exp(A^μ(s,a) / β)</code>，其中 <code>A^μ = Q^μ − V^μ</code> 是优势，β是温度。把它投影到参数化策略上，就得到一个加权最大似然目标：</p><p class="formula"><code>π ← argmax_π E_{(s,a)∼D} [ log π(a|s) · exp( (R_{s,a} − V(s)) / β ) ]</code></p><p>每轮迭代两步：（1）用数据中的回报（论文用TD(λ)回报）回归价值函数 <code>V(s)</code>；（2）用上式对回放池中的动作做加权行为克隆，回报高于价值估计的动作权重大。权重会截断到一个上限以防数值爆炸。作者还分析了混合多个历史策略的回放数据时这一目标的含义。</p><h2>结果</h2><p>摘要称，AWR在一组标准OpenAI Gym任务上与多个成熟的最先进RL算法表现相当；只用静态数据、不再与环境交互时，它比大多数离策略算法学到的策略更好；并在高度复杂的模拟角色连续控制任务上展示了效果。</p><h2>后来的发展</h2><p>AWR把“用优势的指数给行为克隆加权”带入深度离线RL：<a class="ln" href="../n/awac.html">AWAC优势加权</a>把其中的蒙特卡洛价值换成Q函数，<a class="ln" href="../n/crr.html">CRR评论家正则化回归</a>系统比较了不同的权重函数，<a class="ln" href="../n/iql.html">隐式Q学习IQL</a>用期望分位数回归学价值函数后同样用AWR提取策略。后来<a class="ln" href="../n/idql.html">IDQL隐式扩散Q学习</a>指出，用AWR拟合单峰高斯策略会丢掉隐式策略的多峰结构。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>价值函数用蒙特卡洛或TD(λ)回报回归的是数据混合策略的价值，而不是当前策略的价值，离线时改进幅度有限。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/awac.html">AWAC优势加权</a> <a class="chip hue" style="--h:120" href="../n/iql.html">隐式Q学习IQL</a></div></li><li>加权最大似然拟合的是单峰高斯策略，数据里动作分布多峰时会把几种动作平均成一个不好的动作。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/idql.html">IDQL隐式扩散Q学习</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/td-learning.html">时序差分学习</a><span class="yr">1988 · RL</span><div class=nt>价值函数回归的目标是TD(λ)回报，来自时序差分学习的多步回报。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/deep-rl-matters.html">《Deep RL that Matters》复现性批评</a><span class="yr">2017.09 · RL</span><div class=nt>针对深度RL实现复杂、对超参数敏感的问题，只用收敛的监督学习损失构建算法。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/sac.html">SAC</a><span class="yr">2018.01 · RL</span><div class=nt>SAC靠actor-critic联合优化取得高样本效率；AWR只用两个回归步骤，更简单稳定，性能相当。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/mpo.html">MPO</a><span class="yr">2018.06 · RL</span><div class=nt>与MPO同样从KL约束下的策略改进得到“按指数优势重加权”的非参数策略，再投影到参数化策略。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/iql.html">隐式Q学习IQL</a><span class="yr">2021.10 · RL</span><div class=nt>价值函数用蒙特卡洛或TD(λ)回报回归的是数据混合策略的价值，而不是当前策略的价值，离线时改进幅度有限。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/crr.html">CRR评论家正则化回归</a><span class="yr">2020.06 · RL</span><div class=nt>AWR用回报回归价值、对应的是行为策略；CRR用TD学到的Q函数估计当前策略下的优势来加权，离线改进更有效。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/awac.html">AWAC优势加权</a><span class="yr">2020.06 · RL</span><div class=nt>价值函数用蒙特卡洛或TD(λ)回报回归的是数据混合策略的价值，而不是当前策略的价值，离线时改进幅度有限。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/xql.html">XQL极值Q学习</a><span class="yr">2023.01 · RL</span><div class=nt>离线时用优势加权回归从学到的Q和V中提取策略。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/idql.html">IDQL隐式扩散Q学习</a><span class="yr">2023.04 · RL</span><div class=nt>AWR式加权回归拟合单峰高斯策略，会丢失隐式策略的多峰性；IDQL改用扩散行为模型加重要性重采样。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:336" href="../n/digirl.html">DigiRL设备控制RL</a><span class="yr">2024.06 · 推理·智能体</span><div class=nt>策略更新采用优势加权回归式的离线到在线RL。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/policy-value.html">策略与价值函数</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/mle.html">最大似然估计</a> <a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a></p>
+<h2>本篇术语</h2><ul><li><b>优势（advantage）</b>　某个动作的价值比该状态的平均价值高多少：<code>A(s,a) = Q(s,a) − V(s)</code>，正值表示比平均好。</li><li><b>加权行为克隆</b>　模仿数据中的动作，但每个样本乘一个权重；权重大的动作被模仿得更多。</li></ul>
+<h2>怎么学</h2><p>先复习<a class="lc" href="../c/imitation-learning.html">模仿学习与行为克隆</a>和优势函数；读原文第3节从KL约束问题推导出指数权重的过程；在一个连续控制任务上实现AWR的两个回归步骤，试不同温度β看对性能的影响。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1910.00177" rel="noopener">https://arxiv.org/abs/1910.00177</a>（标题、四位作者、arXiv v1于2019-10-01；摘要中只用收敛的最大似然损失、可利用离策略数据、两个监督学习步骤（回归价值目标与回归加权目标动作）、支持连续与离散动作、几行代码实现、分析经验回放离策略数据、Gym上与成熟方法相当、纯静态数据时优于多数离策略算法、复杂模拟角色控制。指数权重公式、TD(λ)目标、权重截断、与RWR的渊源按原文正文通行描述；机构按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20AWR%E4%BC%98%E5%8A%BF%E5%8A%A0%E6%9D%83%E5%9B%9E%E5%BD%92%EF%BC%88awr%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aawr%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/awr.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="maven.html"><small>本分支上一个 · 2019.10</small><b>MAVEN协同探索</b></a><a class="r" href="alphastar.html"><small>本分支下一个 · 2019.10</small><b>AlphaStar</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

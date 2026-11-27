@@ -1,0 +1,31 @@
+{
+  "id": "pandora",
+  "who": "Jiannan Xiang, Guangyi Liu, Yi Gu, Qiyue Gao, Yuting Ning, Yuheng Zha, Zeyu Feng, Tianhua Tao et al.（13位，含Eric P. Xing） · Maitrix.org、UC San Diego、MBZUAI",
+  "venue": "arXiv 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2406.09455"}
+  ],
+  "aka": ["Pandora", "Pandora世界模型", "潘多拉世界模型", "自然语言动作世界模型", "文本动作控制视频世界模型"],
+  "problem": "大语言模型懂语言但不懂物理画面，视频生成模型画面逼真却不能在生成过程中接收动作；通用世界模型需要两者兼得，而从头训练代价太高。",
+  "idea": "把预训练的7B语言模型和预训练视频扩散模型用轻量适配器接起来：语言模型读当前画面和文字动作，输出条件去驱动视频模型生成下一段，再自回归地接着生成。",
+  "impact": "展示了用文字随时改变视频走向（如在驾驶场景里“把天气改成日落”）、并跨室内外、游戏、机器人等领域迁移；但论文只给定性样例，没有定量评测。",
+  "method": "**卡在哪**：[[sora]]这类视频模型一次根据提示生成整段视频，中途不能再输入动作；[[genie]]、[[unisim]]能逐步接收动作，但动作空间各自专用。Pandora想做一个用**自由文本**当动作、用**视频**当状态的通用世界模型（见[[c:world-model-concept]]），并且不从头训练。\n\n**做法**：骨干是两个现成大模型。语言模型部分是以[[vicuna]]-7B为基础、带视觉编码器的Chat-UniVi；视频部分是[[dynamicrafter]]，每次生成16帧。上一段视频经视觉编码器和Q-Former式适配器（见[[blip-2]]）送进语言模型，语言模型再读文字动作，用一组可学习查询向量输出条件，经第二个适配器交给视频模型；视频模型同时以上一段的最后4帧为起点，保证衔接。训练分两步：先冻结两个大模型，只训练适配器，在[[webvid]]上把语言模型输出对齐到视频模型的文本条件空间；再用约120万条“状态-动作-下一状态”数据做指令微调，来源包括重新标注的Panda-70M、[[something-something]]、[[bridgedata-v2]]、[[epic-kitchens]]，以及[[carla]]驾驶、室内导航和2D游戏等仿真渲染。\n\n**结果**：用最长5秒（40帧）的片段训练，可自回归生成8秒（64帧）视频，并在生成途中随时插入新的文字动作；作者展示了在一个领域学到的动作能迁移到没见过的领域。论文没有报告定量指标，并列出视频一致性、物理常识和指令遵循上的失败例子。",
+  "limits": [
+    {"text": "没有任何定量评测，动作是否被准确执行、物理是否合理，只能从挑选的样例里判断。", "solved_by": []},
+    {"text": "视频长度只有几秒，长时间一致性和物理常识常出错；作者推测部分源于GPT-4自动标注的噪声。", "solved_by": ["genie-3"]}
+  ],
+  "relations": [
+    {"to": "dynamicrafter", "type": "uses", "note": "以DynamiCrafter为视频生成部分，指令微调时更新其参数。"},
+    {"to": "vicuna", "type": "uses", "note": "自回归骨干是基于Vicuna-7B的多模态语言模型Chat-UniVi，负责读画面和文字动作。"},
+    {"to": "genie", "type": "rivals", "note": "Genie从无标注视频学离散潜动作，Pandora直接用自然语言当动作，靠预训练语言模型理解动作含义。"},
+    {"to": "unisim", "type": "extends", "note": "延续UniSim用多来源数据训练通用交互模拟器的思路，改为拼接现成语言模型与视频模型，只做轻量微调。"},
+    {"to": "blip-2", "type": "uses", "note": "用Q-Former式适配器把视觉特征压成少量token送入语言模型。"}
+  ],
+  "prereq": ["world-model-concept", "language-model", "diffusion-process", "autoregressive", "pretrain-finetune", "instruction-tuning"],
+  "terms": [
+    {"t": "自回归-扩散混合", "d": "外层按时间一段一段往后生成（自回归），每一段内部用扩散模型去噪生成画面。"},
+    {"t": "适配器", "d": "插在两个冻结大模型之间的小网络，只训练它就能把一个模型的输出翻译成另一个模型能用的输入。"}
+  ],
+  "learn": "先读[[unisim]]了解“动作条件视频模拟器”，再看[[blip-2]]的Q-Former怎样连接视觉和语言模型；然后读原文第2节架构图和表1数据构成，对照项目样例看它能做和做不好的事。",
+  "check": {"source": "https://arxiv.org/abs/2406.09455", "confirmed": "标题、13位作者、arXiv v1 2024-06-12、摘要中7B语言模型与预训练视频模型；HTML正文中Chat-UniVi（Vicuna-7B-v1.5）、DynamiCrafter 16帧、Q-Former适配器、两阶段训练、WebVid对齐、约120万条数据及来源、5秒训练生成8秒、无定量结果及作者列出的失败类型、机构。"}
+}

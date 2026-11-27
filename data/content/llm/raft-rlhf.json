@@ -1,0 +1,32 @@
+{
+  "id": "raft-rlhf",
+  "who": "Hanze Dong, Wei Xiong, Deepanshu Goyal, Yihan Zhang, Winnie Chow, Rui Pan, Shizhe Diao, Jipeng Zhang, Kashun Shum, Tong Zhang · 香港科技大学",
+  "venue": "TMLR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2304.06767"},
+    {"label": "代码", "url": "https://github.com/OptimalScale/LMFlow"}
+  ],
+  "aka": ["RAFT", "Reward rAnked FineTuning", "奖励排序微调", "拒绝采样微调", "Rejection Sampling Fine-tuning", "Best-of-N微调"],
+  "problem": "RLHF用PPO等强化学习算法微调模型，效率低、训练不稳定，经常成为对齐成功的障碍。",
+  "idea": "不做强化学习：每轮让模型对一批提示采样多个回答，用奖励模型打分，只保留每个提示里得分最高的回答，然后在这些筛选出的样本上做普通的监督微调，如此迭代。",
+  "impact": "把“采样—按奖励筛选—监督微调”的迭代流程形式化为一种对齐方法，在大语言模型和扩散模型上都有效，是拒绝采样微调这一类简单对齐方法的代表，常被当作PPO和DPO的对照基线。",
+  "method": "背景：[[instructgpt]]的RLHF流程是：训练奖励模型，再用[[ppo]]最大化奖励并以KL惩罚约束不偏离SFT模型太远。PPO需要同时维护策略、价值网络、参考模型和奖励模型，超参数多，大模型上不稳定。\n\n**RAFT的迭代**：每一轮包括三步：\n- **采样**：从提示集中取一批提示x，用当前模型π_t为每个提示生成K个回答 `y_1…y_K`；\n- **排序筛选**：用奖励模型r给每个回答打分，只保留每个提示中得分最高的那个 `y* = argmax_k r(x, y_k)`（即Best-of-K），丢掉表现不好的回答；\n- **微调**：在筛选出的（x, y*）上用标准的语言建模损失做监督微调，得到π_{t+1}。\n然后用新模型重新采样，进入下一轮。\n\n**为什么有效**：每轮的训练数据都比模型当前的平均输出更好，在这些数据上模仿，相当于把模型分布逐步推向高奖励区域；监督微调本身稳定、实现简单、显存开销小（不需要价值网络）。与PPO相比，它丢弃了低奖励样本里“什么不该做”的信息，只从好样本学习。为防止偏离太远，可以通过控制采样温度、K的大小和迭代轮数来调节。\n\n**结果**（摘要）：RAFT在奖励学习和其他自动指标上都能有效提升模型表现，实验覆盖大语言模型（如在HH-RLHF上对LLaMA对齐）和扩散模型（文生图）。",
+  "legacy": "同类思路在Llama 2的拒绝采样微调、ReST、以及推理模型中的拒绝采样SFT（RFT）里反复出现；RAFT也是LMFlow工具包中的对齐算法。",
+  "limits": [
+    {"text": "只从每个提示的最佳样本学习，低分样本里的负面信息被丢弃，样本效率不如同时利用好坏样本的偏好方法。", "solved_by": ["dpo"]},
+    {"text": "完全依赖奖励模型选样本，迭代越多越容易钻奖励模型的空子（奖励过优化）。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ppo", "type": "solves", "note": "PPO在RLHF中低效且不稳定，RAFT用“按奖励筛选再监督微调”替代强化学习。"},
+    {"to": "instructgpt", "type": "extends", "note": "沿用奖励模型，但把策略优化步骤换成迭代的筛选加SFT。"},
+    {"to": "hh-rlhf", "type": "uses", "note": "在HH-RLHF数据上训练奖励模型并评测对齐效果。"},
+    {"to": "rm-overoptimization", "type": "uses", "note": "Best-of-N采样是奖励过优化研究中分析的基本方式，RAFT把它变成迭代训练。"}
+  ],
+  "prereq": ["rlhf-concept", "pretrain-finetune", "decoding-sampling", "reward-design"],
+  "terms": [
+    {"t": "Best-of-N", "d": "对同一个提示采样N个回答，用奖励模型打分，选得分最高的一个。"},
+    {"t": "拒绝采样微调", "d": "采样多个回答后只保留好的（拒绝差的），再用这些好回答做监督微调。"}
+  ],
+  "learn": "先读[[instructgpt]]的RLHF三阶段；读本文第3节RAFT算法框和与PPO的对比实验；动手：用一个小模型和公开奖励模型，对100个提示各采样8个回答取最好的一个做一轮SFT，比较前后的平均奖励。",
+  "check": {"source": "https://arxiv.org/abs/2304.06767", "confirmed": "标题、10位作者、arXiv首次提交2023-04-13；摘要中RL算法的低效与不稳定阻碍对齐、提出RAFT框架、利用奖励模型和足够多的样本选出高质量样本并丢弃不良样本、在筛选后的样本上微调、在大语言模型和扩散模型上提升奖励学习与其他自动指标。迭代三步的具体写法、HH-RLHF与LLaMA实验、TMLR 2023与LMFlow为对正文的一般了解。"}
+}

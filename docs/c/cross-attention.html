@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>交叉注意力（Cross-Attention） · AI脉络</title>
+<meta name="description" content="查询来自一个序列、键和值来自另一个序列的注意力。它让解码器在生成时回看编码器的输入，也是把图像、检索文档等外部信息接进语言模型的常用接口。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/cross-attention.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="交叉注意力（Cross-Attention）">
+<meta property="og:description" content="查询来自一个序列、键和值来自另一个序列的注意力。它让解码器在生成时回看编码器的输入，也是把图像、检索文档等外部信息接进语言模型的常用接口。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/cross-attention.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/cross-attention">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 入门</div>
+<h1>交叉注意力</h1><div class="full">Cross-Attention</div>
+<p class="muted" style="font-size:13px">也叫：cross-attention　交叉注意力　互注意力　编码器-解码器注意力　encoder-decoder attention　source-target attention　cross attention layer　交叉注意力层</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/cross-attention">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>查询来自一个序列、键和值来自另一个序列的注意力。它让解码器在生成时回看编码器的输入，也是把图像、检索文档等外部信息接进语言模型的常用接口。</b></p>
+<p class="tags">先要会：<a class="chip c" href="self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="encoder-decoder.html">编码器-解码器</a></p>
+<p><a class="lc" href="../c/self-attention.html">自注意力与多头注意力</a>里，Q、K、V都由同一个序列算出，作用是让序列内部交换信息。但很多任务涉及<b>两个</b>序列：翻译时译文要对照原文，看图说话时文字要对照图像。<b>交叉注意力</b>就是在两个序列之间做注意力。</p><p><b>定义</b>。设X是“提问方”（如解码器当前的隐状态，长度m），Y是“被查询方”（如编码器输出，长度n）：</p><p class="formula"><code>Q = X·W_Q，K = Y·W_K，V = Y·W_V</code></p><p class="formula"><code>CrossAttn(X, Y) = softmax(Q·Kᵀ / √d)·V</code></p><p>注意力矩阵是m×n的：X的每个位置在Y的所有位置上分配权重，取回一个加权平均的向量（见<a class="lc" href="../c/query-key-value.html">查询、键与值（Q/K/V）</a>）。由于Y是事先给定的完整输入，交叉注意力不需要<a class="lc" href="../c/causal-mask.html">因果掩码</a>。</p><p><b>在编码器-解码器里</b>。<a class="ln" href="../n/transformer.html">Transformer</a>的每个解码器层有三个子层：带因果掩码的自注意力 → 交叉注意力（查询编码器输出）→ 前馈网络。它的前身是RNN时代的<a class="ln" href="../n/bahdanau-attention.html">注意力机制</a>：解码器每生成一个词，都对源句子的所有隐状态算一次权重——那本质上就是交叉注意力，只是打分函数不同。</p><p><b>作为“接口”</b>。交叉注意力让一个模型以可学习的方式读取另一个来源的信息，所以被大量用来做条件注入：</p><ul><li>图像生成：<a class="ln" href="../n/ldm.html">潜空间扩散LDM</a>把文本编码器的输出作为K、V，U-Net的图像特征作为Q，文字由此控制画面。</li><li>多模态语言模型：<a class="ln" href="../n/flamingo.html">Flamingo</a>在冻结的语言模型层之间插入交叉注意力层去读图像特征；后来更流行的做法是把视觉token直接拼进输入序列，用自注意力统一处理（见<a class="lc" href="../c/visual-connector.html">视觉连接器</a>）。</li><li>检索增强：<a class="ln" href="../n/retro.html">RETRO</a>用分块交叉注意力读取检索到的文档。</li><li>语音识别：<a class="ln" href="../n/whisper.html">Whisper</a>的解码器通过交叉注意力读取音频编码器的输出。</li></ul>
+<div class="example"><h4>例子</h4><p>英译中，编码器输出“The cat sat”的3个向量（n = 3）。解码器已生成“猫”，正在预测下一个词，当前位置的查询向量与3个键的点积（除以√d后）为 [0.5, 0.2, 2.1]，softmax得约 [0.15, 0.11, 0.74]。取回的向量主要来自“sat”，于是解码器倾向于生成“坐”。整句生成完后，把每一步的权重排成一个矩阵，就是翻译里常画的“对齐热力图”。</p></div>
+<h2>容易误解的地方</h2><ul><li>交叉注意力的计算量是m×n，被查询的那一方（如高分辨率图像特征）很长时同样昂贵。</li><li>K、V来自外部输入，推理时只需计算一次就能在每个生成步复用，这与自注意力的<a class="lc" href="../c/kv-cache.html">KV缓存</a>不同。</li><li>不要把它和对比学习里的“跨模态对齐”混为一谈：后者只算两个整体向量的相似度，不交换细粒度信息。</li></ul>
+<h2>用到它的工作</h2><p class="tags"><a class="chip hue" style="--h:240" href="../n/mini-gemini.html">Mini-Gemini双编码器</a> <a class="chip hue" style="--h:240" href="../n/mplug-owl3.html">mPLUG-Owl3长图像序列</a> <a class="chip hue" style="--h:240" href="../n/xgen-mm.html">xGen-MM（BLIP-3）</a> <a class="chip hue" style="--h:240" href="../n/longvu.html">LongVU时空自适应压缩</a></p>
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

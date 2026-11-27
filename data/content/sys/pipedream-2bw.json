@@ -1,0 +1,24 @@
+{
+ "id": "pipedream-2bw",
+ "who": "Deepak Narayanan, Amar Phanishayee, Kaiyu Shi, Xie Chen, Matei Zaharia · 斯坦福大学, 微软研究院",
+ "venue": "ICML 2021",
+ "aka": ["PipeDream-2BW", "双缓冲权重", "double-buffered weights", "2BW", "PipeDream-Flush"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2006.09503"}
+ ],
+ "problem": "流水线并行有两难：GPipe每批结束都要排空流水线，气泡大；PipeDream不排空，但为保证同一个微批次前向和反向用同一版权重，要给每个在途微批次都存一份权重，显存吃不消。",
+ "idea": "每个阶段只保留两版权重（双缓冲），把若干微批次的梯度累加后再统一更新一次；更新语义接近数据并行（只滞后一步），显存却基本不随流水线深度增加。",
+ "impact": "它附带提出的PipeDream-Flush（1F1B加周期性排空）调度，后来成为Megatron-LM流水线并行的默认做法。",
+ "method": "[[gpipe]]把一批数据切成微批次依次流过各阶段，等所有微批次的反向都做完再更新权重，每批开头结尾都有空闲的“气泡”。[[pipedream]]用1F1B调度（每个阶段交替做一个前向和一个反向）不排空流水线，但不同微批次会看到不同版本的权重，只好为每个在途微批次存一份旧权重，深流水线下显存成倍增长。\n\nPipeDream-2BW（double-buffered weights）观察到：如果把多个微批次的梯度合并成一次更新，那么任何时刻只需要两版权重——正在被新微批次使用的一版，和正在做完反向的旧微批次还要用的一版。更新规则相当于用上一步的权重算梯度（一步延迟），论文认为这与数据并行的语义接近、收敛基本不受影响。系统还会根据显存容量和互连拓扑自动把模型切成若干阶段。论文同时给出不存旧权重、定期排空的变体PipeDream-Flush。\n\n摘要报告：训练大型GPT与BERT语言模型最多加速20倍，最终精度相近。",
+ "limits": [
+  {"text": "一步权重延迟改变了严格的同步更新语义；1F1B加排空仍有流水线气泡，阶段数越多气泡越大。", "solved_by": ["megatron-3d", "zero-bubble"]}
+ ],
+ "relations": [
+  {"to": "pipedream", "type": "solves", "note": "PipeDream为每个在途微批次存一份权重，显存随流水线深度增长；2BW只保留两版权重。"},
+  {"to": "gpipe", "type": "solves", "note": "GPipe每批都要排空流水线，2BW通过梯度合并与双缓冲避免频繁排空。"},
+  {"to": "megatron", "type": "uses", "note": "实验在Megatron式张量并行的GPT、BERT模型上做流水线切分。"}
+ ],
+ "prereq": ["distributed-training", "batch-size-epoch", "sgd-minibatch", "throughput-latency"],
+ "terms": [{"t": "流水线气泡", "d": "流水线并行中某些阶段在等待上下游数据、没有活干的空闲时间。"}],
+ "check": {"source": "https://arxiv.org/abs/2006.09503", "confirmed": "标题、五位作者、v1日期2020-06-16；摘要：大模型参数与激活放不下单卡、提出PipeDream-2BW、新的流水线与权重梯度合并策略加权重双缓冲、保证高吞吐低显存且更新语义接近数据并行、按显存与互连拓扑自动切分、GPT与BERT最多加速20倍且精度相近。PipeDream-Flush被Megatron采用、ICML 2021、机构为一般了解。"}
+}

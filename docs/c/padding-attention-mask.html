@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>填充、截断与注意力掩码（Padding, Truncation and Attention Mask） · AI脉络</title>
+<meta name="description" content="把一批长短不一的序列补齐（padding）或截短（truncation）成同样长度，再用attention_mask标出哪些位置是真实token、哪些是凑数的空位，让模型忽略后者。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/padding-attention-mask.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="填充、截断与注意力掩码（Padding, Truncation and Attention Mask）">
+<meta property="og:description" content="把一批长短不一的序列补齐（padding）或截短（truncation）成同样长度，再用attention_mask标出哪些位置是真实token、哪些是凑数的空位，让模型忽略后者。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/padding-attention-mask.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/padding-attention-mask">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 入门</div>
+<h1>填充、截断与注意力掩码</h1><div class="full">Padding, Truncation and Attention Mask</div>
+<p class="muted" style="font-size:13px">也叫：padding　填充　补齐　truncation　截断　attention_mask　注意力掩码　input_ids　token_type_ids　左填充　右填充　left padding　padding side　动态填充　dynamic padding　max_length</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/padding-attention-mask">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>把一批长短不一的序列补齐（padding）或截短（truncation）成同样长度，再用attention_mask标出哪些位置是真实token、哪些是凑数的空位，让模型忽略后者。</b></p>
+<p class="tags">先要会：<a class="chip c" href="tokenization.html">分词与token</a> <a class="chip c" href="attention-concept.html">注意力机制</a></p>
+<p>GPU擅长处理形状规整的张量（见<a class="lc" href="../c/vector-matrix.html">向量、矩阵与张量</a>）。一批文本切成token后长度各不相同，要拼成一个<code>[batch, seq_len]</code>的矩阵，就得补齐或截短。这一步看似是工程细节，处理不好会悄悄改变模型的输出。</p><p><b>三个配套的输入</b>。以Hugging Face的分词器为例，返回的字典里通常有：</p><ul><li><b>input_ids</b>：token编号序列。</li><li><b>attention_mask</b>：与input_ids等长，真实token为1，填充位置为0。</li><li><b>token_type_ids</b>（部分模型才有）：句子对任务中标出每个token属于第一句还是第二句。</li></ul><p><b>填充</b>。把短序列用PAD token补到这批里最长的长度（动态填充），或补到固定长度。模型内部，attention_mask会被转换成加在注意力分数上的偏置：允许的位置加0，填充位置加一个很大的负数（如−10^9），经过<a class="lc" href="../c/softmax.html">Softmax与logits</a>后权重几乎为0，于是任何真实token都不会从填充位置读取信息。计算损失时，填充位置的标签设为忽略值（PyTorch惯例是−100），不计入平均。</p><p><b>左填充还是右填充</b>。BERT这类编码器常用右填充。<b>自回归生成时要用左填充</b>：模型从序列最右端继续写，如果右边是一串PAD，新token就会接在PAD后面，位置编号也被打乱。所以批量生成前要把分词器设为左填充，并相应地调整位置编号。</p><p><b>截断</b>。超过<a class="lc" href="../c/context-window.html">上下文窗口</a>或设定的max_length的部分要截掉，可以截尾部、截头部，或者对长文档用滑动窗口切成几段分别处理（抽取式问答的常见做法）。</p><p><b>与因果掩码的关系</b>。attention_mask处理的是“哪些位置是空的”，<a class="lc" href="../c/causal-mask.html">因果掩码</a>处理的是“不许看未来”，自回归模型里两者会合并成一个掩码同时生效。预训练时常用<a class="lc" href="../c/sequence-packing.html">序列打包与文档掩码</a>把多条短文本拼满一整行，避免大量填充浪费算力。</p>
+<div class="example"><h4>例子</h4><p>两句话切成token后长度分别为3和5，右填充到5：</p><p><code>input_ids = [[101, 7592, 102, 0, 0], [101, 2023, 2003, 2307, 102]]</code> <code>attention_mask = [[1, 1, 1, 0, 0], [1, 1, 1, 1, 1]]</code></p><p>第一句的第3个位置算注意力时，对5个位置的原始分数是 [2.0, 1.0, 0.5, 0.3, 0.8]，加上掩码偏置后变成 [2.0, 1.0, 0.5, −10^9, −10^9]，softmax结果约为 [0.63, 0.23, 0.14, 0, 0]，两个填充位置被完全忽略。</p></div>
+<h2>容易误解的地方</h2><ul><li>忘了传attention_mask时，模型会把PAD当成正常token读进去，输出随填充长度变化，而且不报错。</li><li>自回归模型批量生成时用右填充，是“单条生成正常、批量生成变差”的常见原因。</li><li>有的模型没有专门的PAD token，常用EOS代替；这时训练标签要特别小心，别把真正的EOS也当成填充忽略掉，否则模型学不会停止。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

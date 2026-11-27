@@ -1,0 +1,34 @@
+{
+  "id": "phi-4-reasoning",
+  "who": "Marah Abdin, Sahaj Agarwal, Ahmed Awadallah, Vidhisha Balachandran, Harkirat Behl, Lingjiao Chen, Gustavo de Rosa, Suriya Gunasekar et al. · 微软",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2504.21318"},
+    {"label": "Hugging Face", "url": "https://huggingface.co/microsoft/Phi-4-reasoning"}
+  ],
+  "aka": ["Phi-4-reasoning", "Phi-4-reasoning-plus", "Phi-4推理", "小模型推理", "可教提示", "teachable prompts", "推理蒸馏SFT"],
+  "problem": "DeepSeek-R1之后，小模型的推理能力主要靠蒸馏得到，但蒸馏用什么题、怎样选题，很少被认真研究；14B这样的小模型能否接近671B的R1？",
+  "idea": "精挑细选“可教”的题目——难度刚好处在基础模型能力边界上、覆盖面足够广——再用o3-mini生成长推理答案，对Phi-4做监督微调；在此之上再用约6000道数学题做一小段结果奖励强化学习，得到更强的plus版本。",
+  "impact": "14B的Phi-4-reasoning在多数基准上超过DeepSeek-R1-Distill-Llama-70B，在AIME 2025上接近完整的DeepSeek-R1；报告的核心结论是“题目的选择与过滤是推理蒸馏的关键”，常被数据中心的推理训练工作引用。",
+  "background": "[[phi-4]]系列一贯强调高质量合成数据。推理模型兴起后，[[s1]]、[[limo]]表明少量精选样本的监督微调就能显著提升推理，[[deepseek-r1]]则发布了大规模蒸馏的小模型。微软团队想知道：在数据量更大时，选题策略能把小模型推到多远，RL又能再补多少。",
+  "method": "**选题**：从大量来源收集STEM、编程和安全相关的题目，用模型判断难度，只保留“基础模型做不好、但并非完全无望”的题——即处在能力边界的可教题目，并保证题型多样。最终监督数据超过140万条“题目—回答”，共83亿个不重复词元，回答是o3-mini生成的长推理轨迹，并加入安全与负责任AI的对齐数据。\n\n**监督微调**：增加思考开始和结束的专用标记；Phi-4原本最长16K，把[[rope]]的基频翻倍，训练到32K长度；约1.6万步。\n\n**强化学习（plus版）**：用[[grpo]]在约6000道（从7.2万道中抽样）可验证答案的数学题上训练一小段。奖励以“长度感知的正确率”为主：答对时鼓励简洁、答错时允许更长的思考，同时惩罚重复和格式错误。RL让模型生成更长的推理，换来更高的准确率。\n\n**结果**：两个版本在数学（AIME、HMMT、OmniMath）、科学（GPQA）、编程（LiveCodeBench）、规划与空间理解等任务上都超过DeepSeek-R1-Distill-Llama-70B，plus版在AIME 2025上与完整的DeepSeek-R1相当；作者还观察到在通用基准上也有一定的正迁移。",
+  "legacy": "与[[openthoughts]]等工作一起，把推理蒸馏的研究重心从“轨迹从哪来”转向“题目怎么选”；作者也指出，AIME这类只有30道题的小评测方差很大，呼吁用多次采样报告均值和方差。",
+  "limits": [
+    {"text": "推理轨迹全部来自o3-mini，模型能力上限受老师限制，也无法完全公开复现数据。", "solved_by": []},
+    {"text": "plus版靠更长的推理换准确率，推理成本随之增加，在简单题上可能想得过多。", "solved_by": []},
+    {"text": "“可教”题目的判定依赖难度估计与人工设定的阈值，换一个基础模型需要重新筛选。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "phi-4", "type": "extends", "note": "以Phi-4为基础模型做推理方向的后训练。"},
+    {"to": "o3", "type": "uses", "note": "监督数据的长推理答案由o3-mini生成。"},
+    {"to": "deepseek-r1", "type": "rivals", "note": "14B模型在多数基准超过R1蒸馏的70B模型，plus版在AIME 2025上接近完整R1。"},
+    {"to": "grpo", "type": "uses", "note": "plus版用GRPO做结果奖励的强化学习。"},
+    {"to": "limo", "type": "extends", "note": "同样强调精选题目胜过堆数据，并把规模扩大到上百万条、加上RL阶段。"}
+  ],
+  "prereq": ["knowledge-distillation", "pretrain-finetune", "reasoning-tokens", "policy-gradient-concept", "positional-encoding"],
+  "terms": [
+    {"t": "可教提示（teachable prompts）", "d": "对当前模型来说难度适中、学了能学会的题目：太简单学不到东西，太难则示范答案也学不会。"},
+    {"t": "长度感知奖励", "d": "答案正确与否之外再看长度：答对时越简洁奖励越高，答错时对长思考惩罚较轻，引导模型在难题上多想、易题上少想。"}
+  ],
+  "learn": "先读[[s1]]和[[limo]] → 读原文第2节数据筛选与第4节RL奖励设计 → 动手：用一个小模型对一批题各做8次，按正确率把题分成太易、可教、太难三类，看各占多少。",
+  "check": {"source": "https://arxiv.org/abs/2504.21318", "confirmed": "标题、作者、v1提交于2025-04-30；摘要中14B、可教提示、o3-mini示范、plus版短时结果奖励RL、超过R1-Distill-Llama-70B并接近R1；正文（arxiv.org/html/2504.21318）核对超过140万条与83亿词元、思考标记、RoPE基频翻倍与32K、约1.6万步、约6K数学题与7.2万题池、GRPO、长度感知正确率奖励与重复惩罚、AIME 2025接近R1。“能力边界”的选题标准为概括；AIME小样本方差的呼吁为一般了解；未写venue。"}
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>信赖域与代理目标（Trust Regions and Surrogate Objectives） · AI脉络</title>
+<meta name="description" content="策略更新时只在旧策略附近的一个“可信区域”里优化：用旧数据构造的代理目标只在新旧策略接近时才可靠，所以要用KL约束（TRPO）或概率比裁剪（PPO）限制每一步的改动。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/trust-region-rl.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="信赖域与代理目标（Trust Regions and Surrogate Objectives）">
+<meta property="og:description" content="策略更新时只在旧策略附近的一个“可信区域”里优化：用旧数据构造的代理目标只在新旧策略接近时才可靠，所以要用KL约束（TRPO）或概率比裁剪（PPO）限制每一步的改动。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/trust-region-rl.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/trust-region-rl">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>信赖域与代理目标</h1><div class="full">Trust Regions and Surrogate Objectives</div>
+<p class="muted" style="font-size:13px">也叫：信赖域　trust region　信赖域策略优化　代理目标　surrogate objective　替代目标　clipped surrogate objective　裁剪代理目标　PPO-clip　PPO-penalty　KL约束　KL constraint　单调改进　monotonic improvement　概率比　probability ratio　重要性比裁剪</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/trust-region-rl">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>策略更新时只在旧策略附近的一个“可信区域”里优化：用旧数据构造的代理目标只在新旧策略接近时才可靠，所以要用KL约束（TRPO）或概率比裁剪（PPO）限制每一步的改动。</b></p>
+<p class="tags">先要会：<a class="chip c" href="policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="kl-divergence.html">KL散度</a> <a class="chip c" href="actor-critic.html">Actor-Critic与优势函数</a></p>
+<p><a class="lc" href="../c/policy-gradient-concept.html">策略梯度</a>给出的是方向，不是步长。步子太小学得慢；步子太大，策略可能一下子变坏，而同策略算法的下一批数据又由这个坏策略产生，很难再爬回来。参数空间里的小步也不等于策略的小变化：网络某处参数稍动，某个状态下的动作概率可能从0.5跳到0.99。信赖域方法把“步长”直接定义在策略分布上。</p><p><b>代理目标</b>（surrogate objective）。用旧策略π_old采的数据，估计新策略π_θ的好坏：</p><p class="formula"><code>L(θ) = E_{(s,a)~π_old}[ (π_θ(a|s) / π_old(a|s)) · A^{π_old}(s, a) ]</code></p><p>比率<code>ρ = π_θ/π_old</code>是<a class="lc" href="../c/importance-sampling.html">重要性采样</a>权重，A是旧策略下的优势（见<a class="lc" href="../c/actor-critic.html">Actor-Critic与优势函数</a>）。在θ=θ_old处，L与真实目标的差<code>J(π_θ) − J(π_old)</code>一阶相同，但只有新策略访问的状态分布与旧策略接近时它才准，见<a class="lc" href="../c/performance-difference-lemma.html">性能差异引理</a>和<a class="lc" href="../c/state-visitation.html">状态访问分布与占用度量</a>。</p><p><b>单调改进</b>。<a class="ln" href="../n/cpi.html">保守策略迭代CPI</a>和<a class="ln" href="../n/trpo.html">TRPO</a>的理论给出了一个下界：<code>J(π_new) ≥ J(π_old) + L(π_new) − C·max_s KL(π_old ‖ π_new)</code>。只要每步在这个下界上有提升，真实回报就单调不降。</p><p><b>TRPO</b>。实践中把惩罚换成约束：最大化L，同时要求平均KL散度不超过δ（例如0.01）。用<a class="ln" href="../n/natural-pg.html">自然策略梯度</a>的思路做二阶近似，以共轭梯度求解方向，再做线搜索确保约束满足，见<a class="lc" href="../c/kl-divergence.html">KL散度</a>。</p><p><b>PPO</b>。<a class="ln" href="../n/ppo.html">PPO</a>用一阶方法近似同样的效果：<code>L^CLIP = E[min(ρ·A, clip(ρ, 1−ε, 1+ε)·A)]</code>，ε常取0.2。概率比离开[1−ε, 1+ε]后继续推动不再有收益，于是可以对同一批数据安全地做多轮小批量更新。另一个变体用自适应系数的KL惩罚。<a class="ln" href="../n/implementation-matters.html">PPO的实现细节之争</a>发现PPO的稳定性有相当一部分来自代码层面的其他技巧，而不只是裁剪。<a class="ln" href="../n/mpo.html">MPO</a>则用EM式的方式实现类似的KL约束。</p>
+<div class="example"><h4>例子</h4><p>某动作优势A=+2，旧概率0.4。PPO取ε=0.2：新概率升到0.48时ρ=1.2，目标为2.4；再升到0.6，ρ=1.5，裁剪后目标仍为2.4，梯度为0，不再往上推。若A=−2且新概率降到0.2（ρ=0.5），裁剪项为<code>0.8×(−2) = −1.6</code>，未裁剪项为<code>0.5×(−2) = −1</code>，取较小的−1.6，梯度同样为0，不再继续压低。</p></div>
+<h2>容易误解的地方</h2><ul><li>PPO的裁剪并不能保证KL真的小：多轮更新后KL仍可能失控，很多实现额外监控KL并提前停止该轮更新。</li><li>代理目标里的优势是旧策略的优势，新旧策略差得越远越不准，所以“多用几轮旧数据”和“稳定”是此消彼长的。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

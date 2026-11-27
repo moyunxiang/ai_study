@@ -1,0 +1,23 @@
+{
+  "id": "soft-nms",
+  "who": "Navaneeth Bodla, Bharat Singh, Rama Chellappa, Larry S. Davis · 马里兰大学",
+  "venue": "ICCV 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1704.04503"},
+    {"label": "代码", "url": "https://github.com/bharatsingh430/soft-nms"}
+  ],
+  "aka": ["SoftNMS", "Soft NMS", "软非极大值抑制", "软NMS", "非极大值抑制改进"],
+  "problem": "传统NMS把与最高分框重叠超过阈值的框直接删掉，两个物体靠得很近时，真实的第二个物体也被误删。",
+  "idea": "不删除，而是按与最高分框的重叠程度降低其余框的分数（线性或高斯衰减），重叠越大降得越多。",
+  "impact": "只改一行代码、无需重新训练，就在PASCAL VOC和COCO上给Faster R-CNN、R-FCN等检测器稳定涨点。",
+  "method": "检测器会在同一个物体周围输出很多重叠的框，非极大值抑制（NMS）负责去重：按分数排序，取最高分框，把与它IoU超过阈值（如0.5）的框全部删掉，再重复。问题是阈值很难定：两个人并排站、两辆车相互遮挡时，第二个物体的框与第一个框IoU可能超过阈值而被删，造成漏检；阈值调高又会留下很多重复框。\n\nSoft-NMS把“删除”改成“降分”。对剩余的每个框bᵢ，若与当前最高分框M重叠，就把分数sᵢ乘上一个随重叠增大而减小的系数：线性版是 `sᵢ ← sᵢ(1 − IoU(M, bᵢ))`（仅在IoU超过阈值时），高斯版是 `sᵢ ← sᵢ·exp(−IoU(M, bᵢ)²/σ)`。真正的重复框分数会被压得很低、最终被分数阈值过滤；而与M部分重叠的另一个物体只被降一点，仍能保留下来。\n\n标题强调这是“一行代码”的改动：不需要重新训练，计算复杂度与原NMS相同。摘要报告只换掉NMS，COCO式mAP在PASCAL VOC 2007上对[[r-fcn]]和Faster R-CNN都提高1.7%，在MS COCO上分别提高1.3%和1.1%；配合Deformable-RFCN，单模型最好结果从39.8%提高到40.9%。",
+  "limits": [
+    {"text": "仍是手工设计的后处理，依赖阈值或σ等超参数，也让检测流程无法端到端训练。", "solved_by": ["detr", "yolov10"]}
+  ],
+  "relations": [
+    {"to": "faster-rcnn", "type": "uses", "note": "在Faster R-CNN等检测器的后处理中直接替换NMS验证效果。"},
+    {"to": "r-fcn", "type": "uses", "note": "在R-FCN上验证，无需重新训练即可涨点。"}
+  ],
+  "prereq": ["anchor-nms", "iou-map", "vision-tasks"],
+  "check": {"source": "https://arxiv.org/abs/1704.04503", "confirmed": "arXiv记录：标题、作者、v1日期2017-04-14；摘要中按与M的重叠连续衰减分数、VOC 2007上R-FCN与Faster-RCNN各+1.7%、COCO上+1.3%/+1.1%、Deformable-RFCN 39.8%→40.9%、复杂度同传统NMS、无需额外训练。线性与高斯两种衰减公式、ICCV 2017凭一般了解。"}
+}

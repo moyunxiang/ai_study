@@ -1,0 +1,29 @@
+{
+  "id": "btm",
+  "who": "Margaret Li, Suchin Gururangan, Tim Dettmers, Mike Lewis, Tim Althoff, Noah A. Smith, Luke Zettlemoyer · 华盛顿大学、Meta AI、Allen Institute for AI",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2208.03306"}
+  ],
+  "aka": ["BTM", "Branch-Train-Merge", "分支-训练-合并", "ELM", "expert language models", "c-BTM", "易并行训练"],
+  "problem": "训练一个大语言模型需要成百上千块GPU在每一步同步梯度，通信开销大、对集群要求高；而且训练完成后想为新领域补充数据，只能整体重新训练或继续训练。",
+  "idea": "把模型拆成一组互相独立的领域专家语言模型（ELM）：从已有专家（的平均）分支出新模型，只在某个领域的数据上训练，训练完合并回专家集合。各专家完全并行、互不通信；用时可以集成，也可以把参数平均成单个模型。",
+  "impact": "提出“分别训练领域专家再合并”的易并行训练范式；后续的c-BTM把领域换成无监督聚类，Branch-Train-MiX则把这些专家的FFN拼成MoE层并学习token级路由。",
+  "method": "背景：[[sparse-moe]]、[[switch-transformer]]把专家放在同一个模型里联合训练，仍需全局同步；[[dont-stop-pretraining]]表明在领域数据上继续预训练能显著提升该领域效果；[[model-soups]]表明从同一起点微调出的多个模型可以直接平均参数。\n\n**BTM的三步**（对每个新领域重复）：\n\n- **分支（Branch）**：新专家的初始参数取当前专家集合中若干专家参数的加权平均（第一轮从一个在混合数据上训练的种子模型开始）。\n- **训练（Train）**：只用这个领域的数据（如科学论文、法律文本）独立训练，不与其他专家通信。\n- **合并（Merge）**：把训练好的专家加入集合。\n\n**使用方式**：推理时可以把多个专家的输出按该输入属于各领域的后验概率加权集成；或者直接对专家参数做加权平均，坍缩成一个普通大小的模型，推理成本与单个模型相同。专家也可以随时增删，以更新模型覆盖的数据。\n\n结果：在控制训练成本相同时，BTM在领域内和领域外的困惑度都优于GPT式Transformer语言模型。作者发现这一效果对专家的初始化方式不敏感，但要求专家确实按领域专门化——用随机切分的数据训练的集成效果不好。扩展到64个领域（共1920亿个以空格分隔的词）时，总参数22.4B的BTM模型与用2.5倍算力训练的Transformer语言模型效果相当，且收益随领域数增加而增大。",
+  "limits": [
+    {"text": "需要预先把数据按领域划分并为每个输入估计领域归属，领域定义依赖元数据，对没有标签的网页数据不方便。", "solved_by": []},
+    {"text": "集成时每个参与的专家都要做一次前向计算，推理成本随专家数增长；而参数平均成单模型又会损失一部分专门化的收益，缺少token级的细粒度组合。", "solved_by": ["btx"]}
+  ],
+  "relations": [
+    {"to": "sparse-moe", "type": "rivals", "note": "MoE把专家放在同一模型中联合训练并需全局同步，BTM的专家各自独立训练、完全并行。"},
+    {"to": "dont-stop-pretraining", "type": "extends", "note": "在领域数据上继续预训练的思路被系统化为分支出领域专家。"},
+    {"to": "model-soups", "type": "uses", "note": "借用从同一起点训练的模型可以参数平均的性质，把多个专家合成单个模型。"},
+    {"to": "switch-transformer", "type": "rivals", "note": "同为扩大总参数量而控制计算的路线，Switch依赖大规模同步训练，BTM追求易并行。"}
+  ],
+  "prereq": ["language-model", "ensemble", "distributed-training", "perplexity", "mixture-of-experts"],
+  "terms": [
+    {"t": "易并行（embarrassingly parallel）", "d": "子任务之间完全不需要通信，可以分别在不同机器上同时运行。"},
+    {"t": "领域专家语言模型（ELM）", "d": "BTM中只在某一个领域数据上训练的完整语言模型。"}
+  ],
+  "learn": "先读[[dont-stop-pretraining]]和[[model-soups]]；读原文第2节BTM算法和第4节随机切分对照实验；动手：从同一个小GPT分别在两个领域上继续训练，比较两者的输出集成与参数平均在各领域上的困惑度。",
+  "check": {"source": "https://arxiv.org/abs/2208.03306", "confirmed": "标题、7位作者、arXiv v1提交日2022-08-05；摘要中BTM通信高效、易并行地独立训练不同数据子集上的子模型、领域专家ELM可增删、集成或平均成单个LM、从现有ELM（混合）分支并在新领域训练后合并、在控制训练成本下领域内外困惑度优于GPT式Transformer、对初始化稳健但需要领域专门化而随机切分不好、64个领域1920亿词时22.4B参数模型与用2.5倍算力的Transformer相当、收益随领域数增大。按后验加权集成的细节、c-BTM后续为一般了解。"}
+}

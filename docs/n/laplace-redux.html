@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Laplace Redux拉普拉斯近似（2021） · AI脉络</title>
+<meta name="description" content="拉普拉斯近似是最简单的贝叶斯神经网络后验近似，但大家普遍认为它要算Hessian、代价高、难实现、效果也不如变分贝叶斯和，因此很少被用。 系统梳理拉普拉斯近似的各种变体（只对最后一层、子网络，以及对角、K-FAC等Hessian近似），给出一个易用的PyTorch库，并用大量实验说明这些看法是误解。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/laplace-redux.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Laplace Redux拉普拉斯近似（2021）">
+<meta property="og:description" content="拉普拉斯近似是最简单的贝叶斯神经网络后验近似，但大家普遍认为它要算Hessian、代价高、难实现、效果也不如变分贝叶斯和，因此很少被用。 系统梳理拉普拉斯近似的各种变体（只对最后一层、子网络，以及对角、K-FAC等Hessian近似），给出一个易用的PyTorch库，并用大量实验说明这些看法是误解。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/laplace-redux.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/laplace-redux">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 概率模型与不确定性</div>
+<h1>Laplace Redux拉普拉斯近似</h1>
+<div class="full">Laplace Redux -- Effortless Bayesian Deep Learning</div>
+<div class="meta"><span>2021.06</span><span>论文</span><span>延伸</span><span>NeurIPS 2021</span><span>Erik Daxberger, Agustinus Kristiadi, Alexander Immer, Runa Eschenhagen, Matthias Bauer, Philipp Hennig · 剑桥大学、图宾根大学、苏黎世联邦理工学院、DeepMind等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2106.14806" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/aleximmer/Laplace" rel="noopener">laplace库 ↗</a><a class="btn sm" href="../index.html#/n/laplace-redux">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>拉普拉斯近似是最简单的贝叶斯神经网络后验近似，但大家普遍认为它要算Hessian、代价高、难实现、效果也不如变分贝叶斯和<a class="ln" href="../n/deep-ensembles.html">深度集成</a>，因此很少被用。</p></div><div><h4>方法</h4><p>系统梳理拉普拉斯近似的各种变体（只对最后一层、子网络，以及对角、K-FAC等Hessian近似），给出一个易用的PyTorch库，并用大量实验说明这些看法是误解。</p></div><div><h4>影响</h4><p>让“训完再加一层拉普拉斯近似”成为给现成网络加不确定性估计的轻量方案，laplace库被广泛使用，拉普拉斯近似也重新进入贝叶斯深度学习的主流比较。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>拉普拉斯近似的思路来自<a class="ln" href="../n/bayesian-nn.html">贝叶斯神经网络</a>时代：先正常训练得到权重的最大后验估计θ*，再在θ*处把对数后验做二阶泰勒展开，得到一个高斯后验<code>N(θ*, H⁻¹)</code>，H是损失的Hessian加上先验精度。它的优势是可以“事后”施加在任何训练好的网络上，不改训练过程。</p><p>难点在H太大。论文把可选方案归成几个维度：对哪些权重做（全部、只最后一层、某个子网络）；Hessian怎么近似（广义高斯-牛顿或经验Fisher，再取对角、<a class="ln" href="../n/kfac.html">K-FAC</a>的Kronecker分解或低秩形式）；先验精度怎么定（用边缘似然自动调）；预测时怎么积分（蒙特卡洛、线性化后的probit近似）。作者实现了laplace库，几行代码就能给训练好的模型套上这些变体。</p><p>摘要报告：大量实验显示，拉普拉斯近似在性能上可与更流行的替代方法竞争，而计算代价明显更低。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>高斯近似只描述θ*附近的一个峰，无法覆盖多峰后验，对远离训练分布的输入仍可能过度自信。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/bayesian-nn.html">贝叶斯神经网络</a><span class="yr">1992 · 基础</span><div class=nt>MacKay在1992年用的正是拉普拉斯近似；本文把它扩展到现代大网络并系统化。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/kfac.html">K-FAC</a><span class="yr">2015.03 · 基础</span><div class=nt>用K-FAC的Kronecker分解近似Hessian，使全网络拉普拉斯近似可算。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/mc-dropout.html">MC Dropout不确定性</a><span class="yr">2015.06 · 基础</span><div class=nt>两者都是给现有网络加不确定性的廉价方法，MC Dropout依赖训练时的Dropout结构，拉普拉斯近似不需要。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/deep-ensembles.html">深度集成</a><span class="yr">2016.12 · 基础</span><div class=nt>深度集成需要训多个网络；拉普拉斯近似只在一个训练好的网络上事后计算，实验中性能相当而代价更低。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/map-bayesian.html">先验、后验与贝叶斯推断</a> <a class="chip c" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a> <a class="chip c" href="../c/gaussian.html">高斯分布</a> <a class="chip c" href="../c/taylor-expansion.html">泰勒展开</a> <a class="chip c" href="../c/calibration-concept.html">模型校准</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2106.14806" rel="noopener">https://arxiv.org/abs/2106.14806</a>（标题、6位作者、arXiv v1提交于2021-06-28；摘要中拉普拉斯近似是最简单的近似族、被认为昂贵难实现效果差是误解、回顾含低开销版本的各种变体、发布PyTorch的laplace库、实验显示性能有竞争力且计算代价更优。NeurIPS 2021、机构、各变体维度的细节来自一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Laplace%20Redux%E6%8B%89%E6%99%AE%E6%8B%89%E6%96%AF%E8%BF%91%E4%BC%BC%EF%BC%88laplace-redux%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Alaplace-redux%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/laplace-redux.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="gatv2.html"><small>本分支上一个 · 2021.05</small><b>GATv2动态图注意力</b></a><a class="r" href="graphormer.html"><small>本分支下一个 · 2021.06</small><b>Graphormer图Transformer</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

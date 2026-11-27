@@ -1,0 +1,28 @@
+{
+  "id": "givt",
+  "who": "Michael Tschannen, Cian Eastwood, Fabian Mentzer · Google DeepMind",
+  "venue": "ECCV 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2312.02116"}
+  ],
+  "aka": ["GIVT", "Generative Infinite-Vocabulary Transformers", "无限词表Transformer", "连续token自回归", "高斯混合输出头"],
+  "problem": "Transformer做图像生成都要先把图像量化成有限码本里的离散token（VQ-GAN、MaskGIT），量化丢信息，码本训练也麻烦。能不能让Transformer直接生成实数向量序列？",
+  "idea": "只对解码器式Transformer做两处改动：输入端把查词表换成对实数向量的线性投影；输出端把对词表的logits换成一个多元高斯混合模型的参数。于是可以直接对β-VAE的连续隐变量序列做自回归或掩码式生成。",
+  "impact": "较早证明了“不量化的连续token”也能用Transformer建模，在类条件生成上超过VQ-GAN与MaskGIT，与半年后用扩散头的MAR一起推动了连续token自回归这条路线。",
+  "method": "离散token的语言模型在每个位置输出一个K类的softmax分布。GIVT把每个位置的输出换成k个分量的高斯混合：网络输出混合权重、每个分量的均值和（对角）方差，训练时直接最大化真实下一个向量在这个混合分布下的对数似然，采样时先选分量再从高斯里采样。输入端，上一步的实数向量经线性层映射到模型维度，替代查表。\n\n要让这样的连续序列好建模，隐空间不能太“复杂”：作者用β-VAE作为分词器，通过调节β控制隐变量里的信息量与平滑程度，发现必须有足够的KL正则，GIVT才学得好。此外，作者把语言模型里的技巧搬了过来，如温度采样、无分类器引导，并给出了在连续分布上的对应做法；同一框架既可以按光栅顺序自回归，也可以像MaskGIT那样掩码并行生成。\n\n在ImageNet类条件生成上，GIVT优于VQ-GAN及其改进版和MaskGIT，与当时的潜扩散模型相当；它还用于全景分割和深度估计（基于UViM框架的VAE变体）。",
+  "limits": [
+    {"text": "高斯混合对高维隐向量的表达力有限，需要用β-VAE把隐空间压得很平滑，限制了重建质量。", "solved_by": ["mar"]}
+  ],
+  "relations": [
+    {"to": "maskgit", "type": "extends", "note": "沿用MaskGIT式的掩码并行生成与VQ-GAN两阶段范式，但去掉量化，直接在连续隐变量上生成。"},
+    {"to": "vqgan", "type": "solves", "note": "VQ-GAN的量化会丢信息、码本难训练；GIVT不需要码本，直接建模连续向量。"},
+    {"to": "beta-vae", "type": "uses", "note": "用β-VAE作分词器，靠β控制隐空间的信息量与平滑度。"}
+  ],
+  "prereq": ["autoregressive", "gaussian", "vector-quantization", "elbo", "masked-modeling", "softmax"],
+  "terms": [
+    {"t": "高斯混合模型", "d": "把若干个高斯分布按权重加在一起得到的分布，能表示多峰的连续分布。"},
+    {"t": "连续token", "d": "每个位置是一段实数向量而不是码本里的编号；不经过量化，信息损失更小。"}
+  ],
+  "learn": "先读VQGAN与MaskGIT的两阶段范式和β-VAE → 读本文第3节两处改动与β的影响 → 在MNIST的VAE隐变量上训练一个带高斯混合头的小Transformer。",
+  "check": {"source": "https://arxiv.org/abs/2312.02116", "confirmed": "标题、三位作者、v1日期2023-12-04、摘要中生成实数向量序列、输入端用线性投影替代词表查找、输出端用多元高斯混合参数替代logits、对β-VAE的未量化隐序列建模、类条件生成优于VQ-GAN及改进版和MaskGIT并与潜扩散相当、在全景分割与深度估计上用UViM的VAE变体；机构、ECCV 2024、β需要足够大、温度与CFG的连续版本、光栅与掩码两种顺序来自一般了解"}
+}

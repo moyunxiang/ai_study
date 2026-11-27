@@ -1,0 +1,35 @@
+{
+  "id": "paragram-phrase",
+  "who": "John Wieting, Mohit Bansal, Kevin Gimpel, Karen Livescu · 芝加哥丰田技术研究所",
+  "venue": "ICLR 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1511.08198"}
+  ],
+  "aka": ["PARAGRAM-PHRASE", "Paragram", "Towards Universal Paraphrastic Sentence Embeddings", "改写句向量", "Wieting et al. 2016"],
+  "problem": "大家想要一种通用的句向量：意思相近的句子余弦相似度高，并且能迁移到各种领域；当时的趋势是用越来越复杂的组合模型（递归网络、LSTM），但它们在训练领域之外表现如何，没有系统比较。",
+  "idea": "用释义数据库PPDB里三百多万对带噪声的同义短语作监督，以带间隔的铰链损失训练六种组合结构（从词向量平均到LSTM），让同义短语的向量更接近、和批内挑出的负例更远，然后在22个不同领域的语义相似度数据集上比较。",
+  "impact": "在训练分布之外，最简单的词向量平均模型平均比最好的LSTM高16.5个皮尔逊相关点，比直接平均GloVe高17.1点；它说明「好的句向量来自好的词向量加简单组合」，直接引出了SIF等无监督加权平均方法，也让「平均词向量」成为句向量研究中必比的基线。",
+  "method": "**训练数据与目标**。PPDB的XL部分含3,033,753对互为改写的短语`⟨x₁, x₂⟩`。对每对，从当前小批量中挑出与`x₁`最相似但不是它改写的短语`t₁`作负例（MAX策略；MIX策略则一半用MAX一半随机），目标为`max(0, δ − cos(g(x₁), g(x₂)) + cos(g(x₁), g(t₁))) + max(0, δ − cos(g(x₁), g(x₂)) + cos(g(x₂), g(t₂)))`，再加上对组合参数的L2正则和把词向量拉回初始值的正则。`g`是句子编码函数，`δ`是间隔。\n\n**六种组合结构**：①词向量平均（没有额外参数，只学词向量本身，即PARAGRAM-PHRASE）；②平均后接一层线性变换；③平均后接深层网络（类似[[dan]]）；④普通RNN；⑤带恒等初始化的RNN；⑥LSTM。词向量从此前在PPDB上训练的PARAGRAM-SL999初始化，超参数（正则强度、间隔、优化器等）在两个人工打分的短语对数据集上调。\n\n**结果**。在与训练数据同分布的测试上LSTM最好；但在2012–2015年SemEval语义相似度任务的22个数据集（新闻、论坛、图片与视频描述等）上，平均模型平均比最好的LSTM高16.5（皮尔逊r×100），比平均GloVe高17.1、比平均PARAGRAM-SL999高12.8，并且在其中4个数据集上与专门为该任务调过的系统并列或更好。在有监督的SICK相似度与蕴含任务上平均模型也优于LSTM，但在斯坦福情感树库上LSTM更强并创下新纪录。",
+  "limits": [
+    {"text": "需要PPDB这样的大规模改写监督数据来重新训练词向量，换语言或领域时不一定有这样的资源。", "solved_by": ["sif"]},
+    {"text": "平均模型忽略词序，在情感分类这类依赖组合与否定的任务上明显不如LSTM。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "dan", "type": "extends", "note": "深度平均网络是被比较的结构之一；本文进一步发现连深层网络都不加、只学词向量的平均在跨领域时最好。"},
+    {"to": "skip-thought", "type": "rivals", "note": "Skip-Thought用大语料上的编码器-解码器学通用句向量；本文用改写监督加简单平均，在语义相似度上更好。"},
+    {"to": "glove", "type": "rivals", "note": "直接平均GloVe向量是基线，在22个相似度数据集上平均低17.1点。"},
+    {"to": "tree-lstm", "type": "rivals", "note": "LSTM类组合模型在训练分布内最好，但跨领域时远不如平均。"},
+    {"to": "retrofitting", "type": "extends", "note": "同样利用PPDB这类语义资源改进词向量，但目标是让平均后的句向量反映改写关系。"}
+  ],
+  "prereq": ["embedding", "loss-function", "dot-product", "recurrent-layer", "distribution-shift", "contrastive-learning"],
+  "terms": [
+    {"t": "PPDB", "d": "释义数据库，从双语平行语料中自动抽取的数以百万计的同义短语对，带噪声。"},
+    {"t": "铰链损失", "d": "要求正例的得分至少比负例高出一个间隔δ，否则按差距受罚；已满足时损失为0。"},
+    {"t": "域外泛化", "d": "模型在与训练数据来源、风格不同的数据上的表现。"}
+  ],
+  "learn": "先读[[dan]]和[[skip-thought]]的讲解 → 读原文第3节模型与训练目标、第4节22个数据集的结果表 → 动手：下载PARAGRAM-PHRASE-XXL词向量，在STS基准上比较它的平均与GloVe平均的相关系数。",
+  "check": {
+    "source": "https://arxiv.org/abs/1511.08198",
+    "confirmed": "arXiv：标题、作者Wieting、Bansal、Gimpel、Livescu、2015-11-25提交、摘要（PPDB监督的通用改写句向量；六种组合结构；同分布数据上LSTM最好，域外数据上平均远胜LSTM；平均模型与专门调过的系统相当；SICK相似度与蕴含上平均更好，情感分类上LSTM更强并创斯坦福情感树库新纪录）；PDF正文：间隔目标与小批量负例、MAX与MIX采样、PPDB XL 3,033,753对、平均比最好LSTM高16.5、比GloVe平均高17.1、比PARAGRAM-SL999平均高12.8、22个SemEval数据集、4个数据集最好或并列、PARAGRAM-PHRASE-XXL发布。机构与ICLR 2016出处凭一般了解；六种结构的具体名称按一般了解概括。"
+  }
+}

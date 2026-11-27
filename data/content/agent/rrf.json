@@ -1,0 +1,32 @@
+{
+  "id": "rrf",
+  "who": "Gordon V. Cormack, Charles L. A. Clarke, Stefan Büttcher · 滑铁卢大学 / Google",
+  "venue": "SIGIR 2009",
+  "links": [
+    {"label": "ACM DL", "url": "https://doi.org/10.1145/1571941.1572114"},
+    {"label": "PDF", "url": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf"},
+    {"label": "Elasticsearch RRF文档", "url": "https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion"}
+  ],
+  "aka": ["RRF", "Reciprocal Rank Fusion", "倒数排序融合", "排名融合", "rank fusion", "RAG-Fusion", "混合检索融合", "hybrid search fusion"],
+  "problem": "多个检索系统各给一份排名，分数的量纲和分布互不相同，直接相加没有意义；当时的融合方法要么依赖原始分数，要么像Condorcet投票那样复杂。",
+  "idea": "完全不看分数，只看名次：每份排名里第r名的文档得 `1/(k+r)` 分，k取60，把各份排名的得分加起来重新排序。",
+  "impact": "一行公式、不需训练，至今是关键词检索与向量检索做混合检索时最常用的融合方法，Elasticsearch等搜索引擎内置了它。",
+  "method": "[[trec]]式评测里常有几十个检索系统针对同一查询给出排名。融合它们的标准做法是Condorcet Fuse（两两多数投票）和CombMNZ（把各系统的分数相加，再乘以命中该文档的系统数），后者要求分数可比。作者原本只想做一个简单基线，结果它几乎总是最好。\n\n**公式**。对文档d，`RRF(d) = Σ_r 1/(k + r(d))`，r(d)是它在第r份排名中的名次。名次靠前的贡献大，但靠后的文档贡献不会像指数衰减那样迅速消失；常数k压低了某一个离群系统把文档顶到第一名的影响。k=60在试验阶段定下，之后没有再调；表1中k从10到100的MAP都在0.21左右，说明对k不敏感。\n\n**结果**。融合TREC 3、5、9和2004 Robust四组提交结果，RRF的MAP在所有情况下都高于Condorcet，四次中三次高于CombMNZ。在LETOR 3的58万多个文档—查询对上，把[[listnet]]、[[ranksvm]]、AdaRank、RankBoost等学习排序方法的输出用RRF融合，MAP为0.6051，高于其中任何单个方法（最好的ListNet为0.5846）。\n\n后来稠密向量检索兴起，[[bm25]]关键词结果与向量结果的分数完全不可比，RRF因此成为混合检索的默认选择；Elasticsearch的RRF检索器默认k也是60。",
+  "limits": [
+    {"text": "只用名次、丢掉了分数大小，一个系统非常确信的结果与勉强排进前列的结果被同等对待；也不能按系统好坏加权。", "solved_by": []},
+    {"text": "常数k=60是在少数TREC实验上经验确定的，论文没有给出理论依据，在向量检索等新场景下是否最优未经检验。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "trec", "type": "uses", "note": "用TREC 3、5、9和Robust赛道参赛系统提交的真实排名来验证融合效果。"},
+    {"to": "listnet", "type": "uses", "note": "把ListNet等学习排序方法在LETOR 3上的输出当作待融合的排名，融合结果超过其中最好的单个方法。"},
+    {"to": "ranksvm", "type": "uses", "note": "Ranking SVM是被融合的学习排序方法之一，RRF融合后的MAP比它高约0.03。"},
+    {"to": "bm25", "type": "extends", "note": "BM25等检索函数给出的分数难以跨系统比较；RRF只用名次，后来成为把BM25与向量检索结果合并的标准做法。"}
+  ],
+  "prereq": ["retrieval", "benchmark", "ensemble"],
+  "terms": [
+    {"t": "MAP（平均精度均值）", "d": "对每个查询，在每个相关文档出现的位置计算一次精度并取平均，再对所有查询取平均；越接近1说明相关文档排得越靠前。"},
+    {"t": "Condorcet Fuse", "d": "把每份排名当作选票，按“多数系统认为A排在B前面”的两两比较结果来排序的融合方法。"}
+  ],
+  "learn": "先补[[bm25]]和[[trec]]的评测方式 → 原文只有两页，直接读公式和表1到表3 → 动手：对同一组查询分别用BM25和一个嵌入模型检索，用RRF融合，比较融合前后的召回率。",
+  "check": {"source": "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf", "confirmed": "标题、3位作者及单位（滑铁卢大学、Google）、SIGIR’09（2009年7月）；Crossref记录日期2009-07-19与DOI；正文核对公式与k=60、Condorcet与CombMNZ定义、表1中k对MAP的影响、表2中TREC四组结果（全部胜Condorcet、四次中三次胜CombMNZ）、表3 LETOR 3共583,850对、RRF 0.6051与ListNet 0.5846、RankSVM 0.5737。Elasticsearch文档核对rank_constant默认60。"}
+}

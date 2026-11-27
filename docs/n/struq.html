@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>StruQ结构化查询防注入（2024） · AI脉络</title>
+<meta name="description" content="之所以有效，是因为LLM把开发者的指令和要处理的数据（网页、邮件、用户文本）拼成同一串文字，模型既善于遵循指令、又分不清哪段是指令哪段是数据。 借鉴数据库防SQL注入的“参数化查询”：把提示和数据放进两个分开的通道，由安全前端用特殊分隔符编码；再训练模型只服从提示通道里的指令，对数据通道里出现的指…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/struq.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="StruQ结构化查询防注入（2024）">
+<meta property="og:description" content="之所以有效，是因为LLM把开发者的指令和要处理的数据（网页、邮件、用户文本）拼成同一串文字，模型既善于遵循指令、又分不清哪段是指令哪段是数据。 借鉴数据库防SQL注入的“参数化查询”：把提示和数据放进两个分开的通道，由安全前端用特殊分隔符编码；再训练模型只服从提示通道里的指令，对数据通道里出现的指…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/struq.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/struq">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:312"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">环境 · 社会 › <a href="../t/safety.html">安全、对齐与可解释性</a> › 越狱与提示注入</div>
+<h1>StruQ结构化查询防注入</h1>
+<div class="full">StruQ: Defending Against Prompt Injection with Structured Queries</div>
+<div class="meta"><span>2024.02</span><span>论文</span><span>延伸</span><span>USENIX Security 2025</span><span>Sizhe Chen, Julien Piet, Chawin Sitawarin, David Wagner · UC Berkeley</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2402.06363" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/Sizhe-Chen/StruQ" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/struq">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/prompt-injection.html">提示注入</a>之所以有效，是因为LLM把开发者的指令和要处理的数据（网页、邮件、用户文本）拼成同一串文字，模型既善于遵循指令、又分不清哪段是指令哪段是数据。</p></div><div><h4>方法</h4><p>借鉴数据库防SQL注入的“参数化查询”：把提示和数据放进两个分开的通道，由安全前端用特殊分隔符编码；再训练模型只服从提示通道里的指令，对数据通道里出现的指令视而不见。</p></div><div><h4>影响</h4><p>把“指令与数据分离”从提示技巧变成训练目标，开启了一批通过微调抵御提示注入的防御（同组随后有SecAlign），也是<a class="ln" href="../n/instruction-hierarchy.html">指令层级</a>同一思路的早期版本。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>传统软件里，SQL注入的根治办法是不让用户输入被解释成代码：查询语句和参数分开传。StruQ把同样的思想用在LLM上，系统由两部分组成。</p><ul><li>安全前端：把开发者的提示和外部数据格式化成一种特殊格式，用保留的分隔词元标出“这是指令”“这是数据”，并把数据里可能伪造这些分隔符的字符过滤掉，攻击者因此无法在数据里冒充指令通道。</li><li>结构化指令微调：从一个未经指令微调的基础模型出发，用改造过的指令微调数据训练。除了普通样本，还加入数据部分里夹带了额外指令的样本，训练目标是仍然只完成提示通道里的任务、忽略数据中的指令。这样模型学会的“遵循指令”从一开始就只针对指令通道。</li></ul><p>摘要报告：该系统显著提高了对提示注入攻击的抵抗力，对输出质量几乎没有影响。作者也指出，基于优化的强攻击（如<a class="ln" href="../n/gcg.html">自动化越狱攻击GCG</a>式）仍是挑战，这成为后续工作的出发点。</p><p>与<a class="ln" href="../n/spotlighting.html">Spotlighting防提示注入</a>这类只在提示里加标记、不改模型的做法相比，StruQ把分离写进了权重，代价是需要自己微调模型。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>对基于梯度优化的强提示注入攻击，防御效果明显下降。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:312" href="../n/attacker-moves-second.html">自适应攻击击穿防御</a></div></li><li>需要模型提供方配合改变输入格式并重新微调，无法直接保护已部署的闭源模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:312" href="../n/camel-defense.html">CaMeL：从设计上防注入</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:312" href="../n/prompt-injection.html">提示注入</a><span class="yr">2022.09 · 安全·可解释</span><div class=nt>针对指令与数据混在一起导致的提示注入，用分开的通道和专门训练加以缓解。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:312" href="../n/indirect-prompt-injection.html">间接提示注入</a><span class="yr">2023.02 · 安全·可解释</span><div class=nt>间接注入把指令藏在网页、邮件等数据里，StruQ训练模型忽略数据通道中的指令。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/alpaca.html">Alpaca与廉价指令微调</a><span class="yr">2023.03 · LLM</span><div class=nt>在Alpaca式指令微调数据的基础上构造带注入指令的训练样本。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:312" href="../n/camel-defense.html">CaMeL：从设计上防注入</a><span class="yr">2025.03 · 安全·可解释</span><div class=nt>需要模型提供方配合改变输入格式并重新微调，无法直接保护已部署的闭源模型。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:312" href="../n/attacker-moves-second.html">自适应攻击击穿防御</a><span class="yr">2025.10 · 安全·可解释</span><div class=nt>对基于梯度优化的强提示注入攻击，防御效果明显下降。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/instruction-tuning.html">指令微调与对话模板</a> <a class="chip c" href="../c/tokenization.html">分词与token</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a></p>
+<h2>本篇术语</h2><ul><li><b>参数化查询</b>　数据库编程中把查询语句和用户数据分开传递的做法，使用户输入永远不会被当作代码执行。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/prompt-injection.html">提示注入</a>和<a class="ln" href="../n/indirect-prompt-injection.html">间接提示注入</a> → 读原文的前端格式和训练数据构造 → 设计几条把指令藏在数据中的样例，比较普通指令模型和StruQ模型的反应。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2402.06363" rel="noopener">https://arxiv.org/abs/2402.06363</a>（arXiv记录：标题、4位作者、2024-02-09 v1；摘要所述提示注入依赖模型遵循指令且无法区分提示与数据、结构化查询分两个通道、安全前端加专门训练的LLM、从基础模型做结构化指令微调、在数据部分加入指令并训练忽略、显著提升抵抗且几乎不损效用。分隔符过滤、对优化攻击效果下降、SecAlign后续、USENIX Security 2025凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20StruQ%E7%BB%93%E6%9E%84%E5%8C%96%E6%9F%A5%E8%AF%A2%E9%98%B2%E6%B3%A8%E5%85%A5%EF%BC%88struq%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Astruq%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/struq.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="debate-persuasive.html"><small>本分支上一个 · 2024.02</small><b>更有说服力的辩论者</b></a><a class="r" href="stealing-production-lm.html"><small>本分支下一个 · 2024.03</small><b>窃取生产级LLM的参数</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

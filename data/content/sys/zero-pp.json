@@ -1,0 +1,25 @@
+{
+ "id": "zero-pp",
+ "who": "Guanhua Wang, Heyang Qin, Sam Ade Jacobs, Connor Holmes, Samyam Rajbhandari, Olatunji Ruwase, Feng Yan, Lei Yang, Yuxiong He · 微软",
+ "venue": "ICLR 2024",
+ "aka": ["ZeRO++", "qwZ", "hpZ", "qgZ", "量化all-gather", "分层分片"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2306.10209"},
+  {"label": "DeepSpeed博客", "url": "https://www.microsoft.com/en-us/research/blog/deepspeed-zero-a-leap-in-speed-for-llm-and-chat-model-training-with-4x-less-communication/"}
+ ],
+ "problem": "ZeRO把参数、梯度、优化器状态切到各卡，代价是每一步前向、反向都要all-gather权重、再平均梯度；在带宽低的集群上，或卡数多到每卡批次很小时，通信量吃掉了大部分吞吐。",
+ "idea": "针对ZeRO的三类集合通信分别减量：前向all-gather用分块量化的低精度权重；在每台机器内多存一份权重分片，让反向的all-gather只走机内高速链路；梯度平均改为基于all-to-all的量化通信。",
+ "impact": "合起来把ZeRO的跨机通信量降到四分之一，成为DeepSpeed里在普通以太网或小批次场景训练大模型的常用开关。",
+ "method": "[[zero]]第三阶段（与[[fsdp]]思路相同）每张卡只存参数的1/N，计算某层前要用all-gather从所有卡把这层的完整权重拼回来，反向时再拼一次，梯度则用reduce-scatter平均后各留一份。每步的通信量约为模型大小的三倍，卡间带宽一低就成瓶颈。\n\nZeRO++有三项技术，各对应一种通信：\n- **qwZ**：前向all-gather之前把权重按块量化到低比特（每块单独算缩放系数，比整张张量一起量化误差小），收到后再反量化。\n- **hpZ**：每台机器内部额外保留一份完整的权重分片，反向需要的all-gather只在机内的高速互连上完成，用更多显存换跨机通信。\n- **qgZ**：用基于all-to-all的方式传量化后的梯度来代替reduce-scatter，按论文所说能在低精度通信下保持精度，思路上延续了[[qsgd]]等梯度压缩工作。\n\n摘要报告：通信量降为ZeRO的四分之一，在384张GPU的规模上吞吐最多提高2.16倍。",
+ "limits": [
+  {"text": "hpZ以额外的显存换通信，显存紧张时难以开启；量化通信对收敛的影响需要针对具体模型验证。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "zero", "type": "solves", "note": "ZeRO在低带宽或小批次时通信量过大，ZeRO++用量化与分层分片把跨机通信量降为四分之一。"},
+  {"to": "qsgd", "type": "uses", "note": "沿用量化压缩通信的思路，把它用到权重all-gather和梯度平均上。"},
+  {"to": "fsdp", "type": "rivals", "note": "FSDP是PyTorch内置的同类全分片数据并行，ZeRO++在同一套分片方案上额外压缩通信。"}
+ ],
+ "prereq": ["distributed-training", "quantization-concept", "memory-bandwidth", "interconnect"],
+ "terms": [{"t": "all-gather", "d": "每张卡各持有一块数据，通信后每张卡都拿到所有块拼成的完整数据。"}],
+ "check": {"source": "https://arxiv.org/abs/2306.10209", "confirmed": "标题、九位作者、v1日期2023-06-16；摘要：ZeRO在低带宽集群或每卡批次小时因前向与反向的权重gather以及梯度平均而受限、三项通信减量技术（分块量化all-gather、以内存换通信的数据重映射、基于all-to-all的量化梯度平均替代reduce-scatter）、通信量降为1/4、384 GPU上吞吐最多2.16倍。微软研究院博客（2023-06-22）确认通信量比ZeRO-3降4倍。qwZ/hpZ/qgZ命名、ICLR 2024为一般了解。"}
+}

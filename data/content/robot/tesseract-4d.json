@@ -1,0 +1,84 @@
+{
+  "id": "tesseract-4d",
+  "who": "Haoyu Zhen, Qiao Sun, Hongxin Zhang, Junyan Li, Siyuan Zhou, Yilun Du, Chuang Gan · UMass Amherst、香港科技大学、哈佛大学",
+  "venue": "arXiv 2025",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2504.20995"
+    }
+  ],
+  "aka": [
+    "TesserAct",
+    "Tesseract",
+    "Tesser Act",
+    "4D具身世界模型",
+    "4D embodied world model",
+    "RGB-DN视频世界模型",
+    "四维世界模型"
+  ],
+  "problem": "视频世界模型只预测二维画面，看不出物体形状和远近；从生成的视频反推动作时缺少三维信息，而直接生成3D场景又缺训练数据、难以保持时空一致。",
+  "idea": "给机器人视频数据集用现成模型补上深度和法向，微调CogVideoX同时生成RGB、深度、法向视频，再优化拼成时空一致的4D场景，供逆动力学模型从点云出动作。",
+  "impact": "真实与合成数据上的4D场景预测误差都最低（真实数据Chamfer L1 0.2030）；RLBench九个任务中多数优于UniPi式基线，说明三维几何有助于从预测中学动作。",
+  "method": "**卡在哪**：[[unipi]]一路的方法把视频生成当规划器，再从相邻两帧推出动作。但二维视频里机械臂离杯子还有多远、杯口朝哪，都只能隐式猜。真正的4D（三维随时间变化）数据很少，从零训练4D生成模型不现实。\n\n**做法**：TesserAct先**补标注**：仿真的[[rlbench]]有真实深度，真实数据[[rt-1]]和[[bridgedata-v2]]用视频深度估计模型RollingDepth和基于[[marigold]]的法向估计补上，再加[[something-something]]的人手视频增加指令多样性。然后**微调**[[cogvideox]]：冻结3D VAE，把RGB、深度、法向分别编码后拼起来输入，新增深度/法向输出分支并零初始化，所以起步时RGB输出与原模型一致。第三步**重建4D**：用法向积分修正每帧深度，用[[raft]]光流区分静态背景与运动部分，以时间一致性损失和贴近生成深度的损失做优化。最后，一个基于[[pointnet]]的逆动力学模型读当前和预测的未来点云加指令，输出7自由度动作。\n\n**结果**：4D点云预测的Chamfer L1在真实数据0.2030、合成数据0.0811，均为对比中最低，深度和法向也好于“CogVideoX生成后再估计”的做法。RLBench九个任务上多数超过UniPi式基线和Image-BC，但开微波炉等两个任务不如UniPi式基线。新视角合成PSNR 12.99，高于Shape of Motion的10.94，耗时约1分钟而非约2小时。",
+  "limits": [
+    {
+      "text": "每帧的RGB-DN只描述相机看得到的一层表面，被遮挡的背面和内部没有建模。",
+      "solved_by": []
+    },
+    {
+      "text": "深度和法向标签来自现成估计模型，误差会直接进入训练；策略实验也只在RLBench仿真里做，真机效果未验证。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "cogvideox",
+      "type": "uses",
+      "note": "在CogVideoX上加深度、法向输入投影与输出分支，零初始化后微调。"
+    },
+    {
+      "to": "unipi",
+      "type": "solves",
+      "note": "UniPi从二维视频反推动作，缺少几何；TesserAct预测RGB-DN并重建点云，RLBench多数任务上优于UniPi式基线。"
+    },
+    {
+      "to": "marigold",
+      "type": "uses",
+      "note": "用基于Marigold的时序一致法向估计为真实机器人视频补法向标签。"
+    },
+    {
+      "to": "raft",
+      "type": "uses",
+      "note": "4D重建时用RAFT光流区分静态背景与运动区域。"
+    },
+    {
+      "to": "rlbench",
+      "type": "uses",
+      "note": "合成训练数据和策略评测都来自RLBench任务。"
+    }
+  ],
+  "prereq": [
+    "world-model-concept",
+    "diffusion-process",
+    "3d-representation",
+    "camera-geometry",
+    "pretrain-finetune",
+    "imitation-learning"
+  ],
+  "terms": [
+    {
+      "t": "法向（normal）",
+      "d": "物体表面某点垂直于表面的方向，能刻画形状细节；把相邻像素的法向积分起来可以修正深度。"
+    },
+    {
+      "t": "Chamfer距离",
+      "d": "衡量两组点云有多接近：对每个点找另一组里最近的点，把距离平均后两边相加，越低越好。"
+    }
+  ],
+  "learn": "先读[[unipi]]理解“视频即规划+逆动力学”，再补[[c:3d-representation]]里点云和深度图的概念；然后读原文第3节的RGB-DN模型与4D重建优化，看RLBench结果表。",
+  "check": {
+    "source": "https://arxiv.org/abs/2504.20995",
+    "confirmed": "标题、7位作者、arXiv v1 2025-04-29、摘要中RGB-DN与4D重建；HTML正文中CogVideoX冻结VAE与零初始化分支、RLBench/RT-1/Bridge/SSv2数据与RollingDepth、Marigold法向、法向积分与RAFT光流、PointNet逆动力学7自由度、Chamfer L1 0.2030/0.0811、RLBench九任务对比、PSNR 12.99对10.94及耗时、单表面局限、机构。"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "id": "videoclip",
+  "aka": ["VideoCLIP", "视频文本对比预训练", "MMPT", "零样本视频文本理解"],
+  "who": "Hu Xu, Gargi Ghosh, Po-Yao Huang, Dmytro Okhonko, Armen Aghajanyan, Florian Metze, Luke Zettlemoyer, Christoph Feichtenhofer · Facebook AI、卡内基梅隆大学",
+  "venue": "EMNLP 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2109.14084"},
+    {"label": "代码", "url": "https://github.com/pytorch/fairseq/tree/main/examples/MMPT"}
+  ],
+  "problem": "视频-文本预训练模型通常还要在每个下游任务上微调；而直接借用CLIP式对比学习时，视频里旁白和画面往往对不齐，正负样本也太容易区分。",
+  "idea": "用对比学习预训练一个视频和文本的统一Transformer，正样本取时间上有重叠（而非严格对齐）的视频片段与字幕，负样本用检索出的相似视频作为难负例。",
+  "impact": "在不使用下游标注的零样本设置下，于文本-视频检索、视频问答、动作定位与分割上取得当时最好，有时甚至超过有监督方法，是CLIP式视频预训练的代表作之一。",
+  "method": "教学视频（如[[howto100m]]）里有大量“画面+旁白字幕”，是天然的视频-文本数据，但两者常常对不齐：主播可能先说再做，或者边做边聊无关内容。[[videobert]]等早期工作多依赖严格切分的片段，并需要在下游任务上微调。\n\nVideoCLIP借鉴[[clip]]的对比学习：视频片段经一个视频Transformer编码，字幕经文本Transformer编码，两者投影到同一空间，让匹配的片段与字幕靠近、不匹配的推远。两点改进针对视频的特点：一是**时间重叠的正样本**——先取一段字幕，再在它的时间范围附近采样一段长度不同、与之有重叠的视频片段作为正样本，而不要求起止时间严格一致，从而容忍对不齐；二是**基于检索的难负例**——训练时把相似的视频聚在同一个批次里，使批内负样本更难区分，迫使模型学到细微差别。视频输入使用预先提取的视频特征，再由Transformer建模时间上下文。\n\n摘要报告，在序列级文本-视频检索、视频问答、token级动作定位和动作分割等多种下游任务上，VideoCLIP在零样本设置下取得最好成绩，超过此前工作，有时甚至超过有监督方法。",
+  "limits": [
+    {"text": "视频侧使用冻结的预提取特征，视觉编码器本身不参与端到端训练，限制了表示的上限。", "solved_by": ["clip4clip", "internvideo2"]},
+    {"text": "只学到视频与文本的匹配表示，不能像后来的视频大模型那样生成开放式回答或进行多轮对话。", "solved_by": ["video-chatgpt", "videochat"]}
+  ],
+  "relations": [
+    {"to": "clip", "type": "extends", "note": "把CLIP式的图文对比学习推广到视频与字幕，并针对时间不对齐做改进。"},
+    {"to": "howto100m", "type": "uses", "note": "在HowTo100M教学视频及其旁白字幕上预训练。"},
+    {"to": "videobert", "type": "solves", "note": "VideoBERT式预训练需要下游微调，VideoCLIP以对比学习实现零样本迁移。"},
+    {"to": "msr-vtt", "type": "uses", "note": "在MSR-VTT等数据集上评测文本-视频检索。"}
+  ],
+  "prereq": ["contrastive-learning", "zero-few-shot", "transformer-block", "embedding", "retrieval"],
+  "terms": [
+    {"t": "难负例（hard negative）", "d": "和正样本很像、但并不匹配的负样本；用它训练能逼模型区分细微差别，而不是只学会区分毫不相干的样本。"}
+  ],
+  "learn": "先理解[[clip]]的对比损失，再读VideoCLIP第3节正样本采样和检索增强批次的构造，用fairseq中的MMPT代码跑一次零样本检索。",
+  "check": {"source": "https://arxiv.org/abs/2109.14084", "confirmed": "标题、八位作者、arXiv v1提交2021-09-28；摘要中对比学习预训练统一的视频文本模型、零样本且不使用下游标签、正样本为时间上重叠的视频-文本对、负样本来自最近邻检索的难负例、在文本-视频检索/VideoQA/动作定位/动作分割上取得最好且有时超过有监督方法、代码在fairseq MMPT。使用预提取视频特征、HowTo100M、MSR-VTT评测、机构与EMNLP 2021为一般了解，未逐项核对。"}
+}

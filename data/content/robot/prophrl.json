@@ -1,0 +1,32 @@
+{
+  "id": "prophrl",
+  "who": "Jiahui Zhang, Ze Huang, Chun Gu, Zipei Ma, Li Zhang · 复旦大学、上海创智学院、Logos Robotics",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2511.20633"}
+  ],
+  "aka": ["ProphRL", "Prophet", "Prophet世界模型", "FlowScale", "FA-GRPO", "预言式强化学习", "世界模型VLA后训练", "动作到视频世界模型"],
+  "problem": "VLA纯靠模仿训练，容易过拟合示范、分布偏移下脆弱；真机RL太贵，传统仿真器又难搭、难迁移到真实场景。",
+  "idea": "预训练动作到视频的世界模型Prophet，少样本适配后当作模拟器；再用为流匹配动作头改造的FA-GRPO加FlowScale在其中做RL。",
+  "impact": "官方称在公开基准上带来5–17%的成功率提升、真机上24–30%，覆盖0.5B到7B的三种VLA，给出了不依赖物理仿真器的VLA后训练路线。",
+  "method": "**卡在哪**：[[simplevla-rl]]、[[pi-rl]]在可并行的仿真器里做VLA强化学习，但很多真实任务没有现成仿真器。[[wmpo]]用学到的视频世界模型替代仿真器，不过要为每个任务单独训练世界模型。ProphRL想要一个大规模预训练、换新场景只需少量数据适配的世界模型。\n\n**做法**：**Prophet**是潜空间视频扩散模型，以[[cosmos]]系列的Cosmos-Predict2-2B为底座（约20.6亿参数），用[[wan]]2.1的视频自编码器压缩时空。动作有两条注入方式：动作块的嵌入加到扩散时间步嵌入上；可选地把末端位姿画成“动作帧”再编码。给定当前帧和20步动作，它生成接下来20帧，并保留60帧历史。预训练用[[agibot-world]]、[[droid]]、[[libero]]和Open-X子集共超过3100万条采样轨迹；换新机器人时用秩16的[[lora]]适配，例如真机四个任务共800条轨迹。奖励不由世界模型给，而是让[[qwen2.5-vl]]看生成视频判断是否成功，多次投票取多数，再按组归一化成优势。\n\n**强化学习**：[[flow-grpo]]把流匹配的每个去噪步当作独立动作，各有概率比。FA-GRPO改为把一个动作块所有去噪步的对数似然求和，按动作维度算PPO比率、共享同一优势；FlowScale再按噪声调度给各去噪步重新加权，稳定梯度。\n\n**结果**：SimplerEnv-WidowX上，VLA-Adapter-0.5B从23.3%到41.0%，[[pi0.5]]从38.9%到51.0%，[[openvla-oft]]从25.0%到30.9%；UR30e真机四个任务提升24–30%。",
+  "limits": [
+    {"text": "RL的上限取决于世界模型和VLM判官的准确度：生成视频中的物理错误或判官误判会被策略利用。", "solved_by": []},
+    {"text": "每次rollout都要跑20亿参数的视频扩散模型加7B到72B的VLM判官，算力开销远高于物理仿真器。", "solved_by": []},
+    {"text": "适配新场景仍要几百条该场景的真实轨迹，评测任务以短时序抓放为主，长时序任务效果未知。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "wmpo", "type": "rivals", "note": "两者都在学到的视频世界模型里做VLA强化学习；WMPO按任务训练世界模型，ProphRL先在3100万轨迹上大规模预训练再少样本适配。"},
+    {"to": "flow-grpo", "type": "extends", "note": "在Flow-GRPO基础上改为按动作块汇总去噪步似然，并用FlowScale按噪声调度重加权，适配机器人流匹配动作头。"},
+    {"to": "cosmos", "type": "uses", "note": "Prophet以Cosmos系列的Cosmos-Predict2-2B视频世界模型为底座。"},
+    {"to": "pi0.5", "type": "uses", "note": "π0.5-3B是被后训练的三种VLA之一，SimplerEnv上提升12.1个百分点。"},
+    {"to": "simplevla-rl", "type": "solves", "note": "SimpleVLA-RL依赖可并行的物理仿真器；ProphRL用预训练世界模型代替，能用到没有仿真器的真机场景。"}
+  ],
+  "prereq": ["vla-concept", "world-model-concept", "model-based-rl", "diffusion-process", "normalizing-flow", "policy-gradient-concept"],
+  "terms": [
+    {"t": "动作到视频世界模型", "d": "输入当前画面和一串机器人动作，生成执行这些动作后的视频，可以当作“用神经网络做的模拟器”。"},
+    {"t": "VLM判官", "d": "用视觉语言大模型看一段视频判断任务是否完成，代替手写的奖励函数。"}
+  ],
+  "learn": "先读[[wmpo]]理解在世界模型里做VLA RL的基本框架，再读[[flow-grpo]]；然后看原文第3节Prophet的动作注入方式和第4节FA-GRPO与FlowScale的公式。",
+  "check": {"source": "https://arxiv.org/abs/2511.20633", "confirmed": "标题、5位作者、v1日期2025-11-25、摘要中Prophet与FlowScale、5–17%与24–30%；HTML正文中Cosmos-Predict2-2B底座（2.058B）、Wan2.1自编码器、20步动作生成20帧与60帧历史、3100万轨迹预训练、LoRA秩16、Qwen2.5-VL判官多数投票、FA-GRPO与FlowScale定义、SimplerEnv三组数字、UR30e四任务、复旦大学等机构；正文未用ProphRL一词，项目页URL使用ProphRL。"}
+}

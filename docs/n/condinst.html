@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>CondInst条件卷积实例分割（2020） · AI脉络</title>
+<meta name="description" content="要先用RoIAlign把每个框里的特征裁出来、缩放到28×28再预测掩码，分辨率受限、边界粗糙，而且掩码头参数固定，只能靠裁剪来区分不同实例。 不裁剪特征，而是给每个实例“现生成”一个小掩码头：检测器在每个位置除了预测类别和框，还输出一组卷积参数；用这组参数在整张共享特征图上跑3层很窄的卷积，直接…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/condinst.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CondInst条件卷积实例分割（2020）">
+<meta property="og:description" content="要先用RoIAlign把每个框里的特征裁出来、缩放到28×28再预测掩码，分辨率受限、边界粗糙，而且掩码头参数固定，只能靠裁剪来区分不同实例。 不裁剪特征，而是给每个实例“现生成”一个小掩码头：检测器在每个位置除了预测类别和框，还输出一组卷积参数；用这组参数在整张共享特征图上跑3层很窄的卷积，直接…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/condinst.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/condinst">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 图像分割</div>
+<h1>CondInst条件卷积实例分割</h1>
+<div class="full">Conditional Convolutions for Instance Segmentation</div>
+<div class="meta"><span>2020.03</span><span>论文</span><span>延伸</span><span>ECCV 2020</span><span>Zhi Tian, Chunhua Shen, Hao Chen · 阿德莱德大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2003.05664" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/aim-uofa/adet" rel="noopener">代码（AdelaiDet） ↗</a><a class="btn sm" href="../index.html#/n/condinst">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/mask-rcnn.html">Mask R-CNN</a>要先用RoIAlign把每个框里的特征裁出来、缩放到28×28再预测掩码，分辨率受限、边界粗糙，而且掩码头参数固定，只能靠裁剪来区分不同实例。</p></div><div><h4>方法</h4><p>不裁剪特征，而是给每个实例“现生成”一个小掩码头：检测器在每个位置除了预测类别和框，还输出一组卷积参数；用这组参数在整张共享特征图上跑3层很窄的卷积，直接得到这个实例的全图掩码。</p></div><div><h4>影响</h4><p>把实例分割做成完全不需要RoI操作的全卷积框架，精度超过调好的Mask R-CNN且推理更快；“为每个实例动态生成卷积核”与同期<a class="ln" href="../n/solo.html">SOLO无框实例分割</a>的后续版本一起，成为后来基于核和查询的分割方法的先声。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>CondInst以<a class="ln" href="../n/fcos.html">FCOS无锚框检测</a>为检测骨架。FCOS在特征金字塔的每个位置预测类别和到四条边的距离；CondInst再加一个“控制器”分支，在每个位置输出一个参数向量，把它重排成一个小网络的权重——摘要举的例子是3层卷积、每层只有8个通道，总共一百多个参数。</p><p>另有一个共享的掩码分支，把<a class="ln" href="../n/fpn.html">特征金字塔FPN</a>特征变成一张1/8分辨率的特征图。对某个实例，把它的参数装进小网络，输入是这张共享特征图再拼上“每个像素相对于该实例中心的坐标”，输出就是该实例在整张图上的掩码。因为参数是按实例生成的，网络本身就知道要分割哪一个，不需要裁剪框。</p><p>摘要称在COCO上不需要延长训练就超过了几种近期方法和调好的Mask R-CNN基线，推理也更快，因为掩码头极小。同一时期的SOLOv2也把<a class="ln" href="../n/solo.html">SOLO无框实例分割</a>的掩码分支改成动态卷积核，两者思路相近。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每个实例仍由检测器的一个位置产生，需要NMS去重，语义和全景分割要另做。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/k-net.html">K-Net统一分割</a> <a class="chip hue" style="--h:216" href="../n/mask2former.html">Mask2Former通用分割</a></div></li><li>掩码在1/8分辨率特征上预测，细小结构和边界仍不够精细，常需与<a class="ln" href="../n/pointrend.html">PointRend边界细化</a>式的逐点细化结合。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/fpn.html">特征金字塔FPN</a><span class="yr">2016.12 · 视觉</span><div class=nt>检测在FPN各层进行，共享掩码特征也取自FPN。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/mask-rcnn.html">Mask R-CNN</a><span class="yr">2017.03 · 视觉</span><div class=nt>Mask R-CNN依赖RoIAlign裁剪和固定28×28掩码；CondInst用按实例生成的卷积核在全图上预测，摆脱了裁剪。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/mask-scoring-rcnn.html">Mask Scoring R-CNN</a><span class="yr">2019.03 · 视觉</span><div class=nt>仍是两阶段、依赖检测框和RoI操作的框架，速度受限。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/fcos.html">FCOS无锚框检测</a><span class="yr">2019.04 · 视觉</span><div class=nt>以FCOS无锚框检测器为基础，在每个位置额外预测掩码头参数。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/solo.html">SOLO无框实例分割</a><span class="yr">2019.12 · 视觉</span><div class=nt>SOLO按网格位置区分实例并为每格输出一张掩码；CondInst按检测位置生成动态卷积核，两条路线后来都走向动态核。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/mask2former.html">Mask2Former通用分割</a><span class="yr">2021.12 · 视觉</span><div class=nt>每个实例仍由检测器的一个位置产生，需要NMS去重，语义和全景分割要另做。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/k-net.html">K-Net统一分割</a><span class="yr">2021.06 · 视觉</span><div class=nt>每个实例仍由检测器的一个位置产生，需要NMS去重，语义和全景分割要另做。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/anchor-nms.html">锚框与非极大值抑制</a> <a class="chip c" href="../c/iou-map.html">IoU与mAP</a></p>
+<h2>本篇术语</h2><ul><li><b>动态卷积（条件卷积）</b>　卷积核的数值不是训练后固定的，而是由网络根据当前输入（这里是当前实例）临时算出来。</li></ul>
+<h2>怎么学</h2><p>先理解FCOS的逐位置预测和Mask R-CNN的RoIAlign，再读本文第3节的控制器和掩码头；可在AdelaiDet里跑一次CondInst推理，打印某个实例生成的卷积参数形状。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2003.05664" rel="noopener">https://arxiv.org/abs/2003.05664</a>（arXiv记录：标题、三位作者、v1提交于2020-03-12；摘要中的动态实例感知网络、无需ROI裁剪与特征对齐、掩码头3层每层8通道、COCO上超过调好的Mask R-CNN且更快。ECCV 2020、以FCOS为骨架、相对坐标输入、1/8分辨率、参数量等细节凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20CondInst%E6%9D%A1%E4%BB%B6%E5%8D%B7%E7%A7%AF%E5%AE%9E%E4%BE%8B%E5%88%86%E5%89%B2%EF%BC%88condinst%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acondinst%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/condinst.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="moco-v2.html"><small>本分支上一个 · 2020.03</small><b>MoCo v2改进基线</b></a><a class="r" href="nerf.html"><small>本分支下一个 · 2020.03</small><b>NeRF</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

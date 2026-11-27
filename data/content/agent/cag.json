@@ -1,0 +1,28 @@
+{
+  "id": "cag",
+  "who": "Brian J Chan, Chao-Ting Chen, Jui-Hung Cheng, Hen-Hsen Huang · 台湾政治大学 / 中研院",
+  "venue": "WWW 2025 Companion",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2412.15605"},
+    {"label": "GitHub", "url": "https://github.com/hhhuang/CAG"}
+  ],
+  "aka": ["CAG", "Cache-Augmented Generation", "缓存增强生成", "KV缓存增强生成", "Don't Do RAG", "不要RAG"],
+  "problem": "RAG每次提问都要实时检索，增加延迟，还可能取错文档；当知识库本来就不大时，检索这一步带来的复杂度和错误未必值得。",
+  "idea": "知识库能放进上下文窗口时干脆不检索：把全部文档一次性读进长上下文模型，预先算好并保存KV缓存，之后每个问题直接接在缓存后面作答。",
+  "impact": "以“Don’t Do RAG”为题引发了对小知识库场景是否还需要检索的讨论，把长上下文加KV缓存复用变成RAG之外一个常被拿来比较的简单方案。",
+  "method": "百万级上下文窗口（如[[gemini-1.5]]）出现后，[[rag-vs-long-context]]等研究发现：只要资源充足，直接读全文常常比检索更准，只是每次都重读很贵。[[prompt-caching]]让重复的长前缀可以缓存复用，CAG把这两点组合起来。\n\n**做法**。三步：先把知识库全部文档拼成一段长输入，跑一遍模型，把每层的[[c:kv-cache]]存下来；推理时把问题接在缓存之后直接生成，不再处理文档本身；多轮之间只需把新追加的token从缓存末尾截掉即可复位，不必从磁盘重载。\n\n**实验**。用Llama 3.1 8B，在SQuAD 1.0和HotpotQA上各构造小、中、大三档知识库（HotpotQA分别为16、32、64篇文档），与用[[llamaindex]]搭建的[[bm25]]稀疏检索和OpenAI向量检索RAG比较，指标为BERTScore。六组设置中五组CAG略高，例如HotpotQA小档CAG为0.7951，最好的RAG为0.7676；但在HotpotQA大档上RAG反而更好（0.7535对0.7407）。HotpotQA大档的生成时间，CAG约2.26秒，每次都把参考文本放进提示的做法约92秒。",
+  "limits": [
+    {"text": "只适用于能整体装进上下文窗口的小知识库，作者自己也承认数据一大就不可行；论文中最大一档上RAG已经反超。", "solved_by": []},
+    {"text": "知识库一更新就要重算整份KV缓存，缓存本身也占大量显存；只在两个问答集和一个8B模型上验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "rag-vs-long-context", "type": "extends", "note": "沿着“长上下文能否替代检索”的讨论，加上KV缓存预计算，让读全文的方案在延迟上也可行。"},
+    {"to": "prompt-caching", "type": "uses", "note": "核心机制就是把固定的长前缀（整个知识库）的KV缓存算一次、反复复用。"},
+    {"to": "rag", "type": "rivals", "note": "在小知识库上用预加载全部文档代替实时检索，消除检索延迟和选错文档的问题；知识库变大后RAG重新占优。"},
+    {"to": "bm25", "type": "rivals", "note": "BM25稀疏检索RAG是主要对照，在多数设置下是RAG一方的最好结果。"},
+    {"to": "llamaindex", "type": "uses", "note": "用LlamaIndex搭建作为对照的稀疏和稠密检索RAG流水线。"}
+  ],
+  "prereq": ["kv-cache", "context-window", "retrieval", "throughput-latency", "generation-metrics"],
+  "learn": "先补[[c:kv-cache]]，再读[[rag-vs-long-context]]和[[prompt-caching]] → 原文很短，重点看方法图和结果表 → 动手：用一个开源模型把20篇短文档的KV缓存存下来，比较“缓存后提问”和“每次都带上全文”的首token延迟。",
+  "check": {"source": "https://arxiv.org/abs/2412.15605", "confirmed": "标题、4位作者、v1提交于2024-12-20；正文（arxiv.org/html/2412.15605）核对WWW Companion ’25、政治大学与中研院单位、预加载与KV缓存与截断复位三步、Llama 3.1 8B、SQuAD 1.0与HotpotQA三档（16/32/64篇）、BM25与OpenAI索引RAG基线及LlamaIndex、BERTScore指标、六组中五组CAG更高、HotpotQA大档0.7407对0.7535、生成时间2.26秒对92.08秒、作者承认大数据集不可行。"}
+}

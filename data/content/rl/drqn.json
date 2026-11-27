@@ -1,0 +1,28 @@
+{
+  "id": "drqn",
+  "who": "Matthew Hausknecht, Peter Stone · UT Austin",
+  "venue": "AAAI Fall Symposium 2015",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1507.06527"}
+  ],
+  "problem": "DQN靠把最近4帧叠在一起当输入来获得一点“记忆”，遇到需要更长历史、或画面时有时无的部分可观测环境时就不够用了。",
+  "idea": "把DQN卷积层后的第一个全连接层换成LSTM，每次只输入一帧，让循环网络自己沿时间积累信息（DRQN）。",
+  "impact": "深度RL处理部分可观测问题的最早期做法之一，“DQN+LSTM”成为常见结构，后来R2D2在此基础上解决了循环网络与经验回放的配合问题。",
+  "method": "[[dqn-nature]]的输入是最近4帧画面的堆叠，这相当于假设4帧就足以确定当前状态。很多任务并非如此，这类问题叫[[pomdp]]（部分可观测马尔可夫决策过程）：智能体看到的观测不足以确定真实状态，需要记住过去。\n\nDRQN（Deep Recurrent Q-Network）的改动很小：保留DQN的卷积层，把其后的第一个全连接层换成[[lstm]]，每个时间步只输入一帧，LSTM的隐状态 `h_t = LSTM(h_(t−1), CNN(o_t))` 负责沿时间整合信息，最后输出各动作的Q值。训练时从回放池里取连续的一段轨迹（而不是单个转移）做时间反向传播，论文比较了每段从零初始化隐状态和沿整局展开两种做法。\n\n为了检验记忆能力，作者构造了“闪烁版”Atari：每一帧以一定概率整个变黑。摘要称DRQN在标准Atari和闪烁版上都能复现DQN的表现；用部分观测训练、再用更完整的观测评估时，表现随可观测程度提升；反过来用完整观测训练、在部分观测下评估时，表现下降得比DQN少。作者也指出，在同样的历史长度下，循环结构在学习打游戏时并没有系统优势，主要好处在于评估时观测质量变化后的适应。",
+  "limits": [
+    {"text": "从回放池取片段训练时，隐状态的初始值与收集数据时的网络不一致，会让循环Q学习有偏、不稳定。", "solved_by": ["r2d2"]},
+    {"text": "在大多数标准Atari游戏上相比叠帧没有明显提升，记忆的价值只在专门构造的部分可观测任务里显现。"}
+  ],
+  "relations": [
+    {"to": "dqn-nature", "type": "extends", "note": "在DQN上把叠帧换成LSTM，处理部分可观测。"},
+    {"to": "lstm", "type": "uses", "note": "用LSTM沿时间整合单帧观测。"},
+    {"to": "pomdp", "type": "solves", "note": "用循环网络的隐状态近似POMDP中的信念状态。"}
+  ],
+  "prereq": ["mdp", "recurrent-layer", "td-error", "state-action-observation"],
+  "terms": [
+    {"t": "闪烁Atari", "d": "论文构造的测试：每帧以一定概率被完全遮黑，迫使智能体依靠记忆。"}
+  ],
+  "learn": "先懂[[dqn-nature]]和LSTM；读DRQN原文第3–4节的结构与闪烁实验；在一个需要记忆的MiniGrid小任务上对比叠帧DQN与DRQN。",
+  "check": {"source": "https://arxiv.org/abs/1507.06527", "confirmed": "标题、两位作者、arXiv v1于2015-07-23；摘要中DQN记忆有限、把卷积后第一个全连接层换成LSTM、每步只看一帧、在标准与闪烁Atari上复现DQN、部分观测训练随可观测性提升、完整观测训练在部分观测下退化更少、循环在学习时无系统优势但评估时适应更好。片段训练的两种初始化方式按原文正文通行描述；发表处按通行引用。"},
+  "aka": ["DRQN", "Deep Recurrent Q-Network", "深度循环Q网络", "循环DQN", "DQN+LSTM"]
+}

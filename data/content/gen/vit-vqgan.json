@@ -1,0 +1,29 @@
+{
+  "id": "vit-vqgan",
+  "who": "Jiahui Yu, Xin Li, Jing Yu Koh, Han Zhang, Ruoming Pang, James Qin, Alexander Ku, Yuanzhong Xu et al. · Google Research",
+  "venue": "ICLR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2110.04627"}
+  ],
+  "aka": ["ViT-VQGAN", "VIM", "Vector-quantized Image Modeling", "改进VQGAN", "分解码本", "Factorized Codes", "L2归一化码本"],
+  "problem": "VQGAN把图像变成离散token、再用Transformer逐个预测，但卷积分词器重建质量有限、码本里大量条目从不被使用，导致第二阶段生成的上限被分词器卡住。",
+  "idea": "把VQGAN的卷积编解码器换成ViT，并改进码本学习：先把特征投影到很低维再查码本（分解码），对码和特征都做L2归一化；在这个更好的分词器上，像语言模型一样自回归预训练图像token（VIM）。",
+  "impact": "在ImageNet 256×256上把类条件生成的FID从VQGAN的17.04降到4.17，其ViT分词器被[[parti]]直接采用，低维查找与L2归一化码本的技巧也被许多后来的视觉分词器沿用。",
+  "method": "第一阶段（分词器）：图像切成8×8的块，ViT编码器输出每块一个特征向量；先线性投影到很低的维度（如32维）再在码本中找最近邻，查到后再投影回高维给解码器。低维查找让码本利用率大幅提高；同时对特征和码向量都做L2归一化，相当于用余弦相似度找最近码，训练更稳定。损失沿用VQGAN的重建、感知和对抗损失组合。\n\n第二阶段（VIM）：把图像token按光栅顺序排开，用解码器式Transformer做下一个token预测，可用于无条件、类条件生成；预训练后把中间层特征取平均做线性探测，也能当作表示学习方法评估。\n\n结果：ImageNet 256×256类条件生成IS 175.1、FID 4.17，而原版VQGAN为70.6和17.04；VIM-L的线性探测准确率从iGPT-L的60.3%提高到73.2%，在相近规模下明显更好。",
+  "limits": [
+    {"text": "光栅顺序逐个预测token，生成一张256×256图要上千步串行解码，速度慢。", "solved_by": ["maskgit", "var"]},
+    {"text": "向量量化仍会丢细节，码本大小与重建、生成质量之间的权衡没有根本解决。", "solved_by": ["magvit-v2", "fsq", "mar"]}
+  ],
+  "relations": [
+    {"to": "vqgan", "type": "solves", "note": "VQGAN卷积分词器码本利用率低、重建有限；ViT编码器加分解码和L2归一化码本显著提升重建与生成。"},
+    {"to": "vit", "type": "uses", "note": "分词器的编码器和解码器都换成Vision Transformer。"},
+    {"to": "image-gpt", "type": "extends", "note": "沿iGPT的“图像上的下一个token预测”路线，但在离散码而非像素上做，表示学习效果更好。"}
+  ],
+  "prereq": ["vector-quantization", "autoregressive", "self-attention", "image-patch", "adversarial-training"],
+  "terms": [
+    {"t": "码本利用率", "d": "码本中实际被用到的条目占比；利用率低意味着大量码向量浪费，限制了分词器的表达力。"},
+    {"t": "线性探测", "d": "冻结预训练模型，只在其特征上训练一个线性分类器，用分类准确率衡量特征好坏。"}
+  ],
+  "learn": "先读VQ-VAE和VQGAN → 读本文第3节分词器的改进（分解码与L2归一化） → 在小数据集上对比普通码本与低维L2码本的利用率。",
+  "check": {"source": "https://arxiv.org/abs/2110.04627", "confirmed": "标题、作者、v1日期2021-10-09、摘要中VIM自回归预测光栅化图像token、基于ViT的VQGAN、从架构到码本学习的多项改进、ImageNet 256×256上IS 175.1/FID 4.17对比VQGAN的70.6/17.04、VIM-L线性探测从iGPT-L的60.3%到73.2%；机构、ICLR 2022、8×8块、32维低维查找、L2归一化细节来自一般了解"}
+}

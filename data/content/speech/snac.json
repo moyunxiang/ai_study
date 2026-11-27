@@ -1,0 +1,30 @@
+{
+  "id": "snac",
+  "who": "Hubert Siuzdak, Florian Grötschla, Luca A. Lanzendörfer · ETH Zurich等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2410.14411"},
+    {"label": "GitHub", "url": "https://github.com/hubertsiuzdak/snac"}
+  ],
+  "problem": "残差向量量化（RVQ）的每一层码本都以同一帧率工作，可音频里有变化很慢的成分（音色、和声）也有变化很快的成分（辅音、鼓点），同一帧率对慢成分是浪费。",
+  "idea": "多尺度RVQ：让不同层的量化器在不同时间分辨率上工作，粗层每隔若干帧才出一个码，细层逐帧出码，按层级适应音频在多个时间尺度上的结构。",
+  "impact": "以很少的改动换来更高的压缩效率，代码和权重开源；层级化的token结构便于语言模型生成，被一些开源语音合成模型用作音频分词器。",
+  "method": "[[soundstream]]、[[encodec]]、[[dac]]的残差向量量化是一串码本：第一层量化编码器输出，第二层量化剩下的残差，依此类推，所有层都在同一帧率上。对语言模型来说，这意味着每一帧要预测好几个token，序列很长。\n\nSNAC（Multi-Scale Neural Audio Codec）只做了一个简单扩展：**不同层的量化器工作在不同的时间分辨率**。例如第一层的帧率很低，一个码管一大段时间，负责缓慢变化的整体信息；后面的层帧率逐层升高，补充越来越细的细节。实现上，量化前先在时间上做下采样，量化后再上采样回来，残差照常传给下一层。这样总token数比等帧率的RVQ少，又保留了从粗到细的层级。\n\n摘要报告：大量客观和主观评测显示，这种多尺度量化在同等质量下压缩更高效；作者开源了代码和语音、通用音频两类模型权重。",
+  "limits": [
+    {"text": "不同层的token长度不同，语言模型要专门设计交错或层级展开的生成顺序，不能像单码本那样直接逐个生成。", "solved_by": []},
+    {"text": "码仍然是纯声学的，缺少显式语义信息。", "solved_by": ["spark-tts"]}
+  ],
+  "relations": [
+    {"to": "dac", "type": "extends", "note": "在DAC式改进RVQGAN编解码器上把各层量化器放到不同时间分辨率。"},
+    {"to": "soundstream", "type": "extends", "note": "沿用SoundStream提出的残差向量量化框架，改变各层的帧率。"},
+    {"to": "encodec", "type": "rivals", "note": "EnCodec各层同帧率；SNAC用多尺度帧率减少总token数。"}
+  ],
+  "prereq": ["vector-quantization", "vocoder-codec", "waveform-spectrogram", "autoregressive"],
+  "terms": [
+    {"t": "多尺度量化", "d": "不同码本层使用不同的时间分辨率：粗层隔很多帧出一个码，细层逐帧出码。"}
+  ],
+  "aka": ["SNAC", "Multi-Scale Neural Audio Codec", "多尺度神经音频编解码"],
+  "check": {
+    "source": "https://arxiv.org/abs/2410.14411",
+    "confirmed": "arXiv官方记录：标题SNAC: Multi-Scale Neural Audio Codec、Siuzdak/Grötschla/Lanzendörfer三位作者、v1提交2024-10-18；摘要中RVQ已成标准、量化器在不同时间分辨率工作、层级化变帧率、更高效压缩、代码和权重开源。基于DAC、下采样与上采样实现、语音与通用音频两类权重、被开源TTS采用、机构为一般了解。"
+  }
+}

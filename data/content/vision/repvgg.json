@@ -1,0 +1,31 @@
+{
+  "id": "repvgg",
+  "who": "Xiaohan Ding, Xiangyu Zhang, Ningning Ma, Jungong Han, Guiguang Ding, Jian Sun · 清华大学 / 旷视科技 / 香港科技大学 / 亚伯大学",
+  "venue": "CVPR 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2101.03697"},
+    {"label": "代码", "url": "https://github.com/megvii-model/RepVGG"}
+  ],
+  "aka": ["RepVGG", "结构重参数化", "structural re-parameterization", "重参数化", "re-parameterization"],
+  "problem": "[[vgg]]那样只有3×3卷积和ReLU的直筒网络在GPU上跑得快、省显存、易部署，但不好训练，精度远不如带多分支的[[resnet]]、Inception；而多分支结构推理时要保存中间结果、内存访问多，实际速度慢。",
+  "idea": "训练时用多分支，推理时用直筒：训练阶段每层是“3×3卷积＋1×1卷积＋恒等”三条分支相加；训练完把三条分支连同各自的批归一化，用线性代数等价地合并成一个3×3卷积，得到纯VGG式的推理网络。",
+  "impact": "RepVGG是第一个ImageNet top-1超过80%的直筒式模型（作者所知），推理比同精度的ResNet快很多；“结构重参数化”随后被[[yolov7]]、YOLOv6、MobileOne等大量实时检测和端侧模型采用。",
+  "method": "**训练时结构**：每个块的输出是 `y = BN(Conv3×3(x)) + BN(Conv1×1(x)) + BN(x)`（恒等分支只在输入输出维度相同时存在），再接ReLU。多分支相当于隐式地集成了很多条不同深度的路径，像ResNet一样好训练。\n\n**合并成一个3×3卷积**（推理前一次性完成）：\n\n- 卷积后接BN在推理时是线性变换：`BN(W*x) = γ(W*x − μ)/σ + β`，可以把γ/σ乘进卷积核、把剩下的常数并进偏置，得到一个带偏置的卷积。\n- 1×1卷积等价于中心有值、四周为0的3×3卷积；恒等映射等价于一个“单位”1×1卷积，也能补零成3×3。\n- 三个3×3卷积作用在同一输入上，相加等于卷积核相加：`W' = W₃ + pad(W₁) + pad(I)`。\n\n于是整个网络在推理时只剩3×3卷积加ReLU的堆叠，没有分支。这样的结构对GPU的Winograd等3×3卷积加速算法友好，也没有分支带来的额外显存占用。\n\n摘要称RepVGG在ImageNet上超过80% top-1，据作者所知是直筒模型首次做到；在NVIDIA 1080Ti上比ResNet-50快83%、比ResNet-101快101%且精度更高，与EfficientNet、[[regnet]]等相比也有良好的精度-速度权衡。",
+  "legacy": "结构重参数化成了实时检测器的常用技巧（YOLOv6、[[yolov7]]的RepConv）；同一作者后续提出了ACNet、DBB、RepLKNet等一系列重参数化工作。量化时重参数化后的权重分布不均，后来也有专门的量化友好版本。",
+  "limits": [
+    {"text": "合并后的权重分布范围大，直接做INT8量化精度损失明显。", "solved_by": []},
+    {"text": "只有3×3卷积，参数量相对大，在很小的移动端模型上不如深度可分离卷积网络划算。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "vgg", "type": "extends", "note": "推理时完全回到VGG式的3×3卷积直筒结构，并让它的精度超过80%。"},
+    {"to": "resnet", "type": "solves", "note": "ResNet的分支结构推理时内存访问多、速度慢；RepVGG训练用分支、推理合并成单路，同精度下更快。"},
+    {"to": "batchnorm", "type": "uses", "note": "利用推理时BN是线性变换这一点，把BN折叠进卷积核再合并分支。"},
+    {"to": "regnet", "type": "rivals", "note": "与RegNet、EfficientNet等比较精度与实际GPU速度的权衡。"}
+  ],
+  "prereq": ["conv-layer", "residual-connection", "normalization-layer", "convolution-op", "throughput-latency"],
+  "terms": [
+    {"t": "结构重参数化", "d": "训练时用一种便于优化的结构，训练后用数学上等价的变换把它转成另一种便于推理的结构。"}
+  ],
+  "learn": "先确认会把BN折叠进卷积，再读RepVGG第3节的合并推导；用PyTorch建一个三分支块，随机初始化后合并成单个3×3卷积，检查两者对同一输入的输出是否一致。",
+  "check": {"source": "https://arxiv.org/abs/2101.03697", "confirmed": "arXiv记录：标题、六位作者、v1提交于2021-01-11；摘要中推理时只有3×3卷积与ReLU的VGG式主体、训练时多分支、结构重参数化解耦训练与推理结构、ImageNet超过80% top-1且据作者所知是直筒模型首次、1080Ti上比ResNet-50快83%比ResNet-101快101%、与EfficientNet和RegNet的精度速度权衡。分支形式、合并公式、Winograd、CVPR 2021、机构、后续工作凭一般了解写。"}
+}

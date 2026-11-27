@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Marian C++翻译框架（2018） · AI脉络</title>
+<meta name="description" content="2017年前后的神经机器翻译工具大多基于Python和通用深度学习框架（Theano、TensorFlow），训练和推理都慢，部署到生产系统要再写一套C++代码。 用纯C++从零写一个只为翻译服务的框架：自带基于动态计算图的自动微分引擎，内置RNN与Transformer编码器-解码器、多GPU训…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/marian-nmt.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Marian C++翻译框架（2018）">
+<meta property="og:description" content="2017年前后的神经机器翻译工具大多基于Python和通用深度学习框架（Theano、TensorFlow），训练和推理都慢，部署到生产系统要再写一套C++代码。 用纯C++从零写一个只为翻译服务的框架：自带基于动态计算图的自动微分引擎，内置RNN与Transformer编码器-解码器、多GPU训…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/marian-nmt.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/marian-nmt">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 神经机器翻译与生成</div>
+<h1>Marian C++翻译框架</h1>
+<div class="full">Marian: Fast Neural Machine Translation in C++</div>
+<div class="meta"><span>2018.04</span><span>系统</span><span>延伸</span><span>ACL 2018 Demo</span><span>Marcin Junczys-Dowmunt, Roman Grundkiewicz, Tomasz Dwojak, Hieu Hoang, Kenneth Heafield, Tom Neckermann, Frank Seide, Ulrich Germann et al. · 微软、爱丁堡大学、波兹南大学等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1804.00344" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://marian-nmt.github.io/" rel="noopener">项目主页 ↗</a><a class="btn sm" href="../index.html#/n/marian-nmt">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>2017年前后的神经机器翻译工具大多基于Python和通用深度学习框架（Theano、TensorFlow），训练和推理都慢，部署到生产系统要再写一套C++代码。</p></div><div><h4>方法</h4><p>用纯C++从零写一个只为翻译服务的框架：自带基于动态计算图的自动微分引擎，内置RNN与Transformer编码器-解码器、多GPU训练、批量束搜索解码，没有Python依赖。</p></div><div><h4>影响</h4><p>Marian成为WMT评测中许多冠军系统和微软翻译的训练与推理工具；Hugging Face上上千个「Opus-MT」双语翻译模型都用Marian训练，至今被大量下载使用。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>研究用的NMT工具如Nematus（基于Theano）、<a class="ln" href="../n/opennmt.html">OpenNMT</a>（Lua/PyTorch）、tensor2tensor（TensorFlow）方便改模型，但速度受限于框架的通用性和Python开销；工业界部署往往要重新实现推理。爱丁堡大学的Nematus团队此前已写过一个只做推理的C++解码器amun，Marian是在此基础上扩展出训练能力的完整框架。</p><h2>方法</h2><p><b>自动微分。</b> Marian实现了自己的反向模式自动微分：前向计算时动态构建表达式图，节点是张量运算，反向时按拓扑逆序计算梯度；针对GPU写了融合的CUDA核（例如把层归一化、softmax的多个步骤合并），减少显存读写。</p><p><b>模型。</b> 内置深层RNN（带注意力的编码器-解码器、Nematus兼容结构）和<a class="ln" href="../n/transformer.html">Transformer</a>，支持模型集成、语言模型融合。</p><p><b>训练。</b> 同步/异步的多GPU数据并行，按显存动态决定批大小（按token数而不是句子数组批），支持梯度延迟累积以模拟大批量。</p><p><b>解码。</b> 批量束搜索，多个句子同时解码，CPU与GPU都能跑；后来加入8位整数量化等推理优化。</p><h2>结果</h2><p>摘要称：描述了编码器-解码器框架的设计，并展示了一个便于研究的工具包也能达到很高的训练和翻译速度。论文中的具体速度对比数字未核对。</p><h2>后来的发展</h2><p>Marian被WMT多年的高效翻译共享任务和很多参赛系统采用，微软翻译的生产模型也基于它。赫尔辛基大学用Marian在OPUS语料上训练并公开了上千个语言对的Opus-MT模型，后被移植到Hugging Face Transformers（MarianMT类）。浏览器本地翻译（Firefox Translations / Bergamot项目）也用Marian的量化推理。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>C++实现修改模型结构的门槛高，研究者做新架构实验时仍更常用基于PyTorch的fairseq等工具。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/fairseq.html">fairseq序列建模库</a></div></li><li>主要面向编码器-解码器翻译模型，对大规模预训练语言模型的支持有限。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/bahdanau-attention.html">注意力机制</a><span class="yr">2014.09 · NLP</span><div class=nt>RNN模型采用带注意力的编码器-解码器结构。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>框架内置Transformer编码器-解码器，是大多数Marian翻译模型的结构。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/moses.html">Moses</a><span class="yr">2007.06 · NLP</span><div class=nt>延续统计翻译时代Moses那样由社区维护、可直接用于生产的开源翻译工具传统，核心作者也参与过Moses。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/opennmt.html">OpenNMT</a><span class="yr">2017.01 · NLP</span><div class=nt>同期开源NMT工具；OpenNMT基于Lua/PyTorch便于修改，Marian用纯C++追求训练和推理速度。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/fairseq.html">fairseq序列建模库</a><span class="yr">2019.04 · 系统·效率</span><div class=nt>C++实现修改模型结构的门槛高，研究者做新架构实验时仍更常用基于PyTorch的fairseq等工具。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autodiff.html">自动微分与计算图</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a></p>
+<h2>本篇术语</h2><ul><li><b>Opus-MT</b>　赫尔辛基大学用Marian在OPUS开放平行语料上训练并公开的大量双语翻译模型。</li><li><b>按token组批</b>　每个批次按总token数而不是句子数确定大小，长短句混在一起时更能用满显存。</li></ul>
+<h2>怎么学</h2><p>先了解<a class="ln" href="../n/transformer.html">Transformer</a>编码器-解码器 → 读原文第2–3节框架设计 → 动手：用Hugging Face的MarianMT加载一个Opus-MT英中模型翻译几句话，再用marian-decoder命令行比较CPU推理速度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1804.00344" rel="noopener">https://arxiv.org/abs/1804.00344</a>（arXiv记录：标题Marian: Fast Neural Machine Translation in C++、11位作者、v1 2018-04-01；摘要：高效、自包含的NMT框架、集成基于动态计算图的自动微分引擎、完全用C++编写、描述编码器-解码器框架设计、研究友好的工具也能达到高训练和翻译速度。ACL 2018 Demo、作者单位、amun、融合CUDA核、按token组批、Opus-MT、微软翻译与Bergamot的使用凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Marian%20C%2B%2B%E7%BF%BB%E8%AF%91%E6%A1%86%E6%9E%B6%EF%BC%88marian-nmt%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amarian-nmt%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/marian-nmt.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="subword-regularization.html"><small>本分支上一个 · 2018.04</small><b>Unigram子词与子词正则化</b></a><a class="r" href="qanet.html"><small>本分支下一个 · 2018.04</small><b>QANet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "id": "rcpo",
+  "who": "Chen Tessler, Daniel J. Mankowitz, Shie Mannor · Technion / DeepMind",
+  "venue": "ICLR 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1805.11074"}
+  ],
+  "problem": "智能体常常钻奖励函数的漏洞，加约束能防止，但一般的约束（尤其是不能写成每步代价之和的约束）没有闭式解，CPO这类方法又依赖二阶近似。",
+  "idea": "用多时间尺度的拉格朗日方法：把乘子乘以代价变成一个“惩罚信号”并入奖励，策略在快时间尺度上照常用演员-评论家优化，乘子在慢时间尺度上按约束违反程度调整。",
+  "impact": "把拉格朗日原始-对偶法系统地用到深度演员-评论家上并给出收敛证明，后来常用的PPO-Lagrangian、SAC-Lagrangian等基线都属这一路线。",
+  "method": "在[[cmdp]]里，拉格朗日松弛把约束问题变为 `min_λ≥0 max_π L(λ, π) = J_R(π) − λ(J_C(π) − α)`。RCPO（Reward Constrained Policy Optimization）在实现上分三个时间尺度：\n\n- **最快**：评论家学习“惩罚后的价值”，即把奖励换成 `r̂ = r − λ·c` 的TD学习；\n- **中等**：演员用这个惩罚后的价值做策略梯度更新；\n- **最慢**：乘子按约束违反程度做梯度上升 `λ ← max(0, λ + η(J_C − α))`，约束超了λ就变大，惩罚加重。\n\n这里的“惩罚信号”`λ·c` 被作者称为引导策略走向满足约束的替代信号。因为乘子变化慢，策略在每个λ下近似收敛，这是随机逼近理论里多时间尺度分析的标准条件；论文据此证明了RCPO收敛到满足约束的局部最优。它也能处理只在整条轨迹结束时才能评估的一般约束（不要求代价能逐步分解）。\n\n作者在网格世界和MuJoCo（限制关节力矩等）上实验，显示能训练出满足约束的策略，而直接把代价按固定系数加进奖励要么约束不满足、要么回报很低。",
+  "limits": [
+    {"text": "乘子更新是事后纠正，训练中约束会反复超出再被压回，出现振荡，训练过程中的安全没有保证。", "solved_by": ["lyapunov-safe-rl"]},
+    {"text": "收敛只到局部最优，并依赖学习率满足多时间尺度条件，实践中乘子学习率很难调。"}
+  ],
+  "relations": [
+    {"to": "cmdp", "type": "uses", "note": "基于CMDP的拉格朗日松弛与原始-对偶求解。"},
+    {"to": "cpo-rl", "type": "rivals", "note": "CPO每步解带约束的信赖域问题；RCPO只用一阶的乘子更新，更简单但约束会振荡。"},
+    {"to": "actor-critic-1983", "type": "uses", "note": "采用演员-评论家结构：评论家学惩罚后的价值，演员据此做策略梯度。"},
+    {"to": "reward-shaping", "type": "rivals", "note": "固定系数把代价并入奖励是一种奖励塑形，RCPO改为自适应调节系数。"}
+  ],
+  "prereq": ["actor-critic", "lagrange-duality", "reward-design", "learning-rate"],
+  "terms": [
+    {"t": "多时间尺度", "d": "几组参数用量级不同的学习率同时更新，慢的那组在快的看来近似不动。"}
+  ],
+  "learn": "先读[[cmdp]]的拉格朗日表述；读RCPO原文第4节的三时间尺度算法；在OmniSafe里跑PPO-Lagrangian，画出λ和代价随训练的变化。",
+  "check": {"source": "https://arxiv.org/abs/1805.11074", "confirmed": "标题、三位作者、arXiv v1于2018-05-28；摘要中智能体利用奖励漏洞、约束可解决但一般约束无闭式解、多时间尺度方法、用替代惩罚信号引导策略满足约束、证明收敛与实验验证。三时间尺度的具体安排、网格世界与MuJoCo实验按原文正文通行描述；ICLR 2019按通行引用。"},
+  "aka": ["RCPO", "Reward Constrained Policy Optimization", "奖励约束策略优化", "拉格朗日约束RL", "原始对偶安全RL"]
+}

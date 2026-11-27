@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>RSO统计拒绝采样（2023） · AI脉络</title>
+<meta name="description" content="DPO和SLiC这类离线偏好优化用的偏好对来自SFT模型或别的模型，但从理论上讲，要准确估计最优策略，偏好对应该从最优策略本身采样；DPO没有奖励模型，没法这么做。 先训练奖励模型，再用统计上的拒绝采样，从SFT模型的样本中近似抽出“来自最优策略”的回答，组成偏好对后用DPO或SLiC的损失训练；…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/rso.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RSO统计拒绝采样（2023）">
+<meta property="og:description" content="DPO和SLiC这类离线偏好优化用的偏好对来自SFT模型或别的模型，但从理论上讲，要准确估计最优策略，偏好对应该从最优策略本身采样；DPO没有奖励模型，没法这么做。 先训练奖励模型，再用统计上的拒绝采样，从SFT模型的样本中近似抽出“来自最优策略”的回答，组成偏好对后用DPO或SLiC的损失训练；…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/rso.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/rso">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 指令与偏好对齐</div>
+<h1>RSO统计拒绝采样</h1>
+<div class="full">Statistical Rejection Sampling Improves Preference Optimization</div>
+<div class="meta"><span>2023.09</span><span>论文</span><span>延伸</span><span>ICLR 2024</span><span>Tianqi Liu, Yao Zhao, Rishabh Joshi, Misha Khalman, Mohammad Saleh, Peter J. Liu, Jialu Liu · Google DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2309.06657" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/rso">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>DPO和SLiC这类离线偏好优化用的偏好对来自SFT模型或别的模型，但从理论上讲，要准确估计最优策略，偏好对应该从最优策略本身采样；DPO没有奖励模型，没法这么做。</p></div><div><h4>方法</h4><p>先训练奖励模型，再用统计上的拒绝采样，从SFT模型的样本中近似抽出“来自最优策略”的回答，组成偏好对后用DPO或SLiC的损失训练；同时把两者的损失统一到一个偏好建模框架里。</p></div><div><h4>影响</h4><p>指出离线偏好优化里“偏好数据从哪个分布采样”这个被忽视的问题，给出简单有效的修正，在三个任务上持续超过SLiC和DPO，是后来在线/迭代DPO讨论的先声之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/instructgpt.html">InstructGPT与RLHF</a>式的RLHF用<a class="ln" href="../n/ppo.html">PPO</a>在线采样、在线优化，稳定性差。<a class="ln" href="../n/slic-hf.html">SLiC-HF序列似然校准</a>和<a class="ln" href="../n/dpo.html">DPO直接偏好优化</a>是离线方法：直接在固定的偏好对上训练，简单稳定。DPO的推导表明，在KL约束下最优策略为 <code>π*(y|x) ∝ π_sft(y|x) · exp(r(x,y)/β)</code> 其中r是奖励，β控制偏离SFT模型的程度。DPO的损失本质上是用偏好数据对π*做最大似然估计，而最大似然估计严格来说要求偏好对是从π*本身采样的。实际中，DPO的偏好对来自别处（例如人类标注时用的其他模型），SLiC只能从SFT模型采样，都与π*不一致。</p><p><b>拒绝采样</b>：π*的形式正好适合<a class="lc" href="../c/monte-carlo.html">蒙特卡洛采样</a>式的拒绝采样：以π_sft为提议分布，先采样许多候选回答，对每个回答以概率 <code>exp((r(x,y) − r_max)/β)</code> 接受（r_max是候选中的最大奖励），被接受的样本就近似服从π*。β越小，越只保留高奖励回答；β越大，越接近SFT分布。具体流程：训练一个成对奖励模型 → 对每个提示从SFT模型采样一批回答 → 用奖励模型打分并做拒绝采样，选出若干回答 → 用奖励模型给它们两两标出偏好 → 用偏好损失训练。</p><p><b>统一的损失框架</b>：作者从偏好建模的角度把DPO的sigmoid损失和SLiC的hinge损失统一起来，并给出改进版本，在RSO数据上两种都可用。</p><p><b>结果</b>：在三个不同任务（如摘要、对话）上，用大模型自动评判和人工评判，摘要称RSO持续超过SLiC和DPO。</p><h2>后来的发展</h2><p>“偏好对应来自当前或最优策略”这一论点后来被在线DPO、迭代DPO和OAIF等工作反复强调，RSO常与它们一起被引用。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要训练奖励模型并对每个提示大量采样再拒绝，丢掉了DPO“不需要奖励模型、不需要采样”的简便；接受率随β变小迅速下降。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>近似的是SFT模型下的最优策略，训练过程中策略不断变化，样本仍是一次性离线生成，并非真正在线。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/oaif.html">OAIF在线AI反馈</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/ppo.html">PPO</a><span class="yr">2017.07 · RL</span><div class=nt>PPO在线采样与优化，RSO以离线的拒绝采样加偏好损失近似同样的目标。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/instructgpt.html">InstructGPT与RLHF</a><span class="yr">2022.03 · LLM</span><div class=nt>沿用训练奖励模型并在KL约束下优化策略的RLHF设定。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/dpo.html">DPO直接偏好优化</a><span class="yr">2023.05 · LLM</span><div class=nt>DPO的偏好对不来自最优策略，最大似然估计有偏；RSO用拒绝采样从近似最优策略中采样偏好对。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/slic-hf.html">SLiC-HF序列似然校准</a><span class="yr">2023.05 · LLM</span><div class=nt>SLiC只能用SFT模型的样本，RSO改为从最优策略近似采样，并统一了两者的损失。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/oaif.html">OAIF在线AI反馈</a><span class="yr">2024.02 · LLM</span><div class=nt>RSO指出偏好对应来自（近似）最优策略，OAIF进一步做到每步都从当前策略在线采样。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/rlhf-workflow.html">RLHF Workflow在线迭代DPO</a><span class="yr">2024.05 · LLM</span><div class=nt>延续RSO“偏好对应来自当前或最优策略”的观点，用最好与最差回答组成偏好对。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/rlhf-concept.html">人类反馈强化学习</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/monte-carlo.html">蒙特卡洛采样</a> <a class="chip c" href="../c/mle.html">最大似然估计</a> <a class="chip c" href="../c/logistic-regression.html">逻辑回归</a></p>
+<h2>本篇术语</h2><ul><li><b>拒绝采样</b>　从一个容易采样的分布中抽样，再按一定概率接受或拒绝每个样本，使被接受的样本服从另一个难以直接采样的目标分布。</li><li><b>离线偏好优化</b>　在事先收集好的固定偏好对上训练模型，训练过程中不再用当前模型生成新回答。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/dpo.html">DPO直接偏好优化</a>中最优策略的闭式解和<a class="ln" href="../n/slic-hf.html">SLiC-HF序列似然校准</a>；读本文第3节拒绝采样算法和统一损失；动手：用一个小奖励模型给SFT模型的16个回答打分，按exp((r−r_max)/β)接受，观察β不同时接受了多少、平均奖励多少。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2309.06657" rel="noopener">https://arxiv.org/abs/2309.06657</a>（标题、7位作者、arXiv首次提交2023-09-13；摘要中PPO在线RL、SLiC与DPO作为离线替代、SLiC从SFT策略采样、DPO直接用偏好数据无需奖励模型、目标最优策略的MLE需要从该策略采样的偏好对、DPO无奖励模型无法从最优策略采样、RSO用拒绝采样从目标最优策略获取偏好数据、统一增强SLiC和DPO损失的框架、三个任务上LLM与人工评测都持续超过SLiC和DPO。接受概率公式与具体流程、ICLR 2024与机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20RSO%E7%BB%9F%E8%AE%A1%E6%8B%92%E7%BB%9D%E9%87%87%E6%A0%B7%EF%BC%88rso%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Arso%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/rso.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="sudden-drops.html"><small>本分支上一个 · 2023.09</small><b>损失骤降与句法习得</b></a><a class="r" href="zephyr.html"><small>本分支下一个 · 2023.10</small><b>Zephyr蒸馏对齐</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

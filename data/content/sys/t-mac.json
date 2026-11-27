@@ -1,0 +1,25 @@
+{
+ "id": "t-mac",
+ "who": "Jianyu Wei, Shijie Cao, Ting Cao, Lingxiao Ma, Lei Wang, Yanyong Zhang, Mao Yang · 微软亚洲研究院, 中国科学技术大学",
+ "venue": "EuroSys 2025",
+ "aka": ["T-MAC", "查表矩阵乘", "LUT-based mpGEMM", "混合精度矩阵乘", "CPU低比特推理"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2407.00088"},
+  {"label": "GitHub", "url": "https://github.com/microsoft/T-MAC"}
+ ],
+ "problem": "低比特量化模型推理时要做“低比特权重×高精度激活”的混合精度矩阵乘，CPU没有这种原生指令，只能先把权重反量化回高精度再算，开销大，比特数降低也换不来相应的提速。",
+ "idea": "把乘法变成查表：权重按比特拆开，每一比特只有0/1两种取值，预先把激活的各种组合和算好放进一张小表，计算时用权重比特直接查表累加，不再反量化、也几乎不做乘法。",
+ "impact": "让CPU上的低比特推理速度随比特数线性提升，是微软bitnet.cpp等1比特推理内核的技术基础之一。",
+ "method": "端侧部署通常把权重量化到4比特、2比特甚至1.58比特（如[[bitnet]]），激活仍是8或16比特。[[llama-cpp]]等框架在CPU上的做法是先把一块权重反量化成高精度，再做普通的乘加；比特数再低，乘加次数也不变，所以速度提升有限。\n\nT-MAC把一个n比特权重拆成n个1比特平面：`W = Σ_i 2^i · W_i`，每个 `W_i` 的元素只取0或1。对一组g个激活（如g=4），它们与任意0/1向量的点积只有 `2^g` 种可能，可以先算出来存成一张查找表。于是“权重×激活”变成：用每个比特平面上连续g个比特拼成索引去查表，再按 `2^i` 加权累加。乘法被消除，加法也大为减少；计算量随比特数线性下降。论文还针对CPU的SIMD查表指令、表的存放位置和数据布局做了优化。\n\n摘要报告：在低比特Llama和BitNet模型上，相比llama.cpp吞吐最多提高4倍、能耗降低70%；BitNet-b1.58-3B在M2-Ultra上单核每秒30个词、八核71个词，在树莓派5上每秒11个词。",
+ "limits": [
+  {"text": "查表法在解码这类矩阵-向量乘中优势明显，预填充的大批量矩阵乘仍可能更适合传统的反量化加GEMM；也依赖CPU的SIMD查表指令。", "solved_by": ["bitnet-cpp"]}
+ ],
+ "relations": [
+  {"to": "llama-cpp", "type": "solves", "note": "llama.cpp在CPU上要先反量化权重再计算，T-MAC用查表直接做混合精度矩阵乘，吞吐最多提高4倍。"},
+  {"to": "bitnet", "type": "uses", "note": "以BitNet b1.58等极低比特模型作为主要评测对象。"},
+  {"to": "gguf", "type": "extends", "note": "面向GGUF/k-quants一类的低比特权重格式，提供更快的CPU计算内核。"}
+ ],
+ "prereq": ["quantization-concept", "matrix-multiplication", "cpu-gpu", "memory-bandwidth"],
+ "terms": [{"t": "查找表（LUT）", "d": "把所有可能输入对应的计算结果预先算好存起来，计算时直接按索引读取结果，用存储换计算。"}],
+ "check": {"source": "https://arxiv.org/abs/2407.00088", "confirmed": "标题、七位作者、v1日期2024-06-25；摘要：低比特LLM需要混合精度矩阵乘、现有系统只能反量化、基于查找表的方法直接支持mpGEMM无需反量化并消除乘法减少加法、把数据类型为中心的乘法转为按比特查表、内核随比特宽度线性扩展、对比llama.cpp吞吐最多4倍能耗降70%、BitNet-b1.58-3B在M2-Ultra单核30 tokens/s八核71 tokens/s、树莓派5上11 tokens/s。比特平面分解公式与g=4、EuroSys 2025、机构为一般了解。"}
+}

@@ -1,0 +1,29 @@
+{
+  "id": "qk-norm",
+  "who": "Alex Henry, Prudhvi Raj Dachapally, Shubham Pawar, Yuxuan Chen · Elastic等",
+  "venue": "Findings of EMNLP 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2010.04245"}
+  ],
+  "aka": ["QK-Norm", "QKNorm", "Query-Key Normalization", "查询键归一化", "QK LayerNorm"],
+  "problem": "注意力分数 `q·k/√d` 没有上界：训练中查询和键的范数一旦变大，softmax就会饱和成几乎one-hot，梯度变得极小，训练不稳定；除以√d只是一个固定缩放，管不住范数的增长。",
+  "idea": "在相乘之前先对每个头的查询向量和键向量各做ℓ2归一化，使 q·k 变成夹角余弦、取值在[−1,1]，再乘一个可学习的标量g代替固定的1/√d。",
+  "impact": "原文只在低资源翻译上验证，但这一“给q、k各加一层归一化”的做法后来被大规模训练广泛采用（如ViT-22B、OLMo 2、Gemma 3、Qwen3用RMSNorm版本），成为抑制注意力logit爆炸、稳定大模型训练的常用组件。",
+  "method": "背景：[[transformer]]的注意力权重为 `softmax(q·kᵀ/√d)`。除以√d是为了让点积的方差在初始化时约为1，但训练过程中q、k的范数会持续变化。如果某些头的范数变得很大，点积的数值范围随之放大，softmax输出接近one-hot（饱和），几乎所有梯度都集中到一个位置，其他位置学不动；范数过小时注意力又过于平均。当时针对低资源翻译，已有工作通过调整归一化位置（如[[pre-ln]]）和缩放来改善训练。\n\n**QKNorm**的做法：对每个注意力头，先把查询和键分别沿头维度做ℓ2归一化，`q̂ = q/‖q‖`，`k̂ = k/‖k‖`，于是 `q̂·k̂ = cos θ ∈ [−1, 1]`；再乘以可学习的标量g：`Attention = softmax(g · q̂ k̂ᵀ) V`。这样注意力分布的“锐利程度”完全由g控制，而不会被q、k范数的漂移意外放大，作者称这样能让softmax不再任意饱和，同时不损失表达能力。g在实验中按序列长度相关的公式初始化（细节见原文）。\n\n结果：在TED Talks语料和IWSLT'15的5个低资源翻译方向上，相对当时最好的双语基线平均提升0.928 BLEU。\n\n后续：大模型训练中常见的“注意力logit增长导致损失尖峰”问题让这一思路重新受到重视。后来常见的写法是对q、k各做一次LayerNorm或RMSNorm（不一定是纯ℓ2归一化加单一标量），并保留原来的1/√d缩放。",
+  "limits": [
+    {"text": "原文只在小规模、低资源的翻译任务上实验，对大规模语言模型预训练的稳定性作用没有验证；这一作用是后来的大模型训练报告才系统展示的。", "solved_by": ["olmo-2", "gemma-3"]},
+    {"text": "把点积压到余弦范围后，注意力的锐度完全依赖可学习标量的初始化和学习，g设得不合适时注意力可能过于平均；与RoPE等位置编码的配合方式原文没有讨论。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "solves", "note": "原始缩放点积注意力只除以固定的√d，q、k范数增大时softmax会饱和；QKNorm先归一化再用可学习缩放。"},
+    {"to": "pre-ln", "type": "extends", "note": "同属调整归一化位置以稳定Transformer训练的工作，Pre-LN处理残差通路，QKNorm处理注意力内部的点积。"},
+    {"to": "admin", "type": "rivals", "note": "Admin通过初始化和残差缩放解决训练不稳定，QKNorm直接约束注意力logit的范围。"}
+  ],
+  "prereq": ["self-attention", "softmax", "normalization-layer", "norm", "dot-product"],
+  "terms": [
+    {"t": "softmax饱和", "d": "输入数值差距很大时softmax输出几乎全部集中在最大项上，其余项的梯度接近0。"},
+    {"t": "注意力logit", "d": "进入softmax之前的注意力分数，即 q·k 缩放后的值。"}
+  ],
+  "learn": "先补[[c:softmax]]和[[c:self-attention]]；读原文第3节QKNorm的定义与g的初始化；动手：在小Transformer里打印训练过程中各头注意力logit的最大值，比较加与不加QK归一化时的曲线。",
+  "check": {"source": "https://arxiv.org/abs/2010.04245", "confirmed": "标题、4位作者、arXiv v1提交日2020-10-08；摘要中面向低资源翻译、修改注意力使softmax不易任意饱和、在相乘前沿头维度对每个查询和键做ℓ2归一化并用可学习参数放大以代替除以√d、TED Talks与IWSLT'15的5个低资源方向平均提升0.928 BLEU。venue、机构、g的初始化方式，以及ViT-22B、OLMo 2、Gemma 3、Qwen3等后续采用为一般了解。"}
+}

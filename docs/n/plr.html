@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>PLR优先关卡回放（2020） · AI脉络</title>
+<meta name="description" content="在程序化生成的环境（如）里，训练时通常从固定的一批关卡中均匀随机抽取，不管当前策略在某个关卡上还能不能学到东西，浪费了大量交互在太简单或太难的关卡上。 像按TD误差优先回放经验那样，按“学习潜力”优先回放关卡：记录每个关卡上次被玩时的平均TD误差大小，误差越大说明越有东西可学，下次越优先抽到；同时…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/plr.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PLR优先关卡回放（2020）">
+<meta property="og:description" content="在程序化生成的环境（如）里，训练时通常从固定的一批关卡中均匀随机抽取，不管当前策略在某个关卡上还能不能学到东西，浪费了大量交互在太简单或太难的关卡上。 像按TD误差优先回放经验那样，按“学习潜力”优先回放关卡：记录每个关卡上次被玩时的平均TD误差大小，误差越大说明越有东西可学，下次越优先抽到；同时…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/plr.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/plr">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 探索与好奇心</div>
+<h1>PLR优先关卡回放</h1>
+<div class="full">Prioritized Level Replay</div>
+<div class="meta"><span>2020.10</span><span>论文</span><span>延伸</span><span>ICML 2021</span><span>Minqi Jiang, Edward Grefenstette, Tim Rocktäschel · UCL / Facebook AI Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2010.03934" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/plr">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>在程序化生成的环境（如<a class="ln" href="../n/procgen.html">Procgen泛化基准</a>）里，训练时通常从固定的一批关卡中均匀随机抽取，不管当前策略在某个关卡上还能不能学到东西，浪费了大量交互在太简单或太难的关卡上。</p></div><div><h4>方法</h4><p>像<a class="ln" href="../n/per.html">优先经验回放</a>按TD误差优先回放经验那样，按“学习潜力”优先回放关卡：记录每个关卡上次被玩时的平均TD误差大小，误差越大说明越有东西可学，下次越优先抽到；同时按“多久没玩”加一项保证不被遗忘。</p></div><div><h4>影响</h4><p>给出了一个简单、可以套在任何on-policy算法外面的自动课程方法，在Procgen上同时提高了样本效率和泛化；它的“按回报误差打分的关卡回放”成为后来无监督环境设计（Robust PLR、ACCEL等）的核心部件。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/procgen.html">Procgen泛化基准</a>、MiniGrid这类环境的每个关卡由一个随机种子生成，研究者用其中一部分关卡训练、用没见过的关卡测试泛化。默认做法是每一局均匀随机抽一个训练关卡。但能从一个关卡学到多少，取决于当前策略：已经掌握的关卡没什么可学，完全无法完成的关卡也给不出有用的信号。课程学习希望按难度安排训练顺序，但手工设计课程需要领域知识。</p><h2>方法</h2><p>PLR维护一个已见关卡的缓冲区，每个关卡i有一个分数 <code>S_i</code>，取上一次在该关卡上收集的轨迹的平均绝对GAE（广义优势估计，近似TD误差的加权平均）：<code>S_i = (1/T) Σ_t |Â_t|</code>。误差大说明价值估计与实际回报偏差大，策略在这里还在变化，有学习潜力。</p><p>下一局的关卡从混合分布中抽取：<code>P(i) = (1−ρ)·P_S(i) + ρ·P_C(i)</code>。<code>P_S</code> 按分数的排名做温度为β的排序加权（排名越高概率越大）；<code>P_C</code> 是“陈旧度”分布，与该关卡距上次被抽中的时间成正比，确保分数过时的关卡也会被重新评估。另外以一定概率抽一个全新关卡加入缓冲区。外层训练算法（论文用<a class="ln" href="../n/ppo.html">PPO</a>）完全不变。</p><h2>结果</h2><p>摘要称，TD误差能有效估计关卡未来的学习潜力，用它引导采样会涌现出难度逐渐增加的课程；PLR显著提高了Procgen上的样本效率和泛化，测试回报与此前最好的方法相当，且易于与其他方法结合；与之前领先的方法结合后，测试回报相对标准RL基线的提升超过76%。</p><h2>后来的发展</h2><p>PLR后来被重新解释为无监督环境设计的一种：Robust PLR证明只用PLR选出的关卡更新策略、配合随机生成器，可以在均衡意义下近似极小极大遗憾目标，与<a class="ln" href="../n/paired.html">PAIRED无监督环境设计</a>殊途同归；ACCEL又在PLR上加入对高分关卡的小幅编辑。这些方法常在<a class="ln" href="../n/craftax.html">Craftax极速开放式基准</a>、MiniGrid迷宫等环境上比较。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只能在给定的关卡生成器产生的关卡里挑选，不能主动构造新的、恰好合适的关卡。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/paired.html">PAIRED无监督环境设计</a></div></li><li>用TD误差衡量学习潜力只是启发式，在奖励随机或价值估计本身很差时可能把噪声大的关卡误判为有价值。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/ppo.html">PPO</a><span class="yr">2017.07 · RL</span><div class=nt>外层训练算法是PPO，PLR只改变关卡的采样分布。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/gae.html">广义优势估计GAE</a><span class="yr">2015.06 · RL</span><div class=nt>关卡分数取轨迹上广义优势估计绝对值的平均。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/per.html">优先经验回放</a><span class="yr">2015.11 · RL</span><div class=nt>把按TD误差优先回放单条经验的思想，推广到按TD误差优先回放整个关卡。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/procgen.html">Procgen泛化基准</a><span class="yr">2019.12 · RL</span><div class=nt>Procgen默认均匀抽关卡、效率低；PLR按学习潜力挑关卡，提高样本效率与对新关卡的泛化。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/paired.html">PAIRED无监督环境设计</a><span class="yr">2020.12 · RL</span><div class=nt>只能在给定的关卡生成器产生的关卡里挑选，不能主动构造新的、恰好合适的关卡。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/craftax.html">Craftax极速开放式基准</a><span class="yr">2024.02 · RL</span><div class=nt>测试了优先关卡回放等无监督环境设计方法，发现它们同样难有进展。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/td-error.html">时序差分与自举</a> <a class="chip c" href="../c/generalization.html">泛化与过拟合</a> <a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/exploration-exploitation.html">探索与利用</a></p>
+<h2>本篇术语</h2><ul><li><b>自动课程</b>　不靠人工设计，而是根据智能体当前水平自动决定接下来训练哪些任务，使任务难度随能力提升。</li><li><b>关卡（level）</b>　程序化环境里由一个随机种子确定的具体环境实例，例如一张具体的迷宫地图。</li></ul>
+<h2>怎么学</h2><p>先了解<a class="ln" href="../n/per.html">优先经验回放</a>和<a class="ln" href="../n/procgen.html">Procgen泛化基准</a>；读原文第3节的打分与采样公式；在一个Procgen游戏上，比较均匀采样和PLR采样下训练关卡分布随时间的变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2010.03934" rel="noopener">https://arxiv.org/abs/2010.03934</a>（标题、三位作者、arXiv v1于2020-10-08；摘要中程序化生成环境、以往默认均匀采样训练关卡、按未来学习潜力优先采样、TD误差能有效估计潜力并诱导难度递增的涌现课程、Procgen上显著提高样本效率与泛化、与之前领先方法结合后测试回报提升超过76%。分数公式、排名加权与陈旧度混合按原文正文通行描述；ICML 2021、机构与Robust PLR/ACCEL的后续关系按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20PLR%E4%BC%98%E5%85%88%E5%85%B3%E5%8D%A1%E5%9B%9E%E6%94%BE%EF%BC%88plr%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aplr%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/plr.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="recovery-rl.html"><small>本分支上一个 · 2020.10</small><b>Recovery RL恢复策略</b></a><a class="r" href="offline-linear-lb.html"><small>本分支下一个 · 2020.10</small><b>离线RL线性下界</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "id": "pa-rl",
+  "who": "Max Sobol Mark, Tian Gao, Georgia Gabriela Sampaio, Mohan Kumar Srirama, Archit Sharma, Chelsea Finn, Aviral Kumar · 卡内基梅隆大学、斯坦福大学",
+  "venue": "arXiv 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2412.06685"}
+  ],
+  "aka": ["PA-RL", "PARL", "PA RL", "Policy-Agnostic RL", "策略无关强化学习", "任意策略类的RL微调", "OpenVLA真机RL微调"],
+  "problem": "强化学习算法往往和策略形式绑死：SAC的重参数化梯度只适合高斯策略，对扩散策略不稳，对输出离散token的自回归策略根本没法用。",
+  "idea": "不对策略求RL梯度，而是先用评论家找出“更好的动作”——从策略采多个动作按Q值挑选，再沿Q梯度微调——然后用普通监督损失让策略模仿这些动作。",
+  "impact": "离线RL和在线微调的性能与样本效率最多提高2倍；作者称首次用在线RL微调算法Cal-QL自主微调7B的OpenVLA，真机40分钟从40%提到70%。",
+  "method": "**卡在哪**：机器人策略越来越多用[[diffusion-policy]]或输出离散token的Transformer（如[[openvla]]），它们主要靠[[c:imitation-learning]]训练。想用RL继续提升时，现有算法的“策略改进”一步都假设了策略长什么样：[[sac]]需要对高斯分布做[[c:reparameterization]]，换成扩散策略会不稳，换成类别分布则不可微。每换一种策略都要重新设计RL算法。\n\n**做法**：PA-RL把策略改进拆成两步。**动作优化**：对每个状态从当前策略采样若干动作（默认32个），用评论家Q值排序留下前10个（全局优化），再对每个动作沿`∂Q/∂a`做几步梯度上升，只在Q确实变大时才接受（局部优化）。**策略蒸馏**：按Q值的softmax在这些优化后的动作中抽样，作为新的监督标签，用策略自己原本的训练损失去拟合——扩散策略用去噪损失，自回归策略用交叉熵。评论家部分可以照用[[cal-ql]]或[[iql]]。这样无论策略是什么结构，都只需要能采样、能做监督训练。\n\n**结果**：在[[d4rl]]的AntMaze、FrankaKitchen和图像输入的[[calvin]]上，扩散策略和自回归策略都能训练，整体微调表现比次优方法高约13%，CALVIN上约69%。真机上用WidowX机械臂把蔬菜放进水槽里的盘子，零样本OpenVLA成功率40%，先采1小时零样本试验训练评论家，再在线微调40分钟，提到70%。",
+  "limits": [
+    {"text": "每个状态都要采样几十个动作并对每个做梯度优化，对7B模型来说显存和时间开销大，OpenVLA实验只能减半采样数并缓存动作。", "solved_by": []},
+    {"text": "真机验证只有一个任务、几十条轨迹的规模，评论家在复杂长时序任务上是否可靠未知。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "cal-ql", "type": "uses", "note": "以Cal-QL作为评论家训练算法，并用优化后的动作计算TD目标。"},
+    {"to": "openvla", "type": "uses", "note": "在真机上用RL直接微调7B的OpenVLA，成功率40%→70%。"},
+    {"to": "diffusion-policy", "type": "solves", "note": "扩散策略难以套用SAC式重参数化梯度，PA-RL改用监督蒸馏优化动作，使其能做离线和在线RL。"},
+    {"to": "sac", "type": "rivals", "note": "SAC依赖高斯策略的重参数化梯度；PA-RL完全绕开对策略求RL梯度。"},
+    {"to": "iql", "type": "uses", "note": "也可与IQL搭配，用监督蒸馏替代其优势加权回归步骤。"}
+  ],
+  "prereq": ["actor-critic", "offline-rl", "imitation-learning", "reparameterization", "diffusion-process", "vla-concept"],
+  "terms": [
+    {"t": "策略改进", "d": "RL中根据价值估计让策略倾向于选更好动作的那一步；通常靠对策略参数求梯度实现。"},
+    {"t": "重排序（re-ranking）", "d": "先让模型给出多个候选，再用另一个打分器（这里是Q函数）挑出得分最高的。"}
+  ],
+  "learn": "先读[[cal-ql]]和[[iql]]了解离线RL评论家，再看原文第4节的两步算法图，最后看第5节真机OpenVLA实验。",
+  "check": {"source": "https://arxiv.org/abs/2412.06685", "confirmed": "标题、7位作者、v1日期2024-12-09、摘要中SAC与扩散/自回归策略的问题、最多2倍提升、OpenVLA+Cal-QL真机40%→70%/40分钟、首次的说法；HTML正文：机构、采样32留前10再梯度优化、softmax蒸馏、Cal-QL/IQL、D4RL与CALVIN、约13%与约69%、WidowX蔬菜任务、1小时零样本试验。"}
+}

@@ -1,0 +1,28 @@
+{
+  "id": "mineru2.5",
+  "aka": ["MinerU2.5", "MinerU 2.5", "粗到细文档解析", "解耦式文档VLM"],
+  "who": "Junbo Niu, Zheng Liu, Zhuangcheng Gu, Bin Wang, Linke Ouyang, Zhiyuan Zhao, Tao Chu, Tianyao He et al. · 上海人工智能实验室等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2509.22186"},
+    {"label": "代码", "url": "https://github.com/opendatalab/MinerU"}
+  ],
+  "problem": "端到端VLM直接读高分辨率整页，token多、算得慢；把页面缩小又会丢掉密集小字、复杂公式和表格的细节。",
+  "idea": "一个1.2B的VLM分两步做：先在缩小的整页图上做版面分析，找出各个结构元素；再按版面结果从原图裁出原生分辨率的局部，逐块识别内容。",
+  "impact": "官方称在多个文档解析基准上超过通用和专用模型，同时计算开销显著更低；MinerU也从多模型流水线工具转向以单个小VLM为核心。",
+  "method": "第一代[[mineru]]是一套流水线工具，版面、公式、表格、OCR各用一个模型。之后[[got-ocr]]等端到端VLM流行起来，但它们要么把整页按高分辨率切成很多块输入（token数量大、推理慢），要么把页面缩小（小字和公式看不清）。[[monkeyocr]]已经提出先检测再分块识别，但检测和识别用的是不同模型。\n\nMinerU2.5的做法是**粗到细、两阶段、一个模型**：\n- **第一阶段（粗）**：把整页图缩小后输入模型，只做版面分析，输出段落、标题、表格、公式、图片等元素的位置和类别。缩小后的图token少，这一步很快。\n- **第二阶段（细）**：根据版面结果，从原始高分辨率图里裁出每个元素的区域，以原生分辨率送回同一个模型识别文字、LaTeX公式或表格结构。\n\n这样只在真正需要细节的地方花算力。为了训练这两种能力，作者搭了一套数据引擎，为预训练和微调生成大规模、多样的训练数据。模型总参数为1.2B。",
+  "limits": [
+    {"text": "两阶段之间仍是硬切换，第一阶段版面判断错（漏检、切错）时，第二阶段只能在错误的区域上识别。", "solved_by": []},
+    {"text": "专注于把页面转成文本，不负责回答关于文档的开放问题，下游问答还需另接VLM或LLM。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mineru", "type": "extends", "note": "MinerU系列的新版本，把原来多模型的流水线换成单个1.2B文档VLM。"},
+    {"to": "monkeyocr", "type": "extends", "note": "同样先定位版面再分块识别，MinerU2.5把两步放进同一个模型，并在缩小图上做版面分析以省算力。"},
+    {"to": "got-ocr", "type": "solves", "note": "端到端整页识别在高分辨率下开销大，粗到细策略只对裁出的局部用原生分辨率。"}
+  ],
+  "prereq": ["vision-tasks", "image-patch", "transformer-block", "autoregressive", "throughput-latency"],
+  "terms": [
+    {"t": "原生分辨率（native resolution）", "d": "不把图片缩放到固定尺寸，而是按原始像素大小切成图像块输入模型，保留细小文字和符号的细节。"}
+  ],
+  "learn": "先读[[mineru]]和[[monkeyocr]]，再看MinerU2.5论文的两阶段示意图，用开源版本解析一页含公式和表格的论文，观察第一阶段的版面框。",
+  "check": {"source": "https://arxiv.org/abs/2509.22186", "confirmed": "标题、作者、v1提交2025-09-26；摘要：1.2B参数、粗到细两阶段、在缩小图上做版面分析、按版面从原图裁原生分辨率局部识别、数据引擎、多个基准超过通用与专用模型且计算开销显著更低。机构与代码仓库地址为一般了解。"}
+}

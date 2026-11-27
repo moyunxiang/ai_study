@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>决策时规划与rollout算法（Decision-Time Planning and Rollout Algorithms） · AI脉络</title>
+<meta name="description" content="用模型做规划的两种时机：背景规划在平时用模型改进整个价值函数或策略（如Dyna）；决策时规划只在需要做决定的那一刻，从当前状态出发向前搜索，算完就丢（如rollout算法和MCTS）。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/decision-time-planning.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="决策时规划与rollout算法（Decision-Time Planning and Rollout Algorithms）">
+<meta property="og:description" content="用模型做规划的两种时机：背景规划在平时用模型改进整个价值函数或策略（如Dyna）；决策时规划只在需要做决定的那一刻，从当前状态出发向前搜索，算完就丢（如rollout算法和MCTS）。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/decision-time-planning.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/decision-time-planning">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>决策时规划与rollout算法</h1><div class="full">Decision-Time Planning and Rollout Algorithms</div>
+<p class="muted" style="font-size:13px">也叫：决策时规划　decision-time planning　背景规划　background planning　rollout算法　rollout algorithm　rollout策略　rollout policy　在线规划　online planning　前向搜索　forward search　模拟式规划</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/decision-time-planning">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>用模型做规划的两种时机：背景规划在平时用模型改进整个价值函数或策略（如Dyna）；决策时规划只在需要做决定的那一刻，从当前状态出发向前搜索，算完就丢（如rollout算法和MCTS）。</b></p>
+<p class="tags">先要会：<a class="chip c" href="model-based-rl.html">基于模型的强化学习</a> <a class="chip c" href="tree-search.html">博弈树搜索：minimax与MCTS</a> <a class="chip c" href="mc-rl.html">强化学习中的蒙特卡洛方法</a></p>
+<p>有了环境模型，可以在两种完全不同的时间点用它。<a class="ln" href="../n/sutton-barto.html">《Reinforcement Learning: An Introduction》</a>第8章把这一区分作为理解规划方法的主线。</p><p><b>背景规划</b>（background planning）。模型被用来生成模拟经验，持续更新一个<b>全局的</b>价值函数或策略，供以后任何状态使用。<a class="ln" href="../n/dyna.html">Dyna：学习与规划合一</a>每走一步真实的，就在模型里补做k步模拟更新；<a class="ln" href="../n/prioritized-sweeping.html">优先扫描规划</a>优先更新价值变化可能大的状态；<a class="ln" href="../n/mbpo.html">MBPO</a>用模型生成短rollout来训练无模型的策略。规划的成果沉淀在参数里。</p><p><b>决策时规划</b>（decision-time planning）。到了某个状态s，才以s为根向前看：模拟各种可能的后续，挑出现在这一步最好的动作。搜索树或模拟结果在做完决定后大多丢弃，下一步重新来，与<a class="lc" href="../c/planning-mpc.html">规划与模型预测控制</a>的精神相同。它把计算集中在<b>当前真正遇到的状态</b>上，而不是平均分给所有可能的状态，对状态空间巨大但每次只需决定一步的问题（下棋）特别划算。</p><p><b>rollout算法</b>。决策时规划的一种简单形式：对当前状态的每个候选动作，先执行它，之后按一个固定的<b>rollout策略</b>一直模拟到结束，重复多次取平均回报作为该动作的价值估计，选最高的那个。由<a class="lc" href="../c/policy-iteration-concept.html">策略评估、策略迭代与价值迭代</a>的策略改进定理，得到的决策至少不比rollout策略本身差：它相当于对rollout策略做了一步改进，而不必显式学习任何价值函数。早期的西洋双陆棋程序就用这种方法显著增强了已有的策略。</p><p><b>更强的形式</b>。<a class="ln" href="../n/mcts.html">蒙特卡洛树搜索UCT</a>在rollout之上逐步构建一棵搜索树，用UCB在树内选择分支；<a class="ln" href="../n/alphago.html">AlphaGo</a>结合了学到的价值网络和rollout；<a class="ln" href="../n/alphazero.html">AlphaZero</a>和<a class="ln" href="../n/muzero.html">MuZero</a>去掉rollout，只用价值网络评估叶节点，见<a class="lc" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a>。<a class="ln" href="../n/sparse-sampling.html">稀疏采样在线规划</a>给出了不依赖状态数的在线规划理论保证。现代的做法通常两者并用：用背景学习得到的策略和价值来引导、截断决策时搜索。</p>
+<div class="example"><h4>例子</h4><p>井字棋某局面有3个可走的位置。对每个位置，先落子，再让双方都随机下完，各模拟100局：胜率分别为0.62、0.41、0.55，于是选第一个位置。若rollout策略换成“能赢就赢、能堵就堵”的规则策略，估计会更准，但每局模拟的代价也更高。</p></div>
+<h2>容易误解的地方</h2><ul><li>决策时规划的质量受限于模型和rollout策略：rollout策略很差时，平均回报对动作的区分度很低。</li><li>决策时规划要在每步都付计算代价，实时控制中可能来不及；背景规划则把代价转移到训练时。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Soft-Masked BERT中文纠错（2020） · AI脉络</title>
+<meta name="description" content="中文拼写纠错（找出并改正错别字）的最好方法是在每个位置用BERT从候选字里选一个，但BERT的掩码语言模型预训练只让它预测被[MASK]的位置，不擅长判断「这个位置的字是不是错了」。 先用一个双向GRU 检测网络 估计每个字出错的概率 p_i ，再把该位置的输入表示按 p_i 与[MASK]向量做…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/soft-masked-bert.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Soft-Masked BERT中文纠错（2020）">
+<meta property="og:description" content="中文拼写纠错（找出并改正错别字）的最好方法是在每个位置用BERT从候选字里选一个，但BERT的掩码语言模型预训练只让它预测被[MASK]的位置，不擅长判断「这个位置的字是不是错了」。 先用一个双向GRU 检测网络 估计每个字出错的概率 p_i ，再把该位置的输入表示按 p_i 与[MASK]向量做…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/soft-masked-bert.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/soft-masked-bert">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 神经机器翻译与生成</div>
+<h1>Soft-Masked BERT中文纠错</h1>
+<div class="full">Spelling Error Correction with Soft-Masked BERT</div>
+<div class="meta"><span>2020.05</span><span>论文</span><span>延伸</span><span>ACL 2020</span><span>Shaohua Zhang, Haoran Huang, Jicong Liu, Hang Li · 字节跳动AI Lab、复旦大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2005.07421" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/soft-masked-bert">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>中文拼写纠错（找出并改正错别字）的最好方法是在每个位置用BERT从候选字里选一个，但BERT的掩码语言模型预训练只让它预测被[MASK]的位置，不擅长判断「这个位置的字是不是错了」。</p></div><div><h4>方法</h4><p>先用一个双向GRU<b>检测网络</b>估计每个字出错的概率 <code>p_i</code>，再把该位置的输入表示按 <code>p_i</code> 与[MASK]向量做加权混合（软掩码），送进BERT<b>纠正网络</b>预测正确的字。越可能错的字越接近被遮住，BERT就越会认真去「填空」。</p></div><div><h4>影响</h4><p>这种「检测+纠正」两段、用软掩码连接的结构成为中文拼写纠错的常用基线，之后的SpellGCN、PLOME等方法常与它比较。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>中文没有空格、错别字多是音近字（「在/再」）和形近字（「己/已」），输入法和OCR都会产生。2019年前后的做法是把<a class="ln" href="../n/bert.html">BERT</a>当成每个位置的分类器：输入整句，在每个位置输出一个字，与原字不同就是纠正。但BERT预训练时只有15%的位置被遮住或替换，大多数位置它都倾向「照抄原字」，因此常常检测不出错误。</p><h2>方法</h2><p>模型由两部分串联：</p><p><b>检测网络</b>：字向量 <code>e_i</code> 输入双向GRU，输出每个位置是错字的概率 <code>p_i</code>。</p><p><b>软掩码</b>：把送入纠正网络的输入改成</p><p class="formula"><code>e&#x27;_i = p_i · e_mask + (1 − p_i) · e_i</code></p><p>其中 <code>e_mask</code> 是[MASK]的向量。检测网络认为错得越确定，输入越接近[MASK]；认为没错，就基本保留原字。</p><p><b>纠正网络</b>：一个BERT，接在 <code>e&#x27;_i</code> 后面，最后一层再加上原字向量的残差，经softmax在全字表上预测每个位置的正确字。</p><p>训练的总损失是两部分的加权和 <code>L = λ·L_correct + (1 − λ)·L_detect</code>，两个网络端到端联合训练。训练数据除公开标注集外，还用同音、近形字替换的方法从大量文本中自动生成了错句。</p><h2>结果</h2><p>摘要称在两个数据集上的表现显著优于包括只用BERT的方法在内的基线。具体数字未核对。</p><h2>后来的发展</h2><p>此后的中文拼写纠错工作沿着两条路改进：把字音和字形信息显式加进模型（SpellGCN用图卷积建模混淆集，PLOME等在预训练中加入拼音与笔画），以及把检测和纠正更紧地融合。软掩码这种「用检测概率调节输入」的思路也被用到其他「先检测后纠正」的任务。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只做一对一的字替换，不能处理多字、漏字和语序错误。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>没有显式利用拼音和字形，音近形近混淆的知识只能从数据里间接学到。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/bert.html">BERT</a><span class="yr">2018.10 · LLM</span><div class=nt>直接用BERT纠错时检测能力不足；软掩码让检测网络告诉BERT哪些位置需要重新预测。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/cho-encdec.html">RNN编码器-解码器与GRU</a><span class="yr">2014.06 · NLP</span><div class=nt>检测网络用双向GRU实现。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/kernighan-spell.html">噪声信道拼写纠错</a><span class="yr">1990.08 · NLP</span><div class=nt>继承「先找出可能的错误、再在候选中挑最可能的正确词」的拼写纠错框架，用神经网络替换噪声信道的两个概率。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/chinese-segmentation-tagging.html">中文分词即字标注</a><span class="yr">2003 · NLP</span><div class=nt>与字标注分词一样，把中文任务化为逐字的序列标注/预测问题。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/embedding.html">嵌入向量</a></p>
+<h2>本篇术语</h2><ul><li><b>中文拼写纠错（CSC）</b>　找出中文句子里的错别字并替换为正确的字，常用SIGHAN系列数据集评测，分检测和纠正两个层面计分。</li><li><b>混淆集</b>　每个字可能被误写成的字的集合，通常由音近字和形近字组成，用来生成训练数据或限制候选。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/bert.html">BERT</a>的掩码语言模型 → 读原文第3节软掩码公式与第4节数据构造 → 动手：用一个中文BERT直接做逐字纠错，再加一个简单的检测头实现软掩码，对比检测召回率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2005.07421" rel="noopener">https://arxiv.org/abs/2005.07421</a>（arXiv记录：标题Spelling Error Correction with Soft-Masked BERT、四位作者、v1 2020-05-15；摘要：考虑中文拼写纠错、现有方法基于BERT在每个位置从候选中选字、BERT因掩码预训练方式检测能力不足、提出检测网络+基于BERT的纠正网络、以软掩码连接、在两个数据集上显著优于基线。ACL 2020出处、作者单位、GRU检测器、软掩码公式、损失加权、合成数据凭一般了解，未写数字。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Soft-Masked%20BERT%E4%B8%AD%E6%96%87%E7%BA%A0%E9%94%99%EF%BC%88soft-masked-bert%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asoft-masked-bert%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/soft-masked-bert.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="bpe-suboptimal.html"><small>本分支上一个 · 2020.04</small><b>BPE与Unigram对比</b></a><a class="r" href="gector.html"><small>本分支下一个 · 2020.05</small><b>GECToR标注式语法纠错</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

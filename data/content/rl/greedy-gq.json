@@ -1,0 +1,80 @@
+{
+  "id": "greedy-gq",
+  "who": "Hamid Reza Maei, Csaba Szepesvári, Shalabh Bhatnagar, Richard S. Sutton · 阿尔伯塔大学 / 印度科学理工学院",
+  "venue": "ICML 2010",
+  "links": [
+    {
+      "label": "SZTAKI存档",
+      "url": "http://eprints.sztaki.hu/6160/"
+    }
+  ],
+  "problem": "[[q-learning]]配上线性函数近似、在离策略数据上训练时可能发散（[[baird-counterexample]]）；[[gradient-td]]（GTD/TDC）解决了离策略「评估」的收敛问题，但「控制」——目标策略本身随估值变成贪心——仍没有收敛的线性时间算法。",
+  "idea": "Greedy-GQ把梯度TD的思路用到控制：目标策略取当前Q估值下的贪心策略，最小化投影贝尔曼误差（MSPBE），用两组权重的双时间尺度随机梯度更新，每步计算量与特征数成线性。",
+  "impact": "它是第一批在离策略、线性函数近似下有收敛保证的控制算法之一，和GQ(λ)一起组成梯度TD家族的控制部分，常被拿来与后来的[[emphatic-td]]和深度离策略方法做对照。",
+  "method": "设Q值用线性函数近似 `Q_θ(s,a) = θᵀφ(s,a)`。普通Q-learning的半梯度更新沿TD误差方向走，却没有在优化任何一个目标函数，这正是它可能发散的原因。\n\n梯度TD家族改为优化**均方投影贝尔曼误差**：`MSPBE(θ) = ‖Π T^π Q_θ − Q_θ‖²_μ`，其中T^π是目标策略π的贝尔曼算子，Π是投影回线性函数空间，μ是数据分布。对它求真正的梯度需要估计一个期望的乘积，于是引入第二组权重w，用一个更快的时间尺度去估计 `E[φφᵀ]⁻¹ E[δφ]`。\n\nGreedy-GQ的每一步：\n- 计算TD误差 `δ = r + γ θᵀφ̄' − θᵀφ`，其中 `φ̄' = Σ_a π(a|s') φ(s',a)`，π是θ下的贪心策略；\n- 主权重：`θ ← θ + α [δ φ − γ (wᵀφ) φ̄']`；\n- 辅助权重：`w ← w + β [δ − wᵀφ] φ`。\n\n第二项 `−γ(wᵀφ)φ̄'` 是对普通TD更新的修正，正是它保证了沿目标函数的梯度方向下降。因为目标策略随θ变化，MSPBE不再是二次的，作者证明的是在一定条件下收敛到MSPBE的驻点。每步只需O(n)计算（n为特征数），与Q-learning同阶。",
+  "legacy": "同年Maei与Sutton提出的GQ(λ)把同样的梯度修正加上资格迹，用于离策略的预测问题；Sutton等人随后的Horde架构用GQ(λ)在一台机器人上并行地、离策略地学习成千上万个「通用价值函数」（每个回答一个关于未来传感器读数的问题），这是梯度TD方法最有代表性的应用。之后的[[emphatic-td]]从另一个角度（按兴趣和跟随迹重新加权更新）解决离策略线性TD的稳定性问题，与梯度TD并列为两条主要路线。",
+  "limits": [
+    {
+      "text": "只保证收敛到驻点（局部解），不保证得到好的策略；贪心策略的不连续性也让分析需要较强的假设。",
+      "solved_by": []
+    },
+    {
+      "text": "两个步长需要仔细调，实践中常比Q-learning学得慢，后来的深度RL很少直接使用。",
+      "solved_by": []
+    },
+    {
+      "text": "限于线性函数近似，推广到非线性网络的收敛保证不成立。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "gradient-td",
+      "type": "extends",
+      "note": "把GTD/TDC的双时间尺度梯度更新从离策略评估推广到贪心的离策略控制。"
+    },
+    {
+      "to": "q-learning",
+      "type": "solves",
+      "note": "Q-learning在线性近似和离策略数据下可能发散；Greedy-GQ有收敛到驻点的保证，每步计算同阶。"
+    },
+    {
+      "to": "baird-counterexample",
+      "type": "solves",
+      "note": "Baird反例展示的发散问题在Greedy-GQ这类真梯度方法里不会出现。"
+    },
+    {
+      "to": "tree-backup",
+      "type": "extends",
+      "note": "延续Precup等人的离策略学习路线，从表格多步评估推进到带函数近似的控制。"
+    }
+  ],
+  "prereq": [
+    "td-error",
+    "on-off-policy",
+    "linear-regression",
+    "sgd-minibatch",
+    "bellman-equation"
+  ],
+  "terms": [
+    {
+      "t": "投影贝尔曼误差（MSPBE）",
+      "d": "把贝尔曼更新后的值函数投影回可表示的函数空间后，与当前值函数的差距；梯度TD方法以它为优化目标。"
+    },
+    {
+      "t": "双时间尺度更新",
+      "d": "两组参数用不同大小的步长同时更新，快的一组近似跟踪慢的一组所需的辅助量。"
+    }
+  ],
+  "learn": "先读[[gradient-td]]的TDC；读Sutton与Barto第二版第11章关于梯度TD的部分；在Baird反例上分别跑线性Q-learning和Greedy-GQ，观察权重是否发散。",
+  "check": {
+    "source": "http://eprints.sztaki.hu/6160/",
+    "confirmed": "通过OpenAlex记录核对了标题Toward Off-Policy Learning Control with Function Approximation、四位作者、2010-06（SZTAKI存档，ICML 2010论文）。未打开全文：MSPBE目标、更新公式、收敛到驻点的结论、O(n)复杂度均按教材与通行理解写；机构与ICML 2010凭一般了解。"
+  },
+  "aka": [
+    "Greedy-GQ",
+    "GQ(λ)",
+    "梯度Q学习",
+    "离策略梯度TD控制"
+  ]
+}

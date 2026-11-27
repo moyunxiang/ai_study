@@ -1,0 +1,25 @@
+{
+ "id": "punica",
+ "who": "Lequn Chen, Zihao Ye, Yongji Wu, Danyang Zhuo, Luis Ceze, Arvind Krishnamurthy · 华盛顿大学, 杜克大学",
+ "venue": "MLSys 2024",
+ "aka": ["Punica", "SGMV", "多租户LoRA服务", "multi-LoRA serving", "多LoRA批处理"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2310.18547"},
+  {"label": "GitHub", "url": "https://github.com/punica-ai/punica"}
+ ],
+ "problem": "很多团队各自用LoRA微调同一个基座模型，如果每个LoRA模型单独部署一份，GPU上就重复放着大量相同的基座权重，而且不同LoRA的请求无法拼进同一个批次。",
+ "idea": "整块GPU只放一份基座模型；写一个新的CUDA内核SGMV，让同一个批次里属于不同LoRA的请求各自乘上自己的低秩矩阵，于是不同LoRA的请求可以一起批处理。",
+ "impact": "SGMV式的多LoRA批处理内核被S-LoRA、vLLM等推理引擎采用或借鉴，“一个基座、成百上千个LoRA同时在线”成为常见的服务方式。",
+ "method": "[[lora]]微调后的模型 = 基座权重 `W` + 一对小矩阵 `B·A`。基座部分对所有LoRA模型都一样，只有 `B·A` 不同。一批请求如果属于不同的LoRA，基座那部分的矩阵乘可以照常一次算完，问题出在低秩部分：每个请求要乘不同的 `A`、`B`，普通的批量矩阵乘做不到。\n\nPunica为此设计了**SGMV**（分段收集矩阵-向量乘）内核：把批次里的请求按所属的LoRA分段，每段从显存中收集对应的低秩矩阵，在一个内核里完成所有段的计算，实现不同LoRA请求的批处理。这样一块GPU只需存一份基座模型和许多个很小的LoRA权重，内存和算力都能共享。集群层面，调度器把多租户的请求集中到尽量少的GPU上，以提高利用率，并沿用[[orca-serving]]、[[vllm]]式的逐迭代批处理。\n\n摘要报告：在固定大小的GPU集群上，服务多个LoRA模型的吞吐是当时最先进LLM服务系统的12倍，每个token只增加2毫秒延迟。",
+ "limits": [
+  {"text": "LoRA权重默认都放在GPU显存里，适配器数量上千时放不下，需要在CPU与GPU之间按需换入换出并统一管理显存。", "solved_by": ["s-lora"]}
+ ],
+ "relations": [
+  {"to": "lora", "type": "uses", "note": "利用LoRA“基座共享、只多一对低秩矩阵”的结构来合并不同模型的请求。"},
+  {"to": "orca-serving", "type": "uses", "note": "沿用逐迭代的连续批处理，把不同LoRA的请求放进同一批次。"},
+  {"to": "vllm", "type": "rivals", "note": "以vLLM等单模型服务系统为基线，多LoRA场景下吞吐高12倍。"}
+ ],
+ "prereq": ["peft-concept", "low-rank", "matrix-multiplication", "throughput-latency"],
+ "terms": [{"t": "多租户", "d": "一套硬件同时为多个用户或多个模型提供服务，彼此共享资源。"}],
+ "check": {"source": "https://arxiv.org/abs/2310.18547", "confirmed": "标题、六位作者、v1日期2023-10-28；摘要：在共享GPU集群上服务多个LoRA模型、新CUDA内核支持不同LoRA模型的GPU运算批处理、GPU只需保留一份基座模型、调度器合并多租户负载、吞吐比最先进的LLM服务系统高12倍、每token只增加2ms延迟。SGMV名称、MLSys 2024、被vLLM等借鉴、机构为一般了解。"}
+}

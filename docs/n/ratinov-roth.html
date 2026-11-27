@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>NER设计挑战与BILOU（2009） · AI脉络</title>
+<meta name="description" content="命名实体识别系统有许多看似琐碎却影响很大的设计选择：片段怎样编码成标签、要不要用Viterbi、怎样利用文档级信息和外部知识，但很少有人系统地比较过，流传着不少想当然的做法。 逐项拆开比较：标签编码（BIO与BILOU）、推断方式（贪心与Viterbi、束搜索）、非局部特征（上下文聚合、两阶段预测…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ratinov-roth.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="NER设计挑战与BILOU（2009）">
+<meta property="og:description" content="命名实体识别系统有许多看似琐碎却影响很大的设计选择：片段怎样编码成标签、要不要用Viterbi、怎样利用文档级信息和外部知识，但很少有人系统地比较过，流传着不少想当然的做法。 逐项拆开比较：标签编码（BIO与BILOU）、推断方式（贪心与Viterbi、束搜索）、非局部特征（上下文聚合、两阶段预测…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ratinov-roth.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ratinov-roth">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 序列标注</div>
+<h1>NER设计挑战与BILOU</h1>
+<div class="full">Design Challenges and Misconceptions in Named Entity Recognition</div>
+<div class="meta"><span>2009.06</span><span>论文</span><span>延伸</span><span>CoNLL 2009</span><span>Lev Ratinov, Dan Roth · 伊利诺伊大学厄巴纳-香槟分校</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://aclanthology.org/W09-1119/" rel="noopener">ACL Anthology ↗</a><a class="btn sm" href="../index.html#/n/ratinov-roth">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>命名实体识别系统有许多看似琐碎却影响很大的设计选择：片段怎样编码成标签、要不要用Viterbi、怎样利用文档级信息和外部知识，但很少有人系统地比较过，流传着不少想当然的做法。</p></div><div><h4>方法</h4><p>逐项拆开比较：标签编码（BIO与BILOU）、推断方式（贪心与Viterbi、束搜索）、非局部特征（上下文聚合、两阶段预测、预测历史）、外部知识（无监督词聚类与维基百科地名词典），并把最好的选择组合成一个系统。</p></div><div><h4>影响</h4><p>得到在CoNLL 2003上90.8的F1，是当时该数据集上报告的最好结果；论文的几条结论（BILOU优于BIO、贪心推断不比Viterbi差、词聚类特征很有用）被后续NER系统广泛采纳，Illinois NER也成为常用工具。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/conll-2003.html">CoNLL-2003命名实体</a>确立了NER的标准评测，当时的主流系统是<a class="ln" href="../n/crf.html">条件随机场</a>或<a class="ln" href="../n/structured-perceptron.html">结构化感知机</a>加大量手工特征；<a class="ln" href="../n/stanford-ner.html">Stanford NER非局部约束</a>（2005）说明文档级的标签一致性能纠正不少错误。另一方面，<a class="ln" href="../n/brown-clustering.html">Brown聚类</a>等无监督词聚类、维基百科这类大规模外部知识越来越容易获得，但怎样用、用多少，各家做法不一。</p><h2>方法</h2><p>作者用一个正则化的平均感知机作为基本分类器，逐项回答四个问题：</p><p><b>1. 片段编码。</b> BIO把实体标成「开始B-、内部I-、外部O」；<b>BILOU</b>再区分「最后一个L-」和「单个词实体U-」，例如「New York City」标为B-LOC I-LOC L-LOC，「Paris」标为U-LOC。BILOU让分类器明确学习实体的边界。</p><p><b>2. 推断。</b> 比较逐词贪心解码、束搜索和Viterbi。由于特征里已包含前面预测出的标签，贪心解码与Viterbi效果相近，速度却快得多。</p><p><b>3. 非局部特征。</b> 三种做法：<b>上下文聚合</b>（把同一个词在文档中所有出现位置的上下文特征汇总起来）；<b>两阶段预测聚合</b>（先跑一遍得到初步标签，再把同一词在文档中其他位置的初步标签作为第二阶段的特征）；<b>扩展预测历史</b>（记录这个词串在前文中被预测为各类型的频率）。三者结合效果最好。</p><p><b>4. 外部知识。</b> 一是在大规模无标注文本上做<a class="ln" href="../n/brown-clustering.html">Brown聚类</a>，把词所在聚类的比特串前缀（如长度4、6、10、20）作为特征，缓解稀疏；二是从维基百科等来源整理几十个地名词典（人名、机构名、地名等）作为匹配特征。</p><h2>结果</h2><p>摘要报告：组合这些选择后，系统在CoNLL-2003 NER共享任务上达到90.8的F1，是当时该数据集上报告的最好结果；论文还在MUC7和网页数据上评测了泛化性（具体数字未核对）。</p><h2>后来的发展</h2><p>BILOU（也称BIOES）编码在神经NER中被大量采用；词聚类特征思想后来被词向量取代，<a class="ln" href="../n/collobert-weston.html">从零开始的神经NLP</a>、<a class="ln" href="../n/lample-ner.html">神经命名实体识别</a>等神经模型以学到的表示替代手工特征和地名词典。文档级上下文后来以跨句编码、预训练模型的长上下文等形式回归。论文常被作为「NER工程经验」的标准引用。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍然依赖大量手工特征和人工整理的地名词典，移植到新语言和新领域代价高。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/lample-ner.html">神经命名实体识别</a> <a class="chip hue" style="--h:24" href="../n/bilstm-cnn-crf.html">BiLSTM-CNN-CRF序列标注</a></div></li><li>外部知识只以离散匹配特征的形式使用，无法表达词与词之间连续的相似度。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/flair.html">Flair上下文字符串嵌入</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/brown-clustering.html">Brown聚类</a><span class="yr">1992 · NLP</span><div class=nt>用Brown聚类得到的层次词类前缀作为特征，缓解词汇稀疏。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/structured-perceptron.html">结构化感知机</a><span class="yr">2002.07 · NLP</span><div class=nt>基本分类器是正则化的平均感知机。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/conll-2003.html">CoNLL-2003命名实体</a><span class="yr">2003.06 · 数据·评测</span><div class=nt>主要实验与最终结果都在CoNLL-2003英语NER数据上。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/stanford-ner.html">Stanford NER非局部约束</a><span class="yr">2005.06 · NLP</span><div class=nt>Stanford NER用Gibbs采样施加一致性约束，本文用上下文聚合和两阶段预测等更轻量的非局部特征。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/lample-ner.html">神经命名实体识别</a><span class="yr">2016.03 · NLP</span><div class=nt>仍然依赖大量手工特征和人工整理的地名词典，移植到新语言和新领域代价高。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/bilstm-cnn-crf.html">BiLSTM-CNN-CRF序列标注</a><span class="yr">2016.03 · NLP</span><div class=nt>仍然依赖大量手工特征和人工整理的地名词典，移植到新语言和新领域代价高。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/flair.html">Flair上下文字符串嵌入</a><span class="yr">2018.08 · NLP</span><div class=nt>外部知识只以离散匹配特征的形式使用，无法表达词与词之间连续的相似度。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/classification-metrics.html">准确率、精确率、召回率与F1</a> <a class="chip c" href="../c/feature-representation.html">特征与表示学习</a> <a class="chip c" href="../c/clustering.html">聚类</a> <a class="chip c" href="../c/ablation-baseline.html">基线与消融实验</a></p>
+<h2>本篇术语</h2><ul><li><b>BILOU编码</b>　把实体片段标成开始（B）、内部（I）、结尾（L）、外部（O）、单词实体（U）五类标签，比BIO多表示了边界。</li><li><b>地名词典（gazetteer）</b>　预先整理的人名、地名、机构名列表，句中词串若出现在列表里就产生一个匹配特征。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/conll-2003.html">CoNLL-2003命名实体</a>和<a class="ln" href="../n/crf.html">条件随机场</a> → 读原文第3–6节，每节对应一个设计问题 → 动手：用同一个NER模型分别试BIO和BILOU编码、贪心与Viterbi解码，在CoNLL-2003开发集上比较F1。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://aclanthology.org/W09-1119/" rel="noopener">https://aclanthology.org/W09-1119/</a>（ACL Anthology页面标题；OpenAlex：作者Ratinov与Roth、CoNLL 2009；完整摘要：分析构建高效稳健NER系统的基本设计挑战与误解、涉及文本块表示、结合局部NER决策所需的推断方式、先验知识的来源与用法、得到若干意外结论、CoNLL-2003上90.8 F1为该数据集上报告的最好结果。BILOU定义、贪心与Viterbi对比、三种非局部特征、Brown聚类前缀长度、地名词典、MUC7与网页实验凭一般了解；作者机构凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20NER%E8%AE%BE%E8%AE%A1%E6%8C%91%E6%88%98%E4%B8%8EBILOU%EF%BC%88ratinov-roth%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aratinov-roth%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ratinov-roth.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="hlbl.html"><small>本分支上一个 · 2008.12</small><b>HLBL层次语言模型</b></a><a class="r" href="distant-supervision.html"><small>本分支下一个 · 2009.08</small><b>远程监督关系抽取</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

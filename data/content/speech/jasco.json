@@ -1,0 +1,31 @@
+{
+  "id": "jasco",
+  "who": "Or Tal, Alon Ziv, Itai Gat, Felix Kreuk, Yossi Adi · Meta、耶路撒冷希伯来大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2406.10970"},
+    {"label": "示例", "url": "https://pages.cs.huji.ac.il/adiyoss-lab/JASCO"}
+  ],
+  "problem": "文生音乐模型只能用一句全局描述控制整首曲子，无法指定「第几秒用什么和弦、旋律怎么走、鼓点是什么样」这种随时间变化的细粒度条件。",
+  "idea": "在流匹配文生音乐模型上同时接入符号条件（和弦、旋律）和音频条件（分离出的鼓轨、整段混音），用信息瓶颈层加时间模糊只提取与该控制相关的信息。",
+  "impact": "把局部、随时间变化的控制和全局文本描述放进同一个模型，生成质量与基线相当，但控制能力明显更强、更灵活；模型随Meta的AudioCraft开源。",
+  "method": "[[musicgen]]可以用文本或一段旋律音频做条件，但条件主要是全局的。音乐人更希望像编曲那样逐段指定：前八小节C-G-Am-F和弦、主旋律按这条线走、鼓用某段录音的节奏。\n\nJASCO（Joint Audio and Symbolic Conditioning）基于[[flow-matching]]：在音频编解码器的连续latent上训练一个Transformer，从噪声流向音乐。条件分两类、都对齐到时间轴上：\n- **符号条件**：和弦序列、旋律（逐帧的音高）。\n- **音频条件**：用音源分离得到的鼓轨，或整段混音本身。\n\n直接把参考音频喂进去，模型会照抄它的全部内容。为此作者设计了**信息瓶颈层加时间模糊**：先把音频条件投影到很低的维度，再在时间上做平滑，只留下节奏或大致结构这类与该控制相关的信息，让模型不能逐样本复制。全局的文本描述照常作为条件。\n\n摘要报告：在生成质量上与评测基线相当，同时在条件遵从上明显更好、控制方式更多样，评测同时用了客观指标和人工听测。",
+  "limits": [
+    {"text": "只生成十秒量级的器乐片段，没有人声和歌词，也不能生成完整长度的歌曲。", "solved_by": ["yue", "diffrhythm"]},
+    {"text": "控制信号需要用户提供和弦、旋律或参考音轨，对不懂乐理的普通用户门槛仍然不低。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "musicgen", "type": "extends", "note": "在MusicGen的文本条件之外，加入随时间对齐的和弦、旋律与音频条件。"},
+    {"to": "flow-matching", "type": "uses", "note": "生成模型采用流匹配，而不是MusicGen的自回归token预测。"},
+    {"to": "demucs", "type": "uses", "note": "音频条件中的鼓轨通过音源分离从混音中提取。"}
+  ],
+  "prereq": ["generative-modeling", "latent-space", "transformer-block", "vocoder-codec"],
+  "terms": [
+    {"t": "符号条件", "d": "用乐谱层面的信息（和弦名称、音高序列）而不是声音本身来控制生成。"},
+    {"t": "时间模糊", "d": "在时间轴上对条件特征做平滑，只保留粗略的节奏和结构，防止模型照抄参考音频。"}
+  ],
+  "aka": ["JASCO", "Joint Audio and Symbolic Conditioning", "和弦控制音乐生成"],
+  "check": {
+    "source": "https://arxiv.org/abs/2406.10970",
+    "confirmed": "arXiv官方记录：标题Joint Audio and Symbolic Conditioning for Temporally Controlled Text-to-Music Generation、Tal/Ziv/Gat/Kreuk/Adi五位作者、v1提交2024-06-16；摘要中同时用符号与音频条件、基于Flow Matching、局部（和弦）与全局（文本）控制、信息瓶颈层加时间模糊、和弦/旋律/分离鼓轨/整段混音、质量与基线相当而控制更好、客观指标与人工评测。编解码器latent、用Demucs做分离、片段长度、随AudioCraft开源、Meta机构为一般了解。"
+  }
+}

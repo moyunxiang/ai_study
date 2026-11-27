@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>ValueDICE离策略模仿（2019） · AI脉络</title>
+<meta name="description" content="类分布匹配模仿要交替做两件事：估计“智能体与专家的状态-动作分布之比”，再把它当奖励跑RL；估计分布比需要智能体当前策略的on-policy数据，所以极其耗样本，改用回放数据的变体又会悄悄改变优化目标。 利用分布修正估计（DICE）的换元技巧，把智能体与专家分布之间KL散度的对偶形式改写成一个只需…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/valuedice.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ValueDICE离策略模仿（2019）">
+<meta property="og:description" content="类分布匹配模仿要交替做两件事：估计“智能体与专家的状态-动作分布之比”，再把它当奖励跑RL；估计分布比需要智能体当前策略的on-policy数据，所以极其耗样本，改用回放数据的变体又会悄悄改变优化目标。 利用分布修正估计（DICE）的换元技巧，把智能体与专家分布之间KL散度的对偶形式改写成一个只需…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/valuedice.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/valuedice">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 奖励与模仿</div>
+<h1>ValueDICE离策略模仿</h1>
+<div class="full">Imitation Learning via Off-Policy Distribution Matching</div>
+<div class="meta"><span>2019.12</span><span>论文</span><span>延伸</span><span>ICLR 2020</span><span>Ilya Kostrikov, Ofir Nachum, Jonathan Tompson · Google Research / 纽约大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1912.05032" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/valuedice">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/gail.html">GAIL</a>类分布匹配模仿要交替做两件事：估计“智能体与专家的状态-动作分布之比”，再把它当奖励跑RL；估计分布比需要智能体当前策略的on-policy数据，所以极其耗样本，改用回放数据的变体又会悄悄改变优化目标。</p></div><div><h4>方法</h4><p>利用分布修正估计（DICE）的换元技巧，把智能体与专家分布之间KL散度的对偶形式改写成一个只需要专家数据和初始状态的、完全离策略的目标；而且这个目标可以直接对策略求梯度，不再需要单独的奖励和RL步骤。</p></div><div><h4>影响</h4><p>给出了第一批有原则的完全离策略分布匹配模仿学习方法之一，在少量示范下取得很高的样本效率；“把分布比估计换元成价值函数”的DICE技巧也在离线策略评估与离线RL中被广泛使用。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>分布匹配是模仿学习的主流思路：让智能体访问的状态-动作分布 <code>d^π</code> 接近专家的 <code>d^exp</code>。<a class="ln" href="../n/gail.html">GAIL</a>用一个判别器估计两者之比，再以它为奖励用TRPO训练策略，要大量on-policy交互。之后的DAC等方法改用回放池数据训练判别器，样本效率提高了，但这时匹配的已经不是 <code>d^π</code> 而是回放池中混合策略的分布，目标被改变了。同一时期，<a class="ln" href="../n/dualdice.html">DualDICE分布修正估计</a>提出了不需要知道行为策略就能估计平稳分布比的技巧。</p><h2>方法</h2><p>从反向KL散度的Donsker-Varadhan对偶表示出发：</p><p class="formula"><code>−KL(d^π ‖ d^exp) = min_x  log E_{(s,a)∼d^exp}[ e^{x(s,a)} ] − E_{(s,a)∼d^π}[ x(s,a) ]</code></p><p>第二项需要从智能体分布采样，是on-policy的。关键换元：令 <code>x(s,a) = ν(s,a) − 𝔅^π ν(s,a)</code>，其中 <code>𝔅^π ν(s,a) = γ·E_{s&#x27;∼T(·|s,a), a&#x27;∼π(·|s&#x27;)}[ν(s&#x27;,a&#x27;)]</code>。由于 <code>d^π</code> 满足平稳性，<code>E_{d^π}[ν − 𝔅^π ν]</code> 沿时间望远镜式相消，恰好等于 <code>(1−γ)·E_{s_0∼p_0, a_0∼π}[ν(s_0, a_0)]</code>。于是目标变成</p><p class="formula"><code>J(π, ν) = log E_{(s,a)∼d^exp}[ exp(ν(s,a) − 𝔅^π ν(s,a)) ] − (1−γ)·E_{s_0∼p_0, a_0∼π}[ν(s_0,a_0)]</code></p><p>其中只用到专家的转移和初始状态分布，是完全离策略的；<code>ν</code> 起到类似Q函数的作用（因此称为ValueDICE）。训练时对ν最小化、对π最大化，策略的梯度直接从J传回，不需要显式奖励或单独的RL算法。实践中为稳定性还会混入回放池数据作为正则。</p><h2>结果</h2><p>摘要称，ValueDICE在一组常用模仿学习基准上达到最先进的样本效率和性能；这一目标还使单独的RL优化变得不必要，模仿策略可以直接从目标中学到。</p><h2>后来的发展</h2><p>ValueDICE与<a class="ln" href="../n/dualdice.html">DualDICE分布修正估计</a>一起推动了“DICE”系列方法：在离线策略评估、离线RL（如约束分布修正的方法）和离线模仿学习中，用对偶变量代替显式的重要性权重成为常见技巧。之后的<a class="ln" href="../n/iq-learn.html">IQ-Learn逆软Q模仿</a>也从“只学一个Q函数、隐式表示奖励”的角度得到了非对抗的模仿目标。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>目标里有 <code>log E[exp(·)]</code> 项，小批量估计有偏、方差大，在专家数据少或高维任务上训练不稳定。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/iq-learn.html">IQ-Learn逆软Q模仿</a></div></li><li>仍是极小极大的鞍点优化，ν与π交替更新需要仔细调参。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/iq-learn.html">IQ-Learn逆软Q模仿</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/gail.html">GAIL</a><span class="yr">2016.06 · RL</span><div class=nt>GAIL估计分布比需要on-policy数据；ValueDICE把目标改写成完全离策略的形式，并去掉了单独的RL步骤。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/maxent-irl.html">最大熵逆强化学习</a><span class="yr">2008 · RL</span><div class=nt>同属分布匹配视角下的模仿/逆RL，但不再显式恢复奖励。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/airl.html">AIRL对抗逆强化学习</a><span class="yr">2017.10 · RL</span><div class=nt>AIRL通过对抗训练恢复可迁移的奖励；ValueDICE不学奖励，直接优化策略。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/dualdice.html">DualDICE分布修正估计</a><span class="yr">2019.06 · RL</span><div class=nt>借用DualDICE把分布比换元为 <code>ν − 𝔅^π ν</code> 的技巧。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/iq-learn.html">IQ-Learn逆软Q模仿</a><span class="yr">2021.06 · RL</span><div class=nt>目标里有 <code>log E[exp(·)]</code> 项，小批量估计有偏、方差大，在专家数据少或高维任务上训练不稳定。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/lagrange-duality.html">拉格朗日乘子、约束优化与对偶</a> <a class="chip c" href="../c/bellman-equation.html">Bellman方程</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a></p>
+<h2>本篇术语</h2><ul><li><b>平稳分布</b>　策略长期运行下访问各状态-动作的（折扣）频率分布 <code>d^π</code>；模仿学习常以匹配专家的这一分布为目标。</li><li><b>Donsker-Varadhan表示</b>　把KL散度写成对一个辅助函数取极值的变分形式，使散度可以只用样本估计。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/gail.html">GAIL</a>和<a class="ln" href="../n/dualdice.html">DualDICE分布修正估计</a>；读原文第4节，自己推一遍 <code>E_{d^π}[ν − 𝔅^π ν] = (1−γ)E_{p_0,π}[ν]</code> 的望远镜相消；在一个MuJoCo任务上只用一两条专家轨迹，比较ValueDICE与行为克隆、GAIL的样本效率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1912.05032" rel="noopener">https://arxiv.org/abs/1912.05032</a>（标题、三位作者、arXiv v1于2019-12-10；摘要中分布匹配交替估计分布比与跑RL、传统上需要on-policy数据导致数据低效或改变原目标、有原则地变换为完全离策略目标、无需单独RL优化、可直接学模仿策略、在常用模仿学习基准上达到最先进样本效率与性能。DV对偶、换元与望远镜相消的公式、回放数据正则按原文正文通行描述；ICLR 2020与机构按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ValueDICE%E7%A6%BB%E7%AD%96%E7%95%A5%E6%A8%A1%E4%BB%BF%EF%BC%88valuedice%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Avaluedice%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/valuedice.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="juewu.html"><small>本分支上一个 · 2019.12</small><b>腾讯绝悟王者荣耀AI</b></a><a class="r" href="ngu.html"><small>本分支下一个 · 2020.02</small><b>Never Give Up</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

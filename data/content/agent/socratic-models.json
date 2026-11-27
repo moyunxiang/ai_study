@@ -1,0 +1,30 @@
+{
+  "id": "socratic-models",
+  "who": "Andy Zeng, Maria Attarian, Brian Ichter, Krzysztof Choromanski, Adrian Wong, Stefan Welker, Federico Tombari, Aveek Purohit et al. · Google",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2204.00598"},
+    {"label": "项目页", "url": "https://socraticmodels.github.io/"}
+  ],
+  "aka": ["Socratic Models", "SMs", "苏格拉底模型", "语言组合多模型", "多模型语言组合", "Composing Zero-Shot Multimodal Reasoning with Language"],
+  "problem": "视觉语言模型懂图片和文字的对应，大语言模型懂常识和推理，音频模型懂声音，但它们各自训练在不同数据上；要把这些能力合在一起，通常需要收集多模态数据再联合训练。",
+  "idea": "不训练任何模型，让多个预训练模型用自然语言“对话”：一个模型把它看到或听到的东西写成文字，填进另一个模型的提示里，层层传递，零样本组合出新的多模态能力。",
+  "impact": "零样本图像描述在COCO上CIDEr从18.0提到44.5，并演示了第一人称视频问答、多模态助手和机器人规划；这种“以语言为接口串联模型”的做法，与后来HuggingGPT等让LLM调度专家模型的系统思路相同。",
+  "method": "以零样本看图说话为例：先用[[clip]]给图片在一组候选词上打分，选出最可能的场所（如“厨房”）、物体、图片类型和人数；把这些词填进一段提示交给[[gpt-3]]，让它写出若干条候选描述；再用CLIP把候选描述与图片比对，挑出最匹配的一条。三个步骤都是零样本，模型之间只交换文字。\n\n同样的拼装方式可以用于更多任务。视频检索：语音模型把视频里的话转成文字，GPT-3做摘要，再用[[roberta]]计算与候选文本的相似度，修正CLIP的排序；MSR-VTT上R@1从此前零样本方法的40.3提到44.7。第一人称视频问答：把视频关键时刻逐一写成描述，汇总成一份按时间排列的“世界状态日志”，再让LLM读日志回答“我把钥匙放哪了”这类问题。机器人：[[vild]]列出桌面上的物体，LLM写出多步计划，由类似[[cliport]]的语言条件策略执行抓放。\n\n这套方法的价值在于工程上的低门槛：换一个更强的语言模型或视觉模型，只需替换对应模块，其他部分不必重新训练；代价是每个应用都要人工设计模型之间传递哪些文字。",
+  "limits": [
+    {"text": "所有信息都要先压缩成文字才能传递，细粒度的视觉细节（位置、颜色、数量）在转写时就丢失了，下游模型无从得知。", "solved_by": ["blip-2", "llava"]},
+    {"text": "每个应用的模型组合和提示都要人工设计，前一个模型的错误会直接传给后一个；系统本身不会根据任务自动决定调用哪个模型。", "solved_by": ["hugginggpt"]}
+  ],
+  "relations": [
+    {"to": "clip", "type": "uses", "note": "用CLIP给图片打类别分、并对LLM生成的候选描述重新排序，是系统里主要的视觉模块。"},
+    {"to": "gpt-3", "type": "uses", "note": "用GPT-3根据视觉模块给出的词生成描述、总结视频日志、回答问题和写机器人计划。"},
+    {"to": "vild", "type": "uses", "note": "在机器人应用中用开放词表检测器ViLD列出场景中的物体，供LLM规划。"},
+    {"to": "saycan", "type": "rivals", "note": "同月发表、都让LLM为机器人写多步计划：SayCan用可执行性价值函数为LLM的候选动作打分，Socratic Models用视觉模型的文字描述提供场景信息。"}
+  ],
+  "prereq": ["zero-few-shot", "in-context-learning", "contrastive-learning", "embedding", "tool-calling"],
+  "terms": [
+    {"t": "零样本组合", "d": "不做任何额外训练，只通过提示把几个现成模型串起来完成新任务。"},
+    {"t": "CIDEr", "d": "图像描述的常用评测指标，衡量生成的描述与多条人工参考描述在词组层面的相似程度，越高越好。"}
+  ],
+  "learn": "先读[[clip]]和[[gpt-3]]，补[[c:zero-few-shot]] → 读原文第3节框架和第4节看图说话、视频问答两个例子 → 动手：用CLIP从一组场景词和物体词中选前3名，填进提示让LLM写描述，再用CLIP挑出最匹配的一条。",
+  "check": {"source": "https://arxiv.org/abs/2204.00598", "confirmed": "标题、13位作者、v1提交于2022-04-01；摘要中零样本组合、看图说话与视频文本检索、第一人称视频问答、多模态助手、机器人规划；ar5iv全文核对作者单位Google、CLIP/ViLD/GPT-3/RoBERTa/语音转写的分工、看图说话三步流程、世界状态日志、COCO CIDEr 18.0→44.5、MSR-VTT R@1 40.3→44.7、ViLD与类CLIPort策略的机器人流程；arXiv页未写正式发表处。"}
+}

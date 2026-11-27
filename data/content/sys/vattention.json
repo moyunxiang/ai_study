@@ -1,0 +1,24 @@
+{
+ "id": "vattention",
+ "who": "Ramya Prabhu, Ajay Nayak, Jayashree Mohan, Ramachandran Ramjee, Ashish Panwar · 微软研究院印度, 印度科学理工学院",
+ "venue": "ASPLOS 2025",
+ "aka": ["vAttention", "虚拟内存KV缓存", "CUDA VMM", "无PagedAttention"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2405.04437"},
+  {"label": "GitHub", "url": "https://github.com/microsoft/vattention"}
+ ],
+ "problem": "PagedAttention把KV缓存切成不连续的小页，解决了显存碎片，但注意力内核必须改写成按页表查地址，每接入一种新内核都要重写，还带来额外开销。",
+ "idea": "借用操作系统“虚拟地址连续、物理页按需分配”的老办法：用CUDA虚拟内存管理接口先为每个请求预留一段连续的虚拟地址，再随生成长度按需映射物理显存页。",
+ "impact": "说明分页的好处可以不靠改注意力内核获得，任何现成的注意力内核都能直接用；为推理引擎的KV缓存管理提供了PagedAttention之外的另一条路线。",
+ "method": "[[vllm]]的PagedAttention像操作系统分页一样把每个请求的[[c:kv-cache]]分成固定大小的块，按需分配，碎片几乎为零，批次因此能开得很大。代价是一个请求的KV在显存里不再连续，注意力内核要额外读一张块表来找每个块在哪；[[flashattention-2]]这类内核原本假设KV连续存放，于是每个推理引擎都得维护一份分页版本的内核，新内核出来也要再移植一遍。\n\nvAttention把虚拟内存和物理内存的分配分开：利用CUDA的虚拟内存管理API，先为每个请求按最大长度预留一段连续的虚拟地址空间（只占地址、不占显存），随着生成往下走，再把物理显存页逐步映射到这段地址上。对注意力内核来说KV始终是连续的张量，现成内核不用改；物理显存仍按需分配，没有碎片。论文还针对CUDA虚拟内存的限制做了几项优化，例如分配粒度过大、映射调用延迟高，用更小的页和把分配与计算重叠来缓解。\n\n摘要报告：与使用FlashAttention和FlashInfer分页内核相比，服务吞吐最多提高1.23倍。",
+ "limits": [
+  {"text": "依赖CUDA驱动的虚拟内存接口，换到其他加速器需要对应的支持；前缀共享等需要多个请求共用同一块KV的场景，实现比分页表更麻烦。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "vllm", "type": "rivals", "note": "PagedAttention用页表打散KV缓存，vAttention用虚拟内存保持KV连续，两种方式都消除显存碎片。"},
+  {"to": "flashattention-2", "type": "uses", "note": "可以直接使用FlashAttention等假设KV连续存放的现成内核，无需改写分页版本。"}
+ ],
+ "prereq": ["kv-cache", "cpu-gpu", "memory-bandwidth", "throughput-latency"],
+ "terms": [{"t": "虚拟内存", "d": "程序看到的是连续的虚拟地址，系统在背后把它映射到零散的物理内存页，物理页可以按需再分配。"}],
+ "check": {"source": "https://arxiv.org/abs/2405.04437", "confirmed": "标题、五位作者、v1日期2024-05-07；摘要：PagedAttention按需分配缓解碎片但把KV虚拟布局变为不连续带来编程与性能开销、用CUDA虚拟内存管理API解耦虚拟与物理分配、针对CUDA虚拟内存支持的局限做LLM专门优化、开箱支持各种注意力内核、相比FlashAttention与FlashInfer的分页内核吞吐最多1.23倍。优化的具体内容、ASPLOS 2025、机构为一般了解。"}
+}

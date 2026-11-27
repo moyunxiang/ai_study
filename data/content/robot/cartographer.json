@@ -1,0 +1,31 @@
+{
+ "id": "cartographer",
+ "who": "Wolfgang Hess, Damon Kohler, Holger Rapp, Daniel Andor · Google",
+ "venue": "ICRA 2016",
+ "links": [
+  {"label": "ICRA 2016", "url": "https://doi.org/10.1109/icra.2016.7487258"},
+  {"label": "代码", "url": "https://github.com/cartographer-project/cartographer"}
+ ],
+ "aka": ["Cartographer", "Google Cartographer", "子图SLAM", "回环检测"],
+ "problem": "用激光雷达给大楼画平面图时，单靠逐帧匹配会累积漂移，地图越画越歪；必须做回环检测修正，但在大场景里实时搜索回环的计算量太大。",
+ "idea": "把连续几帧扫描拼成局部“子图”，后台把新扫描与所有子图做匹配来找回环，用分支定界加速搜索，再用图优化（稀疏位姿调整）统一修正所有位姿。",
+ "impact": "Google开源的Cartographer成为二维/三维激光SLAM最常用的工程系统之一，提供ROS集成，在机器人社区被广泛使用。",
+ "method": "二维激光SLAM的基本流程是把每一帧激光扫描和已有地图对齐，求出机器人当前的位置，再把这帧加进地图（基于[[occupancy-grid]]）。问题是每次对齐都有小误差，走一圈回到起点时，地图上的起点和终点对不上。解决办法是**回环检测**：认出“这里我来过”，加一个约束把误差分摊回整条轨迹。但场景越大，候选位置越多，实时搜索很难。\n\nCartographer分两层。**局部SLAM**：每帧扫描与当前正在构建的子图（若干连续扫描组成的一小块占据栅格地图）做匹配插入，子图在短时间内足够精确。**全局SLAM**：后台不断把新扫描与所有已完成的子图尝试匹配；为了快，它用**分支定界**在多分辨率地图上搜索——先在粗分辨率上排除不可能的大片区域，只在有希望的区域细化，从而保证找到最优匹配的同时把计算量降到实时可行。找到的回环作为约束加入位姿图，再用稀疏位姿调整（一种非线性最小二乘优化）求解所有子图和扫描的位姿。\n\n论文展示了在大型建筑中实时构建二维地图并闭合回环，精度与当时的方法相当；系统同年作为开源项目发布并提供ROS集成，后来也支持三维激光。",
+ "limits": [
+  {"text": "以几何匹配为主，缺少语义信息，在动态和长期变化的环境中地图维护困难。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "occupancy-grid", "type": "uses", "note": "子图和全局地图都用占据栅格表示。"},
+  {"to": "fastslam", "type": "rivals", "note": "FastSLAM用粒子滤波维护地图与位姿的联合分布；Cartographer用基于图优化的方法和回环约束。"},
+  {"to": "loam", "type": "solves", "note": "LOAM这类里程计式方法没有回环检测，Cartographer通过子图匹配与位姿图优化实时闭合回环。"},
+  {"to": "ros", "type": "uses", "note": "以ROS节点的形式发布和集成，便于机器人直接使用。"}
+ ],
+ "prereq": ["graph-basics", "gradient-descent", "probability-basics", "tree-search"],
+ "terms": [
+  {"t": "回环检测", "d": "识别机器人回到了曾经到过的地方，并据此加约束修正累积的定位误差。"},
+  {"t": "分支定界", "d": "一种搜索技巧：先用上界快速排除整块不可能的候选，只在有希望的分支里继续细分，保证找到最优解。"},
+  {"t": "位姿图优化", "d": "把各时刻的机器人位姿当作图的节点、相对测量当作边，求一组最符合所有测量的位姿。"}
+ ],
+ "learn": "先理解占据栅格与扫描匹配，再读论文第4–5节子图与分支定界；可在ROS中运行Cartographer的官方示例数据包。",
+ "check": {"source": "https://doi.org/10.1109/icra.2016.7487258", "confirmed": "经Crossref核对：标题《Real-time loop closure in 2D LIDAR SLAM》、四位作者、ICRA 2016（2016-05）。未打开正文；子图、分支定界、稀疏位姿调整、ROS集成与三维支持、开源时间与应用范围为凭一般了解。"}
+}

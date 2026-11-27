@@ -1,0 +1,32 @@
+{
+  "id": "rlpd",
+  "who": "Philip J. Ball, Laura Smith, Ilya Kostrikov, Sergey Levine · Oxford / UC Berkeley",
+  "venue": "ICML 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2302.02948"},
+    {"label": "代码", "url": "https://github.com/ikostrikov/rlpd"}
+  ],
+  "problem": "手头有一批示范或旧轨迹时，想在在线RL里用上它们，以往方法要先离线预训练、加约束或改很多结构，复杂且不稳定。",
+  "idea": "直接用现成的离策略算法（SAC）在线学习，每个批次一半来自离线数据、一半来自在线数据，再加上层归一化、大集成和高更新比这几处最小改动即可。",
+  "impact": "成为“在线RL+先验数据”的默认配方，被SERL等真实机器人RL系统和后续离线转在线工作广泛沿用和比较。",
+  "method": "论文问了一个直白的问题：能不能不做离线预训练，直接让离策略算法在在线学习时把离线数据也当经验用？答案是可以，但要三处关键改动：\n\n- **对称采样**：每个训练批次50%从离线数据集里抽、50%从在线回放池里抽，保证一开始在线数据很少时也能用上离线数据，又不会被它淹没；\n- **层归一化**：在评论家里加LayerNorm，限制网络在数据没覆盖的动作上外推出过大的Q值，缓解高估，代替显式的保守正则；\n- **样本效率技巧**：沿用[[redq]]的思路，用较大的Q集成取随机子集的最小值，并把每步环境交互对应的梯度更新次数（更新比，UTD）调高到如20。\n\n底座是[[sac]]，不需要行为克隆项、不需要离线预训练阶段。作者在D4RL的AntMaze、Adroit以及图像任务上大量消融这些选择，摘要称正确应用这些简单建议能比现有方法提升2.5倍，且不增加额外计算开销。",
+  "limits": [
+    {"text": "高更新比和Q集成让每步交互的训练计算量变大，墙钟时间并不省。"},
+    {"text": "离线数据质量很差或与任务目标差别很大时，对称采样可能把策略带偏，论文没有给出自适应调整比例的方法。"}
+  ],
+  "relations": [
+    {"to": "sac", "type": "uses", "note": "以SAC为底座，不改算法主体。"},
+    {"to": "redq", "type": "uses", "note": "借用REDQ的随机集成和高更新比来提高样本效率。"},
+    {"to": "awac", "type": "solves", "note": "AWAC等方法需要离线预训练加约束再微调；RLPD去掉预训练阶段，直接在线混合采样。"},
+    {"to": "iql", "type": "rivals", "note": "IQL离线预训练后在线微调是当时主要对比方法，RLPD在AntMaze等任务上明显更快。"},
+    {"to": "d4rl", "type": "uses", "note": "在D4RL的AntMaze、Adroit等离线数据集上评测。"}
+  ],
+  "prereq": ["actor-critic", "on-off-policy", "normalization-layer", "offline-rl"],
+  "terms": [
+    {"t": "对称采样", "d": "每个训练批次一半来自离线数据、一半来自在线新数据。"},
+    {"t": "更新比（UTD）", "d": "每与环境交互一步就做多少次梯度更新，越高越省样本但越费算力。"}
+  ],
+  "learn": "先懂[[sac]]和[[redq]]；读RLPD原文第4节的三条设计建议和消融图；用官方代码在antmaze-medium上关闭层归一化或对称采样，看曲线怎么变。",
+  "check": {"source": "https://arxiv.org/abs/2302.02948", "confirmed": "标题、四位作者、arXiv v1于2023-02-06；摘要中能否直接用离策略方法利用离线数据、需要一组最小但重要的改动、大量消融、比现有方法提升2.5倍且无额外计算开销、代码地址。对称采样、LayerNorm、集成与UTD=20的具体内容按原文正文通行描述；ICML 2023按通行引用。"},
+  "aka": ["RLPD", "RL with Prior Data", "先验数据在线RL", "对称采样", "online RL with offline data"]
+}

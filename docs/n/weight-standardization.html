@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>权重标准化WS（2019） · AI脉络</title>
+<meta name="description" content="检测、分割等任务受显存限制，每张GPU只能放1–2张图，此时的批统计量几乎没用；不依赖批次，但精度仍不如大批量下的BN。 不归一化激活，而是归一化卷积核：把每个输出通道的权重减去均值、除以标准差后再做卷积；配合不依赖批次的GroupNorm，在微批量下就能接近甚至超过大批量BN的效果。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/weight-standardization.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="权重标准化WS（2019）">
+<meta property="og:description" content="检测、分割等任务受显存限制，每张GPU只能放1–2张图，此时的批统计量几乎没用；不依赖批次，但精度仍不如大批量下的BN。 不归一化激活，而是归一化卷积核：把每个输出通道的权重减去均值、除以标准差后再做卷积；配合不依赖批次的GroupNorm，在微批量下就能接近甚至超过大批量BN的效果。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/weight-standardization.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/weight-standardization">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 深层训练配方</div>
+<h1>权重标准化WS</h1>
+<div class="full">Micro-Batch Training with Batch-Channel Normalization and Weight Standardization</div>
+<div class="meta"><span>2019.03</span><span>论文</span><span>延伸</span><span>arXiv 2019</span><span>Siyuan Qiao, Huiyu Wang, Chenxi Liu, Wei Shen, Alan Yuille · 约翰斯·霍普金斯大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1903.10520" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/weight-standardization">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>检测、分割等任务受显存限制，每张GPU只能放1–2张图，此时<a class="ln" href="../n/batchnorm.html">Batch Normalization</a>的批统计量几乎没用；<a class="ln" href="../n/groupnorm.html">Group Normalization</a>不依赖批次，但精度仍不如大批量下的BN。</p></div><div><h4>方法</h4><p>不归一化激活，而是归一化卷积核：把每个输出通道的权重减去均值、除以标准差后再做卷积；配合不依赖批次的GroupNorm，在微批量下就能接近甚至超过大批量BN的效果。</p></div><div><h4>影响</h4><p>“GroupNorm + Weight Standardization”成为微批量训练和大规模迁移学习的常用组合，Google的BiT（Big Transfer）等工作采用它替代BN；后来无归一化的NFNet所用的缩放权重标准化也直接借鉴了它。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>对卷积层的权重W（形状为输出通道×输入通道×核高×核宽），WS对每个输出通道i，把它对应的全部权重 <code>W_i</code> 标准化：<code>Ŵ_i = (W_i − mean(W_i)) / std(W_i)</code>，再用Ŵ做卷积。这一操作只作用在参数上，与批大小完全无关，计算量也可以忽略。</p><p>作者从两个角度解释BN为什么有效，并让WS和BCN分别补上：一是<b>平滑损失曲面</b>，即降低损失和梯度的Lipschitz常数（见<a class="ln" href="../n/bn-optimization.html">BN为何有效之争</a>），WS对权重标准化在理论上能达到类似效果；二是<b>避开“消除奇异点”</b>，即训练中某些通道的激活全部变为0或彼此完全相同、无法再学的状态。为此作者还提出批-通道归一化（BCN），把批统计量的滑动估计与通道归一化结合，让网络远离这类奇异点。</p><p>摘要报告：在图像分类、目标检测、实例分割、视频识别和语义分割上，WS和BCN都显著改善了微批量训练；用它们做微批量训练，甚至能匹配或超过大批量下BN的表现。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>主要针对卷积网络设计和验证，在Transformer等以全连接和LayerNorm为主的结构中作用不明确；它对BN“为何有效”的解释也只是几种假说之一。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/batchnorm.html">Batch Normalization</a><span class="yr">2015.02 · 基础</span><div class=nt>解决BN在每卡只有1–2个样本的微批量训练下失效的问题。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/weight-norm.html">权重归一化</a><span class="yr">2016.02 · 基础</span><div class=nt>同属对权重而非激活做归一化：权重归一化只除以范数，WS还减去均值。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/batch-renorm.html">批再归一化Batch Renorm</a><span class="yr">2017.02 · 基础</span><div class=nt>仍然依赖批统计量和滑动平均，需要额外调r_max、d_max的放宽时间表；批极小（每卡1–2个样本）时效果有限。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/groupnorm.html">Group Normalization</a><span class="yr">2018.03 · 基础</span><div class=nt>与GroupNorm配合使用，弥补其在微批量下与大批量BN之间的精度差距。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/bn-optimization.html">BN为何有效之争</a><span class="yr">2018.05 · 基础</span><div class=nt>沿用“BN平滑损失曲面”的解释，并把这种平滑通过对权重标准化实现。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/nfnet.html">NFNet无归一化网络</a><span class="yr">2021.02 · 基础</span><div class=nt>采用缩放后的权重标准化来控制无归一化网络的激活尺度。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/batch-size-epoch.html">批大小、步数与轮数</a> <a class="chip c" href="../c/loss-landscape.html">损失曲面、局部极小与鞍点</a> <a class="chip c" href="../c/expectation-variance.html">期望与方差</a></p>
+<h2>本篇术语</h2><ul><li><b>微批量训练</b>　每张GPU上只放1–2个样本的训练方式，多见于输入图像很大的检测和分割任务。</li><li><b>消除奇异点</b>　网络中某些神经元输出恒为零或彼此完全相同、相互抵消，导致梯度停滞的参数区域。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/batchnorm.html">Batch Normalization</a>和<a class="ln" href="../n/groupnorm.html">Group Normalization</a>；读论文第3节WS的定义与Lipschitz分析；在PyTorch里给Conv2d写一个前向时标准化权重的子类，在CIFAR-10上以批大小2比较GN与GN+WS。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1903.10520" rel="noopener">https://arxiv.org/abs/1903.10520</a>（标题、5位作者、arXiv v1提交于2019-03-25；摘要中BN在每卡1–2张图的微批量训练下受限、WS与BCN带来BN的两个成功因素（平滑损失曲面、避免消除奇异点）、WS通过降低损失与梯度的Lipschitz常数平滑曲面、BCN结合批与通道归一化、分类/检测/实例分割/视频识别/语义分割上一致改善、可匹配或超过大批量BN。BiT与NFNet对它的采用、机构来自一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%9D%83%E9%87%8D%E6%A0%87%E5%87%86%E5%8C%96WS%EF%BC%88weight-standardization%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aweight-standardization%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/weight-standardization.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="han-hetero.html"><small>本分支上一个 · 2019.03</small><b>HAN异构图注意力</b></a><a class="r" href="bitter-lesson.html"><small>本分支下一个 · 2019.03</small><b>苦涩的教训</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

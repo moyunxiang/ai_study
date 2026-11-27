@@ -3,28 +3,82 @@
   "who": "Zheng Yuan, Hongyi Yuan, Chuanqi Tan, Wei Wang, Songfang Huang, Fei Huang · 阿里巴巴达摩院、清华大学",
   "venue": "NeurIPS 2023",
   "links": [
-    {"label": "arXiv", "url": "https://arxiv.org/abs/2304.05302"},
-    {"label": "GitHub", "url": "https://github.com/GanjinZero/RRHF"}
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2304.05302"
+    },
+    {
+      "label": "GitHub",
+      "url": "https://github.com/GanjinZero/RRHF"
+    }
   ],
-  "aka": ["RRHF", "Rank Responses from Human Feedback", "排序对齐", "无需PPO的RLHF"],
+  "aka": [
+    "RRHF",
+    "Rank Responses from Human Feedback",
+    "排序对齐",
+    "无需PPO的RLHF"
+  ],
   "problem": "InstructGPT式RLHF要同时维护策略、参考、奖励、价值等多个模型，PPO对超参数敏感，很难在学术界的算力下复现和放大。",
   "idea": "对同一提示收集多个来源的回答，用奖励模型或人工给它们排序；用模型对每个回答的平均对数概率当“模型打分”，以排序损失让模型打分的顺序与奖励顺序一致，再加一项对最佳回答的SFT损失。",
   "impact": "2023年春最早一批“不用PPO也能对齐”的方法之一，和同期的RAFT、稍晚的DPO一起，把偏好对齐从在线强化学习转向了排序或分类式的监督目标。",
   "method": "背景：[[instructgpt]]的对齐流程是监督微调、训练奖励模型、再用[[ppo]]优化。PPO训练时显存里要放下策略模型、参考模型、奖励模型和价值模型，超参数多、容易不稳定，开源社区在[[alpaca]]之后很难照着做。\n\n**RRHF**把问题改写成排序学习。对每个提示x，先收集k个回答y₁…y_k，来源可以是模型自己的采样、ChatGPT等别的模型、人工写的标准答案；再用奖励模型给出分数r_i。模型对回答的“打分”取长度归一化的条件对数概率 `p_i = (1/|y_i|) Σ_t log π(y_i,t | x, y_i,<t)`。排序损失要求：凡是 r_i < r_j，就惩罚 `max(0, p_i − p_j)`，即奖励更低的回答不该被模型给出更高概率。另外对奖励最高的回答加一项普通的交叉熵损失。训练时只需要正在训练的模型本身（奖励分数可以提前算好），所以一次只占1到2个模型的显存，也几乎没有PPO那样的超参数。\n\n结果：作者在[[hh-rlhf]]数据上对LLaMA和Alpaca做实验，摘要称在奖励模型分数和人工标注上与PPO相当。作者也发现效果高度依赖采样回答的质量，认为RRHF本质上是一个从N个候选里学最好那个的学习器（best-of-n learner）。",
   "limits": [
-    {"text": "效果受限于候选回答的质量：如果k个回答都不好，排序损失只能在差的里面挑相对好的，摘要明确指出性能与采样质量高度相关；离线排序也没有在线采样那样持续探索新回答。", "solved_by": ["dpo", "rloo"]}
+    {
+      "text": "效果受限于候选回答的质量：如果k个回答都不好，排序损失只能在差的里面挑相对好的，摘要明确指出性能与采样质量高度相关；离线排序也没有在线采样那样持续探索新回答。",
+      "solved_by": [
+        "dpo",
+        "rloo"
+      ]
+    },
+    {
+      "text": "排序损失只约束候选之间的相对顺序，没有像PPO那样用KL项约束模型偏离SFT起点的程度，奖励模型被过度优化时缺少显式的保护。",
+      "solved_by": [
+        "dpo"
+      ]
+    }
   ],
   "relations": [
-    {"to": "instructgpt", "type": "solves", "note": "InstructGPT的PPO流程要同时维护多个模型且调参困难，RRHF只需1到2个模型、用排序损失替代RL。"},
-    {"to": "ppo", "type": "rivals", "note": "同样优化人类偏好，RRHF用离线排序损失代替PPO的在线策略梯度，摘要称效果相当。"},
-    {"to": "alpaca", "type": "uses", "note": "实验在LLaMA和Alpaca上进行，并把ChatGPT等模型的回答一起放进候选。"},
-    {"to": "hh-rlhf", "type": "uses", "note": "在Anthropic的Helpful and Harmless偏好数据上评测。"}
+    {
+      "to": "instructgpt",
+      "type": "solves",
+      "note": "InstructGPT的PPO流程要同时维护多个模型且调参困难，RRHF只需1到2个模型、用排序损失替代RL。"
+    },
+    {
+      "to": "ppo",
+      "type": "rivals",
+      "note": "同样优化人类偏好，RRHF用离线排序损失代替PPO的在线策略梯度，摘要称效果相当。"
+    },
+    {
+      "to": "alpaca",
+      "type": "uses",
+      "note": "实验在LLaMA和Alpaca上进行，并把ChatGPT等模型的回答一起放进候选。"
+    },
+    {
+      "to": "hh-rlhf",
+      "type": "uses",
+      "note": "在Anthropic的Helpful and Harmless偏好数据上评测。"
+    }
   ],
-  "prereq": ["rlhf-concept", "language-model", "cross-entropy", "loss-function", "instruction-tuning"],
+  "prereq": [
+    "rlhf-concept",
+    "language-model",
+    "cross-entropy",
+    "loss-function",
+    "instruction-tuning"
+  ],
   "terms": [
-    {"t": "排序损失（ranking loss）", "d": "不要求预测具体分数，只要求预测的先后顺序与目标顺序一致；顺序错了才产生损失。"},
-    {"t": "长度归一化对数概率", "d": "把整段回答的对数概率除以token数，避免模型只因回答短就给它更高概率。"}
+    {
+      "t": "排序损失（ranking loss）",
+      "d": "不要求预测具体分数，只要求预测的先后顺序与目标顺序一致；顺序错了才产生损失。"
+    },
+    {
+      "t": "长度归一化对数概率",
+      "d": "把整段回答的对数概率除以token数，避免模型只因回答短就给它更高概率。"
+    }
   ],
   "learn": "先补[[c:rlhf-concept]]和[[instructgpt]]的三阶段流程；读原文第2节损失函数和与PPO的显存对比；动手：对同一组提示用奖励模型给4个回答排序，实现 p_i 和hinge排序损失，在小模型上训练并与只做SFT的结果比较。",
-  "check": {"source": "https://arxiv.org/abs/2304.05302", "confirmed": "标题、6位作者、arXiv v1提交日2023-04-11；摘要中InstructGPT三阶段与PPO超参数敏感、用条件概率对数给多来源回答打分并用排序损失对齐、只需1到2个模型、在HH数据集上奖励分数与人工标注与PPO相当、性能与采样质量高度相关是best-of-n learner。长度归一化和SFT项的具体形式、NeurIPS 2023与作者机构为一般了解。"}
+  "check": {
+    "source": "https://arxiv.org/abs/2304.05302",
+    "confirmed": "标题、6位作者、arXiv v1提交日2023-04-11；摘要中InstructGPT三阶段与PPO超参数敏感、用条件概率对数给多来源回答打分并用排序损失对齐、只需1到2个模型、在HH数据集上奖励分数与人工标注与PPO相当、性能与采样质量高度相关是best-of-n learner。长度归一化和SFT项的具体形式、NeurIPS 2023与作者机构为一般了解。"
+  }
 }

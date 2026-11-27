@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>PeRFlow分段整流流（2024） · AI脉络</title>
+<meta name="description" content="整流流的reflow操作能把采样轨迹拉直、从而用很少步数生成，但对整条轨迹做reflow需要先用教师模型完整模拟大量噪声—图像对，代价高，而且一次拉直整条弯曲轨迹很难。 把采样时间切成几个窗口，在每个窗口内单独做reflow、把这一段拉直，整体逼近一条分段线性的流；并设计参数化让模型直接继承预训练…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/perflow.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PeRFlow分段整流流（2024）">
+<meta property="og:description" content="整流流的reflow操作能把采样轨迹拉直、从而用很少步数生成，但对整条轨迹做reflow需要先用教师模型完整模拟大量噪声—图像对，代价高，而且一次拉直整条弯曲轨迹很难。 把采样时间切成几个窗口，在每个窗口内单独做reflow、把这一段拉直，整体逼近一条分段线性的流；并设计参数化让模型直接继承预训练…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/perflow.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/perflow">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 少步采样与蒸馏</div>
+<h1>PeRFlow分段整流流</h1>
+<div class="full">PeRFlow: Piecewise Rectified Flow as Universal Plug-and-Play Accelerator</div>
+<div class="meta"><span>2024.05</span><span>论文</span><span>延伸</span><span>Hanshu Yan, Xingchao Liu, Jiachun Pan, Jun Hao Liew, Qiang Liu, Jiashi Feng · 字节跳动、德州大学奥斯汀分校、新加坡国立大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2405.07510" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/magic-research/piecewise-rectified-flow" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/perflow">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>整流流的reflow操作能把采样轨迹拉直、从而用很少步数生成，但对整条轨迹做reflow需要先用教师模型完整模拟大量噪声—图像对，代价高，而且一次拉直整条弯曲轨迹很难。</p></div><div><h4>方法</h4><p>把采样时间切成几个窗口，在每个窗口内单独做reflow、把这一段拉直，整体逼近一条分段线性的流；并设计参数化让模型直接继承预训练扩散模型的权重。</p></div><div><h4>影响</h4><p>得到的少步模型训练收敛快、迁移性好，可以作为“即插即用加速器”直接替换到基于同一底座的各种工作流（LoRA、ControlNet等）里，是整流流路线在文生图加速上的代表实践之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/rectified-flow.html">整流Rectified Flow</a>的reflow：用当前模型从噪声z模拟出图像x，再以(z, x)为配对重新训练，让模型沿直线从z走到x；直线轨迹一步就能走完。问题是要模拟整条轨迹的配对，且弯曲很大的轨迹难以一次拉直。</p><p>PeRFlow把时间区间[0,1]分成K个窗口（如4段）。在每个窗口内，只需用教师模型从窗口起点模拟到窗口终点（步数少得多），得到这一段的起止配对，然后训练学生在这一段内走直线。所有窗口拉直后，整条轨迹近似分段线性：每段一步，总共K步即可生成。</p><p>为了继承预训练模型的知识，作者让学生直接从教师（如Stable Diffusion）的权重初始化，并调整参数化，使学生预测的“速度”与教师原本的噪声预测形式兼容，因此训练很快收敛；得到的权重差还可以作为一个“加速增量”加到同底座的其他微调模型上，实现即插即用。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>步数降到1–2步时质量仍明显下降，分段数与质量之间需要折中。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/dmd2.html">DMD2改进分布匹配蒸馏</a> <a class="chip hue" style="--h:288" href="../n/sana-sprint.html">SANA-Sprint一步文生图</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/stable-diffusion.html">Stable Diffusion开源</a><span class="yr">2022.08 · 生成</span><div class=nt>以Stable Diffusion系列为教师和初始化，产出可替换的加速权重。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/rectified-flow.html">整流Rectified Flow</a><span class="yr">2022.09 · 生成</span><div class=nt>把整流流对整条轨迹的reflow改成按时间窗口分段reflow，更容易拉直、模拟代价更低。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/instaflow.html">InstaFlow一步文生图</a><span class="yr">2023.09 · 生成</span><div class=nt>InstaFlow对整条轨迹reflow后再蒸馏，训练代价高；PeRFlow分段reflow并继承教师权重，收敛更快、可即插即用。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/dmd2.html">DMD2改进分布匹配蒸馏</a><span class="yr">2024.05 · 生成</span><div class=nt>步数降到1–2步时质量仍明显下降，分段数与质量之间需要折中。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/sana-sprint.html">SANA-Sprint一步文生图</a><span class="yr">2025.03 · 生成</span><div class=nt>步数降到1–2步时质量仍明显下降，分段数与质量之间需要折中。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/few-step-sampling.html">少步采样与扩散蒸馏</a> <a class="chip c" href="../c/ode-sde.html">常微分方程与随机微分方程</a> <a class="chip c" href="../c/knowledge-distillation.html">知识蒸馏</a> <a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a></p>
+<h2>本篇术语</h2><ul><li><b>reflow</b>　用模型自己生成的噪声—样本配对重新训练流模型，使新的采样轨迹更接近直线。</li></ul>
+<h2>怎么学</h2><p>先读Rectified Flow的reflow与InstaFlow → 读本文分段窗口的训练流程 → 在二维数据上比较整段reflow与分段reflow的轨迹弯曲度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2405.07510" rel="noopener">https://arxiv.org/abs/2405.07510</a>（标题、六位作者、v1日期2024-05-13、摘要中把生成流的采样过程分成若干时间窗口、在每个区间内用reflow拉直轨迹逼近分段线性流、少步生成性能好、专门的参数化使其继承预训练扩散模型知识、训练收敛快、迁移性好、可作为兼容多种工作流的通用即插即用加速器；机构、窗口数示例、权重增量迁移的具体做法来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20PeRFlow%E5%88%86%E6%AE%B5%E6%95%B4%E6%B5%81%E6%B5%81%EF%BC%88perflow%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aperflow%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/perflow.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="hunyuan-dit.html"><small>本分支上一个 · 2024.05</small><b>Hunyuan-DiT中英双语</b></a><a class="r" href="lumina-t2x.html"><small>本分支下一个 · 2024.05</small><b>Lumina-T2X与Flag-DiT</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

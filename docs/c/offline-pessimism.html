@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>离线RL的悲观与保守（Pessimism and Conservatism in Offline RL） · AI脉络</title>
+<meta name="description" content="离线RL的核心对策：数据没覆盖到的动作，宁可往坏处估计。具体做法有约束策略别离数据太远、主动压低分布外动作的Q值、只在数据内部学习，以及按不确定性扣分。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/offline-pessimism.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="离线RL的悲观与保守（Pessimism and Conservatism in Offline RL）">
+<meta property="og:description" content="离线RL的核心对策：数据没覆盖到的动作，宁可往坏处估计。具体做法有约束策略别离数据太远、主动压低分布外动作的Q值、只在数据内部学习，以及按不确定性扣分。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/offline-pessimism.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/offline-pessimism">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>离线RL的悲观与保守</h1><div class="full">Pessimism and Conservatism in Offline RL</div>
+<p class="muted" style="font-size:13px">也叫：悲观原则　pessimism　pessimism principle　保守性　conservatism　保守Q学习　策略约束　policy constraint　行为正则　behavior regularization　行为约束　样本内学习　in-sample learning　数据覆盖　data coverage　集中系数　concentrability　concentrability coefficient　分布外动作　OOD action　外推误差　extrapolation error</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/offline-pessimism">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>离线RL的核心对策：数据没覆盖到的动作，宁可往坏处估计。具体做法有约束策略别离数据太远、主动压低分布外动作的Q值、只在数据内部学习，以及按不确定性扣分。</b></p>
+<p class="tags">先要会：<a class="chip c" href="offline-rl.html">离线强化学习</a> <a class="chip c" href="maximization-bias.html">过估计与最大化偏差</a> <a class="chip c" href="distribution-shift.html">分布偏移</a></p>
+<p><a class="lc" href="../c/offline-rl.html">离线强化学习</a>只有一份固定数据集，无法通过试一试来纠正错误。Q-learning的max会挑中被高估的、数据里没出现过的动作，误差还会经自举放大（见<a class="lc" href="../c/maximization-bias.html">过估计与最大化偏差</a>），学出的策略在纸面上回报很高、一上线就崩。几乎所有离线RL算法都可以理解为在实现同一个原则：<b>对不确定的东西保持悲观</b>。它和在线探索的<a class="lc" href="../c/ucb-optimism.html">上置信界与乐观原则</a>正好相反：在线时乐观能带来新数据，离线时没有新数据，乐观只会自欺。</p><p><b>四类做法</b>。</p><ul><li><b>策略约束</b>：要求学到的策略π不离产生数据的行为策略太远。<a class="ln" href="../n/bcq.html">BCQ批量约束Q学习</a>只在生成模型给出的“类似数据”的动作中选；<a class="ln" href="../n/bear.html">BEAR自举误差约束</a>和<a class="ln" href="../n/brac.html">BRAC行为正则化</a>约束分布距离；<a class="ln" href="../n/td3-bc.html">TD3+BC极简离线RL</a>最简单，在actor损失里加一项行为克隆：<code>−λ·Q(s, π(s)) + (π(s) − a)²</code>。</li><li><b>价值正则（保守）</b>：直接修改Q的训练目标。<a class="ln" href="../n/cql.html">离线强化学习CQL</a>在TD损失之外加一项<code>α·(E_s[log Σ_a exp Q(s, a)] − E_{(s,a)~D}[Q(s, a)])</code>，压低所有动作（特别是Q高的分布外动作）的Q值、抬高数据中动作的Q值，学到的Q在期望上是真实值的下界。</li><li><b>样本内学习</b>：训练过程中从不在数据外的动作上查询Q。<a class="ln" href="../n/iql.html">隐式Q学习IQL</a>用分位数式（expectile）回归估计数据内动作的“较好那部分”，再用优势加权的行为克隆提取策略。</li><li><b>不确定性惩罚</b>：用模型或Q的集成估计不确定性，按不确定性扣分，如<a class="ln" href="../n/mopo.html">MOPO模型离线优化</a>在模型奖励上减去不确定性，<a class="ln" href="../n/pevi.html">PEVI悲观值迭代</a>在理论上用置信下界做值迭代。</li></ul><p><b>数据覆盖与理论</b>。离线RL能学到多好，取决于数据<b>覆盖</b>了哪些状态-动作。常用<b>集中系数</b>衡量：<code>C^π = max_{s,a} d^π(s, a) / μ(s, a)</code>，即目标策略的占用度量（见<a class="lc" href="../c/state-visitation.html">状态访问分布与占用度量</a>）与数据分布μ之比的最大值。早期理论要求所有策略都被覆盖；悲观方法的结论更弱也更实用：只要某个好策略被数据充分覆盖，悲观算法就能与它竞争。</p>
+<div class="example"><h4>例子</h4><p>某状态的数据里只有动作a₁（真实价值5）。神经网络对没见过的a₂随意外推出Q=8（真实价值1）。普通离策略Q-learning取max，选a₂，上线后只拿到1。CQL的正则项会压低a₂这类高Q的分布外动作：若压到4，就会选回a₁。代价是：如果a₂其实真的更好（真实价值8），悲观算法也会错过它，离线RL无法发现数据之外的好动作。</p></div>
+<h2>容易误解的地方</h2><ul><li>悲观的力度是关键超参数：太弱等于没加，太强则退化为行为克隆，比数据策略好不了多少。</li><li>数据质量决定上限：数据全来自随机策略时，任何离线算法都很难学好；评测常用<a class="ln" href="../n/d4rl.html">D4RL离线RL基准</a>中不同质量的数据集分开比较。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,86 @@
+{
+  "id": "vid2world",
+  "who": "Siqiao Huang, Jialong Wu, Qixing Zhou, Shangchen Miao, Mingsheng Long · 清华大学、重庆大学",
+  "venue": "arXiv 2025",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2505.14357"
+    }
+  ],
+  "aka": [
+    "Vid2World",
+    "Vid-2-World",
+    "Video to World",
+    "视频扩散转世界模型",
+    "视频扩散因果化",
+    "causal action guidance",
+    "因果动作引导"
+  ],
+  "problem": "在网络视频上预训练的扩散模型画质和动力学都强，但它们一次双向生成整段视频、不接受逐步动作，不能直接当可交互的世界模型；专门训练的世界模型又画质粗、要大量领域数据。",
+  "idea": "把预训练视频扩散模型“因果化”：时间注意力加因果掩码、时间卷积做混合权重迁移、每帧独立加噪；再对最新一步动作做无分类器引导，增强动作可控性。",
+  "impact": "RT-1上自回归预测FVD 21.0，好于动作条件微调基线的24.2；CS:GO上FVD 102.6，远低于DIAMOND的562.2，给出改造视频大模型当世界模型的做法。",
+  "method": "**卡在哪**：[[diamond]]、[[iris]]这类世界模型在单一环境里从头训练，画面粗；[[dynamicrafter]]这类视频扩散模型在海量网络视频上学到了丰富的动力学，但它的注意力和卷积在时间上是**双向**的——生成第3帧会偷看第8帧——因此只能一次生成整段，不能“给一个动作、出一帧、再给下一个动作”（见[[c:autoregressive]]）。直接加动作条件微调的做法，仍然不是真正的逐步交互。\n\n**做法**：Vid2World以约11亿可训练参数的DynamiCrafter为底座，做两件事。**因果化**：时间注意力直接加因果掩码，不改权重；时间卷积不能看未来，就保留与过去对齐的权重，把原本对应未来位置的卷积核权重换成核的平均值（混合权重迁移），消融显示优于简单平移。训练目标改用[[diffusion-forcing]]：每帧独立采样噪声强度，让模型习惯逐帧滚动生成时“前面干净、后面嘈杂”的输入。**因果动作引导**：每个动作嵌入后加到对应帧上，训练时以0.2的概率独立丢弃，推理时只对最近一步动作做[[cfg]]式引导（系数2.5），让画面更紧地跟着当前动作走（见[[c:guidance]]）。\n\n**结果**：[[rt-1]]操作视频上，自回归版本FVD 21.0，动作条件微调基线24.2；在CS:GO上FVD 102.6、FID 19.8，DIAMOND最好配置为562.2和87.2。作者还用它在仿真中给三个RT-1策略检查点打分，排序与真实成功率一致。去掉动作引导或混合权重迁移都会变差。",
+  "limits": [
+    {
+      "text": "底座是低分辨率、约11亿参数的UNet视频模型，单视角，尚未验证在更大的DiT视频模型和多相机机器人上是否同样有效。",
+      "solved_by": []
+    },
+    {
+      "text": "用于策略评测的证据只有一个关抽屉任务、三个检查点，离可靠的大规模策略评测还差很多。",
+      "solved_by": [
+        "veo-robot-eval"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "dynamicrafter",
+      "type": "uses",
+      "note": "以预训练的DynamiCrafter为底座，改造成因果的自回归世界模型。"
+    },
+    {
+      "to": "diffusion-forcing",
+      "type": "uses",
+      "note": "训练时给每帧独立噪声强度，沿用Diffusion Forcing的目标以支持逐帧自回归生成。"
+    },
+    {
+      "to": "diamond",
+      "type": "solves",
+      "note": "DIAMOND从头训练的扩散世界模型画面粗；借用网络视频预训练后，CS:GO上FVD从562.2降到102.6。"
+    },
+    {
+      "to": "cfg",
+      "type": "uses",
+      "note": "因果动作引导即对最近一步动作做无分类器引导，训练时随机丢弃动作。"
+    },
+    {
+      "to": "irasim",
+      "type": "rivals",
+      "note": "IRASim为机器人专门训练逐帧动作条件的DiT，Vid2World则改造通用预训练视频模型，同样在RT-1上评测。"
+    }
+  ],
+  "prereq": [
+    "world-model-concept",
+    "diffusion-process",
+    "autoregressive",
+    "guidance",
+    "attention-concept",
+    "model-based-rl"
+  ],
+  "terms": [
+    {
+      "t": "因果化",
+      "d": "让模型生成某一帧时只能看到它之前的帧，不能看到之后的帧；这是逐步接收动作、逐帧生成的前提。"
+    },
+    {
+      "t": "混合权重迁移",
+      "d": "把双向时间卷积改成只看过去时，保留与过去帧对齐的权重，原本对应未来帧的权重用整个卷积核的平均值代替。"
+    }
+  ],
+  "learn": "先读[[diffusion-forcing]]理解逐帧独立噪声，再看[[cfg]]的引导公式；然后读原文第3节的因果化与动作引导设计，对照RT-1和CS:GO的结果表与消融。",
+  "check": {
+    "source": "https://arxiv.org/abs/2505.14357",
+    "confirmed": "标题、5位作者、arXiv v1 2025-05-20、摘要中因果化与因果动作引导；HTML正文中DynamiCrafter约1.1B可训练参数（引言另写1.4B）、因果掩码、混合权重迁移、Diffusion Forcing、动作丢弃0.2与引导系数2.5、RT-1 FVD 21.0对24.2、CS:GO FVD 102.6/FID 19.8对DIAMOND 562.2/87.2、关抽屉任务三检查点排序、消融结论、机构清华与重庆大学。"
+  }
+}

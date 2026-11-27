@@ -1,0 +1,32 @@
+{
+  "id": "long-data-engineering",
+  "who": "Yao Fu, Rameswar Panda, Xinyao Niu, Xiang Yue, Hannaneh Hajishirzi, Yoon Kim, Hao Peng · 爱丁堡大学、MIT-IBM Watson AI Lab、华盛顿大学、MIT、UIUC等",
+  "venue": "ICML 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2402.10171"},
+    {"label": "GitHub", "url": "https://github.com/FranxYao/Long-Context-Data-Engineering"}
+  ],
+  "aka": ["Long-Context Data Engineering", "长上下文数据工程", "per-source length upsampling", "按来源长度上采样", "128K续训配方"],
+  "problem": "把模型从4K扩到128K上下文，大家都在改位置编码、加长训练，但续训用什么数据、要多少数据缺少系统研究；常见做法是大量上采样书籍这类长文本，效果并不稳定。",
+  "idea": "假设“在任意位置取用信息”的能力在预训练中基本已经学会，只需少量合适数据的续训就能扩展到更长上下文；据此研究续训数据的数量和配比，提出保持原有领域比例、只在每个领域内部上采样长文档。",
+  "impact": "给出了一个便宜的128K扩展配方：只需5亿到50亿token、保持领域平衡的长度上采样。其“数据配比比位置编码技巧更关键”的结论影响了后来的长上下文续训实践，也成为ProLong等工作对比的基线。",
+  "method": "背景：[[position-interpolation]]、[[yarn]]等方法解决了位置编码外推，[[llama-2-long]]用4000亿token的长文本续训得到32K模型。但续训数据的作用没有被拆开研究。很多开源工作直接把书籍、论文等天然长文本大量上采样。\n\n**假设**：长上下文建模、特别是从任意位置检索信息的能力，大部分在大规模预训练中已经获得，只是没有在超长输入上被“解锁”。因此续训不需要很多数据，关键是数据的分布。\n\n**数量**：作者用[[llama-2]] 7B和13B做全参数续训，发现5亿到50亿token就足以让模型在128K上下文内的任意位置检索信息（用[[needle-haystack]]测试衡量）。\n\n**质量与配比**：比较几种配比后发现，只在书籍等少数领域上大幅上采样长文本（改变了领域比例）效果次优；更好的做法是**按来源的长度上采样（per-source length upsampling）**：保持SlimPajama原有的各领域比例不变，在每个领域内部提高长文档的采样比例。这样既获得足够多的长序列，又不让模型的知识分布偏向书籍。\n\n结果：用10亿到50亿token这样的数据对完整模型续训，就能把上下文扩展到128K；摘要称该配方超过了当时强的开源长上下文模型，并缩小了与GPT-4 128K的差距。",
+  "limits": [
+    {"text": "评测以大海捞针类检索和困惑度为主，这类指标对真实长文档理解、多跳推理的反映有限；后来的研究指出需要用更广的下游任务、并在SFT之后评测。", "solved_by": ["prolong", "ruler"]},
+    {"text": "只做了续训阶段，长上下文的指令微调和对齐数据怎么配没有涉及。", "solved_by": ["prolong"]}
+  ],
+  "relations": [
+    {"to": "llama-2-long", "type": "rivals", "note": "Llama 2 Long用4000亿token续训到32K，本文只用5亿到50亿token扩到128K，并强调配比而非数量。"},
+    {"to": "position-interpolation", "type": "uses", "note": "位置编码的外推沿用对RoPE基频或插值的调整，本文的贡献集中在数据。"},
+    {"to": "llama-2", "type": "uses", "note": "在Llama 2 7B和13B上做全参数续训实验。"},
+    {"to": "needle-haystack", "type": "uses", "note": "用大海捞针测试衡量模型能否在128K内任意位置取回信息。"},
+    {"to": "longlora", "type": "rivals", "note": "LongLoRA用稀疏注意力加LoRA降低续训成本，本文认为全参数续训加正确的数据配比就足够便宜。"}
+  ],
+  "prereq": ["context-window", "positional-encoding", "pretrain-finetune", "perplexity"],
+  "terms": [
+    {"t": "续训（continual pretraining）", "d": "在已经预训练好的模型上，用新的数据继续以预训练目标训练一段时间。"},
+    {"t": "按来源长度上采样", "d": "不改变各数据来源（网页、书、代码等）的比例，只在每个来源内部更频繁地抽到长文档。"}
+  ],
+  "learn": "先读[[position-interpolation]]和[[needle-haystack]]；读原文第3节数据配比的对比实验；动手：统计一个开放预训练语料中各领域长于32K token的文档比例，设计一个保持领域比例的长度上采样方案。",
+  "check": {"source": "https://arxiv.org/abs/2402.10171", "confirmed": "标题、7位作者、arXiv v1提交日2024-02-15；摘要中假设在任意位置利用信息的能力主要在大规模预训练中获得、轻量续训即可从4K扩到128K、5亿到50亿token足以在128K内任意位置检索、领域平衡与长度上采样同等重要、只在书籍等领域上采样长数据次优、10亿到50亿token续训完整模型、超过强开源长上下文模型并缩小与GPT-4 128K的差距。SlimPajama语料、Llama 2 7B/13B、ICML 2024与作者机构为一般了解。"}
+}

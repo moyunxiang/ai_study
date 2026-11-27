@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Punica多LoRA服务（2023） · AI脉络</title>
+<meta name="description" content="很多团队各自用LoRA微调同一个基座模型，如果每个LoRA模型单独部署一份，GPU上就重复放着大量相同的基座权重，而且不同LoRA的请求无法拼进同一个批次。 整块GPU只放一份基座模型；写一个新的CUDA内核SGMV，让同一个批次里属于不同LoRA的请求各自乘上自己的低秩矩阵，于是不同LoRA的请…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/punica.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Punica多LoRA服务（2023）">
+<meta property="og:description" content="很多团队各自用LoRA微调同一个基座模型，如果每个LoRA模型单独部署一份，GPU上就重复放着大量相同的基座权重，而且不同LoRA的请求无法拼进同一个批次。 整块GPU只放一份基座模型；写一个新的CUDA内核SGMV，让同一个批次里属于不同LoRA的请求各自乘上自己的低秩矩阵，于是不同LoRA的请…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/punica.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/punica">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 推理服务引擎</div>
+<h1>Punica多LoRA服务</h1>
+<div class="full">Punica: Multi-Tenant LoRA Serving</div>
+<div class="meta"><span>2023.10</span><span>论文</span><span>延伸</span><span>MLSys 2024</span><span>Lequn Chen, Zihao Ye, Yongji Wu, Danyang Zhuo, Luis Ceze, Arvind Krishnamurthy · 华盛顿大学, 杜克大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2310.18547" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/punica-ai/punica" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/punica">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>很多团队各自用LoRA微调同一个基座模型，如果每个LoRA模型单独部署一份，GPU上就重复放着大量相同的基座权重，而且不同LoRA的请求无法拼进同一个批次。</p></div><div><h4>方法</h4><p>整块GPU只放一份基座模型；写一个新的CUDA内核SGMV，让同一个批次里属于不同LoRA的请求各自乘上自己的低秩矩阵，于是不同LoRA的请求可以一起批处理。</p></div><div><h4>影响</h4><p>SGMV式的多LoRA批处理内核被S-LoRA、vLLM等推理引擎采用或借鉴，“一个基座、成百上千个LoRA同时在线”成为常见的服务方式。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/lora.html">LoRA</a>微调后的模型 = 基座权重 <code>W</code> + 一对小矩阵 <code>B·A</code>。基座部分对所有LoRA模型都一样，只有 <code>B·A</code> 不同。一批请求如果属于不同的LoRA，基座那部分的矩阵乘可以照常一次算完，问题出在低秩部分：每个请求要乘不同的 <code>A</code>、<code>B</code>，普通的批量矩阵乘做不到。</p><p>Punica为此设计了<b>SGMV</b>（分段收集矩阵-向量乘）内核：把批次里的请求按所属的LoRA分段，每段从显存中收集对应的低秩矩阵，在一个内核里完成所有段的计算，实现不同LoRA请求的批处理。这样一块GPU只需存一份基座模型和许多个很小的LoRA权重，内存和算力都能共享。集群层面，调度器把多租户的请求集中到尽量少的GPU上，以提高利用率，并沿用<a class="ln" href="../n/orca-serving.html">Orca连续批处理</a>、<a class="ln" href="../n/vllm.html">vLLM与PagedAttention</a>式的逐迭代批处理。</p><p>摘要报告：在固定大小的GPU集群上，服务多个LoRA模型的吞吐是当时最先进LLM服务系统的12倍，每个token只增加2毫秒延迟。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>LoRA权重默认都放在GPU显存里，适配器数量上千时放不下，需要在CPU与GPU之间按需换入换出并统一管理显存。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/s-lora.html">S-LoRA多适配器服务</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/lora.html">LoRA</a><span class="yr">2021.06 · 系统·效率</span><div class=nt>利用LoRA“基座共享、只多一对低秩矩阵”的结构来合并不同模型的请求。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/orca-serving.html">Orca连续批处理</a><span class="yr">2022.07 · 系统·效率</span><div class=nt>沿用逐迭代的连续批处理，把不同LoRA的请求放进同一批次。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/vllm.html">vLLM与PagedAttention</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>以vLLM等单模型服务系统为基线，多LoRA场景下吞吐高12倍。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/s-lora.html">S-LoRA多适配器服务</a><span class="yr">2023.11 · 系统·效率</span><div class=nt>LoRA权重默认都放在GPU显存里，适配器数量上千时放不下，需要在CPU与GPU之间按需换入换出并统一管理显存。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/peft-concept.html">参数高效微调</a> <a class="chip c" href="../c/low-rank.html">低秩近似</a> <a class="chip c" href="../c/matrix-multiplication.html">矩阵乘法与线性变换</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+<h2>本篇术语</h2><ul><li><b>多租户</b>　一套硬件同时为多个用户或多个模型提供服务，彼此共享资源。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2310.18547" rel="noopener">https://arxiv.org/abs/2310.18547</a>（标题、六位作者、v1日期2023-10-28；摘要：在共享GPU集群上服务多个LoRA模型、新CUDA内核支持不同LoRA模型的GPU运算批处理、GPU只需保留一份基座模型、调度器合并多租户负载、吞吐比最先进的LLM服务系统高12倍、每token只增加2ms延迟。SGMV名称、MLSys 2024、被vLLM等借鉴、机构为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Punica%E5%A4%9ALoRA%E6%9C%8D%E5%8A%A1%EF%BC%88punica%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Apunica%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/punica.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="cachegen.html"><small>本分支上一个 · 2023.10</small><b>CacheGen KV缓存编码传输</b></a><a class="r" href="distillspec.html"><small>本分支下一个 · 2023.10</small><b>DistillSpec草稿模型蒸馏</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

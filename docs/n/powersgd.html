@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>PowerSGD低秩梯度压缩（2019） · AI脉络</title>
+<meta name="description" content="数据并行训练每一步都要全量交换梯度，通信成了瓶颈；已有的梯度压缩要么不能用all-reduce高效聚合、扩展性差，要么达不到原来的测试精度。 把每层的梯度矩阵用一步幂迭代近似成两个瘦长矩阵的乘积（低秩分解），只传输这两个小矩阵；它们可以直接相加，所以能用all-reduce聚合；再用误差反馈把压缩…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/powersgd.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PowerSGD低秩梯度压缩（2019）">
+<meta property="og:description" content="数据并行训练每一步都要全量交换梯度，通信成了瓶颈；已有的梯度压缩要么不能用all-reduce高效聚合、扩展性差，要么达不到原来的测试精度。 把每层的梯度矩阵用一步幂迭代近似成两个瘦长矩阵的乘积（低秩分解），只传输这两个小矩阵；它们可以直接相加，所以能用all-reduce聚合；再用误差反馈把压缩…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/powersgd.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/powersgd">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 分布式与数据并行</div>
+<h1>PowerSGD低秩梯度压缩</h1>
+<div class="full">PowerSGD: Practical Low-Rank Gradient Compression for Distributed Optimization</div>
+<div class="meta"><span>2019.05</span><span>论文</span><span>延伸</span><span>NeurIPS 2019</span><span>Thijs Vogels, Sai Praneeth Karimireddy, Martin Jaggi · 洛桑联邦理工学院（EPFL）</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1905.13727" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/epfml/powersgd" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/powersgd">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>数据并行训练每一步都要全量交换梯度，通信成了瓶颈；已有的梯度压缩要么不能用all-reduce高效聚合、扩展性差，要么达不到原来的测试精度。</p></div><div><h4>方法</h4><p>把每层的梯度矩阵用一步幂迭代近似成两个瘦长矩阵的乘积（低秩分解），只传输这两个小矩阵；它们可以直接相加，所以能用all-reduce聚合；再用误差反馈把压缩丢掉的部分留到下一步补上。</p></div><div><h4>影响</h4><p>论文称是所评测方法中唯一在优化过的通信后端上对比普通SGD仍稳定取得墙钟加速的；后来被并入PyTorch DDP的通信钩子，成为最常用的梯度压缩方法之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/qsgd.html">QSGD梯度量化</a>把梯度量化成少量比特，<a class="ln" href="../n/dgc.html">深度梯度压缩DGC</a>只传最大的少数梯度分量。问题在于：稀疏或量化后的梯度，在不同机器上位置、尺度各不相同，不能直接相加，只能用all-gather或参数服务器聚合，机器一多通信量又上去了；而高度压缩又常常损失最终精度。</p><p>PowerSGD把一层的梯度看成矩阵 <code>M</code>（n×m），用秩r的近似 <code>M ≈ P Qᵀ</code>，其中P是n×r、Q是m×r，r很小（如1–4）。计算只用一步幂迭代：<code>P = M Q</code>，所有机器对P做all-reduce求和后正交化，<code>Q = Mᵀ P</code>，再对Q做all-reduce。由于矩阵乘是线性的，各机器的P、Q直接相加就等于对平均梯度做近似，于是可以沿用高效的<a class="ln" href="../n/ring-allreduce.html">Ring All-Reduce</a>。Q在步与步之间复用上一步的结果（热启动），一步幂迭代就足够准确。每台机器还保存压缩误差 <code>M − PQᵀ</code>，加到下一步的梯度上（误差反馈），保证长期看没有信息丢失。</p><p>摘要报告：在卷积网络和LSTM上缩短了训练时间，测试性能与SGD持平。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每一步仍要同步，只是传得少了；跨数据中心等极低带宽、高延迟的网络下，需要连同步频率一起降低。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/diloco.html">DiLoCo低通信训练</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/qsgd.html">QSGD梯度量化</a><span class="yr">2016.10 · 系统·效率</span><div class=nt>QSGD式量化梯度难以用all-reduce直接相加；PowerSGD的低秩因子是线性的，可直接all-reduce。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/ring-allreduce.html">Ring All-Reduce</a><span class="yr">2017.02 · 系统·效率</span><div class=nt>压缩后的P、Q矩阵用标准all-reduce聚合，保留集合通信的扩展性。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/dgc.html">深度梯度压缩DGC</a><span class="yr">2017.12 · 系统·效率</span><div class=nt>DGC靠稀疏化与动量修正，PowerSGD靠低秩近似与误差反馈，后者在优化过的通信后端上更容易拿到实际加速。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/diloco.html">DiLoCo低通信训练</a><span class="yr">2023.11 · 系统·效率</span><div class=nt>每一步仍要同步，只是传得少了；跨数据中心等极低带宽、高延迟的网络下，需要连同步频率一起降低。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/demo-optim.html">DeMo解耦动量优化</a><span class="yr">2024.11 · 系统·效率</span><div class=nt>PowerSGD用低秩近似压缩梯度，DeMo用正交变换后的稀疏化压缩动量。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/low-rank.html">低秩近似</a> <a class="chip c" href="../c/eigen-svd.html">特征分解与奇异值分解</a> <a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a></p>
+<h2>本篇术语</h2><ul><li><b>幂迭代</b>　反复用矩阵去乘一个向量（或矩阵）并归一化，结果会逐渐对齐到矩阵最主要的奇异方向，是求主成分的廉价方法。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1905.13727" rel="noopener">https://arxiv.org/abs/1905.13727</a>（标题、三位作者、v1日期2019-05-31；摘要：研究缓解数据并行通信瓶颈的梯度压缩、现有方案扩展性差或达不到目标精度、基于幂迭代的低秩梯度压缩、快速压缩并可用all-reduce聚合、测试性能与SGD持平、是所评测方法中唯一在优化通信后端下对比普通SGD稳定取得墙钟加速的、卷积网络与LSTM上缩短训练时间。P/Q计算步骤、热启动、误差反馈细节、NeurIPS 2019、并入PyTorch DDP通信钩子为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20PowerSGD%E4%BD%8E%E7%A7%A9%E6%A2%AF%E5%BA%A6%E5%8E%8B%E7%BC%A9%EF%BC%88powersgd%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Apowersgd%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/powersgd.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="bf16.html"><small>本分支上一个 · 2019.05</small><b>bfloat16</b></a><a class="r" href="triton-lang.html"><small>本分支下一个 · 2019.06</small><b>Triton GPU编程语言</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "id": "multi-prototype-embeddings",
+  "who": "Eric H. Huang, Richard Socher, Christopher D. Manning, Andrew Y. Ng · 斯坦福大学",
+  "venue": "ACL 2012",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/P12-1092/"}
+  ],
+  "aka": ["Huang et al. 2012", "Global Context", "多原型词向量", "Multi-Prototype Word Embeddings", "SCWS", "Stanford Contextual Word Similarity"],
+  "problem": "神经网络学到的词向量只用局部窗口里的上下文，而且每个词只有一个向量；可是bank既是银行又是河岸，一个向量只能是几种意思的混合，局部窗口也常常不足以判断词义。",
+  "idea": "两处改进：一是在打分网络里同时看局部窗口和整篇文档（文档用词向量的idf加权平均表示），学到更好的单一词向量；二是把每个词所有出现处的上下文向量做聚类，每个簇当作一个词义，给每个词义各学一个向量（多原型）。另外构建了带上下文的词对相似度数据集SCWS。",
+  "impact": "多原型模型优于单原型版本和其他神经语言模型基线；SCWS的2003个带句子语境的词对成为评测上下文相关词义表示的标准数据集，多原型思路则开启了「每个词义一个向量」的一系列工作，直到ELMo等上下文词向量出现。",
+  "method": "**训练目标**沿用[[collobert-weston]]的排序损失：给定一个词序列s及其所在文档d，把s的最后一个词随机换成别的词得到`s^w`，要求正确序列的得分至少高出1：`C = Σ_w max(0, 1 − g(s, d) + g(s^w, d))`。得分`g`由两部分相加：**局部得分**由窗口内词向量拼接后过一个隐藏层得到；**全局得分**把文档向量`c`（文档中所有词向量的idf加权平均）与最后一个词的向量`x_m`拼接，同样过一个隐藏层：`score_g = W₂·f(W₁·[c; x_m] + b₁) + b₂`。这样像「股票」这样的主题信息就能帮助判断窗口里的词。训练用小批量L-BFGS。\n\n**多原型**（借鉴Reisinger和Mooney 2010年基于计数向量的方法）：对词表中的每个词，取它在语料中每次出现时前后各5个词，用已学到的单原型词向量做idf加权平均，得到这次出现的上下文向量；用球面k均值把这些上下文向量聚成若干类，把语料中这个词的每次出现重新标注成对应的类，再训练，每个类得到自己的向量。\n\n**评测与数据**。在WordSim-353上，作者的模型去掉停用词后Spearman相关达到71.3（×100）。作者指出WordSim-353的词对没有语境，无法检验多义词，因此用众包收集了**SCWS**：2003个词对，每个词都放在一个句子里，由10位标注者打相似度分。在SCWS上，用上下文挑选词义的多原型模型达到65.7，优于单原型版本和其他基线。语料是2010年4月的维基百科（约200万篇文章、9.9亿词），词表取最常见的3万词。",
+  "limits": [
+    {"text": "每个词的词义数固定为同一个k，不管它实际上有一个还是二十个意思，罕见词义的簇数据很少。", "solved_by": []},
+    {"text": "词义靠先聚类再训练两阶段得到，聚类与表示学习分离；测试时还要先判别属于哪个簇。", "solved_by": ["elmo"]},
+    {"text": "排序损失与全局上下文网络训练较慢，规模化不如之后的word2vec。", "solved_by": ["word2vec"]}
+  ],
+  "relations": [
+    {"to": "collobert-weston", "type": "extends", "note": "沿用Collobert和Weston的窗口打分网络和排序损失，加上文档级的全局上下文得分。"},
+    {"to": "tf-idf", "type": "uses", "note": "文档表示和上下文表示都是词向量的idf加权平均。"},
+    {"to": "turian-word-reps", "type": "rivals", "note": "Turian等比较的C&W、HLBL等词表示都只用局部上下文、每词一个向量，是本文的主要比较对象。"},
+    {"to": "lesk-wsd", "type": "extends", "note": "把「用上下文区分词义」的词义消歧思路搬到词向量学习中，用无监督聚类代替词典释义。"}
+  ],
+  "prereq": ["embedding", "distributional-hypothesis", "clustering", "loss-function", "mlp"],
+  "terms": [
+    {"t": "多原型", "d": "一个词有多个向量，每个对应一个由上下文聚类得到的词义。"},
+    {"t": "球面k均值", "d": "用余弦相似度而不是欧氏距离度量的k均值聚类，适合向量方向比长度更重要的场合。"},
+    {"t": "SCWS", "d": "Stanford Contextual Word Similarity，2003个带句子语境的词对相似度数据集，用于评测多义词表示。"}
+  ],
+  "learn": "先读[[collobert-weston]]和[[turian-word-reps]]的讲解 → 读原文第2节全局上下文模型和第3节多原型 → 动手：取一组训练好的词向量，对bank在语料中的所有出现用上下文平均向量做k=3的聚类，看各簇的代表句子。",
+  "check": {
+    "source": "https://aclanthology.org/P12-1092.pdf",
+    "confirmed": "ACL Anthology PDF：标题、作者Huang、Socher、Manning、Ng（斯坦福）、ACL 2012、摘要（多数模型只用局部上下文、每词一个表示；结合局部与全局文档上下文；学习每词多个嵌入以处理同形异义与多义；新的带语境的词对人工判断数据集）、正文：排序损失公式(1)、全局得分公式、文档为idf加权平均、小批量L-BFGS、借鉴Reisinger和Mooney的多原型、上下文加权平均与球面k均值、2010年4月维基百科约200万篇9.9亿词、3万词表、WordSim-353上71.3、新数据2003个词对、SCWS上65.7。前后各5词的上下文窗口；每个词的簇数未核对，正文不写。"
+  }
+}

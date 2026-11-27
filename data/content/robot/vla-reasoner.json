@@ -1,0 +1,33 @@
+{
+  "id": "vla-reasoner",
+  "who": "Wenkai Guo, Guanxing Lu, Haoyuan Deng, Zhenyu Wu, Yansong Tang, Ziwei Wang · 南洋理工大学、清华大学深圳国际研究生院、北京邮电大学",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2509.22643"},
+    {"label": "项目主页", "url": "https://vla-reasoner.github.io/"}
+  ],
+  "aka": ["VLAReasoner", "VLA Reasoner", "VLA树搜索", "VLA测试时搜索", "VLA+MCTS", "在线蒙特卡洛树搜索VLA", "世界模型树搜索"],
+  "problem": "VLA每步只预测下一个动作，看不到后果，长时序任务里小偏差一步步累积成失败。",
+  "idea": "即插即用：用世界模型想象候选动作的未来画面，用蒙特卡洛树搜索在动作空间里搜索，VLA的预测作为树根先验，核密度估计采样候选，离线学的进度模型给想象状态打分。",
+  "impact": "不训练VLA本身，在LIBERO上把OpenVLA平均成功率从76.0%提到81.0%，真机5个任务从22%提到41%，展示了机器人上的测试时计算扩展。",
+  "method": "**卡在哪**：[[openvla]]这类VLA通过[[c:imitation-learning]]学“看到画面→输出下一步动作”，不会预想动作的后果。语言模型里，测试时多想几步（[[c:reasoning-tokens]]）能提高正确率；棋类里[[alphazero]]用策略网络给[[mcts]]提供先验、用价值网络评估局面。VLA-Reasoner把这套搬到机器人上。\n\n**做法**：四个部件。**世界模型**：基于iVideoGPT的约6亿参数动作条件视频预测模型，输入当前画面和候选动作，预测下一帧；在与VLA相同的仿真数据上微调，真机每个任务再加约10条失败轨迹。**MCTS**：VLA给出的动作放在树根；扩展时从核密度估计（KDE）先验中采样一批候选动作，保留与VLA动作欧氏距离最近的k个；用世界模型推演、按UCB公式选择节点。KDE拟合在离线动作上，用它的密度代替反复调用VLA来估计访问次数，节省计算。**价值估计**：把示范帧的进度按0到1线性标注，用冻结的ResNet-34加两层MLP回归，作为想象状态的分数，训练不到30分钟。**输出**：最终动作是VLA动作与搜索结果的加权和，`a = 0.6·a_VLA + 0.4·a_搜索`。\n\n**结果**：LIBERO四个套件（每个500回合）上OpenVLA从76.0%到81.0%；SimplerEnv上[[octo]]-Small从26.5%到37.3%，[[spatialvla]]从34.0%到41.8%；真机5个任务（各20次）OpenVLA从22%到41%，[[fast]]版π0从64%到74%。",
+  "limits": [
+    {"text": "论文没有报告搜索带来的推理延迟和算力开销，而每一步都要多次调用视频世界模型，实时控制代价可能很大。", "solved_by": []},
+    {"text": "搜索质量受限于世界模型和进度模型：进度只是按帧数线性插值，世界模型预测错了，搜索会选出错误动作。", "solved_by": []},
+    {"text": "只在测试时修正，VLA本身没有从搜索结果中学习；搜索得到的好动作没有蒸馏回策略。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mcts", "type": "uses", "note": "用UCB式蒙特卡洛树搜索在连续动作空间里搜索，节点用世界模型推演。"},
+    {"to": "alphazero", "type": "extends", "note": "借鉴AlphaZero用策略先验引导搜索、用价值评估叶子的结构，策略先验换成VLA，环境换成学到的世界模型。"},
+    {"to": "openvla", "type": "uses", "note": "OpenVLA是主要的被增强对象，LIBERO和真机上都有提升，且不需要改动其权重。"},
+    {"to": "libero", "type": "uses", "note": "在LIBERO四个套件上做主要仿真评测。"},
+    {"to": "fast", "type": "uses", "note": "真机实验还增强了π0-FAST，平均成功率从64%到74%。"}
+  ],
+  "prereq": ["vla-concept", "tree-search", "world-model-concept", "planning-mpc", "reasoning-tokens", "monte-carlo"],
+  "terms": [
+    {"t": "核密度估计（KDE）", "d": "在每个数据点上放一个小高斯“鼓包”再叠加，得到一个平滑的概率密度，用来在动作空间里采样和估计某个动作有多常见。"},
+    {"t": "即插即用", "d": "不改动或重训原模型，只在它的推理过程外面加一层，就能用到不同的VLA上。"}
+  ],
+  "learn": "先补[[c:tree-search]]和[[mcts]]的UCB选择规则，读[[alphazero]]的先验加搜索结构；再读原文第3节的KDE扩展与价值估计，看LIBERO表格。",
+  "check": {"source": "https://arxiv.org/abs/2509.22643", "confirmed": "标题、6位作者、v1日期2025-09-26、摘要中世界模型推演、MCTS、KDE、离线价值估计；HTML正文中iVideoGPT约6亿参数世界模型、真机每任务约10条失败轨迹、ResNet-34+MLP进度模型（<30分钟）、α=0.6、LIBERO 76.0→81.0、Octo-Small 26.5→37.3、SpatialVLA 34.0→41.8、真机OpenVLA 22→41与π0-FAST 64→74、作者机构；未报告推理延迟。"}
+}

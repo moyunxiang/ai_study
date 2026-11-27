@@ -1,0 +1,31 @@
+{
+  "id": "logic-lm",
+  "who": "Liangming Pan, Alon Albalak, Xinyi Wang, William Yang Wang · UC圣塔芭芭拉",
+  "venue": "Findings of EMNLP 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2305.12295"},
+    {"label": "GitHub", "url": "https://github.com/teacherpeterpan/Logic-LLM"}
+  ],
+  "aka": ["Logic-LM", "LogicLM", "Logic LM", "符号求解器推理", "LLM+符号求解器", "神经符号逻辑推理", "faithful logical reasoning"],
+  "problem": "LLM做多步逻辑推理时，思维链写得像模像样，但中间可能悄悄跳步或推错，最后的答案未必由前面的推理得出；推理步骤越多越容易出错。",
+  "idea": "分工：LLM只负责把自然语言题目翻译成形式化的逻辑表示，真正的推理交给确定性的符号求解器；求解器报错时，把错误信息交回LLM修改翻译。",
+  "impact": "在五个逻辑推理数据集上，平均比直接提示高39.2%、比思维链高18.4%，展示了“LLM翻译加求解器推理”的神经符号路线在逻辑题上的优势与局限。",
+  "method": "流程分三段。**形式化**：用少样本提示让LLM把题目写成某种[[c:logic-symbolic]]表示——演绎推理题写成逻辑程序（事实加规则），交给Pyke求解；一阶逻辑题交给定理证明器Prover9；“五本书按顺序排列”这类题写成约束满足问题，交给python-constraint；法学院入学考试的分析推理题写成SAT问题，交给Z3（SAT表示的语法借用自同期的SatLM）。**符号推理**：求解器严格按逻辑规则推出结论，不会跳步。**解释结果**：把求解器输出映射回选项。这样得到的答案一定是从写下的前提严格推出的，所谓“忠实”就是这个意思；只要翻译正确，推理就不会出错，出错时也能定位是哪条翻译写错了。\n\n**自我修正**：LLM写的形式化常有语法错误，求解器跑不通。这时把错误的表示、报错信息和常见错误示例交给LLM重写，最多若干轮。GPT-4在FOLIO上的可执行率从79.9%升到85.8%，AR-LSAT从32.6%升到39.8%。\n\n结果（GPT-4，标准提示/思维链/Logic-LM）：ProofWriter 52.67/68.11/79.66；LogicalDeduction 71.33/75.25/87.63；AR-LSAT 33.33/35.06/43.04。但在较简单的PrOntoQA上，思维链98.79%反而高于Logic-LM的83.20%。这和[[faithful-cot]]、[[pal]]的思路一致：让外部程序做模型不擅长的严格推导。",
+  "limits": [
+    {"text": "瓶颈从推理转移到翻译：AR-LSAT这类复杂题，GPT-4写出的形式化即使修正后也只有约四成能执行，翻译错了求解器再严格也没用。", "solved_by": []},
+    {"text": "每种题型要人工选定逻辑表示和求解器，并为每类写示例；不能形式化的常识或模糊推理无法处理，简单题上还可能不如直接用思维链。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "faithful-cot", "type": "extends", "note": "Faithful CoT把问题翻译成程序并交给确定性求解器执行；Logic-LM把这条路线系统化到四类逻辑表示和求解器，并加入按报错修正的环节。"},
+    {"to": "pal", "type": "extends", "note": "PAL让模型写Python把计算交给解释器；Logic-LM把交出去的对象从算术换成逻辑推导，用逻辑编程、定理证明和SAT求解器。"},
+    {"to": "cot", "type": "solves", "note": "思维链在多步逻辑推理中可能推错且无从验证；Logic-LM让求解器做推导，平均比思维链高18.4%，但在简单的PrOntoQA上不如思维链。"},
+    {"to": "self-refine", "type": "extends", "note": "沿用“根据反馈修改输出”的思路，但反馈来自求解器的确定性报错，而不是模型自评。"}
+  ],
+  "prereq": ["logic-symbolic", "in-context-learning", "zero-few-shot", "tool-calling"],
+  "terms": [
+    {"t": "符号求解器", "d": "按严格逻辑规则自动推理的程序，如定理证明器Prover9、SAT/SMT求解器Z3，结论保证由前提推出。"},
+    {"t": "约束满足问题", "d": "给定若干变量和它们必须满足的条件，求一组满足全部条件的取值，例如安排五本书的顺序。"}
+  ],
+  "learn": "先补[[c:logic-symbolic]]，读[[pal]]和[[faithful-cot]] → 读原文第3节四类表示与求解器、表2和表3 → 动手：用python-constraint手写一道排序逻辑题的约束，再让LLM把同一道题翻译成约束代码并运行。",
+  "check": {"source": "https://arxiv.org/abs/2305.12295", "confirmed": "标题、4位作者、v1提交于2023-05-20；摘要中五个数据集、比标准提示+39.2%、比CoT+18.4%、自我修正；arxiv.org/html/2305.12295v2核对单位、四类表示与Pyke/Prover9/python-constraint/Z3、GPT-4各数据集三组准确率、可执行率79.9→85.8与32.6→39.8、SatLM仅作为SAT语法来源被引用；GitHub README注明Findings of EMNLP 2023。"}
+}

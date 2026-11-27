@@ -1,0 +1,28 @@
+{
+  "id": "rwkv-7",
+  "who": "Bo Peng, Ruichong Zhang, Daniel Goldstein, Eric Alcaide, Xingjian Du, Haowen Hou 等 · RWKV项目、EleutherAI等",
+  "venue": "arXiv 2025",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2503.14456"}, {"label": "代码", "url": "https://github.com/RWKV/RWKV-LM"}],
+  "aka": ["RWKV-7", "RWKV7", "Goose", "RWKV-7 Goose", "RWKV v7"],
+  "problem": "线性注意力和RNN类模型推理时内存恒定，但状态更新规则简单，回忆和状态追踪能力弱于Transformer。",
+  "idea": "把增量规则（delta rule）推广为带向量门控和上下文学习率的形式，再放宽值的替换规则，让固定大小的状态更会“改写自己”。",
+  "impact": "29亿参数模型以远少于同类的训练token拿到3B级多语言最好成绩，并在理论上能识别所有正则语言。",
+  "background": "[[rwkv]]等线性RNN在推理时每个token的计算和内存都是常数，但它们的状态只会按固定衰减累加新信息。[[deltanet]]和[[gated-deltanet]]引入增量规则 `S ← S − β(S k − v)kᵀ`，让状态按“预测误差”改写对应的键值，回忆能力明显提升，但门控和学习率仍是标量。",
+  "method": "RWKV-7的状态更新可以概括为\n\n`S_t = S_{t−1}·(diag(w_t) − κ̂_tᵀ(a_t ⊙ κ̂_t)) + v_tᵀ k̃_t`\n\n其中 `w_t` 是逐通道的向量衰减（门控），`a_t` 是逐通道的“上下文学习率”，决定沿 `κ̂_t` 方向擦掉多少旧内容，`k̃_t` 是用来写入新值的键。与只用标量β的增量规则相比，每个通道都可以有自己的遗忘与写入强度，而且擦除用的键和写入用的键可以不同（论文称为放宽的值替换规则）。训练时仍可按块并行。",
+  "results": "摘要报告：2.9B参数的RWKV-7在多语言任务上达到3B级新的最好成绩，在英文下游任务上追平当时3B级最好水平，而训练token显著更少；理论上它能做状态追踪并识别所有正则语言，作者指出在标准复杂度猜想下这超出了Transformer（TC⁰）的能力。作者同时开放了3.1万亿token的多语言语料和0.19B–2.9B四个模型。",
+  "legacy": "它是线性循环模型这条路线在2025年的代表之一，和[[gated-deltanet]]、[[kimi-linear]]等一起说明增量规则类状态更新可以接近注意力的效果。",
+  "limits": [
+    {"text": "公开模型最大只有2.9B，与主流Transformer大模型相比规模差距大，大规模下的回忆能力仍待验证。", "solved_by": []},
+    {"text": "固定大小的状态对需要精确回忆长距离细节的任务仍有上限，常需与少量注意力层混合。", "solved_by": ["kimi-linear"]}
+  ],
+  "relations": [
+    {"to": "rwkv", "type": "extends", "note": "RWKV系列第七代，把时间混合模块换成广义增量规则。"},
+    {"to": "deltanet", "type": "extends", "note": "把标量学习率的增量规则推广为逐通道的向量门控和上下文学习率。"},
+    {"to": "gated-deltanet", "type": "rivals", "note": "同期的门控增量规则模型；RWKV-7的门控与擦写更细到每个通道。"},
+    {"to": "transformer", "type": "rivals", "note": "以恒定内存的循环状态替代随长度增长的KV缓存，并在理论上声称更强的状态追踪能力。"}
+  ],
+  "prereq": ["recurrent-layer", "linear-regression", "gating", "efficient-attention", "kv-cache"],
+  "terms": [{"t": "增量规则（delta rule）", "d": "用“新值减去当前状态对这个键的预测”作为修正量去更新状态，像一步在线最小二乘。"}],
+  "learn": "先读[[deltanet]]理解增量规则；再读RWKV-7论文第4节的状态更新式；动手：用numpy实现标量与向量门控两种更新，比较在键值回忆玩具任务上的准确率。",
+  "check": {"source": "https://arxiv.org/abs/2503.14456", "confirmed": "标题、作者、arXiv首次提交2025-03-18；摘要中广义delta rule、向量门控与上下文学习率、2.9B多语言3B级SOTA、识别所有正则语言、3.1T语料、0.19B–2.9B四个模型、Apache 2.0。状态更新公式的具体写法为一般了解。"}
+}

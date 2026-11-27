@@ -1,0 +1,31 @@
+{
+  "id": "muesli",
+  "who": "Matteo Hessel, Ivo Danihelka, Fabio Viola, Arthur Guez, Simon Schmitt, Laurent Sifre, Theophane Weber, David Silver, Hado van Hasselt · DeepMind",
+  "venue": "ICML 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2104.06159"}
+  ],
+  "problem": "[[muzero]]在Atari上最强，但每走一步都要做几十次模型内的树搜索，计算贵、实现复杂；无模型的策略优化方法快，分数却明显落后。搜索带来的收益里，有多少其实来自「学模型」这件事本身？",
+  "idea": "Muesli不在行动时搜索：它直接用策略网络选动作，但把MuZero式的模型学习当作辅助损失，并用一个带截断优势的正则化目标（CMPO）更新策略，在Atari上追平MuZero，而速度接近无模型基线。",
+  "impact": "说明MuZero的大部分好处可以在不做深度搜索的情况下拿到，成为「策略优化＋模型辅助损失」路线的代表；它的CMPO更新和组合式设计也被后续大规模智能体研究借用。",
+  "method": "Muesli的策略损失由两部分组成。\n\n**正则化策略优化**：先用价值网络（以及学到的模型做一步展开）估计每个动作的优势 `Â(s,a)`，构造一个目标分布 `π_CMPO(a|s) ∝ π_prior(a|s)·exp(clip(Â(s,a), −c, c))`，其中π_prior是一个缓慢更新的目标策略。优势被截断在[−c, c]之内，这保证了π_CMPO与π_prior的KL散度有一个与环境奖励尺度无关的上界——这是对[[mpo]]的改造（CMPO = clipped MPO），省去了MPO里需要求解温度的步骤。策略网络一方面最大化带优势的策略梯度项，一方面最小化与π_CMPO的KL，二者合起来既能利用离策略数据，又不会一次走太远。\n\n**模型作为辅助损失**：和MuZero一样学一个隐空间模型，从当前隐状态出发按实际动作展开几步，要求每一步预测的奖励、价值和策略与真实数据一致。模型不用于搜索，只用来塑造表示、并帮助估计多步的优势和价值。\n\n其他组件包括回报的归一化、Retrace式的离策略价值目标等。摘要称，Muesli在Atari上达到了MuZero的最先进水平，但不做深度搜索，直接用策略网络行动，计算速度与无模型基线相当；论文还给出大量消融，以及连续控制和9×9围棋上的结果。",
+  "limits": [
+    {"text": "组件很多（CMPO、模型损失、回报归一化、离策略修正），各部分对最终结果的贡献依赖细致的消融，复现门槛高。", "solved_by": []},
+    {"text": "不做搜索，在围棋等需要深度前瞻的任务上仍不如带MCTS的方法。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "muzero", "type": "rivals", "note": "沿用MuZero的模型学习，但只当辅助损失，行动时不做树搜索；在Atari上追平MuZero而计算便宜得多。"},
+    {"to": "mpo", "type": "extends", "note": "CMPO是对MPO目标分布的改造：截断优势使KL有与奖励尺度无关的上界，不必求解温度。"},
+    {"to": "v-mpo", "type": "extends", "note": "同属DeepMind的正则化策略迭代路线，Muesli改为可用离策略数据并加入模型辅助损失。"},
+    {"to": "retrace", "type": "uses", "note": "价值和优势估计使用Retrace式的离策略多步目标。"},
+    {"to": "popart", "type": "uses", "note": "与DeepMind同期的大规模智能体一样对回报做尺度归一化，以便跨游戏使用同一组超参。"}
+  ],
+  "prereq": ["policy-gradient-concept", "kl-divergence", "model-based-rl", "actor-critic", "on-off-policy"],
+  "terms": [
+    {"t": "CMPO", "d": "clipped MPO：用截断后的优势对先验策略做指数加权得到的目标策略分布。"},
+    {"t": "辅助损失", "d": "不直接服务于主目标、但能帮网络学到更好表示的额外训练任务。"}
+  ],
+  "learn": "先读[[muzero]]和[[mpo]]；读原文第3–4节CMPO的定义和KL上界，再看消融图；在一个小离散动作任务上实现CMPO目标，比较不同截断c的稳定性。",
+  "check": {"source": "https://arxiv.org/abs/2104.06159", "confirmed": "标题、九位作者、arXiv v1于2021-04-13；摘要中结合正则化策略优化与模型学习辅助损失、Atari上追平MuZero、不用深度搜索而直接用策略网络行动、计算速度与无模型基线相当、大量消融以及连续控制与9×9围棋结果。CMPO公式与KL上界、Retrace目标与回报归一化等组件按原文正文的通行描述；ICML 2021按通行引用。"},
+  "aka": ["Muesli", "CMPO", "Clipped MPO"]
+}

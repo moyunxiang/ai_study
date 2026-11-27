@@ -1,0 +1,30 @@
+{
+  "id": "monkeyocr",
+  "aka": ["MonkeyOCR", "SRR三元组", "Structure-Recognition-Relation", "MonkeyDoc"],
+  "who": "Zhang Li, Yuliang Liu, Qiang Liu, Zhiyin Ma, Ziyang Zhang, Shuo Zhang, Biao Yang, Zidun Guo et al. · 华中科技大学 / 金山办公",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2506.05218"},
+    {"label": "代码", "url": "https://github.com/Yuliang-Liu/MonkeyOCR"}
+  ],
+  "problem": "文档解析要么用多工具串联的流水线（版面检测、OCR、表格、公式各一个模型），复杂且误差累积；要么用一个大模型端到端吃下整页，速度慢、对长页面效率低。",
+  "idea": "把文档解析抽象成三个问题：在哪（结构检测）、是什么（内容识别）、怎么组织（关系预测），用一个3B模型按区域分块识别，再预测阅读顺序，取两种路线的中间。",
+  "impact": "官方称在文档解析评测上超过此前开源与闭源方法（含Gemini 2.5 Pro），3B模型可在单张RTX 3090上部署；同时发布450万条双语文档数据MonkeyDoc。",
+  "method": "把PDF或扫描页变成结构化文本（Markdown、表格、公式）有两条典型路线。[[mineru]]这类**流水线**方案为每个子任务各配一个专用模型，组装复杂，前一步出错后面全错；[[got-ocr]]、[[olmocr]]这类**端到端**方案让一个VLM直接从整页图读出全文，简单但整页高分辨率输入很费算力，长页面上也容易漏行。\n\nMonkeyOCR提出**SRR三元组**范式：\n- **Structure（在哪）**：先检测页面里的版面块，如段落、表格、公式、图片；\n- **Recognition（是什么）**：把每个块裁出来，交给同一个文档模型分块识别内容，块可以并行处理；\n- **Relation（怎么组织）**：最后预测各块之间的阅读顺序和关系，拼回完整文档。\n\n为此作者构建了MonkeyDoc数据集，含450万条中英双语样本，覆盖十多种文档类型。模型主体为3B参数；他们还发现模型存在参数冗余，提出“连续参数退化”（CPD），裁出0.6B到1.2B的小版本，速度更快、性能下降可接受。",
+  "limits": [
+    {"text": "版面检测仍是独立的第一步，检测漏掉或切错区块时，后面的识别和排序无法补救。", "solved_by": []},
+    {"text": "“超过Gemini 2.5 Pro”等结论来自作者自己的评测设置，不同文档解析基准上的排名并不一致。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mineru", "type": "solves", "note": "MinerU式流水线要串多个专用模型，MonkeyOCR把识别统一到一个模型，只保留检测与排序两步。"},
+    {"to": "got-ocr", "type": "rivals", "note": "GOT-OCR这类端到端模型直接读整页，MonkeyOCR改为分块识别，以减少整页高分辨率推理的开销。"},
+    {"to": "olmocr", "type": "rivals", "note": "olmOCR同为VLM文档转写，但走整页端到端路线。"},
+    {"to": "monkey", "type": "extends", "note": "出自Monkey团队，延续其高分辨率文档与文字理解的工作。"}
+  ],
+  "prereq": ["vision-tasks", "image-patch", "transformer-block", "autoregressive", "benchmark"],
+  "terms": [
+    {"t": "文档解析（document parsing）", "d": "把一页PDF或扫描图转换成带结构的文本，包括段落、标题、表格、公式和正确的阅读顺序。"},
+    {"t": "阅读顺序（reading order）", "d": "多栏、带图表的页面里，人读文字的先后顺序；版面块识别出来后要按这个顺序拼接，否则文字会错乱。"}
+  ],
+  "learn": "先读[[mineru]]和[[got-ocr]]分别了解流水线和端到端两种文档解析，再看MonkeyOCR论文的SRR示意图，用开源模型解析一页多栏论文对比三者输出。",
+  "check": {"source": "https://arxiv.org/abs/2506.05218", "confirmed": "标题、作者、v1提交2025-06-05；摘要：SRR三元组与三个问题、避免多工具流水线和整页巨型端到端模型的低效、MonkeyDoc 450万双语样本覆盖十余种文档类型、3B模型、CPD得到0.6B–1.2B模型、超过开源与闭源方法含Gemini 2.5-Pro、单张RTX 3090部署。机构为一般了解。"}
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DNO直接纳什优化（2024） · AI脉络</title>
+<meta name="description" content="DPO把奖励学习和策略优化合成一个对比损失，稳定好用，但仍绑在“最大化点式奖励”的框架里；NLHF一类一般偏好方法理论上更好，却不好实现、不好扩展。 保留DPO式对比回归的简单，把目标换成一般偏好下的纳什均衡：每一轮用当前模型在线采样，请强教师（GPT-4）比较打分，构造差距大的回答对做回归式训练…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dno.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DNO直接纳什优化（2024）">
+<meta property="og:description" content="DPO把奖励学习和策略优化合成一个对比损失，稳定好用，但仍绑在“最大化点式奖励”的框架里；NLHF一类一般偏好方法理论上更好，却不好实现、不好扩展。 保留DPO式对比回归的简单，把目标换成一般偏好下的纳什均衡：每一轮用当前模型在线采样，请强教师（GPT-4）比较打分，构造差距大的回答对做回归式训练…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dno.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dno">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 指令与偏好对齐</div>
+<h1>DNO直接纳什优化</h1>
+<div class="full">Direct Nash Optimization: Teaching Language Models to Self-Improve with General Preferences</div>
+<div class="meta"><span>2024.04</span><span>论文</span><span>延伸</span><span>Corby Rosset, Ching-An Cheng, Arindam Mitra, Michael Santacroce, Ahmed Awadallah, Tengyang Xie · Microsoft Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2404.03715" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/dno">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>DPO把奖励学习和策略优化合成一个对比损失，稳定好用，但仍绑在“最大化点式奖励”的框架里；NLHF一类一般偏好方法理论上更好，却不好实现、不好扩展。</p></div><div><h4>方法</h4><p>保留DPO式对比回归的简单，把目标换成一般偏好下的纳什均衡：每一轮用当前模型在线采样，请强教师（GPT-4）比较打分，构造差距大的回答对做回归式训练，迭代地自我改进，并证明各轮单调提升。</p></div><div><h4>影响</h4><p>把“一般偏好+批量在线迭代”的思路做成可复现的配方，7B模型在AlpacaEval 2.0上对GPT-4-Turbo的长度控制胜率从7%升到33%，说明迭代对齐可以超过提供偏好的教师本身。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/instructgpt.html">InstructGPT与RLHF</a>式RLHF先学奖励再优化策略；<a class="ln" href="../n/dpo.html">DPO直接偏好优化</a>证明二者可以合成一个对比损失，但它依赖Bradley-Terry点式奖励，而且只在固定的离线偏好对上训练。<a class="ln" href="../n/nlhf.html">NLHF纳什学习</a>提出直接对一般偏好 <code>P(y≻y′|x)</code> 求纳什均衡，能表达不传递的偏好，但算法需要复杂的采样，难以用于大模型。<a class="ln" href="../n/self-rewarding.html">自奖励语言模型</a>等迭代方法让模型自评自练，却缺少收敛保证。</p><h2>方法</h2><p><b>目标</b>：在一般偏好下找一个策略，使它对自己的胜率不再能提高（对称博弈的纳什均衡）。理论版本每一轮把“回答y对当前策略π_t的胜率” <code>r_t(x,y) = P(y≻π_t|x)</code> 当作这一轮的奖励，用KL正则的最优解形式更新，并把更新写成一个回归问题：让新旧策略的对数概率差去拟合奖励差。作者证明在这种批量在线（batched on-policy）更新下，各轮策略单调变好。</p><p><b>实用版DNO-Prct</b>：每一轮对每个提示从当前模型采样若干回答，再加上教师模型GPT-4-Turbo的回答；请GPT-4给所有回答打分，只挑分差足够大的“好—差”对，用类似DPO的对比损失训练一轮，得到下一轮模型。与普通DPO的区别有三点：回答来自当前模型（在线）；偏好来自一般偏好判断而非奖励模型；只保留差距大的对，降低噪声。</p><p>用更强的教师回答当正例，使模型能逐轮逼近甚至超过教师；单调改进的性质保证迭代不会来回震荡。</p><h2>结果</h2><p>从Orca-2.5（7B）出发，经DNO对齐后在AlpacaEval 2.0上对GPT-4-Turbo的胜率达到33%（控制回答长度后仍成立），比初始模型的7%绝对提高26个百分点；超过参数多得多的Mistral Large、70B的Self-Rewarding LM和较早版本的GPT-4。</p><h2>后来的发展</h2><p>DNO与稍晚的<a class="ln" href="../n/sppo.html">SPPO自我对弈偏好优化</a>并列，常被一起称为“纳什式”或“一般偏好”迭代对齐；它强调的在线采样、强教师标注、按分差筛选偏好对，也成了迭代DPO配方中的常见做法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>实用版依赖GPT-4同时当教师和评判，标注成本高，评测（AlpacaEval）也是GPT-4评判，存在自我偏好的风险。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>单调改进的证明针对理论版本；DNO-Prct用DPO式损失和分差筛选近似，二者之间没有严格对应。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/dpo.html">DPO直接偏好优化</a><span class="yr">2023.05 · LLM</span><div class=nt>沿用DPO把奖励与策略合成一个对比损失的做法，但换成一般偏好、改为在线迭代。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/orca-2.html">Orca 2解题策略蒸馏</a><span class="yr">2023.11 · LLM</span><div class=nt>以Orca系列7B模型为起点，得到Orca-2.5。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/nlhf.html">NLHF纳什学习</a><span class="yr">2023.12 · LLM</span><div class=nt>NLHF的一般偏好纳什目标难以在大模型上求解；DNO用批量在线的回归式对比损失实现，并证明单调改进。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/self-rewarding.html">自奖励语言模型</a><span class="yr">2024.01 · LLM</span><div class=nt>同为迭代自我改进；自奖励模型自己当评判，DNO用强教师判断一般偏好，并给出理论保证。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/lc-alpacaeval.html">AlpacaEval长度控制</a><span class="yr">2024.04 · 数据·评测</span><div class=nt>主要成绩在长度控制的AlpacaEval 2.0上报告。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/rlhf-concept.html">人类反馈强化学习</a> <a class="chip c" href="../c/nash-equilibrium.html">博弈论基础与纳什均衡</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a> <a class="chip c" href="../c/logistic-regression.html">逻辑回归</a></p>
+<h2>本篇术语</h2><ul><li><b>一般偏好</b>　直接用“y比y′好的概率”描述偏好，不假设每个回答背后有一个可比较的绝对分数，因此可以有循环偏好。</li><li><b>批量在线</b>　每一轮先用当前模型批量生成并标注一批数据，再离线训练一轮，介于完全离线与逐步在线之间。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/dpo.html">DPO直接偏好优化</a>和<a class="ln" href="../n/nlhf.html">NLHF纳什学习</a>；读本文第3节的理论算法和第4节DNO-Prct流程；动手：用一个小模型做两轮“采样—打分—挑分差大的对—DPO”，比较只用离线数据的DPO。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2404.03715" rel="noopener">https://arxiv.org/abs/2404.03715</a>（标题、6位作者、arXiv首次提交2024-04-04；摘要中点式奖励无法表达不传递或循环偏好、DPO合并奖励学习与策略优化仍属奖励最大化框架、DNO可证明且可扩展、批量在线、回归式目标、各轮单调改进、可超过GPT-4这样的强教师、7B的Orca-2.5在AlpacaEval 2.0对GPT-4-Turbo胜率33%（控制长度后）、从7%提高26个百分点、超过Mistral Large、70B的Self-Rewarding LM和旧版GPT-4。DNO-Prct的具体流程（加入教师回答、按分差筛选）与机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DNO%E7%9B%B4%E6%8E%A5%E7%BA%B3%E4%BB%80%E4%BC%98%E5%8C%96%EF%BC%88dno%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adno%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dno.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="rho-1.html"><small>本分支上一个 · 2024.04</small><b>Rho-1选择性语言建模</b></a><a class="r" href="mixture-of-depths.html"><small>本分支下一个 · 2024.04</small><b>深度混合MoD</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

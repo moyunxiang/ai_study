@@ -1,0 +1,30 @@
+{
+  "id": "adjoint-matching",
+  "who": "Carles Domingo-Enrich, Michal Drozdzal, Brian Karrer, Ricky T. Q. Chen · Meta FAIR",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2409.08861"}
+  ],
+  "aka": ["Adjoint Matching", "伴随匹配", "无记忆噪声调度", "Memoryless Noise Schedule", "随机最优控制奖励微调", "SOC Fine-tuning"],
+  "problem": "流匹配和扩散模型的奖励微调缺少理论上站得住的方法：直接反传奖励会刷分、丢多样性；把它写成KL正则的控制问题时，又发现生成样本和初始噪声之间的依赖会让最优解偏离想要的“预训练分布×exp(奖励)”。",
+  "idea": "把奖励微调写成随机最优控制（SOC），并证明微调时必须使用一种特定的“无记忆”噪声调度，使终点样本与初始噪声无关，才能得到正确的目标分布；再提出Adjoint Matching，把求解SOC变成一个回归问题。",
+  "impact": "给流匹配模型（不只是扩散模型）提供了一个有理论保证的奖励微调算法，在一致性、真实感和对未见过的人类偏好奖励的泛化上优于此前方法，同时保持样本多样性。",
+  "method": "流匹配和DDIM式模型通常用确定性ODE采样，此时终点x₁完全由初始噪声x₀决定。若直接把KL正则的奖励最大化套上去，最优的终点分布会带上与x₀相关的偏差，而不是`p*(x) ∝ p_base(x)·exp(r(x))`。作者证明：只要在微调时把采样过程换成某个特定噪声强度的SDE（无记忆调度，噪声大到让x₁与x₀相互独立），这个偏差就消失了，而且这种SDE与原模型有相同的边缘分布，微调完仍可换回ODE采样。\n\n求解这个控制问题时，经典做法是沿轨迹反传奖励梯度，开销大且不稳定。Adjoint Matching利用伴随方程（与神经ODE中伴随法同源）：先沿采样轨迹倒着解出“伴随状态”`a(t)`，它表示终点奖励对当前状态的敏感度；然后让模型的控制项去回归由伴随状态给出的目标，变成一个普通的最小二乘回归，像流匹配本身那样稳定、好训练。作者还证明伴随方程中有几项在最优解处期望为零，去掉后得到更简洁的“精简伴随状态”（lean adjoint），进一步降低方差。\n\n在文生图的流匹配模型上，以ImageReward为奖励，用ClipScore、PickScore、HPS v2评估一致性与偏好、用DreamSim评估多样性，Adjoint Matching优于DRaFT、ReFL、Diffusion-DPO等基线，并保持了多样性。",
+  "limits": [
+    {"text": "仍要求奖励可微，并需要沿每条轨迹解伴随方程，单次更新的计算量高于策略梯度类方法。", "solved_by": ["flow-grpo", "diffusionnft"]}
+  ],
+  "relations": [
+    {"to": "elegant-control", "type": "solves", "note": "熵正则控制的做法需要额外学习初始分布来修正偏差；本文证明只要使用无记忆噪声调度即可消除偏差，无需学初始分布。"},
+    {"to": "flow-matching", "type": "extends", "note": "方法适用于流匹配模型，并像流匹配一样把训练写成回归目标。"},
+    {"to": "neural-ode", "type": "uses", "note": "伴随状态的计算与神经ODE的伴随法同源。"},
+    {"to": "draft", "type": "rivals", "note": "DRaFT直接沿轨迹反传奖励；本文改为回归伴随状态，并作为对照基线被超过。"},
+    {"to": "imagereward", "type": "uses", "note": "实验以缩放后的ImageReward作为奖励函数。"}
+  ],
+  "prereq": ["ode-sde", "kl-divergence", "reward-design", "backpropagation", "diffusion-process", "rlhf-concept"],
+  "terms": [
+    {"t": "无记忆噪声调度", "d": "让采样SDE的噪声足够大，使生成的终点样本与起始噪声统计独立；文中证明这是奖励微调得到正确目标分布的必要条件。"},
+    {"t": "伴随状态", "d": "终点目标对中间某一时刻状态的梯度，可以沿时间倒着解一个ODE得到，避免保存整条前向轨迹。"}
+  ],
+  "learn": "先补RLHF中KL正则目标的最优解形式与神经ODE伴随法 → 读本文第3节无记忆调度的定理和第4节Adjoint Matching的损失 → 在二维流匹配模型上用简单奖励比较有无无记忆调度的结果。",
+  "check": {"source": "https://arxiv.org/html/2409.08861v5", "confirmed": "标题、四位作者、v1日期2024-09-13、摘要中把奖励微调写成随机最优控制、证明必须使用特定的无记忆噪声调度以处理噪声变量与样本的依赖、Adjoint Matching把SOC写成回归问题并优于已有SOC算法、在一致性、真实感、对未见偏好奖励的泛化上更好且保持多样性；HTML正文中无记忆条件σ(t)=√(2η_t)、精简伴随状态去掉最优解处期望为零的项、奖励为ImageReward、评测用ClipScore/PickScore/HPS v2/DreamSim、基线含DRaFT、ReFL、Diffusion-DPO；机构、ICLR 2025来自一般了解"}
+}

@@ -1,0 +1,26 @@
+{
+  "id": "batch-renorm",
+  "who": "Sergey Ioffe · Google",
+  "venue": "NIPS 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1702.03275"}
+  ],
+  "aka": ["Batch Renormalization", "BatchRenorm", "批再归一化", "小批量BN"],
+  "problem": "[[batchnorm]]训练时用当前小批量的均值方差、推理时用全局滑动平均，两者不一致；批很小或批内样本不独立时（如每卡只有几张图、按类别成组采样），批统计量噪声大，BN效果明显变差。",
+  "idea": "训练时仍用批统计量归一化，但再乘上一个修正系数r、加上偏移d，把结果校正成“用滑动平均统计量归一化”的样子；r和d当作常数不参与求导，并把它们截断在一个逐渐放宽的范围内。",
+  "impact": "由BN的作者本人提出，是解决小批量与非独立同分布批次下BN失效的早期方案；它与随后的[[groupnorm]]等不依赖批次的归一化一起，成为讨论“BN的批依赖问题”时的标准参照。",
+  "method": "BN训练时计算 `x̂ = (x − μ_B)/σ_B`，μ_B、σ_B来自当前小批量；推理时改用滑动平均 μ、σ。Batch Renorm在训练时做如下校正：\n\n`x̂ = (x − μ_B)/σ_B · r + d`，其中 `r = σ_B/σ`，`d = (μ_B − μ)/σ`。\n\n代入可以验证，`x̂` 在数值上恰好等于 `(x − μ)/σ`，也就是推理时的计算方式，因此训练和推理的输出一致。关键是r和d在反向传播中被当作常数（stop gradient），梯度仍然按批统计量的方式传播，保留了BN对优化的好处。\n\n为防止训练早期滑动平均还不可靠时校正过猛，r被截断在 `[1/r_max, r_max]`、d被截断在 `[−d_max, d_max]`，开始时 r_max=1、d_max=0（等价于普通BN），之后逐步放宽。\n\n摘要报告：在小批量或非独立同分布小批量的训练中，Batch Renorm的模型明显好于BN，同时保留了BN对初始化不敏感、训练高效等优点。",
+  "limits": [
+    {"text": "仍然依赖批统计量和滑动平均，需要额外调r_max、d_max的放宽时间表；批极小（每卡1–2个样本）时效果有限。", "solved_by": ["groupnorm", "weight-standardization"]}
+  ],
+  "relations": [
+    {"to": "batchnorm", "type": "solves", "note": "缓解BN在小批量和非独立同分布批次上训练与推理不一致、性能下降的问题。"},
+    {"to": "layernorm", "type": "rivals", "note": "LayerNorm在单个样本内部归一化、完全不依赖批次；Batch Renorm保留批归一化，只修正其批依赖。"}
+  ],
+  "prereq": ["normalization-layer", "batch-size-epoch", "expectation-variance", "backpropagation"],
+  "terms": [
+    {"t": "滑动平均统计量", "d": "训练过程中对各批均值和方差做指数移动平均得到的估计，推理时用它代替批统计量。"}
+  ],
+  "learn": "先读[[batchnorm]]；读论文第3节r、d的定义和截断时间表；在CIFAR-10上把批大小设为4，分别用BN和Batch Renorm训练ResNet，比较测试精度。",
+  "check": {"source": "https://arxiv.org/abs/1702.03275", "confirmed": "标题、作者、arXiv v1提交于2017-02-10；摘要中BN在小批量或非独立样本批次下效果下降、归因于对整个批次的依赖和训练推理激活不同、Batch Renorm保证训练与推理输出一致且依赖单个样本、小批量与非独立同分布批次下明显好于BN、保留BN的好处。r与d的公式、截断与放宽时间表、NIPS 2017来自一般了解。"}
+}

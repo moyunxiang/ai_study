@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SIGMA稀疏不规则矩阵加速器（2020） · AI脉络</title>
+<meta name="description" content="深度学习训练的核心是通用矩阵乘法（GEMM），和Tensor Core这类二维脉动阵列对规整的稠密大矩阵很高效，但新模型里的GEMM形状越来越不规则、又常常稀疏，映射到脉动阵列上利用率很低。 用灵活的分发网络加一种新的归约树“前向加法网络”（FAN）替代固定的脉动连接，让所有运算单元在任意矩阵形状…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sigma-accel.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SIGMA稀疏不规则矩阵加速器（2020）">
+<meta property="og:description" content="深度学习训练的核心是通用矩阵乘法（GEMM），和Tensor Core这类二维脉动阵列对规整的稠密大矩阵很高效，但新模型里的GEMM形状越来越不规则、又常常稀疏，映射到脉动阵列上利用率很低。 用灵活的分发网络加一种新的归约树“前向加法网络”（FAN）替代固定的脉动连接，让所有运算单元在任意矩阵形状…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sigma-accel.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sigma-accel">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:72"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/hw.html">硬件与算力</a> › AI加速器</div>
+<h1>SIGMA稀疏不规则矩阵加速器</h1>
+<div class="full">SIGMA: A Sparse and Irregular GEMM Accelerator with Flexible Interconnects for DNN Training</div>
+<div class="meta"><span>2020.02</span><span>论文</span><span>延伸</span><span>HPCA 2020</span><span>Eric Qin, Ananda Samajdar, Hyoukjun Kwon, Vineet Nadella, Sudarshan Srinivasan, Dipankar Das, Bharat Kaul, Tushar Krishna · 佐治亚理工学院 / Intel</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1109/HPCA47549.2020.00015" rel="noopener">IEEE DOI ↗</a><a class="btn sm" href="../index.html#/n/sigma-accel">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>深度学习训练的核心是通用矩阵乘法（GEMM），<a class="ln" href="../n/tpu.html">Google TPU</a>和Tensor Core这类二维脉动阵列对规整的稠密大矩阵很高效，但新模型里的GEMM形状越来越不规则、又常常稀疏，映射到脉动阵列上利用率很低。</p></div><div><h4>方法</h4><p>用灵活的分发网络加一种新的归约树“前向加法网络”（FAN）替代固定的脉动连接，让所有运算单元在任意矩阵形状和稀疏度下都能被充分利用。</p></div><div><h4>影响</h4><p>把MAERI的可重构互连思路推广到训练用的稀疏不规则GEMM，是“灵活互连 vs 脉动阵列”讨论中常被比较的代表设计。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>GEMM在前向推理、训练的前向和反向传播里都大量出现，是硬件加速的天然目标，于是有了<a class="ln" href="../n/systolic-array.html">脉动阵列</a>式的Tensor Core和TPU。问题在于，新出现的GEMM往往很“瘦长”（某一维很小）或带有大量零元素：脉动阵列的形状是固定的，矩阵切不满阵列时大批单元空转；零元素也照样占用乘法器。</p><p>SIGMA保留大量简单的乘加单元，但把它们之间的连线做成可配置的：分发网络能把任意非零元素送到任意单元，乘积再通过FAN归约。FAN是一种新的加法树微结构，可以在同一棵树里同时对多组长度不等的部分和求和，从而支持不规则的切分。这样，无论矩阵是什么形状、稀疏度多少，都能把非零运算紧凑地排满所有单元。</p><p>摘要报告：对不规则稀疏矩阵，SIGMA比脉动阵列快5.7倍，比当时先进的稀疏加速器快约3倍；一个28nm工艺实例在任意稀疏度下有效算力10.8 TFLOPS，面积65.10平方毫米、功耗22.33瓦。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>灵活的分发和归约网络比脉动阵列的近邻连线贵得多；对规整的稠密大矩阵反而不如脉动阵列省面积和能耗，商用芯片后来多选择在脉动阵列上加结构化稀疏支持。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:72" href="../n/sparse-tensor-core.html">2:4结构化稀疏Tensor Core</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:72" href="../n/tpu.html">Google TPU</a><span class="yr">2016.05 · 硬件</span><div class=nt>TPU代表的二维脉动阵列路线是SIGMA的主要比较对象。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:72" href="../n/systolic-array.html">脉动阵列</a><span class="yr">1982.01 · 硬件</span><div class=nt>脉动阵列在不规则、稀疏矩阵上利用率低，SIGMA用灵活互连让所有单元都有活干。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:72" href="../n/scnn.html">SCNN稀疏卷积加速器</a><span class="yr">2017.05 · 硬件</span><div class=nt>SCNN等稀疏加速器面向卷积推理，SIGMA面向训练中的通用稀疏GEMM，并报告约3倍优势。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:72" href="../n/maeri.html">MAERI可重构数据流加速器</a><span class="yr">2018.03 · 硬件</span><div class=nt>同组前作MAERI的可重构分发树与归约树，SIGMA把它改进为FAN并面向训练中的稀疏GEMM。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:72" href="../n/sparse-tensor-core.html">2:4结构化稀疏Tensor Core</a><span class="yr">2021.04 · 硬件</span><div class=nt>灵活的分发和归约网络比脉动阵列的近邻连线贵得多；对规整的稠密大矩阵反而不如脉动阵列省面积和能耗，商用芯片后来多选择在脉动阵列上加结构化稀疏支持。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/matrix-multiplication.html">矩阵乘法与线性变换</a> <a class="chip c" href="../c/chip-basics.html">晶体管、制程与摩尔定律</a> <a class="chip c" href="../c/backpropagation.html">反向传播</a></p>
+<h2>本篇术语</h2><ul><li><b>GEMM</b>　通用矩阵乘法，C = A×B。全连接层、注意力、卷积（转成矩阵后）都归结为GEMM。</li><li><b>利用率</b>　实际在做有效运算的单元占全部运算单元的比例，矩阵形状不匹配或有零元素时会变低。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/systolic-array.html">脉动阵列</a>和<a class="ln" href="../n/maeri.html">MAERI可重构数据流加速器</a>；再拿一个16×16的脉动阵列，算一算乘一个4×1000的矩阵时有多少单元空着，就能理解SIGMA要解决的问题。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1109/HPCA47549.2020.00015" rel="noopener">https://doi.org/10.1109/HPCA47549.2020.00015</a>（OpenAlex核对标题、8位作者与单位（佐治亚理工、Intel）、HPCA 2020与摘要：GEMM是关键内核、脉动阵列如Tensor Core与TPU、新GEMM不规则且稀疏导致映射差、FAN归约树、比脉动阵列快5.7倍、比稀疏加速器快约3倍、28nm实例10.8 TFLOPS、65.10平方毫米、22.33瓦。分发网络细节与商用芯片选择结构化稀疏的说法按一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SIGMA%E7%A8%80%E7%96%8F%E4%B8%8D%E8%A7%84%E5%88%99%E7%9F%A9%E9%98%B5%E5%8A%A0%E9%80%9F%E5%99%A8%EF%BC%88sigma-accel%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asigma-accel%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sigma-accel.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="a3-attention.html"><small>本分支上一个 · 2020.02</small><b>A³注意力加速器</b></a><a class="r" href="ms-openai-sc.html"><small>本分支下一个 · 2020.05</small><b>微软为OpenAI建的超算</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

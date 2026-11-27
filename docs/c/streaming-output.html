@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>流式输出（Streaming Output） · AI脉络</title>
+<meta name="description" content="模型每生成一小段token就立刻发给用户，而不是等整段回答写完再一次性返回。它不让生成变快，但让用户几乎马上看到开头，是聊天产品“打字机效果”的来源。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/streaming-output.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="流式输出（Streaming Output）">
+<meta property="og:description" content="模型每生成一小段token就立刻发给用户，而不是等整段回答写完再一次性返回。它不让生成变快，但让用户几乎马上看到开头，是聊天产品“打字机效果”的来源。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/streaming-output.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/streaming-output">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 入门</div>
+<h1>流式输出</h1><div class="full">Streaming Output</div>
+<p class="muted" style="font-size:13px">也叫：streaming　流式输出　流式生成　streaming output　token streaming　流式响应　SSE　server-sent events　打字机效果　stream=True　增量解码　incremental detokenization　TTFT　首token延迟　time to first token　TPOT　time per output token　ITL</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/streaming-output">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>模型每生成一小段token就立刻发给用户，而不是等整段回答写完再一次性返回。它不让生成变快，但让用户几乎马上看到开头，是聊天产品“打字机效果”的来源。</b></p>
+<p class="tags">先要会：<a class="chip c" href="autoregressive.html">自回归生成</a> <a class="chip c" href="throughput-latency.html">吞吐、延迟与批处理</a></p>
+<p>自回归生成是一个token一个token串行产生的（见<a class="lc" href="../c/autoregressive.html">自回归生成</a>），一段500个token的回答可能要十几秒才能写完。如果等全部生成完再返回，用户要盯着空白界面等十几秒；而第一个token其实在零点几秒后就已经出来了。<b>流式输出</b>利用了这一点：边生成边发送。</p><p><b>怎么实现</b>。</p><ul><li><b>服务端</b>：生成循环每产出一个或几个token，就把它们解码成文字，推送给客户端。HTTP接口常用SSE（Server-Sent Events，服务器推送事件）：一个长连接里连续发送一条条<code>data: {...}</code>消息，最后发送一个结束标记；也可以用WebSocket。</li><li><b>客户端</b>：收到一块就追加显示一块。</li></ul><p><b>两个延迟指标</b>。流式输出让用户关心的延迟拆成两部分（见<a class="lc" href="../c/throughput-latency.html">吞吐、延迟与批处理</a>和<a class="lc" href="../c/prefill-decode.html">预填充与解码两阶段</a>）：</p><ul><li><b>首token延迟</b>（TTFT）：从发出请求到看到第一个字。主要取决于排队时间和预填充（处理整段提示）的时间。</li><li><b>每token间隔</b>（TPOT或ITL）：之后每个token之间的时间，决定文字“打出来”的速度。</li></ul><p>总耗时没有变短，但用户感知的等待从“总时间”降到了“首token延迟”。</p><p><b>几个实现上的坑</b>。</p><ul><li><b>多字节字符被切开</b>。字节级分词器（见<a class="lc" href="../c/tokenization.html">分词与token</a>）可能把一个汉字的3个UTF-8字节分到两个token里，单独解码第一个token会得到乱码。增量解码要缓存不完整的字节，等凑齐再输出。</li><li><b>停止序列跨token</b>。见<a class="lc" href="../c/stopping-criteria.html">生成的停止条件</a>：可能构成停止序列前缀的文字要先缓存，确认不是停止序列后再发送。</li><li><b>结构化输出与工具调用</b>。JSON或函数参数在流式过程中是不完整的，客户端要么等完整后再解析，要么用能处理半截JSON的增量解析器（见<a class="lc" href="../c/tool-calling.html">工具调用</a>）。</li><li><b>审核</b>。内容安全检查如果要看完整回答才能判断，就与流式输出冲突，常见折中是对已生成部分分段检查。</li></ul><p>流式输出在<a class="ln" href="../n/chatgpt.html">ChatGPT发布</a>等对话产品中是默认体验，推理框架如<a class="ln" href="../n/vllm.html">vLLM与PagedAttention</a>和主流API都提供流式接口。</p>
+<div class="example"><h4>例子</h4><p>一段回答共400个token。预填充用时0.4秒，之后每个token约0.03秒：</p><ul><li>非流式：用户等 0.4 + 400×0.03 = 12.4秒后，一次看到全文。</li><li>流式：0.4秒后看到第一个字，之后每秒约33个token的速度往外冒，12.4秒时显示完毕。</li></ul><p>多字节问题：“好”的UTF-8编码是3个字节E5 A5 BD。若分词器把它拆成两个token（E5 A5 | BD），收到第一个token时解码得到无效字节，应暂不显示，等第二个token到达后再输出“好”。</p></div>
+<h2>容易误解的地方</h2><ul><li>流式输出改善的是感知延迟，不是吞吐；服务端为维持大量长连接也要付出额外开销。</li><li>流式过程中用户看到的半截内容可能在后面被模型自己“推翻”，不能把中途内容当作最终结果使用。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

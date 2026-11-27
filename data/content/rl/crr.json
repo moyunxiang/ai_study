@@ -1,0 +1,32 @@
+{
+  "id": "crr",
+  "who": "Ziyu Wang, Alexander Novikov, Konrad Zolna, Jost Tobias Springenberg, Scott Reed, Bobak Shahriari, Noah Siegel, Josh Merel et al. · DeepMind",
+  "venue": "NeurIPS 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2006.15134"}
+  ],
+  "problem": "多数离策略算法在固定数据集上表现很差；直接行为克隆不会挑数据，好坏动作一起学；[[awr]]式的加权克隆用回报估计价值，在离线数据上改进有限。",
+  "idea": "用一个学到的Q函数（critic）来“筛选”数据：对数据集中每个动作估计优势，只模仿（或更多地模仿）比当前策略平均水平好的动作，策略更新就是一个以critic为权重的回归。",
+  "impact": "给出了一个简单、在高维状态与动作上可扩展的离线RL方法，与[[awac]]同期提出了“critic加权的行为克隆”，此后与[[iql]]等方法一起成为离线策略提取的常用做法，也是RL Unplugged基准上的强基线。",
+  "background": "离线RL的两大类做法：一类在普通actor-critic上加对行为策略的约束（[[bcq]]、[[brac]]），需要估计行为策略；另一类是行为克隆，简单但会把数据里差的动作也学进去。[[awr]]提出用 `exp(优势/β)` 加权行为克隆，但它的价值函数用蒙特卡洛回报拟合，对应的是混合的行为策略，而不是正在学习的策略。DeepMind同时在整理大规模离线数据集（RL Unplugged），需要一个在高维控制任务上稳健的方法。",
+  "method": "CRR交替训练critic和策略。critic `Q(s,a)` 用普通的离策略TD学习，目标里的下一步动作从当前策略 π 采样（论文中critic可以是分布式的）。策略的更新是加权最大似然：\n\n`max_π E_{(s,a)∼D} [ f(Q, π, s, a) · log π(a|s) ]`\n\n权重函数f基于优势估计 `Â(s,a) = Q(s,a) − (1/m) Σ_j Q(s, a_j)`，`a_j ∼ π(·|s)`（也可以用max代替平均）。作者比较了两种f：\n\n- **二值**：`f = 1[Â(s,a) > 0]`，只模仿比当前策略平均更好的动作，其余丢弃；\n- **指数**：`f = min(exp(Â/β), C)`，按优势指数加权并截断。\n\n因为只在数据中出现过的动作上做回归，策略不会被推向数据之外，自然避免了外推误差，而又不需要显式估计行为策略。",
+  "results": "摘要称，CRR表现出人意料地好，能扩展到高维状态和动作空间的任务，在大量基准任务上显著超过若干最先进的离线RL算法。按原文正文的通行描述，实验基于RL Unplugged中的DeepMind控制套件与运动控制数据集，对比了BCQ、BRAC等方法。",
+  "legacy": "CRR与[[awac]]几乎同时出现，后来的[[iql]]沿用了“只在数据动作上加权回归”的策略提取，只是把critic的训练也改成不查询数据外动作。[[idql]]进一步指出这种加权回归在拟合单峰策略时会丢失多峰性。",
+  "limits": [
+    {"text": "critic的TD目标仍要从当前策略采样下一步动作，会查询数据外动作的Q值，外推误差没有被完全消除。", "solved_by": ["iql"]},
+    {"text": "二值权重会丢弃大量数据，指数权重需要调温度β和截断值，不同数据集上最优选择不同。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "awr", "type": "solves", "note": "AWR用回报回归价值、对应的是行为策略；CRR用TD学到的Q函数估计当前策略下的优势来加权，离线改进更有效。"},
+    {"to": "bcq", "type": "rivals", "note": "BCQ靠生成模型加扰动把动作限制在数据附近；CRR只在数据动作上做加权回归，不需要行为策略模型。"},
+    {"to": "brac", "type": "rivals", "note": "BRAC用显式散度惩罚约束策略；CRR把约束隐含在“只回归数据动作”之中。"},
+    {"to": "mpo", "type": "extends", "note": "与MPO同样把策略改进写成对样本动作的加权最大似然。"}
+  ],
+  "prereq": ["offline-rl", "actor-critic", "imitation-learning", "mle", "distribution-shift"],
+  "terms": [
+    {"t": "策略提取", "d": "已经有了价值函数之后，如何从它得到一个可执行的策略；离线RL中常用的方式是对数据动作做按价值加权的回归。"}
+  ],
+  "learn": "先读[[awr]]理解指数加权回归；读原文第3节两种权重函数的定义；在一个D4RL或RL Unplugged任务上分别实现二值与指数权重，比较学习曲线和被保留的数据比例。",
+  "check": {"source": "https://arxiv.org/abs/2006.15134", "confirmed": "标题、作者（共11位）、arXiv v1于2020-06-26；摘要中离线RL即批量RL、多数离策略算法在固定数据集上表现差、提出critic正则化回归、表现出人意料地好、可扩展到高维状态和动作空间、在大量基准任务上显著超过若干最先进离线方法。权重函数的二值与指数形式、优势的均值/最大值估计、RL Unplugged数据集与对比基线按原文正文通行描述；NeurIPS 2020按通行引用。"},
+  "aka": ["CRR", "Critic Regularized Regression", "评论家正则化回归"]
+}

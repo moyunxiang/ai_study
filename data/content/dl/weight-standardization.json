@@ -1,0 +1,29 @@
+{
+  "id": "weight-standardization",
+  "who": "Siyuan Qiao, Huiyu Wang, Chenxi Liu, Wei Shen, Alan Yuille · 约翰斯·霍普金斯大学",
+  "venue": "arXiv 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1903.10520"}
+  ],
+  "aka": ["WS", "Weight Standardization", "权重标准化", "BCN", "Batch-Channel Normalization", "GN+WS"],
+  "problem": "检测、分割等任务受显存限制，每张GPU只能放1–2张图，此时[[batchnorm]]的批统计量几乎没用；[[groupnorm]]不依赖批次，但精度仍不如大批量下的BN。",
+  "idea": "不归一化激活，而是归一化卷积核：把每个输出通道的权重减去均值、除以标准差后再做卷积；配合不依赖批次的GroupNorm，在微批量下就能接近甚至超过大批量BN的效果。",
+  "impact": "“GroupNorm + Weight Standardization”成为微批量训练和大规模迁移学习的常用组合，Google的BiT（Big Transfer）等工作采用它替代BN；后来无归一化的NFNet所用的缩放权重标准化也直接借鉴了它。",
+  "method": "对卷积层的权重W（形状为输出通道×输入通道×核高×核宽），WS对每个输出通道i，把它对应的全部权重 `W_i` 标准化：`Ŵ_i = (W_i − mean(W_i)) / std(W_i)`，再用Ŵ做卷积。这一操作只作用在参数上，与批大小完全无关，计算量也可以忽略。\n\n作者从两个角度解释BN为什么有效，并让WS和BCN分别补上：一是**平滑损失曲面**，即降低损失和梯度的Lipschitz常数（见[[bn-optimization]]），WS对权重标准化在理论上能达到类似效果；二是**避开“消除奇异点”**，即训练中某些通道的激活全部变为0或彼此完全相同、无法再学的状态。为此作者还提出批-通道归一化（BCN），把批统计量的滑动估计与通道归一化结合，让网络远离这类奇异点。\n\n摘要报告：在图像分类、目标检测、实例分割、视频识别和语义分割上，WS和BCN都显著改善了微批量训练；用它们做微批量训练，甚至能匹配或超过大批量下BN的表现。",
+  "limits": [
+    {"text": "主要针对卷积网络设计和验证，在Transformer等以全连接和LayerNorm为主的结构中作用不明确；它对BN“为何有效”的解释也只是几种假说之一。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "groupnorm", "type": "extends", "note": "与GroupNorm配合使用，弥补其在微批量下与大批量BN之间的精度差距。"},
+    {"to": "batchnorm", "type": "solves", "note": "解决BN在每卡只有1–2个样本的微批量训练下失效的问题。"},
+    {"to": "weight-norm", "type": "extends", "note": "同属对权重而非激活做归一化：权重归一化只除以范数，WS还减去均值。"},
+    {"to": "bn-optimization", "type": "extends", "note": "沿用“BN平滑损失曲面”的解释，并把这种平滑通过对权重标准化实现。"}
+  ],
+  "prereq": ["normalization-layer", "conv-layer", "batch-size-epoch", "loss-landscape", "expectation-variance"],
+  "terms": [
+    {"t": "微批量训练", "d": "每张GPU上只放1–2个样本的训练方式，多见于输入图像很大的检测和分割任务。"},
+    {"t": "消除奇异点", "d": "网络中某些神经元输出恒为零或彼此完全相同、相互抵消，导致梯度停滞的参数区域。"}
+  ],
+  "learn": "先读[[batchnorm]]和[[groupnorm]]；读论文第3节WS的定义与Lipschitz分析；在PyTorch里给Conv2d写一个前向时标准化权重的子类，在CIFAR-10上以批大小2比较GN与GN+WS。",
+  "check": {"source": "https://arxiv.org/abs/1903.10520", "confirmed": "标题、5位作者、arXiv v1提交于2019-03-25；摘要中BN在每卡1–2张图的微批量训练下受限、WS与BCN带来BN的两个成功因素（平滑损失曲面、避免消除奇异点）、WS通过降低损失与梯度的Lipschitz常数平滑曲面、BCN结合批与通道归一化、分类/检测/实例分割/视频识别/语义分割上一致改善、可匹配或超过大批量BN。BiT与NFNet对它的采用、机构来自一般了解。"}
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>REINFORCE++（2025） · AI脉络</title>
+<meta name="description" content="PPO要额外训练一个评论家网络，开销大；GRPO、RLOO等无评论家方法改在每道题的一小组回答里做优势归一化，但组太小时估计不准、容易过拟合。 仍然不用评论家，但把优势的归一化从“每道题一组”改到“整个批次”上做，得到随批次变大偏差趋于零的估计，并给出适合复杂推理的带组基线变体。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/reinforce-pp.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="REINFORCE++（2025）">
+<meta property="og:description" content="PPO要额外训练一个评论家网络，开销大；GRPO、RLOO等无评论家方法改在每道题的一小组回答里做优势归一化，但组太小时估计不准、容易过拟合。 仍然不用评论家，但把优势的归一化从“每道题一组”改到“整个批次”上做，得到随批次变大偏差趋于零的估计，并给出适合复杂推理的带组基线变体。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/reinforce-pp.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/reinforce-pp">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:336"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/agent.html">推理、检索与智能体</a> › 可验证奖励强化学习</div>
+<h1>REINFORCE++</h1>
+<div class="full">REINFORCE++: Stabilizing Critic-Free Policy Optimization with Global Advantage Normalization</div>
+<div class="meta"><span>2025.01</span><span>论文</span><span>延伸</span><span>Jian Hu, Jason Klein Liu, Haotian Xu, Wei Shen · OpenRLHF团队</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2501.03262" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/OpenRLHF/OpenRLHF" rel="noopener">OpenRLHF ↗</a><a class="btn sm" href="../index.html#/n/reinforce-pp">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>PPO要额外训练一个评论家网络，开销大；GRPO、RLOO等无评论家方法改在每道题的一小组回答里做优势归一化，但组太小时估计不准、容易过拟合。</p></div><div><h4>方法</h4><p>仍然不用评论家，但把优势的归一化从“每道题一组”改到“整个批次”上做，得到随批次变大偏差趋于零的估计，并给出适合复杂推理的带组基线变体。</p></div><div><h4>影响</h4><p>作为OpenRLHF里的默认可选算法被很多推理RL复现采用，和GRPO、RLOO、DAPO一起构成无评论家策略优化的常用对照组。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/ppo.html">PPO</a>用评论家网络估计每个词元的优势，显存和计算都要多出一份模型。<a class="ln" href="../n/grpo.html">GRPO</a>和<a class="ln" href="../n/rloo.html">RLOO回归REINFORCE</a>去掉评论家：对同一道题采样一组回答，用组内平均奖励当基线，GRPO还会除以组内标准差。作者指出，这种<b>按题目的局部归一化</b>在组很小时会放大噪声——一道题四个回答全对或全错时尤其不稳定——并论证它是有偏估计。</p><p>REINFORCE++的核心是<b>全局优势归一化</b>：先算每条回答的回报（含与参考模型的KL惩罚），再在整个训练批次的所有样本上减均值、除标准差。批次越大，这个估计的偏差越小。它保留了PPO的一些稳定技巧（比如对更新比率做截断），但不需要价值网络。论文给出两个版本：</p><ul><li><b>REINFORCE++</b>：每题可只采1条回答，适合一般的RLHF；</li><li><b>REINFORCE++ w/ baseline</b>：每题采多条，先减组内均值再做全局归一化，适合数学推理这类复杂任务。</li></ul><p>摘要称两者在各自场景下更稳定，在复杂的智能体任务上甚至超过PPO。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍是序列级的结果奖励，对长推理链和多轮智能体任务中“哪一步做对了”的细粒度信用分配帮助有限。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:336" href="../n/gigpo.html">GiGPO组中组优化</a></div></li><li>与GRPO、DAPO等方法的优劣在不同模型、数据和超参数下结论不一，社区复现结果并不完全一致。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/ppo.html">PPO</a><span class="yr">2017.07 · RL</span><div class=nt>去掉PPO的评论家网络以节省开销，同时保留截断等稳定性设计。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/reinforce.html">REINFORCE策略梯度</a><span class="yr">1992 · RL</span><div class=nt>以经典REINFORCE策略梯度为基础，加上全局归一化与PPO式截断等稳定技巧。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/grpo.html">GRPO</a><span class="yr">2024.02 · 推理·智能体</span><div class=nt>针对GRPO按题目做局部优势归一化带来的偏差和过拟合，改为在整个批次上归一化。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/rloo.html">RLOO回归REINFORCE</a><span class="yr">2024.02 · LLM</span><div class=nt>同为无评论家方法，RLOO用留一基线，REINFORCE++用全局归一化。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/openrlhf.html">OpenRLHF训练框架</a><span class="yr">2024.05 · 系统·效率</span><div class=nt>在OpenRLHF框架中实现并作为可选算法发布。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/gigpo.html">GiGPO组中组优化</a><span class="yr">2025.05 · 推理·智能体</span><div class=nt>仍是序列级的结果奖励，对长推理链和多轮智能体任务中“哪一步做对了”的细粒度信用分配帮助有限。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/reward-return.html">奖励、回报与折扣</a> <a class="chip c" href="../c/expectation-variance.html">期望与方差</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/rlhf-concept.html">人类反馈强化学习</a></p>
+
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/grpo.html">GRPO</a>和<a class="ln" href="../n/rloo.html">RLOO回归REINFORCE</a> → 读原文第3节两种归一化的对比与偏差分析 → 动手：在同一批模拟奖励上分别算组内归一化和全局归一化的优势，观察组大小为2和16时两者方差的差别。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2501.03262" rel="noopener">https://arxiv.org/abs/2501.03262</a>（标题、作者、v1提交于2025-01-04（当前v9）；摘要中PPO评论家开销、GRPO/RLOO的局部归一化有偏、全局优势归一化随批次增大偏差消失、两个变体及适用场景、在复杂智能体设置中超过PPO。PPO式截断与KL惩罚的具体做法、作者团队归属凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20REINFORCE%2B%2B%EF%BC%88reinforce-pp%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Areinforce-pp%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/reinforce-pp.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="search-o1.html"><small>本分支上一个 · 2025.01</small><b>Search-o1</b></a><a class="r" href="prm-lessons.html"><small>本分支下一个 · 2025.01</small><b>Qwen过程奖励模型经验</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

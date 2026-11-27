@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Diffusion-QL扩散策略（2022） · AI脉络</title>
+<meta name="description" content="离线RL的策略约束方法（、等）大多用单峰高斯策略，表达能力有限：当数据由几种截然不同的行为混合而成时，高斯策略要么平均成一个糟糕的动作，要么约束不住，导致明显次优。 直接用条件扩散模型（式的去噪过程）表示策略 π(a|s) ；训练损失是扩散模型的去噪行为克隆损失，再加一项让生成的动作Q值最大的项，…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/diffusion-ql.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Diffusion-QL扩散策略（2022）">
+<meta property="og:description" content="离线RL的策略约束方法（、等）大多用单峰高斯策略，表达能力有限：当数据由几种截然不同的行为混合而成时，高斯策略要么平均成一个糟糕的动作，要么约束不住，导致明显次优。 直接用条件扩散模型（式的去噪过程）表示策略 π(a|s) ；训练损失是扩散模型的去噪行为克隆损失，再加一项让生成的动作Q值最大的项，…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/diffusion-ql.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/diffusion-ql">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 离线RL与序列建模</div>
+<h1>Diffusion-QL扩散策略</h1>
+<div class="full">Diffusion Policies as an Expressive Policy Class for Offline Reinforcement Learning</div>
+<div class="meta"><span>2022.08</span><span>论文</span><span>延伸</span><span>ICLR 2023</span><span>Zhendong Wang, Jonathan J Hunt, Mingyuan Zhou · 德克萨斯大学奥斯汀分校 / Twitter</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2208.06193" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/diffusion-ql">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>离线RL的策略约束方法（<a class="ln" href="../n/td3-bc.html">TD3+BC极简离线RL</a>、<a class="ln" href="../n/brac.html">BRAC行为正则化</a>等）大多用单峰高斯策略，表达能力有限：当数据由几种截然不同的行为混合而成时，高斯策略要么平均成一个糟糕的动作，要么约束不住，导致明显次优。</p></div><div><h4>方法</h4><p>直接用条件扩散模型（<a class="ln" href="../n/ddpm.html">DDPM</a>式的去噪过程）表示策略 <code>π(a|s)</code>；训练损失是扩散模型的去噪行为克隆损失，再加一项让生成的动作Q值最大的项，于是策略在“像数据”和“回报高”之间取折中。</p></div><div><h4>影响</h4><p>首批把扩散模型用作离线RL策略类的工作之一，在D4RL上取得当时的最好成绩，开启了“扩散/流策略+Q学习”的一系列后续工作（<a class="ln" href="../n/idql.html">IDQL隐式扩散Q学习</a>、一致性策略、流匹配Q学习等）。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>离线RL需要防止策略选数据中没出现过的动作，常见办法是让策略贴近行为策略，例如在目标里加行为克隆项（<a class="ln" href="../n/td3-bc.html">TD3+BC极简离线RL</a>）或散度惩罚（<a class="ln" href="../n/brac.html">BRAC行为正则化</a>）。这些方法默认策略是一个高斯分布，均值由网络给出。但真实数据集常由多个策略或多种技能混合采集，在同一状态下的动作分布是多峰的；用高斯去拟合，均值会落在几个峰之间——一个数据里从没出现过、可能很差的动作。与此同时，扩散模型在图像生成中证明了对复杂多峰分布的建模能力，<a class="ln" href="../n/diffuser.html">Diffuser扩散规划</a>也已把它用到轨迹规划上。</p><h2>方法</h2><p>策略是一个以状态为条件的扩散模型：从高斯噪声 <code>a_N ∼ N(0, I)</code> 出发，经过N步去噪 <code>a_{i−1} = (a_i − β_i/√(1−ᾱ_i)·ε_θ(a_i, s, i))/√α_i + σ_i z</code> 得到动作 <code>a_0</code>。训练损失有两项：</p><p class="formula"><code>L(θ) = E_{i,ε,(s,a)∼D} ‖ε − ε_θ(√ᾱ_i·a + √(1−ᾱ_i)·ε, s, i)‖² − α · E_{s∼D, a_0∼π_θ} [Q_φ(s, a_0)]</code></p><p>第一项是标准的去噪损失，等价于在数据动作上做行为克隆，起到约束作用；第二项通过整条去噪链反向传播，把生成的动作往Q值高的方向推。α按Q值的平均绝对值归一化，以适应不同任务的奖励尺度。Q函数用双Q网络和普通TD学习，目标中的下一步动作由扩散策略采样。为了训练和推理不太慢，去噪步数取得很少。</p><h2>结果</h2><p>摘要称，扩散策略的表达能力，以及在扩散模型内部把行为克隆与策略改进耦合在一起，这两点共同带来了很好的表现；在行为策略多峰的二维老虎机例子中优于以往方法，并在大多数D4RL基准任务上达到最先进水平。</p><h2>后来的发展</h2><p>此后离线RL里出现了大量扩散/流策略方法：<a class="ln" href="../n/idql.html">IDQL隐式扩散Q学习</a>把扩散行为模型与<a class="ln" href="../n/iql.html">隐式Q学习IQL</a>的critic结合，用重要性采样挑动作而不是通过去噪链反向传播；也有工作用一致性模型或流匹配减少采样步数。扩散策略同时在机器人模仿学习中大放异彩（<a class="ln" href="../n/diffusion-policy.html">Diffusion Policy</a>）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>Q值梯度要穿过整条去噪链反向传播，训练和推理都比高斯策略慢得多，步数一多就难以训练。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/idql.html">IDQL隐式扩散Q学习</a></div></li><li>Q学习的目标仍要从策略采样下一步动作，会在数据外动作上外推，对α的选择比较敏感。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/idql.html">IDQL隐式扩散Q学习</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/ddpm.html">DDPM</a><span class="yr">2020.06 · 生成</span><div class=nt>策略就是一个以状态为条件的DDPM式扩散模型。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/brac.html">BRAC行为正则化</a><span class="yr">2019.11 · RL</span><div class=nt>BRAC用显式散度把高斯策略拉向行为策略；Diffusion-QL用表达力更强的生成模型隐式实现约束。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/plas.html">PLAS潜在动作空间策略</a><span class="yr">2020.11 · RL</span><div class=nt>策略能达到的动作完全取决于VAE的表达能力，VAE对多峰或复杂动作分布拟合不好时，好动作可能根本解码不出来。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/td3-bc.html">TD3+BC极简离线RL</a><span class="yr">2021.06 · RL</span><div class=nt>TD3+BC用高斯策略加行为克隆项，难以拟合多峰数据；Diffusion-QL把行为克隆项换成扩散模型的去噪损失。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/diffuser.html">Diffuser扩散规划</a><span class="yr">2022.05 · RL</span><div class=nt>Diffuser用扩散模型生成整条轨迹做规划；Diffusion-QL只用扩散模型表示单步策略，并配合Q学习。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/idql.html">IDQL隐式扩散Q学习</a><span class="yr">2023.04 · RL</span><div class=nt>Diffusion-QL要通过去噪链反向传播Q梯度，训练慢且敏感；IDQL的扩散模型只做行为克隆，用critic权重在采样后重选动作。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/fql.html">FQL流Q学习</a><span class="yr">2025.02 · RL</span><div class=nt>Diffusion-QL要对整条去噪链反传Q梯度；FQL改为只训练一步策略，避免递归反传。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/offline-rl.html">离线强化学习</a> <a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a> <a class="chip c" href="../c/noise-schedule.html">噪声调度与采样步数</a></p>
+<h2>本篇术语</h2><ul><li><b>多峰分布</b>　有多个高概率区域的分布，例如在同一路口有人左转有人右转；单个高斯只有一个峰，拟合时会落在中间。</li><li><b>扩散策略</b>　用扩散模型表示的策略：从噪声出发，经过若干步以状态为条件的去噪，生成一个动作。</li></ul>
+<h2>怎么学</h2><p>先学<a class="ln" href="../n/ddpm.html">DDPM</a>的去噪训练和采样；读原文第3节目标函数和第4节二维老虎机例子；在一个D4RL任务上把TD3+BC的高斯策略换成小型扩散策略，比较在混合质量数据集上的表现。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2208.06193" rel="noopener">https://arxiv.org/abs/2208.06193</a>（标题、三位作者、arXiv v1于2022-08-12；摘要中数据外动作的函数近似误差、正则化方法受限于表达力有限的策略类、用条件扩散模型表示策略、在扩散模型训练损失中加入最大化动作价值的项、表达力与行为克隆-策略改进耦合共同带来性能、二维多峰老虎机例子、大多数D4RL任务达到最先进。去噪公式、α按Q尺度归一化、双Q与少步去噪按原文正文通行描述；ICLR 2023与机构按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Diffusion-QL%E6%89%A9%E6%95%A3%E7%AD%96%E7%95%A5%EF%BC%88diffusion-ql%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adiffusion-ql%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/diffusion-ql.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="alberta-plan.html"><small>本分支上一个 · 2022.08</small><b>Alberta研究计划</b></a><a class="r" href="algorithm-distillation.html"><small>本分支下一个 · 2022.10</small><b>算法蒸馏与上下文RL</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

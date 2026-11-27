@@ -1,0 +1,85 @@
+{
+  "id": "selective-attention-re",
+  "who": "Yankai Lin（林衍凯）, Shiqi Shen, Zhiyuan Liu（刘知远）, Huanbo Luan, Maosong Sun（孙茂松）· 清华大学",
+  "venue": "ACL 2016",
+  "links": [
+    {
+      "label": "ACL Anthology",
+      "url": "https://aclanthology.org/P16-1200/"
+    },
+    {
+      "label": "OpenNRE",
+      "url": "https://github.com/thunlp/OpenNRE"
+    }
+  ],
+  "aka": [
+    "PCNN+ATT",
+    "CNN+ATT",
+    "选择性注意力",
+    "Selective Attention",
+    "句子级注意力",
+    "Sentence-level Attention",
+    "多示例注意力"
+  ],
+  "problem": "远程监督自动生成的训练包里，很多句子其实并不表达目标关系；PCNN只从每个包中挑一句「最可能的」来训练，又丢掉了包里其他真正有用的句子。",
+  "idea": "用卷积网络把包里每个句子编码成向量，再以关系为查询，对包内所有句子做注意力加权：表达该关系的句子权重高，噪声句子权重低，用加权和代表整个实体对。",
+  "impact": "在纽约时报-Freebase基准上明显优于只取一句和简单平均的做法，PCNN+ATT成为此后几年远程监督关系抽取的标准基线，作者团队的OpenNRE工具包也被广泛使用。",
+  "background": "[[distant-supervision]]用知识库自动标注句子，[[riedel-mil]]提出「至少一句表达关系」的多示例假设。[[pcnn]]（Zeng等，2015）用分段卷积网络编码句子，并在多示例学习中每个包只选得分最高的一句参与训练。这样虽然避开了大量噪声句，但一个实体对往往有多句都在表达关系，只取一句浪费了信息；而直接对所有句子取平均又会把噪声也平均进来。[[bahdanau-attention]]已在翻译中证明，注意力可以学会对一组向量做软选择。",
+  "method": "**句子编码。** 每个句子x_i经过词向量和位置向量（每个词到两个实体的相对距离）输入，用CNN或分段最大池化的PCNN编码成向量 **x**_i。\n\n**选择性注意力。** 实体对(h, t)的包里有n个句子。对候选关系r，给每个句子打分 `e_i = x_iᵀ A r`，其中r是关系r的查询向量、A是对角权重矩阵；归一化 `α_i = exp(e_i) / Σ_k exp(e_k)`；包的表示 `s = Σ_i α_i x_i`。\n\n**分类。** `o = M s + d`，经softmax得到各关系的条件概率，以交叉熵在包级别上训练；测试时对每个关系分别计算注意力，因此同一包对不同关系可以关注不同的句子。\n\n作者比较三种包表示：ONE（只取一句，即PCNN原做法）、AVE（所有句子平均，相当于均匀注意力）和ATT（选择性注意力）。",
+  "results": "在NYT-Freebase数据上，以留出评估的精确率-召回率曲线和P@N比较，CNN+ATT与PCNN+ATT都优于对应的ONE和AVE版本（论文报告，具体数字未逐项核对）；摘要称模型能充分利用每个实体对的所有句子并有效减轻错误标注的影响。",
+  "legacy": "随后的工作在此基础上加入关系之间的层次结构、对抗训练、强化学习选句、预训练语言模型编码器等；也有研究指出NYT数据的留出评估本身噪声很大，并构建人工标注的测试集重新评估。监督关系抽取转向TACRED（2017）这类人工标注数据集后，远程监督主要作为预训练或数据增强手段继续使用。",
+  "limits": [
+    {
+      "text": "注意力只能在包内重新加权，若一个包里没有任何句子真正表达该关系（整包都是错误标注），仍无法纠正。",
+      "solved_by": []
+    },
+    {
+      "text": "以NYT留出数据的自动标签评估，测试标签本身有大量噪声，报告的提升未必反映真实精度。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "pcnn",
+      "type": "solves",
+      "note": "PCNN每个包只取一句训练、浪费其余句子；选择性注意力对所有句子加权，噪声句权重低、有效句都能贡献。"
+    },
+    {
+      "to": "riedel-mil",
+      "type": "extends",
+      "note": "沿用多示例学习的「包」设定，把硬的「至少一句」选择改为软的注意力加权。"
+    },
+    {
+      "to": "bahdanau-attention",
+      "type": "uses",
+      "note": "用以关系为查询的注意力机制在包内句子之间做软选择。"
+    },
+    {
+      "to": "distant-supervision",
+      "type": "solves",
+      "note": "缓解远程监督自动标注带来的错误标签问题。"
+    }
+  ],
+  "prereq": [
+    "conv-layer",
+    "attention-concept",
+    "softmax",
+    "embedding",
+    "cross-entropy"
+  ],
+  "terms": [
+    {
+      "t": "包（bag）",
+      "d": "远程监督中同一实体对的所有句子组成的集合，标签给在包上而不是单个句子上。"
+    },
+    {
+      "t": "位置向量",
+      "d": "表示句中每个词到两个目标实体的相对距离的向量，让卷积网络知道实体在哪儿。"
+    }
+  ],
+  "learn": "先读[[distant-supervision]]、[[riedel-mil]]和[[pcnn]] → 读原文第3节注意力公式 → 动手：用OpenNRE在NYT数据上分别训练ONE、AVE、ATT三种包表示，比较精确率-召回率曲线，并查看一个包里各句的注意力权重。",
+  "check": {
+    "source": "https://aclanthology.org/P16-1200/",
+    "confirmed": "OpenAlex：标题、作者Lin、Shen、Liu、Luan、Sun、ACL 2016、DOI 10.18653/v1/p16-1200；摘要：远程监督关系抽取广泛用于发现新的关系事实、但不可避免伴随错误标注问题、提出基于句子级注意力的模型、用卷积神经网络编码句子语义、在多个实例上建立句子级注意力以动态降低噪声实例的权重、在真实数据集上实验显示能充分利用所有句子。注意力打分公式、ONE/AVE/ATT对比、NYT数据与评估方式、OpenNRE与后续工作凭一般了解；作者机构凭一般了解。"
+  }
+}

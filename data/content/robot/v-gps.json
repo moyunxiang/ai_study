@@ -1,0 +1,32 @@
+{
+  "id": "v-gps",
+  "who": "Mitsuhiko Nakamoto, Oier Mees, Aviral Kumar, Sergey Levine · UC Berkeley、卡内基梅隆大学",
+  "venue": "arXiv 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2410.13816"},
+    {"label": "项目主页", "url": "https://nakamotoo.github.io/V-GPS"}
+  ],
+  "aka": ["V-GPS", "VGPS", "Value-Guided Policy Steering", "价值引导策略操控", "价值函数重排序动作", "用价值函数引导通用策略"],
+  "problem": "通用机器人策略的训练数据质量参差不齐，人采示范本身不完美，数据越大越难筛；想改进它又往往要重新微调甚至拿不到权重。",
+  "idea": "不动策略本身：用离线RL单独训练一个语言条件的Q函数，部署时让通用策略采样多个候选动作，选Q值最高的那个执行。",
+  "impact": "同一个价值函数提升了五个架构、训练数据各不相同的通用策略，覆盖12个任务；真机上Octo-small-1.5的平均成功率从0.24提到0.44。",
+  "method": "**卡在哪**：[[octo]]、[[openvla]]等通用策略在大规模混合数据上做[[c:imitation-learning]]，它们模仿的是“数据里的平均行为”，示范中的犹豫、失误也一并学了进去。用RL微调能纠正，但需要访问和改动大模型权重，代价高，有些策略还是闭源的。\n\n**做法**：V-GPS在[[bridgedata-v2]]和Google的Fractal数据混合上，用[[cal-ql]]训练一个以语言指令为条件的Q函数（ResNet-34图像编码器，语言特征通过FiLM注入，动作拼接后过两层MLP）。奖励设计很简单：每条示范最后3步视为成功，其余为失败。部署时，通用策略对当前观测采样K个候选动作，Q函数给每个打分，取最高分（或按温度做softmax采样）执行。整个过程只需要能从策略采样，不需要策略的梯度或权重，可以视为一种测试时计算：多采几个、挑好的。附录显示把Cal-QL换成[[iql]]也有效。\n\n**结果**：在五个策略（Octo-small、Octo-base、Octo-small-1.5、[[rt-1]]的跨形态版RT-1-X、OpenVLA）上测试，12个任务包括WidowX真机3个场景的6个任务和[[simpler]]仿真的6个任务。真机上Octo-small-1.5平均成功率从0.24到0.44，相对提升82.8%；仿真中五个策略全部提升，例如Octo-small从0.27到0.34，OpenVLA从0.24到0.27。",
+  "limits": [
+    {"text": "只能在通用策略给出的候选动作里挑，策略本身没有变好；如果候选里没有好动作，价值函数也无能为力。", "solved_by": []},
+    {"text": "每一步要多次采样并计算Q值，推理开销随K线性增加；Q函数在训练数据之外的场景是否可靠没有保证，对OpenVLA的提升也较小。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "cal-ql", "type": "uses", "note": "用Cal-QL在离线数据上训练语言条件Q函数。"},
+    {"to": "octo", "type": "extends", "note": "不改Octo的权重，靠部署时重排序它的动作提高成功率，Octo-small-1.5真机提升最明显。"},
+    {"to": "openvla", "type": "extends", "note": "同一个价值函数也用来引导OpenVLA，仿真平均成功率0.24→0.27。"},
+    {"to": "simpler", "type": "uses", "note": "在SIMPLER的WidowX和Google Robot任务上做仿真评测。"},
+    {"to": "bridgedata-v2", "type": "uses", "note": "价值函数在BridgeData V2与Fractal数据混合上训练。"}
+  ],
+  "prereq": ["policy-value", "offline-rl", "td-error", "imitation-learning", "vla-concept"],
+  "terms": [
+    {"t": "策略操控（steering）", "d": "不重新训练策略，只在执行时改变它从哪些候选中选动作，以此改善行为。"},
+    {"t": "FiLM", "d": "一种条件注入方式：用条件（如语言指令）算出缩放和平移系数，逐通道调制图像特征。"}
+  ],
+  "learn": "先读[[cal-ql]]了解离线Q学习，再看原文第4节的采样-重排序流程，最后看真机与SIMPLER结果表。",
+  "check": {"source": "https://arxiv.org/abs/2410.13816", "confirmed": "标题、4位作者、v1日期2024-10-17、摘要中五个策略、12个任务、无需访问权重；HTML v2：机构、Cal-QL（附录IQL）、Bridge V2+Fractal、ResNet-34+FiLM+MUSE、末3步奖励、K∈{10,50}、真机0.24→0.44（82.8%）、仿真Octo-small 0.27→0.34、OpenVLA 0.24→0.27。"}
+}

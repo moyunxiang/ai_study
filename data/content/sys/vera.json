@@ -1,0 +1,23 @@
+{
+ "id": "vera",
+ "who": "Dawid J. Kopiczko, Tijmen Blankevoort, Yuki M. Asano · 阿姆斯特丹大学, 高通AI研究院",
+ "venue": "ICLR 2024",
+ "aka": ["VeRA", "Vector-based Random Matrix Adaptation", "随机矩阵适配", "共享随机投影"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2310.11454"}
+ ],
+ "problem": "LoRA已把可训练参数降到千分之一级别，但要给成千上万个用户或任务各存一份适配器时，存储和加载开销仍然可观，模型越大越明显。",
+ "idea": "所有层共用一对随机初始化后冻结的低秩矩阵A和B，每层只学习两个很小的缩放向量，分别缩放B的输出维度和A的秩维度。",
+ "impact": "把参数高效微调的可训练参数再压低一个数量级以上，同时性能与LoRA相当，被Hugging Face PEFT库收录，是“更省参数的LoRA变体”这一支的代表。",
+ "method": "[[lora]]给每个权重W加上一个低秩更新 `ΔW = BA`，每层都有自己的A、B要训练和存储。有研究发现，随机初始化并冻结的投影本身已经有相当的表达能力，真正需要学习的可能只是怎样缩放它们。\n\nVeRA据此把更新写成 `ΔW = Λ_b B Λ_d A`：A（r×n）和B（m×r）用随机数初始化后冻结，并且**所有层共享同一对**（只需存一个随机种子就能重新生成）；每层只训练两个向量——长度为r的d（构成对角矩阵Λ_d，缩放秩维度）和长度为m的b（构成Λ_b，缩放输出维度）。由于A、B不用训练也不用逐层存储，VeRA可以把秩r取得比LoRA大得多，而可训练参数仍然极少。初始化时b取0，使训练开始时 `ΔW = 0`，与LoRA的做法一致。\n\n摘要报告：可训练参数相比LoRA显著减少而性能相当，在GLUE、E2E、图像分类任务上验证，并用于7B和13B语言模型的指令微调。",
+ "limits": [
+  {"text": "表达能力受限于共享的随机子空间，在需要大幅改变模型行为的任务上可能不如LoRA；更大的秩也增加了前向计算量。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "lora", "type": "solves", "note": "LoRA每层都要训练和存储A、B，VeRA让所有层共享冻结的随机A、B，只学两个缩放向量。"},
+  {"to": "ia3", "type": "extends", "note": "与(IA)³一样只学习缩放向量，但把缩放作用在共享随机低秩投影上。"},
+  {"to": "llama-2", "type": "uses", "note": "在7B和13B语言模型上做指令微调实验。"}
+ ],
+ "prereq": ["low-rank", "peft-concept", "pretrain-finetune", "instruction-tuning"],
+ "check": {"source": "https://arxiv.org/abs/2310.11454", "confirmed": "标题、三位作者、v1日期2023-10-17；摘要：LoRA在扩展到更大模型或部署大量每用户/每任务适配模型时面临存储挑战、VeRA相比LoRA显著减少可训练参数且性能相同、使用跨所有层共享的一对低秩矩阵并学习小的缩放向量、在GLUE、E2E、图像分类上验证、用于7B和13B语言模型的指令微调。公式形式、b初始化为0、随机矩阵冻结、ICLR 2024、机构、所用模型为Llama 2、被PEFT库收录为一般了解。"}
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Accel-Sim GPU模拟框架（2020） · AI脉络</title>
+<meta name="description" content="学术界研究GPU主要靠，但它模拟的是虚拟指令集PTX和较老的硬件；工业界的新GPU细节不公开，cuDNN等闭源库也没有PTX可供执行，研究者的基线假设越来越落后。 做三件事：新增一个前端，直接以NVIDIA原生机器指令（SASS）的执行轨迹驱动模拟；大幅更新GPGPU-Sim的性能模型；再配一套微…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/accel-sim.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Accel-Sim GPU模拟框架（2020）">
+<meta property="og:description" content="学术界研究GPU主要靠，但它模拟的是虚拟指令集PTX和较老的硬件；工业界的新GPU细节不公开，cuDNN等闭源库也没有PTX可供执行，研究者的基线假设越来越落后。 做三件事：新增一个前端，直接以NVIDIA原生机器指令（SASS）的执行轨迹驱动模拟；大幅更新GPGPU-Sim的性能模型；再配一套微…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/accel-sim.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/accel-sim">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:72"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/hw.html">硬件与算力</a> › GPU通用计算</div>
+<h1>Accel-Sim GPU模拟框架</h1>
+<div class="full">Accel-Sim: An Extensible Simulation Framework for Validated GPU Modeling</div>
+<div class="meta"><span>2020.05</span><span>论文</span><span>延伸</span><span>ISCA 2020</span><span>Mahmoud Khairy, Zhesheng Shen, Tor M. Aamodt, Timothy G. Rogers · 普渡大学 / 英属哥伦比亚大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1109/ISCA45697.2020.00047" rel="noopener">IEEE DOI ↗</a><a class="btn sm" href="../index.html#/n/accel-sim">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>学术界研究GPU主要靠<a class="ln" href="../n/gpgpu-sim.html">GPGPU-Sim GPU模拟器</a>，但它模拟的是虚拟指令集PTX和较老的硬件；工业界的新GPU细节不公开，cuDNN等闭源库也没有PTX可供执行，研究者的基线假设越来越落后。</p></div><div><h4>方法</h4><p>做三件事：新增一个前端，直接以NVIDIA原生机器指令（SASS）的执行轨迹驱动模拟；大幅更新GPGPU-Sim的性能模型；再配一套微基准和自动相关性分析，方便快速对照真实GPU校准。</p></div><div><h4>影响</h4><p>成为GPGPU-Sim的继任框架，此后学术界的GPU体系结构研究大多在Accel-Sim上建模和对比。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>论文的出发点是：体系结构的重要创新常来自工业界，但工业界的模拟器不开放，设计细节也不公开，学术研究必须不断检查自己对当代处理器的假设是否仍然成立。</p><p>Accel-Sim提供三种机制。其一是新前端：用真实GPU运行程序、记录原生机器指令SASS的轨迹，再交给模拟器重放（trace-driven），这样换一代硬件只需换指令描述，也能模拟没有PTX代码的闭源手调内核；同时保留基于虚拟指令PTX的执行驱动模式。其二是大幅更新GPGPU-Sim的性能模型，提高细节程度、可配置性和准确性。其三是一套验证基础设施：全面的微基准和自动绘制相关性图，使建模过程更快。</p><p>在80个负载、1945个内核实例上，Accel-Sim把周期误差降低了79个百分点；它还模拟了DeepBench中60个负载、11,440个内核实例——这些内核是闭源手调的，其他开源模拟器无法运行。作者逐个硬件计数器对照真实GPU做了验证，并用两个案例说明落后于工业界的基线假设会掩盖新的研究机会、导致错误的设计决策。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍是单GPU、逐周期模拟，速度慢；多GPU、NVLink互连和整机柜级系统需要另外扩展。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:72" href="../n/v100.html">V100与Tensor Core</a><span class="yr">2017.05 · 硬件</span><div class=nt>以Volta等当代NVIDIA GPU作为校准与验证对象。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:72" href="../n/gpgpu-sim.html">GPGPU-Sim GPU模拟器</a><span class="yr">2009.04 · 硬件</span><div class=nt>在GPGPU-Sim基础上加入SASS轨迹前端、更新性能模型和验证设施。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:72" href="../n/cudnn.html">cuDNN</a><span class="yr">2014.09 · 硬件</span><div class=nt>cuDNN等闭源库的手调内核没有PTX，旧模拟器跑不了，SASS轨迹驱动让它们也能被模拟。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/chip-basics.html">晶体管、制程与摩尔定律</a> <a class="chip c" href="../c/benchmark.html">基准、排行榜与SOTA</a></p>
+<h2>本篇术语</h2><ul><li><b>PTX与SASS</b>　PTX是NVIDIA公开的虚拟指令集，编译时再翻译成各代GPU真正执行的机器指令SASS；SASS的细节NVIDIA不公开。</li><li><b>trace驱动模拟</b>　先在真实机器上记录程序执行的指令序列，再让模拟器按这个序列重放，而不是从头执行程序。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/gpgpu-sim.html">GPGPU-Sim GPU模拟器</a>了解GPU模拟器的基本结构；再读本文第2节的前端设计，理解为什么换成SASS轨迹后能模拟cuDNN内核。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1109/ISCA45697.2020.00047" rel="noopener">https://doi.org/10.1109/ISCA45697.2020.00047</a>（OpenAlex核对标题、4位作者与单位（普渡、英属哥伦比亚大学）、ISCA 2020与摘要：工业界模拟器不公开、SASS原生指令trace驱动前端并保留PTX执行驱动、更新GPGPU-Sim性能模型、微基准与自动相关性绘图、80个负载1945个内核实例周期误差降低79个百分点、DeepBench 60个负载11,440个内核实例、两个案例研究。以Volta为校准对象和“成为学术界主流框架”的说法按一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Accel-Sim%20GPU%E6%A8%A1%E6%8B%9F%E6%A1%86%E6%9E%B6%EF%BC%88accel-sim%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aaccel-sim%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/accel-sim.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ms-openai-sc.html"><small>本分支上一个 · 2020.05</small><b>微软为OpenAI建的超算</b></a><a class="r" href="a100.html"><small>本分支下一个 · 2020.05</small><b>A100</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

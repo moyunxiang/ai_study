@@ -1,0 +1,23 @@
+{
+ "id": "mirostat",
+ "who": "Sourya Basu, Govardana Sachitanandam Ramachandran, Nitish Shirish Keskar, Lav R. Varshney · 伊利诺伊大学厄巴纳-香槟分校, Salesforce Research",
+ "venue": "ICLR 2021",
+ "aka": ["Mirostat", "困惑度控制采样", "自适应top-k", "boredom trap", "confusion trap", "无聊陷阱", "混乱陷阱"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2007.14966"}
+ ],
+ "problem": "top-k、top-p和温度采样都要手调参数，调小了文本越写越重复，调大了越写越乱，而且没人说得清这些参数到底控制了输出的什么统计量。",
+ "idea": "先分析不同采样方式下生成文本的困惑度如何随参数变化，再设计一个带反馈的自适应top-k：每生成一个词就测一下实际的“意外程度”，自动调大或调小k，让整段文本的困惑度稳定在预先设定的目标值。",
+ "impact": "把“直接控制输出困惑度”变成一种采样思路，llama.cpp等本地推理工具内置了Mirostat采样选项。",
+ "method": "[[nucleus-sampling]]指出纯随机采样会采到长尾里的离谱词，于是截掉低概率尾部；但截多少靠手调。论文在词频服从齐普夫分布的假设下推导：top-p采样时交叉熵大致随p线性变化，top-k时随k非线性变化。实验发现，k或p较小时，生成越长困惑度越低，伴随大量重复（论文称“无聊陷阱”）；k或p较大时，困惑度随长度上升，文本变得不连贯（“混乱陷阱”）。\n\nMirostat像一个温控器：设定目标意外度 `τ`（每个词的目标信息量，`−log p`），生成每个词后计算它的实际意外度，与 `τ` 的差值按学习率反馈去调整截断阈值 `μ`，下一个词只从意外度不超过 `μ` 的候选里采样。于是无论文本多长，困惑度都保持在目标附近。\n\n摘要报告：交叉熵与生成文本的重复程度近似线性相关，因此控制困惑度也就控制了重复；人工评分在流畅性、连贯性和质量上验证了这一点。",
+ "limits": [
+  {"text": "目标困惑度仍要人为设定，且只控制平均信息量，不保证每一步选出的词符合人类说话时的信息分布。", "solved_by": ["typical-sampling", "min-p"]}
+ ],
+ "relations": [
+  {"to": "nucleus-sampling", "type": "solves", "note": "核采样的p需要手调、对输出统计量没有直接控制，Mirostat用反馈自动调节截断，使困惑度稳定在目标值。"},
+  {"to": "gpt-2", "type": "uses", "note": "以GPT-2这类语言模型的开放式生成为实验对象。"}
+ ],
+ "prereq": ["decoding-sampling", "perplexity", "entropy", "language-model"],
+ "terms": [{"t": "意外度", "d": "一个词的信息量 −log p，模型越没料到这个词，它的意外度越高；整段平均后就是交叉熵。"}],
+ "check": {"source": "https://arxiv.org/abs/2007.14966", "confirmed": "标题、四位作者、v1日期2020-07-29；摘要：top-k、top-p与温度采样需调参且是临时做法、齐普夫统计下top-p交叉熵近似随p线性而top-k随k非线性、基于反馈的自适应top-k算法mirostat生成预定困惑度的文本、小k/p时困惑度随长度下降伴随重复（boredom trap）、大k/p时上升伴随不连贯（confusion trap）、交叉熵与重复近似线性、人工评分验证。反馈更新规则细节、ICLR 2021、机构、llama.cpp内置为一般了解。"}
+}

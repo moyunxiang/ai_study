@@ -1,0 +1,32 @@
+{
+  "id": "spark-tts",
+  "who": "Xinsheng Wang, Mingqi Jiang, Ziyang Ma, Ziyu Zhang, Songxiang Liu, Linqin Li, Zheng Liang, Qixi Zheng et al. · 香港科技大学、上海交通大学等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2503.01710"},
+    {"label": "GitHub", "url": "https://github.com/SparkAudio/Spark-TTS"}
+  ],
+  "problem": "基于大语言模型的零样本TTS大多要多阶段处理（LLM出语义token、再用流匹配或扩散补声学细节），或者要同时预测多个码本，结构复杂、效率低，也不方便与通用LLM整合。",
+  "idea": "设计一个单码本的语音编解码器BiCodec，把语音拆成两类token：低码率的语义token表示内容，固定长度的全局token表示说话人属性；LLM（Qwen2.5）直接预测这两类token，BiCodec一步还原波形。",
+  "impact": "Spark-TTS以只用一个LLM、单流token的极简结构做到了有竞争力的零样本克隆，并能按性别、音高、语速等属性「捏」出新声音；开源后在社区里被大量使用和二次开发。",
+  "method": "[[cosyvoice-2]]等系统用LLM生成语义token，再由流匹配模型补上声学细节，属于两阶段；[[vall-e]]系列则要预测多层残差码本。[[llasa]]已经尝试用单层码本和纯LLM完成合成。\n\nSpark-TTS的核心是编解码器**BiCodec**：它把一段语音编码成两种互补的离散token——**语义token**码率低、随时间变化，主要承载说的内容；**全局token**数量固定，与语音长度无关，承载音色、性别、风格等说话人属性。生成时，[[qwen2.5]]按文本（和可选的属性说明）先预测全局token，再预测语义token，BiCodec解码器直接把两者合成波形，不需要额外的声学模型。论文把先预测粗粒度属性（性别、风格）、再预测细粒度数值（具体音高、语速）、最后生成token的过程称为**思维链式生成**（借用[[cot]]的说法），从而支持不用参考录音、按属性描述直接创造新声音。\n\n作者同时发布了VoxBox：一个10万小时、带完整属性标注的语料。摘要称Spark-TTS在零样本克隆上达到当时最好的水平，并能生成超出参考录音限制的高度定制化声音；代码、预训练模型和示例全部开源。",
+  "limits": [
+    {"text": "单码本、低码率的语义token牺牲了一部分声学细节，在情感丰富或非常规发声的语音上表现有限。", "solved_by": []},
+    {"text": "自回归LLM生成仍有吞字、重复等稳定性问题，长文本需要分段。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "qwen2.5", "type": "uses", "note": "以Qwen2.5作为预测语音token的语言模型。"},
+    {"to": "cosyvoice-2", "type": "solves", "note": "CosyVoice 2需要LLM加流匹配两阶段；Spark-TTS用单流解耦token让LLM输出可直接解码为波形。"},
+    {"to": "llasa", "type": "rivals", "note": "同为单码本加纯LLM的TTS；Llasa研究训练和推理的扩展规律，Spark-TTS侧重把说话人属性解耦为全局token以便控制。"},
+    {"to": "cot", "type": "uses", "note": "借用思维链的说法：先预测属性、再预测具体数值、最后生成token。"}
+  ],
+  "prereq": ["vector-quantization", "language-model", "autoregressive", "zero-few-shot", "vocoder-codec"],
+  "terms": [
+    {"t": "全局token", "d": "数量固定、与语音长短无关的离散码，用来概括整段语音的说话人属性。"},
+    {"t": "单流token", "d": "每个时间步只有一个离散码（只用一个码本），LLM可以像生成文字一样逐个生成。"}
+  ],
+  "aka": ["Spark-TTS", "BiCodec", "VoxBox", "单流解耦语音token"],
+  "check": {
+    "source": "https://arxiv.org/abs/2503.01710",
+    "confirmed": "arXiv官方记录：标题Spark-TTS: An Efficient LLM-Based Text-to-Speech Model with Single-Stream Decoupled Speech Tokens、Wang等25位作者、v1提交2025-03-03；摘要中多阶段或多码本的局限、BiCodec单流、低码率语义token与固定长度全局token、Qwen2.5、CoT生成、粗粒度与细粒度控制、VoxBox 10万小时、零样本克隆SOTA、开源。生成顺序细节、机构、社区使用情况为一般了解。"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "id": "vita-audio",
+  "who": "Zuwei Long, Yunhang Shen, Chaoyou Fu, Heting Gao, Lijiang Li, Peixian Chen, Mengdan Zhang, Hang Shao et al. · 腾讯优图、南京大学等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2505.03739"},
+    {"label": "GitHub", "url": "https://github.com/VITA-MLLM/VITA-Audio"}
+  ],
+  "problem": "端到端语音大模型在流式对话时，生成第一个音频token要等很久：模型通常先吐出一段文字，再逐个生成音频token，首包延迟成了部署瓶颈。",
+  "idea": "在大模型上加轻量的多跨模态token预测（MCTP）模块，一次前向就能产出多个音频token，并用四阶段渐进训练在提速的同时尽量不损失音质。",
+  "impact": "官方称它是第一个在第一次前向就能输出音频的多模态大模型；7B规模推理提速3–5倍，且全部用开源数据训练、可复现，为降低语音对话首包延迟提供了一种做法。",
+  "method": "[[mini-omni]]、[[llama-omni]]、[[glm-4-voice]]这类端到端语音对话模型让一个LLM同时产生文字和音频token。为了让声音和内容对得上，常见做法是文字先行、音频token随后交错生成。但LLM每次前向只出一个token，而一秒语音需要几十个音频token，所以要等很多步才能播放第一段声音。\n\nVITA-Audio的核心是**MCTP（Multiple Cross-modal Token Prediction）模块**：在主干LLM的隐藏状态后面接几个轻量预测头，每个头根据主干输出和前一个头的结果预测下一个音频token，于是一次前向就能得到多个音频token。思路类似文本里的[[multi-token-prediction]]，但这里预测的是跨模态的音频token：文本token已经决定了要说什么，音频token主要是把它「读出来」，局部依赖较强，适合用轻量模块补齐。\n\n训练分四个阶段逐步加入MCTP模块，以尽量少损失语音质量换取加速。摘要报告：7B规模推理提速3–5倍，在ASR、TTS和语音问答多个基准上明显优于同规模开源模型。",
+  "limits": [
+    {"text": "仍是半双工的轮流对话，不能边听边说、处理打断。", "solved_by": ["personaplex"]},
+    {"text": "MCTP模块按固定步数预测，多个音频token一次生成在情感、韵律复杂的句子上可能损失质量。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mini-omni", "type": "solves", "note": "Mini-Omni类模型文字先行、逐个生成音频token，首包延迟高；VITA-Audio一次前向产出多个音频token。"},
+    {"to": "multi-token-prediction", "type": "extends", "note": "把多token预测的思路用到跨模态的音频token上。"},
+    {"to": "glm-4-voice", "type": "rivals", "note": "同为文本与语音token交错生成的端到端语音对话模型，作为同规模开源基线比较。"},
+    {"to": "vita-1.5", "type": "extends", "note": "同一团队VITA系列的语音方向工作，专门解决语音输出的延迟。"}
+  ],
+  "prereq": ["autoregressive", "language-model", "throughput-latency", "tokenization", "vocoder-codec"],
+  "terms": [
+    {"t": "首包延迟", "d": "从用户说完到系统开始播放第一段回答声音的时间。"},
+    {"t": "MCTP", "d": "多跨模态token预测模块：主干LLM一次前向后，由几个轻量头依次预测多个音频token。"}
+  ],
+  "aka": ["VITA-Audio", "MCTP", "多跨模态token预测", "低延迟语音大模型"],
+  "check": {
+    "source": "https://arxiv.org/abs/2505.03739",
+    "confirmed": "arXiv官方记录：标题VITA-Audio: Fast Interleaved Cross-Modal Token Generation for Efficient Large Speech-Language Model、Long等14位作者、v1提交2025-05-06；摘要中首个音频token延迟高的问题、轻量MCTP模块单次前向生成多个音频token、四阶段渐进训练、宣称首个在第一次前向就生成音频的MLLM、只用开源数据、7B规模提速3~5倍、ASR/TTS/SQA基准优于同规模开源模型。MCTP的级联头结构、机构、与VITA-1.5的关系为一般了解。"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "id": "simulst",
+  "who": "Xutai Ma, Juan Pino, Philipp Koehn · 约翰斯·霍普金斯大学、Facebook AI",
+  "venue": "AACL 2020",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2011.02048"
+    }
+  ],
+  "problem": "同声翻译要求边听边译。文本同传已有wait-k、单调多头注意力等「什么时候读、什么时候写」的策略，但它们以词为单位做决策；语音输入是连续的帧，没有现成的词边界。",
+  "idea": "在端到端语音翻译模型里加一个「预决策」模块：先把连续的语音帧切成段（固定长度或按预测的边界灵活切），每到一段末尾才调用文本同传的读写策略，从而把wait-k和单调注意力搬到语音上。",
+  "impact": "把文本同传的读写策略系统地接到端到端语音翻译上，并提出考虑计算时间的延迟指标；代码随fairseq公开，此后的流式语音翻译工作常沿用这套预决策加读写策略的分析框架。",
+  "method": "文本同传的经典策略有两类：**固定策略**如wait-k，先读k个词，之后每读一个词写一个词；**灵活策略**如单调多头注意力，由模型自己学什么时候停下来输出。它们都以源语言的「词」为读写单位。可端到端语音翻译（如[[seq2seq-st]]）的输入是每10毫秒一帧的声学特征，一个词可能对应几十帧，没有现成的分界。\n\n作者加了一个**预决策模块**，决定在哪些帧位置值得做一次读写决策：\n- **固定预决策**：每隔固定数量的帧（例如若干百毫秒）做一次决策；\n- **灵活预决策**：只在源语言的词或音素边界处做决策；论文用的是由对齐得到的理想（oracle）边界，用来研究按词边界决策的潜力。\n\n在每个决策点上，再用文本的读写策略（wait-k或单调多头注意力）决定是继续听还是输出一个目标词。论文分析了四种组合（固定或灵活预决策 × 固定或灵活策略）下延迟和质量的权衡，并在Average Lagging（平均滞后）的基础上设计了**考虑计算时间的延迟指标**：除了等待输入的时间，还把模型计算本身花的时间计入延迟。",
+  "limits": [
+    {
+      "text": "只输出文字译文，没有直接生成译语语音；同声语音到语音翻译要等后续工作。",
+      "solved_by": [
+        "streamspeech",
+        "hibiki"
+      ]
+    },
+    {
+      "text": "读写策略和翻译模型分开设计，策略较为启发式，延迟与质量的平衡需要人工调参。",
+      "solved_by": [
+        "seamless"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "seq2seq-st",
+      "type": "extends",
+      "note": "在端到端直接语音翻译模型上加入同声传译的读写决策。"
+    },
+    {
+      "to": "transformer",
+      "type": "uses",
+      "note": "翻译模型与单调多头注意力都基于Transformer。"
+    }
+  ],
+  "prereq": [
+    "encoder-decoder",
+    "attention-concept",
+    "throughput-latency",
+    "text-metrics"
+  ],
+  "terms": [
+    {
+      "t": "wait-k",
+      "d": "同传的固定读写策略：先读入k个源词，之后每读一个源词就输出一个目标词。"
+    },
+    {
+      "t": "Average Lagging",
+      "d": "平均滞后，衡量同传系统输出每个词时比理想的同步翻译落后了多少输入。"
+    }
+  ],
+  "aka": [
+    "SimulST",
+    "端到端同声语音翻译",
+    "simultaneous speech translation",
+    "预决策模块"
+  ],
+  "check": {
+    "source": "https://arxiv.org/abs/2011.02048",
+    "confirmed": "arXiv官方记录：标题SimulMT to SimulST: Adapting Simultaneous Text Translation to End-to-End Simultaneous Speech Translation、Ma/Pino/Koehn三位作者、v1提交2020-11-03；摘要中把wait-k与单调多头注意力等文本同传方法适配到端到端同声语音翻译、引入预决策模块、固定与灵活预决策和固定与灵活策略组合的延迟-质量分析、基于Average Lagging的计算感知延迟指标。另读PDF正文确认：代码在fairseq仓库公开、作者含约翰斯·霍普金斯大学、灵活预决策使用词或音素级的oracle边界、平均词长约271ms。后续工作的沿用、Facebook机构与AACL 2020为一般了解。"
+  }
+}

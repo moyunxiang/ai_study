@@ -1,0 +1,31 @@
+{
+  "id": "e3b",
+  "who": "Mikael Henaff, Roberta Raileanu, Minqi Jiang, Tim Rocktäschel · Meta AI / UCL",
+  "venue": "NeurIPS 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2210.05805"}
+  ],
+  "problem": "RIDE、NovelD等方法在每局不同的环境里有效，关键其实是其中的“按局计数”项；但计数需要判断状态是否相同，在状态空间巨大、带噪声的真实场景里失效。",
+  "idea": "把局内计数推广到连续空间：用逆动力学模型学一个只保留可控信息的嵌入，按本局已见嵌入的协方差构造一个椭圆，新状态的嵌入离这个椭圆越远，奖励越大（E3B）。",
+  "impact": "成为MiniHack、Habitat等复杂环境中局内探索的强基线，并把“椭圆奖励”这一来自线性老虎机的工具带进深度探索。",
+  "method": "论文先做分析：去掉RIDE、AGAC、NovelD中“按局计数”那一项后，它们在程序化环境里几乎都失效，说明真正起作用的是局内新颖性。但计数只适合离散、少噪声的状态。\n\nE3B（Exploration via Elliptical Episodic Bonuses）的做法：\n\n- 用逆动力学模型（由 `φ(s_t)`、`φ(s_(t+1))` 预测动作）训练嵌入φ，只保留与智能体动作有关的信息，过滤掉噪声；\n- 每局开始时令 `C_0 = λI`，每步把当前嵌入加入：`C_t = C_(t−1) + φ(s_t)φ(s_t)ᵀ`；\n- 内在奖励是椭圆范数：`b(s_t) = φ(s_t)ᵀ C_(t−1)^(−1) φ(s_t)`。\n\n当φ是独热向量时，这个奖励退化为 `1/(N+λ)`，正是按局计数；一般情况下，它衡量新嵌入在本局已见嵌入张成的方向上有多“新”，与[[linucb]]等线性老虎机里的置信椭圆是同一个量。协方差的逆可以用Sherman–Morrison公式每步增量更新。\n\n摘要称E3B在MiniHack的16个困难任务上取得新的最好成绩，不需要针对任务的归纳偏置；在稀疏奖励的像素VizDoom上与现有方法相当，在Habitat的无奖励探索上优于现有方法。",
+  "limits": [
+    {"text": "只奖励局内新颖性，不跨局累积，对需要长期系统性覆盖整个环境的任务帮助有限。"},
+    {"text": "嵌入由逆动力学决定，与任务无关的可控因素（如反复开关一个无关的灯）仍会被奖励。", "solved_by": ["motif"]}
+  ],
+  "relations": [
+    {"to": "ride", "type": "solves", "note": "RIDE依赖离散的局内计数；E3B用椭圆奖励把计数推广到连续嵌入。"},
+    {"to": "linucb", "type": "uses", "note": "奖励就是线性老虎机中置信椭圆的宽度。"},
+    {"to": "icm", "type": "uses", "note": "用逆动力学模型学只保留可控因素的嵌入。"},
+    {"to": "ngu", "type": "rivals", "note": "NGU用局内k近邻记忆衡量新颖性，E3B用协方差椭圆。"},
+    {"to": "nle", "type": "uses", "note": "在基于NetHack的MiniHack任务上评测。"}
+  ],
+  "prereq": ["exploration-exploitation", "covariance", "embedding", "reward-design"],
+  "terms": [
+    {"t": "椭圆奖励（elliptical bonus）", "d": "`φᵀC⁻¹φ`：新特征在已见特征协方差下的“马氏长度”，方向越少见值越大。"},
+    {"t": "逆动力学模型", "d": "根据前后两个状态预测中间执行了什么动作的模型。"}
+  ],
+  "learn": "先懂[[linucb]]的置信椭圆和[[icm]]；读E3B原文第3节的消融分析与第4节方法；在MiniHack的一个迷宫任务上对比RIDE与E3B。",
+  "check": {"source": "https://arxiv.org/abs/2210.05805", "confirmed": "标题、四位作者、arXiv v1于2022-10-11；摘要中已有方法的效果关键依赖按局计数项、在状态空间大且有噪声时失效、E3B把局内计数推广到连续空间、用逆动力学模型学嵌入、MiniHack的16个任务新最好且无需任务特定归纳偏置、像素VizDoom相当、Habitat无奖励探索更好。椭圆奖励公式与独热时退化为计数的性质按原文正文通行描述；NeurIPS 2022与单位按通行引用。"},
+  "aka": ["E3B", "Exploration via Elliptical Episodic Bonuses", "椭圆局内奖励", "椭圆探索奖励", "elliptical bonus"]
+}

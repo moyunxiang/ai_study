@@ -1,0 +1,25 @@
+{
+ "id": "tutel",
+ "who": "Changho Hwang, Wei Cui, Yifan Xiong, Ziyue Yang, Ze Liu, Han Hu, Zilong Wang, Rafael Salas et al. · 微软",
+ "venue": "MLSys 2023",
+ "aka": ["Tutel", "Flex", "自适应MoE", "adaptive parallelism", "SwinV2-MoE"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2206.03382"},
+  {"label": "GitHub", "url": "https://github.com/microsoft/tutel"}
+ ],
+ "problem": "MoE每一步分给各专家的token数由路由临时决定，负载时多时少；已有系统在训练开始前就把并行方式和流水线切法定死，负载一变就有大量GPU空等。",
+ "idea": "给MoE参数和输入数据设计一种所有并行方式都能共用的统一布局，于是运行时可以零成本地在不同并行与流水线配置之间切换，按当前负载挑最快的那种。",
+ "impact": "作为微软的MoE训练与推理库被SwinV2-MoE等模型使用，也是MegaBlocks等后续MoE系统论文对比的主要基线之一。",
+ "method": "在[[gshard]]、[[switch-transformer]]式的MoE层里，路由器为每个token挑专家，专家之间的负载每一步都不同。已有实现（包括[[deepspeed-moe]]）采用静态执行：数据并行、专家并行、张量切分的组合以及all-to-all通信和专家计算的流水线分块数，都在启动时固定，最优配置却随负载变化。\n\nTutel的关键设计是一种对所有并行和流水线方式都相同的参数与数据分布布局：换一种并行策略时不需要搬迁张量、也不改变数学结果，因此可以在运行时按每一步的实际负载自适应选择并行度和流水线分块。在此基础上它还实现了多种MoE加速技术，如更快的all-to-all通信和专家计算内核。\n\n摘要报告：单个MoE层在16张和2048张A100上分别比之前最好的实现快4.96倍和5.75倍；SwinV2-MoE训练和推理比fairseq分别快1.55倍和2.11倍，精度优于对应的稠密模型。注意摘要中系统名写作Flex，即Tutel。",
+ "limits": [
+  {"text": "仍沿用固定专家容量，超出容量的token会被丢弃或需要填充，计算浪费与质量损失之间仍要权衡。", "solved_by": ["megablocks"]}
+ ],
+ "relations": [
+  {"to": "gshard", "type": "solves", "note": "GShard式静态专家并行无法适应每步变化的负载，Tutel在运行时自适应切换并行与流水线配置。"},
+  {"to": "switch-transformer", "type": "extends", "note": "面向Switch式top-k路由的MoE层做系统加速。"},
+  {"to": "deepspeed-moe", "type": "rivals", "note": "同一时期微软的另一套MoE系统；DeepSpeed-MoE侧重压缩与推理，Tutel侧重运行时自适应并行。"}
+ ],
+ "prereq": ["mixture-of-experts", "distributed-training", "cpu-gpu", "throughput-latency"],
+ "terms": [{"t": "all-to-all通信", "d": "每张卡都要给其他每张卡发一份不同的数据，MoE用它把token送到对应专家所在的卡并把结果送回。"}],
+ "check": {"source": "https://arxiv.org/abs/2206.03382", "confirmed": "标题、作者列表（15位）、v1日期2022-06-07；摘要：现有系统静态并行与流水线无法适应动态负载、为MoE参数与输入设计对所有并行方式相同的布局、运行时零成本自适应、单层在16与2048张A100上快4.96与5.75倍、SwinV2-MoE训练与推理比fairseq快1.55与2.11倍。摘要中系统名为Flex。MLSys 2023、机构细节为一般了解。"}
+}

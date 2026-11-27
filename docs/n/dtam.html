@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DTAM稠密单目SLAM（2011） · AI脉络</title>
+<meta name="description" content="等单目SLAM只跟踪和重建几百上千个稀疏特征点，地图是一堆离散的点，既不能用来做遮挡、碰撞等AR交互，跟踪也只用到了图像里很少一部分信息，快速运动和模糊时容易丢。 放弃特征点，直接用每个像素的亮度：对关键帧建立逐像素的深度图（用一组相邻帧的光度误差构建代价体，再加全变分正则在GPU上优化），然后把…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dtam.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DTAM稠密单目SLAM（2011）">
+<meta property="og:description" content="等单目SLAM只跟踪和重建几百上千个稀疏特征点，地图是一堆离散的点，既不能用来做遮挡、碰撞等AR交互，跟踪也只用到了图像里很少一部分信息，快速运动和模糊时容易丢。 放弃特征点，直接用每个像素的亮度：对关键帧建立逐像素的深度图（用一组相邻帧的光度误差构建代价体，再加全变分正则在GPU上优化），然后把…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dtam.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dtam">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 多视图几何与重建</div>
+<h1>DTAM稠密单目SLAM</h1>
+<div class="full">DTAM: Dense tracking and mapping in real-time</div>
+<div class="meta"><span>2011.11</span><span>论文</span><span>延伸</span><span>ICCV 2011</span><span>Richard A. Newcombe, Steven J. Lovegrove, Andrew J. Davison · 帝国理工学院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1109/iccv.2011.6126513" rel="noopener">DOI ↗</a><a class="btn sm" href="../index.html#/n/dtam">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/ptam.html">PTAM</a>等单目SLAM只跟踪和重建几百上千个稀疏特征点，地图是一堆离散的点，既不能用来做遮挡、碰撞等AR交互，跟踪也只用到了图像里很少一部分信息，快速运动和模糊时容易丢。</p></div><div><h4>方法</h4><p>放弃特征点，直接用每个像素的亮度：对关键帧建立逐像素的深度图（用一组相邻帧的光度误差构建代价体，再加全变分正则在GPU上优化），然后把整张稠密模型渲染出来、与新图像逐像素对齐来跟踪相机。</p></div><div><h4>影响</h4><p>第一批只用普通单目相机实时做稠密跟踪与建图的系统之一，与同作者的<a class="ln" href="../n/kinectfusion.html">KinectFusion</a>一起把“直接法、稠密模型”带入SLAM，后续的<a class="ln" href="../n/lsd-slam.html">LSD-SLAM直接法</a>、<a class="ln" href="../n/dso.html">DSO直接稀疏里程计</a>走的都是直接法路线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>DTAM交替做两件事：</p><ul><li><b>建图</b>：选一张关键帧，对它的每个像素在若干个候选逆深度上，用附近几十帧图像计算光度误差（假设这个深度对，那么把像素投到别的帧上应该颜色相同），得到一个“像素×深度”的代价体。直接取代价最小的深度会很嘈杂，于是加上全变分（TV）正则——要求深度图分片平滑但允许在边缘处跳变——并用原始-对偶方法在GPU上交替优化，得到稠密的深度图；</li><li><b>跟踪</b>：把已有的稠密模型从当前估计的相机位姿渲染成一张预测图像，与新来的实时图像逐像素比较亮度差，用高斯-牛顿法求相机的6自由度位姿更新，即“整图对齐”。由于使用了所有像素，对运动模糊和快速运动更鲁棒。</li></ul><p>系统运行需要较强的GPU，论文演示的是桌面、房间尺度的场景。</p><h2>后来的发展</h2><p>DTAM证明了单目相机也能实时得到稠密几何，但对GPU要求高、场景规模小。之后<a class="ln" href="../n/lsd-slam.html">LSD-SLAM直接法</a>改为只在梯度明显的像素上做“半稠密”直接法以扩展到大场景，<a class="ln" href="../n/dso.html">DSO直接稀疏里程计</a>进一步做稀疏直接法加联合优化；学习式方法如<a class="ln" href="../n/droid-slam.html">DROID-SLAM</a>则用网络预测稠密对应关系。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要GPU实时优化整张深度图，算力要求高，只适合小范围场景，缺少回环和大尺度一致性。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/lsd-slam.html">LSD-SLAM直接法</a> <a class="chip hue" style="--h:216" href="../n/dso.html">DSO直接稀疏里程计</a></div></li><li>依赖亮度恒定假设，光照变化、反光和弱纹理区域的深度不可靠。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/droid-slam.html">DROID-SLAM</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/lucas-kanade.html">Lucas–Kanade光流</a><span class="yr">1981.08 · 视觉</span><div class=nt>跟踪时最小化整图光度误差求位姿，是Lucas–Kanade图像对齐思想在三维位姿上的推广。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/ptam.html">PTAM</a><span class="yr">2007.11 · 视觉</span><div class=nt>PTAM只跟踪稀疏特征点、地图稀疏；DTAM用全部像素做稠密建图和整图对齐跟踪。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/kinectfusion.html">KinectFusion</a><span class="yr">2011.10 · 视觉</span><div class=nt>同作者同年工作：KinectFusion依赖深度相机，DTAM只用普通RGB单目相机，靠多帧光度一致性算深度。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/lsd-slam.html">LSD-SLAM直接法</a><span class="yr">2014.09 · 视觉</span><div class=nt>需要GPU实时优化整张深度图，算力要求高，只适合小范围场景，缺少回环和大尺度一致性。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/elasticfusion.html">ElasticFusion面元SLAM</a><span class="yr">2015.07 · 视觉</span><div class=nt>同一实验室的稠密SLAM路线：跟踪时同样使用逐像素的光度误差，并与几何误差联合优化。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/dso.html">DSO直接稀疏里程计</a><span class="yr">2016.07 · 视觉</span><div class=nt>需要GPU实时优化整张深度图，算力要求高，只适合小范围场景，缺少回环和大尺度一致性。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/droid-slam.html">DROID-SLAM</a><span class="yr">2021.08 · 视觉</span><div class=nt>依赖亮度恒定假设，光照变化、反光和弱纹理区域的深度不可靠。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/regularization.html">正则化与权重衰减</a> <a class="chip c" href="../c/image-tensor.html">图像作为张量</a></p>
+<h2>本篇术语</h2><ul><li><b>直接法</b>　不先提取特征点，直接用像素亮度的差来估计相机运动和深度。</li><li><b>全变分正则</b>　惩罚相邻像素深度差的绝对值之和，让深度图分片平滑、同时保留真正的边缘跳变。</li></ul>
+<h2>怎么学</h2><p>先弄懂PTAM的跟踪-建图分离和极线几何，再读DTAM论文的代价体与TV优化部分；可以对比LSD-SLAM论文里对DTAM算力问题的讨论。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1109/iccv.2011.6126513" rel="noopener">https://doi.org/10.1109/iccv.2011.6126513</a>（Crossref记录：标题“DTAM: Dense tracking and mapping in real-time”、作者Newcombe、Lovegrove、Davison、ICCV 2011（2011-11）。代价体、TV正则与原始-对偶优化、整图对齐跟踪、GPU实现、机构凭一般了解写，没有读到原文；文中没有引用具体数字。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DTAM%E7%A8%A0%E5%AF%86%E5%8D%95%E7%9B%AESLAM%EF%BC%88dtam%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adtam%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dtam.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="orb.html"><small>本分支上一个 · 2011.11</small><b>ORB特征</b></a><a class="r" href="densecrf.html"><small>本分支下一个 · 2011.12</small><b>全连接CRF</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

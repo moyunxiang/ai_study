@@ -1,0 +1,27 @@
+{
+ "id": "once-for-all",
+ "who": "Han Cai, Chuang Gan, Tianzhe Wang, Zhekai Zhang, Song Han · MIT, MIT-IBM Watson AI Lab",
+ "venue": "ICLR 2020",
+ "aka": ["OFA", "Once-for-All", "一次训练多处部署", "渐进收缩", "progressive shrinking", "超网络", "supernet"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1908.09791"},
+  {"label": "GitHub", "url": "https://github.com/mit-han-lab/once-for-all"}
+ ],
+ "problem": "手机、芯片、延迟预算各不相同，每种部署场景都要单独设计或用NAS搜一个网络再从头训练，算力和碳排放成本极高，不可能对每台设备都做一遍。",
+ "idea": "只训练一个“一次满足所有”的大网络，让它的深度、宽度、卷积核大小和输入分辨率都能裁剪；部署时直接从中选出符合约束的子网络，不需要再训练。",
+ "impact": "把“训练与搜索解耦”的超网络思路做成实用方案，成为硬件感知NAS和弹性部署的常用基线，也是后来MCUNet等极小设备工作的前身之一。",
+ "method": "传统做法是：对每个目标设备，手工设计（如[[mobilenet]]）或用[[nas]]/[[mnasnet]]搜一个架构，然后从头训练。论文估计这样做的碳排放相当于5辆车的全生命周期，场景一多就无法扩展。\n\nOFA先训练一个最大的网络，并让它的所有子网络（更浅、更窄、更小卷积核、更低分辨率）共享权重。直接一起训练这些子网络会互相干扰，于是提出**渐进收缩**：先训练完整的大网络，再逐步允许更小的卷积核、更少的层、更少的通道，每一步都用大网络当老师做[[distillation]]，小子网络在大网络基础上微调。这可以看成一种在深度、宽度、核大小、分辨率多个维度上同时进行的广义剪枝。训练完后得到超过10¹⁹个子网络；部署时用一个预测精度和延迟的小模型，快速在其中搜出满足目标设备约束的那个，直接拿去用。\n\n摘要报告：在多种边缘设备上优于当时的NAS方法，ImageNet top-1比MobileNetV3最多高4.0%，或同精度下比MobileNetV3快1.5倍、比[[efficientnet]]快2.6倍（实测延迟）；在移动设置（<600M MACs）下达到80.0% top-1；赢得第3、4届低功耗计算机视觉挑战赛的多个赛道。",
+ "limits": [
+  {"text": "训练超网络本身代价很高，渐进收缩流程复杂；子网络的结构空间局限于卷积网络的几种维度。", "solved_by": []},
+  {"text": "面向手机级设备，微控制器只有几百KB内存，还需要连同推理引擎一起设计。", "solved_by": ["mcunet"]}
+ ],
+ "relations": [
+  {"to": "mnasnet", "type": "solves", "note": "MnasNet这类硬件感知NAS每个场景都要搜索并重新训练，OFA训练一次即可为多种设备直接选出子网络。"},
+  {"to": "distillation", "type": "uses", "note": "渐进收缩中用最大网络作为老师，蒸馏指导各个子网络。"},
+  {"to": "efficientnet", "type": "rivals", "note": "EfficientNet按固定比例缩放出一族模型，OFA从一个超网络里按设备约束选子网络，实测延迟下更快。"},
+  {"to": "network-slimming", "type": "extends", "note": "把按通道剪枝推广到深度、宽度、卷积核大小与分辨率多个维度的“广义剪枝”。"}
+ ],
+ "prereq": ["conv-layer", "knowledge-distillation", "params-flops", "throughput-latency"],
+ "terms": [{"t": "超网络（supernet）", "d": "一个包含许多子结构、各子结构共享权重的大网络，从中取出某个子结构就得到一个可用的小网络。"}],
+ "check": {"source": "https://arxiv.org/abs/1908.09791", "confirmed": "标题、五位作者、v1日期2019-08-26；摘要：每种情况单独设计或NAS后从头训练代价高（碳排放相当于5辆车的生命周期）、训练与搜索解耦、渐进收缩是在深度宽度核大小分辨率上的广义剪枝、超过10^19个子网络、比MobileNetV3最多高4.0%或同精度快1.5倍、比EfficientNet快2.6倍、<600M MACs下80.0% top-1、第3届LPCVC DSP分类赛道和第4届LPCVC分类与检测赛道冠军。用大网络蒸馏子网络、精度/延迟预测器、ICLR 2020、机构为一般了解。"}
+}

@@ -1,0 +1,31 @@
+{
+  "id": "lavit",
+  "aka": ["LaVIT", "Language-VIsion Transformer", "动态离散视觉分词", "dynamic visual tokenizer"],
+  "who": "Yang Jin, Kun Xu, Liwei Chen, Chao Liao, Jianchao Tan, Quzhe Huang, Bin Chen, Chenyi Lei et al. · 北京大学 / 快手",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2309.04669"},
+    {"label": "代码", "url": "https://github.com/jy0205/LaVIT"}
+  ],
+  "problem": "主流做法把图像当作冻结LLM的“提示”，只优化“看图写字”这一个方向，视觉和语言地位不对等，模型既不能生成图，视觉也没有参与真正的生成式学习。",
+  "idea": "设计一个视觉分词器，把图像翻译成像外语单词一样的离散token序列，每个token有接近词级别的语义，且序列长度随图像内容动态变化；然后让LLM对图文token统一做下一词预测。",
+  "impact": "一个模型同时完成图像理解和文生图，在大量图文任务上大幅超过此前模型；“语义级离散视觉token+动态长度”成为统一多模态模型里视觉分词器的一条代表路线。",
+  "method": "[[blip-2]]、[[llava]]式的模型把视觉特征投影后当提示词，LLM只负责输出文字，损失也只算在文字上。作者认为这种不对等限制了模型：视觉输入不参与生成式训练，模型也无法输出图像。\n\nLaVIT的关键是视觉分词器：\n- **动态长度**：一张图切成很多图像块，但并非每一块都同样重要。分词器先打分选出信息量大的块，再把其余块的信息合并进去，所以简单的图得到较少token，复杂的图得到较多token。\n- **离散且有语义**：选出的特征经过量化映射到一个视觉码本，每个码相当于一个“视觉单词”，带有较高层的语义，而不是像素级的纹理码。\n\n有了这种分词器，图像就像一种外语，可以和文字拼成一条序列，交给[[llama-1]]类语言模型统一做下一词预测，图文token都算损失。生成图像时，模型输出视觉token，再由一个扩散解码器还原成像素。",
+  "limits": [
+    {"text": "离散化会丢失细节，以视觉token为条件、再用扩散解码器还原的图像，与原图在细节上常有偏差，编辑类任务受限。", "solved_by": ["transfusion", "janus"]},
+    {"text": "理解和生成共用同一种语义token，对需要像素级保真的生成和需要高层语义的理解难以同时兼顾。", "solved_by": ["janus", "tokenflow"]}
+  ],
+  "relations": [
+    {"to": "seed-tokenizer", "type": "rivals", "note": "同期都提出让LLM能读写的离散视觉分词器；SEED用固定数量的因果token，LaVIT的token数随图像动态变化。"},
+    {"to": "emu", "type": "rivals", "note": "Emu用连续视觉嵌入回归做统一预训练，LaVIT坚持离散token与下一词预测。"},
+    {"to": "llama-1", "type": "uses", "note": "以LLaMA类语言模型为主体，对图文token统一建模。"},
+    {"to": "vq-vae", "type": "extends", "note": "借用向量量化码本把视觉特征离散化，但码本面向高层语义而非像素重建。"},
+    {"to": "blip-2", "type": "solves", "note": "BLIP-2把视觉当冻结LLM的提示、只训练文字生成，LaVIT让视觉token也参与生成式训练。"}
+  ],
+  "prereq": ["vector-quantization", "tokenization", "autoregressive", "diffusion-process", "image-patch"],
+  "terms": [
+    {"t": "视觉分词器（visual tokenizer）", "d": "把一张图像转换成一串离散编号的模块，作用相当于文字的分词器，使图像能和文字放在同一条序列里建模。"}
+  ],
+  "learn": "先读[[seed-tokenizer]]和[[vq-vae]]，再看LaVIT论文的分词器结构图（token选择与合并两部分），对比它和[[emu]]在“离散还是连续”上的取舍。",
+  "check": {"source": "https://arxiv.org/abs/2309.04669", "confirmed": "标题、作者、v1提交2023-09-09；摘要：批评把视觉当冻结LLM提示、只优化文字生成、视觉分词器把图像翻译成像外语的离散token、token具有词级高层语义且支持动态长度、统一生成式学习、同时理解与生成、大幅超过已有模型。token选择与合并的具体机制、扩散解码器、基座LLaMA、ICLR 2024、机构为一般了解。"}
+}

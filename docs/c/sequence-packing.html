@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>序列打包与文档掩码（Sequence Packing and Document Masking） · AI脉络</title>
+<meta name="description" content="训练时把多条短样本首尾相接拼成一条接近最大长度的序列，消除大量填充造成的算力浪费；配合文档掩码可以防止不同样本之间互相“看见”。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/sequence-packing.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="序列打包与文档掩码（Sequence Packing and Document Masking）">
+<meta property="og:description" content="训练时把多条短样本首尾相接拼成一条接近最大长度的序列，消除大量填充造成的算力浪费；配合文档掩码可以防止不同样本之间互相“看见”。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/sequence-packing.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/sequence-packing">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>序列打包与文档掩码</h1><div class="full">Sequence Packing and Document Masking</div>
+<p class="muted" style="font-size:13px">也叫：sequence packing　packing　序列打包　样本打包　sample packing　数据打包　document masking　文档掩码　跨文档注意力掩码　intra-document masking　block-diagonal mask　块对角掩码　varlen attention　变长注意力</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/sequence-packing">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>训练时把多条短样本首尾相接拼成一条接近最大长度的序列，消除大量填充造成的算力浪费；配合文档掩码可以防止不同样本之间互相“看见”。</b></p>
+<p class="tags">先要会：<a class="chip c" href="padding-attention-mask.html">填充、截断与注意力掩码</a> <a class="chip c" href="causal-mask.html">因果掩码</a></p>
+<p>训练数据的长度差别很大：有的对话几十个token，有的文档几千个。如果每条样本单独成一行、统一<a class="lc" href="../c/padding-attention-mask.html">填充、截断与注意力掩码</a>到最大长度，一批里可能大半位置都是PAD，GPU在空转。<b>序列打包</b>（packing）把多条样本拼起来填满每一行。</p><p><b>预训练中的做法</b>。把整个语料的文档用EOS（见<a class="lc" href="../c/special-tokens.html">特殊token</a>）连接成一条极长的token流，再按固定长度（如4096）切块，每块就是一条训练样本。一块里可能包含一篇文档的结尾和下一篇的开头。<a class="ln" href="../n/gpt-2.html">GPT-2</a>、<a class="ln" href="../n/gpt-3.html">GPT-3</a>以来的预训练基本都这样做，几乎没有填充。</p><p><b>跨文档注意力</b>。简单拼接后，用普通的<a class="lc" href="../c/causal-mask.html">因果掩码</a>训练，后一篇文档的token能“看见”前一篇文档的内容。两篇无关的文档之间本没有关系，模型可能学到一些虚假的依赖，并在推理时把无关的上下文当回事。两种处理：</p><ul><li><b>不管它</b>：很多模型就是这样训练的，影响通常不大，模型会学会在EOS之后基本忽略前文。</li><li><b>文档掩码</b>（document masking）：把因果掩码改成块对角形式，每个token只能看到同一文档内、在它之前的token；位置编号也在每篇文档开头重置为0。<a class="ln" href="../n/llama-3.html">Llama 3</a>的技术报告写明使用了“阻止同一序列内不同文档之间自注意力”的掩码。FlashAttention等高效注意力实现提供了“变长序列”接口，可以直接支持这种掩码而不浪费计算。</li></ul><p><b>微调中的打包</b>。监督微调的样本更短、长度差异更大，打包的收益更明显。此时一般同时使用文档掩码和<a class="lc" href="../c/loss-masking.html">损失掩码：只对回答计算损失</a>：每条样本只对自己的回答部分算损失，且不能看到同一行里的其他样本。</p><p><b>一个副作用</b>。打包后每个优化步里包含的样本数不再固定，样本越短，一步里的样本越多。若损失按token平均，长样本在梯度中的权重相对更大；若按样本平均，又会反过来。不同的实现选择会影响训练结果，需要在对比实验时注意。</p>
+<div class="example"><h4>例子</h4><p>最大长度8，三条样本长度分别为3、2、3：A = [a1 a2 a3]，B = [b1 b2]，C = [c1 c2 c3]。</p><ul><li>不打包：3行×8 = 24个位置，真实token只有8个，填充率67%。</li><li>打包：一行 [a1 a2 a3 b1 b2 c1 c2 c3]，8个位置全部有效。</li></ul><p>文档掩码下，b1只能看到自己，看不到a1到a3；c2只能看到c1和自己。位置编号为 [0 1 2 0 1 0 1 2]，而不是 [0 1 2 3 4 5 6 7]。</p></div>
+<h2>容易误解的地方</h2><ul><li>打包但不重置位置编号，模型看到的位置分布会和推理时不同（推理时每段对话都从位置0开始）。</li><li>用了打包的训练，batch size应该按token数而不是样本数来统计和报告。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

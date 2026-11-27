@@ -1,0 +1,31 @@
+{
+  "id": "polyvoice",
+  "who": "Qianqian Dong, Zhiying Huang, Qiao Tian, Chen Xu, Tom Ko, Yunlong Zhao, Siyuan Feng, Tang Li et al. · 字节跳动",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2306.02982"},
+    {"label": "示例", "url": "https://speechtranslation.github.io/polyvoice"}
+  ],
+  "problem": "直接语音到语音翻译要么依赖文字做中间监督，无法用于没有书面文字的语言；要么生成的译语语音换成了固定音色，丢掉原说话人的声音和说话风格。",
+  "idea": "用两个语言模型完成翻译：翻译语言模型把源语音的无监督离散单元翻成目标语言的单元，语音合成语言模型（借用VALL-E X的做法）再根据目标单元和源语音提示生成保留原音色的译语语音。",
+  "impact": "较早把「语言模型+离散单元」完整用于语音到语音翻译的框架，既能用于无文字语言，又能保留说话人音色与风格；在中英、英西两个方向上验证了翻译与音质。",
+  "method": "[[s2ut]]用离散单元做语音翻译目标，避免依赖文字，但输出是单元声码器的固定音色。[[vall-e-x]]展示了用编解码器语言模型做跨语言声音克隆：给一段源语言录音做提示，就能用同一个人的声音说出另一种语言。PolyVoice把两者串起来，全部用语言模型实现：\n\n- **语音单元**：用自监督模型（[[hubert]]类）提取特征并聚类，得到完全无监督的离散单元；源语音和目标语音都用这种单元表示，不需要文字，因此适用于没有书面文字的语言。\n- **翻译语言模型**：一个decoder-only的语言模型，读入源语言单元序列，续写出目标语言单元序列，相当于在单元层面做翻译。\n- **语音合成语言模型**：仿照VALL-E X建立基于单元的音频语言模型，以目标单元为内容、以源语音的编解码器token为声音提示，生成目标语言的声学token，再由编解码器解码成波形。\n\n作者在中文到英文、英文到西班牙文两个方向上实验，结果显示系统在翻译质量和音频质量上都不错，并保留了原说话人的音色与说话风格。",
+  "limits": [
+    {"text": "两个语言模型串联，延迟较高，不能做同声传译。", "solved_by": ["streamspeech", "hibiki"]},
+    {"text": "单元层面的翻译仍不如有文字监督的系统准确，只在两个语言方向上验证。", "solved_by": ["seamless"]}
+  ],
+  "relations": [
+    {"to": "vall-e-x", "type": "uses", "note": "语音合成部分沿用VALL-E X的跨语言编解码器语言模型做法，保留源说话人音色。"},
+    {"to": "s2ut", "type": "extends", "note": "同样以无监督离散单元为翻译目标，但把翻译和合成都换成语言模型，并保留音色。"},
+    {"to": "hubert", "type": "uses", "note": "用自监督语音特征聚类得到离散单元。"},
+    {"to": "unity", "type": "rivals", "note": "UnitY用文字作中间监督的两段式结构；PolyVoice只用单元，面向无文字语言。"}
+  ],
+  "prereq": ["language-model", "autoregressive", "clustering", "self-supervised", "vocoder-codec"],
+  "terms": [
+    {"t": "无文字语言", "d": "unwritten language，没有通行书面文字的语言，无法依赖文字转写做监督。"}
+  ],
+  "aka": ["PolyVoice", "语言模型语音到语音翻译", "LM-based S2ST"],
+  "check": {
+    "source": "https://arxiv.org/abs/2306.02982",
+    "confirmed": "arXiv官方记录：标题PolyVoice: Language Models for Speech to Speech Translation、Dong等18位作者、v1提交2023-06-05；摘要中由翻译语言模型和语音合成语言模型组成、完全无监督生成的离散语音单元、可用于无文字语言、语音合成部分采用VALL-E X方法建立基于单元的音频语言模型、保留原语音的声音特征与说话风格、中→英与英→西实验、翻译与音频质量较高。decoder-only结构、HuBERT类单元、字节跳动机构为一般了解。"
+  }
+}

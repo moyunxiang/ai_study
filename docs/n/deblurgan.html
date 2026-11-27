@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DeblurGAN对抗去模糊（2017） · AI脉络</title>
+<meta name="description" content="运动模糊的“盲去模糊”要同时猜出模糊核和清晰图，传统方法先估核再反卷积，慢且对复杂的非均匀模糊失效；用像素误差训练的网络又容易输出偏平滑、细节不足的结果。 把去模糊当成条件图像翻译：生成器直接把模糊图变成清晰图，不估计模糊核；用条件GAN（WGAN-GP）的对抗损失加上基于VGG特征的内容损失训练…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/deblurgan.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DeblurGAN对抗去模糊（2017）">
+<meta property="og:description" content="运动模糊的“盲去模糊”要同时猜出模糊核和清晰图，传统方法先估核再反卷积，慢且对复杂的非均匀模糊失效；用像素误差训练的网络又容易输出偏平滑、细节不足的结果。 把去模糊当成条件图像翻译：生成器直接把模糊图变成清晰图，不估计模糊核；用条件GAN（WGAN-GP）的对抗损失加上基于VGG特征的内容损失训练…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/deblurgan.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/deblurgan">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 图像复原</div>
+<h1>DeblurGAN对抗去模糊</h1>
+<div class="full">DeblurGAN: Blind Motion Deblurring Using Conditional Adversarial Networks</div>
+<div class="meta"><span>2017.11</span><span>论文</span><span>延伸</span><span>CVPR 2018</span><span>Orest Kupyn, Volodymyr Budzan, Mykola Mykhailych, Dmytro Mishkin, Jiri Matas · 乌克兰天主教大学 / 布拉格捷克理工大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1711.07064" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/KupynOrest/DeblurGAN" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/deblurgan">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>运动模糊的“盲去模糊”要同时猜出模糊核和清晰图，传统方法先估核再反卷积，慢且对复杂的非均匀模糊失效；用像素误差训练的网络又容易输出偏平滑、细节不足的结果。</p></div><div><h4>方法</h4><p>把去模糊当成条件图像翻译：生成器直接把模糊图变成清晰图，不估计模糊核；用条件GAN（WGAN-GP）的对抗损失加上基于VGG特征的内容损失训练，让结果既像原图又有真实细节。还提出一种用随机轨迹合成运动模糊的数据增强方法。</p></div><div><h4>影响</h4><p>成为学习式去模糊的常用基线，并开创了用下游任务（模糊图上的目标检测）评估复原效果的做法；后续的DeblurGAN-v2进一步加入特征金字塔和轻量骨干。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>生成器是带残差块的全卷积网络，输入模糊图，学习输出“清晰图减模糊图”的残差；判别器是只看局部图像块真假的PatchGAN（同<a class="ln" href="../n/pix2pix.html">pix2pix条件图像翻译</a>）。损失由两部分组成：</p><ul><li><b>对抗损失</b>：用<a class="ln" href="../n/wgan-gp.html">WGAN-GP梯度惩罚</a>的形式，训练比原始GAN稳定；</li><li><b>内容损失</b>：比较生成图与真值在VGG某一层特征上的差（即<a class="ln" href="../n/perceptual-loss.html">感知损失</a>），而不是直接比像素，避免平均化造成的模糊。</li></ul><p>数据方面，除了GoPro数据集（高速相机连续帧平均得到的真实模糊），论文提出用随机相机运动轨迹生成模糊核、合成运动模糊图像，用于扩充训练数据。</p><p>摘要称DeblurGAN在结构相似度（SSIM）和视觉效果上都达到当时最好，比最接近的竞争方法DeepDeblur快5倍；还在真实问题上评估：对去模糊前后的图像跑目标检测，看检测效果改善了多少。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>以感知质量为主，PSNR等保真度指标不如后来的多阶段和Transformer复原网络，GAN也可能生成不存在的细节。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/mprnet.html">MPRNet多阶段复原</a> <a class="chip hue" style="--h:216" href="../n/restormer.html">Restormer复原Transformer</a></div></li><li>只针对运动模糊一种退化，真实照片里噪声、压缩、失焦等混合退化处理不了。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/real-esrgan.html">Real-ESRGAN</a> <a class="chip hue" style="--h:216" href="../n/swinir.html">SwinIR图像复原</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/wgan-gp.html">WGAN-GP梯度惩罚</a><span class="yr">2017.03 · 生成</span><div class=nt>对抗损失采用WGAN-GP，训练更稳定。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/perceptual-loss.html">感知损失</a><span class="yr">2016.03 · 视觉</span><div class=nt>内容损失比较VGG特征而不是像素，减少结果的平滑模糊。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/srgan.html">SRGAN</a><span class="yr">2016.09 · 视觉</span><div class=nt>SRGAN用对抗加感知损失做超分；DeblurGAN把同样的损失组合用于盲运动去模糊。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/pix2pix.html">pix2pix条件图像翻译</a><span class="yr">2016.11 · 生成</span><div class=nt>沿用条件GAN做图像到图像翻译、PatchGAN判别器的框架，专门用于去模糊。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/mprnet.html">MPRNet多阶段复原</a><span class="yr">2021.02 · 视觉</span><div class=nt>DeblurGAN靠对抗损失追求视觉效果，保真度指标偏低；MPRNet用多阶段监督在PSNR上明显提升。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/real-esrgan.html">Real-ESRGAN</a><span class="yr">2021.07 · 视觉</span><div class=nt>只针对运动模糊一种退化，真实照片里噪声、压缩、失焦等混合退化处理不了。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/swinir.html">SwinIR图像复原</a><span class="yr">2021.08 · 视觉</span><div class=nt>只针对运动模糊一种退化，真实照片里噪声、压缩、失焦等混合退化处理不了。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/restormer.html">Restormer复原Transformer</a><span class="yr">2021.11 · 视觉</span><div class=nt>以感知质量为主，PSNR等保真度指标不如后来的多阶段和Transformer复原网络，GAN也可能生成不存在的细节。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/generative-modeling.html">生成建模的目标</a> <a class="chip c" href="../c/adversarial-training.html">对抗训练</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/image-tensor.html">图像作为张量</a></p>
+<h2>本篇术语</h2><ul><li><b>盲去模糊</b>　不知道图像是被什么样的模糊核弄糊的，只拿到模糊图，就要恢复清晰图。</li></ul>
+<h2>怎么学</h2><p>先读pix2pix理解条件GAN做图像翻译，再读本文第3节的损失设计和第4节的合成模糊方法；用GoPro数据集跑一遍预训练模型，并在去模糊前后跑一个现成检测器对比。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1711.07064" rel="noopener">https://arxiv.org/abs/1711.07064</a>（arXiv记录：标题、五位作者、v1提交于2017-11-19；摘要中的条件GAN加内容损失、SSIM与视觉效果最好、以去模糊图上的目标检测评估、比DeepDeblur快5倍、合成运动模糊数据的新方法。CVPR 2018、机构、WGAN-GP与PatchGAN、VGG内容损失、GoPro数据集、DeblurGAN-v2凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DeblurGAN%E5%AF%B9%E6%8A%97%E5%8E%BB%E6%A8%A1%E7%B3%8A%EF%BC%88deblurgan%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adeblurgan%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/deblurgan.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="deep-image-prior.html"><small>本分支上一个 · 2017.11</small><b>深度图像先验</b></a><a class="r" href="cascade-rcnn.html"><small>本分支下一个 · 2017.12</small><b>Cascade R-CNN</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,34 @@
+{
+  "id": "toolace",
+  "who": "Weiwen Liu, Xu Huang, Xingshan Zeng, Xinlong Hao, Shuai Yu, Dexun Li, Shuai Wang, Weinan Gan et al. · 华为诺亚方舟实验室 / 中国科学技术大学等",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2409.00920"},
+    {"label": "Hugging Face", "url": "https://huggingface.co/Team-ACE"}
+  ],
+  "aka": ["ToolACE", "ToolACE-8B", "函数调用数据合成", "function calling data synthesis", "工具自演化合成", "Tool Self-Evolution Synthesis", "合成API"],
+  "problem": "要教模型调用函数，就需要大量“用户请求→该调用哪个函数、参数怎么填”的对话数据。真实数据难收集；已有的合成数据（如Gorilla、ToolLLM）依赖公开API，覆盖的领域有限，多是单轮、单次调用，很少有并行调用、前后依赖的调用或嵌套参数，标注也常有错误。",
+  "idea": "全自动合成数据：先让LLM自己“演化”出一个覆盖390个领域、26507个API的工具池；再让扮演用户、助手、工具的三个智能体对话，由一个评估器按目标模型当前能力调节对话难度；最后用规则加模型两层检查过滤错误样本。",
+  "impact": "只用这些合成数据对LLaMA3.1-8B做LoRA微调，在伯克利函数调用榜（BFCL）上达到当时的最好水平，官方称可与最新的GPT-4模型相当；数据被后续工具调用和智能体强化学习工作广泛用作训练语料。",
+  "background": "[[function-calling]]成为API标准之后，开源模型急需相应的训练数据。[[gorilla]]用约1600个机器学习API，[[toolllm]]用RapidAPI上的1.6万个真实API，但都受限于“有什么公开API就只能练什么”，场景也以单轮简单调用为主。[[bfcl]]等评测则要求模型处理并行调用、多轮澄清、无需调用工具等多种情况。",
+  "method": "**工具自演化合成（TSS）**：从预训练语料中提取各领域的使用场景作为起点，按“物种形成—适应—进化”的流程让LLM生成API：先分出领域与功能层级，再为具体场景生成API定义，然后不断变异出新版本（增加参数、嵌套结构、数据类型和约束），扩充多样性。最终得到26507个API、390个领域。\n\n**自引导对话生成（SDG）**：三个智能体角色扮演——用户提需求或补充信息；助手可以调用API、追问、总结工具返回结果或直接回答；工具智能体模拟API执行并返回结果。数据覆盖单次调用、并行调用、相互依赖的调用和不需要工具四类。一个复杂度评估器用目标模型自身来判断样本难度，让数据难度“略高于模型当前能力”。助手的每一步会生成多次，只保留决策一致的版本。\n\n**双层验证（DLV）**：规则层检查API定义是否清楚、调用格式和参数类型是否符合定义；模型层用LLM检查是否幻觉出不存在的参数、回答与工具结果是否一致等。\n\n**结果**：用LoRA（秩16）微调LLaMA3.1-8B-Instruct得到ToolACE-8B，在BFCL和API-Bank上明显超过同规模开源模型，BFCL总分接近当时的GPT-4系列。消融显示准确性、多样性和复杂度三方面都有贡献。",
+  "legacy": "其开源数据子集成为工具调用训练的常用来源，例如[[rstar2-agent]]在非推理监督微调阶段就使用了ToolACE数据；“合成API池+多智能体模拟对话+验证”的流水线后来被许多函数调用与智能体数据工作沿用。",
+  "limits": [
+    {"text": "API和执行结果都是LLM模拟的，并不真正运行，模型在真实接口的报错、超时和返回格式上可能表现不同。", "solved_by": []},
+    {"text": "主要优化单次对话中的调用正确性，对需要几十步工具交互的长程智能体任务帮助有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "toolllm", "type": "solves", "note": "ToolLLM受限于真实公开API且多为单轮；ToolACE合成26507个API并覆盖并行、依赖、多轮等场景。"},
+    {"to": "gorilla", "type": "extends", "note": "同为让模型学会按API文档生成调用，把API来源从现成库扩展为自动合成。"},
+    {"to": "function-calling", "type": "extends", "note": "为函数调用能力提供大规模、可控难度的训练数据。"},
+    {"to": "bfcl", "type": "uses", "note": "主要评测基准。"},
+    {"to": "llama-3.1", "type": "uses", "note": "以LLaMA3.1-8B-Instruct为基础模型做LoRA微调。"}
+  ],
+  "prereq": ["tool-calling", "pretrain-finetune", "peft-concept", "agent-loop", "instruction-tuning"],
+  "terms": [
+    {"t": "并行调用与依赖调用", "d": "并行调用指一次请求需要同时调用多个互不相关的函数；依赖调用指后一个函数的参数要用前一个函数的返回结果。"},
+    {"t": "嵌套参数", "d": "函数参数本身是对象或列表，里面还有子字段，例如一个订单参数里包含多个商品对象。"}
+  ],
+  "learn": "先读[[function-calling]]和[[toolllm]] → 读原文第2节三个模块（图1流程图）与表1对比 → 动手：写一个简单的规则检查器，验证模型生成的JSON函数调用是否符合给定的参数类型和必填项。",
+  "check": {"source": "https://arxiv.org/abs/2409.00920", "confirmed": "标题、作者、v1提交于2024-09-02；摘要中自演化合成26507个API、多智能体对话、复杂度评估器、规则加模型双层验证、8B模型在BFCL达到最好水平并可与最新GPT-4相当；正文（arxiv.org/html/2409.00920）核对TSS的物种形成-适应-进化、表1中390个领域与Gorilla/ToolLLM对比、三个角色与助手动作空间、多次生成取一致决策、LLaMA3.1-8B-Instruct与LoRA秩16、BFCL-v3与API-Bank。“四类数据”的具体名称与验证细节为概括；venue与单位凭一般了解。"}
+}

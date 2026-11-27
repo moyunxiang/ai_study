@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>QServe W4A8KV4量化服务（2024） · AI脉络</title>
+<meta name="description" content="INT4权重量化在小批次的端侧推理里能提速，但到了大批次的云端服务，GPU要在低吞吐的CUDA核心上反量化权重或部分和，开销占20%–90%，反而跑不过TensorRT-LLM的W8A8。 算法与系统一起设计：4比特权重、8比特激活、4比特KV缓存（W4A8KV4），用渐进式量化让反量化能在INT…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/qserve.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="QServe W4A8KV4量化服务（2024）">
+<meta property="og:description" content="INT4权重量化在小批次的端侧推理里能提速，但到了大批次的云端服务，GPU要在低吞吐的CUDA核心上反量化权重或部分和，开销占20%–90%，反而跑不过TensorRT-LLM的W8A8。 算法与系统一起设计：4比特权重、8比特激活、4比特KV缓存（W4A8KV4），用渐进式量化让反量化能在INT…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/qserve.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/qserve">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 低比特量化</div>
+<h1>QServe W4A8KV4量化服务</h1>
+<div class="full">QServe: W4A8KV4 Quantization and System Co-design for Efficient LLM Serving</div>
+<div class="meta"><span>2024.05</span><span>论文</span><span>延伸</span><span>MLSys 2025</span><span>Yujun Lin, Haotian Tang, Shang Yang, Zhekai Zhang, Guangxuan Xiao, Chuang Gan, Song Han · MIT, 英伟达等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2405.04532" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/mit-han-lab/omniserve" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/qserve">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>INT4权重量化在小批次的端侧推理里能提速，但到了大批次的云端服务，GPU要在低吞吐的CUDA核心上反量化权重或部分和，开销占20%–90%，反而跑不过TensorRT-LLM的W8A8。</p></div><div><h4>方法</h4><p>算法与系统一起设计：4比特权重、8比特激活、4比特KV缓存（W4A8KV4），用渐进式量化让反量化能在INT8张量核心路径上便宜地完成，并用SmoothAttention压住4比特KV的精度损失。</p></div><div><h4>影响</h4><p>说明低比特量化能否在服务端提速取决于反量化落在哪类硬件单元上，W4A8KV4成为大批次LLM服务量化的代表配置之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>GPU上矩阵乘主要由张量核心完成，而反量化、缩放这类逐元素运算只能在普通CUDA核心上做，后者吞吐低得多。<a class="ln" href="../n/awq.html">AWQ激活感知量化</a>式W4A16在批次小、受显存带宽限制时有效；批次一大变成计算受限，每次都把4比特权重反量化成FP16的开销就暴露出来。</p><p>论文提出QoQ算法（拉丁文4-8-4）并实现为QServe库：</p><ul><li><b>渐进式量化</b>：权重先按通道量化到8比特，再按组量化到4比特，使组内反量化可以用整数运算在寄存器级并行完成，W4A8的矩阵乘可以走INT8张量核心。</li><li><b>SmoothAttention</b>：仿照<a class="ln" href="../n/smoothquant.html">SmoothQuant</a>把Key中的离群通道缩放平滑，降低4比特KV缓存（参见<a class="ln" href="../n/kivi.html">KIVI两比特KV缓存</a>）的误差。</li><li>系统侧做按计算顺序的权重重排、寄存器级并行降低反量化延迟，并让融合注意力在KV4下变成受显存带宽限制，从而真正吃到KV压缩的收益。</li></ul><p>摘要报告：与<a class="ln" href="../n/tensorrt-llm.html">TensorRT-LLM</a>相比，Llama-3-8B最大服务吞吐在A100上提高1.2倍、L40S上1.4倍；Qwen1.5-72B在A100上2.4倍、L40S上3.5倍；L40S上的QServe甚至超过A100上的TensorRT-LLM，服务成本降为约三分之一。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要专门的内核与模型转换流程，新硬件（如原生支持FP4/FP8的GPU）上最优的量化格式可能又会改变。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/nvfp4.html">NVFP4四比特预训练</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/smoothquant.html">SmoothQuant</a><span class="yr">2022.11 · 系统·效率</span><div class=nt>SmoothAttention把SmoothQuant的离群通道平滑用于Key，以支持4比特KV缓存。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/awq.html">AWQ激活感知量化</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>AWQ式INT4权重量化在大批次服务中反量化开销大，QServe用W4A8与渐进式量化把它降下来。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/squeezellm.html">SqueezeLLM稠密加稀疏量化</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>查表式非均匀量化只对权重有效，计算仍以FP16进行，在大批次、计算受限的服务场景下收益有限。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/tensorrt-llm.html">TensorRT-LLM</a><span class="yr">2023.10 · 系统·效率</span><div class=nt>以TensorRT-LLM为主要基线，在A100与L40S上服务吞吐提高1.2–3.5倍。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/kivi.html">KIVI两比特KV缓存</a><span class="yr">2024.02 · 系统·效率</span><div class=nt>同样做低比特KV缓存，QServe把它与权重、激活量化及内核设计结合起来。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/nvfp4.html">NVFP4四比特预训练</a><span class="yr">2025.09 · 系统·效率</span><div class=nt>需要专门的内核与模型转换流程，新硬件（如原生支持FP4/FP8的GPU）上最优的量化格式可能又会改变。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/quantization-concept.html">量化</a> <a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a></p>
+<h2>本篇术语</h2><ul><li><b>W4A8KV4</b>　权重4比特、激活8比特、KV缓存4比特的量化配置写法。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2405.04532" rel="noopener">https://arxiv.org/abs/2405.04532</a>（标题、七位作者、v1日期2024-05-07；摘要：现有INT4方法只加速小批次端侧推理、反量化在GPU上有20–90%运行时开销、QoQ即W4A8KV4（拉丁文4-8-4）、关键在低吞吐CUDA核心上的运算、渐进式量化、SmoothAttention、计算感知权重重排与寄存器级并行、融合注意力变为内存受限、对比TensorRT-LLM在Llama-3-8B上1.2/1.4倍与Qwen1.5-72B上2.4/3.5倍、L40S超过A100上的TensorRT-LLM、成本降3倍。渐进式量化的两级细节、MLSys 2025、机构为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20QServe%20W4A8KV4%E9%87%8F%E5%8C%96%E6%9C%8D%E5%8A%A1%EF%BC%88qserve%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aqserve%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/qserve.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="cacheblend.html"><small>本分支上一个 · 2024.05</small><b>CacheBlend非前缀KV复用</b></a><a class="r" href="mooncake.html"><small>本分支下一个 · 2024.06</small><b>Mooncake以KV缓存为中心</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

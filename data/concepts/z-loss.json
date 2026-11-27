@@ -1,0 +1,9 @@
+{
+  "key": "z-loss",
+  "short": "大模型训练中防止输出logits数值失控的两种技巧：z-loss给softmax归一化项的对数加一个平方惩罚，让它保持在0附近；logit软上限用tanh把logits平滑地压在一个范围内。",
+  "body": "大模型训练有时会在跑了很久之后突然出现损失尖峰甚至发散，一个常见的诱因是logits越变越大。softmax只关心logits之间的差（见[[c:softmax]]），所有logits同时加一个常数，概率完全不变，所以普通的交叉熵损失对logits的整体大小没有任何约束，它可以悄悄地漂移。数值很大时，低精度格式（见[[c:floating-point]]）下的指数运算和求和容易出现溢出和舍入误差，梯度也会变得不稳定。\n\n**z-loss**。设输出层的logits为z，归一化项（配分函数）为`Z = Σ_i exp(z_i)`。在交叉熵之外加一项：\n\n`L_z = α · (log Z)²`\n\n它推动`log Z`接近0，即让softmax“本来就差不多归一化了”，从而把logits的整体水平钉在一个合理范围内；对预测分布本身几乎没有影响。[[palm]]在训练中使用了它（论文中系数取10^−4），以提高稳定性。在[[c:mixture-of-experts]]里，对路由器的logits加类似的“路由z-loss”，也是稳定训练的常用手段。\n\n**logit软上限**（soft-capping）。直接对logits做一个平滑的截断：\n\n`z' = c · tanh(z / c)`\n\nz远小于c时`z' ≈ z`，几乎不变；z很大时`z'`被压到不超过c。它不像硬截断那样在边界处梯度突然消失。[[gemma-2]]对注意力分数和最终输出的logits都做了软上限。\n\n**相关做法**。注意力内部也有同样的问题：Q和K的点积可能变得很大，让注意力权重退化为one-hot（见[[c:query-key-value]]）。[[qk-norm]]对Q和K先做归一化再点积，是控制注意力logits的另一种办法，在[[olmo-2]]等模型中用于稳定训练。这几种技巧都属于大模型训练的“稳定性配方”，与[[c:gradient-clipping]]、学习率预热（见[[c:learning-rate]]）配合使用。",
+  "example": "三个logits [10, 9, 8]，Z = e^10 + e^9 + e^8 ≈ 22026 + 8103 + 2981 = 33110，log Z ≈ 10.41，z-loss（α = 10^−4）≈ 10^−4 × 108.4 ≈ 0.011。把三个logits都减去10.41，得到[−0.41, −1.41, −2.41]，softmax概率完全不变（约0.67、0.24、0.09），但log Z变成0，z-loss也变成0。\n\n软上限：c = 30，z = 10时`30·tanh(1/3) ≈ 9.65`，几乎不变；z = 100时`30·tanh(3.33) ≈ 29.9`，被压到30以下。",
+  "pitfalls": "- 这里的“z”指softmax归一化项Z，与统计学的z分数、扩散模型的潜变量z都无关。\n- 加了软上限的模型，推理时也必须做同样的变换，否则输出分布会变；一些推理框架早期不支持，导致结果对不上。",
+  "aka": ["z-loss", "z loss", "logit soft-capping", "soft-capping", "logit软上限", "软截断", "logit capping", "router z-loss", "路由z-loss", "log Z惩罚", "logit漂移"],
+  "needs": ["softmax", "cross-entropy"]
+}

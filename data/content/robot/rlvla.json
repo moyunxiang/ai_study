@@ -1,0 +1,33 @@
+{
+  "id": "rlvla",
+  "who": "Jijia Liu, Feng Gao, Bingwen Wei, Xinlei Chen, Qingmin Liao, Yi Wu, Chao Yu, Yu Wang · 清华大学",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2505.19789"},
+    {"label": "项目主页", "url": "https://rlvla.github.io"}
+  ],
+  "aka": ["RLVLA", "RL-VLA", "RL4VLA", "RL for VLA", "强化学习对VLA泛化的作用", "VLA强化学习实证研究", "RL与SFT泛化对比", "VLA RL vs SFT"],
+  "problem": "大家开始给VLA做强化学习微调，但RL到底比监督微调多带来了哪种泛化、该用PPO还是从大模型借来的GRPO/DPO，没有系统比较。",
+  "idea": "在ManiSkill里搭一个从视觉、语义、执行三个维度测分布外泛化的抓放基准，同一个OpenVLA分别做SFT和PPO/GRPO/DPO微调，逐项对比。",
+  "impact": "结论是RL主要改善语义理解和执行鲁棒性，视觉鲁棒性与SFT相当；PPO比GRPO、DPO更有效，并给出单卡A100约42小时可收敛的PPO配方。",
+  "method": "**卡在哪**：[[openvla]]这类VLA用[[c:imitation-learning]]训练，一旦偏离示范轨迹就容易误差累积（见[[c:distribution-shift]]）。大语言模型那边[[grpo]]、[[dpo]]很流行，于是有人直接搬到VLA上，但没人系统回答过：RL微调到底在哪些方面比监督微调（SFT）泛化更好，哪种算法最合适。\n\n**做法**：作者在[[maniskill3]]里设计一个抓放任务，训练时随机化16种桌面、16种物体和执行位姿，测试时再分三类分布外变化：视觉（没见过的桌面、强噪声）、语义（没见过的物体、换种说法的指令、多物体干扰）、执行（没见过的机械臂初始位姿、执行中途把物体挪走）。SFT基线用运动规划器生成示范，数据加到约1.6万条轨迹时性能饱和。RL一侧用[[ppo]]、[[grpo]]和轨迹级[[dpo]]三种算法，都配[[lora]]。PPO配方有三点：actor和critic共享VLA主干，只在第一个动作token的隐状态上接一个三层MLP价值头（单独的critic主干慢35%、显存多83%）；先用少量示范把VLA热身，环境步数省约一半；每批数据只更新1轮。\n\n**结果**：执行维度差距最大，例如没见过的初始位姿成功率SFT为0.339、RL为0.797，中途挪动物体为0.286对0.745；语义维度上没见过的物体从0.453升到0.714；视觉维度两者接近（强噪声0.505对0.667，没见过的桌面0.719对0.844）。三种算法中PPO稳定领先。",
+  "limits": [
+    {"text": "只研究了一个抓放任务族和一个模型（OpenVLA），结论能否推广到长时序任务、连续动作或流匹配动作头的VLA，本文没有验证。", "solved_by": ["pi-rl"]},
+    {"text": "所有RL都在可重置、可并行的仿真器里做，真机上RL的样本成本和安全问题没有涉及。", "solved_by": []},
+    {"text": "PPO对比GRPO、DPO的优势是在一种奖励设置和一种超参下得到的，后续用GRPO的工作在别的基准上也取得了好结果，算法选择并无定论。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "openvla", "type": "uses", "note": "以OpenVLA为统一的被测模型，SFT与各种RL都从它出发。"},
+    {"to": "ppo", "type": "uses", "note": "主力算法，配合共享主干的价值头、示范热身和单轮更新形成高效配方。"},
+    {"to": "grpo", "type": "rivals", "note": "把大模型推理里流行的GRPO放到同一基准上对比，发现对VLA不如PPO。"},
+    {"to": "dpo", "type": "rivals", "note": "轨迹级DPO作为离线偏好路线参与对比，泛化收益小于PPO。"},
+    {"to": "maniskill3", "type": "uses", "note": "在ManiSkill里搭建三维度分布外泛化基准并做GPU并行RL训练。"}
+  ],
+  "prereq": ["vla-concept", "imitation-learning", "policy-gradient-concept", "actor-critic", "distribution-shift", "generalization"],
+  "terms": [
+    {"t": "价值头", "d": "接在策略网络某层隐状态后面的小网络，输出对当前状态好坏的估计V(s)，供PPO计算优势。"},
+    {"t": "分布外（OOD）", "d": "测试时出现训练数据里没有的情况，比如没见过的物体或初始姿态。"}
+  ],
+  "learn": "先复习[[ppo]]的优势估计和裁剪目标，再看原文第4节的三维度泛化表和第5节各算法对比；可用作者开源代码在ManiSkill上复现PPO配方。",
+  "check": {"source": "https://arxiv.org/abs/2505.19789", "confirmed": "标题、8位作者、v1日期2025-05-26；HTML正文：OpenVLA+ManiSkill、16桌面16物体、SFT约16k轨迹饱和、共享主干MLP价值头（独立critic慢35%、显存多83%）、热身省约50%步数、单轮更新、单A100约42小时；表中0.339/0.797、0.286/0.745、0.453/0.714、0.505/0.667、0.719/0.844。"}
+}

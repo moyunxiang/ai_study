@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>IPPO独立PPO（2020） · AI脉络</title>
+<meta name="description" content="合作MARL的主流方法都在学一个集中式的联合价值（、），理由是独立学习面对的环境是非平稳的、理论上站不住；但这种复杂设计在实践中到底带来多少好处，没有被认真检验过。 做一个反例式的实验：每个智能体各自跑，只用自己的局部观测估计局部价值函数，不学任何联合价值，几乎不调超参数，直接与当时最好的联合学习…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ippo.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="IPPO独立PPO（2020）">
+<meta property="og:description" content="合作MARL的主流方法都在学一个集中式的联合价值（、），理由是独立学习面对的环境是非平稳的、理论上站不住；但这种复杂设计在实践中到底带来多少好处，没有被认真检验过。 做一个反例式的实验：每个智能体各自跑，只用自己的局部观测估计局部价值函数，不学任何联合价值，几乎不调超参数，直接与当时最好的联合学习…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ippo.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ippo">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 多智能体与电子游戏</div>
+<h1>IPPO独立PPO</h1>
+<div class="full">Is Independent Learning All You Need in the StarCraft Multi-Agent Challenge?</div>
+<div class="meta"><span>2020.11</span><span>论文</span><span>延伸</span><span>Christian Schroeder de Witt, Tarun Gupta, Denys Makoviichuk, Viktor Makoviychuk, Philip H. S. Torr, Mingfei Sun, Shimon Whiteson · 牛津大学 / NVIDIA</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2011.09533" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/ippo">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>合作MARL的主流方法都在学一个集中式的联合价值（<a class="ln" href="../n/qmix.html">QMIX值分解</a>、<a class="ln" href="../n/coma.html">COMA反事实策略梯度</a>），理由是独立学习面对的环境是非平稳的、理论上站不住；但这种复杂设计在实践中到底带来多少好处，没有被认真检验过。</p></div><div><h4>方法</h4><p>做一个反例式的实验：每个智能体各自跑<a class="ln" href="../n/ppo.html">PPO</a>，只用自己的局部观测估计局部价值函数，不学任何联合价值，几乎不调超参数，直接与当时最好的联合学习方法在<a class="ln" href="../n/smac.html">星际多智能体挑战SMAC</a>上比较。</p></div><div><h4>影响</h4><p>发现独立PPO在SMAC上与最好的联合学习方法相当甚至更好，动摇了“合作MARL必须学联合价值”的默认看法，与几个月后的<a class="ln" href="../n/mappo.html">MAPPO</a>一起让PPO类方法成为合作MARL的标准基线。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>多智能体RL里最朴素的做法是独立学习：每个智能体把别人当成环境的一部分，各学各的（<a class="ln" href="../n/independent-q.html">独立Q学习多智能体</a>）。教科书式的反对理由是：别人的策略在不断变化，从单个智能体看环境是非平稳的，Q学习的收敛保证失效，经验回放里的旧数据也会过时。于是2017年后的工作大多在集中训练、分散执行（CTDE）的框架下学一个联合的价值函数，再设法分解或用作评论家，比如<a class="ln" href="../n/vdn.html">VDN值分解网络</a>、<a class="ln" href="../n/qmix.html">QMIX值分解</a>、<a class="ln" href="../n/coma.html">COMA反事实策略梯度</a>、<a class="ln" href="../n/maddpg.html">MADDPG</a>。这些方法在星际多智能体挑战<a class="ln" href="../n/smac.html">星际多智能体挑战SMAC</a>上互相刷新成绩，但没有人系统地检验：最简单的独立学习到底差多少？</p><h2>方法</h2><p>IPPO（Independent PPO）就是给每个智能体一个<a class="ln" href="../n/ppo.html">PPO</a>：策略 <code>π_i(u_i | τ_i)</code> 和价值函数 <code>V_i(τ_i)</code> 都只用该智能体自己的观测历史，优势用<a class="ln" href="../n/gae.html">广义优势估计GAE</a>估计，更新用PPO的截断目标 <code>L = E[min(r_t·Â_t, clip(r_t, 1−ε, 1+ε)·Â_t)]</code>，其中 <code>r_t</code> 是新旧策略概率比。智能体之间可以共享网络参数（输入里带上智能体编号），但不共享任何集中式的价值或状态信息。</p><p>作者把IPPO与QMIX等联合学习方法放在同样的SMAC地图上对比，并比较了几种变体，例如把价值函数换成以全局状态为输入的集中式价值，以检验“集中式价值”是否必要。</p><h2>结果</h2><p>摘要称，尽管有各种理论缺陷，IPPO在SMAC上几乎不调超参数就能与最先进的联合学习方法表现相当或更好；变体对比的结果表明，IPPO表现好可能是因为它对某些形式的环境非平稳性更鲁棒。</p><h2>后来的发展</h2><p>同一时期<a class="ln" href="../n/mappo.html">MAPPO</a>更系统地说明了PPO加上合适的实现细节（价值归一化、集中式价值输入的设计等）在多个合作基准上都很强；此后合作MARL论文普遍把IPPO和MAPPO列为基线。另一方面，这类发现也促使人们怀疑SMAC本身是否足够难，后来<a class="ln" href="../n/smacv2.html">SMACv2程序化星际挑战</a>指出SMAC缺乏随机性和部分可观测性。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>结论主要来自SMAC，后来发现SMAC的很多场景用不依赖观测的开环策略就能取得不错胜率，IPPO的强势部分可能反映的是基准太简单。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/smacv2.html">SMACv2程序化星际挑战</a></div></li><li>独立学习在需要精细信用分配或强协同探索的任务上仍缺乏理论保证，什么时候独立学习够用没有给出判据。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/ppo.html">PPO</a><span class="yr">2017.07 · RL</span><div class=nt>每个智能体就是一个PPO学习者，用截断的策略比目标更新。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/gae.html">广义优势估计GAE</a><span class="yr">2015.06 · RL</span><div class=nt>用广义优势估计计算每个智能体的局部优势。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/qmix.html">QMIX值分解</a><span class="yr">2018.03 · RL</span><div class=nt>QMIX学集中的单调联合Q值；IPPO不学任何联合价值，却在SMAC上表现相当或更好。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/independent-q.html">独立Q学习多智能体</a><span class="yr">1993 · RL</span><div class=nt>沿用独立学习的思路，但把独立的Q学习换成独立的PPO，避开了回放数据过时的问题。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/smac.html">星际多智能体挑战SMAC</a><span class="yr">2019.02 · RL</span><div class=nt>全部对比实验在星际多智能体挑战上进行。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/smacv2.html">SMACv2程序化星际挑战</a><span class="yr">2022.12 · RL</span><div class=nt>结论主要来自SMAC，后来发现SMAC的很多场景用不依赖观测的开环策略就能取得不错胜率，IPPO的强势部分可能反映的是基准太简单。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a> <a class="chip c" href="../c/credit-assignment.html">信用分配</a> <a class="chip c" href="../c/ablation-baseline.html">基线与消融实验</a></p>
+<h2>本篇术语</h2><ul><li><b>非平稳性</b>　从一个智能体的角度看，其他智能体也在学习、策略不断变化，所以同样的状态和动作带来的结果分布会随时间变化，违背单智能体RL的基本假设。</li></ul>
+<h2>怎么学</h2><p>先复习<a class="ln" href="../n/ppo.html">PPO</a>和<a class="ln" href="../n/qmix.html">QMIX值分解</a>；读原文的实验部分，看不同地图上IPPO与QMIX的胜率曲线；再读<a class="ln" href="../n/mappo.html">MAPPO</a>，对比两篇对“为什么PPO在合作MARL里有效”的不同解释。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2011.09533" rel="noopener">https://arxiv.org/abs/2011.09533</a>（标题、七位作者、arXiv v1于2020-11-18；摘要中CTDE方法多数估计集中联合价值、IPPO每个智能体只估计局部价值、尽管有理论缺陷却在SMAC上与最先进联合学习方法相当或更好且几乎不调参、与若干变体比较、强表现可能源于对某些非平稳性的鲁棒性。PPO目标与参数共享的写法按通行描述；机构按作者通行所属。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20IPPO%E7%8B%AC%E7%AB%8BPPO%EF%BC%88ippo%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aippo%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ippo.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="revisiting-rainbow.html"><small>本分支上一个 · 2020.11</small><b>小环境重访Rainbow</b></a><a class="r" href="loon.html"><small>本分支下一个 · 2020.12</small><b>Loon平流层气球导航</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

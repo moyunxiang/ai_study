@@ -1,0 +1,29 @@
+{
+  "id": "uni-moe",
+  "aka": ["Uni-MoE", "统一多模态MoE", "UMOE"],
+  "who": "Yunxin Li, Shenyuan Jiang, Baotian Hu, Longyue Wang, Wanqi Zhong, Wenhan Luo, Lin Ma, Min Zhang · 哈尔滨工业大学（深圳）等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2405.11273"},
+    {"label": "代码", "url": "https://github.com/HITsz-TMG/UMOE-Scaling-Unified-Multimodal-LLMs"}
+  ],
+  "problem": "MoE已经用来高效放大语言模型和图文模型，但专家数量少、只覆盖图文两种模态；一个模型同时处理图像、视频、语音、音频时，各模态互相拖累，训练成本也高。",
+  "idea": "各模态用专门编码器加连接器接入LLM，LLM内部换成稀疏MoE；用三阶段渐进训练：先对齐各模态连接器，再用跨模态指令数据分别训练各模态偏好的专家，最后用LoRA在混合指令数据上整体微调。",
+  "impact": "在多种多模态数据集上显著减少混合数据训练时的“模态偏差”，提升专家协作与泛化；是把MoE用于覆盖音频、语音的统一多模态LLM的早期代表，后续有Uni-MoE-2.0-Omni。",
+  "method": "[[moe-llava]]把[[c:mixture-of-experts]]带进图文大模型，只激活部分专家就能扩大参数量而不显著增加计算。但它只处理图像。若要同时处理图像、视频、语音和一般音频，不同模态的数据分布差异很大，把它们混在一起直接训练，常出现某些模态被压制、整体表现偏向数据多的模态。\n\nUni-MoE的结构是：每种模态一个专门编码器（图像、音频、语音等），通过各自的连接器映射成统一的表示，送进内部为稀疏MoE层的LLM。系统上用模态级数据并行和专家级模型并行提高训练和推理效率。\n\n训练分三步：\n- **跨模态对齐**：用不同的跨模态数据训练各个连接器，让各模态表示落到LLM能读的空间；\n- **训练模态专家**：用各模态的指令数据分别训练对应的专家，激活它们对特定模态的偏好；\n- **整体微调**：在混合多模态指令数据上，用[[lora]]微调整个Uni-MoE框架。\n\n论文报告，经过这种渐进训练，模型在混合多模态数据上的性能偏差明显减小，专家间的协作和泛化也更好。",
+  "limits": [
+    {"text": "只做理解，输出仍是文字，不能像全模态对话模型那样直接生成语音。", "solved_by": ["qwen-omni"]},
+    {"text": "三阶段训练和各模态专门编码器让系统组件很多，加入新模态需要重新走一遍对齐和专家训练。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "moe-llava", "type": "extends", "note": "把MoE-LLaVA的图文稀疏专家推广到图像、视频、语音、音频多种模态，并增加模态专家训练阶段。"},
+    {"to": "mixtral", "type": "uses", "note": "采用稀疏MoE语言模型的结构，每个token只激活少数专家。"},
+    {"to": "lora", "type": "uses", "note": "最后一阶段用LoRA在混合指令数据上微调整个框架。"},
+    {"to": "imagebind", "type": "rivals", "note": "ImageBind把多模态对齐到同一嵌入空间做检索，Uni-MoE把多模态接进LLM做生成式理解。"}
+  ],
+  "prereq": ["mixture-of-experts", "peft-concept", "instruction-tuning", "embedding", "distributed-training"],
+  "terms": [
+    {"t": "模态偏差（modality bias）", "d": "多种模态的数据混合训练时，模型偏向某些模态（通常是数据多的那种）、在其他模态上表现变差的现象。"}
+  ],
+  "learn": "先读[[moe-llava]]和[[mixtral]]理解稀疏专家，再看Uni-MoE论文的三阶段训练示意图，比较各阶段后在不同模态任务上的变化。",
+  "check": {"source": "https://arxiv.org/abs/2405.11273", "confirmed": "标题、八位作者、v1提交2024-05-18；摘要：已有MoE专家少且模态有限、模态专用编码器与连接器、LLM内部稀疏MoE、模态级数据并行与专家级模型并行、三阶段渐进训练（跨模态对齐/训练模态专家/LoRA混合微调）、显著减少混合数据性能偏差。后续Uni-MoE-2.0-Omni用arXiv标题检索确认存在（2511.12609，2025-11）。“覆盖图像视频语音音频”的模态列表、机构为一般了解。"}
+}

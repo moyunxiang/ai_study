@@ -1,0 +1,30 @@
+{
+  "id": "packnet-sfm",
+  "who": "Vitor Guizilini, Rares Ambrus, Sudeep Pillai, Allan Raventos, Adrien Gaidon · 丰田研究院（TRI）",
+  "venue": "CVPR 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1905.02693"},
+    {"label": "代码", "url": "https://github.com/TRI-ML/packnet-sfm"}
+  ],
+  "aka": ["PackNet", "PackNet-SfM", "3D Packing", "DDAD", "Dense Depth for Automated Driving"],
+  "problem": "自监督单目深度（[[sfmlearner]]、[[monodepth2]]）只用无标注视频训练，但编码器反复池化和步长卷积会丢掉细节，深度图模糊；而且网络往往依赖ImageNet预训练，加大输入分辨率也不见得变好。",
+  "idea": "用“打包/解包”块替代下采样和上采样：把相邻像素重排进通道维（space-to-depth），再用3D卷积压缩；解码时反过来解包。这样缩小特征图时不扔掉信息，细节能保留到输出。",
+  "impact": "在KITTI上让纯自监督方法追上甚至超过部分有监督方法；同时发布的DDAD驾驶数据集提供了更远、更密的激光雷达真值，成为自监督深度的常用评测集。",
+  "method": "训练目标和[[sfmlearner]]一样：给定视频里相邻几帧，深度网络预测当前帧深度，位姿网络预测相机运动，用深度和位姿把邻帧“扭”到当前视角，最小化两者的光度差。不需要任何深度真值。\n\nPackNet的改动在深度网络结构上：\n\n- **打包块**：把H×W×C的特征按2×2重排成H/2×W/2×4C（不丢任何数值），再加一个维度当成3D张量做3D卷积，学习如何把这些空间信息压缩进特征；\n- **解包块**：用卷积扩出通道，再按depth-to-space重排回更高分辨率。\n\n摘要报告：虽然是自监督，它在KITTI上超过了其他自监督、半监督和全监督方法；3D归纳偏置让它在加大分辨率和参数量时不过拟合，并能更好泛化到NuScenes；不需要ImageNet预训练，可以实时运行。论文还发布了DDAD数据集，用多辆自动驾驶车的高密度激光雷达生成更远距离、更稠密的深度真值。",
+  "limits": [
+    {"text": "仍然只从单一领域的驾驶视频学习，换到室内或网络图片时泛化有限。", "solved_by": ["midas", "depth-anything"]},
+    {"text": "光度一致性假设在运动物体、遮挡和弱纹理处失效，单目尺度也只能靠额外信息（如速度）恢复。", "solved_by": ["metric3d", "unidepth"]}
+  ],
+  "relations": [
+    {"to": "sfmlearner", "type": "uses", "note": "沿用“深度网络+位姿网络、用视图合成的光度误差做监督”的自监督框架。"},
+    {"to": "monodepth2", "type": "solves", "note": "Monodepth2用普通ResNet编码器，下采样丢细节；PackNet用可逆重排加3D卷积保留细节，KITTI上精度更高。"},
+    {"to": "monodepth", "type": "extends", "note": "同属不需要深度真值、靠图像重建误差训练深度的路线。"}
+  ],
+  "prereq": ["self-supervised", "camera-geometry", "conv-layer", "encoder-decoder"],
+  "terms": [
+    {"t": "space-to-depth", "d": "把2×2邻域的像素搬到通道维，分辨率减半、通道变4倍，信息一个不丢，可逆。"},
+    {"t": "光度一致性", "d": "同一个三维点在相邻帧里应该颜色相同，所以用预测的深度和位姿重投影后颜色差越小越好。"}
+  ],
+  "learn": "先读SfMLearner弄懂视图合成损失，再看本文第3节的打包/解包块示意图；在PyTorch里用pixel_unshuffle和pixel_shuffle验证这对操作是可逆的。",
+  "check": {"source": "https://arxiv.org/abs/1905.02693", "confirmed": "arXiv记录：标题、五位作者、v1提交于2019-05-06；摘要中的只用无标签单目视频、对称的打包与解包块与3D卷积、KITTI上超过其他自/半/全监督方法、扩分辨率和参数不过拟合、泛化到NuScenes、无需ImageNet预训练、实时、发布DDAD数据集。CVPR 2020、space-to-depth的具体实现凭一般了解写。"}
+}

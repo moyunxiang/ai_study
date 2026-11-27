@@ -1,0 +1,30 @@
+{
+  "id": "chain-of-table",
+  "who": "Zilong Wang, Hao Zhang, Chun-Liang Li, Julian Martin Eisenschlos, Vincent Perot, Zifeng Wang, Lesly Miculicich, Yasuhisa Fujii et al. · UC圣迭戈 / Google Cloud AI Research / Google Research",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2401.04398"}
+  ],
+  "aka": ["Chain-of-Table", "Chain of Table", "表格推理链", "表格思维链", "表格链", "table reasoning chain"],
+  "problem": "表格问答要同时读懂问题和半结构化的表格；思维链把中间推理写成文字，表格本身不变，长表格里关键信息被淹没；一次性写完整SQL或程序又容易在复杂问题上出错。",
+  "idea": "让中间步骤直接作用在表格上：LLM每一步从加列、选行、选列、分组、排序这几种原子操作里挑一个并填参数，由程序执行得到新表，再看着新表决定下一步，最后用变换后的小表回答。",
+  "impact": "在PaLM 2上把WikiTQ准确率做到67.31%、TabFact做到86.61%，分别比此前最好的方法高5.83和1.98个点，并在GPT-3.5、LLaMA 2上同样有效。",
+  "method": "举个示意的例子：问题是“哪个国家拿到的金牌最多”，原表有几十行比赛记录。Chain-of-Table的推理链大致是：先选出“国家”和“奖牌”两列，再按国家分组计数，再按数量排序，最后对着只剩几行的小表作答。每一步表格都在变，这串不断变化的表就是“推理链”。好处是模型每一步面对的表格越来越小、越来越贴近问题，不必在几十行原始记录里一次找全所有信息。\n\n每一轮分两次调用LLM。**动态规划**：给出当前表、已执行的操作链和问题，让模型从操作池（f_add_column、f_select_row、f_select_column、f_group_by、f_sort_by）中选下一个操作或结束；**生成参数**：让模型写出该操作的参数，如按哪一列分组，用正则表达式解析后由程序在表上执行。这些操作对应SQL和[[pandas]]数据框里的常见动作。循环直到模型输出结束标记，再用最终的表回答问题。\n\n与[[pal]]和Binder那类一次写好整段程序的方法相比，它每一步都能看到上一步的真实结果再规划，类似[[react]]的“行动—观察”循环，只是观察对象换成了表格。实验用[[palm-2]]、GPT-3.5和LLaMA 2；PaLM 2上，WikiTQ为67.31%（Dater 61.48%、Binder 54.88%），TabFact为86.61%（Dater 84.63%）。",
+  "limits": [
+    {"text": "只有五种固定的原子操作，需要复杂计算、跨表连接或多步算术的问题难以表达；每一步要两次LLM调用，长链条成本和延迟都会上升。", "solved_by": []},
+    {"text": "操作选错一步（如误删了需要的行），后面的表格就丢失信息，方法本身没有回退或纠错机制。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "cot", "type": "extends", "note": "保留逐步推理的思路，但中间状态从一段文字换成一张被不断变换的表格。"},
+    {"to": "pal", "type": "rivals", "note": "PAL式方法一次生成完整程序再执行；Chain-of-Table每次只生成一个操作，执行后看结果再规划下一步。"},
+    {"to": "react", "type": "extends", "note": "沿用“推理—行动—观察”的循环，动作是表格操作，观察是执行后的新表格。"},
+    {"to": "palm-2", "type": "uses", "note": "主实验的底座模型之一，WikiTQ和TabFact的最好成绩在PaLM 2上取得。"},
+    {"to": "pandas", "type": "uses", "note": "原子操作对应数据框处理中常见的选行、选列、分组和排序，由程序而非LLM执行。"}
+  ],
+  "prereq": ["in-context-learning", "reasoning-tokens", "tool-calling", "agent-loop"],
+  "terms": [
+    {"t": "原子操作", "d": "不可再拆的基本表格变换，例如“只保留某几列”“按某列排序”，复杂的处理由它们串起来完成。"},
+    {"t": "WikiTQ与TabFact", "d": "两个表格理解基准：前者是针对维基百科表格的问答，后者判断一句陈述是否被表格支持。"}
+  ],
+  "learn": "先读[[cot]]和[[react]] → 读原文第3节算法（动态规划与参数生成）和表1 → 动手：用pandas实现五个操作，让LLM在一张奖牌表上逐步选择操作回答“谁的金牌最多”。",
+  "check": {"source": "https://arxiv.org/abs/2401.04398", "confirmed": "标题、11位作者、v1提交于2024-01-09；摘要中WikiTQ、FeTaQA、TabFact；arxiv.org/html/2401.04398v2核对单位、五种原子操作、DynamicPlan与GenerateArgs流程、PaLM 2/GPT-3.5/LLaMA 2、PaLM 2上67.31/61.48/54.88与86.61/84.63、领先5.83与1.98；页面未写正式发表处。"}
+}

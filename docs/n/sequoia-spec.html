@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Sequoia最优草稿树（2024） · AI脉络</title>
+<meta name="description" content="树状推测解码一次验证一整棵候选词树，但树的形状靠手工设定；树一大，加速就不再增长，换了采样温度或硬件，原来的树也不再最优。 用动态规划按“每个位置的候选被接受的概率”求出给定预算下期望接受词数最多的树形；配一种在各种温度下都稳定的采样—验证方法；再按硬件实测的前向耗时自动挑树的大小和深度。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sequoia-spec.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Sequoia最优草稿树（2024）">
+<meta property="og:description" content="树状推测解码一次验证一整棵候选词树，但树的形状靠手工设定；树一大，加速就不再增长，换了采样温度或硬件，原来的树也不再最优。 用动态规划按“每个位置的候选被接受的概率”求出给定预算下期望接受词数最多的树形；配一种在各种温度下都稳定的采样—验证方法；再按硬件实测的前向耗时自动挑树的大小和深度。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sequoia-spec.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sequoia-spec">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 解码与生成控制</div>
+<h1>Sequoia最优草稿树</h1>
+<div class="full">Sequoia: Scalable, Robust, and Hardware-aware Speculative Decoding</div>
+<div class="meta"><span>2024.02</span><span>论文</span><span>延伸</span><span>NeurIPS 2024</span><span>Zhuoming Chen, Avner May, Ruslan Svirschevski, Yuhsun Huang, Max Ryabinin, Zhihao Jia, Beidi Chen · 卡内基梅隆大学, Together AI, Yandex</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2402.12374" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/Infini-AI-Lab/Sequoia" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/sequoia-spec">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>树状推测解码一次验证一整棵候选词树，但树的形状靠手工设定；树一大，加速就不再增长，换了采样温度或硬件，原来的树也不再最优。</p></div><div><h4>方法</h4><p>用动态规划按“每个位置的候选被接受的概率”求出给定预算下期望接受词数最多的树形；配一种在各种温度下都稳定的采样—验证方法；再按硬件实测的前向耗时自动挑树的大小和深度。</p></div><div><h4>影响</h4><p>把草稿树的形状从手调参数变成可优化的对象，尤其在权重卸载到CPU、每次大模型前向都很贵的场景下，展示了推测解码可以带来近十倍的加速。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/specinfer.html">SpecInfer树状推测解码</a>把草稿组织成一棵树，大模型用一次前向（配合树形注意力掩码）同时验证所有分支，接受最长的正确路径。树越大，猜中的机会越多，但验证代价也越高；手工设定的树形在预算增大时收益很快饱和。</p><p>Sequoia有三个部分。<b>可扩展性</b>：假设草稿模型第k个候选被接受的概率只与k有关（可预先统计），则在节点总数固定时，使期望接受词数最大的树可以用动态规划精确求出，预算越大树形也随之最优地扩展。<b>鲁棒性</b>：设计新的采样与验证方式，在不同温度下（包括贪心）都保持与<a class="ln" href="../n/speculative-decoding.html">推测解码</a>相同的无损性，并比之前的方法更稳定。<b>硬件感知</b>：大模型验证n个token的耗时随n变化的曲线因GPU而异，优化器结合实测耗时自动选择树的大小和深度。</p><p>摘要报告：在A100上，Llama2-7B、Llama2-13B、Vicuna-33B的解码速度最多提升4.04、3.73、2.27倍；在L40上做权重卸载时，Llama2-70B精确推理延迟低至0.56秒/词，比作者优化过的卸载系统（5.6秒/词）快9.96倍，比DeepSpeed-Zero-Inference快9.7倍，比Hugging Face Accelerate快19.5倍。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>最优树的求解依赖“接受率只与候选排名有关”的简化假设，实际接受率随上下文变化；静态树不能针对每一步动态调整。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/eagle-2.html">EAGLE-2动态草稿树</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/speculative-decoding.html">推测解码</a><span class="yr">2022.11 · 系统·效率</span><div class=nt>保持推测解码的无损性，改进采样验证方法使其在各种温度下都稳定。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/flexgen.html">FlexGen单卡卸载推理</a><span class="yr">2023.03 · 系统·效率</span><div class=nt>在权重卸载到CPU的推理场景下，每次大模型前向极贵，推测解码收益更大。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/specinfer.html">SpecInfer树状推测解码</a><span class="yr">2023.05 · 系统·效率</span><div class=nt>SpecInfer式手工树形在预算增大时收益饱和，Sequoia用动态规划求最优树形。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/eagle-2.html">EAGLE-2动态草稿树</a><span class="yr">2024.06 · 系统·效率</span><div class=nt>最优树的求解依赖“接受率只与候选排名有关”的简化假设，实际接受率随上下文变化；静态树不能针对每一步动态调整。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/dynamic-programming.html">动态规划</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+<h2>本篇术语</h2><ul><li><b>草稿树</b>　把多个候选续写组织成一棵树，每条从根到叶的路径都是一种可能的续写，由大模型一次并行验证。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2402.12374" rel="noopener">https://arxiv.org/abs/2402.12374</a>（标题、七位作者、v1日期2024-02-19；摘要：现有方法难以扩展到更大推测预算、难以适应不同超参与硬件、动态规划求最优token树结构、新的采样与验证方法在不同温度下更好、硬件感知树优化器自动选树大小与深度、A100上Llama2-7B/13B/Vicuna-33B最多4.04/3.73/2.27倍、L40卸载下Llama2-70B 0.56 s/token比自有卸载系统5.6 s/token快9.96倍、比DeepSpeed-Zero-Inference快9.7倍、比HF Accelerate快19.5倍。接受率只依赖排名的假设、NeurIPS 2024、机构为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Sequoia%E6%9C%80%E4%BC%98%E8%8D%89%E7%A8%BF%E6%A0%91%EF%BC%88sequoia-spec%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asequoia-spec%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sequoia-spec.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="cllm.html"><small>本分支上一个 · 2024.02</small><b>CLLM一致性并行解码</b></a><a class="r" href="bitnet.html"><small>本分支下一个 · 2024.02</small><b>1.58比特模型BitNet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

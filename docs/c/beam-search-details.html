@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>束宽、长度惩罚与束搜索的细节（Beam Width, Length Penalty and Beam Search Details） · AI脉络</title>
+<meta name="description" content="束搜索的几个关键设置：束宽决定同时保留几条候选；长度惩罚（长度归一化）修正“短句累积概率天然更高”的偏差；提前停止决定何时结束搜索。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/beam-search-details.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="束宽、长度惩罚与束搜索的细节（Beam Width, Length Penalty and Beam Search Details）">
+<meta property="og:description" content="束搜索的几个关键设置：束宽决定同时保留几条候选；长度惩罚（长度归一化）修正“短句累积概率天然更高”的偏差；提前停止决定何时结束搜索。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/beam-search-details.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/beam-search-details">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>束宽、长度惩罚与束搜索的细节</h1><div class="full">Beam Width, Length Penalty and Beam Search Details</div>
+<p class="muted" style="font-size:13px">也叫：beam width　束宽　beam size　num_beams　length penalty　长度惩罚　length normalization　长度归一化　early_stopping　提前停止（束搜索）　diverse beam search　多样化束搜索　约束束搜索　constrained beam search　束搜索细节</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/beam-search-details">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>束搜索的几个关键设置：束宽决定同时保留几条候选；长度惩罚（长度归一化）修正“短句累积概率天然更高”的偏差；提前停止决定何时结束搜索。</b></p>
+<p class="tags">先要会：<a class="chip c" href="decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a></p>
+<p><a class="lc" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a>介绍了束搜索的基本思想：每一步保留累积对数概率最高的B条部分序列。真正用起来，还有几个细节决定了效果。</p><p><b>束宽B</b>。B = 1就是贪心解码。B越大，越可能找到整体概率更高的序列，但计算量和显存约为B倍。机器翻译常用4到10；更大的束宽往往带来的提升很小，有时反而更差（见下）。</p><p><b>长度偏差</b>。序列的得分是各步对数概率之和：</p><p class="formula"><code>score(y) = Σ_t log p(y_t | y_&lt;t, x)</code></p><p>每一项都是负数，序列越长，加的负数越多。所以束搜索天然偏爱<b>短</b>序列：只要模型给EOS（见<a class="lc" href="../c/stopping-criteria.html">生成的停止条件</a>）一个不太低的概率，提早结束的候选就可能胜出。神经机器翻译中观察到，束宽变大时译文反而变短、质量下降，有研究发现在极大的束宽下，模型认为概率最高的输出常常是空句子。这说明问题出在模型的概率本身，而不只是搜索不够。</p><p><b>长度惩罚（长度归一化）</b>。用长度修正得分：</p><ul><li>简单平均：<code>score / |y|</code>。</li><li>GNMT的形式：<code>score / lp(y)</code>，<code>lp(y) = ((5 + |y|) / 6)^α</code>。α = 0时不做修正；α越大越鼓励长句。Hugging Face的<code>length_penalty</code>参数是<code>score / |y|^α</code>的指数α，大于0鼓励长输出、小于0鼓励短输出。</li></ul><p><b>提前停止</b>。当一条候选生成了EOS，就把它移入“已完成”列表，其他候选继续。什么时候整体停止？一种做法是凑够B条已完成的候选就停（early_stopping=True）；另一种是继续搜索，直到可以确定不会再有得分更高的候选。</p><p><b>其他变体</b>。</p><ul><li><b>多样化束搜索</b>：把束分成几组，组间加多样性惩罚，避免B条候选几乎一样。</li><li><b>约束束搜索</b>：强制输出包含某些词。</li><li><b>n-gram阻断</b>：不允许重复出现的n元组，见<a class="lc" href="../c/repetition-penalty.html">重复惩罚、频率惩罚与存在惩罚</a>。</li></ul><p><b>用在哪里</b>。有标准答案、输出与输入高度对应的任务：机器翻译（<a class="ln" href="../n/seq2seq.html">Seq2Seq</a>、<a class="ln" href="../n/transformer.html">Transformer</a>的实验都用束搜索）、语音识别、摘要。开放式对话和写作则改用采样，因为束搜索的输出容易平淡和重复（见<a class="ln" href="../n/nucleus-sampling.html">核采样Top-p</a>、<a class="lc" href="../c/text-degeneration.html">文本退化与重复循环</a>）。</p>
+<div class="example"><h4>例子</h4><p>两条已完成的候选：</p><ul><li>A：“好的。”，3个token，对数概率之和 −1.5。</li><li>B：“好的，我明天上午九点到。”，12个token，对数概率之和 −4.8。</li></ul><p>不做长度修正，A得分−1.5高于B的−4.8，选A。用平均对数概率：A = −0.50，B = −0.40，选B。用HF式长度惩罚、α = 1：同样是A −0.50、B −0.40，选B；α = 0时退化为不修正，选A。</p></div>
+<h2>容易误解的地方</h2><ul><li>束搜索的输出是确定的；同一个输入总得到同一个结果，需要多样的候选时要换用采样或多样化束搜索。</li><li>束宽越大并不总是越好：找到模型认为概率更高的输出，可能恰恰暴露了模型概率与人类偏好之间的偏差。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

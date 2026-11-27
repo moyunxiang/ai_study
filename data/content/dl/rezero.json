@@ -1,0 +1,25 @@
+{
+  "id": "rezero",
+  "who": "Thomas Bachlechner, Bodhisattwa Prasad Majumder, Huanru Henry Mao, Garrison W. Cottrell, Julian McAuley · 加州大学圣地亚哥分校",
+  "venue": "UAI 2021",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2003.04887"}],
+  "aka": ["ReZero", "零初始化残差门", "zero-init residual", "ReZero is All You Need"],
+  "problem": "很深的网络信号传播差，梯度容易消失或爆炸；当时的补救办法（精心设计的残差结构、归一化、复杂初始化）都比较繁琐。",
+  "idea": "每个残差分支乘一个初始化为0的可学习标量α：`x ← x + α·F(x)`。训练开始时整个网络就是恒等映射，满足动力学等距，之后α自己学大。",
+  "impact": "成为“零初始化残差分支”这一类技巧最常被引用的版本，与[[fixup]]、SkipInit一起说明深网络可以不依赖归一化层稳定训练。",
+  "method": "残差块写作 `x_{i+1} = x_i + α_i·F(x_i)`，α_i是每层一个标量，初值为0，不再在残差路径上放LayerNorm或BatchNorm。初始时每层都是恒等映射，输入输出的雅可比矩阵是单位阵，所有奇异值都等于1——这正是Pennington等人用自由概率论指出的“动力学等距”条件，信号与梯度都不会随深度衰减或放大。随着训练，梯度会把α推离0，各层逐渐“接通”。\n\n与Transformer常见的Post-LN、Pre-LN相比，ReZero把归一化完全去掉，只多出每层一个参数。摘要报告：它能训练上千层的全连接网络并收敛很快；在CIFAR-10上的ResNet收敛更快、测试表现更好；能轻松训练120层的Transformer；用在12层Transformer上时，在enwik8上收敛快56%。",
+  "limits": [
+    {"text": "在大规模语言模型中没有取代Pre-LN/RMSNorm，去掉归一化后对学习率和激活尺度更敏感。", "solved_by": []},
+    {"text": "只保证初始化时的信号传播，训练中后期的稳定性仍需其他手段。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "resnet", "type": "extends", "note": "在残差连接上加一个零初始化的门控标量。"},
+    {"to": "fixup", "type": "rivals", "note": "两者都用初始化让深网络免归一化；Fixup按深度缩放并把最后一层置零，ReZero只用一个零初始化标量。"},
+    {"to": "layernorm", "type": "rivals", "note": "在Transformer里直接去掉LayerNorm，用ReZero门代替。"},
+    {"to": "highway", "type": "extends", "note": "延续门控跳连的思路，但门不依赖输入、只是一个可学习标量。"}
+  ],
+  "prereq": ["residual-connection", "initialization", "vanishing-exploding", "normalization-layer"],
+  "terms": [{"t": "动力学等距（dynamical isometry）", "d": "网络输入输出雅可比矩阵的所有奇异值都接近1，信号和梯度经过任意多层都不会被放大或缩小。"}],
+  "learn": "先理解[[resnet]]和[[layernorm]]在深网络中的作用；读论文第3节动力学等距的论证；动手把一个小Transformer的LayerNorm换成ReZero，比较不同深度下的收敛速度。",
+  "check": {"source": "https://arxiv.org/abs/2003.04887", "confirmed": "标题、5位作者、arXiv v1 2020-03-10；摘要中零初始化单参数门控残差、动力学等距与Pennington等、上千层全连接、CIFAR-10 ResNet、120层Transformer、12层enwik8快56%。UAI 2021、机构、与Fixup的比较凭一般了解。"}
+}

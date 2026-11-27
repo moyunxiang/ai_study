@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MHA、MQA、GQA与MLA（MHA, MQA, GQA and MLA） · AI脉络</title>
+<meta name="description" content="多头注意力的几种变体，区别在于多少个查询头共用一组键和值：MHA每头一组，MQA所有头共用一组，GQA分组共用，MLA把键值压缩成一个低维向量。目的都是缩小KV缓存、加快推理。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/mha-mqa-gqa.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MHA、MQA、GQA与MLA（MHA, MQA, GQA and MLA）">
+<meta property="og:description" content="多头注意力的几种变体，区别在于多少个查询头共用一组键和值：MHA每头一组，MQA所有头共用一组，GQA分组共用，MLA把键值压缩成一个低维向量。目的都是缩小KV缓存、加快推理。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/mha-mqa-gqa.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/mha-mqa-gqa">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>MHA、MQA、GQA与MLA</h1><div class="full">MHA, MQA, GQA and MLA</div>
+<p class="muted" style="font-size:13px">也叫：MHA　MQA　GQA　MLA　多头注意力　multi-head attention　多查询注意力　multi-query attention　分组查询注意力　grouped-query attention　多头潜在注意力　multi-head latent attention　KV头　KV heads　num_key_value_heads</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/mha-mqa-gqa">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>多头注意力的几种变体，区别在于多少个查询头共用一组键和值：MHA每头一组，MQA所有头共用一组，GQA分组共用，MLA把键值压缩成一个低维向量。目的都是缩小KV缓存、加快推理。</b></p>
+<p class="tags">先要会：<a class="chip c" href="self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="kv-cache.html">KV缓存</a> <a class="chip c" href="query-key-value.html">查询、键与值（Q/K/V）</a></p>
+<p>大模型生成文本时，每一步都要读取所有历史token的K和V（见<a class="lc" href="../c/kv-cache.html">KV缓存</a>）。这份缓存随上下文长度线性增长，长对话、大批量时会占满显存，而且每一步都要把它从显存搬进计算单元，解码速度主要受内存带宽限制（见<a class="lc" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a>）。缩小KV缓存，就成了推理优化的头号目标。</p><p><b>每个token的KV缓存大小</b>：</p><p class="formula"><code>2 × 层数 × KV头数 × 每头维度 × 每个数的字节数</code></p><p>前面的2对应K和V。可以动的主要是“KV头数”。</p><p><b>MHA（多头注意力）</b>。<a class="ln" href="../n/transformer.html">Transformer</a>原本的设计：h个查询头，各有自己的K头和V头，KV头数 = h。表达能力最强，缓存最大。</p><p><b>MQA（多查询注意力）</b>。<a class="ln" href="../n/mqa.html">多查询注意力MQA</a>（2019）让所有查询头共用<b>一组</b>K和V，KV头数 = 1，缓存缩小为1/h。代价是质量有所下降，训练也可能不稳定。<a class="ln" href="../n/palm.html">PaLM</a>采用了它。</p><p><b>GQA（分组查询注意力）</b>。<a class="ln" href="../n/gqa.html">分组查询注意力GQA</a>（2023）折中：把h个查询头分成g组，每组共用一组K、V，KV头数 = g。g = h就是MHA，g = 1就是MQA。论文还提出可以把已训练好的MHA模型的KV头按组取平均，再少量继续训练，转换成GQA。<a class="ln" href="../n/llama-2.html">Llama 2</a>的大尺寸版本和<a class="ln" href="../n/mistral-7b.html">Mistral 7B</a>等模型使用GQA，它成为开源大模型的默认选择。</p><p><b>MLA（多头潜在注意力）</b>。<a class="ln" href="../n/deepseek-v2.html">DeepSeek-V2与MLA</a>提出：不缓存每个头的K、V，而是缓存一个低维的“潜在向量”，用时再通过矩阵把它还原成各头的K、V（见<a class="lc" href="../c/low-rank.html">低秩近似</a>）。缓存比GQA更小，而每个头仍有各自不同的K、V。旋转位置编码与这种压缩不兼容，所以MLA把位置信息放在额外的一小段维度里单独处理。</p><p>这些变体只改动K、V的数量，查询头数和注意力的计算方式不变；它们与<a class="lc" href="../c/efficient-attention.html">稀疏注意力与高效注意力</a>（改变“谁看谁”）是两类不同的优化。</p>
+<div class="example"><h4>例子</h4><p>设某模型有80层、64个查询头、每头维度128，用FP16（2字节）存储。</p><ul><li>MHA：每个token的KV缓存 = 2×80×64×128×2 = 2,621,440字节 ≈ 2.5MB。4096个token的上下文约10GB。</li><li>GQA，8个KV头：缩小到1/8，每token约0.31MB，4096个token约1.25GB。</li><li>MQA，1个KV头：再缩小到1/64，4096个token约0.16GB。</li></ul><p>同一张显卡上，缓存越小，能同时服务的请求越多、能支持的上下文越长。</p></div>
+<h2>容易误解的地方</h2><ul><li>GQA减少的是KV缓存和显存读写，不是参数量的主要部分，也几乎不减少训练时的计算量。</li><li>用张量并行把注意力头分到多张卡上时，KV头数太少（如MQA的1个）会让每张卡都得保留同一份K、V，节省效果打折扣。</li><li>“多头潜在注意力”的“潜在”指压缩后的低维向量，与生成模型的<a class="lc" href="../c/latent-space.html">潜空间</a>无关。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

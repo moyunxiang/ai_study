@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>字节级BPE（BBPE）（2019） · AI脉络</title>
+<meta name="description" content="字符级BPE的基础词表是全部字符，中文、日文这类字符繁多的语言会让大量生僻字占掉词表名额，噪声文本里的罕见字符还会变成未登录符号；直接用256个字节建模又让序列太长、计算太贵。 先把文本转成UTF-8字节序列，在字节上而不是字符上运行BPE合并，得到「字节级子词」词表：基础单位只有256个，任何文…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/bbpe.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="字节级BPE（BBPE）（2019）">
+<meta property="og:description" content="字符级BPE的基础词表是全部字符，中文、日文这类字符繁多的语言会让大量生僻字占掉词表名额，噪声文本里的罕见字符还会变成未登录符号；直接用256个字节建模又让序列太长、计算太贵。 先把文本转成UTF-8字节序列，在字节上而不是字符上运行BPE合并，得到「字节级子词」词表：基础单位只有256个，任何文…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/bbpe.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/bbpe">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 子词切分</div>
+<h1>字节级BPE（BBPE）</h1>
+<div class="full">Neural Machine Translation with Byte-Level Subwords</div>
+<div class="meta"><span>2019.09</span><span>论文</span><span>延伸</span><span>AAAI 2020</span><span>Changhan Wang, Kyunghyun Cho, Jiatao Gu · Facebook AI Research、纽约大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1909.03341" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/bbpe">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>字符级BPE的基础词表是全部字符，中文、日文这类字符繁多的语言会让大量生僻字占掉词表名额，噪声文本里的罕见字符还会变成未登录符号；直接用256个字节建模又让序列太长、计算太贵。</p></div><div><h4>方法</h4><p>先把文本转成UTF-8字节序列，在字节上而不是字符上运行BPE合并，得到「字节级子词」词表：基础单位只有256个，任何文本都不会有未登录符号；再用卷积或循环层给字节级嵌入补充上下文，弥补单个字节没有独立含义的问题。</p></div><div><h4>影响</h4><p>实验表明BBPE的词表只需BPE的约1/8就能取得相当的翻译质量，在多语言场景中词表共享更充分；字节级BPE（GPT-2首先在大模型中采用）此后成为GPT系列、LLaMA 3、Qwen等大语言模型分词器的主流做法。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/bpe.html">BPE子词切分</a>把罕见词切成子词，<a class="ln" href="../n/sentencepiece.html">SentencePiece</a>把空格也当作普通符号、做到语言无关，但它们的最小单位仍是字符（或Unicode码位）。英语只有几十个字母，汉字却有几万个，日文、韩文类似；字符级词表要么非常大，要么只能把罕见字符映射为未知符号。<a class="ln" href="../n/gpt-2.html">GPT-2</a>（2019年2月）在其技术报告中已经使用了在字节上运行的BPE，但没有对它做系统研究。另一方面，<a class="ln" href="../n/byt5.html">ByT5字节级模型</a>那样完全以字节为单位的模型要到后来才出现，当时字节级建模普遍被认为太慢。</p><h2>方法</h2><p><b>字节化。</b> 把文本按UTF-8编码成字节：英文字母各占1个字节，常见汉字占3个字节。例如「你」是三个字节 E4 BD A0。</p><p><b>在字节上做BPE。</b> 从256个字节出发，像普通BPE一样反复统计最频繁的相邻单元对并合并，例如把构成一个常用汉字的三个字节合成一个单元，或把英文中的常见字母组合合成一个单元。最终词表中既有完整的常用词或字，也有不足一个字符的「半个字」片段。任何输入都能被拆成这些单元，最坏情况退回单个字节，因此不存在未登录符号。</p><p><b>上下文化嵌入。</b> 一个字节片段（比如汉字的前两个字节）单独看没有意义，必须结合邻近片段才能确定它属于哪个字。作者在嵌入层之后加一个卷积层或双向GRU，让每个单元的表示融合左右邻居，再送入Transformer翻译模型。</p><p><b>解码修复。</b> 模型可能生成不构成合法UTF-8的字节序列，作者用动态规划从中恢复出最多的合法字符。</p><h2>结果</h2><p>摘要称：BBPE的翻译效果与BPE相当，而词表大小只有BPE的1/8；在多语言设置下，BBPE最大化了不同语言之间的词表共享并取得更好的翻译质量；它还使模型可以在字符集完全不重叠的语言之间迁移。</p><h2>后来的发展</h2><p>字节级BPE因为「永不出现未知符号」而被大语言模型普遍采用：GPT-2/3/4的分词器（tiktoken）、RoBERTa、LLaMA 3、Qwen等都在字节上运行BPE；<a class="ln" href="../n/superbpe.html">SuperBPE超词切分</a>等后续工作在此基础上允许跨空格合并。完全不用分词的路线则发展为<a class="ln" href="../n/byt5.html">ByT5字节级模型</a>、<a class="ln" href="../n/megabyte.html">MEGABYTE</a>和<a class="ln" href="../n/blt.html">字节潜变量BLT</a>。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>非拉丁文字被切成「半个字」的片段，模型需要额外学习把字节拼回字符，有时生成非法的字节序列。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>同样的内容在不同语言中被编码成长度相差很大的序列，字节越多的文字越吃亏。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>翻译模型是Transformer，BBPE只改变输入输出的切分方式和嵌入层。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a><span class="yr">2019.02 · LLM</span><div class=nt>GPT-2已在实践中使用字节级BPE，本文首次对它在翻译中的效果和多语言特性做系统研究。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/bpe.html">BPE子词切分</a><span class="yr">2015.08 · NLP</span><div class=nt>把BPE的合并过程从字符层面下移到UTF-8字节层面。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/sentencepiece.html">SentencePiece</a><span class="yr">2018.08 · NLP</span><div class=nt>SentencePiece以Unicode字符为最小单位并对罕见字符回退，BBPE以字节为最小单位彻底消除未登录符号。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/tokenization.html">分词与token</a> <a class="chip c" href="../c/embedding.html">嵌入向量</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a></p>
+<h2>本篇术语</h2><ul><li><b>UTF-8</b>　把Unicode字符编码成1到4个字节的标准方式，ASCII字符占1字节，常用汉字占3字节。</li><li><b>未登录符号（OOV）</b>　词表里没有、模型无法表示的输入单元，通常被替换为一个统一的未知标记。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/bpe.html">BPE子词切分</a> → 读原文第2–3节字节化、上下文化嵌入和解码修复 → 动手：用Hugging Face tokenizers分别训练字符级BPE和字节级BPE，在一段中日英混合文本上比较词表大小、序列长度和是否出现未知标记。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1909.03341" rel="noopener">https://arxiv.org/abs/1909.03341</a>（arXiv：标题、作者Wang、Cho、Gu、v1提交2019-09-07；摘要：现有翻译模型基于字符级词表、罕见字符与日中等字符丰富语言浪费词表名额、用256字节作为词表的计算代价高、研究字节级子词即BBPE、比字符词表紧凑且无未登录符号、比纯字节高效、需要用卷积或循环层上下文化BBPE嵌入、效果与BPE相当而词表只有其1/8、多语言下最大化词表共享并提高翻译质量、可在字符集不重叠的语言间迁移。动态规划解码修复、AAAI 2020发表处、作者机构与大模型分词器的采用情况凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%AD%97%E8%8A%82%E7%BA%A7BPE%EF%BC%88BBPE%EF%BC%89%EF%BC%88bbpe%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Abbpe%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/bbpe.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="bertsum.html"><small>本分支上一个 · 2019.08</small><b>BertSum预训练摘要</b></a><a class="r" href="plato-dialog.html"><small>本分支下一个 · 2019.10</small><b>PLATO对话预训练</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

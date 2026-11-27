@@ -1,0 +1,28 @@
+{
+  "id": "copilot4d",
+  "who": "Lunjun Zhang, Yuwen Xiong, Ze Yang, Sergio Casas, Rui Hu, Raquel Urtasun · Waabi、多伦多大学",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2311.01017"}
+  ],
+  "aka": ["Copilot4D", "Copilot 4D", "Waabi世界模型", "激光雷达世界模型", "LiDAR world model", "点云世界模型"],
+  "problem": "驾驶世界模型大多生成相机视频；激光雷达点云稀疏、无序，没法直接套用图像生成里的离散token和扩散方法，未来点云预测误差很大。",
+  "idea": "先用VQ-VAE式分词器把点云压成鸟瞰图上的离散token，再用MaskGIT改来的离散扩散Transformer预测未来token，并用可微深度渲染还原点云。",
+  "impact": "在NuScenes、KITTI和Argoverse 2上把1秒点云预测的Chamfer距离降低65%–75%，说明“分词+生成式预训练”这套做法也能用在机器人的三维传感器上。",
+  "method": "**卡在哪**：世界模型要回答“我这样开，接下来周围会变成什么样”。图像侧有[[gaia-1]]这类视频模型，但自动驾驶的主要三维传感器是激光雷达，输出是几万个没有顺序的三维点。直接回归未来点云误差大；以往的点云预测方法在3秒尺度上几乎不可用。\n\n**做法**：Copilot4D分两步。第一步是**分词器**：仿照[[vq-vae]]，把一帧点云编码到鸟瞰图网格上，每个格子量化成一个离散token；解码器用隐式表示加可微的深度渲染，把token还原成点云。第二步是**世界模型**：在[[maskgit]]的基础上改成离散扩散，用交替做空间注意力和时间注意力的Transformer，在过去若干帧token和自车动作的条件下预测下一帧token。训练时混合三种目标——给过去预测未来、过去与未来联合去噪、单帧去噪；推理时逐帧自回归，并使用[[cfg]]。\n\n**结果**：在NuScenes、KITTI Odometry和Argoverse 2上，1秒预测的Chamfer距离比此前最好方法低65%–75%，3秒预测低一半以上；例如NuScenes 1秒从1.41降到0.36。",
+  "limits": [
+    {"text": "只预测几何点云，不含语义、颜色和其他交通参与者的意图，离直接给规划器用还差一步。", "solved_by": []},
+    {"text": "预测仍逐帧自回归、每帧要多步去噪，长时预测的计算量和误差累积都会增长。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "vq-vae", "type": "uses", "note": "用VQ-VAE式的离散分词器把点云量化成鸟瞰图token。"},
+    {"to": "maskgit", "type": "extends", "note": "把MaskGIT的并行掩码生成改造成离散扩散，用来预测未来token。"},
+    {"to": "gaia-1", "type": "rivals", "note": "GAIA-1在相机视频上做驾驶世界模型，Copilot4D在激光雷达点云上做。"},
+    {"to": "nuscenes", "type": "uses", "note": "主要评测数据集之一，另有KITTI Odometry与Argoverse 2。"}
+  ],
+  "prereq": ["world-model-concept", "vector-quantization", "diffusion-process", "masked-modeling", "3d-representation"],
+  "terms": [
+    {"t": "Chamfer距离", "d": "衡量两组点云有多接近：对每个点找另一组里最近的点，把这些距离平均起来，越小越好。"}
+  ],
+  "check": {"source": "https://arxiv.org/abs/2311.01017", "confirmed": "标题、6位作者、arXiv v1 2023-11-02；HTML正文中Waabi与多伦多大学、VQVAE式BEV分词器与可微深度渲染、MaskGIT改造的离散扩散、三种训练目标、CFG、三个数据集、1秒Chamfer降65%–75%、3秒降50%以上、NuScenes 1秒1.41→0.36。venue ICLR 2024凭一般了解，arXiv页未注明。"}
+}

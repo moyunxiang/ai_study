@@ -1,0 +1,31 @@
+{
+ "id": "simple-adaptive-attacks",
+ "who": "Maksym Andriushchenko, Francesco Croce, Nicolas Flammarion · EPFL",
+ "venue": "ICLR 2025",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2404.02151"},
+  {"label": "代码", "url": "https://github.com/tml-epfl/llm-adaptive-attacks"}
+ ],
+ "aka": ["Simple Adaptive Attacks", "随机搜索越狱", "logprob越狱", "预填充攻击", "prefilling attack"],
+ "problem": "各家宣称新模型已经很难越狱，[[harmbench]]里的R2D2还专门针对[[gcg]]做过对抗训练；但这些结论多是在固定攻击下测出来的，没有针对每个模型的弱点去调整攻击。",
+ "idea": "不追求复杂算法，而是“因模型而异”：先写一个对目标模型有效的提示模板，再用随机搜索改后缀，最大化回答以“Sure”开头的对数概率；不给概率的模型就用迁移或预填充。",
+ "impact": "在一批当时最强的安全对齐模型上做到按GPT-4裁判100%的攻击成功率，把对抗鲁棒性领域“必须做自适应评测”的教训带到了LLM越狱。",
+ "method": "作者来自图像对抗鲁棒性方向（[[autoattack]]、[[robustbench]]的作者组），他们的核心论点是：评价防御时，攻击必须针对被测对象自适应调整，否则测出的鲁棒性只是假象，这和图像领域[[obfuscated-gradients]]的教训一样。\n\n具体攻击很简单：\n\n- 若API提供logprob（每个词元的对数概率），先设计一个对抗性提示模板（必要时针对目标模型调整），在请求后面接一段后缀，然后做随机搜索：每次随机改动后缀里的几个词元，如果目标词元（例如“Sure”）的对数概率上升就保留，可多次重启。和[[gcg]]相比，它不需要梯度，只需要概率输出。\n- 对不暴露logprob的Claude系列，用在别的模型上找到的提示迁移，或利用API允许预先填写回答开头的“预填充”功能，直接让回答从顺从的语气开始。\n- 在带后门的模型里找触发串时，把随机搜索限制在先验上可能的词元集合里，这一做法在SaTML'24木马检测竞赛中获得第一。\n\n结果：按GPT-4裁判，对Vicuna-13B、Mistral-7B、Llama-2-Chat各尺寸、Llama-3-Instruct-8B、Gemma-7B、GPT-3.5、GPT-4o以及R2D2都达到100%攻击成功率；所有Claude模型也通过迁移或预填充达到100%。作者总结：不同模型对不同模板敏感，有的API有独特漏洞，攻击要利用先验知识缩小搜索空间——“自适应”才是关键。",
+ "limits": [
+  {"text": "依赖logprob或预填充这类API功能，厂商关闭这些接口后部分攻击不再直接可用，但并不意味着模型本身变鲁棒。", "solved_by": []},
+  {"text": "成功与否由GPT-4裁判判断，可能把空洞或低质量的顺从回答也算作成功，[[strongreject]]指出过这类评分会高估越狱效果。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "gcg", "type": "rivals", "note": "同样优化对抗后缀让模型以肯定语开头，但用无需梯度的随机搜索代替GCG的梯度引导，只要概率输出。"},
+  {"to": "harmbench", "type": "solves", "note": "HarmBench中针对GCG对抗训练的R2D2被自适应攻击100%突破，说明只针对固定攻击训练的防御不可靠。"},
+  {"to": "autoattack", "type": "extends", "note": "同一作者组把图像对抗鲁棒性中“用多样化自适应攻击评测防御”的方法论搬到LLM越狱。"},
+  {"to": "jailbreakbench", "type": "uses", "note": "攻击日志与越狱产物按JailbreakBench格式公开，便于复现。"}
+ ],
+ "prereq": ["language-model", "autoregressive", "tokenization", "adversarial-training"],
+ "terms": [
+  {"t": "自适应攻击", "d": "针对具体防御或具体模型的特点专门设计的攻击，而不是对所有目标都用同一种固定攻击。"},
+  {"t": "预填充", "d": "一些API允许调用者替模型写好回答的开头，模型会顺着这个开头继续生成。"}
+ ],
+ "learn": "先读[[gcg]]和[[obfuscated-gradients]] → 读原文的随机搜索算法和各模型的攻击设置表 → 在开源小模型上实现“改后缀、看Sure概率”的随机搜索，观察几百步内概率如何上升。",
+ "check": {"source": "https://arxiv.org/abs/2404.02151", "confirmed": "arXiv记录：标题、3位作者、2024-04-02 v1；摘要所述利用logprob、对抗提示模板加后缀随机搜索、最大化Sure的对数概率、多次重启、GPT-4裁判下对所列模型（含HarmBench的R2D2）100%成功、Claude模型通过迁移或预填充100%、SaTML'24木马检测竞赛第一、JailbreakBench格式公开。EPFL、ICLR 2025、作者组与AutoAttack/RobustBench的关系凭一般了解写。"}
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>APPNP先预测后传播（2018） · AI脉络</title>
+<meta name="description" content="类模型给一个节点分类时只看几跳之内的邻居，想看得更远就得加层，但层数一多表示就趋于一致（），参数也随层数增加。 把“特征变换”和“信息传播”拆开：先用普通神经网络对每个节点独立做预测，再用个性化PageRank在图上传播这些预测；PageRank的“随机跳回起点”项保证传播很多步也不会把节点自身信…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/appnp.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="APPNP先预测后传播（2018）">
+<meta property="og:description" content="类模型给一个节点分类时只看几跳之内的邻居，想看得更远就得加层，但层数一多表示就趋于一致（），参数也随层数增加。 把“特征变换”和“信息传播”拆开：先用普通神经网络对每个节点独立做预测，再用个性化PageRank在图上传播这些预测；PageRank的“随机跳回起点”项保证传播很多步也不会把节点自身信…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/appnp.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/appnp">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 图与几何深度学习</div>
+<h1>APPNP先预测后传播</h1>
+<div class="full">Predict then Propagate: Graph Neural Networks meet Personalized PageRank</div>
+<div class="meta"><span>2018.10</span><span>论文</span><span>延伸</span><span>ICLR 2019</span><span>Johannes Gasteiger (Klicpera), Aleksandar Bojchevski, Stephan Günnemann · 慕尼黑工业大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1810.05997" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/appnp">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/gcn.html">图卷积网络</a>类模型给一个节点分类时只看几跳之内的邻居，想看得更远就得加层，但层数一多表示就趋于一致（<a class="ln" href="../n/gcn-oversmoothing.html">GCN过平滑</a>），参数也随层数增加。</p></div><div><h4>方法</h4><p>把“特征变换”和“信息传播”拆开：先用普通神经网络对每个节点独立做预测，再用个性化PageRank在图上传播这些预测；PageRank的“随机跳回起点”项保证传播很多步也不会把节点自身信息抹掉。</p></div><div><h4>影响</h4><p>“先预测后传播”的解耦思路与随后的SGC一起成为GNN设计的重要范式，个性化PageRank传播也被GPR-GNN、图扩散卷积等后续工作沿用；APPNP至今是半监督节点分类的强基线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>GCN的传播相当于反复乘以归一化邻接矩阵Â，乘很多次会收敛到与起点无关的平稳分布，这就是过平滑。<a class="ln" href="../n/pagerank.html">PageRank与Google搜索</a>的个性化版本在每一步以概率α“跳回”起始节点，其平稳分布 <code>Π = α(I − (1−α)Â)⁻¹</code> 始终保留对起点的偏好。</p><p><b>PPNP</b>：先用一个MLP对每个节点独立算出预测 <code>H = f_θ(X)</code>，再整体传播 <code>Z = softmax(Π·H)</code>。参数只在MLP里，传播矩阵没有参数，因此可以看非常大的邻域而不增加参数、不怕过平滑。</p><p>直接求逆矩阵Π在大图上代价太高，于是用<b>APPNP</b>做近似：从 <code>Z⁰ = H</code> 开始迭代K步，<code>Z^{k+1} = (1−α)·Â·Z^k + α·H</code>。每步都是一次稀疏矩阵乘法，K取10左右即可，α通常取0.1左右。训练时梯度穿过整个传播过程回到MLP。</p><p>摘要报告：模型的训练时间与参数量与以往模型持平或更少，可以利用大而可调的邻域，并能与任意神经网络结合；在作者所称迄今对GCN类模型最彻底的对比研究中，超过了多种近期提出的半监督节点分类方法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>传播权重固定为个性化PageRank，隐含“相连节点标签相似”的同配假设，在相邻节点常属不同类的异配图上效果差。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/gcn.html">图卷积网络</a><span class="yr">2016.09 · 基础</span><div class=nt>解决GCN增加层数以扩大感受野时出现的过平滑和参数增长问题。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/pagerank.html">PageRank与Google搜索</a><span class="yr">1998.04 · NLP</span><div class=nt>用个性化PageRank作为无参数的传播方式。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/label-propagation.html">标签传播（调和函数）</a><span class="yr">2003.08 · 基础</span><div class=nt>思路接近标签传播，但传播的是神经网络的预测而不是原始标签，并且端到端训练。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/gcn-oversmoothing.html">GCN过平滑</a><span class="yr">2018.01 · 基础</span><div class=nt>跳回起点的项让传播多步后仍保留节点自身信息。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/jk-net.html">跳跃知识网络JK-Net</a><span class="yr">2018.06 · 基础</span><div class=nt>只是在输出端组合各层，中间层本身仍会随深度过平滑；网络深到几十层时效果仍会下降。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/sgc.html">简化图卷积SGC</a><span class="yr">2019.02 · 基础</span><div class=nt>同样把传播与特征变换解耦，SGC进一步把传播变成训练前的无参数预处理。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/gcnii.html">GCNII深层图卷积</a><span class="yr">2020.07 · 基础</span><div class=nt>初始残差与APPNP的个性化PageRank传播形式一致。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/correct-smooth.html">C&amp;S纠正与平滑</a><span class="yr">2020.10 · 基础</span><div class=nt>APPNP在特征预测上做个性化PageRank传播，C&amp;S在残差与标签上做传播。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/graph-basics.html">图、树与搜索</a> <a class="chip c" href="../c/message-passing.html">图神经网络与消息传递</a> <a class="chip c" href="../c/markov-chain.html">马尔可夫性与马尔可夫链</a> <a class="chip c" href="../c/mlp.html">多层感知机</a> <a class="chip c" href="../c/semi-supervised.html">半监督学习与伪标签</a></p>
+<h2>本篇术语</h2><ul><li><b>个性化PageRank</b>　随机游走每一步以一定概率跳回固定的起点，得到的停留概率分布反映“离起点近且连接紧密”的节点。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/gcn.html">图卷积网络</a>和<a class="ln" href="../n/pagerank.html">PageRank与Google搜索</a>；读论文第2–3节从GCN到PPNP的推导；在Cora上实现APPNP，把K从2调到20，比较与同样深度GCN的准确率变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1810.05997" rel="noopener">https://arxiv.org/abs/1810.05997</a>（标题、3位作者、arXiv v1提交于2018-10-14；摘要中现有方法只看几步传播且邻域难以扩大、利用GCN与PageRank的关系推导个性化PageRank传播、PPNP及其快速近似APPNP、训练时间与参数量持平或更低、可与任意神经网络结合、在最彻底的GCN类模型对比中胜出。传播公式、α与K的取值、ICLR 2019与机构来自一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20APPNP%E5%85%88%E9%A2%84%E6%B5%8B%E5%90%8E%E4%BC%A0%E6%92%AD%EF%BC%88appnp%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aappnp%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/appnp.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="overparam-convergence.html"><small>本分支上一个 · 2018.10</small><b>过参数化网络的GD收敛</b></a><a class="r" href="k-gnn.html"><small>本分支下一个 · 2018.10</small><b>k-GNN与WL测试</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,89 @@
+{
+  "id": "world4rl",
+  "who": "Zhennan Jiang, Kai Liu, Yuxin Qin, Shuai Tian, Yupeng Zheng, Mingcai Zhou, Chao Yu, Haoran Li, Dongbin Zhao · 中国科学院自动化研究所、中国科学院大学、清华大学等",
+  "venue": "arXiv 2025",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2509.19080"
+    }
+  ],
+  "aka": [
+    "World4RL",
+    "World 4 RL",
+    "World-for-RL",
+    "扩散世界模型策略精调",
+    "世界模型里做操作RL",
+    "想象环境中强化学习精调"
+  ],
+  "problem": "操作策略靠模仿学习初始化，受示范数据少、覆盖窄所限；真机强化学习昂贵又危险，仿真里训练又有仿真到现实的差距。",
+  "idea": "先在多任务数据上预训练扩散世界模型，冻结后当高保真模拟器，用PPO在想象环境里端到端精调预训练策略；动作用two-hot编码输入，奖励由成功分类器给出。",
+  "impact": "Meta-World六任务平均成功率从模仿初始化的51.5%提到67.5%，真机六个任务从68.3%提到93.3%，全程不需要额外的在线真机交互。",
+  "method": "**卡在哪**：[[diffusion-policy]]等模仿学习策略的上限受示范覆盖所限，没见过的状态容易失败。用[[ppo]]在线精调可以修正，但真机交互贵；以往的视频世界模型（如[[irasim]]、[[nwm]]）多用来做规划或评测，很少直接拿来端到端训练策略。\n\n**做法**：World4RL分两步。**预训练世界模型**：用[[edm]]式参数化的二维UNet扩散去噪器，以若干历史帧和编码后的动作为条件生成下一帧，思路类似[[diamond]]。数据是每个任务的专家示范、带噪的高斯策略轨迹和随机轨迹混合，让模型见过成功也见过失败：仿真中每个[[meta-world]]任务50条专家、150条高斯策略、30条随机；真机Franka上每个任务各50条示范、高斯策略和随机轨迹。动作编码借用[[dreamerv3]]的two-hot：每个动作维度分成K个格子（如21个），落在两个相邻格子之间就按距离分配权重，作者称这种编码无损、可微，视频预测指标优于one-hot、线性、FAST和VQ-VAE编码。**冻结后做RL**：以ResNet18成功分类器给稀疏奖励，从行为克隆得到的高斯策略出发，在想象轨迹上用PPO更新（见[[c:model-based-rl]]）。\n\n**结果**：Meta-World六任务（3个种子）平均成功率51.5%→67.5%，高于Diffusion Policy的45.0%及TD3+BC、IQL和用IRASim微调的基线；真机六任务（每任务20次试验）68.3%→93.3%，Diffusion Policy为88.3%。视频预测的FVD、FID、LPIPS也优于NWM、iVideoGPT等对比模型。",
+  "limits": [
+    {
+      "text": "被精调的是小型高斯策略，没有验证能否用于大规模VLA这类生成式策略。",
+      "solved_by": [
+        "wmpo"
+      ]
+    },
+    {
+      "text": "世界模型和奖励分类器都要用目标任务的数据（含专门采集的失败与随机轨迹）训练，换任务需重新收集和训练。",
+      "solved_by": []
+    },
+    {
+      "text": "冻结的世界模型一旦有误差，策略可能学会利用想象中的漏洞，论文没有在线校正这类偏差的机制。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "diamond",
+      "type": "extends",
+      "note": "同样用EDM式扩散模型逐帧预测当世界模型，World4RL把它用到机器人操作并在其中精调预训练策略。"
+    },
+    {
+      "to": "dreamerv3",
+      "type": "uses",
+      "note": "借用DreamerV3的two-hot编码来表示连续动作，作为世界模型的动作条件。"
+    },
+    {
+      "to": "ppo",
+      "type": "uses",
+      "note": "在冻结世界模型生成的想象轨迹上用PPO端到端更新策略。"
+    },
+    {
+      "to": "irasim",
+      "type": "rivals",
+      "note": "IRASim把动作条件视频模型用于评测和规划；World4RL用于端到端RL，并以IRASim微调作为对比基线。"
+    },
+    {
+      "to": "meta-world",
+      "type": "uses",
+      "note": "仿真实验在Meta-World六个任务上进行。"
+    }
+  ],
+  "prereq": [
+    "model-based-rl",
+    "world-model-concept",
+    "diffusion-process",
+    "policy-gradient-concept",
+    "imitation-learning",
+    "reward-design"
+  ],
+  "terms": [
+    {
+      "t": "two-hot编码",
+      "d": "把一个连续值表示成两个相邻格子上的权重，例如0.37落在0.3和0.4之间，就给两个格子分配0.3和0.7，可以无损还原原值。"
+    },
+    {
+      "t": "高斯策略",
+      "d": "输出动作分布的均值和方差、按高斯分布采样动作的策略，便于计算PPO需要的动作概率。"
+    }
+  ],
+  "learn": "先读[[diamond]]理解扩散世界模型，再读[[ppo]]的裁剪目标；然后读原文第3节世界模型与two-hot编码、第4节Meta-World与真机结果表。",
+  "check": {
+    "source": "https://arxiv.org/abs/2509.19080",
+    "confirmed": "标题、9位作者、arXiv v1 2025-09-23、摘要中两条设计原则与two-hot编码；HTML正文中EDM式2D UNet去噪器、K=21、编码对比、Meta-World与真机数据构成、ResNet18成功分类器、PPO、高斯行为克隆策略、Meta-World 51.5→67.5（DP 45.0）、真机68.3→93.3（DP 88.3）、与NWM/iVideoGPT/DiWA的视频预测对比、作者机构。"
+  }
+}

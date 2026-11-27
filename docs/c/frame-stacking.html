@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>帧堆叠、跳帧与像素输入的预处理（Frame Stacking, Frame Skip and Pixel Preprocessing） · AI脉络</title>
+<meta name="description" content="像素输入RL的标准预处理：把最近几帧叠在一起作为观测，让网络看出速度和方向；每个动作重复执行几帧（跳帧/动作重复）以缩短决策链并节省计算；奖励常被裁剪到[−1, 1]。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/frame-stacking.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="帧堆叠、跳帧与像素输入的预处理（Frame Stacking, Frame Skip and Pixel Preprocessing）">
+<meta property="og:description" content="像素输入RL的标准预处理：把最近几帧叠在一起作为观测，让网络看出速度和方向；每个动作重复执行几帧（跳帧/动作重复）以缩短决策链并节省计算；奖励常被裁剪到[−1, 1]。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/frame-stacking.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/frame-stacking">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 入门</div>
+<h1>帧堆叠、跳帧与像素输入的预处理</h1><div class="full">Frame Stacking, Frame Skip and Pixel Preprocessing</div>
+<p class="muted" style="font-size:13px">也叫：帧堆叠　frame stacking　frame stack　堆叠帧　跳帧　frame skip　frame skipping　动作重复　action repeat　奖励裁剪　reward clipping　Atari预处理　Atari preprocessing　粘性动作　sticky actions　max pooling over frames</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/frame-stacking">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>像素输入RL的标准预处理：把最近几帧叠在一起作为观测，让网络看出速度和方向；每个动作重复执行几帧（跳帧/动作重复）以缩短决策链并节省计算；奖励常被裁剪到[−1, 1]。</b></p>
+<p class="tags">先要会：<a class="chip c" href="state-action-observation.html">状态、观测与动作</a> <a class="chip c" href="image-tensor.html">图像作为张量</a> <a class="chip c" href="mdp.html">马尔可夫决策过程</a></p>
+<p>从<a class="ln" href="../n/dqn.html">DQN</a>开始，几乎所有在Atari等像素环境上的工作都沿用一套预处理。它们看起来像工程细节，却会实质性地改变问题本身，比较不同论文的分数时必须知道。</p><p><b>帧堆叠</b>（frame stacking）。单独一帧画面看不出球往哪边飞、飞多快：只看一帧，环境是<b>部分可观测</b>的（见<a class="lc" href="../c/state-action-observation.html">状态、观测与动作</a>）。把最近k帧（DQN取4）沿通道维叠起来作为一个观测，网络就能从相邻帧的差异推出速度。这是用很短的历史近似马尔可夫状态的最简单办法；需要更长记忆时改用循环网络，如<a class="ln" href="../n/r2d2.html">R2D2</a>。</p><p><b>跳帧与动作重复</b>（frame skip / action repeat）。Atari每秒60帧，相邻两帧几乎一样，没必要每帧都决策。做法是智能体选一个动作，环境把它重复执行k帧（DQN取4），只返回最后的画面和这k帧奖励之和。好处是决策步数减为1/k，信用分配的链条变短，计算也省了。为避免Atari某些物体隔帧闪烁，常对最后两帧逐像素取最大值。连续控制（如<a class="ln" href="../n/dm-control.html">DeepMind Control Suite</a>）也常用2到8的动作重复。</p><p><b>其他常见处理</b>。转灰度并缩放到84×84；<b>奖励裁剪</b>把所有正奖励记为+1、负奖励记为−1，使同一组超参数能用于奖励尺度不同的游戏，代价是智能体分不清10分和1000分；把丢一条命当作回合结束（只用于训练）。</p><p><b>评测协议</b>。原始ALE是确定性的，智能体可以靠背下固定的动作序列取得高分。<a class="ln" href="../n/revisiting-ale.html">重访ALE与粘性动作</a>建议使用<b>粘性动作</b>：每一步以一定概率（论文推荐0.25）重复上一步的动作而不执行新选的动作，引入随机性，并呼吁统一报告协议。环境本身见<a class="ln" href="../n/ale.html">Arcade学习环境ALE</a>。</p>
+<div class="example"><h4>例子</h4><p>DQN的输入：每次决策看最近4个处理后的画面，形状为4×84×84。智能体每做一次决策，环境前进4帧，所以“每秒决策15次”。论文常说训练了“5000万帧”，按跳帧4换算是1250万个决策步、也就是1250万个转移。若另一篇论文报告的是决策步数，两者看起来差了4倍。</p></div>
+<h2>容易误解的地方</h2><ul><li>帧数和步数混用是Atari文献里最常见的比较错误之一。</li><li>帧堆叠只能提供几帧的记忆，需要记住几十步之前信息的任务（如钥匙在哪个房间）仍然是部分可观测的。</li><li>奖励裁剪改变了最优策略，训练出的智能体优化的是“得分事件次数”而不是真实分数。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

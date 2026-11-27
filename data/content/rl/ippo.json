@@ -1,0 +1,32 @@
+{
+  "id": "ippo",
+  "who": "Christian Schroeder de Witt, Tarun Gupta, Denys Makoviichuk, Viktor Makoviychuk, Philip H. S. Torr, Mingfei Sun, Shimon Whiteson · 牛津大学 / NVIDIA",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2011.09533"}
+  ],
+  "problem": "合作MARL的主流方法都在学一个集中式的联合价值（[[qmix]]、[[coma]]），理由是独立学习面对的环境是非平稳的、理论上站不住；但这种复杂设计在实践中到底带来多少好处，没有被认真检验过。",
+  "idea": "做一个反例式的实验：每个智能体各自跑[[ppo]]，只用自己的局部观测估计局部价值函数，不学任何联合价值，几乎不调超参数，直接与当时最好的联合学习方法在[[smac]]上比较。",
+  "impact": "发现独立PPO在SMAC上与最好的联合学习方法相当甚至更好，动摇了“合作MARL必须学联合价值”的默认看法，与几个月后的[[mappo]]一起让PPO类方法成为合作MARL的标准基线。",
+  "background": "多智能体RL里最朴素的做法是独立学习：每个智能体把别人当成环境的一部分，各学各的（[[independent-q]]）。教科书式的反对理由是：别人的策略在不断变化，从单个智能体看环境是非平稳的，Q学习的收敛保证失效，经验回放里的旧数据也会过时。于是2017年后的工作大多在集中训练、分散执行（CTDE）的框架下学一个联合的价值函数，再设法分解或用作评论家，比如[[vdn]]、[[qmix]]、[[coma]]、[[maddpg]]。这些方法在星际多智能体挑战[[smac]]上互相刷新成绩，但没有人系统地检验：最简单的独立学习到底差多少？",
+  "method": "IPPO（Independent PPO）就是给每个智能体一个[[ppo]]：策略 `π_i(u_i | τ_i)` 和价值函数 `V_i(τ_i)` 都只用该智能体自己的观测历史，优势用[[gae]]估计，更新用PPO的截断目标 `L = E[min(r_t·Â_t, clip(r_t, 1−ε, 1+ε)·Â_t)]`，其中 `r_t` 是新旧策略概率比。智能体之间可以共享网络参数（输入里带上智能体编号），但不共享任何集中式的价值或状态信息。\n\n作者把IPPO与QMIX等联合学习方法放在同样的SMAC地图上对比，并比较了几种变体，例如把价值函数换成以全局状态为输入的集中式价值，以检验“集中式价值”是否必要。",
+  "results": "摘要称，尽管有各种理论缺陷，IPPO在SMAC上几乎不调超参数就能与最先进的联合学习方法表现相当或更好；变体对比的结果表明，IPPO表现好可能是因为它对某些形式的环境非平稳性更鲁棒。",
+  "legacy": "同一时期[[mappo]]更系统地说明了PPO加上合适的实现细节（价值归一化、集中式价值输入的设计等）在多个合作基准上都很强；此后合作MARL论文普遍把IPPO和MAPPO列为基线。另一方面，这类发现也促使人们怀疑SMAC本身是否足够难，后来[[smacv2]]指出SMAC缺乏随机性和部分可观测性。",
+  "limits": [
+    {"text": "结论主要来自SMAC，后来发现SMAC的很多场景用不依赖观测的开环策略就能取得不错胜率，IPPO的强势部分可能反映的是基准太简单。", "solved_by": ["smacv2"]},
+    {"text": "独立学习在需要精细信用分配或强协同探索的任务上仍缺乏理论保证，什么时候独立学习够用没有给出判据。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "independent-q", "type": "extends", "note": "沿用独立学习的思路，但把独立的Q学习换成独立的PPO，避开了回放数据过时的问题。"},
+    {"to": "ppo", "type": "uses", "note": "每个智能体就是一个PPO学习者，用截断的策略比目标更新。"},
+    {"to": "qmix", "type": "rivals", "note": "QMIX学集中的单调联合Q值；IPPO不学任何联合价值，却在SMAC上表现相当或更好。"},
+    {"to": "smac", "type": "uses", "note": "全部对比实验在星际多智能体挑战上进行。"},
+    {"to": "gae", "type": "uses", "note": "用广义优势估计计算每个智能体的局部优势。"}
+  ],
+  "prereq": ["policy-gradient-concept", "actor-critic", "on-off-policy", "credit-assignment", "ablation-baseline"],
+  "terms": [
+    {"t": "非平稳性", "d": "从一个智能体的角度看，其他智能体也在学习、策略不断变化，所以同样的状态和动作带来的结果分布会随时间变化，违背单智能体RL的基本假设。"}
+  ],
+  "learn": "先复习[[ppo]]和[[qmix]]；读原文的实验部分，看不同地图上IPPO与QMIX的胜率曲线；再读[[mappo]]，对比两篇对“为什么PPO在合作MARL里有效”的不同解释。",
+  "check": {"source": "https://arxiv.org/abs/2011.09533", "confirmed": "标题、七位作者、arXiv v1于2020-11-18；摘要中CTDE方法多数估计集中联合价值、IPPO每个智能体只估计局部价值、尽管有理论缺陷却在SMAC上与最先进联合学习方法相当或更好且几乎不调参、与若干变体比较、强表现可能源于对某些非平稳性的鲁棒性。PPO目标与参数共享的写法按通行描述；机构按作者通行所属。"},
+  "aka": ["IPPO", "Independent PPO", "独立PPO"]
+}

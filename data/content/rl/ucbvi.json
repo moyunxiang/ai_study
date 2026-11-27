@@ -1,0 +1,33 @@
+{
+  "id": "ucbvi",
+  "who": "Mohammad Gheshlaghi Azar, Ian Osband, Rémi Munos · DeepMind",
+  "venue": "ICML 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1703.05449"}
+  ],
+  "problem": "表格MDP的探索理论里，[[ucrl2]]的遗憾界 `Õ(HS√(AT))` 与已知下界 `Ω(√(HSAT))` 之间差了约 `√(HS)` 倍；遗憾界里对状态数S的依赖到底能不能降到最优，一直没有答案。",
+  "idea": "在有限时域的值迭代上加探索奖励（UCBVI）：用经验转移估计做值迭代，每个状态-动作加一个随访问次数减小的乐观奖励。关键改进是对“下一状态价值”整体做集中不等式，而不是对整个转移概率向量；并用基于经验方差的Bernstein型奖励改进对时域H的依赖。",
+  "impact": "第一次在T足够大时把表格MDP的遗憾上界做到与下界只差对数因子，`Õ(√(HSAT))`；“乐观值迭代+方差感知奖励”成为后续表格与线性函数近似理论分析的标准模板。",
+  "background": "探索的理论通常用遗憾（regret）衡量：智能体在T步内少拿了多少回报（与一直用最优策略相比）。[[ucrl2]]用“面对不确定性保持乐观”的原则，对转移概率构造置信集合，在其中挑最乐观的MDP求解，得到 `Õ(DS√(AT))`（D为直径）类型的界；换成有限时域H的设定大约是 `Õ(HS√(AT))`。同时信息论下界是 `Ω(√(HSAT))`。上界多出来的一个√S来自对整个转移概率向量（S维）的集中不等式，多出来的√H来自对价值方差的粗糙处理。",
+  "method": "UCBVI在每一局开始时，用到目前为止的计数估计转移 `P̂(s'|s,a)` 和奖励，从最后一步往前做值迭代：\n\n`Q_h(s,a) = min( H, r(s,a) + Σ_{s'} P̂(s'|s,a)·V_{h+1}(s') + b_h(s,a) )`，`V_h(s) = max_a Q_h(s,a)`\n\n然后在这一局里按 `Q_h` 贪心行动。探索奖励b有两个版本：**UCBVI-CH**用Hoeffding不等式，`b ≈ c·H·√(L / N(s,a))`（L是对数项，N是访问次数）；**UCBVI-BF**用Bernstein不等式，奖励里用的是下一状态估计价值的经验方差，`b ≈ √(L·Var_{P̂}(V_{h+1}) / N) + H·L/N` 再加修正项。\n\n两个关键洞察：一是只需要保证 `P̂·V*` 与 `P·V*` 接近（这是一个标量，对 `V*` 这个固定函数做集中即可），不需要整个概率向量都接近，从而省掉一个√S；二是由“总方差定律”，一局内各步价值方差之和是 `O(H²)` 而不是 `O(H³)`，Bernstein型奖励利用这一点省掉一个√H。",
+  "results": "摘要称，乐观值迭代的遗憾界为 `Õ(√(HSAT) + H²S²A + H√T)`，优于UCRL2此前最好的 `Õ(HS√(AT))`；当 `T ≥ H³S³A` 且 `SA ≥ H` 时，遗憾为 `Õ(√(HSAT))`，与下界 `Ω(√(HSAT))` 只差对数因子。",
+  "legacy": "UCBVI之后，[[q-ucb]]证明无模型的Q学习加UCB奖励也能达到只差√H的遗憾，[[lsvi-ucb]]把乐观值迭代推广到线性MDP，后续还有工作去掉了低阶项、得到对所有T都最优的界。离线RL理论中，[[pevi]]把同样的奖励“翻转符号”变成悲观惩罚。",
+  "limits": [
+    {"text": "遗憾界含有 `H²S²A` 的低阶项，只有当T很大时才达到最优，样本量不大时界很松。", "solved_by": []},
+    {"text": "只适用于状态和动作有限、能逐一计数的表格MDP，无法直接用于需要函数近似的大状态空间。", "solved_by": ["lsvi-ucb"]}
+  ],
+  "relations": [
+    {"to": "ucrl2", "type": "solves", "note": "把UCRL2的 `HS√(AT)` 遗憾改进为 `√(HSAT)`（T足够大时），与下界只差对数因子。"},
+    {"to": "lai-robbins", "type": "extends", "note": "继承由下界刻画最优探索效率的思路，把“上界匹配下界”推进到MDP的极小极大遗憾。"},
+    {"to": "ucb1", "type": "extends", "note": "把老虎机中“均值估计加置信半径”的乐观原则用于值迭代中的每个状态-动作。"},
+    {"to": "bellman", "type": "uses", "note": "核心计算是有限时域的反向值迭代。"}
+  ],
+  "prereq": ["exploration-exploitation", "mdp", "dynamic-programming", "expectation-variance", "big-o"],
+  "terms": [
+    {"t": "遗憾（regret）", "d": "学习过程中实际获得的总回报与一直执行最优策略应得的总回报之差；遗憾随T次线性增长说明学会了。"},
+    {"t": "Bernstein不等式", "d": "一种集中不等式，置信半径与随机变量的方差有关；方差小时比只依赖取值范围的Hoeffding不等式紧得多。"}
+  ],
+  "learn": "先掌握[[ucb1]]和[[ucrl2]]的乐观原则；读原文第3节算法与第4节证明思路，重点看为什么对 `P̂·V*` 集中能省掉√S；在一个小网格MDP上实现UCBVI-CH，与ε-贪心对比累计遗憾曲线。",
+  "check": {"source": "https://arxiv.org/abs/1703.05449", "confirmed": "标题、三位作者、arXiv v1于2017-03-16；摘要中有限时域MDP的可证明最优探索、乐观值迭代的遗憾 `Õ(√(HSAT)+H²S²A+H√T)`、优于UCRL2的 `Õ(HS√(AT))`、`T≥H³S³A` 且 `SA≥H` 时匹配下界 `Ω(√(HSAT))`、对最优价值函数整体做集中、基于下一状态价值经验方差的Bernstein型探索奖励。奖励的具体形式与总方差论证按原文正文通行描述；ICML 2017与机构按通行引用。"},
+  "aka": ["UCBVI", "UCB-VI", "Upper Confidence Bound Value Iteration", "极小极大遗憾界"]
+}

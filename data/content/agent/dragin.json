@@ -1,0 +1,27 @@
+{
+  "id": "dragin",
+  "who": "Weihang Su, Yichen Tang, Qingyao Ai, Zhijing Wu, Yiqun Liu · 清华大学 / 北京理工大学",
+  "venue": "ACL 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2403.10081"},
+    {"label": "GitHub", "url": "https://github.com/oneal2000/DRAGIN"}
+  ],
+  "aka": ["Dynamic RAG", "动态RAG", "动态检索增强生成", "RIND", "QFS", "Dragin"],
+  "problem": "动态检索要在生成途中决定何时检索、检索什么；已有方法要么按固定规则（每隔几个token、每句一次）触发，要么只用最后一句当查询，抓不住模型真正缺的信息。",
+  "idea": "用token的不确定性、它被后文关注的程度和是否为实词，判断模型此刻是否缺信息；触发后按注意力从整个上文挑出最相关的词拼成查询。",
+  "impact": "给“生成途中主动检索”提供了一个无需训练、只读模型内部信号的做法，在多跳问答上稳定超过FLARE和固定间隔检索。",
+  "method": "[[flare]]在下一句出现低置信度token时检索，并用这句话作查询；固定长度或每句检索一次的做法则不看模型是否真的需要。DRAGIN把问题拆成两半。\n\n**何时检索（RIND）**。对生成的每个token i算三样东西：词表上的熵 `H_i = −Σ p_i(v) log p_i(v)`（模型有多拿不准）；最后一层里后续token对它的最大注意力 `a_max(i)`（它对后文多重要）；停用词指示 `s_i`（虚词为0）。得分 `S = H_i · a_max(i) · s_i` 超过阈值θ就触发检索。\n\n**检索什么（QFS）**。取触发位置对之前所有token的注意力，选出得分最高的n个词（论文用25或35个），按原顺序拼成查询，因此查询可以包含早几句提到的实体，而不只是最后一句。检索器为[[bm25]]，从维基百科取前3段，接回上下文后从触发处重新生成。\n\n在2WikiMultihopQA、HotpotQA、StrategyQA、IIRC四个数据集上用Llama2-7b/13b-chat和Vicuna-13b评测。以Llama2-13b-chat为例，HotpotQA上EM为0.314，单次检索0.263，FLARE 0.180；2WikiMultihopQA上为0.304，FLARE 0.224。",
+  "limits": [
+    {"text": "需要读取模型每个token的概率分布和注意力矩阵，只能用于开源权重模型，无法套在只提供文本接口的闭源API上。", "solved_by": []},
+    {"text": "阈值θ和查询词数n要按模型和数据集调，触发规则仍是手工设计的公式，模型本身没有学会何时该搜。", "solved_by": ["search-r1"]}
+  ],
+  "relations": [
+    {"to": "flare", "type": "solves", "note": "FLARE只用最后一句作查询、按单个token概率触发；DRAGIN加入注意力与实词判断，并从整个上文选查询词，多跳问答上明显更好。"},
+    {"to": "self-rag", "type": "rivals", "note": "Self-RAG通过微调让模型输出“是否检索”的反思token；DRAGIN不训练，直接读模型内部的熵和注意力信号。"},
+    {"to": "ircot", "type": "rivals", "note": "IRCoT每生成一句思维链就检索一次；DRAGIN只在模型显得缺信息时才检索。"},
+    {"to": "bm25", "type": "uses", "note": "检索器使用BM25，论文对比稠密检索器SGPT后发现BM25在各数据集上都更好。"}
+  ],
+  "prereq": ["retrieval", "entropy", "attention-concept", "language-model", "decoding-sampling"],
+  "learn": "先读[[flare]] → 读原文第3节RIND与QFS的公式和附录里的查询示例 → 动手：对一个开源小模型打印生成时每个token的熵与最大注意力，看高分token是否正是答案缺失的实体。",
+  "check": {"source": "https://arxiv.org/abs/2403.10081", "confirmed": "标题、5位作者、v1提交于2024-03-15；GitHub README注明ACL 2024主会；正文（arxiv.org/html/2403.10081）核对RIND公式（熵×最大注意力×停用词指示）、QFS选25或35个词、BM25与SGPT对比、维基百科前3段、三个模型、四个数据集、Llama2-13b上HotpotQA EM 0.314/0.263/0.180与2Wiki 0.304/0.224、作者单位。"}
+}

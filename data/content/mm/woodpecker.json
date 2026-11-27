@@ -1,0 +1,26 @@
+{
+  "id": "woodpecker",
+  "aka": ["Woodpecker", "啄木鸟", "幻觉后处理纠正", "免训练幻觉纠正"],
+  "who": "Shukang Yin, Chaoyou Fu, Sirui Zhao, Tong Xu, Hao Wang, Dianbo Sui, Yunhang Shen, Ke Li et al. · 中国科学技术大学 / 腾讯优图实验室",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2310.16045"},
+    {"label": "代码", "url": "https://github.com/BradyFU/Woodpecker"}
+  ],
+  "problem": "MLLM常常描述出图里不存在的物体或错误属性（幻觉），已有缓解方法大多要准备专门数据重新做指令微调，成本高且换个模型就得重来。",
+  "idea": "不改模型，在它输出之后做“体检”：抽出回答里的关键概念、据此提问、用检测器和VQA模型去图里核实，再把核实结果写成视觉事实，让LLM据此改写原回答。",
+  "impact": "在POPE上把MiniGPT-4和mPLUG-Owl的准确率分别提高30.66%和24.33%，代表了“训练无关、事后纠正”这一类幻觉缓解路线。",
+  "method": "[[c:hallucination]]在多模态模型里表现为回答和图像对不上，例如说图中有一只狗而其实没有。当时的主要办法是构造更干净的指令数据重新微调，如[[lrv-instruction]]。Woodpecker换了一条路：模型照常生成，之后像啄木鸟找虫一样把错误挑出来改掉。\n\n它是一个五步流水线：\n- **关键概念抽取**：用语言模型从回答里找出提到的物体等主要概念；\n- **提问**：围绕这些概念生成要核实的问题，如“图里有几只狗”“狗是什么颜色”；\n- **视觉知识核验**：用开放词表检测器回答是否存在、有几个、在哪里，用VQA模型回答属性类问题；\n- **视觉断言生成**：把核验结果整理成一组带框坐标的结构化事实；\n- **幻觉纠正**：让语言模型对照这些事实改写原回答，并可以附上物体的框。\n\n因为是后处理，它能直接套在不同MLLM上，中间每一步的输出也能拿来解释为什么改。",
+  "limits": [
+    {"text": "要串联语言模型、检测器和VQA模型多次调用，推理延迟和成本比原模型高出数倍。", "solved_by": ["vcd", "opera"]},
+    {"text": "纠正能力受限于外部检测器和VQA模型本身的准确率，它们看错时会把正确回答改错。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "pope", "type": "uses", "note": "以POPE物体存在性问答作为主要的幻觉评测，报告大幅提升。"},
+    {"to": "minigpt-4", "type": "solves", "note": "以MiniGPT-4为基线之一，不重训模型就把它在POPE上的准确率提高30.66%。"},
+    {"to": "mplug-owl", "type": "solves", "note": "同样套在mPLUG-Owl上，POPE准确率提高24.33%。"},
+    {"to": "grounding-dino", "type": "uses", "note": "核验物体是否存在和数量时用开放词表检测器给出框。"}
+  ],
+  "prereq": ["hallucination", "vision-tasks", "language-model", "anchor-nms"],
+  "learn": "先读[[pope]]理解物体幻觉怎么评，再看Woodpecker论文的五阶段流程图，用开源代码对一条有幻觉的回答走一遍每个阶段的中间输出。",
+  "check": {"source": "https://arxiv.org/abs/2310.16045", "confirmed": "标题、作者、v1提交2023-10-24；摘要：训练无关、五个阶段的名称、可服务不同MLLM且中间输出可解释、POPE上相对MiniGPT-4/mPLUG-Owl提高30.66%/24.33%。核验阶段具体用Grounding DINO与BLIP-2类VQA模型、机构、“代表一类路线”为一般了解，未在正文中逐项核对。"}
+}

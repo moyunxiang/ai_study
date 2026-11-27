@@ -1,0 +1,35 @@
+{
+  "id": "zoology",
+  "who": "Simran Arora, Sabri Eyuboglu, Aman Timalsina, Isys Johnson, Michael Poli, James Zou, Atri Rudra, Christopher Ré · 斯坦福大学、布法罗大学",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2312.04927"},
+    {"label": "GitHub", "url": "https://github.com/HazyResearch/zoology"}
+  ],
+  "aka": ["Zoology", "MQAR", "多查询关联回忆", "Multi-Query Associative Recall", "关联回忆", "associative recall"],
+  "problem": "H3、Hyena、RWKV等“门控卷积”类无注意力模型在合成测试上看似能完美完成关联回忆，困惑度也接近Transformer，但在真实语言上仍落后，差距从哪来不清楚。",
+  "idea": "预训练17个注意力与门控卷积模型做细粒度分析，发现差距的82%来自“回忆上下文中出现过的信息”的能力；据此提出更贴近真实语言的多查询关联回忆（MQAR）任务，并从理论和实验上解释注意力与卷积在回忆上的参数效率差异。",
+  "impact": "MQAR成为评测线性注意力、SSM和混合架构“回忆能力”的标准合成任务，后来的Based、Mamba-2、GLA、DeltaNet、Gated DeltaNet等工作普遍报告MQAR结果；“状态大小决定回忆能力”的观点也推动了混合架构的流行。",
+  "background": "2023年，[[hyena]]、H3、[[rwkv]]、[[retnet]]等用长卷积、门控或线性递归代替注意力的模型成为热点，它们计算随长度线性增长，在Pile上的困惑度也越来越接近Transformer。此前的工作用“关联回忆”（associative recall，给出一串键值对后，看到某个键能否说出对应的值）这类合成任务检验它们，并报告门控卷积能完美解决。[[induction-heads]]的研究则说明，Transformer中执行“看到A B……A就预测B”的电路与上下文学习密切相关。",
+  "method": "**定位差距**：作者在Pile上预训练了17个规模不同的注意力模型和门控卷积模型，发现最好的门控卷积架构仍比注意力差最多2.1个困惑度点。把测试token按类别拆开，82%的差距来自那些“答案在前文已经出现过”的token，例如“Hakuna Matata means no worries Hakuna Matata it means no → worries”。在这类关联回忆token上，70M参数的注意力模型就胜过1.4B参数的门控卷积模型。\n\n**MQAR**：以往的合成关联回忆每条序列只在末尾问一次，门控卷积可以靠固定的卷积核完成。真实语言里，模型要在序列的许多位置分别回忆不同的键，查询位置也不固定。作者据此定义**多查询关联回忆**：序列前半部分给出若干键值对，后半部分在多个位置分别查询不同的键，要求在每个查询处输出对应的值。在MQAR上，门控卷积需要的模型宽度随序列长度增长，而注意力只需常数宽度即可解决。作者给出理论分析：数据无关的卷积要解决MQAR，所需维度与序列长度相关；带有输入依赖的注意力则不需要。\n\n**混合架构**：在门控卷积中加入少量具有输入依赖稀疏模式的注意力，能补上97.4%与注意力的差距，同时保持次二次复杂度。",
+  "results": "门控卷积最好架构比注意力差最多2.1困惑度点，其中82%由关联回忆解释；70M注意力模型在关联回忆上胜过1.4B门控卷积；输入依赖的稀疏注意力混合补上97.4%的差距。",
+  "legacy": "同组的后续工作Based把这一分析推进为“回忆能力与循环状态大小之间的权衡”，[[mamba]]、[[gla]]、[[deltanet]]等方法在论文中普遍用MQAR比较回忆能力；[[repeat-after-me]]则从复制任务的角度给出了类似的理论限制。",
+  "limits": [
+    {"text": "MQAR只测精确的键值回忆，不能代表长文理解、推理等更复杂的上下文使用方式；在MQAR上好不等于在真实长文任务上好。", "solved_by": ["ruler"]},
+    {"text": "分析集中在门控卷积类模型，对后来具有输入依赖门控的选择性SSM（如Mamba）只作了有限讨论，固定状态循环模型能否靠更大状态补上回忆差距留给了后续工作。", "solved_by": ["deltanet", "gated-deltanet"]}
+  ],
+  "relations": [
+    {"to": "hyena", "type": "rivals", "note": "Hyena等门控卷积模型是主要分析对象，本文指出它们在关联回忆上远弱于注意力。"},
+    {"to": "induction-heads", "type": "extends", "note": "关联回忆正是归纳头执行的“A B……A→B”模式，本文把它量化为困惑度差距的主要来源。"},
+    {"to": "rwkv", "type": "rivals", "note": "RWKV等固定状态的无注意力模型同样被纳入回忆能力的比较。"},
+    {"to": "retnet", "type": "rivals", "note": "线性递归类模型的回忆能力同样受状态大小限制。"},
+    {"to": "transformer", "type": "uses", "note": "以标准注意力模型作为回忆能力的上限参照。"}
+  ],
+  "prereq": ["self-attention", "convolution-op", "state-space-model", "perplexity", "in-context-learning", "efficient-attention"],
+  "terms": [
+    {"t": "关联回忆（associative recall）", "d": "先看到若干“键→值”对，之后给出某个键，要求说出对应的值，用来测模型能否从上下文里取回信息。"},
+    {"t": "门控卷积（gated convolution）", "d": "用长卷积混合序列信息、再与另一路输入逐元素相乘作门控的结构，H3和Hyena属于这一类。"}
+  ],
+  "learn": "先读[[induction-heads]]和[[hyena]]；读原文第3节困惑度差距的拆解和第4节MQAR的定义与理论；动手：用zoology代码库在MQAR上训练一个小Transformer和一个小Hyena，画出准确率随模型宽度和序列长度的变化。",
+  "check": {"source": "https://arxiv.org/abs/2312.04927", "confirmed": "标题、8位作者、arXiv v1提交日2023-12-08；摘要中预训练17个注意力与门控卷积模型、门控卷积在Pile上最多差2.1困惑度点、82%差距由上下文回忆解释（Hakuna Matata示例）、70M注意力胜过1.4B门控卷积、先前工作称门控卷积能完美解决合成AR、提出MQAR并做理论与实验研究、输入依赖稀疏注意力混合补上97.4%差距且保持次二次复杂度。ICLR 2024、机构、卷积所需维度随长度增长的理论表述、后续工作普遍使用MQAR为一般了解。"}
+}

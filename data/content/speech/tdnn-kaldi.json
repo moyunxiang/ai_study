@@ -1,0 +1,33 @@
+{
+  "id": "tdnn-kaldi",
+  "who": "Vijayaditya Peddinti, Daniel Povey, Sanjeev Khudanpur · 约翰斯·霍普金斯大学",
+  "venue": "Interspeech 2015",
+  "links": [
+    {"label": "ISCA Archive", "url": "https://doi.org/10.21437/interspeech.2015-647"},
+    {"label": "TDNN-F (Interspeech 2018)", "url": "https://doi.org/10.21437/interspeech.2018-1417"}
+  ],
+  "problem": "前馈DNN声学模型只能看一个固定的小窗口；LSTM能看长上下文，但训练和解码慢、难并行。",
+  "idea": "重新启用1989年的时延神经网络思想：每层只在少数几个时间偏移上拼接下一层的输出（层层扩大感受野），并对时间做子采样，只计算真正需要的帧。",
+  "impact": "这种「子采样TDNN」成为Kaldi的标准声学模型，配合链式模型（LF-MMI）和后来的TDNN-F，在2016–2020年是工业界和学术界混合识别系统的主力结构。",
+  "method": "[[tdnn]]最早由Waibel等人在1989年提出，用来做音素识别：每层对前一层在若干相邻时刻的输出做同样的变换，相当于沿时间方向的一维卷积。在[[cd-dnn-hmm]]时代，大家改用普通前馈网络看一个固定窗口（比如前后各5帧），想看更长上下文就只能把窗口加宽，参数随之暴涨。\n\nPeddinti等人的做法是：底层只看相邻几帧，越往上层拼接的时间偏移越大（例如{−1,0,1}、{−3,3}、{−7,2}这样不对称的组合），整个网络的感受野可以覆盖几百毫秒；同时做**子采样**——高层只在少数时刻计算，不必为每一帧都算一遍，因为相邻帧的高层表示高度相关。这让训练速度接近前馈DNN，而建模能力接近循环网络。\n\n论文在多个大词汇量任务上报告比DNN基线有相对错误率下降（具体数字未核对）。它被并入[[kaldi]]，随后与[[lf-mmi]]链式训练一起成为Kaldi的默认配方。2018年Povey等人又提出**TDNN-F**：把每层权重矩阵分解为两个低秩因子，其中一个被约束为半正交，在参数更少的情况下进一步降低错误率，成为Kaldi后期的标准结构。[[x-vector]]说话人嵌入也采用了这种TDNN。",
+  "limits": [
+    {"text": "仍依赖HMM状态对齐、发音词典和WFST解码，整套流程复杂，难以和端到端模型一样一体训练。", "solved_by": ["conformer", "wenet"]},
+    {"text": "拼接偏移和子采样方式需要人工设计，不同任务往往要重新调结构。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "tdnn", "type": "extends", "note": "沿用1989年TDNN的时间偏移拼接思想，加入层间不同偏移和子采样，使之能用于大词汇量识别。"},
+    {"to": "kaldi", "type": "uses", "note": "在Kaldi中实现，成为其默认的nnet3声学模型结构。"},
+    {"to": "cd-dnn-hmm", "type": "solves", "note": "前馈DNN上下文窗口固定且加宽代价大；TDNN用层级偏移以较少参数覆盖长上下文。"},
+    {"to": "lstm-am", "type": "rivals", "note": "LSTM声学模型同样建模长上下文，但难并行；TDNN以前馈结构达到相近效果、速度快得多。"}
+  ],
+  "prereq": ["conv-layer", "mlp", "hmm-concept", "phoneme-acoustic", "word-error-rate"],
+  "terms": [
+    {"t": "感受野", "d": "网络某一层的一个输出能「看到」的输入范围，这里指覆盖多少帧语音。"},
+    {"t": "半正交约束", "d": "要求矩阵M满足M·Mᵀ等于单位矩阵（只在一个方向正交），用来让低秩分解训练更稳定。"}
+  ],
+  "aka": ["Kaldi TDNN", "子采样TDNN", "TDNN-F", "factorized TDNN", "nnet3 TDNN"],
+  "check": {
+    "source": "https://doi.org/10.21437/interspeech.2015-647",
+    "confirmed": "Crossref记录：标题A time delay neural network architecture for efficient modeling of long temporal contexts、作者Peddinti/Povey/Khudanpur、Interspeech 2015（2015-09-06）；TDNN-F的Crossref记录：Semi-Orthogonal Low-Rank Matrix Factorization for Deep Neural Networks、Povey等7位作者、Interspeech 2018。偏移组合示例、子采样细节、成为Kaldi默认结构与x-vector采用为一般了解，未逐项对照原文；论文中的错误率数字未写。"
+  }
+}

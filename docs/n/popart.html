@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>PopArt自适应目标归一化（2016） · AI脉络</title>
+<meta name="description" content="神经网络对要拟合的目标的尺度很敏感。为了用同一套超参玩几十个Atari游戏，把所有奖励裁剪到[−1, 1]；可这样一来，吃一个小豆子和打掉一个大BOSS在智能体看来一样重要，行为会和真实目标不同。 PopArt：对价值网络的回归目标做自适应归一化（持续估计目标的均值和标准差），并在更新统计量的同时…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/popart.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PopArt自适应目标归一化（2016）">
+<meta property="og:description" content="神经网络对要拟合的目标的尺度很敏感。为了用同一套超参玩几十个Atari游戏，把所有奖励裁剪到[−1, 1]；可这样一来，吃一个小豆子和打掉一个大BOSS在智能体看来一样重要，行为会和真实目标不同。 PopArt：对价值网络的回归目标做自适应归一化（持续估计目标的均值和标准差），并在更新统计量的同时…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/popart.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/popart">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 深度值函数</div>
+<h1>PopArt自适应目标归一化</h1>
+<div class="full">Learning values across many orders of magnitude</div>
+<div class="meta"><span>2016.02</span><span>论文</span><span>延伸</span><span>NeurIPS 2016</span><span>Hado van Hasselt, Arthur Guez, Matteo Hessel, Volodymyr Mnih, David Silver · Google DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1602.07714" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/popart">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>神经网络对要拟合的目标的尺度很敏感。<a class="ln" href="../n/dqn-nature.html">DQN（Nature版）</a>为了用同一套超参玩几十个Atari游戏，把所有奖励裁剪到[−1, 1]；可这样一来，吃一个小豆子和打掉一个大BOSS在智能体看来一样重要，行为会和真实目标不同。</p></div><div><h4>方法</h4><p>PopArt：对价值网络的回归目标做自适应归一化（持续估计目标的均值和标准差），并在更新统计量的同时反向修正网络最后一层的权重，让未归一化的输出保持不变。</p></div><div><h4>影响</h4><p>使去掉奖励裁剪成为可能，后来成为多任务RL的标准组件：<a class="ln" href="../n/impala.html">IMPALA与V-trace</a>的多任务版本、<a class="ln" href="../n/v-mpo.html">V-MPO同策略MPO</a>等都用PopArt平衡不同游戏之间相差几个数量级的回报尺度。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>设网络输出归一化后的值 <code>ŷ = W·h + b</code>，真实尺度上的预测是 <code>f(x) = σ·ŷ + μ</code>，其中μ、σ是对回归目标（如TD目标）均值和标准差的滑动估计。训练时网络拟合的是归一化后的目标 <code>(y − μ)/σ</code>，梯度尺度因此大致恒定，不受某个游戏回报是1还是10000的影响。</p><p>问题在于：μ、σ一变，同一个网络的真实尺度输出也会跟着变，等于凭空改变了已经学到的价值。PopArt的名字就来自它的两半：</p><ul><li><b>ART</b>（Adaptively Rescaling Targets）：自适应地更新μ、σ；</li><li><b>POP</b>（Preserving Outputs Precisely）：每次把μ、σ更新为μ&#x27;、σ&#x27;时，同时把最后一层改成 <code>W&#x27; = σW/σ&#x27;</code>、<code>b&#x27; = (σb + μ − μ&#x27;)/σ&#x27;</code>，使得 <code>σ&#x27;·(W&#x27;h + b&#x27;) + μ&#x27; = σ·(Wh + b) + μ</code> 对所有输入都精确成立。</li></ul><p>这样统计量可以随时调整，而网络已经学到的函数一点不变。摘要称，在Atari上用自适应归一化可以去掉奖励裁剪这一领域特定的启发式，整体性能不下降；作者还展示了去掉裁剪后某些游戏中行为在质上的变化。</p><h2>后来的发展</h2><p>PopArt的主要用武之地后来转到了多任务RL：同时学几十个Atari游戏或DMLab关卡时，各游戏回报的尺度可以相差几个数量级，不做归一化，回报大的游戏会主导梯度，回报小的游戏几乎学不到东西。DeepMind把PopArt与<a class="ln" href="../n/impala.html">IMPALA与V-trace</a>结合，对每个任务分别维护一套均值和标准差，让一个智能体在所有任务上都能学习；<a class="ln" href="../n/v-mpo.html">V-MPO同策略MPO</a>、<a class="ln" href="../n/muesli.html">Muesli策略优化</a>等后续的大规模智能体也沿用了这种按任务归一化回报的做法。在单任务里，人们更常用的仍是奖励裁剪或对回报做简单缩放。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只归一化了目标的整体尺度，奖励稀疏程度和时间尺度的差异仍会影响学习。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>在单任务Atari上去掉裁剪后，有些游戏变好、有些变差，并非全面提升。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/batchnorm.html">Batch Normalization</a><span class="yr">2015.02 · 基础</span><div class=nt>批归一化标准化网络内部的激活，PopArt标准化的是回归目标，并保证输出不变。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/ale.html">Arcade学习环境ALE</a><span class="yr">2012.07 · RL</span><div class=nt>在ALE的几十个回报尺度差异极大的游戏上评测。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/dqn-nature.html">DQN（Nature版）</a><span class="yr">2015.02 · RL</span><div class=nt>DQN靠把奖励裁剪到[−1,1]统一不同游戏的尺度，改变了真实目标；PopArt用自适应归一化替代裁剪。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/double-dqn.html">Double DQN</a><span class="yr">2015.09 · RL</span><div class=nt>Atari实验建立在Double DQN之上，只改目标的归一化方式。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/muesli.html">Muesli策略优化</a><span class="yr">2021.04 · RL</span><div class=nt>与DeepMind同期的大规模智能体一样对回报做尺度归一化，以便跨游戏使用同一组超参。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/td-error.html">时序差分与自举</a> <a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/linear-regression.html">线性回归</a> <a class="chip c" href="../c/expectation-variance.html">期望与方差</a></p>
+<h2>本篇术语</h2><ul><li><b>奖励裁剪</b>　把每一步奖励截断到固定区间（如[−1,1]），统一尺度但丢失了奖励大小的信息。</li><li><b>目标归一化</b>　回归时先把目标减均值除标准差，再让网络去拟合，保持梯度尺度稳定。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/dqn-nature.html">DQN（Nature版）</a>的奖励裁剪部分；读原文第2节POP的推导；在一个回报尺度会突然变大的回归任务上，对比直接回归、只做ART和完整PopArt三种做法。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1602.07714" rel="noopener">https://arxiv.org/abs/1602.07714</a>（标题、五位作者、arXiv v1于2016-02-24；摘要中学习算法对被近似函数的尺度不具不变性、自适应归一化学习目标、价值型RL中合适的价值尺度会随策略变化、Atari工作把奖励裁剪到预定范围、裁剪会导致质上不同的行为、用自适应归一化去掉这一启发式而整体性能不下降。POP的权重修正公式按原文正文；多任务中的使用和NeurIPS 2016按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20PopArt%E8%87%AA%E9%80%82%E5%BA%94%E7%9B%AE%E6%A0%87%E5%BD%92%E4%B8%80%E5%8C%96%EF%BC%88popart%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Apopart%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/popart.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="bootstrapped-dqn.html"><small>本分支上一个 · 2016.02</small><b>Bootstrapped DQN</b></a><a class="r" href="vin.html"><small>本分支下一个 · 2016.02</small><b>价值迭代网络VIN</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

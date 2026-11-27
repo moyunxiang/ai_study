@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>自我验证反向验算（2022） · AI脉络</title>
+<meta name="description" content="思维链一步算错，后面全错，而模型自己不知道；当时挑选答案的办法要么是多数投票，要么像GSM8K论文那样额外训练一个验证器，后者需要标注数据和微调。 像学生做完题后验算：先用思维链生成几个候选答案；再把每个候选答案当作已知条件，遮住题目里原来的某个条件，让模型反过来把它算出来——算回来的值与原题一致…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/self-verification.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="自我验证反向验算（2022）">
+<meta property="og:description" content="思维链一步算错，后面全错，而模型自己不知道；当时挑选答案的办法要么是多数投票，要么像GSM8K论文那样额外训练一个验证器，后者需要标注数据和微调。 像学生做完题后验算：先用思维链生成几个候选答案；再把每个候选答案当作已知条件，遮住题目里原来的某个条件，让模型反过来把它算出来——算回来的值与原题一致…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/self-verification.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/self-verification">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:336"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/agent.html">推理、检索与智能体</a> › 推理搜索与验证</div>
+<h1>自我验证反向验算</h1>
+<div class="full">Large Language Models are Better Reasoners with Self-Verification</div>
+<div class="meta"><span>2022.12</span><span>论文</span><span>延伸</span><span>Findings of EMNLP 2023</span><span>Yixuan Weng, Minjun Zhu, Fei Xia, Bin Li, Shizhu He, Shengping Liu, Bin Sun, Kang Liu, Jun Zhao · 中国科学院自动化研究所等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2212.09561" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/WENGSYX/Self-Verification" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/self-verification">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>思维链一步算错，后面全错，而模型自己不知道；当时挑选答案的办法要么是多数投票，要么像GSM8K论文那样额外训练一个验证器，后者需要标注数据和微调。</p></div><div><h4>方法</h4><p>像学生做完题后验算：先用思维链生成几个候选答案；再把每个候选答案当作已知条件，遮住题目里原来的某个条件，让模型反过来把它算出来——算回来的值与原题一致的次数越多，这个答案越可信。</p></div><div><h4>影响</h4><p>较早用纯提示的方式让大模型对自己的推理做反向检验，在多个算术、常识和逻辑推理数据集上提高了准确率；也是后来讨论“模型能不能自我验证”时常被引用的正面证据之一。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/cot.html">思维链CoT</a>让模型逐步推理，但多步计算对单个错误非常敏感。<a class="ln" href="../n/self-consistency.html">自洽性采样</a>用多次采样后的多数票来选答案，没有真正检查过程；<a class="ln" href="../n/gsm8k.html">GSM8K</a>的作者训练了一个专门的验证模型，需要大量带标签的解答。人做题时常用另一种办法：把答案代回去，看能不能推出题目给的条件。</p><h2>方法</h2><p><b>前向推理</b>：用少样本思维链采样得到若干个不同的候选答案。</p><p><b>改写结论</b>：把“问题+候选答案”改写成陈述句。例如题目问“Jackie比Adam多几个苹果”，候选答案是18，就改写成“Jackie比Adam多18个苹果”。</p><p><b>反向验证</b>，分两种：</p><ul><li><b>条件掩码验证</b>（用于算术题）：把题目中的一个数值条件换成X，把改写后的结论作为新条件，让模型用思维链求出X，再与原题中被遮住的数比较。</li><li><b>对错判断验证</b>（用于常识、逻辑等非数值题）：直接问模型“在这个结论成立的前提下，原题的某个条件是否正确”。</li></ul><p>对每个候选答案重复验证P次，以“算回来一致”的次数作为验证分，选分最高的答案。全过程不微调、不更新参数，只用提示。</p><p><b>结果</b>：在InstructGPT（text-davinci-002）等模型上，对算术、常识、逻辑推理数据集都有提升。作者单独分析了“候选里恰有一个正确答案和1到4个错误答案”的样本：GSM8K上验证后选对的比例为58.9%，单纯思维链为53.4%，随机挑选为35.7%；MultiArith从71.2%到89.0%。作者也发现模型越小，验证带来的好处越少，小模型上甚至起反作用。</p><h2>后来的发展</h2><p>随后的<a class="ln" href="../n/self-refine.html">Self-Refine自我改进</a>、<a class="ln" href="../n/chain-of-verification.html">验证链CoVe</a>等工作继续探索让模型自我检查，<a class="ln" href="../n/cannot-self-correct.html">自我纠错的局限</a>则指出在没有外部反馈时这类自我纠错往往不可靠；推理模型时代，“生成后自我验证”以长思维链中的反思与验算行为再次出现。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只能在候选答案里挑，如果前向推理一个正确答案都没生成出来，验证无能为力。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>效果依赖模型自身的推理能力，小模型上验证分不可靠，甚至降低准确率。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:336" href="../n/rstar.html">rStar小模型互相推理</a></div></li><li>只验证最终结论能否推回条件，不检查中间每一步，过程中的错误抵消时可能误判。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:336" href="../n/prm.html">过程监督与过程奖励模型</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/cot.html">思维链CoT</a><span class="yr">2022.01 · 推理·智能体</span><div class=nt>前向与反向两个阶段都用思维链，反向阶段相当于让模型用思维链做验算。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/instructgpt.html">InstructGPT与RLHF</a><span class="yr">2022.03 · LLM</span><div class=nt>主要实验模型text-davinci-002属于InstructGPT系列。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:264" href="../n/gsm8k.html">GSM8K</a><span class="yr">2021.10 · 数据·评测</span><div class=nt>GSM8K论文训练独立验证器来给解答打分；本文不训练任何模型，只用提示让模型自己验证。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:336" href="../n/self-consistency.html">自洽性采样</a><span class="yr">2022.03 · 推理·智能体</span><div class=nt>两者都从多个候选里选答案：自洽性看哪个答案票数多，自我验证看哪个答案能被反推回原条件。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/prm.html">过程监督与过程奖励模型</a><span class="yr">2023.05 · 推理·智能体</span><div class=nt>只验证最终结论能否推回条件，不检查中间每一步，过程中的错误抵消时可能误判。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/rstar.html">rStar小模型互相推理</a><span class="yr">2024.08 · 推理·智能体</span><div class=nt>效果依赖模型自身的推理能力，小模型上验证分不可靠，甚至降低准确率。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/in-context-learning.html">上下文学习与提示</a> <a class="chip c" href="../c/zero-few-shot.html">零样本与少样本</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a></p>
+<h2>本篇术语</h2><ul><li><b>条件掩码</b>　把题目中的某个已知数遮住换成未知数X，再用候选答案作为已知条件把X求回来。</li><li><b>验证分</b>　对同一个候选答案重复做多次反向验证，算回来与原条件一致的次数。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/cot.html">思维链CoT</a>和<a class="ln" href="../n/self-consistency.html">自洽性采样</a> → 读原文第3节两种反向验证与图2的苹果例子 → 动手：取几道GSM8K题，对模型给出的不同答案各做一次“遮住条件再求回”，看能否挑出正确答案。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2212.09561" rel="noopener">https://arxiv.org/abs/2212.09561</a>（标题、作者、v1提交于2022-12-19；摘要中把CoT结论作为条件做反向验证、可解释的验证分；正文（arxiv.org/html/2212.09561）核对前向推理与反向验证、改写为陈述句（Jackie比Adam多18个苹果）、条件掩码验证与对错判断验证、重复P次、表2中GSM8K 35.7%/53.4%/58.9%与MultiArith 71.2%/89.0%、小模型收益小甚至为负、局限一节。venue与单位凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E8%87%AA%E6%88%91%E9%AA%8C%E8%AF%81%E5%8F%8D%E5%90%91%E9%AA%8C%E7%AE%97%EF%BC%88self-verification%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aself-verification%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/self-verification.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ircot.html"><small>本分支上一个 · 2022.12</small><b>IRCoT交替检索推理</b></a><a class="r" href="replug.html"><small>本分支下一个 · 2023.01</small><b>REPLUG黑盒检索增强</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

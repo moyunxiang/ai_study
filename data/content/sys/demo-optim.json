@@ -1,0 +1,25 @@
+{
+ "id": "demo-optim",
+ "who": "Bowen Peng, Lizhang Chen, Baiyu Su, Jeffrey Quesnelle, Diederik P. Kingma, Qiang Liu · Nous Research, 得克萨斯大学奥斯汀分校等",
+ "aka": ["DeMo", "Decoupled Momentum", "解耦动量", "DisTrO", "低带宽训练"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2411.19870"},
+  {"label": "GitHub", "url": "https://github.com/bloc97/DeMo"}
+ ],
+ "problem": "同步数据并行每一步都要用全精度all-reduce所有梯度，跨数据中心或只有以太网连接时带宽根本不够，限制了在分散的算力上训练大模型。",
+ "idea": "让每张卡各自维护本地动量、不再每步同步；每一步只把动量中最“快变”的少量成分（经离散余弦变换后取top-k）发出去同步，并把已发出的部分从本地动量里减掉，剩下的留作误差反馈。",
+ "impact": "作为可直接替换AdamW等动量优化器的低通信方案，被Nous Research用于其去中心化训练网络，与DiLoCo一起成为“跨地域训练大模型”路线的代表算法。",
+ "method": "[[c:distributed-training]]的标准做法是每步all-reduce完整梯度。[[diloco]]走另一条路：各节点本地训练几百步才同步一次。[[dgc]]、[[powersgd]]则是每步同步但压缩梯度。DeMo属于后者，但压缩的对象是动量而非梯度。\n\n它有三步：(1) **解耦本地动量**：每张卡用自己的梯度更新本地动量，不与他人同步；(2) **快速正交变换加稀疏化**：对动量做离散余弦变换（DCT）这类快速正交变换，在频域里选出幅值最大的top-k个分量，只同步这些分量（各卡的结果合并后用于更新参数）；(3) **把动量缓冲当误差反馈**：已经发出去的分量从本地动量中减掉，没发出去的留在动量里继续累积，等以后再发，类似[[onebit-adam]]等方法里的误差补偿，但不需要额外的缓冲区。\n\n摘要报告：每步通信量最多减少两个数量级，计算开销很小；在3亿和10亿参数的语言模型上，每张GPU传输的数据比AdamW加DDP最多少85倍，损失和准确率相当；方法与网络拓扑无关，可用于多数据中心或以太网环境。",
+ "limits": [
+  {"text": "论文验证的规模只到10亿参数，更大模型、更长训练下与全同步训练的差距尚待检验；top-k比例等超参数需要调。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "diloco", "type": "rivals", "note": "DiLoCo靠减少同步次数降通信，DeMo每步都同步但只传极少量动量分量，两者都面向跨地域低带宽训练。"},
+  {"to": "dgc", "type": "extends", "note": "延续top-k稀疏化加误差累积的通信压缩思路，把对象从梯度换成本地动量的频域分量。"},
+  {"to": "powersgd", "type": "rivals", "note": "PowerSGD用低秩近似压缩梯度，DeMo用正交变换后的稀疏化压缩动量。"},
+  {"to": "onebit-adam", "type": "extends", "note": "同样借误差反馈保证压缩后的收敛，DeMo直接把动量缓冲当作误差反馈。"}
+ ],
+ "prereq": ["momentum", "distributed-training", "fourier-transform", "adaptive-optimizer"],
+ "terms": [{"t": "离散余弦变换（DCT）", "d": "把一组数分解为不同频率余弦波的加权和，能量往往集中在少数分量上，适合只保留最大的几个来压缩。"}],
+ "check": {"source": "https://arxiv.org/abs/2411.19870", "confirmed": "标题、六位作者、v1日期2024-11-29；摘要：同步数据并行的全精度梯度all-reduce造成严重通信瓶颈、DeMo可替换任何基于动量的优化器、三点设计（解耦本地动量更新、快速正交变换如DCT后top-k稀疏化、通过动量相减把动量缓冲复用为误差反馈）、每步通信最多减少两个数量级、3亿与10亿参数模型上每GPU传输比AdamW-DDP最多少85倍且损失与准确率相当、与拓扑无关可用于多数据中心或以太网。机构、与DisTrO的关系、被Nous去中心化训练使用为一般了解。"}
+}

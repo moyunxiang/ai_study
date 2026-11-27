@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DPS扩散后验采样（2022） · AI脉络</title>
+<meta name="description" content="去模糊、超分、补全这类“反问题”要从退化观测y恢复图像x。用预训练扩散模型当先验的做法大多只处理无噪声的线性退化，靠每步把结果硬投影回“满足观测”的集合，一有噪声就失效。 把每一步要用的似然梯度∇log p(y|x_t)近似成∇log p(y|x̂₀)：先用去噪网络估出干净图x̂₀，再对观测误差‖…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dps.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DPS扩散后验采样（2022）">
+<meta property="og:description" content="去模糊、超分、补全这类“反问题”要从退化观测y恢复图像x。用预训练扩散模型当先验的做法大多只处理无噪声的线性退化，靠每步把结果硬投影回“满足观测”的集合，一有噪声就失效。 把每一步要用的似然梯度∇log p(y|x_t)近似成∇log p(y|x̂₀)：先用去噪网络估出干净图x̂₀，再对观测误差‖…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dps.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dps">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 扩散与流匹配</div>
+<h1>DPS扩散后验采样</h1>
+<div class="full">Diffusion Posterior Sampling for General Noisy Inverse Problems</div>
+<div class="meta"><span>2022.09</span><span>论文</span><span>延伸</span><span>ICLR 2023</span><span>Hyungjin Chung, Jeongsol Kim, Michael T. McCann, Marc L. Klasky, Jong Chul Ye · KAIST、Los Alamos国家实验室</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2209.14687" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/DPS2022/diffusion-posterior-sampling" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/dps">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>去模糊、超分、补全这类“反问题”要从退化观测y恢复图像x。用预训练扩散模型当先验的做法大多只处理无噪声的线性退化，靠每步把结果硬投影回“满足观测”的集合，一有噪声就失效。</p></div><div><h4>方法</h4><p>把每一步要用的似然梯度∇log p(y|x_t)近似成∇log p(y|x̂₀)：先用去噪网络估出干净图x̂₀，再对观测误差‖y−A(x̂₀)‖²求梯度，加在普通扩散采样步上，不做硬投影。</p></div><div><h4>影响</h4><p>给出了一个只要退化算子可微就能用的通用做法，能处理高斯与泊松噪声、相位恢复等非线性问题，成为扩散模型解反问题最常被比较和改进的基线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>反问题的目标是从后验p(x|y)采样。由贝叶斯公式，后验的分数可拆成两项：<code>∇log p(x_t|y) = ∇log p(x_t) + ∇log p(y|x_t)</code>。第一项就是预训练扩散模型学到的<a class="lc" href="../c/score-function.html">分数函数与分数匹配</a>；难的是第二项，因为观测y只和干净图x₀直接相关，和带噪的x_t之间隔着一个积分。</p><p>DPS的近似很简单：用Tweedie公式从x_t估出后验均值x̂₀（也就是去噪网络的输出），假设<code>p(y|x_t) ≈ p(y|x̂₀)</code>。若观测是<code>y = A(x) + 高斯噪声</code>，这一项的梯度就是<code>−∇_{x_t}‖y − A(x̂₀(x_t))‖²</code>乘一个步长，通过自动微分穿过去噪网络算出来。采样时每一步先按<a class="ln" href="../n/ddpm.html">DDPM</a>正常去噪，再沿这个梯度方向修正一下。</p><p>和此前把每步结果投影到“严格满足观测”的方法相比，它不强求一致性，在有噪声时路径更自然；把平方误差换成泊松似然即可处理泊松噪声，A是非线性的（如傅里叶相位恢复、非均匀去模糊）也照样可用。代价是每一步都要对网络反传一次，比普通采样慢不少。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每一步都要穿过去噪网络求梯度，显存和时间开销是普通采样的数倍，在潜空间大模型上更慢。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>p(y|x_t)≈p(y|x̂₀)的近似在高噪声阶段很粗糙，步长需要逐任务调，结果对超参数敏感。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/ddpm.html">DDPM</a><span class="yr">2020.06 · 生成</span><div class=nt>以预训练的DDPM作为图像先验，逐步去噪时加入似然梯度修正。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/denoising-score-matching.html">去噪分数匹配</a><span class="yr">2011.07 · 生成</span><div class=nt>去噪网络给出的x̂₀即Tweedie公式下的后验均值，DPS用它近似似然。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/score-sde.html">Score SDE统一框架</a><span class="yr">2020.11 · 生成</span><div class=nt>在分数SDE的条件生成框架里，把条件项换成任意可微退化算子的观测似然。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/repaint.html">RePaint扩散修复</a><span class="yr">2022.01 · 生成</span><div class=nt>RePaint这类方法靠把已知区域直接替换回去来满足观测，只适用于无噪声的线性掩码；DPS用软的梯度修正，覆盖带噪和非线性问题。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/score-function.html">分数函数与分数匹配</a> <a class="chip c" href="../c/conditional-bayes.html">条件概率与贝叶斯公式</a> <a class="chip c" href="../c/gaussian.html">高斯分布</a> <a class="chip c" href="../c/chain-rule.html">链式法则</a></p>
+<h2>本篇术语</h2><ul><li><b>反问题</b>　已知退化过程A和观测y=A(x)+噪声，反推原始信号x。去模糊、超分辨率、CT重建都属于这一类。</li><li><b>Tweedie公式</b>　对加了高斯噪声的变量，其干净值的条件期望可以由噪声版本的分数直接算出；扩散模型的去噪输出就是这个期望。</li></ul>
+<h2>怎么学</h2><p>先弄懂分数SDE中条件生成的分数分解 → 读本文第3节的近似推导与算法1 → 在预训练的人脸扩散模型上实现DPS做高斯去模糊，改变步长观察效果。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2209.14687" rel="noopener">https://arxiv.org/abs/2209.14687</a>（标题、五位作者、v1日期2022-09-29、摘要中扩展到带噪的线性与非线性反问题、近似后验采样、不做严格观测一致性投影、可处理高斯与泊松噪声、相位恢复与非均匀去模糊；机构、ICLR 2023、Tweedie近似的具体写法与计算开销来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DPS%E6%89%A9%E6%95%A3%E5%90%8E%E9%AA%8C%E9%87%87%E6%A0%B7%EF%BC%88dps%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adps%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dps.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="get3d.html"><small>本分支上一个 · 2022.09</small><b>GET3D带纹理网格生成</b></a><a class="r" href="diffusion-convergence.html"><small>本分支下一个 · 2022.09</small><b>扩散采样收敛理论</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "id": "remax",
+  "who": "Ziniu Li, Tian Xu, Yushun Zhang, Zhihang Lin, Yang Yu, Ruoyu Sun, Zhi-Quan Luo · 香港中文大学（深圳）、南京大学、深圳市大数据研究院",
+  "venue": "ICML 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2310.10505"},
+    {"label": "代码", "url": "https://github.com/liziniu/ReMax"}
+  ],
+  "aka": ["ReMax", "REINFORCE + 贪心基线", "Greedy Baseline", "无价值网络RLHF"],
+  "problem": "PPO是为一般强化学习任务设计的，用在RLHF上过于复杂：要额外训练价值网络、调很多超参数，显存和时间开销都很大。",
+  "idea": "利用RLHF的三个特点——模拟快、状态转移确定、奖励只在整段末尾给出——回到REINFORCE，不要价值网络，用“同一提示下贪心解码回答的奖励”作为基线来降低方差。",
+  "impact": "比PPO实现简单、少调4个以上超参数，训练7B模型可节省约46%显存，并在AlpacaEval和MT-bench上取得当时开源7B模型的最好成绩，是RLOO、GRPO同期“去掉价值网络”路线中的一种。",
+  "method": "背景：[[instructgpt]]用[[ppo]]做RLHF。PPO需要一个和策略差不多大的价值网络来估计每个词元的优势（通常用[[gae]]），还有裁剪系数、价值损失系数、GAE参数等一堆超参数。作者指出RLHF和一般强化学习不同：\n- **模拟快**：生成一段回答只需一次前向采样，代价远低于真实环境交互；\n- **转移确定**：状态就是已生成的文本，下一个状态完全由选择的词决定，没有环境随机性；\n- **轨迹级奖励**：奖励模型只在整段回答结束时给一个分数。\n在这种设定下，为每个词元学一个价值函数并不必要。\n\n**ReMax**：把整段回答看作一个动作，用[[reinforce]]的梯度\n`∇J = E[(r(x, y) − b(x)) · ∇ log π(y|x)]`\n其中y是采样的回答，b(x)是基线。ReMax的关键是基线的选法：对每个提示x，额外用**贪心解码**生成一个回答ȳ，以它的奖励 `b(x) = r(x, ȳ)` 作为基线。直观上，只有比“模型最自信的那个回答”更好的采样才会被鼓励，比它差的会被抑制。这个基线与采样的y无关，不改变梯度的期望，却能大幅降低方差。\n\n**好处**（摘要）：实现更简单，去掉了PPO中4个以上的超参数，降低显存占用、缩短训练时间。训练7B模型时比PPO节省约46%的GPU显存，在A800-80GB上不需要PPO所需的显存卸载技术就能训练。把ReMax用于Mistral-7B，在AlpacaEval上胜率94.78%，MT-bench得分7.739，摘要称是当时开源7B模型的新最好成绩。",
+  "legacy": "ReMax与RLOO、GRPO一起说明，在LLM的RL微调中价值网络往往可以去掉；这一共识后来被推理模型的RL训练广泛采纳。",
+  "limits": [
+    {"text": "每个提示需要额外做一次贪心解码来计算基线，生成开销增加；实验以对话偏好为主，奖励更稀疏的长链推理任务上是否同样好用没有验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ppo", "type": "solves", "note": "PPO在RLHF中显存和调参负担重，ReMax去掉价值网络和多个超参数，显存节省约46%。"},
+    {"to": "reinforce", "type": "extends", "note": "直接使用REINFORCE梯度，用贪心解码回答的奖励作基线降低方差。"},
+    {"to": "instructgpt", "type": "solves", "note": "InstructGPT确立的PPO式RLHF计算昂贵，ReMax给出更轻的替代。"},
+    {"to": "mistral-7b", "type": "uses", "note": "在Mistral-7B上训练，取得AlpacaEval胜率94.78%和MT-bench 7.739。"}
+  ],
+  "prereq": ["rlhf-concept", "policy-gradient-concept", "expectation-variance", "actor-critic", "decoding-sampling"],
+  "terms": [
+    {"t": "贪心基线", "d": "对同一个提示用贪心解码（每步选概率最大的词）生成一个回答，用它的奖励作为采样回答的比较基准。"},
+    {"t": "价值网络", "d": "PPO中用来估计“从当前状态出发预期能拿多少奖励”的网络，用于计算每一步的优势。"}
+  ],
+  "learn": "先补[[reinforce]]的策略梯度和基线不改变期望的证明；读本文第3节三个RLHF特点的论证和ReMax算法；动手：在同一个小奖励模型上，用“贪心基线”和“k个样本平均奖励基线”分别估计梯度，比较两者的方差。",
+  "check": {"source": "https://arxiv.org/abs/2310.10505", "confirmed": "标题、7位作者、arXiv首次提交2023-10-16；摘要中PPO对LLM过于复杂、超参数调节繁重且计算负担大、利用RLHF的快速模拟、确定性转移和轨迹级奖励三个性质、基于REINFORCE、无需价值模型、新的方差降低技术、去掉PPO中4个以上超参数、7B模型节省约46%显存、A800-80GB上无需卸载、Mistral-7B上AlpacaEval胜率94.78%和MT-bench 7.739。贪心解码基线的具体形式、ICML 2024与机构为对正文的一般了解。"}
+}

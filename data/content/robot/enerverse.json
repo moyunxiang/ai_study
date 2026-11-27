@@ -1,0 +1,89 @@
+{
+  "id": "enerverse",
+  "who": "Siyuan Huang, Liliang Chen, Pengfei Zhou, Shengcong Chen, Zhengkai Jiang, Yue Hu, Yue Liao, Peng Gao et al.（11位） · 智元机器人AgiBot、上海人工智能实验室等",
+  "venue": "arXiv 2025",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2501.01895"
+    }
+  ],
+  "aka": [
+    "EnerVerse",
+    "Ener-Verse",
+    "EnerVerse-A",
+    "EnerVerse-D",
+    "智元EnerVerse",
+    "具身未来空间生成",
+    "Free Anchor View",
+    "FAV"
+  ],
+  "problem": "用视频预测辅助机器人决策时，单一视角有运动歧义、难以定位三维位置；长任务要记住很久以前的画面，直接把历史帧全塞进去又太贵。",
+  "idea": "分块自回归的视频扩散模型生成多视角的未来画面，用稀疏记忆帧支撑长任务；再用一个扩散策略头读取去噪第一步的中间特征直接输出动作块，并用4D高斯溅射构建数据引擎。",
+  "impact": "LIBERO平均成功率三视角88.5%，高于OpenVLA的76.5%；稀疏记忆让LIBERO-Long从30.8%升到73%；官方称4090上8步动作块约280毫秒。",
+  "method": "**卡在哪**：[[vpp]]、[[gr-1]]等工作说明，先预测未来画面再出动作，能把视频模型学到的动力学知识带给策略。但它们大多只有单一相机视角，看不出深度、容易把前后运动看混；长任务里关键信息可能在很久以前的帧，而视频模型的上下文很短。\n\n**做法**：EnerVerse以[[dynamicrafter]]为底座，改成**分块自回归**：每次生成8帧一块，块内双向注意力，块与块之间只往前看；生成到一个“结束帧”（与预设结束画面的L1距离低于阈值）就停。上下文不用连续帧，而是稀疏抽取的干净记忆帧，训练时约丢掉80%的帧仍保留足够信息。为了三维感知，它引入**自由锚定视角**：在相对机器人底座固定的位置放若干虚拟相机，由已有视角重建点云渲染出来，相机参数编码成光线方向图，二维注意力扩展成跨视角注意力。真实场景缺多相机数据，就用EnerVerse-D数据引擎：生成多视角视频→做[[4dgs]]重建→渲染锚定视角当伪真值，反复迭代。动作由约1.9亿参数的[[diffusion-policy]]式头给出，它只读去噪第一步的UNet中层特征，不必等视频完全生成。\n\n**结果**：[[libero]]上平均成功率一个锚定视角84.1%、三个88.5%，对比[[openvla]] 76.5%、Octo 75.1%。消融显示稀疏记忆让LIBERO-Long从30.8%升到73%；从零训练不收敛，说明视频预训练是必要的。真机部分在智元机器人上做了两个工业任务，但没有报告成功率。",
+  "limits": [
+    {
+      "text": "定量结果几乎只有LIBERO仿真，真机任务只给定性展示，没有成功率数字。",
+      "solved_by": []
+    },
+    {
+      "text": "锚定视角靠点云渲染和4D高斯重建得到伪真值，流程复杂，重建误差会传到训练数据里。",
+      "solved_by": []
+    },
+    {
+      "text": "底座是UNet结构的DynamiCrafter，分辨率和模型容量有限，作者只说可以换成DiT而未验证。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "dynamicrafter",
+      "type": "uses",
+      "note": "以DynamiCrafter为视频扩散底座，改造成分块自回归、多视角生成。"
+    },
+    {
+      "to": "vpp",
+      "type": "extends",
+      "note": "同样从视频模型的去噪中间特征里读出动作；EnerVerse加入多视角锚定视角和稀疏长期记忆。"
+    },
+    {
+      "to": "diffusion-policy",
+      "type": "uses",
+      "note": "动作头采用扩散策略式结构，输出8步动作块。"
+    },
+    {
+      "to": "4dgs",
+      "type": "uses",
+      "note": "数据引擎EnerVerse-D用4D高斯溅射重建场景，为锚定视角渲染伪真值。"
+    },
+    {
+      "to": "openvla",
+      "type": "rivals",
+      "note": "OpenVLA用视觉语言模型直接输出动作，EnerVerse先想象未来多视角画面再出动作；LIBERO上88.5%对76.5%。"
+    }
+  ],
+  "prereq": [
+    "world-model-concept",
+    "diffusion-process",
+    "autoregressive",
+    "action-chunking",
+    "camera-geometry",
+    "3d-representation"
+  ],
+  "terms": [
+    {
+      "t": "自由锚定视角（FAV）",
+      "d": "相对机器人底座固定放置的虚拟相机视角，不随机械臂移动，由已有相机的点云渲染得到，用来补充三维信息。"
+    },
+    {
+      "t": "稀疏记忆",
+      "d": "只挑少量历史关键帧作为上下文，而不是保留连续的全部帧，用较少计算记住长任务的早期信息。"
+    }
+  ],
+  "learn": "先读[[vpp]]理解“视频模型特征当策略输入”，再补[[c:camera-geometry]]里相机内外参的概念；然后读原文第3节的分块生成、FAV和策略头，看LIBERO表格与稀疏记忆消融。",
+  "check": {
+    "source": "https://arxiv.org/abs/2501.01895",
+    "confirmed": "标题、11位作者、arXiv v1 2025-01-03、摘要中RTX 4090约280毫秒/8步动作块；HTML正文中DynamiCrafter底座、块大小8、EOS判定、约80%丢帧、FAV与光线方向图、4DGS数据引擎、约190M策略头读首步去噪特征、LIBERO 84.1/88.5对OpenVLA 76.5与Octo 75.1、LIBERO-Long 30.8→73、从零训练失败、真机无成功率、作者机构以AgiBot为主。"
+  }
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SliceGPT删行删列压缩（2024） · AI脉络</title>
+<meta name="description" content="SparseGPT、Wanda等训练后剪枝把单个权重置零，得到的稀疏矩阵要额外的数据结构存储，在现有硬件上加速有限。 利用Transformer的“计算不变性”：在残差流上插入正交旋转不改变模型输出，选用PCA方向做旋转后，直接删掉方差最小的那些行和列，把每个权重矩阵换成更小的稠密矩阵。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/slicegpt.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SliceGPT删行删列压缩（2024）">
+<meta property="og:description" content="SparseGPT、Wanda等训练后剪枝把单个权重置零，得到的稀疏矩阵要额外的数据结构存储，在现有硬件上加速有限。 利用Transformer的“计算不变性”：在残差流上插入正交旋转不改变模型输出，选用PCA方向做旋转后，直接删掉方差最小的那些行和列，把每个权重矩阵换成更小的稠密矩阵。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/slicegpt.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/slicegpt">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 模型压缩与蒸馏</div>
+<h1>SliceGPT删行删列压缩</h1>
+<div class="full">SliceGPT: Compress Large Language Models by Deleting Rows and Columns</div>
+<div class="meta"><span>2024.01</span><span>论文</span><span>延伸</span><span>ICLR 2024</span><span>Saleh Ashkboos, Maximilian L. Croci, Marcelo Gennari do Nascimento, Torsten Hoefler, James Hensman · 苏黎世联邦理工学院, 微软研究院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2401.15024" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/microsoft/TransformerCompression" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/slicegpt">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>SparseGPT、Wanda等训练后剪枝把单个权重置零，得到的稀疏矩阵要额外的数据结构存储，在现有硬件上加速有限。</p></div><div><h4>方法</h4><p>利用Transformer的“计算不变性”：在残差流上插入正交旋转不改变模型输出，选用PCA方向做旋转后，直接删掉方差最小的那些行和列，把每个权重矩阵换成更小的稠密矩阵。</p></div><div><h4>影响</h4><p>给出了一种“训练后变小但保持稠密”的LLM压缩方式，它提出的旋转不变性观察也直接启发了QuaRot等旋转量化方法。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>训练后剪枝的主流（<a class="ln" href="../n/sparsegpt.html">SparseGPT一次性剪枝</a>、<a class="ln" href="../n/wanda.html">Wanda权重乘激活剪枝</a>）是把一部分权重置零，模型参数量下降，但矩阵形状不变，GPU只在特定稀疏格式下才能加速。SliceGPT换了一个思路：缩小网络的<b>嵌入维度</b>本身。</p><p>关键观察是<b>计算不变性</b>：在使用RMSNorm的Transformer里，残差流上的隐藏向量x如果左乘一个正交矩阵Q（<code>x → xQ</code>），同时把读取它的权重换成 <code>QᵀW</code>、写入它的权重换成 <code>WQ</code>，模型输出完全不变（LayerNorm模型可先转换成RMSNorm形式）。既然可以任意旋转，就选一个有用的旋转：用少量校准数据计算每层残差流激活的主成分（PCA），把Q取成主成分方向，旋转后各维度按方差从大到小排列。然后直接删掉方差最小的那部分维度——对应权重矩阵删掉若干行和列，矩阵变小但仍是稠密的。</p><p>摘要报告：对LLAMA2-70B、OPT-66B和Phi-2可删掉最多25%的参数（含嵌入），分别保持稠密模型99%、99%和90%的零样本任务性能；无需额外代码优化，在24GB消费级GPU上LLAMA2-70B的推理总计算降到稠密模型的64%，在40GB A100上降到66%。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>删掉25%参数后，较小模型（如Phi-2）的性能损失明显，压缩率再高就掉得更快，通常需要后续微调来恢复。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/opt.html">OPT-175B</a><span class="yr">2022.05 · LLM</span><div class=nt>在OPT-66B上验证，删掉25%参数保持99%零样本性能。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/llama-2.html">Llama 2</a><span class="yr">2023.07 · LLM</span><div class=nt>以LLAMA2-70B等模型为主要压缩对象。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/sparsegpt.html">SparseGPT一次性剪枝</a><span class="yr">2023.01 · 系统·效率</span><div class=nt>SparseGPT得到的非结构化稀疏在硬件上加速有限，SliceGPT删行删列得到更小的稠密矩阵，无需特殊内核即可提速。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/phi-2.html">小模型路线Phi</a><span class="yr">2023.12 · LLM</span><div class=nt>在较小的Phi-2上测试，同样压缩率下保持约90%性能。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/eigen-svd.html">特征分解与奇异值分解</a> <a class="chip c" href="../c/dimensionality-reduction.html">降维与PCA</a> <a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/residual-connection.html">残差连接</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a></p>
+<h2>本篇术语</h2><ul><li><b>计算不变性</b>　对网络内部表示做某种变换（这里是正交旋转）并相应改写权重后，模型的输出保持完全不变的性质。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2401.15024" rel="noopener">https://arxiv.org/abs/2401.15024</a>（标题、五位作者、v1日期2024-01-26；摘要：现有稀疏化需要额外数据结构且在现有硬件上加速受限、用更小的稠密矩阵替换每个权重矩阵以降低嵌入维度、LLAMA2-70B/OPT 66B/Phi-2最多删25%参数保持99%/99%/90%零样本性能、24GB消费级GPU上计算降到64%、40GB A100上降到66%、提出Transformer中的计算不变性、代码在microsoft/TransformerCompression。PCA旋转、RMSNorm转换细节、ICLR 2024、对QuaRot的启发为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SliceGPT%E5%88%A0%E8%A1%8C%E5%88%A0%E5%88%97%E5%8E%8B%E7%BC%A9%EF%BC%88slicegpt%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aslicegpt%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/slicegpt.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="eagle.html"><small>本分支上一个 · 2024.01</small><b>EAGLE特征级推测解码</b></a><a class="r" href="aqlm.html"><small>本分支下一个 · 2024.01</small><b>AQLM加性量化</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

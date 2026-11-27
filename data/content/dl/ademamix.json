@@ -1,0 +1,24 @@
+{
+  "id": "ademamix",
+  "who": "Matteo Pagliardini, Pierre Ablin, David Grangier · Apple、EPFL",
+  "venue": "ICLR 2025",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2409.03137"}],
+  "aka": ["AdEMAMix优化器", "双EMA Adam", "mixture of two EMAs"],
+  "problem": "动量类优化器用单一指数滑动平均（EMA）累积历史梯度，无法同时既重视最近的梯度、又给很久以前的梯度保留可观权重。",
+  "idea": "在Adam上再加一条衰减很慢的EMA，把快、慢两条动量加权相加作为更新方向，让几万步前的梯度仍能起作用。",
+  "impact": "说明“旧梯度很快失效”的默认假设不一定成立；双动量的做法被后来的优化器研究频繁引用和对比。",
+  "method": "Adam的一阶动量 `m ← β₁m + (1−β₁)g` 中β₁通常取0.9，相当于只记住最近约10步的梯度。若把β₁调到0.9999，旧梯度权重变大，但最近梯度的权重又被压得太小，训练会变慢甚至不稳。作者认为问题在于“一条EMA无法兼顾两头”。\n\nAdEMAMix同时维护两条一阶动量：快的m₁（β₁≈0.9）和慢的m₂（β₃接近1，如0.9999），更新方向取 `(m̂₁ + α·m₂)/(√v̂ + ε)`，α控制慢动量的比重。训练早期慢动量还不可靠，论文对α和β₃使用逐渐升高的预热时间表以保证稳定。二阶矩v与Adam相同。\n\n摘要报告：在语言建模和图像分类上，梯度在数万步内都保持有用；一个在1010亿token上训练的1.3B参数AdEMAMix模型，效果与在1970亿token上训练的AdamW模型相当（数据量多95%）；它还明显减缓了训练中的遗忘。",
+  "limits": [
+    {"text": "多存一份动量，显存比Adam更高；还引入了α、β₃及其预热时间表等新超参数。", "solved_by": []},
+    {"text": "为什么旧梯度能长期有用，论文给的是经验观察，缺少理论解释。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "adam", "type": "extends", "note": "在Adam基础上加一条慢衰减的一阶动量并与快动量混合。"},
+    {"to": "adamw", "type": "rivals", "note": "主要对比基线，报告同等效果下数据量可减少近一半。"},
+    {"to": "momentum", "type": "extends", "note": "重新审视动量中“单一指数衰减”的设计。"},
+    {"to": "polyak-averaging", "type": "rivals", "note": "两者都利用长时间尺度的历史信息，Polyak平均作用在权重上，AdEMAMix作用在梯度上。"}
+  ],
+  "prereq": ["momentum", "adaptive-optimizer", "learning-rate"],
+  "learn": "先弄清EMA的衰减系数与“记忆长度”约等于1/(1−β)的关系；读论文第3节的算法与α、β₃预热；动手比较β₁=0.9与0.9999的Adam和AdEMAMix在小语言模型上的曲线。",
+  "check": {"source": "https://arxiv.org/abs/2409.03137", "confirmed": "标题、3位作者、arXiv v1 2024-09-05；摘要中单EMA的局限、两条EMA的混合、梯度可保持数万步有用、1.3B模型101B token对比AdamW 197B token（+95%）、减缓遗忘。更新式写法、β₃取值、α与β₃预热、ICLR 2025、机构凭一般了解。"}
+}

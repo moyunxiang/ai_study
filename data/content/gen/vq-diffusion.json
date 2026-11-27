@@ -1,0 +1,30 @@
+{
+  "id": "vq-diffusion",
+  "who": "Shuyang Gu, Dong Chen, Jianmin Bao, Fang Wen, Bo Zhang, Dongdong Chen, Lu Yuan, Baining Guo · 中国科学技术大学、微软",
+  "venue": "CVPR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2111.14822"}
+  ],
+  "aka": ["VQ-Diffusion", "向量量化扩散", "离散扩散文生图", "Mask-and-Replace", "掩码与替换扩散"],
+  "problem": "DALL·E这类自回归文生图模型按从左上到右下的顺序逐个预测图像token，有单向偏置（后面的内容无法影响前面），一步错步步错，而且生成时间随分辨率线性增长。",
+  "idea": "在VQ-VAE的离散token空间里做扩散：前向过程每一步以一定概率把token替换成随机token或特殊的[MASK]，反向用一个以文本为条件的Transformer同时预测所有位置的原始token。",
+  "impact": "是把离散扩散用在大规模文生图上的早期代表，在参数量相近时优于自回归模型、速度快约15倍；其“掩码+均匀替换”的转移设计，与之后掩码生成和离散扩散语言模型的思路相通。",
+  "method": "先用VQ-VAE（实际用VQGAN）把图像编码成例如32×32个离散token。前向扩散在token上进行，每一步对每个token：以概率α保持不变，以概率β换成码本中均匀随机的另一个token，以概率γ换成[MASK]。这种“掩码与替换”策略结合了两种噪声：[MASK]让模型清楚哪些位置被破坏了，随机替换迫使模型也要检查看起来完好的token是否正确，从而能纠正前面步骤的错误，缓解自回归模型的误差累积。\n\n反向过程用一个以CLIP或BPE文本编码为条件的Transformer，输入当前带噪的所有token，一次性预测每个位置的干净token分布，再按离散扩散的后验公式得到上一步分布。因为所有位置并行预测，步数与分辨率无关；作者还给出一种重参数化，可以跳步采样，进一步减少步数。\n\n实验在CUB-200、Oxford-102和MSCOCO上比同等规模的自回归模型画质更好，在复杂场景上明显优于GAN类文生图方法；重参数化后速度约是传统自回归方法的15倍且质量更好。",
+  "limits": [
+    {"text": "生成质量受VQ分词器的重建上限约束，分辨率和细节不如同期的连续潜扩散。", "solved_by": ["ldm", "muse-t2i"]},
+    {"text": "均匀替换噪声使训练更难，后来的研究发现纯掩码（吸收态）转移往往更简单有效。", "solved_by": ["maskgit", "mdlm"]}
+  ],
+  "relations": [
+    {"to": "dall-e", "type": "solves", "note": "DALL·E自回归逐个预测token有单向偏置和误差累积，生成时间随分辨率线性增长；离散扩散并行预测并可纠错。"},
+    {"to": "d3pm", "type": "extends", "note": "沿用D3PM的离散状态扩散框架，设计了掩码与均匀替换混合的转移矩阵用于图像token。"},
+    {"to": "vqgan", "type": "uses", "note": "用VQGAN把图像压成离散token，在其上做扩散。"},
+    {"to": "multinomial-diffusion", "type": "extends", "note": "其均匀替换部分即多项式扩散的类别噪声。"}
+  ],
+  "prereq": ["vector-quantization", "diffusion-process", "masked-modeling", "markov-chain", "self-attention"],
+  "terms": [
+    {"t": "单向偏置", "d": "自回归模型按固定顺序生成，前面的token看不到后面的内容，图像的全局结构不易协调。"},
+    {"t": "掩码与替换", "d": "离散扩散的一种前向噪声：一部分token变成[MASK]，一部分换成随机token，其余保留。"}
+  ],
+  "learn": "先读D3PM的离散转移矩阵和VQGAN分词 → 读本文第3节掩码与替换转移的设计 → 在小数据集的VQ token上实现纯掩码与掩码加替换两种转移对比。",
+  "check": {"source": "https://arxiv.org/abs/2111.14822", "confirmed": "标题、八位作者、v1日期2021-11-29、摘要中基于VQ-VAE的隐空间用条件DDPM变体建模、消除单向偏置、掩码与替换扩散策略避免误差累积、同等参数下优于自回归模型、复杂场景优于GAN方法、重参数化后比传统自回归快15倍；机构、CVPR 2022、转移概率记号、文本编码器、32×32 token、数据集名称来自一般了解"}
+}

@@ -1,0 +1,37 @@
+{
+  "id": "conllpp-2023",
+  "who": "Shuheng Liu, Alan Ritter · 佐治亚理工学院",
+  "venue": "ACL 2023（获奖论文）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2212.09747"},
+    {"label": "数据", "url": "https://github.com/ShuhengL/acl2023_conllpp"}
+  ],
+  "aka": ["CoNLL++", "CoNLLPP", "Do CoNLL-2003 Named Entity Taggers Still Work Well in 2023", "NER时间漂移", "Temporal Drift", "测试集重复使用"],
+  "problem": "CoNLL-2003英语NER数据集用了近20年，大家在同一份2003年前后的新闻测试集上反复刷分。用这份旧数据训练、在这份旧测试集上调出来的模型，放到今天的新闻上还管用吗？",
+  "idea": "仿照CoNLL-2003的标注规范，标注一份2020年的新闻测试集（CoNLL++），对20多个从特征CRF到BiLSTM-CRF再到RoBERTa、T5的模型比较新旧测试集上的F1落差，并拆分「时间漂移」和「测试集反复使用造成的过拟合」两种原因。",
+  "impact": "结论出人意料：预训练Transformer在新数据上几乎不掉点，掉点主要来自预训练语料与测试数据的时间错位，而非对旧测试集的过拟合；论文据此认为20年来NER的进步被低估了。",
+  "background": "[[conll-2003]]是神经序列标注的标准基准，[[lample-ner]]、[[bilstm-crf]]、[[flair]]直到BERT系列都用它报分。机器学习里有一类担忧：同一测试集被反复使用，模型设计会不知不觉地「拟合」测试集（自适应过拟合）；而语言本身会随时间变化（新的人名、机构、话题），旧数据训练的模型也可能失效（时间漂移）。两者会同时拉低新数据上的成绩，但很少有人把它们分开测量。",
+  "method": "**造新测试集。** 收集2020年的路透社新闻，按CoNLL-2003的指南和实体类别（人名PER、地名LOC、机构ORG、其他MISC）标注，规模与原测试集相近，称为CoNLL++。\n\n**比较。** 所有模型只用CoNLL-2003训练集训练，分别在原测试集和CoNLL++上算F1，看 `ΔF1 = F1(CoNLL++) − F1(CoNLL-2003)`。\n\n**归因。** 若是自适应过拟合，那么在旧测试集上越好的模型，在新测试集上的提升应「打折」，即新旧F1回归线斜率小于1；若是时间漂移，则用更新语料预训练或用更近期的数据继续训练应能补回落差。作者分别做了这些对照实验，并分析了模型结构、参数量、预训练语料的时间段和微调数据量四个因素。",
+  "results": "摘要报告：20多个模型的泛化表现差异很大；RoBERTa、T5等预训练Transformer即使只用几十年前的数据微调，也看不到性能下降；大部分下降来自预训练语料与下游测试集之间的时间错位；好的泛化取决于模型结构、参数量、预训练语料的时间段和微调数据量。",
+  "legacy": "CoNLL++成了检验NER模型时间泛化的常用附加测试集，这篇工作也常被引用来说明：在一个老基准上持续刷分不一定是过拟合，但评测时应准备新近的数据。它与「测试集重复使用是否导致过拟合」的更广泛讨论（如ImageNet新测试集的研究）互相呼应。",
+  "limits": [
+    {"text": "只覆盖英语新闻领域和四类粗粒度实体，其他语言、社交媒体文本上的时间漂移没有测量。", "solved_by": []},
+    {"text": "新测试集只有一个时间点（2020年），无法画出性能随年份连续变化的曲线。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "conll-2003", "type": "extends", "note": "按CoNLL-2003的标注规范标注了2020年新闻的新测试集，检验20年来在该基准上训练的模型能否泛化。"},
+    {"to": "roberta", "type": "uses", "note": "RoBERTa等预训练模型是被评测对象之一，结果显示几乎没有性能下降。"},
+    {"to": "lample-ner", "type": "uses", "note": "BiLSTM-CRF类神经NER模型作为评测对象，与预训练模型比较新旧测试集落差。"},
+    {"to": "flair", "type": "uses", "note": "Flair上下文字符串嵌入模型也在被比较的20多个模型之中。"}
+  ],
+  "prereq": ["train-val-test", "generalization", "distribution-shift", "classification-metrics", "pretrain-finetune"],
+  "terms": [
+    {"t": "时间漂移（temporal drift）", "d": "语言和世界随时间变化，导致用旧数据训练的模型在新数据上效果变差。"},
+    {"t": "自适应过拟合（adaptive overfitting）", "d": "研究者根据同一测试集的反馈反复改进模型，使模型设计间接拟合了测试集，在新测试集上效果打折。"}
+  ],
+  "learn": "先了解[[conll-2003]]的任务定义和BIO标注 → 读原文第3节CoNLL++的构建和第5节归因实验 → 动手：用Hugging Face上一个CoNLL-2003微调的BERT模型，在CoNLL++上测F1并与原测试集比较。",
+  "check": {
+    "source": "https://arxiv.org/abs/2212.09747",
+    "confirmed": "arXiv记录：标题、作者Shuheng Liu与Alan Ritter、v1 2022-12-19；摘要：CoNLL-2003近20年被广泛使用、评估20多个模型的泛化、RoBERTa与T5等预训练Transformer无性能下降、尝试拆分时间漂移与测试集复用导致的过拟合、多数退化来自预训练语料与测试集的时间错位、四个重要因素、过去20年NER的进步被低估、数据地址。ACL 2023获奖来自汇总页（列为special award）；2020年路透社新闻、四类实体、回归斜率分析凭一般了解。"
+  }
+}

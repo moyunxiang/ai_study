@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>强化学习中的蒙特卡洛方法（Monte Carlo Methods in RL） · AI脉络</title>
+<meta name="description" content="不用环境模型、也不自举：把整局玩完，用实际得到的回报的平均值来估计价值。无偏但方差大，而且必须等回合结束才能更新。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/mc-rl.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="强化学习中的蒙特卡洛方法（Monte Carlo Methods in RL）">
+<meta property="og:description" content="不用环境模型、也不自举：把整局玩完，用实际得到的回报的平均值来估计价值。无偏但方差大，而且必须等回合结束才能更新。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/mc-rl.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/mc-rl">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 入门</div>
+<h1>强化学习中的蒙特卡洛方法</h1><div class="full">Monte Carlo Methods in RL</div>
+<p class="muted" style="font-size:13px">也叫：蒙特卡洛方法　Monte Carlo methods　MC方法　蒙特卡洛控制　Monte Carlo control　蒙特卡洛预测　Monte Carlo prediction　first-visit MC　首次访问　首次访问蒙特卡洛　every-visit MC　每次访问　探索性起点　exploring starts　备份图　backup diagram　MC vs TD</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/mc-rl">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>不用环境模型、也不自举：把整局玩完，用实际得到的回报的平均值来估计价值。无偏但方差大，而且必须等回合结束才能更新。</b></p>
+<p class="tags">先要会：<a class="chip c" href="monte-carlo.html">蒙特卡洛采样</a> <a class="chip c" href="reward-return.html">奖励、回报与折扣</a> <a class="chip c" href="policy-value.html">策略与价值函数</a></p>
+<p><a class="lc" href="../c/policy-iteration-concept.html">策略评估、策略迭代与价值迭代</a>要求知道转移概率，现实中通常不知道。最直接的替代办法是：反正能玩，就多玩几局，看看从某个状态出发<b>实际</b>能拿多少回报，取平均。这就是强化学习里的蒙特卡洛方法（名字来自<a class="lc" href="../c/monte-carlo.html">蒙特卡洛采样</a>采样）。</p><p><b>蒙特卡洛预测</b>。估计V^π(s)：按π玩很多回合，每当经过s，记下从那一刻到回合结束的回报G，<code>V(s)</code>取这些G的平均，或者增量地更新<code>V(s) ← V(s) + α·(G − V(s))</code>。一个回合里可能多次经过同一状态：</p><ul><li><b>首次访问</b>（first-visit MC）：每回合只用第一次经过s之后的回报。</li><li><b>每次访问</b>（every-visit MC）：每次经过都算一个样本。</li></ul><p>两者在访问次数趋于无穷时都收敛到V^π。</p><p><b>蒙特卡洛控制</b>。没有模型时，只有V不够（不知道哪个动作通向好状态），要估计Q(s, a)，再对Q取贪心，形成<a class="lc" href="../c/policy-iteration-concept.html">策略评估、策略迭代与价值迭代</a>式的循环。难点是贪心策略不会去试其他动作，需要保证探索：要么假设每个回合从随机的(s, a)出发（探索性起点），要么让策略始终保持一点随机，如<a class="lc" href="../c/epsilon-greedy.html">ε-贪心与玻尔兹曼探索</a>。也可以用另一个策略采样、用<a class="lc" href="../c/importance-sampling.html">重要性采样</a>修正，得到离策略蒙特卡洛。</p><p><b>与TD的对比</b>。蒙特卡洛的目标G是真实回报，对V^π<b>无偏</b>；但G累加了整局所有步的随机性，<b>方差大</b>，而且要等回合结束，不能用于持续任务。<a class="lc" href="../c/td-error.html">时序差分与自举</a>用<code>r + γV(s&#x27;)</code>代替G，可以每步更新、方差小，但依赖当前估计因而有偏。在<a class="ln" href="../n/sutton-barto.html">《Reinforcement Learning: An Introduction》</a>的备份图里，蒙特卡洛的备份一路画到回合终点，TD只画一步。<a class="lc" href="../c/n-step-return.html">n步回报与多步TD</a>和<a class="lc" href="../c/eligibility-trace.html">资格迹与TD(λ)</a>介于两者之间。<a class="ln" href="../n/reinforce.html">REINFORCE策略梯度</a>本质上就是用蒙特卡洛回报的策略梯度。</p>
+<div class="example"><h4>例子</h4><p>γ=1，一个回合依次经过 s, x, s, y，奖励依次为 1, 0, 2, 3（每步之后获得）。第一次经过s之后的回报是1+0+2+3=6，第二次是2+3=5。首次访问只记一个样本6；每次访问记两个样本6和5，平均5.5。若之前V(s)=4、α=0.1，首次访问的更新为<code>4 + 0.1×(6 − 4) = 4.2</code>。</p></div>
+<h2>容易误解的地方</h2><ul><li>蒙特卡洛的“无偏”只针对评估当前策略而言；做控制时策略在变化，整体并不保证无偏。</li><li>回合很长时（几千步）回报方差极大，纯蒙特卡洛几乎学不动，这是深度RL普遍使用TD或GAE的原因。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

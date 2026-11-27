@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Skywork-OR1开源推理RL（2025） · AI脉络</title>
+<meta name="description" content="在已经很强的长思维链蒸馏模型（DeepSeek-R1-Distill）上继续做强化学习，常见的现象是训练一段时间后模型输出变得越来越确定、熵迅速降到很低，之后成绩不再上升；各家报告对这个现象和对策说法不一。 给出一套在长思维链模型上做RL的完整配方MAGIC：多阶段逐步加长上下文、离线与在线过滤题…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/skywork-or1.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Skywork-OR1开源推理RL（2025）">
+<meta property="og:description" content="在已经很强的长思维链蒸馏模型（DeepSeek-R1-Distill）上继续做强化学习，常见的现象是训练一段时间后模型输出变得越来越确定、熵迅速降到很低，之后成绩不再上升；各家报告对这个现象和对策说法不一。 给出一套在长思维链模型上做RL的完整配方MAGIC：多阶段逐步加长上下文、离线与在线过滤题…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/skywork-or1.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/skywork-or1">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:336"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/agent.html">推理、检索与智能体</a> › 可验证奖励强化学习</div>
+<h1>Skywork-OR1开源推理RL</h1>
+<div class="full">Skywork Open Reasoner 1 Technical Report</div>
+<div class="meta"><span>2025.05</span><span>论文</span><span>延伸</span><span>Jujie He, Jiacai Liu, Chris Yuhao Liu, Rui Yan, Chaojie Wang, Peng Cheng, Xiaoyu Zhang, Fuxiang Zhang et al. · 昆仑万维Skywork AI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2505.22312" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/SkyworkAI/Skywork-OR1" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/skywork-or1">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>在已经很强的长思维链蒸馏模型（DeepSeek-R1-Distill）上继续做强化学习，常见的现象是训练一段时间后模型输出变得越来越确定、熵迅速降到很低，之后成绩不再上升；各家报告对这个现象和对策说法不一。</p></div><div><h4>方法</h4><p>给出一套在长思维链模型上做RL的完整配方MAGIC：多阶段逐步加长上下文、离线与在线过滤题目、只保留有区分度的样本组、去掉KL项，并用“目标熵”自动调节熵奖励系数，防止过早的熵坍缩；同时系统地做消融，找出影响熵变化的因素。</p></div><div><h4>影响</h4><p>把32B蒸馏模型在AIME24、AIME25和LiveCodeBench上的平均成绩从57.8%提到72.8%，并完整开源权重、训练代码和数据；其中关于熵坍缩的系统实验是“RL中的熵为什么重要”这一讨论的重要实证来源。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/deepseek-r1.html">DeepSeek-R1</a>发布了从R1蒸馏出的一系列小模型；在它们之上再做<a class="ln" href="../n/grpo.html">GRPO</a>式强化学习，成为2025年上半年开源界提升推理能力的主要办法。<a class="ln" href="../n/dapo.html">DAPO</a>等工作指出熵坍缩会限制探索，但何种因素导致坍缩、怎样控制，缺少系统的对照实验。</p><h2>方法</h2><p><b>数据</b>：训练前去掉基础模型全对或全错的题；每个阶段开始时，再去掉上一阶段已经全对的题，让模型始终练难题。训练批次只保留组内回答有对有错（优势不为零）的题目。</p><p><b>训练策略</b>：仿照开源的DeepScaleR，分多个阶段逐步加大上下文长度，前期短、后期长，大幅节省计算；实验发现，对被截断的超长回答直接给负分并不妨碍后期提升，还更省词元，所以不做特殊屏蔽。</p><p><b>损失</b>：词元级的策略损失（对整批所有词元求平均，不按每个回答长度归一化）；去掉KL项——作者发现它在后期阶段明显拖累提升。</p><p><b>自适应熵控制</b>：在损失里加熵奖励 <code>α_k·H</code>，但不固定系数，而是设定一个目标熵：当前熵低于目标时自动调大 <code>α_k</code>，高于目标时调小，保证熵不会掉到目标以下。</p><p><b>熵坍缩的分析</b>：消融显示，每批数据做多次梯度更新（更偏离在策略）会加速坍缩，而过早坍缩的运行最终测试成绩更差。</p><p><b>结果</b>：32B模型三项平均从57.8%到72.8%，7B从43.6%到57.5%；32B在AIME24和AIME25上超过DeepSeek-R1和Qwen3-32B，LiveCodeBench上相当。</p><h2>后来的发展</h2><p>与同期的<a class="ln" href="../n/entropy-rl.html">RL中的熵坍缩</a>、<a class="ln" href="../n/forking-tokens.html">高熵分叉词元</a>等工作一起，让“监控并控制策略熵”成为RLVR训练的常规环节；其开源数据与代码常被用作后续RL研究的起点。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>建立在已经蒸馏过R1长思维链的模型上，提升里有多少来自RL本身、多少依赖蒸馏起点，没有完全分开。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>目标熵仍是需要人工设定的超参数，合适的值随模型和数据变化。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只在数学和代码这类答案可自动判定的题目上训练和评测，向开放任务的推广未验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:336" href="../n/deepseek-r1.html">DeepSeek-R1</a><span class="yr">2025.01 · 推理·智能体</span><div class=nt>以DeepSeek-R1-Distill系列为起点继续做RL，并在AIME上与R1对比。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/dapo.html">DAPO</a><span class="yr">2025.03 · 推理·智能体</span><div class=nt>同样关注熵坍缩与零优势样本，进一步给出按目标熵自动调节的控制方法和系统消融。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/grpo.html">GRPO</a><span class="yr">2024.02 · 推理·智能体</span><div class=nt>MAGIC是改造过的GRPO：词元级损失、去KL、过滤零优势组、自适应熵奖励。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/deepscaler.html">DeepScaleR小模型RL</a><span class="yr">2025.02 · 推理·智能体</span><div class=nt>以博客与模型卡发布，没有正式论文和系统的消融实验，加长时机等超参数靠经验设定。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:336" href="../n/entropy-rl.html">RL中的熵坍缩</a><span class="yr">2025.05 · 推理·智能体</span><div class=nt>同期研究RL中的熵坍缩：该文从协方差角度解释机制并提出限制高协方差词元，本文用目标熵自适应调节熵奖励。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/entropy.html">信息量与熵</a> <a class="chip c" href="../c/exploration-exploitation.html">探索与利用</a> <a class="chip c" href="../c/reward-design.html">奖励设计与奖励投机</a> <a class="chip c" href="../c/reasoning-tokens.html">推理token与测试时计算</a></p>
+<h2>本篇术语</h2><ul><li><b>熵坍缩</b>　强化学习中策略的输出分布越来越集中，几乎每次都生成同样的内容，模型失去探索新解法的能力。</li><li><b>目标熵</b>　预先设定的熵下限；训练中根据当前熵与它的差距自动调节熵奖励的权重。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/grpo.html">GRPO</a>和<a class="ln" href="../n/dapo.html">DAPO</a> → 读原文第3.1节MAGIC配方和第4节熵坍缩的对照实验 → 动手：在小模型RL训练中记录每步的平均词元熵，比较每批更新1次和4次时的熵曲线。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2505.22312" rel="noopener">https://arxiv.org/abs/2505.22312</a>（标题、作者、v1提交于2025-05-28；摘要中基于R1-Distill、32B平均57.8%→72.8%、7B 43.6%→57.5%、32B在AIME24/25超过R1与Qwen3-32B、熵坍缩研究与完整开源；正文（arxiv.org/html/2505.22312）核对MAGIC名称、离线与在线过滤、非零优势组、仿DeepScaleR的多阶段加长、截断回答不屏蔽、词元级损失、去KL、目标熵tgt-ent调节α_k、离策略更新加速坍缩。单位按通讯邮箱kunlun-inc.com；未写venue。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Skywork-OR1%E5%BC%80%E6%BA%90%E6%8E%A8%E7%90%86RL%EF%BC%88skywork-or1%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Askywork-or1%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/skywork-or1.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="webdancer.html"><small>本分支上一个 · 2025.05</small><b>WebDancer信息检索智能体</b></a><a class="r" href="ag-ui.html"><small>本分支下一个 · 2025.05</small><b>AG-UI智能体界面协议</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

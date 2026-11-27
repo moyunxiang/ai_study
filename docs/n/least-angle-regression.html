@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>最小角回归LARS（2004） · AI脉络</title>
+<meta name="description" content="要对每个正则强度λ单独解一次优化，想看“随λ变化哪些变量进入模型”的完整路径代价很高；传统的前向选择又太贪心，一步就把一个变量的系数推到底。 每一步只朝“与当前残差夹角最小”的方向前进，并在多个变量与残差相关性打平时沿它们的角平分线一起走；稍作修改就能一次算出Lasso在所有λ下的整条解路径。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/least-angle-regression.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="最小角回归LARS（2004）">
+<meta property="og:description" content="要对每个正则强度λ单独解一次优化，想看“随λ变化哪些变量进入模型”的完整路径代价很高；传统的前向选择又太贪心，一步就把一个变量的系数推到底。 每一步只朝“与当前残差夹角最小”的方向前进，并在多个变量与残差相关性打平时沿它们的角平分线一起走；稍作修改就能一次算出Lasso在所有λ下的整条解路径。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/least-angle-regression.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/least-angle-regression">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 经典统计学习</div>
+<h1>最小角回归LARS</h1>
+<div class="full">Least Angle Regression</div>
+<div class="meta"><span>2004.06</span><span>论文</span><span>延伸</span><span>Annals of Statistics 2004</span><span>Bradley Efron, Trevor Hastie, Iain Johnstone, Robert Tibshirani · 斯坦福大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/math/0406456" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/least-angle-regression">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/lasso.html">Lasso与L1稀疏</a>要对每个正则强度λ单独解一次优化，想看“随λ变化哪些变量进入模型”的完整路径代价很高；传统的前向选择又太贪心，一步就把一个变量的系数推到底。</p></div><div><h4>方法</h4><p>每一步只朝“与当前残差夹角最小”的方向前进，并在多个变量与残差相关性打平时沿它们的角平分线一起走；稍作修改就能一次算出Lasso在所有λ下的整条解路径。</p></div><div><h4>影响</h4><p>让Lasso的整条正则化路径变得几乎和一次最小二乘一样便宜，成为稀疏回归和变量选择的标准工具，也是后来坐标下降等路径算法的比较对象。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>设自变量都已标准化。LARS从全零系数出发，找出与当前残差相关性最大的变量，把它的系数朝最小二乘方向增加；但不像前向选择那样一次走到底，而是走到“另一个变量与残差的相关性追平”为止。此后两个变量一起前进，方向取它们的等角方向，保证两者与残差的相关性始终相等、同步下降；再有第三个变量追平就把它也加入，依此类推。因为每段都是直线，整个过程只需与变量个数同量级的步数，计算量和一次最小二乘差不多。</p><p>作者证明了三点：加一条规则（某个系数穿过0时把它移出活动集）后，LARS给出的正是<a class="ln" href="../n/lasso.html">Lasso与L1稀疏</a>对所有λ的解路径；另一种修改给出前向分段回归（Forward Stagewise）的路径；并给出了用自由度估计预测误差、从路径上挑选模型的简单方法。</p><p>这让统计学习里“看一整条正则化路径再挑λ”（配合<a class="ln" href="../n/cross-validation.html">交叉验证</a>）成为常规做法，<a class="ln" href="../n/elastic-net.html">弹性网Elastic Net</a>的原始求解算法LARS-EN也直接建立在它上面。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每一步都要处理活动集的最小二乘问题，变量数达到几十万、数据高度共线时数值上不如后来的坐标下降稳定、快速。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/ridge.html">岭回归与L2正则</a><span class="yr">1970 · 基础</span><div class=nt>岭回归收缩所有系数但不产生稀疏解；LARS/Lasso路径让变量逐个进入，直接做变量选择。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/cross-validation.html">交叉验证</a><span class="yr">1974 · 基础</span><div class=nt>整条路径算出后，通常再用交叉验证或自由度估计在路径上选λ。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/lasso.html">Lasso与L1稀疏</a><span class="yr">1996 · 基础</span><div class=nt>解决Lasso对每个λ都要单独求解、难以得到整条正则化路径的问题。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/linear-regression.html">线性回归</a> <a class="chip c" href="../c/regularization.html">正则化与权重衰减</a> <a class="chip c" href="../c/dot-product.html">内积与余弦相似度</a> <a class="chip c" href="../c/generalization.html">泛化与过拟合</a></p>
+<h2>本篇术语</h2><ul><li><b>正则化路径</b>　把正则强度λ从大到小连续变化时，模型系数随之变化形成的轨迹；看路径能知道变量按什么顺序进入模型。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/lasso.html">Lasso与L1稀疏</a>；读论文第2节LARS算法的几何描述，画出两个变量时等角方向的示意图；用scikit-learn的lars_path在糖尿病数据上画出系数路径图。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/math/0406456" rel="noopener">https://arxiv.org/abs/math/0406456</a>（标题、4位作者、arXiv v1提交于2004-06-23；摘要中LARS是不那么贪心的前向选择、简单修改即可实现Lasso并计算全部Lasso估计且计算时间少一个数量级、另一修改实现Forward Stagewise。等角方向的几何细节、自由度估计、Annals of Statistics刊载与LARS-EN的关系来自一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%9C%80%E5%B0%8F%E8%A7%92%E5%9B%9E%E5%BD%92LARS%EF%BC%88least-angle-regression%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aleast-angle-regression%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/least-angle-regression.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="echo-state-network.html"><small>本分支上一个 · 2004.04</small><b>回声状态网络ESN</b></a><a class="r" href="entropy-minimization.html"><small>本分支下一个 · 2004.12</small><b>熵最小化半监督</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "id": "appnp",
+  "who": "Johannes Gasteiger (Klicpera), Aleksandar Bojchevski, Stephan Günnemann · 慕尼黑工业大学",
+  "venue": "ICLR 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1810.05997"}
+  ],
+  "aka": ["APPNP", "PPNP", "Predict then Propagate", "先预测后传播", "个性化PageRank传播", "Personalized PageRank"],
+  "problem": "[[gcn]]类模型给一个节点分类时只看几跳之内的邻居，想看得更远就得加层，但层数一多表示就趋于一致（[[gcn-oversmoothing]]），参数也随层数增加。",
+  "idea": "把“特征变换”和“信息传播”拆开：先用普通神经网络对每个节点独立做预测，再用个性化PageRank在图上传播这些预测；PageRank的“随机跳回起点”项保证传播很多步也不会把节点自身信息抹掉。",
+  "impact": "“先预测后传播”的解耦思路与随后的SGC一起成为GNN设计的重要范式，个性化PageRank传播也被GPR-GNN、图扩散卷积等后续工作沿用；APPNP至今是半监督节点分类的强基线。",
+  "method": "GCN的传播相当于反复乘以归一化邻接矩阵Â，乘很多次会收敛到与起点无关的平稳分布，这就是过平滑。[[pagerank]]的个性化版本在每一步以概率α“跳回”起始节点，其平稳分布 `Π = α(I − (1−α)Â)⁻¹` 始终保留对起点的偏好。\n\n**PPNP**：先用一个MLP对每个节点独立算出预测 `H = f_θ(X)`，再整体传播 `Z = softmax(Π·H)`。参数只在MLP里，传播矩阵没有参数，因此可以看非常大的邻域而不增加参数、不怕过平滑。\n\n直接求逆矩阵Π在大图上代价太高，于是用**APPNP**做近似：从 `Z⁰ = H` 开始迭代K步，`Z^{k+1} = (1−α)·Â·Z^k + α·H`。每步都是一次稀疏矩阵乘法，K取10左右即可，α通常取0.1左右。训练时梯度穿过整个传播过程回到MLP。\n\n摘要报告：模型的训练时间与参数量与以往模型持平或更少，可以利用大而可调的邻域，并能与任意神经网络结合；在作者所称迄今对GCN类模型最彻底的对比研究中，超过了多种近期提出的半监督节点分类方法。",
+  "limits": [
+    {"text": "传播权重固定为个性化PageRank，隐含“相连节点标签相似”的同配假设，在相邻节点常属不同类的异配图上效果差。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "gcn", "type": "solves", "note": "解决GCN增加层数以扩大感受野时出现的过平滑和参数增长问题。"},
+    {"to": "pagerank", "type": "uses", "note": "用个性化PageRank作为无参数的传播方式。"},
+    {"to": "gcn-oversmoothing", "type": "solves", "note": "跳回起点的项让传播多步后仍保留节点自身信息。"},
+    {"to": "label-propagation", "type": "extends", "note": "思路接近标签传播，但传播的是神经网络的预测而不是原始标签，并且端到端训练。"}
+  ],
+  "prereq": ["graph-basics", "message-passing", "markov-chain", "mlp", "semi-supervised"],
+  "terms": [
+    {"t": "个性化PageRank", "d": "随机游走每一步以一定概率跳回固定的起点，得到的停留概率分布反映“离起点近且连接紧密”的节点。"}
+  ],
+  "learn": "先读[[gcn]]和[[pagerank]]；读论文第2–3节从GCN到PPNP的推导；在Cora上实现APPNP，把K从2调到20，比较与同样深度GCN的准确率变化。",
+  "check": {"source": "https://arxiv.org/abs/1810.05997", "confirmed": "标题、3位作者、arXiv v1提交于2018-10-14；摘要中现有方法只看几步传播且邻域难以扩大、利用GCN与PageRank的关系推导个性化PageRank传播、PPNP及其快速近似APPNP、训练时间与参数量持平或更低、可与任意神经网络结合、在最彻底的GCN类模型对比中胜出。传播公式、α与K的取值、ICLR 2019与机构来自一般了解。"}
+}

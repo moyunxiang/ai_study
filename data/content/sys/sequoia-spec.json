@@ -1,0 +1,25 @@
+{
+ "id": "sequoia-spec",
+ "who": "Zhuoming Chen, Avner May, Ruslan Svirschevski, Yuhsun Huang, Max Ryabinin, Zhihao Jia, Beidi Chen · 卡内基梅隆大学, Together AI, Yandex",
+ "venue": "NeurIPS 2024",
+ "aka": ["Sequoia", "最优草稿树", "token tree", "硬件感知推测解码"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2402.12374"},
+  {"label": "GitHub", "url": "https://github.com/Infini-AI-Lab/Sequoia"}
+ ],
+ "problem": "树状推测解码一次验证一整棵候选词树，但树的形状靠手工设定；树一大，加速就不再增长，换了采样温度或硬件，原来的树也不再最优。",
+ "idea": "用动态规划按“每个位置的候选被接受的概率”求出给定预算下期望接受词数最多的树形；配一种在各种温度下都稳定的采样—验证方法；再按硬件实测的前向耗时自动挑树的大小和深度。",
+ "impact": "把草稿树的形状从手调参数变成可优化的对象，尤其在权重卸载到CPU、每次大模型前向都很贵的场景下，展示了推测解码可以带来近十倍的加速。",
+ "method": "[[specinfer]]把草稿组织成一棵树，大模型用一次前向（配合树形注意力掩码）同时验证所有分支，接受最长的正确路径。树越大，猜中的机会越多，但验证代价也越高；手工设定的树形在预算增大时收益很快饱和。\n\nSequoia有三个部分。**可扩展性**：假设草稿模型第k个候选被接受的概率只与k有关（可预先统计），则在节点总数固定时，使期望接受词数最大的树可以用动态规划精确求出，预算越大树形也随之最优地扩展。**鲁棒性**：设计新的采样与验证方式，在不同温度下（包括贪心）都保持与[[speculative-decoding]]相同的无损性，并比之前的方法更稳定。**硬件感知**：大模型验证n个token的耗时随n变化的曲线因GPU而异，优化器结合实测耗时自动选择树的大小和深度。\n\n摘要报告：在A100上，Llama2-7B、Llama2-13B、Vicuna-33B的解码速度最多提升4.04、3.73、2.27倍；在L40上做权重卸载时，Llama2-70B精确推理延迟低至0.56秒/词，比作者优化过的卸载系统（5.6秒/词）快9.96倍，比DeepSpeed-Zero-Inference快9.7倍，比Hugging Face Accelerate快19.5倍。",
+ "limits": [
+  {"text": "最优树的求解依赖“接受率只与候选排名有关”的简化假设，实际接受率随上下文变化；静态树不能针对每一步动态调整。", "solved_by": ["eagle-2"]}
+ ],
+ "relations": [
+  {"to": "specinfer", "type": "solves", "note": "SpecInfer式手工树形在预算增大时收益饱和，Sequoia用动态规划求最优树形。"},
+  {"to": "speculative-decoding", "type": "extends", "note": "保持推测解码的无损性，改进采样验证方法使其在各种温度下都稳定。"},
+  {"to": "flexgen", "type": "uses", "note": "在权重卸载到CPU的推理场景下，每次大模型前向极贵，推测解码收益更大。"}
+ ],
+ "prereq": ["decoding-sampling", "dynamic-programming", "autoregressive", "throughput-latency"],
+ "terms": [{"t": "草稿树", "d": "把多个候选续写组织成一棵树，每条从根到叶的路径都是一种可能的续写，由大模型一次并行验证。"}],
+ "check": {"source": "https://arxiv.org/abs/2402.12374", "confirmed": "标题、七位作者、v1日期2024-02-19；摘要：现有方法难以扩展到更大推测预算、难以适应不同超参与硬件、动态规划求最优token树结构、新的采样与验证方法在不同温度下更好、硬件感知树优化器自动选树大小与深度、A100上Llama2-7B/13B/Vicuna-33B最多4.04/3.73/2.27倍、L40卸载下Llama2-70B 0.56 s/token比自有卸载系统5.6 s/token快9.96倍、比DeepSpeed-Zero-Inference快9.7倍、比HF Accelerate快19.5倍。接受率只依赖排名的假设、NeurIPS 2024、机构为一般了解。"}
+}

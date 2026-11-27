@@ -1,0 +1,24 @@
+{
+ "id": "gspmd",
+ "who": "Yuanzhong Xu, HyoukJoong Lee, Dehao Chen, Blake Hechtman, Yanping Huang, Rahul Joshi, Maxim Krikun, Dmitry Lepikhin et al.（含Noam Shazeer） · Google",
+ "aka": ["GSPMD", "SPMD分片", "分片标注", "sharding annotation", "自动分片", "XLA SPMD", "jax.jit sharding", "pjit"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2105.04663"}
+ ],
+ "problem": "Megatron式张量并行、流水线并行、GShard的专家并行各要求手工改写模型代码，不同模型、不同并行组合都得重写一遍，很难混用。",
+ "idea": "让用户按单设备的方式写程序，只在少数几个张量上标注“沿哪个维度切到设备网格的哪个轴”；编译器据此推断图中每个算子的切分方式，自动插入所需的集合通信。",
+ "impact": "成为XLA的通用并行化机制，JAX中基于分片标注的自动并行（pjit，后来并入jax.jit）、PaLM等谷歌大模型的训练都建立在它之上，PyTorch/XLA也有对应实现。",
+ "method": "[[mesh-tensorflow]]提出把张量的维度映射到设备网格上，但要求用一套专门的API重写模型；[[gshard]]在[[xla]]里加入了用于MoE的分片标注；[[megatron]]则是在PyTorch里手写好每一层的切分与通信。GSPMD把这些统一成一个编译器问题。\n\n用户把加速器组织成一个逻辑网格（例如8×16），然后对少数张量写标注：某个张量的第0维切到网格的第一个轴、第1维复制等。GSPMD用一种简单而通用的切分表示（每个维度可以切分、复制，或部分切分），从这些标注出发，沿计算图前后传播，推断出每个算子输入输出的切分方式；遇到两侧切分不一致的地方，就自动插入all-gather、reduce-scatter、all-to-all等集合通信。这样同一套机制可以表达数据并行、张量并行、专家并行、流水线（把层的维度切开），以及它们的混合，单设备程序几乎不用改。\n\n摘要报告：在最多2048个Cloud TPUv3核上，对最多一万亿参数的模型达到50%–62%的计算利用率。",
+ "limits": [
+  {"text": "最佳切分标注仍要由人来决定，选错了性能会大幅下降；自动搜索切分方案是另一个问题。", "solved_by": ["alpa"]}
+ ],
+ "relations": [
+  {"to": "mesh-tensorflow", "type": "extends", "note": "继承“张量维度映射到设备网格”的思想，但改为在编译器里由少量标注自动推断，不必改写模型。"},
+  {"to": "gshard", "type": "extends", "note": "把GShard中为MoE引入的XLA分片标注推广成通用的并行化系统。"},
+  {"to": "xla", "type": "uses", "note": "作为XLA编译器的一个阶段实现切分传播与集合通信插入。"},
+  {"to": "megatron", "type": "rivals", "note": "Megatron在代码里手写张量并行；GSPMD用标注让编译器自动生成同样的切分。"}
+ ],
+ "prereq": ["distributed-training", "matrix-multiplication", "mixture-of-experts", "interconnect"],
+ "terms": [{"t": "SPMD", "d": "单程序多数据：所有设备运行同一份程序，各自处理数据的不同分片，靠集合通信交换结果。"}],
+ "check": {"source": "https://arxiv.org/abs/2105.04663", "confirmed": "标题、作者（Xu等16人，含Noam Shazeer）、v1日期2021-05-10；摘要：基于编译器的自动并行化系统、用户按单设备方式写程序并用少量标注提示如何分布张量、切分表示简单而通用可表达不同或混合的并行范式、从有限标注推断每个算子的切分、在最多2048个Cloud TPUv3核上对最多一万亿参数模型达到50%–62%计算利用率。切分传播与集合通信插入的细节、pjit/jax.jit与PaLM基于它、PyTorch/XLA实现为一般了解。"}
+}

@@ -1,0 +1,39 @@
+{
+  "id": "infini-gram",
+  "who": "Jiacheng Liu, Sewon Min, Luke Zettlemoyer, Yejin Choi, Hannaneh Hajishirzi · 华盛顿大学、艾伦人工智能研究所",
+  "venue": "COLM 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2401.17377"},
+    {"label": "项目主页", "url": "https://infini-gram.io/"}
+  ],
+  "aka": ["Infini-gram", "infinigram", "∞-gram", "无限元语法", "无界n-gram", "Unbounded n-gram", "后缀数组", "Suffix Array"],
+  "problem": "神经大模型时代n-gram语言模型几乎被遗忘：传统做法要预先统计n-gram计数表，n只能取5左右，语料也远小于大模型的训练数据。",
+  "idea": "不存计数表，而是给整个语料建**后缀数组**，查询时现场数出任意长度上下文的出现次数；据此定义「∞-gram」：每次都用语料里能匹配上的最长后缀来预测下一个词，匹配不上再回退。",
+  "impact": "第一次把n-gram模型做到与大模型训练数据同量级（5万亿token），并公开了毫秒级查询的引擎和API，成为分析训练数据、检测记忆与污染的常用工具。",
+  "background": "[[shannon-ngram]]以来的n-gram模型靠数「前n−1个词之后出现某词」的次数估概率，[[kneser-ney]]等平滑方法处理没见过的组合，[[large-lm-mt]]把语料推到万亿词但n仍只有5。n越大越稀疏、计数表越大，所以n-gram模型的上下文一直很短，而Transformer语言模型能看几千个词，n-gram逐渐只剩教科书地位。",
+  "method": "**后缀数组。** 把语料（tokenize后的token序列）的所有后缀按字典序排好，只存每个后缀的起始位置。任何一个token串在语料中的所有出现位置都落在后缀数组的一段连续区间里，用两次二分查找就能找到区间端点，区间长度就是出现次数，时间是 `O(L·log N)`（L为查询长度，N为语料长度），不需要预存任何计数。\n\n**∞-gram。** 对上下文 `w_1…w_{i−1}`，找到在语料中出现过的最长后缀 `w_{i−n+1}…w_{i−1}`（有效n），然后用\n\n`P(w_i | 上下文) = count(w_{i−n+1}…w_{i−1} w_i) / count(w_{i−n+1}…w_{i−1})`\n\n这相当于把回退的起点放在「能匹配的最长长度」上，n没有上限。作者把它与神经语言模型的分布做插值 `P = λ·P_∞ + (1−λ)·P_neural`，λ随有效n和分布稀疏程度变化。",
+  "results": "摘要报告：在5万亿token上建成了迄今最大的n-gram模型；∞-gram的下一个token预测准确率约47%，与神经大模型插值能大幅降低困惑度；分析机器生成文本时，发现模型与∞-gram的一致率随后缀长度出现异常波动，提示预训练和Transformer位置编码的缺陷。",
+  "legacy": "infini-gram的引擎和公开API被用来检索训练语料中的原文、统计记忆现象和评测集污染。后续的[[infini-gram-mini]]（EMNLP 2025最佳论文）改用FM-index，把索引压缩到语料大小的一半以下，扩展到几十TB的网页文本。",
+  "limits": [
+    {"text": "后缀数组索引大约是语料大小的数倍，几十TB级的网页语料难以全部建索引。", "solved_by": ["infini-gram-mini"]},
+    {"text": "只能做精确的token串匹配，同义改写、换一种说法就数不到。", "solved_by": []},
+    {"text": "∞-gram本身没有泛化能力，必须与神经语言模型插值才能用于生成。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "shannon-ngram", "type": "extends", "note": "沿用按上下文计数估计下一个词概率的n-gram思路，但让n不再固定。"},
+    {"to": "kneser-ney", "type": "rivals", "note": "传统平滑在固定n内重新分配概率；∞-gram改为从最长可匹配后缀回退，不做折扣平滑。"},
+    {"to": "large-lm-mt", "type": "extends", "note": "Stupid Backoff把n-gram推到万亿词量级，infini-gram把语料推到5万亿token、并取消n的上限。"},
+    {"to": "dolma", "type": "uses", "note": "在Dolma、RedPajama、The Pile等开放预训练语料上建索引。"},
+    {"to": "gpt-2", "type": "uses", "note": "把∞-gram与GPT-2、Llama-2等神经模型插值，测量困惑度下降。"}
+  ],
+  "prereq": ["n-gram", "language-model", "perplexity", "tokenization", "big-o"],
+  "terms": [
+    {"t": "后缀数组（suffix array）", "d": "把一个长字符串的所有后缀按字典序排好后，记录每个后缀起点的数组；能用二分查找快速统计任意子串的出现次数。"},
+    {"t": "有效n（effective n）", "d": "∞-gram在当前位置实际用上的上下文长度，即语料中能匹配到的最长后缀长度再加1。"}
+  ],
+  "learn": "先复习[[c:n-gram]]与平滑 → 读原文第2–3节∞-gram定义和后缀数组引擎 → 动手：调用infini-gram的公开API查一句话在Pile里的出现次数，再算它的∞-gram概率。",
+  "check": {
+    "source": "https://arxiv.org/abs/2401.17377",
+    "confirmed": "arXiv记录：标题、五位作者、v1 2024-01-30；摘要：n-gram在大模型时代仍有价值、5万亿token训练为最大n-gram模型、∞-gram带回退、基于后缀数组的infini-gram引擎毫秒级延迟、下一token预测准确率47%、与神经LLM互补大幅降低困惑度、机器文本一致率随后缀长度异常。COLM 2024出处、作者单位、插值形式、所用语料名单与GPT-2/Llama-2对比对象凭一般了解。"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "id": "dong-lapata",
+  "who": "Li Dong（董力）, Mirella Lapata · 爱丁堡大学",
+  "venue": "ACL 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1601.01280"}
+  ],
+  "aka": ["Seq2Tree", "神经语义解析", "Neural Semantic Parsing", "Language to Logical Form", "序列到树", "层次树解码器"],
+  "problem": "传统语义解析依赖高质量词典、手工模板和领域相关的语言特征，每换一个领域或一种意义表示（逻辑式、IFTTT规则）都要重新设计。",
+  "idea": "把语义解析当作翻译：用带注意力的编码器-解码器把句子直接生成为逻辑式；除了逐词生成的Seq2Seq，还提出按树结构逐层展开的Seq2Tree解码器，让输出天然符合括号嵌套。",
+  "impact": "在JOBS、GEO、ATIS、IFTTT四个数据集上不用手工特征就取得有竞争力的结果，开启了神经语义解析的路线；Seq2Tree的层次解码思想被后续的语法约束解码、代码生成和文本到SQL模型广泛借鉴。",
+  "background": "从[[geoquery-chill]]到[[semantic-parsing-ccg]]，语义解析器都需要一个把词映射到逻辑谓词的词典，以及领域相关的组合规则或特征，可移植性差。[[seq2seq]]和[[bahdanau-attention]]在机器翻译上证明了端到端编码器-解码器可以直接学会序列之间的映射。逻辑式本身可以看成一种「目标语言」。",
+  "method": "**Seq2Seq。** 用LSTM编码输入句子，另一个LSTM逐个生成逻辑式的符号（谓词、变量、括号），每一步用注意力在输入词上取加权上下文，`p(y_t | y_<t, x) = softmax(W [h_t ; c_t])`，c_t是注意力上下文向量。\n\n**Seq2Tree。** 逻辑式是带括号的嵌套结构，逐个生成括号容易出错。层次解码器把它看成一棵树，一层一层生成：解码器先生成最外层的符号序列，遇到一个子树时生成特殊的非终结符 `<n>` 代替；之后对每个 `<n>` 再启动一次解码，以 `<n>` 位置的隐藏状态为条件生成它的内容，并把父节点的隐藏状态作为额外输入（父节点反馈），直到不再出现 `<n>`。例如 `(lambda $0 e (and (flight $0) (from $0 dallas)))` 会先生成外层，再分别展开里面的括号。\n\n**参数识别。** 实体名、数字等在训练中很稀疏，作者先把它们替换成带类型的占位符（如 `ci0` 表示第一个城市），解码后再换回原值，相当于一种简单的复制机制。",
+  "results": "摘要称，在四个数据集上该方法不使用手工特征就取得有竞争力的表现，并且容易适配到不同领域和意义表示；论文中Seq2Tree在多数数据集上优于Seq2Seq（具体数字未逐项核对）。",
+  "legacy": "Jia与Liang同年提出数据重组增强神经语义解析；Dong与Lapata在2018年提出Coarse-to-Fine解码（先生成草图再填细节）。语法约束解码（Yin与Neubig的TRANX等）把「按树生成」推进到按抽象语法树规则生成代码；[[wikisql]]、[[spider]]上的文本到SQL模型也继承了这一路线。大语言模型出现后，语义解析多以提示或微调LLM的方式完成。",
+  "limits": [
+    {"text": "神经模型在GeoQuery这类小数据上组合泛化能力弱，遇到训练中没见过的谓词组合时容易出错。", "solved_by": []},
+    {"text": "仍需要句子与完整逻辑式配对的标注数据，没有解决标注成本问题。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "seq2seq", "type": "uses", "note": "把语义解析直接做成编码器-解码器的序列转换问题。"},
+    {"to": "bahdanau-attention", "type": "uses", "note": "解码每一步用注意力对齐输入词与输出的谓词或参数。"},
+    {"to": "semantic-parsing-ccg", "type": "solves", "note": "CCG语义解析依赖词典和手工特征，本文端到端学习、无需这些领域资源。"},
+    {"to": "geoquery-chill", "type": "uses", "note": "在GeoQuery等经典语义解析基准上评测。"}
+  ],
+  "prereq": ["encoder-decoder", "attention-concept", "recurrent-layer", "softmax"],
+  "terms": [
+    {"t": "逻辑式（logical form）", "d": "用谓词、变量和量词写出的形式化意义，如 (from $0 dallas) 表示「航班$0从达拉斯出发」。"},
+    {"t": "层次解码", "d": "先生成外层结构并用占位符标出子结构，再逐个展开占位符，使输出按树形一层层生成。"}
+  ],
+  "learn": "先懂[[seq2seq]]与[[bahdanau-attention]] → 读原文第3节Seq2Tree和第3.4节参数识别 → 动手：在GeoQuery上训练一个Seq2Seq模型，统计输出括号不配对的比例，再实现层次解码对比。",
+  "check": {
+    "source": "https://arxiv.org/abs/1601.01280",
+    "confirmed": "arXiv：标题、作者Dong与Lapata、v1提交2016-01-06；摘要：语义解析把自然语言映射为机器可解释的意义表示、传统方法依赖高质量词典、手工模板和语言特征、提出基于注意力增强编码器-解码器的通用方法、以编码向量为条件生成序列或树形式的逻辑式、在四个数据集上无需手工特征就有竞争力且易于跨领域和意义表示迁移。四个数据集名称、<n>非终结符与父节点反馈、参数识别、ACL 2016发表处与后续工作凭一般了解。"
+  }
+}

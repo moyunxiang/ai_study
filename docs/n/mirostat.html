@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Mirostat困惑度控制采样（2020） · AI脉络</title>
+<meta name="description" content="top-k、top-p和温度采样都要手调参数，调小了文本越写越重复，调大了越写越乱，而且没人说得清这些参数到底控制了输出的什么统计量。 先分析不同采样方式下生成文本的困惑度如何随参数变化，再设计一个带反馈的自适应top-k：每生成一个词就测一下实际的“意外程度”，自动调大或调小k，让整段文本的困惑…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/mirostat.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Mirostat困惑度控制采样（2020）">
+<meta property="og:description" content="top-k、top-p和温度采样都要手调参数，调小了文本越写越重复，调大了越写越乱，而且没人说得清这些参数到底控制了输出的什么统计量。 先分析不同采样方式下生成文本的困惑度如何随参数变化，再设计一个带反馈的自适应top-k：每生成一个词就测一下实际的“意外程度”，自动调大或调小k，让整段文本的困惑…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/mirostat.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/mirostat">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 解码与生成控制</div>
+<h1>Mirostat困惑度控制采样</h1>
+<div class="full">Mirostat: A Neural Text Decoding Algorithm that Directly Controls Perplexity</div>
+<div class="meta"><span>2020.07</span><span>论文</span><span>延伸</span><span>ICLR 2021</span><span>Sourya Basu, Govardana Sachitanandam Ramachandran, Nitish Shirish Keskar, Lav R. Varshney · 伊利诺伊大学厄巴纳-香槟分校, Salesforce Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2007.14966" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/mirostat">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>top-k、top-p和温度采样都要手调参数，调小了文本越写越重复，调大了越写越乱，而且没人说得清这些参数到底控制了输出的什么统计量。</p></div><div><h4>方法</h4><p>先分析不同采样方式下生成文本的困惑度如何随参数变化，再设计一个带反馈的自适应top-k：每生成一个词就测一下实际的“意外程度”，自动调大或调小k，让整段文本的困惑度稳定在预先设定的目标值。</p></div><div><h4>影响</h4><p>把“直接控制输出困惑度”变成一种采样思路，llama.cpp等本地推理工具内置了Mirostat采样选项。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/nucleus-sampling.html">核采样Top-p</a>指出纯随机采样会采到长尾里的离谱词，于是截掉低概率尾部；但截多少靠手调。论文在词频服从齐普夫分布的假设下推导：top-p采样时交叉熵大致随p线性变化，top-k时随k非线性变化。实验发现，k或p较小时，生成越长困惑度越低，伴随大量重复（论文称“无聊陷阱”）；k或p较大时，困惑度随长度上升，文本变得不连贯（“混乱陷阱”）。</p><p>Mirostat像一个温控器：设定目标意外度 <code>τ</code>（每个词的目标信息量，<code>−log p</code>），生成每个词后计算它的实际意外度，与 <code>τ</code> 的差值按学习率反馈去调整截断阈值 <code>μ</code>，下一个词只从意外度不超过 <code>μ</code> 的候选里采样。于是无论文本多长，困惑度都保持在目标附近。</p><p>摘要报告：交叉熵与生成文本的重复程度近似线性相关，因此控制困惑度也就控制了重复；人工评分在流畅性、连贯性和质量上验证了这一点。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>目标困惑度仍要人为设定，且只控制平均信息量，不保证每一步选出的词符合人类说话时的信息分布。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/typical-sampling.html">局部典型采样</a> <a class="chip hue" style="--h:192" href="../n/min-p.html">Min-p采样</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a><span class="yr">2019.02 · LLM</span><div class=nt>以GPT-2这类语言模型的开放式生成为实验对象。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/nucleus-sampling.html">核采样Top-p</a><span class="yr">2019.04 · 系统·效率</span><div class=nt>核采样的p需要手调、对输出统计量没有直接控制，Mirostat用反馈自动调节截断，使困惑度稳定在目标值。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/typical-sampling.html">局部典型采样</a><span class="yr">2022.02 · 系统·效率</span><div class=nt>Mirostat控制整段文本的平均困惑度，典型采样在每一步按信息量接近条件熵来截断。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/min-p.html">Min-p采样</a><span class="yr">2024.07 · 系统·效率</span><div class=nt>目标困惑度仍要人为设定，且只控制平均信息量，不保证每一步选出的词符合人类说话时的信息分布。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/perplexity.html">困惑度</a> <a class="chip c" href="../c/entropy.html">信息量与熵</a> <a class="chip c" href="../c/language-model.html">语言模型</a></p>
+<h2>本篇术语</h2><ul><li><b>意外度</b>　一个词的信息量 −log p，模型越没料到这个词，它的意外度越高；整段平均后就是交叉熵。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2007.14966" rel="noopener">https://arxiv.org/abs/2007.14966</a>（标题、四位作者、v1日期2020-07-29；摘要：top-k、top-p与温度采样需调参且是临时做法、齐普夫统计下top-p交叉熵近似随p线性而top-k随k非线性、基于反馈的自适应top-k算法mirostat生成预定困惑度的文本、小k/p时困惑度随长度下降伴随重复（boredom trap）、大k/p时上升伴随不连贯（confusion trap）、交叉熵与重复近似线性、人工评分验证。反馈更新规则细节、ICLR 2021、机构、llama.cpp内置为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Mirostat%E5%9B%B0%E6%83%91%E5%BA%A6%E6%8E%A7%E5%88%B6%E9%87%87%E6%A0%B7%EF%BC%88mirostat%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amirostat%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/mirostat.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mcunet.html"><small>本分支上一个 · 2020.07</small><b>MCUNet微控制器深度学习</b></a><a class="r" href="tinygrad.html"><small>本分支下一个 · 2020.10</small><b>tinygrad</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

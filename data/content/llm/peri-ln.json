@@ -1,0 +1,27 @@
+{
+  "id": "peri-ln",
+  "who": "Jeonghoon Kim, Byeongchan Lee, Cheonbok Park, Yeontaek Oh, Beomjun Kim, Taehwan Yoo, Seongjin Shin, Dongyoon Han 等 · NAVER Cloud、KAIST",
+  "venue": "arXiv 2025",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2502.02732"}],
+  "aka": ["Peri-LN", "Peri-Norm", "三明治归一化", "Sandwich Norm", "前后双归一化", "peripheral layer normalization"],
+  "problem": "Pre-LN和Post-LN两种归一化放法都有毛病：Post-LN深了难训，Pre-LN的激活方差会逐层暴涨；一些开源模型悄悄换了第三种放法，却没人说清为什么。",
+  "idea": "把这种“在子层输入和输出两头都做归一化”的放法命名为Peri-LN，并从激活方差和梯度传播的角度系统分析、实验验证它。",
+  "impact": "给出了Peri-LN更稳的理论解释和最高32亿参数的对照实验，让这种放法从“经验配方”变成有依据的选择。",
+  "background": "原始[[transformer]]把[[layernorm]]放在残差相加之后（Post-LN），层数一多就需要预热甚至专门的初始化（见[[admin]]）。[[pre-ln]]把归一化挪到子层输入处，训练稳了，但残差流里的激活不经归一化地层层累加，方差和个别巨大激活（见[[massive-activations]]）随深度增长，容易出现损失尖峰。",
+  "method": "Peri-LN在每个子层（注意力或MLP）的输入和输出都加归一化，然后再加回残差：\n\n`h ← h + Norm_out(F(Norm_in(h)))`\n\n对比 Pre-LN 的 `h ← h + F(Norm(h))`，多出来的 `Norm_out` 让每层加进残差流的增量有受控的尺度，残差流的方差只随层数大致线性增长，而不会被某一层的大输出放大；同时输入端的归一化保留了Pre-LN易训练的优点。论文分析了三种放法下激活方差的增长规律和梯度范数的分布。",
+  "results": "摘要报告：在最高32亿参数的Transformer上，Peri-LN相比Pre-LN和Post-LN表现出更均衡的方差增长、更平稳的梯度流和更稳定的收敛。",
+  "legacy": "这类前后双归一化在Gemma 2、OLMo 2等开源模型中已有使用（论文称之为“悄悄采用”）；Peri-LN为它提供了统一的名称和分析框架。",
+  "limits": [
+    {"text": "每个子层多一次归一化，带来少量额外计算；与QK归一化等其他稳定技巧如何组合最优没有定论。", "solved_by": []},
+    {"text": "实验最大到32亿参数，更大规模下的收益依赖已有开源模型的经验而非对照实验。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "pre-ln", "type": "solves", "note": "Pre-LN残差流激活方差逐层暴涨，Peri-LN在子层输出端再归一化来控制增量尺度。"},
+    {"to": "admin", "type": "rivals", "note": "Admin靠初始化让Post-LN可训，Peri-LN换一种归一化放法解决同一稳定性问题。"},
+    {"to": "normformer", "type": "extends", "note": "NormFormer也在子层后加额外归一化，Peri-LN系统分析了这一类放法。"},
+    {"to": "massive-activations", "type": "solves", "note": "输出端归一化抑制了残差流里个别维度的巨大激活累积。"}
+  ],
+  "prereq": ["normalization-layer", "residual-connection", "transformer-block", "vanishing-exploding"],
+  "learn": "先对比[[pre-ln]]和原始Post-LN的公式；读Peri-LN第3节方差分析；动手：在小GPT里给子层输出加RMSNorm，记录各层残差流范数随深度的变化。",
+  "check": {"source": "https://arxiv.org/abs/2502.02732", "confirmed": "标题、arXiv首次提交2025-02-04；摘要中开源模型悄悄采用第三种放法、实验到3.2B参数、方差增长更均衡梯度更稳。Gemma 2/OLMo 2使用前后归一化为一般了解。"}
+}

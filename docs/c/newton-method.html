@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>牛顿法与拟牛顿法（Newton and Quasi-Newton Methods） · AI脉络</title>
+<meta name="description" content="用曲率（二阶导数）定步长和方向：把目标近似成二次函数，直接跳到它的最低点。拟牛顿法（BFGS、L-BFGS）用梯度的变化近似曲率，不必算海森矩阵。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/newton-method.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="牛顿法与拟牛顿法（Newton and Quasi-Newton Methods）">
+<meta property="og:description" content="用曲率（二阶导数）定步长和方向：把目标近似成二次函数，直接跳到它的最低点。拟牛顿法（BFGS、L-BFGS）用梯度的变化近似曲率，不必算海森矩阵。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/newton-method.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/newton-method">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 优化与训练 · 进阶</div>
+<h1>牛顿法与拟牛顿法</h1><div class="full">Newton and Quasi-Newton Methods</div>
+<p class="muted" style="font-size:13px">也叫：牛顿法　Newton&#x27;s method　Newton method　牛顿迭代　Newton-Raphson　牛顿-拉弗森　拟牛顿法　quasi-Newton　BFGS　L-BFGS　LBFGS　DFP　二阶方法　second-order method　二次收敛　quadratic convergence　阻尼牛顿法</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/newton-method">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>用曲率（二阶导数）定步长和方向：把目标近似成二次函数，直接跳到它的最低点。拟牛顿法（BFGS、L-BFGS）用梯度的变化近似曲率，不必算海森矩阵。</b></p>
+<p class="tags">先要会：<a class="chip c" href="jacobian-hessian.html">雅可比矩阵与海森矩阵</a> <a class="chip c" href="taylor-expansion.html">泰勒展开</a> <a class="chip c" href="gradient-descent.html">梯度下降</a></p>
+<p><a class="lc" href="../c/gradient-descent.html">梯度下降</a>只看坡度，不看弯曲程度：在一个又窄又长的山谷里，它会在两侧谷壁之间来回震荡，沿谷底前进得很慢。如果知道每个方向弯得有多厉害，就能在平缓的方向迈大步、陡峭的方向迈小步。</p><p><b>牛顿法</b>。在当前点θ做二阶<a class="lc" href="../c/taylor-expansion.html">泰勒展开</a>：</p><p class="formula"><code>f(θ + d) ≈ f(θ) + gᵀd + ½ dᵀHd</code></p><p>g是梯度，H是海森矩阵（见<a class="lc" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a>）。对d求导令其为0，得到这个二次近似的最低点：</p><p><code>d = −H⁻¹g</code>，<code>θ ← θ − H⁻¹g</code></p><p>对二次函数它一步就到最优点；在最优点附近，误差每一步大致平方一次（二次收敛），有效数字位数翻倍。</p><p><b>为什么深度学习里不直接用</b>。一是代价：n个参数的海森矩阵有n²个元素，求逆要O(n³)，十亿参数完全不可能。二是非凸：H有负特征值时，<code>−H⁻¹g</code>可能指向上坡，牛顿法会被鞍点吸引（见<a class="ln" href="../n/saddle-point.html">高维优化的鞍点问题</a>）。三是噪声：小批量上估计的曲率很不准。</p><p><b>拟牛顿法</b>。不算H，而是从相邻两步的“位置变化”和“梯度变化”中逐步拼出H⁻¹的近似。BFGS维护一个n×n的近似矩阵；<a class="ln" href="../n/lbfgs.html">L-BFGS</a>只保留最近m步（常取5到20）的向量对，用O(mn)内存隐式地乘出H⁻¹g，适合中等规模的确定性问题，例如逻辑回归、风格迁移、物理模拟里的参数拟合。它通常与<a class="lc" href="../c/line-search.html">线搜索与共轭梯度</a>配合，每一步沿方向找一个合适的步长。</p><p><b>在深度学习里的影子</b>。<a class="ln" href="../n/hessian-free.html">Hessian-free优化</a>用共轭梯度只计算海森与向量的乘积，不显式存H；<a class="ln" href="../n/natural-gradient.html">自然梯度</a>用费舍尔信息矩阵代替海森（见<a class="lc" href="../c/fisher-information.html">费舍尔信息与Cramér–Rao下界</a>）；<a class="ln" href="../n/kfac.html">K-FAC</a>、<a class="ln" href="../n/shampoo.html">Shampoo</a>把曲率矩阵分块、分解成小矩阵再求逆；<a class="lc" href="../c/adaptive-optimizer.html">自适应学习率优化器</a>如Adam只用梯度平方的滑动平均，可以看作极其廉价的对角近似。</p>
+<div class="example"><h4>例子</h4><p>最小化f(x) = x⁴/4 − x，最优点x* = 1。f&#x27;(x) = x³ − 1，f&#x27;&#x27;(x) = 3x²。从x = 2出发：</p><ul><li>牛顿：x ← 2 − 7/12 ≈ 1.417 → 1.417 − 1.845/6.02 ≈ 1.110 → ≈ 1.010 → ≈ 1.0001，四步误差到1e−4。</li><li>梯度下降（学习率0.1）：x ← 2 − 0.7 = 1.3 → 1.3 − 0.12 ≈ 1.18 → … 需要十几步才到同样精度。</li></ul></div>
+<h2>容易误解的地方</h2><ul><li>牛顿法的局部二次收敛只在离最优点足够近时成立；离得远时一步可能跳得很远甚至发散，所以实际实现都加阻尼或线搜索。</li><li>L-BFGS对梯度噪声敏感，用在小批量随机训练上通常不如SGD或Adam。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

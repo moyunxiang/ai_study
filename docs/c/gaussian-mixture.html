@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>高斯混合模型（Gaussian Mixture Model） · AI脉络</title>
+<meta name="description" content="用几个高斯分布按权重叠加来拟合复杂的数据分布：每个样本被看作先随机选一个分量、再从该高斯里抽出。它是最经典的隐变量模型，用EM算法训练。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/gaussian-mixture.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="高斯混合模型（Gaussian Mixture Model）">
+<meta property="og:description" content="用几个高斯分布按权重叠加来拟合复杂的数据分布：每个样本被看作先随机选一个分量、再从该高斯里抽出。它是最经典的隐变量模型，用EM算法训练。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/gaussian-mixture.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/gaussian-mixture">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 概率统计与信息论 · 入门</div>
+<h1>高斯混合模型</h1><div class="full">Gaussian Mixture Model</div>
+<p class="muted" style="font-size:13px">也叫：高斯混合模型　混合高斯　混合高斯模型　GMM　Gaussian mixture model　Gaussian mixture　mixture of Gaussians　MoG　混合模型　mixture model　责任度　responsibility　软聚类　soft clustering　GMM-HMM　混合密度网络　mixture density network　MDN</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/gaussian-mixture">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>用几个高斯分布按权重叠加来拟合复杂的数据分布：每个样本被看作先随机选一个分量、再从该高斯里抽出。它是最经典的隐变量模型，用EM算法训练。</b></p>
+<p class="tags">先要会：<a class="chip c" href="gaussian.html">高斯分布</a> <a class="chip c" href="latent-variable.html">隐变量模型</a> <a class="chip c" href="em-algorithm.html">EM算法</a></p>
+<p>单个<a class="lc" href="../c/gaussian.html">高斯分布</a>只有一个峰。可是人的身高混合了男女两个群体，语音的声学特征来自几十个音素，数据常常有多个峰。最直接的办法是把几个高斯加起来。</p><p><b>定义</b>。K个分量的高斯混合模型（GMM）：</p><p class="formula"><code>p(x) = Σ_k π_k · N(x | μ_k, Σ_k)</code></p><p>π_k是混合权重（非负、和为1），每个分量有自己的均值μ_k和协方差Σ_k（见<a class="lc" href="../c/covariance.html">协方差矩阵</a>）。只要分量足够多，GMM可以任意精度地逼近任何光滑密度。</p><p><b>生成视角与隐变量</b>。GMM描述了一个两步过程：先按π抽一个分量编号z，再从<code>N(μ_z, Σ_z)</code>中抽x。z看不见，是一个隐变量（见<a class="lc" href="../c/latent-variable.html">隐变量模型</a>）。给定x，它属于第k个分量的后验概率叫<b>责任度</b>：</p><p class="formula"><code>γ_k(x) = π_k N(x | μ_k, Σ_k) / Σ_j π_j N(x | μ_j, Σ_j)</code></p><p><b>训练：EM</b>。对数似然里有“log套着求和”，不能直接求闭式解。<a class="lc" href="../c/em-algorithm.html">EM算法</a>交替两步：E步用当前参数算每个样本的责任度；M步把责任度当作软标签，按加权平均重新估计每个分量的π、μ、Σ。每一轮都保证似然不下降。如果把责任度硬化成0或1、并让所有协方差相同且趋于0，EM就退化成<a class="ln" href="../n/k-means.html">k-means聚类</a>，所以GMM常被称为“软聚类”（见<a class="lc" href="../c/clustering.html">聚类</a>）。</p><p><b>它出现在哪里</b>。</p><ul><li>语音识别在深度学习之前的二十多年里用GMM建模每个HMM状态的声学特征分布（GMM-HMM），<a class="ln" href="../n/dnn-hmm.html">深度网络声学模型</a>用神经网络替换了GMM这一部分；说话人确认的<a class="ln" href="../n/gmm-ubm.html">GMM-UBM说话人确认</a>和<a class="ln" href="../n/i-vector.html">i-vector说话人识别</a>也建立在GMM上。</li><li>图像分割的<a class="ln" href="../n/grabcut.html">GrabCut框选抠图</a>用两个GMM分别建模前景和背景颜色。</li><li>混合密度网络让神经网络输出GMM的参数，用来预测有多种可能答案的连续量；一些连续token的自回归生成模型（如<a class="ln" href="../n/givt.html">GIVT连续token生成</a>）也让输出头给出高斯混合。</li></ul>
+<div class="example"><h4>例子</h4><p>一维数据来自两个群体：π = (0.6, 0.4)，μ = (160, 175)，σ = (6, 7)（单位cm）。身高168的人：两个分量的密度分别约0.027和0.035，乘上权重为0.6 × 0.027 ≈ 0.016与0.4 × 0.035 ≈ 0.014，属于第二个分量的责任度约0.014/(0.016 + 0.014) ≈ 0.46，几乎各占一半。身高185的人属于第二个分量的责任度则超过0.99。</p></div>
+<h2>容易误解的地方</h2><ul><li>分量数K需要人选，常用BIC等信息准则或验证集似然来定。</li><li>某个分量只覆盖一个样本时，其方差可以缩到0，似然趋于无穷；实际实现会给协方差加一个下限。</li><li>EM只收敛到局部最优，结果依赖初始化，通常用k-means的结果初始化并多次重启。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

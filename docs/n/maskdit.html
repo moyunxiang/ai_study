@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MaskDiT掩码训练（2023） · AI脉络</title>
+<meta name="description" content="DiT这样的大型扩散Transformer效果好但训练极贵：每一步都要在全部图像块上跑完整个网络，训练成本随模型和分辨率迅速上涨。 借用MAE的掩码训练：训练时随机遮掉一大部分（如50%）带噪图像块，只让Transformer编码器处理可见块，再用一个轻量解码器在全部块上输出；损失除了可见块的去噪…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/maskdit.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MaskDiT掩码训练（2023）">
+<meta property="og:description" content="DiT这样的大型扩散Transformer效果好但训练极贵：每一步都要在全部图像块上跑完整个网络，训练成本随模型和分辨率迅速上涨。 借用MAE的掩码训练：训练时随机遮掉一大部分（如50%）带噪图像块，只让Transformer编码器处理可见块，再用一个轻量解码器在全部块上输出；损失除了可见块的去噪…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/maskdit.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/maskdit">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 潜空间与骨架网络</div>
+<h1>MaskDiT掩码训练</h1>
+<div class="full">Fast Training of Diffusion Models with Masked Transformers</div>
+<div class="meta"><span>2023.06</span><span>论文</span><span>延伸</span><span>Hongkai Zheng, Weili Nie, Arash Vahdat, Anima Anandkumar · 加州理工学院、NVIDIA</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2306.09305" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/maskdit">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>DiT这样的大型扩散Transformer效果好但训练极贵：每一步都要在全部图像块上跑完整个网络，训练成本随模型和分辨率迅速上涨。</p></div><div><h4>方法</h4><p>借用MAE的掩码训练：训练时随机遮掉一大部分（如50%）带噪图像块，只让Transformer编码器处理可见块，再用一个轻量解码器在全部块上输出；损失除了可见块的去噪分数匹配，再加一个重建被遮块的辅助任务。</p></div><div><h4>影响</h4><p>在ImageNet 256×256和512×512上以约30%的原训练时间达到与DiT相当甚至更好的生成质量，是把掩码训练用于降低扩散模型训练成本的代表工作，后来一些低成本DiT训练方案也采用了类似的块掩码。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>一张带噪图像（实际在潜空间）被切成块后，随机丢掉一定比例（如50%）的块。非对称的编解码结构：大的Transformer编码器只处理剩下的可见块，计算量随之下降约一半；一个小的Transformer解码器接收编码器输出，并在被遮住的位置填入可学习的掩码token，在全部块上输出结果。</p><p>训练目标有两项：一是在可见块上的去噪分数匹配，也就是普通扩散训练的损失；二是辅助的掩码块重建损失，要求解码器把被遮块的（带噪）输入重建出来，促使模型理解全图的长程结构，否则只看局部块的去噪很难学到整体一致性。训练接近结束时，再用很少的步数做不掩码的微调，消除训练与推理（推理时不掩码）之间的差异。</p><p>结果：在ImageNet 256×256和512×512上，以约30%的DiT原训练时间达到相当甚至更好的FID。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>掩码训练与无掩码推理之间存在差异，需要额外的无掩码微调；掩码比例过高时质量下降。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/mae.html">掩码自编码器MAE</a><span class="yr">2021.11 · 视觉</span><div class=nt>沿用MAE的高比例随机掩码与非对称编解码结构。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/dit.html">Diffusion Transformer</a><span class="yr">2022.12 · 生成</span><div class=nt>DiT在全部图像块上训练成本高；掩码掉一半块、只编码可见块，用约30%的训练时间达到相当质量。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/mdt.html">MDT掩码扩散Transformer</a><span class="yr">2023.03 · 生成</span><div class=nt>MDT同样在扩散Transformer里加掩码，但目的是增强上下文推理以提升质量；MaskDiT主要目标是降低训练成本。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/image-patch.html">图像块与视觉token</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a></p>
+<h2>本篇术语</h2><ul><li><b>非对称编解码</b>　编码器大、只处理可见部分；解码器小、处理全部位置。MAE用它大幅节省预训练计算。</li></ul>
+<h2>怎么学</h2><p>先读DiT与MAE → 读本文第3节结构与两项损失 → 在CIFAR-10上用小DiT对比有无掩码训练的速度与FID。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2306.09305" rel="noopener">https://arxiv.org/abs/2306.09305</a>（标题、四位作者、v1日期2023-06-15、摘要中以掩码Transformer高效训练大型扩散模型、训练时随机遮掉高比例（如50%）带噪图像块、非对称编解码结构（编码器只处理未遮块、轻量解码器处理全部块）、加入重建被遮块的辅助任务、ImageNet 256与512上以约30%的DiT训练时间达到相当或更好的生成性能；机构、潜空间、无掩码微调来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MaskDiT%E6%8E%A9%E7%A0%81%E8%AE%AD%E7%BB%83%EF%BC%88maskdit%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amaskdit%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/maskdit.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="dragdiffusion.html"><small>本分支上一个 · 2023.06</small><b>DragDiffusion拖拽编辑</b></a><a class="r" href="sdxl.html"><small>本分支下一个 · 2023.07</small><b>SDXL</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

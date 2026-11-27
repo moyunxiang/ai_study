@@ -1,0 +1,35 @@
+{
+  "id": "rlhf-workflow",
+  "who": "Hanze Dong, Wei Xiong, Bo Pang, Haoxiang Wang, Han Zhao, Yingbo Zhou, Nan Jiang, Doyen Sahoo et al. · Salesforce AI Research、UIUC",
+  "venue": "TMLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2405.07863"},
+    {"label": "代码", "url": "https://github.com/RLHFlow/Online-RLHF"}
+  ],
+  "aka": ["RLHF Workflow", "RLHFlow", "Online Iterative RLHF", "在线迭代RLHF", "迭代DPO", "Iterative DPO", "Online DPO", "SFR-Iterative-DPO"],
+  "problem": "大量报告称在线迭代的RLHF明显好于离线DPO，但开源项目基本只做离线训练：社区没有在线人类反馈，也没有一份可复现的在线迭代配方。",
+  "idea": "用开源偏好数据训练一个代理奖励（偏好）模型来代替人类在线打分，再做在线迭代DPO：每一轮用当前模型采样多个回答，让代理模型挑出最好和最差的一对，用DPO训练，然后进入下一轮；同时给出背后的理论与完整的工程细节。",
+  "impact": "把“迭代DPO”变成一份公开数据、公开模型、公开代码的标准配方，用纯开源数据把8B模型推到当时同尺寸领先的聊天水平，此后大量开源后训练工作直接沿用它的奖励模型和迭代流程。",
+  "background": "[[dpo]]在固定的离线偏好对上训练，偏好对来自别的模型，与当前策略的分布不一致；[[rso]]、[[self-rewarding]]等工作已经显示，用当前模型重新采样再标注（在线、迭代）效果更好。但在线需要随时有人打分，开源社区做不到；已有的开源RLHF项目大多停留在离线阶段，实现细节也零散。",
+  "method": "**第一步：代理偏好模型**。把多份开源偏好数据（如[[hh-rlhf]]、[[ultrafeedback]]等）混合，训练Bradley-Terry奖励模型，以及直接比较两个回答的成对偏好模型，用来近似人类反馈。\n\n**第二步：理论框架**。把问题写成带KL正则的上下文赌博机：目标是 `max_π E[r(x,y)] − η·KL(π‖π_0)`。在线迭代时，每一轮用当前策略收集新数据，既要利用（选当前看起来最好的），也要探索（让偏好对覆盖不确定的区域），作者据此解释为什么在线比离线好，以及为什么要在同一提示下采样多个回答。\n\n**第三步：实际流程**。从SFT模型出发，每一轮：对一批提示用当前模型采样若干回答 → 用代理奖励模型打分 → 取最高分和最低分组成偏好对（类似拒绝采样） → 用DPO损失训练 → 得到下一轮模型。如此迭代数轮。报告还讨论了长度偏差等工程问题，并公开了逐步的代码手册。",
+  "results": "得到的8B模型在AlpacaEval-2、Arena-Hard、MT-Bench等聊天基准，以及HumanEval、TruthfulQA等学术基准上表现突出；报告称只用全开源数据的SFT加迭代RLHF就能取得同尺寸当时最好的水平，具体数字见原文。",
+  "legacy": "它发布的奖励模型和迭代DPO流程被大量后续工作当作基线或直接复用，同组随后发布了[[armorm]]等奖励模型；“在线迭代DPO”与[[sppo]]、[[dno]]等纳什式方法一起，成为2024年开源对齐的主流做法。",
+  "limits": [
+    {"text": "整个流程以代理奖励模型为准，奖励模型的偏差（尤其是偏爱长回答）会随着迭代累积，需要额外的长度惩罚。", "solved_by": []},
+    {"text": "每一轮都要大量采样和打分，算力开销远高于一次离线DPO；理论分析中的探索策略在实际流程里只做了粗略近似。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "dpo", "type": "extends", "note": "把离线DPO改成在线迭代：每一轮用当前模型采样、代理模型标注再做DPO。"},
+    {"to": "rso", "type": "extends", "note": "延续RSO“偏好对应来自当前或最优策略”的观点，用最好与最差回答组成偏好对。"},
+    {"to": "instructgpt", "type": "uses", "note": "沿用先训练Bradley-Terry奖励模型、在KL约束下优化策略的RLHF框架。"},
+    {"to": "ultrafeedback", "type": "uses", "note": "代理偏好模型的训练数据之一。"},
+    {"to": "llama-3", "type": "uses", "note": "以Llama-3 8B为基础模型训练。"}
+  ],
+  "prereq": ["rlhf-concept", "kl-divergence", "on-off-policy", "exploration-exploitation", "logistic-regression"],
+  "terms": [
+    {"t": "代理偏好模型", "d": "用已有的人类偏好数据训练出的打分模型，在训练中代替真人判断哪个回答更好。"},
+    {"t": "上下文赌博机", "d": "每次看到一个情境（提示），选一个动作（回答），得到一个奖励，没有后续状态；RLHF的单轮回答可以这样建模。"}
+  ],
+  "learn": "先读[[dpo]]和[[rso]]；读本文第2节奖励模型构建与第4节迭代流程，再看GitHub上的逐步手册；动手：用一个小奖励模型对SFT模型做两轮“采样8个—取最好最差—DPO”，比较一次离线DPO。",
+  "check": {"source": "https://arxiv.org/abs/2405.07863", "confirmed": "标题、10位作者（列前8位）、arXiv首次提交2024-05-13；摘要中在线迭代RLHF普遍好于离线、开源项目局限于离线、用多样开源数据构建偏好模型代替人类反馈、理论洞见与算法原则、详细实现、AlpacaEval-2、Arena-Hard、MT-Bench与HumanEval、TruthfulQA上表现、SFT加迭代RLHF以全开源数据取得最好水平、公开模型数据与代码手册。KL正则上下文赌博机表述、最好最差配对、TMLR 2024与机构为对正文的一般了解。"}
+}

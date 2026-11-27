@@ -1,0 +1,29 @@
+{
+  "id": "multinomial-diffusion",
+  "who": "Emiel Hoogeboom, Didrik Nielsen, Priyank Jaini, Patrick Forré, Max Welling · 阿姆斯特丹大学、丹麦技术大学",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2102.05379"}
+  ],
+  "aka": ["Multinomial Diffusion", "多项式扩散", "Argmax Flows", "Argmax流", "类别扩散", "离散扩散"],
+  "problem": "标准化流和扩散模型都是为连续、有大小顺序的数据（像素值）设计的。文字、分割图这类类别数据没有顺序，此前只能先“去量化”（加噪声变成连续值）再建模，效果和似然都不理想。",
+  "idea": "提出两种直接面向类别数据的生成模型：Argmax流用一个连续流加argmax得到类别，并学一个从类别回到连续空间的概率逆映射；多项式扩散则在每一步用类别噪声（以一定概率把token换成均匀随机的类别）逐渐打乱数据，再学去噪的反向过程。",
+  "impact": "多项式扩散是扩散模型推广到离散数据的早期工作之一，D3PM在几个月后把它的均匀转移推广成一般转移矩阵，进而走到今天的掩码扩散语言模型和离散图像token扩散。",
+  "method": "多项式扩散：设x是one-hot类别向量，共K类。前向一步为`q(x_t|x_{t−1}) = Cat(x_t; (1−β_t)·x_{t−1} + β_t/K)`，即以概率1−β_t保持原类别，以β_t换成K类中的均匀随机类别；多步合起来仍有闭式`q(x_t|x₀) = Cat((ᾱ_t)·x₀ + (1−ᾱ_t)/K)`，最终变成完全均匀分布。反向过程用网络预测x₀，再按类别分布的后验公式得到`p(x_{t−1}|x_t)`，像[[ddpm]]一样用变分下界训练。\n\nArgmax流：先用一个连续的标准化流生成向量v，再取`x = argmax(v)`得到类别。训练时需要从类别x反推v，作者学一个概率逆映射q(v|x)，约束v的最大分量恰好落在x所在位置，这比通用的变分去量化更贴合类别结构。\n\n两种方法在text8字符级文本和Cityscapes分割图上的对数似然都优于已有的去量化做法。",
+  "limits": [
+    {"text": "只用均匀噪声这一种转移方式，没有利用类别之间的结构（比如图像token的相近程度、掩码状态）。", "solved_by": ["d3pm", "vq-diffusion"]},
+    {"text": "在文本上的似然和样本质量仍明显落后于自回归模型。", "solved_by": ["sedd", "mdlm"]}
+  ],
+  "relations": [
+    {"to": "ddpm", "type": "extends", "note": "把DDPM的高斯加噪换成类别噪声，推广到离散数据。"},
+    {"to": "diffusion-2015", "type": "extends", "note": "Sohl-Dickstein等人原始扩散论文已讨论过二值数据的扩散，本文推广到一般类别。"},
+    {"to": "flow-pp", "type": "solves", "note": "Flow++的变分去量化是为有序像素设计的，Argmax流给类别数据提供了更贴切的逆映射。"}
+  ],
+  "prereq": ["diffusion-process", "normalizing-flow", "one-hot", "elbo", "markov-chain"],
+  "terms": [
+    {"t": "去量化", "d": "给离散数据加连续噪声，让它变成连续变量以便用连续密度模型建模。"},
+    {"t": "类别分布", "d": "在K个类别上各给一个概率、概率和为1的离散分布，记作Cat。"}
+  ],
+  "learn": "先弄懂DDPM的前向闭式与后验公式 → 读本文第4节多项式扩散的前向、后验推导 → 在text8或二值MNIST上实现均匀转移的离散扩散并与掩码转移比较。",
+  "check": {"source": "https://arxiv.org/abs/2102.05379", "confirmed": "标题、五位作者、v1日期2021-02-10、摘要中流与扩散多针对有序数据、提出Argmax流（连续分布+argmax，学argmax的概率逆）与多项式扩散（逐步加类别噪声）、在文本与分割图上似然优于去量化方法；机构、NeurIPS 2021、前向转移与闭式的具体写法、text8与Cityscapes数据集名、与D3PM的关系来自一般了解"}
+}

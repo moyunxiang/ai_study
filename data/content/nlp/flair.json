@@ -1,0 +1,38 @@
+{
+  "id": "flair",
+  "who": "Alan Akbik, Duncan Blythe, Roland Vollgraf · Zalando Research",
+  "venue": "COLING 2018",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/C18-1139/"},
+    {"label": "GitHub", "url": "https://github.com/flairNLP/flair"}
+  ],
+  "aka": ["Flair", "Flair Embeddings", "上下文字符串嵌入", "Contextual String Embeddings", "字符级语言模型嵌入"],
+  "problem": "word2vec、GloVe给每个词一个固定向量，不随上下文变化，也对未登录词无能为力；当时的上下文表示（如ELMo）仍以词为单位、计算较重。",
+  "idea": "先在大规模文本上训练前向和后向两个字符级LSTM语言模型；对句中每个词，取前向模型读完这个词最后一个字符时的隐藏状态和后向模型读到这个词第一个字符时的隐藏状态，拼起来作为它的词向量，再送进BiLSTM-CRF做标注。",
+  "impact": "在英语和德语CoNLL03命名实体识别上刷新了最好成绩，并在四个经典序列标注任务上都超过以前的方法；配套的Flair框架因简单易用被大量用于NER和文本分类，直到BERT类模型普及。",
+  "background": "[[lample-ner]]和[[bilstm-cnn-crf]]用字符级网络加静态词向量做序列标注，[[elmo]]（2018年初）则用双向语言模型给出随上下文变化的词表示。与此同时，字符级语言模型被发现能自动学到词、句子乃至情感等语言概念。作者想直接把字符级语言模型的内部状态拿来当词向量：它不需要预先切词、天然能处理任何拼写，又是上下文相关的。",
+  "method": "**字符级语言模型。** 在大量无标注文本（英语用十亿词基准语料）上训练一个前向LSTM，按字符预测下一个字符；再训练一个从右往左读的后向LSTM。\n\n**取出词向量。** 把整句作为字符序列送入两个模型。对于句中第i个词，设它的字符起止位置为 s_i 到 e_i：\n`w_i = [ h^f_{e_i+1} ; h^b_{s_i−1} ]`\n前向部分取读完该词最后一个字符（及其后的空格）时的隐藏状态，它概括了「从句首到这个词」的内容；后向部分取从句尾读到该词第一个字符之前时的隐藏状态，它概括了「从句尾到这个词」的内容。这样同一个词「Washington」在「George Washington」和「Washington state」中会得到不同向量。\n\n**堆叠与下游。** 把这个上下文字符串嵌入与传统静态词向量（如[[glove]]）拼接（作者称为堆叠嵌入），作为[[bilstm-crf]]序列标注器的输入；语言模型参数在下游训练时保持固定。",
+  "results": "摘要称：在四个经典序列标注任务（论文中为英语和德语NER、词性标注、名词短语分块）上都一致超过此前最好结果，其中英语和德语NER提升显著，在CoNLL03共享任务上报告了新的最好F1（具体数字未逐项核对）。",
+  "legacy": "作者把代码和预训练语言模型做成Flair框架，后来扩展出池化嵌入（把同一词在语料中各次出现的嵌入聚合起来）、文档级嵌入和多语言模型。[[stanza]]等工具的NER模块也采用了类似的字符级语言模型表示。BERT发布后，基于Transformer的子词上下文表示成为主流，但Flair嵌入因为轻量，在资源受限场景和一些语言上仍被使用。",
+  "limits": [
+    {"text": "语言模型是LSTM且在下游任务中不微调，表示能力和迁移效果不如随后可整体微调的Transformer预训练模型。", "solved_by": ["bert", "roberta"]},
+    {"text": "每个词的向量只由两个时刻的隐藏状态决定，对长距离的文档级信息利用有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "elmo", "type": "rivals", "note": "同期的上下文词表示：ELMo用以词为输入的双向语言模型，Flair直接用字符级语言模型的隐藏状态，无需词表。"},
+    {"to": "bilstm-crf", "type": "uses", "note": "生成的嵌入作为BiLSTM-CRF序列标注器的输入。"},
+    {"to": "char-aware-lm", "type": "extends", "note": "沿着「在字符层面建模语言」的思路，把字符级语言模型的内部状态当作可迁移的词表示。"},
+    {"to": "glove", "type": "uses", "note": "与GloVe等静态词向量拼接成堆叠嵌入。"}
+  ],
+  "prereq": ["language-model", "recurrent-layer", "embedding", "transfer-learning"],
+  "terms": [
+    {"t": "上下文相关词向量", "d": "同一个词在不同句子中得到不同的向量，能区分一词多义。"},
+    {"t": "字符级语言模型", "d": "按字符而不是按词预测下一个单元的语言模型，可以处理任意拼写的词。"},
+    {"t": "堆叠嵌入", "d": "把多种词向量（如上下文字符串嵌入和GloVe）直接拼接成一个更长的向量使用。"}
+  ],
+  "learn": "先读[[bilstm-crf]]与[[elmo]] → 读原文第2节的嵌入定义与第3节实验 → 动手：用flair库加载预训练的news-forward/backward嵌入，在CoNLL03上训练一个NER模型，并与只用GloVe的版本比较F1。",
+  "check": {
+    "source": "https://aclanthology.org/C18-1139/",
+    "confirmed": "ACL Anthology：标题、作者Akbik、Blythe、Vollgraf、COLING 2018（C18-1139）、完整摘要：利用训练好的字符语言模型的内部状态产生上下文字符串嵌入、不显式依赖词的概念而把词建模为字符序列、随上下文变化、在四个经典序列标注任务上一致超过此前最好结果、英语和德语NER显著提升并在CoNLL03上报告新的最好F1、开源代码与预训练模型。嵌入取法公式、训练语料、堆叠嵌入、四个任务的具体名称和后续池化嵌入凭一般了解；GitHub地址已由原仓库迁移至flairNLP组织（凭一般了解）。"
+  }
+}

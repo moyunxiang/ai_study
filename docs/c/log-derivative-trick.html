@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>对数导数技巧与得分函数估计（Log-Derivative Trick and Score-Function Estimator） · AI脉络</title>
+<meta name="description" content="求“期望对分布参数的梯度”的通用办法：∇E[f(x)] = E[f(x)·∇log p_θ(x)]。f不需要可导、x可以是离散的，只要能采样并算出对数概率的梯度，代价是方差大。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/log-derivative-trick.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="对数导数技巧与得分函数估计（Log-Derivative Trick and Score-Function Estimator）">
+<meta property="og:description" content="求“期望对分布参数的梯度”的通用办法：∇E[f(x)] = E[f(x)·∇log p_θ(x)]。f不需要可导、x可以是离散的，只要能采样并算出对数概率的梯度，代价是方差大。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/log-derivative-trick.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/log-derivative-trick">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>对数导数技巧与得分函数估计</h1><div class="full">Log-Derivative Trick and Score-Function Estimator</div>
+<p class="muted" style="font-size:13px">也叫：对数导数技巧　log-derivative trick　得分函数估计　score function estimator　score function gradient　似然比　似然比技巧　likelihood ratio trick　likelihood ratio gradient　REINFORCE estimator　REINFORCE估计　似然比梯度估计</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/log-derivative-trick">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>求“期望对分布参数的梯度”的通用办法：∇E[f(x)] = E[f(x)·∇log p_θ(x)]。f不需要可导、x可以是离散的，只要能采样并算出对数概率的梯度，代价是方差大。</b></p>
+<p class="tags">先要会：<a class="chip c" href="derivative-gradient.html">导数、偏导与梯度</a> <a class="chip c" href="expectation-variance.html">期望与方差</a> <a class="chip c" href="monte-carlo.html">蒙特卡洛采样</a></p>
+<p>很多目标的形式是<code>J(θ) = E_{x~p_θ}[f(x)]</code>：参数θ决定采样分布，f给样本打分。强化学习里x是轨迹、f是回报；语言模型的RL微调里x是一段生成的文本、f是奖励模型或验证器的打分。困难在于f往往不可导（环境、编译器、人类评分），x又是离散的，无法把梯度从f穿过采样传回θ。</p><p><b>推导</b>。只用一个恒等式<code>∇p = p · ∇log p</code>：</p><p class="formula"><code>∇_θ J = ∇_θ Σ_x p_θ(x) f(x) = Σ_x p_θ(x) · ∇_θ log p_θ(x) · f(x) = E_{x~p_θ}[f(x) · ∇_θ log p_θ(x)]</code></p><p>右边是一个期望，可以用采样估计：采N个样本，对<code>f(x_i)·∇log p_θ(x_i)</code>取平均。<code>∇log p_θ(x)</code>在统计学里叫<b>得分函数</b>（score function），所以这个估计也叫得分函数估计、似然比估计，在强化学习里叫REINFORCE估计。</p><p><b>直观含义</b>。把得分高的样本的对数概率往上推、得分低的往下推，推的力度与得分成正比。</p><p><b>基线</b>。因为<code>E[∇log p_θ(x)] = Σ_x ∇p_θ(x) = ∇1 = 0</code>，从f里减去任何与x无关的常数b都不改变期望，却能大幅降低方差，见<a class="lc" href="../c/pg-variance-reduction.html">策略梯度的方差缩减：基线与reward-to-go</a>。</p><p><b>它出现在哪里</b>。<a class="ln" href="../n/reinforce.html">REINFORCE策略梯度</a>和<a class="ln" href="../n/pg-theorem.html">策略梯度定理</a>把它用到序列决策上，见<a class="lc" href="../c/policy-gradient-concept.html">策略梯度</a>；<a class="ln" href="../n/rloo.html">RLOO回归REINFORCE</a>等大模型RL方法用同组其他样本的平均奖励作基线。离散隐变量的变分推断也用它。另一条路是<a class="lc" href="../c/reparameterization.html">重参数化技巧</a>：把采样写成<code>x = g(θ, ε)</code>，让梯度直接穿过f，方差通常小得多，但要求f可导、x连续；离散情形的近似办法见<a class="lc" href="../c/gumbel-softmax.html">离散变量的梯度：直通估计与Gumbel-Softmax</a>。</p>
+<div class="example"><h4>例子</h4><p>伯努利变量x ∈ {0, 1}，<code>p_θ(x=1) = σ(θ)</code>，f(1)=1、f(0)=0，于是J = σ(θ)，真实梯度为σ(θ)(1−σ(θ))。θ=0时p=0.5，真实梯度0.25。得分函数估计：采到x=1（概率0.5）时，<code>∇log σ(θ) = 1 − σ(θ) = 0.5</code>，乘f=1得0.5；采到x=0时f=0，估计为0。平均0.25，无偏；但单个样本只会是0或0.5，方差为0.0625，与均值同一量级。</p></div>
+<h2>容易误解的地方</h2><ul><li>无偏不等于好用：f的取值范围大（例如回报在几百上千）时，单样本的梯度方向几乎是随机的，不加基线和归一化很难训练。</li><li>估计要求样本真的来自p_θ。用旧参数的样本估计新参数的梯度，必须加<a class="lc" href="../c/importance-sampling.html">重要性采样</a>修正，这就是PPO里概率比的来源。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

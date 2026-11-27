@@ -1,0 +1,26 @@
+{
+  "id": "speculative-rag",
+  "who": "Zilong Wang, Zifeng Wang, Long Le, Huaixiu Steven Zheng, Swaroop Mishra, Vincent Perot, Yuwei Zhang, Anush Mattapalli et al. · 加州大学圣地亚哥分校 / Google Cloud AI Research",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2407.08223"},
+    {"label": "Google Research博客", "url": "https://research.google/blog/speculative-rag-enhancing-retrieval-augmented-generation-through-drafting/"}
+  ],
+  "aka": ["Speculative RAG", "SpeculativeRAG", "推测式RAG", "推测检索增强", "起草-验证RAG", "drafter-verifier RAG"],
+  "problem": "把检索到的一大堆文档全塞给大模型，输入长、慢，还受位置偏差影响；Self-RAG、CRAG等改进又要额外微调大模型或多轮自我批评，进一步增加延迟。",
+  "idea": "借推测解码“小模型起草、大模型验证”的思路：把检索文档分成几组，让一个专门微调的小模型并行地各写一份答案和理由，大模型只读这些草稿打分选出最好的。",
+  "impact": "把RAG的瓶颈从“大模型读全部文档”改成“小模型分头读、大模型只验证”，同时提高准确率并降低延迟，说明RAG里同样可以做大小模型分工。",
+  "method": "[[self-rag]]需要把生成模型本身微调成会输出反思标记的版本，[[crag]]要额外训练检索质量评估器并可能回头重新检索；两者都让大模型读完全部文档。Speculative RAG借鉴[[speculative-decoding]]的大小模型分工，但分工单位从token变成整份答案。\n\n**起草**。先把检索回来的文档按嵌入向量聚类，每组草稿从每个簇里各抽一篇，使每份子集覆盖不同角度、彼此重复少。起草模型是Mistral-7B，用约4万条“问题+文档→答案+简短理由”的数据微调（理由由Gemini-Ultra生成）。多数基准上并行生成5份草稿，每份只读2篇文档。\n\n**验证**。不微调的大模型（Mixtral-8x7B等）只读问题、草稿和理由，不读原文档。每份草稿的得分由三部分概率组合：起草模型生成它的概率、验证模型认为答案与理由一致的概率、验证模型对“理由是否支持答案”回答“是”的概率，取得分最高者。\n\n**结果**。与Mixtral-8x7B标准[[rag]]相比，PubHealth准确率从63.63提高到76.60、延迟降低50.83%；PopQA从53.68到57.54；TriviaQA、MuSiQue、ARC-Challenge上也有1到2个点的提升。",
+  "limits": [
+    {"text": "起草模型需要用更强模型生成的理由数据专门微调，换领域时要重新准备数据。", "solved_by": []},
+    {"text": "只并行一轮、不会根据草稿再去检索，检索本身漏掉关键文档时无从补救；多跳的MuSiQue上提升有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "speculative-decoding", "type": "extends", "note": "把推测解码“小模型起草、大模型验证”的分工从逐token生成推广到整份RAG答案。"},
+    {"to": "self-rag", "type": "solves", "note": "Self-RAG要微调生成模型并多步自我批评；Speculative RAG只微调小起草模型、大模型一次验证，五个基准上准确率都高于Mistral-7B版Self-RAG（如PubHealth 76.60对72.44）。"},
+    {"to": "crag", "type": "rivals", "note": "CRAG靠评估器纠正检索质量，Speculative RAG靠多份子集草稿互相比较来抵御噪声文档，论文以CRAG为对照之一。"},
+    {"to": "rag", "type": "solves", "note": "缓解了标准RAG把全部文档塞给大模型导致的输入过长、延迟高和位置偏差问题。"}
+  ],
+  "prereq": ["retrieval", "clustering", "embedding", "decoding-sampling", "throughput-latency"],
+  "learn": "先读[[speculative-decoding]]和[[self-rag]] → 读原文第3节（文档分组、起草、打分公式）和主结果表 → 动手：把10篇检索文档分成5组，让小模型各写一个答案，再让大模型从中挑一个，与直接读全部10篇的答案比较。",
+  "check": {"source": "https://arxiv.org/abs/2407.08223", "confirmed": "标题、12位作者、v1提交于2024-07-11；摘要中PubHealth提升12.97%、延迟降低50.83%；正文（arxiv.org/html/2407.08223v2）核对UCSD与Google单位、Mistral-7B起草模型约4万条数据与Gemini-Ultra理由、Mixtral-8x7B验证、聚类抽样、5份草稿每份2篇、三项概率打分、五个数据集准确率（PubHealth 63.63→76.60、PopQA 53.68→57.54等）。"}
+}

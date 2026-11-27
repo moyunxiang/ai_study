@@ -1,0 +1,30 @@
+{
+  "id": "optidice",
+  "who": "Jongmin Lee, Wonseok Jeon, Byung-Jun Lee, Joelle Pineau, Kee-Eung Kim · KAIST / Mila / McGill",
+  "venue": "ICML 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2106.10783"}
+  ],
+  "problem": "离线RL里大多数方法靠各种手段压低动作价值来防高估，引入了一堆难调的超参数，而且仍要做基于自举的策略梯度。",
+  "idea": "不学Q函数和策略梯度，而是直接估计“最优策略的状态-动作分布相对数据分布的比值”（平稳分布修正），再用这个比值对数据加权做行为克隆得到策略。",
+  "impact": "把DICE（分布修正估计）一族从离策略评估推广到离线策略优化，成为D4RL对比表中“基于分布比值”一类的代表。",
+  "method": "强化学习可以写成一个关于**占用分布**的线性规划：`d(s, a)` 表示策略长期运行下访问各状态-动作对的频率，回报就是 `Σ d(s, a) r(s, a)`，约束是 `d` 要满足流量守恒（贝尔曼流约束）。[[dualdice]]等工作用这个视角来估计比值 `w(s, a) = d_π(s, a) / d_D(s, a)`，做离策略评估。\n\nOptiDICE把它用于优化：在这个线性规划里加一个f散度正则，让最优的 `d` 不要偏离数据分布 `d_D` 太远，然后用拉格朗日对偶把问题变成只需要从数据里采样的无约束优化，直接解出最优策略对应的比值 `w*(s, a)`。整个过程不需要估计Q函数、不需要从策略采样分布外动作，因而从原理上避免了分布外动作的高估。最后用加权行为克隆提取策略：`max_π E_D[w*(s, a) log π(a|s)]`。\n\n摘要称OptiDICE在大量离线RL基准数据集上与当时最好的方法竞争。",
+  "limits": [
+    {"text": "对偶问题里的价值网络训练对正则系数和散度选择敏感，在高维连续任务上数值稳定性一般，分数通常不及后来的IQL类方法。", "solved_by": ["iql"]},
+    {"text": "加权行为克隆只能在数据出现过的动作上重新分配权重，数据里没有好动作时无法改进。"}
+  ],
+  "relations": [
+    {"to": "dualdice", "type": "extends", "note": "把DualDICE的平稳分布修正估计从离策略评估推广到离线策略优化。"},
+    {"to": "brac", "type": "rivals", "note": "BRAC在策略层面做行为正则；OptiDICE在占用分布层面做f散度正则。"},
+    {"to": "cql", "type": "rivals", "note": "CQL靠压低分布外动作的Q值防高估；OptiDICE不学Q函数，从原理上避开这个问题。"},
+    {"to": "d4rl", "type": "uses", "note": "在D4RL等离线基准上评测。"}
+  ],
+  "prereq": ["offline-rl", "lagrange-duality", "importance-sampling", "mdp"],
+  "terms": [
+    {"t": "平稳分布修正", "d": "目标策略的状态-动作访问频率与数据中频率之比，可以当作样本权重使用。"},
+    {"t": "占用分布（occupancy measure）", "d": "策略长期运行时访问每个状态-动作对的（折扣）频率。"}
+  ],
+  "learn": "先补[[c:lagrange-duality]]和[[dualdice]]；读OptiDICE原文第3节从线性规划到对偶目标的推导；对比加权行为克隆与普通行为克隆在D4RL medium-replay上的差别。",
+  "check": {"source": "https://arxiv.org/abs/2106.10783", "confirmed": "标题、五位作者、arXiv v1于2021-06-21；摘要中离线设定、分布偏移导致动作价值高估、以往方法鼓励低估带来额外超参数、直接估计最优策略的平稳分布修正且不依赖策略梯度、在大量基准数据集上有竞争力。线性规划与加权BC的形式按原文正文通行描述；ICML 2021按通行引用。"},
+  "aka": ["OptiDICE", "DICE离线优化", "平稳分布修正", "stationary distribution correction"]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "signsgd",
+  "who": "Jeremy Bernstein, Yu-Xiang Wang, Kamyar Azizzadenesheli, Anima Anandkumar · 加州理工、亚马逊AWS等",
+  "venue": "ICML 2018",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/1802.04434"}],
+  "aka": ["sign SGD", "符号SGD", "符号梯度下降", "Signum", "majority vote", "多数投票梯度压缩"],
+  "problem": "多机训练大网络时，每一步都要把完整精度的梯度在机器之间传来传去，通信成了瓶颈。",
+  "idea": "每个工作节点只发送梯度的正负号（每个参数1比特），参数服务器对各节点的符号做多数投票再更新；论文证明这样仍能得到与SGD同级的收敛速度。",
+  "impact": "给“只看符号”的更新提供了收敛理论；带动量的版本Signum在ImageNet上与Adam相当，这一视角影响了[[lion]]、[[old-optimizer-new-norm]]等工作。",
+  "method": "signSGD的更新是 `x ← x − η·sign(g)`，g是小批量随机梯度：每个坐标只走一个固定步长，方向取梯度的符号。带动量的版本Signum先对梯度做指数平均再取符号。\n\n分布式时，M个工作节点各自算出梯度的符号发给服务器，服务器对每个坐标做多数投票（票多的符号胜出），再把这1比特结果发回去，于是上传和下发都只要1比特/参数，相比32位浮点压缩了32倍。作者证明在非凸问题上它能达到与SGD同级的收敛速度，并借助高斯的一个定理说明多数投票能获得与全精度分布式SGD同样的方差缩减。理论还指出：梯度、噪声与曲率的ℓ1/ℓ2几何（是否“稠密”）决定signSGD和SGD谁更合适。实验上，Signum在ImageNet深度模型上能追平Adam的精度和收敛速度。",
+  "limits": [
+    {"text": "多数投票的理论需要噪声对称、单峰等假设；节点数据异构或有拜占庭节点时表现会变差。", "solved_by": []},
+    {"text": "纯符号压缩丢掉了梯度大小信息，后续工作多用误差反馈来补偿。", "solved_by": ["onebit-adam"]}
+  ],
+  "relations": [
+    {"to": "sgd", "type": "extends", "note": "保留SGD框架，只把更新方向换成梯度符号。"},
+    {"to": "adam", "type": "rivals", "note": "论文论证Adam可近似看作一种符号更新，Signum在ImageNet上与Adam效果相当。"},
+    {"to": "parameter-server", "type": "uses", "note": "分布式版本运行在参数服务器架构上，服务器做多数投票。"},
+    {"to": "qsgd", "type": "rivals", "note": "同期的梯度压缩方法；QSGD做随机量化，signSGD只保留符号。"}
+  ],
+  "prereq": ["sgd-minibatch", "momentum", "distributed-training", "adaptive-optimizer"],
+  "terms": [{"t": "多数投票（majority vote）", "d": "对同一个坐标，统计各节点发来的正号和负号哪个多，就用哪个作为这一步的更新方向。"}],
+  "learn": "先懂[[sgd]]与[[parameter-server]]；读论文第2–3节的收敛定理和第4节的多数投票；动手在单机上把SGD换成sign(g)更新，观察学习率需要怎样调整。",
+  "check": {"source": "https://arxiv.org/abs/1802.04434", "confirmed": "标题、4位作者、arXiv v1 2018-02-13；摘要中只传梯度符号、SGD级收敛率、ℓ1/ℓ2几何、动量版本在ImageNet上匹配Adam、多数投票与高斯定理、双向1比特压缩。Signum名称、ICML 2018、机构、对Lion等的影响凭一般了解。"}
+}

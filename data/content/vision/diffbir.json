@@ -1,0 +1,31 @@
+{
+  "id": "diffbir",
+  "who": "Xinqi Lin, Jingwen He, Ziyan Chen, Zhaoyang Lyu, Bo Dai, Fanghua Yu, Wanli Ouyang, Yu Qiao et al. · 上海人工智能实验室 / 中科院深圳先进技术研究院",
+  "venue": "ECCV 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2308.15070"},
+    {"label": "代码", "url": "https://github.com/XPixelGroup/DiffBIR"}
+  ],
+  "aka": ["DiffBIR", "IRControlNet", "扩散先验盲复原", "blind image restoration", "生成式图像复原"],
+  "problem": "真实老照片、手机截图里的退化是未知且混合的（噪声、模糊、压缩、低分辨率一起出现）。[[real-esrgan]]这类GAN方法能去掉退化，但丢失的细节补不回来，纹理常显得假；直接用扩散模型生成细节又容易被残留噪声带偏、偏离原图。",
+  "idea": "把盲复原拆成两步：先用一个普通复原网络“去退化”，得到干净但偏平滑的图；再把这张图当条件，用改造过的ControlNet（IRControlNet）驱动预训练的潜空间扩散模型“补细节”；推理时还可以用一个引导强度在真实感和保真度之间调节。",
+  "impact": "一个框架同时处理盲超分、盲人脸复原和盲去噪，是2023年把文生图扩散先验用于真实图像复原的代表工作之一，随后[[supir]]把同一思路推向更大的模型。",
+  "method": "DiffBIR的两个阶段各自独立训练，推理时串起来用：\n\n- **去退化**：用[[swinir]]这类复原网络，在大量合成的混合退化数据上训练，输出一张退化已去除、但缺细节的图。这一步只管“去掉与图像内容无关的东西”；\n- **信息再生**：以Stable Diffusion为生成先验，训练一个IRControlNet：条件输入是第一阶段的干净图（而不是原始退化图，以免噪声干扰生成），由它控制扩散模型在潜空间里生成与之对齐的逼真细节。原扩散模型权重冻结，保留其生成能力。\n\n推理时，论文设计了**区域自适应的复原引导**：在去噪过程中按区域把结果往第一阶段输出拉近，平坦区域拉得多、纹理区域拉得少，用户调一个引导系数就能在“更真实”和“更忠实于原图”之间权衡，无需重新训练。摘要称在合成与真实数据上的盲超分、盲人脸复原和盲去噪任务上都优于当时的方法。",
+  "limits": [
+    {"text": "扩散采样需要几十步，速度远慢于前馈复原网络；生成出的细节可能与真实内容不符（幻觉）。", "solved_by": []},
+    {"text": "第一阶段失败（退化没去干净或去过头）时，第二阶段会在错误的基础上生成细节。", "solved_by": ["supir"]}
+  ],
+  "relations": [
+    {"to": "controlnet", "type": "extends", "note": "把ControlNet的条件控制改造成以干净复原图为条件的IRControlNet。"},
+    {"to": "stable-diffusion", "type": "uses", "note": "以冻结的Stable Diffusion作为生成先验，负责补回细节。"},
+    {"to": "real-esrgan", "type": "solves", "note": "Real-ESRGAN能去除混合退化但补不回真实细节；DiffBIR借扩散先验再生细节，真实感更好。"},
+    {"to": "swinir", "type": "uses", "note": "第一阶段的去退化模块采用SwinIR这类复原网络。"}
+  ],
+  "prereq": ["diffusion-process", "latent-space", "guidance", "image-tensor"],
+  "terms": [
+    {"t": "盲图像复原", "d": "不知道图像经历了哪些退化、退化有多强，只凭退化图恢复高质量图像。"},
+    {"t": "保真度与真实感的权衡", "d": "结果越贴近输入越可信，但细节少；生成的细节越多越好看，但越可能与真实内容不符。"}
+  ],
+  "learn": "先了解Real-ESRGAN的退化合成和ControlNet的条件控制，再读本文第3节两阶段流程与第4节复原引导；用官方demo调引导系数，观察细节与保真度的变化。",
+  "check": {"source": "https://arxiv.org/abs/2308.15070", "confirmed": "arXiv记录：标题、九位作者、v1提交于2023-08-29；摘要中的两阶段（去退化、信息再生）、IRControlNet利用潜扩散模型、条件图去掉噪声内容、区域自适应复原引导与可调引导系数、盲超分/盲人脸复原/盲去噪。ECCV 2024、机构、第一阶段用SwinIR、Stable Diffusion权重冻结凭一般了解写。"}
+}

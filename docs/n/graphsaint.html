@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>GraphSAINT子图采样训练（2019） · AI脉络</title>
+<meta name="description" content="大图上做小批量训练时，GCN每加一层要看的邻居数指数增长（邻居爆炸）；逐层采样邻居的方法又让深层的节点越来越稀疏、彼此连接差。 换个角度：不在GCN的各层里采样节点或边，而是先从训练图上采样一个子图，在这个子图上构建一个完整的GCN；再用归一化系数消除采样偏差，并设计降低方差的采样器。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/graphsaint.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="GraphSAINT子图采样训练（2019）">
+<meta property="og:description" content="大图上做小批量训练时，GCN每加一层要看的邻居数指数增长（邻居爆炸）；逐层采样邻居的方法又让深层的节点越来越稀疏、彼此连接差。 换个角度：不在GCN的各层里采样节点或边，而是先从训练图上采样一个子图，在这个子图上构建一个完整的GCN；再用归一化系数消除采样偏差，并设计降低方差的采样器。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/graphsaint.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/graphsaint">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 图与几何深度学习</div>
+<h1>GraphSAINT子图采样训练</h1>
+<div class="full">GraphSAINT: Graph Sampling Based Inductive Learning Method</div>
+<div class="meta"><span>2019.07</span><span>论文</span><span>延伸</span><span>ICLR 2020</span><span>Hanqing Zeng, Hongkuan Zhou, Ajitesh Srivastava, Rajgopal Kannan, Viktor Prasanna · 南加州大学、美国陆军研究实验室</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1907.04931" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/graphsaint">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>大图上做小批量训练时，GCN每加一层要看的邻居数指数增长（邻居爆炸）；逐层采样邻居的方法又让深层的节点越来越稀疏、彼此连接差。</p></div><div><h4>方法</h4><p>换个角度：不在GCN的各层里采样节点或边，而是先从训练图上采样一个子图，在这个子图上构建一个完整的GCN；再用归一化系数消除采样偏差，并设计降低方差的采样器。</p></div><div><h4>影响</h4><p>与<a class="ln" href="../n/cluster-gcn.html">Cluster-GCN大图训练</a>一起成为大图GNN训练的两种主流“子图小批量”方案，PyG提供了GraphSAINT采样器。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/graphsage.html">GraphSAGE</a>式方法在每一层为每个节点采样固定数目的邻居，层数一多，计算量仍随层数指数增长；FastGCN等逐层采样能控制规模，但被采到的节点之间连接稀疏。</p><p>GraphSAINT每一步：用某种采样器（随机节点、随机边、随机游走）从整张训练图中采出一个子图G_s，然后在G_s上跑完整的多层GCN前向与反向——所有层用的是同一组节点，规模固定、彼此连接良好。因为不同节点和边被采到的概率不同，直接在子图上聚合会有偏，作者推导了对聚合和损失的归一化系数（基于预先估计的节点、边被采样的概率），使估计无偏；并根据方差分析设计了边采样器的采样概率。采样与前向/反向传播解耦，可以和注意力、跳跃连接等多种结构组合。摘要报告在五个大规模图上，精度和训练时间都优于当时的方法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>归一化系数需要预先多次采样估计；子图采样会丢掉跨子图的边，信息有损。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/gcn.html">图卷积网络</a><span class="yr">2016.09 · 基础</span><div class=nt>在采样子图上运行完整的GCN。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/graphsage.html">GraphSAGE</a><span class="yr">2017.06 · 基础</span><div class=nt>用子图采样代替逐层邻居采样，避免层数增加带来的邻居爆炸。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/cluster-gcn.html">Cluster-GCN大图训练</a><span class="yr">2019.05 · 基础</span><div class=nt>同为在子图上训练完整GCN；Cluster-GCN用图划分得到子图，GraphSAINT用随机采样并做无偏校正。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/graph-basics.html">图、树与搜索</a> <a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="../c/importance-sampling.html">重要性采样</a> <a class="chip c" href="../c/message-passing.html">图神经网络与消息传递</a></p>
+
+<h2>怎么学</h2><p>先了解<a class="ln" href="../n/graphsage.html">GraphSAGE</a>的邻居采样与<a class="ln" href="../n/cluster-gcn.html">Cluster-GCN大图训练</a>；读论文第3节归一化系数与第4节方差分析；动手用PyG的GraphSAINTRandomWalkSampler在ogbn-products上训练。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1907.04931" rel="noopener">https://arxiv.org/abs/1907.04931</a>（标题、5位作者、arXiv v1 2019-07-10；摘要中邻居爆炸、逐层采样的问题、采样训练图构造小批量、每次迭代在子图上构建完整GCN、归一化消除偏差、降方差的采样算法、采样与前反向解耦、五个大图上精度与时间更优。三种采样器名称、ICLR 2020、机构凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20GraphSAINT%E5%AD%90%E5%9B%BE%E9%87%87%E6%A0%B7%E8%AE%AD%E7%BB%83%EF%BC%88graphsaint%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Agraphsaint%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/graphsaint.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="dropedge.html"><small>本分支上一个 · 2019.07</small><b>DropEdge随机删边</b></a><a class="r" href="lookahead.html"><small>本分支下一个 · 2019.07</small><b>Lookahead优化器</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

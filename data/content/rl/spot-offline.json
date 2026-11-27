@@ -1,0 +1,29 @@
+{
+  "id": "spot-offline",
+  "who": "Jialong Wu, Haixu Wu, Zihan Qiu, Jianmin Wang, Mingsheng Long · 清华大学",
+  "venue": "NeurIPS 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2202.06239"}
+  ],
+  "problem": "策略约束类离线RL里，改策略结构的做法（如BCQ、PLAS）侵入网络、增加推理开销；加正则的做法约束的是分布距离，与“支撑集”按密度定义的本意不一致，挡不住分布外动作。",
+  "idea": "直接从“支撑约束”的定义出发：用VAE估计行为策略的密度，把“策略动作在行为策略下的密度不能太低”写成一个正则项，即插即用地加到TD3等离策略算法上。",
+  "impact": "成为“支撑约束”路线里简洁好用的代表方法，因可直接接着做在线微调，被CORL等库列为离线转在线基线。",
+  "method": "支撑约束的本意是：策略只选行为策略μ下概率密度大于某个阈值ε的动作，即 `μ(a|s) > ε`。以往的正则化方法（如[[brac]]、[[bear]]）约束的是π与μ之间的散度或MMD，它们与密度阈值并不等价。\n\nSPOT（Supported Policy OpTimization）从这个定义出发推导，把约束放松成一个惩罚项：\n\n`max_π E_s[ Q(s, π(s)) − λ·(−log μ̂(π(s)|s)) ]`\n\n其中 `μ̂` 是用条件[[vae]]估计的行为密度，用VAE的证据下界（ELBO）近似 `log μ(a|s)`。策略动作在数据里越罕见，惩罚越大。整个方法只是在[[td3]]的策略损失里加了这一项，网络结构不变，因此可以“即插即用”地用于现成的离策略算法。\n\n因为策略本身就是普通的TD3策略，离线训练好的模型可以直接切到在线微调：逐渐减小λ即可。摘要称SPOT在标准离线RL基准上取得当时最好的性能，并能无缝做在线微调。",
+  "limits": [
+    {"text": "约束效果取决于VAE密度估计的准确度，ELBO只是对数密度的下界，估计偏差会让惩罚失真。"},
+    {"text": "惩罚系数λ要按数据集调，在线微调时λ的衰减方式也需要设计。"}
+  ],
+  "relations": [
+    {"to": "bear", "type": "solves", "note": "BEAR用MMD近似支撑约束，与按密度定义的支撑不一致；SPOT直接用密度惩罚。"},
+    {"to": "plas", "type": "rivals", "note": "PLAS把约束写进策略结构；SPOT不改结构，只加正则项。"},
+    {"to": "td3", "type": "uses", "note": "以TD3为底座，只在策略损失里加密度惩罚。"},
+    {"to": "vae", "type": "uses", "note": "用条件VAE的ELBO估计行为策略的对数密度。"}
+  ],
+  "prereq": ["offline-rl", "elbo", "actor-critic", "distribution-shift"],
+  "terms": [
+    {"t": "支撑约束", "d": "只要求策略动作出现在行为策略概率不为零（或不太小）的范围内，而不要求两个分布接近。"}
+  ],
+  "learn": "先读[[bear]]和[[td3-bc]]；读SPOT原文第3节从密度约束到惩罚项的推导；在CORL里用SPOT先离线再在线跑antmaze。",
+  "check": {"source": "https://arxiv.org/abs/2202.06239", "confirmed": "标题、五位作者、arXiv v1于2022-02-13；摘要中参数化方法侵入策略网络增加推理开销、正则化方法与基于密度的支撑定义不匹配、SPOT由基于密度的支撑约束形式化直接推导、用基于VAE的密度估计器、可即插即用于现成离策略算法、标准基准上最好、可无缝在线微调。惩罚项形式按原文正文通行描述；NeurIPS 2022与单位按通行引用。"},
+  "aka": ["SPOT", "Supported Policy Optimization", "支撑策略优化", "支撑约束离线RL"]
+}

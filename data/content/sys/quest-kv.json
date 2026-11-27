@@ -1,0 +1,26 @@
+{
+ "id": "quest-kv",
+ "who": "Jiaming Tang, Yilong Zhao, Kan Zhu, Guangxuan Xiao, Baris Kasikci, Song Han · MIT, 上海交通大学, 华盛顿大学, NVIDIA",
+ "venue": "ICML 2024",
+ "aka": ["Quest", "查询感知稀疏", "query-aware sparsity", "KV页选择", "KV cache page selection", "动态KV稀疏"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2406.10774"},
+  {"label": "GitHub", "url": "https://github.com/mit-han-lab/Quest"}
+ ],
+ "problem": "128K乃至1M上下文的模型解码时，每生成一个词都要读完整个KV缓存，速度随长度明显下降；H2O、StreamingLLM这类方法按固定规则永久丢掉一部分token，可一个token是否重要其实取决于当前的查询。",
+ "idea": "不丢弃任何KV，而是按页记录每页内各维度Key的最小值和最大值；每步解码用当前Query估计每页可能的最大注意力分数，只把得分最高的K页读进来做注意力。",
+ "impact": "确立了“查询感知、按页选择”的长上下文解码稀疏注意力做法，与分页KV缓存天然契合，被大量KV检索与稀疏解码工作作为基线，相关思路也进入了推理引擎的稀疏注意力实现。",
+ "method": "长上下文解码时，模型权重的读取量不变，而KV缓存随长度线性增长，注意力成了瓶颈。已有观察是：少量关键token主导了注意力结果。[[h2o]]按累计注意力分数保留“重击者”，[[streamingllm]]保留开头的汇聚token和最近窗口，被淘汰的token就永久丢失；可论文发现，一个token是否关键高度依赖当前的Query，之前不重要的token，后面的问题可能恰好要用到。\n\nQuest把KV缓存按[[vllm]]式的页（例如每页16个token）组织，为每一页存两个向量：这一页里所有Key在每个维度上的最小值m和最大值M。解码时，对当前查询q，逐维取 `max(qᵢ·mᵢ, qᵢ·Mᵢ)` 再求和，得到该页内任何Key与q的点积的上界，作为这一页的重要性估计。然后只加载得分最高的K页做精确注意力。所有KV仍保留在显存里，只是每步只读一小部分，所以对需要回看早先内容的任务也不会丢信息。\n\n摘要报告：自注意力最多加速2.23倍，推理延迟最多降低7.03倍，在长依赖任务上精度损失可以忽略。",
+ "limits": [
+  {"text": "所有KV仍要放在显存里，只省带宽不省容量；超长上下文下显存仍是上限，需要配合KV卸载或量化。", "solved_by": ["lmcache"]},
+  {"text": "页级上界估计较粗，页内只有少数关键token时会多读不少无关内容；前几层等注意力分散的层效果差。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "h2o", "type": "solves", "note": "H2O按历史分数永久淘汰token，Quest发现重要性依赖当前查询，改为保留全部KV、每步按查询选页。"},
+  {"to": "streamingllm", "type": "rivals", "note": "StreamingLLM只保留汇聚token与近期窗口，适合流式但会丢远处信息；Quest保留全部内容按需读取。"},
+  {"to": "vllm", "type": "uses", "note": "沿用分页KV缓存的组织方式，以页为单位估计重要性与加载。"},
+  {"to": "flash-decoding", "type": "extends", "note": "同样针对长上下文解码时读取KV缓存的瓶颈，Quest进一步减少需要读取的KV量。"}
+ ],
+ "prereq": ["kv-cache", "self-attention", "dot-product", "memory-bandwidth", "context-window"],
+ "check": {"source": "https://arxiv.org/abs/2406.10774", "confirmed": "标题、六位作者、v1日期2024-06-16；摘要：128K或1M上下文模型日益普遍、推理速度随序列长度显著下降主要因为自注意力中加载大量KV缓存、少量关键token主导注意力、token的关键性高度依赖查询、Quest跟踪KV缓存页中Key的最小值和最大值并用Query向量估计页的关键性、只加载Top-K关键页、自注意力最多加速2.23倍、推理延迟最多降低7.03倍、长依赖任务上精度损失可忽略。上界公式写法、页大小示例、ICML 2024、机构为一般了解。"}
+}

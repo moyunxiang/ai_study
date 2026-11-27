@@ -1,0 +1,29 @@
+{
+  "id": "cic",
+  "who": "Michael Laskin, Hao Liu, Xue Bin Peng, Denis Yarats, Aravind Rajeswaran, Pieter Abbeel · UC Berkeley / NYU / Meta AI",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2202.00161"}
+  ],
+  "problem": "无监督技能发现方法（DIAYN、APS等）用一个判别器从状态猜技能，技能空间一大判别器就学不好，学出的技能多样性有限，在URLB上不如纯探索方法。",
+  "idea": "把技能与“状态转移”（s, s′）之间的互信息分开优化：用对比学习（类似CPC/InfoNCE）让转移嵌入与技能向量对齐，用转移嵌入上的粒子熵作为内在奖励鼓励多样性（CIC）。",
+  "impact": "在URLB上大幅领先此前的技能发现方法，成为无监督RL预训练的强基线；METRA等后来的技能发现工作都把它列入对比。",
+  "method": "目标仍是最大化技能z与行为之间的互信息，但CIC用转移 `τ = (s, s′)` 而不是单个状态，并按 `I(τ; z) = H(τ) − H(τ | z)` 拆开：\n\n- **`−H(τ | z)`（技能可区分）**：用对比学习的下界。给一批 `(τ_i, z_i)`，让查询网络 `g_q(τ_i)` 与键网络 `g_k(z_i)` 的内积在配对时大、不配对时小，损失是InfoNCE形式：\n\n`L = −log [ exp(g_q(τ_i)ᵀg_k(z_i)/T) / Σ_j exp(g_q(τ_i)ᵀg_k(z_j)/T) ]`\n\n这比训练一个直接输出技能的判别器容易扩展到高维技能；\n\n- **`H(τ)`（行为多样）**：在学到的转移嵌入空间里用k近邻粒子熵估计，作为RL的内在奖励，与[[apt]]的做法相同。\n\n预训练阶段智能体（DDPG底座）在无奖励的环境中最大化这个内在奖励；下游阶段给出外部奖励，选择一个技能后短时间微调。作者在URLB上评测：先进行长时间无奖励预训练，再进行短时间的下游适应。摘要称CIC在适应效率上大幅提升，比此前的无监督技能发现方法高1.79倍，比次优的探索算法高1.18倍。",
+  "limits": [
+    {"text": "下游适应时要先在多个技能中搜索最合适的一个，技能数多时选择成本高，且选到的技能未必对齐任务。"},
+    {"text": "熵最大化部分仍在全状态转移空间上覆盖，复杂高维环境里难以真正覆盖。", "solved_by": ["metra"]}
+  ],
+  "relations": [
+    {"to": "diayn", "type": "solves", "note": "DIAYN用判别器直接猜技能，技能空间大时难学；CIC改用对比学习的互信息下界。"},
+    {"to": "aps", "type": "rivals", "note": "同样把互信息拆成熵项与条件熵项，CIC用对比学习代替后继特征。"},
+    {"to": "apt", "type": "uses", "note": "熵项沿用APT的k近邻粒子熵估计。"},
+    {"to": "cpc", "type": "uses", "note": "条件熵项用CPC式的InfoNCE对比下界。"},
+    {"to": "urlb", "type": "uses", "note": "在URLB基准上评测预训练与适应效率。"}
+  ],
+  "prereq": ["mutual-information", "contrastive-learning", "entropy", "pretrain-finetune"],
+  "terms": [
+    {"t": "技能（skill）", "d": "一个潜变量向量z，固定z后策略表现出一种特定、可区分的行为模式。"}
+  ],
+  "learn": "先读[[diayn]]和对比学习的InfoNCE；读CIC原文第4节的互信息分解；用URLB代码在Walker域复现CIC与DIAYN的下游分数。",
+  "check": {"source": "https://arxiv.org/abs/2202.00161", "confirmed": "标题、六位作者、arXiv v1于2022-02-01；摘要中最大化状态转移与潜在技能向量之间的互信息、转移与技能间的对比学习、最大化嵌入熵作为内在奖励、URLB的长时间无奖励预训练与短时间适应、比此前技能发现方法高1.79倍、比次优探索算法高1.18倍。InfoNCE形式、DDPG底座与技能选择按原文正文通行描述；发表处未核对。"},
+  "aka": ["CIC", "Contrastive Intrinsic Control", "对比内在控制", "对比技能发现"]
+}

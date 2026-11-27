@@ -1,0 +1,36 @@
+{
+  "id": "stern-span-parser",
+  "who": "Mitchell Stern, Jacob Andreas, Dan Klein · 加州大学伯克利分校",
+  "venue": "ACL 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1705.03919"}
+  ],
+  "aka": ["跨度式成分分析", "Span-based Parser", "Minimal Span-Based Parser", "片段打分句法分析", "Chart Parser"],
+  "problem": "神经成分句法分析器要么是转移式的（贪心、易累积错误），要么把树线性化后用seq2seq生成（不保证输出合法树），缺少一个结构简单、又能精确解码的做法。",
+  "idea": "让双向LSTM给句子中每一个片段(i, j)和每个标签单独打分，整棵树的分数就是它包含的所有片段分数之和；既可以用经典的图表动态规划精确求最优树，也可以自顶向下贪心地递归切分。",
+  "impact": "在宾州树库上单模型F1达到91.79，结构极简却与复杂系统相当；「片段表示+图表解码」的框架被Kitaev与Klein的自注意力分析器直接继承，成为此后神经成分分析的主流范式。",
+  "background": "[[charniak-johnson-rerank]]等统计分析器靠大量手工特征，F1停在91–92%附近。神经方法出现后，[[grammar-foreign-language]]把树写成括号串用seq2seq生成，[[stack-lstm-parser]]和[[rnng]]则走转移式路线。[[kiperwasser-goldberg]]已经说明，在依存分析里只要用双向LSTM给出好的上下文表示，打分函数可以非常简单。作者想在成分分析上验证同样的想法。",
+  "method": "**片段表示。** 先用多层双向LSTM读整句，得到每个位置的前向输出 f_t 和后向输出 b_t。片段(i, j)（词i+1到词j）的表示取两端之差：`r_ij = [ f_j − f_i ; b_{i+1} − b_{j+1} ]`，即这段区间里前向和后向LSTM各自「读进了多少新信息」。\n\n**打分。** 一个前馈网络给每个片段的每个标签打分 `s_label(i, j, ℓ)`（包括表示「这不是一个成分」的空标签）。一棵树T的分数 `s(T) = Σ_{(i,j,ℓ)∈T} s_label(i, j, ℓ)`。\n\n**两种解码。** 由于分数在片段上可分解，可以用[[cky-parsing]]式的动态规划在O(n³)时间求出精确最优树：`best(i, j) = max_ℓ s_label(i,j,ℓ) + max_k [ best(i, k) + best(k, j) ]`。作者还提出一种贪心的**自顶向下**解码：对整句先选最优标签，再选一个切分点k把它一分为二，递归处理两半，复杂度更低，精度几乎不降。\n\n**训练。** 用结构化的最大间隔损失：要求标准树的分数比任何其他树至少高出它们之间的汉明距离（错的片段数），损失增强解码同样用上面的动态规划完成。",
+  "results": "摘要报告：宾州树库单模型F1为91.79，法语树库F1为82.23，两种解码方式都与当时的最好工作相当。",
+  "legacy": "第二年[[kitaev-klein-parser]]保留了片段打分和图表解码，只把双向LSTM换成自注意力编码器并加入预训练表示，F1进一步大幅提高；之后的成分分析器（包括基于BERT、XLNet的版本）基本都沿用这一框架。片段两端差分的表示方式也被用在共指消解、语义角色标注等以片段为单位的任务中。",
+  "limits": [
+    {"text": "各片段独立打分，标签之间、父子短语之间的依赖没有直接建模。", "solved_by": []},
+    {"text": "编码器是双向LSTM且不用预训练表示，上下文建模能力受限。", "solved_by": ["kitaev-klein-parser"]}
+  ],
+  "relations": [
+    {"to": "kiperwasser-goldberg", "type": "extends", "note": "沿用「双向LSTM特征+简单打分函数」的思路，从依存分析搬到成分分析的片段上。"},
+    {"to": "cky-parsing", "type": "uses", "note": "片段分数可加，因此可用CKY式图表动态规划精确找出最优树。"},
+    {"to": "grammar-foreign-language", "type": "rivals", "note": "seq2seq把树线性化后生成，不保证输出合法；本文直接在树空间里打分和搜索。"},
+    {"to": "penn-treebank", "type": "uses", "note": "在宾州树库WSJ上训练和评测。"}
+  ],
+  "prereq": ["recurrent-layer", "dynamic-programming", "mlp", "loss-function"],
+  "terms": [
+    {"t": "片段（span）", "d": "句子中一段连续的词，用起止位置(i, j)表示；成分树就是一组互相嵌套或不相交的带标签片段。"},
+    {"t": "最大间隔训练", "d": "要求正确结构的分数比错误结构高出一个与错误程度成正比的间隔，否则产生损失。"}
+  ],
+  "learn": "先懂[[cky-parsing]]和双向LSTM → 读原文第2–3节的片段表示与两种解码 → 动手：用PyTorch实现片段打分和O(n³)图表解码，在宾州树库的一个小子集上训练，再与贪心自顶向下解码比较速度和F1。",
+  "check": {
+    "source": "https://arxiv.org/abs/1705.03919",
+    "confirmed": "arXiv：标题、作者Stern、Andreas、Klein、v1提交2017-05-10；摘要：基于标签与片段独立打分的极简神经成分分析模型、与经典动态规划兼容、新的贪心自顶向下递归切分推断、宾州树库单模型91.79 F1、法语树库82.23 F1。片段差分表示公式、最大间隔训练、ACL 2017发表处凭一般了解。"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "primer",
+  "who": "David R. So, Wojciech Mańke, Hanxiao Liu, Zihang Dai, Noam Shazeer, Quoc V. Le · Google Research",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2109.08668"}
+  ],
+  "aka": ["Primer", "Primer-EZ", "平方ReLU", "squared ReLU", "ReLU²", "Multi-DConv-Head Attention"],
+  "problem": "大Transformer的训练成本增长很快；以往的架构搜索多在“换哪个模块”这一高层级上搜，找到的改进常常难以迁移到别的代码库和规模。",
+  "idea": "在更底层——组成Transformer的TensorFlow原语程序上做进化搜索，找到训练更省的变体Primer；其收益主要来自两处简单改动：把ReLU换成平方ReLU，以及在Q、K、V投影后各加一个沿序列方向的深度卷积。",
+  "impact": "平方ReLU后来作为一种常见的FFN激活出现在多个模型和速通训练（如NanoGPT speedrun）中；“Q/K/V后加短卷积”的思路也在线性注意力和SSM类模型（如Mamba的短卷积）中反复出现。",
+  "method": "背景：[[nas]]（神经架构搜索）已经被用来设计视觉网络，也有人用它搜索翻译Transformer（Evolved Transformer）。但这些搜索空间由人预先定义好的模块组成，结论受搜索空间限制。\n\n**搜索**：作者把一个自回归语言模型的Transformer写成由基本运算（加、乘、卷积、激活等）组成的程序，用进化算法在C4语言建模上直接对程序做变异和选择，目标是固定训练算力下的困惑度。搜索得到的Primer有许多改动，但作者通过消融发现，大部分收益来自两项，合起来称为**Primer-EZ**：\n\n- **平方ReLU**：FFN激活由 `ReLU(x)` 改为 `ReLU(x)²`。\n- **多头深度卷积注意力（MDHA）**：在Q、K、V三个投影之后，各接一个宽度为3、沿序列维度、每个通道独立的深度卷积，让每个位置的q、k、v先混合相邻几个token的信息，再做注意力。\n\n结果：摘要称Primer相对Transformer的收益随算力增大而增大，并在最优模型规模下的质量上呈幂律。在500M参数、C4自回归语言建模上，Primer让原始[[t5]]架构的训练成本降低到1/4；在与GPT-3 XL相近的1.9B配置下，Primer只用1/3的训练算力就达到与Transformer相同的单样本（one-shot）表现。作者还验证了它可以不调参直接放进不同代码库。",
+  "limits": [
+    {"text": "收益在原文的T5/C4设定与相应超参数下测得，后来的大模型主流选择的是SwiGLU等门控FFN，平方ReLU与它们的优劣在更大规模下没有定论。", "solved_by": []},
+    {"text": "深度卷积引入了对相邻token的局部依赖，与KV缓存、序列并行等推理和训练工程的配合需要额外处理，主流Transformer大模型多数没有采用这一项。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "nas", "type": "extends", "note": "把架构搜索的粒度从预定义模块降到构成程序的基本运算。"},
+    {"to": "transformer", "type": "solves", "note": "在相同算力下降低原始Transformer语言模型的训练成本，500M规模上约为1/4。"},
+    {"to": "t5", "type": "uses", "note": "在T5代码库和C4数据上做搜索与对比。"},
+    {"to": "swiglu", "type": "rivals", "note": "同为改进FFN激活的方案，SwiGLU用门控，Primer用平方ReLU；后来的大模型多用SwiGLU。"},
+    {"to": "gpt-3", "type": "uses", "note": "用与GPT-3 XL相近的1.9B配置验证单样本性能的算力节省。"}
+  ],
+  "prereq": ["neuron-activation", "transformer-block", "convolution-op", "self-attention", "scaling-law-concept"],
+  "terms": [
+    {"t": "深度卷积（depthwise convolution）", "d": "每个通道单独做卷积、通道之间不混合的卷积，参数和计算都很少。"},
+    {"t": "进化搜索", "d": "维护一群候选结构，反复随机变异、训练评估、保留好的，像自然选择一样逐步改进。"}
+  ],
+  "learn": "先补[[c:neuron-activation]]和[[c:convolution-op]]；读原文第3节Primer-EZ两项改动的消融；动手：在nanoGPT里把GELU换成平方ReLU、在q/k/v后加宽度3的因果深度卷积，比较相同步数下的验证损失。",
+  "check": {"source": "https://arxiv.org/abs/2109.08668", "confirmed": "标题、6位作者、arXiv v1提交日2021-09-17；摘要中在定义Transformer的TensorFlow原语层级做搜索、收益主要来自平方ReLU与在Q/K/V投影后加深度卷积、收益随算力增大并呈幂律、500M规模上T5在C4自回归建模训练成本降为1/4、1.9B类GPT-3 XL配置用1/3算力达到相同one-shot性能、可直接放入不同代码库。卷积宽度3、Primer-EZ名称、NeurIPS 2021、后续采用情况为一般了解。"}
+}

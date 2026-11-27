@@ -1,0 +1,25 @@
+{
+ "id": "pyramidkv",
+ "who": "Zefan Cai, Yichi Zhang, Bofei Gao, Yuliang Liu, Yucheng Li, Tianyu Liu, Keming Lu, Wayne Xiong et al. · 北京大学等",
+ "aka": ["PyramidKV", "金字塔KV缓存", "分层KV预算", "Pyramidal Information Funneling", "金字塔信息漏斗"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2406.02069"},
+  {"label": "GitHub", "url": "https://github.com/Zefan-Cai/KVCache-Factory"}
+ ],
+ "problem": "H2O、SnapKV等KV缓存压缩方法给每一层保留同样多的token，但不同层的注意力分布差别很大，统一预算在缓存压得很小时会明显掉点。",
+ "idea": "观察到注意力在低层分散、越往高层越集中到少数关键token（金字塔式的信息漏斗），于是给低层分配更多KV缓存、高层分配更少，总预算不变。",
+ "impact": "把“层间不均匀分配KV预算”变成KV缓存压缩的常用设计，其开源代码库后来汇集了多种KV压缩方法，常被后续工作当作对比平台。",
+ "method": "长上下文推理时，每层每个token的键值向量都要存进[[c:kv-cache]]，显存随上下文线性增长。[[h2o]]、[[snapkv]]等方法按注意力分数挑出重要token、丢掉其余的，但对所有层用相同的保留数量。\n\n作者分析长文本推理时各层的注意力，发现一种规律：低层注意力广泛地分散在整段输入上，中间层逐渐集中到局部的某些片段，高层则集中在极少数关键token上（与[[streamingllm]]观察到的注意力汇聚现象相关）。据此PyramidKV让每层的缓存大小随层数递减，形如金字塔；每层内部仍像SnapKV那样，用提示末尾一小段token的注意力来挑选要保留的位置。\n\n摘要报告：在LongBench上只保留12%的KV缓存就能与完整缓存持平；只保留0.7%时，比其他KV压缩方法在TREC上最多高20.5个百分点；大海捞针测试中，Llama-3-70B只保留128条KV也能达到100%准确率。",
+ "limits": [
+  {"text": "层间预算按固定的金字塔形状分配，没有针对不同模型、任务自适应；丢掉的token无法找回，多轮对话中后来变重要的信息可能已经丢失。", "solved_by": ["quest-kv"]}
+ ],
+ "relations": [
+  {"to": "snapkv", "type": "extends", "note": "层内沿用SnapKV用提示末尾观察窗口挑选token的做法，再加上层间不均匀预算。"},
+  {"to": "h2o", "type": "solves", "note": "H2O等方法各层统一预算，低预算时掉点明显；PyramidKV按层分配预算缓解这一问题。"},
+  {"to": "streamingllm", "type": "uses", "note": "高层注意力集中在关键token与注意力汇聚现象的观察，是金字塔分配的依据之一。"},
+  {"to": "longbench", "type": "uses", "note": "主要在LongBench上评测不同KV预算下的效果。"}
+ ],
+ "prereq": ["kv-cache", "attention-concept", "context-window", "memory-bandwidth"],
+ "terms": [{"t": "KV预算", "d": "每层允许保留的键值向量条数上限，超出的token被丢弃，预算越小越省显存。"}],
+ "check": {"source": "https://arxiv.org/abs/2406.02069", "confirmed": "标题、作者（11位）、v1日期2024-06-04；摘要：金字塔信息漏斗（低层注意力分散、逐渐集中、高层聚焦关键token即注意力汇聚）、层间动态调整KV缓存大小低层多高层少、LongBench上保留12%与完整缓存持平、保留0.7%时TREC最多高20.5、大海捞针Llama-3-70B保留128条达100.0。层内选择沿用SnapKV、机构、代码库名称为一般了解。"}
+}

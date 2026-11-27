@@ -1,0 +1,34 @@
+{
+  "id": "byol-explore",
+  "who": "Zhaohan Daniel Guo, Shantanu Thakoor, Miruna Pîslar, Bernardo Avila Pires, Florent Altché, Corentin Tallec, Alaa Saade, Daniele Calandriello et al. · DeepMind",
+  "venue": "NeurIPS 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2206.08332"}
+  ],
+  "problem": "在视觉复杂、部分可观测的三维环境里，好奇心方法要么在像素上预测（被无关细节干扰），要么要额外拼装表示学习、逆动力学、随机网络等多个模块，困难探索任务仍常常只能靠人类示范起步。",
+  "idea": "只用一个损失：在隐空间里预测未来的表示，而预测目标来自同一网络的慢速更新（EMA）版本，即BYOL式的自举预测。这个预测误差同时用来训练世界表示、动力学，并直接作为内在奖励。",
+  "impact": "展示了单一自监督预测目标就能同时承担表示学习与好奇心奖励，在DM-HARD-8和Atari最难探索的游戏上取得强结果，成为“自举隐空间预测式好奇心”的代表方法。",
+  "background": "[[icm]]、[[large-scale-curiosity]]用前向模型的预测误差作奖励，但需要决定在哪个特征空间里预测：像素太细，随机特征太粗，逆动力学特征要额外训练；[[rnd]]回避了动力学，却和环境结构无关。DeepMind的DM-HARD-8是一组部分可观测、连续动作、画面丰富的三维困难探索任务，此前只有借助人类示范的方法才能取得进展。另一方面，表示学习里的[[byol]]和RL里的[[spr]]表明，用目标网络提供的表示作为预测对象，可以在不用负样本的情况下学到好的表示。",
+  "method": "BYOL-Explore有三部分：在线编码器 f 把观测编成表示；一个循环网络把历史汇总成信念状态，并结合未来的动作开环地预测未来若干步的表示；目标编码器 f_targ 是 f 参数的指数滑动平均（EMA）。对时刻t、预测步长k，损失是归一化后的余弦式误差\n\n`ℓ_{t,k} = ‖ ĝ_t,k / ‖ĝ_t,k‖ − sg(f_targ(o_{t+k})) / ‖f_targ(o_{t+k})‖ ‖²`\n\nsg表示不回传梯度。这同一个损失既训练表示和预测器，也被汇总、归一化后作为内在奖励 `r_t^i`，与外部奖励相加后交给RL（论文用基于V-trace的演员—评论家）。因为目标是网络自身的慢速副本，预测对象会随表示的改进而变化，智能体不断被引向“自己的模型还预测不好”的地方；归一化与对奖励的裁剪用于抑制不可预测噪声的影响。",
+  "results": "摘要称：在DM-HARD-8上，仅用BYOL-Explore的内在奖励增强外部奖励就解决了大部分任务，而之前的工作只能借助人类示范起步；在Atari最难探索的十个游戏上达到超人表现，且设计比其他有竞争力的智能体简单得多。",
+  "legacy": "BYOL-Explore把“自举预测”从表示学习带进探索，此后同组和其他工作把它用于开放式环境、多任务智能体和带记忆的探索；它也说明了在世界模型的隐空间里度量新颖度比在像素空间里更稳健。",
+  "limits": [
+    {"text": "仍然是预测误差式奖励，环境中真正不可预测的随机源会长期产生奖励，只能靠归一化与裁剪缓解。", "solved_by": []},
+    {"text": "需要大规模分布式训练，在DM-HARD-8和Atari上的结果依赖大量环境步数，样本效率不高。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "byol", "type": "uses", "note": "借用BYOL用EMA目标网络提供预测目标、不需负样本的自举表示学习。"},
+    {"to": "spr", "type": "extends", "note": "SPR用隐空间多步预测作辅助损失提高样本效率；BYOL-Explore把同样的预测误差直接当作内在奖励。"},
+    {"to": "icm", "type": "solves", "note": "ICM要额外训练逆动力学模型来选特征空间；BYOL-Explore用一个自举预测损失同时学表示与好奇心。"},
+    {"to": "rnd", "type": "rivals", "note": "RND预测固定随机网络的输出，与环境动力学无关；BYOL-Explore预测的是未来的学到的表示。"},
+    {"to": "agent57", "type": "rivals", "note": "Agent57在困难探索Atari上依赖多种内在奖励与元控制器；BYOL-Explore以更简单的设计取得超人表现。"}
+  ],
+  "prereq": ["exploration-exploitation", "self-supervised", "world-model-concept", "feature-representation", "actor-critic"],
+  "terms": [
+    {"t": "自举预测（bootstrapped prediction）", "d": "预测目标不是固定的，而是网络自己的慢速副本给出的表示；表示变好，目标也随之变化。"},
+    {"t": "DM-HARD-8", "d": "DeepMind的一组八个三维困难探索任务，部分可观测、连续动作，需要完成多步操作才能拿到奖励。"}
+  ],
+  "learn": "先读[[byol]]理解EMA目标网络和[[icm]]的预测误差奖励；读原文第3节损失与奖励的定义；在一个小型像素环境上实现隐空间自举预测，并与随机特征版本的好奇心比较。",
+  "check": {"source": "https://arxiv.org/abs/2206.08332", "confirmed": "标题、作者（Guo, Thakoor, Pîslar, Avila Pires, Altché, Tallec, Saade, Calandriello等14人）、arXiv v1于2022-06-16；摘要中用单一隐空间预测损失同时学世界表示、动力学和探索策略、无额外辅助目标、DM-HARD-8上仅靠内在奖励解决多数任务而以往需人类示范、Atari最难探索十个游戏上超人表现、设计更简单。损失公式、EMA目标、循环预测器、V-trace演员—评论家、奖励归一化与裁剪、NeurIPS 2022与机构按原文正文和通行引用。"},
+  "aka": ["BYOL-Explore", "Exploration by Bootstrapped Prediction", "自举预测探索", "BYOL好奇心"]
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>循环学习率CLR（2015） · AI脉络</title>
+<meta name="description" content="学习率是最重要的超参数，通常要反复试验才能找到合适的初值和衰减时间表，代价很高。 不让学习率单调下降，而是在一个上下界之间周期性地来回变化（三角波），再用一次“线性增大学习率”的短实验估出上下界。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/clr.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="循环学习率CLR（2015）">
+<meta property="og:description" content="学习率是最重要的超参数，通常要反复试验才能找到合适的初值和衰减时间表，代价很高。 不让学习率单调下降，而是在一个上下界之间周期性地来回变化（三角波），再用一次“线性增大学习率”的短实验估出上下界。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/clr.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/clr">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 优化器与学习率</div>
+<h1>循环学习率CLR</h1>
+<div class="full">Cyclical Learning Rates for Training Neural Networks</div>
+<div class="meta"><span>2015.06</span><span>论文</span><span>延伸</span><span>WACV 2017</span><span>Leslie N. Smith · 美国海军研究实验室</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1506.01186" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/clr">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>学习率是最重要的超参数，通常要反复试验才能找到合适的初值和衰减时间表，代价很高。</p></div><div><h4>方法</h4><p>不让学习率单调下降，而是在一个上下界之间周期性地来回变化（三角波），再用一次“线性增大学习率”的短实验估出上下界。</p></div><div><h4>影响</h4><p>PyTorch的CyclicLR直接以它命名；它提出的学习率范围测试后来成了fastai里“lr_find”的做法，也是作者后续<a class="ln" href="../n/super-convergence.html">超级收敛与One-Cycle</a>（One-Cycle）的起点。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>常规做法是选一个初始学习率，再按阶梯或指数让它逐渐变小。Smith观察到：让学习率在合理区间里周期性变大变小，准确率往往不降反升，而且省掉了调时间表的工作。</p><p>最简单的“三角”策略：设下界base_lr、上界max_lr、半周期stepsize（通常取2–10个epoch的迭代数），学习率在stepsize步内从base_lr线性升到max_lr，再线性降回，如此往复；变体有每个周期把振幅减半、或按指数衰减振幅。直观解释是：短暂地调大学习率能帮模型跳出鞍点附近的平坦区。</p><p>怎么定上下界：做一次“范围测试”，从很小的学习率开始，几个epoch内线性增大，记录准确率；准确率开始上升处取为下界，开始变差或震荡处取为上界。摘要报告在CIFAR-10/100上的ResNet、随机深度网络、DenseNet，以及ImageNet上的AlexNet、GoogLeNet上验证了这一方法，常常用更少的迭代达到更好的准确率。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>周期长度和振幅仍需人为设定，对大规模语言模型预训练并不常用，后者主流仍是预热加余弦或WSD一类时间表。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:48" href="../n/schedule-free.html">Schedule-Free优化</a></div></li><li>“跳出鞍点”的解释是经验性的，没有给出收敛分析。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/alexnet.html">AlexNet</a><span class="yr">2012.09 · 视觉</span><div class=nt>ImageNet实验对象之一（另有GoogLeNet，以及v6版本补充的ResNet、DenseNet）。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/momentum.html">动量法</a><span class="yr">1964 · 基础</span><div class=nt>实验中与带动量的SGD一起使用，后续工作还让动量与学习率反向循环。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/sgd.html">随机梯度下降</a><span class="yr">1951 · 基础</span><div class=nt>改的是SGD学习率随时间变化的方式，而不是更新方向。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/random-search-hpo.html">超参数随机搜索</a><span class="yr">2012.02 · 基础</span><div class=nt>随机搜索靠多次试验挑学习率，CLR改为在一次训练里让学习率在区间内循环，省掉大部分试验。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/schedule-free.html">Schedule-Free优化</a><span class="yr">2024.05 · 基础</span><div class=nt>周期长度和振幅仍需人为设定，对大规模语言模型预训练并不常用，后者主流仍是预热加余弦或WSD一类时间表。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/learning-rate.html">学习率与学习率调度</a> <a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="../c/hyperparameter.html">超参数与调参</a></p>
+<h2>本篇术语</h2><ul><li><b>学习率范围测试</b>　在一次短训练里让学习率从很小线性增大，看准确率或损失在哪段区间里改善最快，用来选学习率上下界。</li></ul>
+<h2>怎么学</h2><p>先理解<a class="ln" href="../n/sgd.html">随机梯度下降</a>和普通的阶梯衰减；读论文第3节的三角策略和范围测试；动手在CIFAR-10上用PyTorch的CyclicLR对比固定学习率与阶梯衰减。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1506.01186" rel="noopener">https://arxiv.org/abs/1506.01186</a>（标题、单一作者、arXiv v1 2015-06-03；摘要中周期性在上下界之间变化、线性增大学习率估计边界、CIFAR-10/100与ImageNet上的网络列表。三角策略的具体参数（stepsize取2–10个epoch）、WACV 2017、机构、与fastai lr_find的关系凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%BE%AA%E7%8E%AF%E5%AD%A6%E4%B9%A0%E7%8E%87CLR%EF%BC%88clr%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aclr%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/clr.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mc-dropout.html"><small>本分支上一个 · 2015.06</small><b>MC Dropout不确定性</b></a><a class="r" href="ladder-networks.html"><small>本分支下一个 · 2015.07</small><b>梯形网络半监督学习</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

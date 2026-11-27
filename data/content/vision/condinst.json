@@ -1,0 +1,30 @@
+{
+  "id": "condinst",
+  "who": "Zhi Tian, Chunhua Shen, Hao Chen · 阿德莱德大学",
+  "venue": "ECCV 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2003.05664"},
+    {"label": "代码（AdelaiDet）", "url": "https://github.com/aim-uofa/adet"}
+  ],
+  "aka": ["CondInst", "条件卷积实例分割", "conditional convolutions", "动态掩码头", "dynamic mask head"],
+  "problem": "[[mask-rcnn]]要先用RoIAlign把每个框里的特征裁出来、缩放到28×28再预测掩码，分辨率受限、边界粗糙，而且掩码头参数固定，只能靠裁剪来区分不同实例。",
+  "idea": "不裁剪特征，而是给每个实例“现生成”一个小掩码头：检测器在每个位置除了预测类别和框，还输出一组卷积参数；用这组参数在整张共享特征图上跑3层很窄的卷积，直接得到这个实例的全图掩码。",
+  "impact": "把实例分割做成完全不需要RoI操作的全卷积框架，精度超过调好的Mask R-CNN且推理更快；“为每个实例动态生成卷积核”与同期[[solo]]的后续版本一起，成为后来基于核和查询的分割方法的先声。",
+  "method": "CondInst以[[fcos]]为检测骨架。FCOS在特征金字塔的每个位置预测类别和到四条边的距离；CondInst再加一个“控制器”分支，在每个位置输出一个参数向量，把它重排成一个小网络的权重——摘要举的例子是3层卷积、每层只有8个通道，总共一百多个参数。\n\n另有一个共享的掩码分支，把[[fpn]]特征变成一张1/8分辨率的特征图。对某个实例，把它的参数装进小网络，输入是这张共享特征图再拼上“每个像素相对于该实例中心的坐标”，输出就是该实例在整张图上的掩码。因为参数是按实例生成的，网络本身就知道要分割哪一个，不需要裁剪框。\n\n摘要称在COCO上不需要延长训练就超过了几种近期方法和调好的Mask R-CNN基线，推理也更快，因为掩码头极小。同一时期的SOLOv2也把[[solo]]的掩码分支改成动态卷积核，两者思路相近。",
+  "limits": [
+    {"text": "每个实例仍由检测器的一个位置产生，需要NMS去重，语义和全景分割要另做。", "solved_by": ["k-net", "mask2former"]},
+    {"text": "掩码在1/8分辨率特征上预测，细小结构和边界仍不够精细，常需与[[pointrend]]式的逐点细化结合。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mask-rcnn", "type": "solves", "note": "Mask R-CNN依赖RoIAlign裁剪和固定28×28掩码；CondInst用按实例生成的卷积核在全图上预测，摆脱了裁剪。"},
+    {"to": "fcos", "type": "uses", "note": "以FCOS无锚框检测器为基础，在每个位置额外预测掩码头参数。"},
+    {"to": "solo", "type": "rivals", "note": "SOLO按网格位置区分实例并为每格输出一张掩码；CondInst按检测位置生成动态卷积核，两条路线后来都走向动态核。"},
+    {"to": "fpn", "type": "uses", "note": "检测在FPN各层进行，共享掩码特征也取自FPN。"}
+  ],
+  "prereq": ["vision-tasks", "conv-layer", "anchor-nms", "iou-map"],
+  "terms": [
+    {"t": "动态卷积（条件卷积）", "d": "卷积核的数值不是训练后固定的，而是由网络根据当前输入（这里是当前实例）临时算出来。"}
+  ],
+  "learn": "先理解FCOS的逐位置预测和Mask R-CNN的RoIAlign，再读本文第3节的控制器和掩码头；可在AdelaiDet里跑一次CondInst推理，打印某个实例生成的卷积参数形状。",
+  "check": {"source": "https://arxiv.org/abs/2003.05664", "confirmed": "arXiv记录：标题、三位作者、v1提交于2020-03-12；摘要中的动态实例感知网络、无需ROI裁剪与特征对齐、掩码头3层每层8通道、COCO上超过调好的Mask R-CNN且更快。ECCV 2020、以FCOS为骨架、相对坐标输入、1/8分辨率、参数量等细节凭一般了解写。"}
+}

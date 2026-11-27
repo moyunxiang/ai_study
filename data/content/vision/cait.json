@@ -1,0 +1,30 @@
+{
+  "id": "cait",
+  "who": "Hugo Touvron, Matthieu Cord, Alexandre Sablayrolles, Gabriel Synnaeve, Hervé Jégou · Facebook AI Research / 索邦大学",
+  "venue": "ICCV 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2103.17239"},
+    {"label": "代码", "url": "https://github.com/facebookresearch/deit"}
+  ],
+  "aka": ["CaiT", "Class-Attention in Image Transformers", "LayerScale", "类注意力", "class attention", "深层ViT"],
+  "problem": "[[vit]]和[[deit]]加深到二十多层以后精度就不再上涨，甚至训练不稳定；视觉Transformer“怎么优化得更深”几乎没人研究过。",
+  "idea": "两处结构改动：**LayerScale**给每个残差分支的输出乘一个按通道可学习、初始值很小的缩放系数，让深层网络一开始接近恒等映射、训练更稳；**类注意力**把分类token推迟到最后几层才加入，前面的层只让图块互相注意，后面几层只让分类token去读图块。",
+  "impact": "CaiT把视觉Transformer做到几十层且精度持续上涨，在不用额外数据的设置下取得ImageNet 86.5% top-1；LayerScale后来成为[[convnext]]、[[dinov2]]等大量模型的标准组件。",
+  "method": "**LayerScale**：残差块原本是 `x ← x + F(x)`。CaiT改成 `x ← x + diag(λ) · F(x)`，λ是每个通道一个的可学习向量，初始化为很小的数（深模型如1e-5或1e-6，浅一些的模型取0.1左右）。这样网络初始时每个块的贡献极小，深层叠加不会让信号爆炸；与之前只用一个标量缩放的做法相比，按通道缩放给了更多自由度。作者比较了几种稳定深层训练的方法（如Fixup、ReZero式的标量缩放），按通道的LayerScale效果最好。\n\n**类注意力（class-attention）**：ViT从第一层就把分类token和图块token放在一起做自注意力，分类token既要帮着处理图块，又要汇总全局信息，两个目标互相牵制。CaiT的前面若干层（如36层）只有图块token做自注意力；最后两层才插入分类token，并且只更新分类token：它作为查询去注意所有图块，图块本身不再变化。这部分计算量很小。\n\n训练沿用DeiT的数据增强和蒸馏。摘要称这些改动让模型性能不会随深度过早饱和，不用外部数据时ImageNet top-1达到86.5%，以更少的FLOPs和参数刷新当时最好结果；在ImageNet-ReaL和ImageNet-V2匹配频率版本上也取得无额外数据设置下的最好结果。",
+  "legacy": "LayerScale被[[convnext]]、[[dinov2]]、[[eva]]等广泛采用，成为训练大型视觉骨干的常用稳定化技巧；“分类token晚加入”的类注意力思想也出现在后来的注意力池化头里。",
+  "limits": [
+    {"text": "深度带来的精度提升伴随较高的推理延迟，高分辨率下全局注意力的计算量仍随token数平方增长。", "solved_by": ["swin-v2"]}
+  ],
+  "relations": [
+    {"to": "deit", "type": "extends", "note": "同一团队在DeiT的训练方案上把视觉Transformer加深，解决加深后精度饱和的问题。"},
+    {"to": "vit", "type": "solves", "note": "ViT加深后训练不稳、精度饱和；LayerScale与类注意力让几十层的模型仍能持续变好。"},
+    {"to": "resnet", "type": "uses", "note": "LayerScale作用在残差分支上，延续“深网络初始时接近恒等映射”的残差网络思想。"}
+  ],
+  "prereq": ["residual-connection", "self-attention", "transformer-block", "initialization", "vanishing-exploding"],
+  "terms": [
+    {"t": "LayerScale", "d": "给每个残差分支的输出乘一组按通道、初值很小的可学习系数，让很深的网络更容易训练。"},
+    {"t": "分类token", "d": "ViT额外加入的一个可学习token，最后用它的输出做图像分类。"}
+  ],
+  "learn": "先读DeiT和ViT的结构，再读CaiT第2节LayerScale与几种替代方案的对比，以及第3节类注意力；在timm里找到LayerScale的实现，把λ初值改大后训练一个小模型，观察是否发散。",
+  "check": {"source": "https://arxiv.org/abs/2103.17239", "confirmed": "arXiv记录：标题、五位作者、v1提交于2021-03-31；摘要中构建并优化更深的图像Transformer、研究结构与优化的相互作用、两处结构改动显著提升深层模型精度、性能不随深度过早饱和、无外部数据ImageNet 86.5% top-1、以更少FLOPs与参数刷新SOTA、ImageNet-ReaL与ImageNet-V2匹配频率上无额外数据最好。LayerScale与类注意力的具体形式、初值、层数、对比方法、ICCV 2021凭一般了解写。"}
+}

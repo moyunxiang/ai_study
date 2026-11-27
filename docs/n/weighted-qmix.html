@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Weighted QMIX加权分解（2020） · AI脉络</title>
+<meta name="description" content="只能表示对个体Q值单调的团队Q值；当一个智能体的最优动作取决于队友选什么时，它学出的分散策略可能连最优解都找不到，即使给它真实的最优Q值也不行。 把QMIX看成“先算Q学习目标、再投影到单调函数空间”的算子，指出问题出在投影时所有联合动作等权；改成加权投影，把更大权重放在更好的联合动作上，证明这样…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/weighted-qmix.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Weighted QMIX加权分解（2020）">
+<meta property="og:description" content="只能表示对个体Q值单调的团队Q值；当一个智能体的最优动作取决于队友选什么时，它学出的分散策略可能连最优解都找不到，即使给它真实的最优Q值也不行。 把QMIX看成“先算Q学习目标、再投影到单调函数空间”的算子，指出问题出在投影时所有联合动作等权；改成加权投影，把更大权重放在更好的联合动作上，证明这样…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/weighted-qmix.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/weighted-qmix">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 多智能体与电子游戏</div>
+<h1>Weighted QMIX加权分解</h1>
+<div class="full">Weighted QMIX: Expanding Monotonic Value Function Factorisation for Deep Multi-Agent Reinforcement Learning</div>
+<div class="meta"><span>2020.06</span><span>论文</span><span>延伸</span><span>NeurIPS 2020</span><span>Tabish Rashid, Gregory Farquhar, Bei Peng, Shimon Whiteson · 牛津大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2006.10800" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/weighted-qmix">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/qmix.html">QMIX值分解</a>只能表示对个体Q值单调的团队Q值；当一个智能体的最优动作取决于队友选什么时，它学出的分散策略可能连最优解都找不到，即使给它真实的最优Q值也不行。</p></div><div><h4>方法</h4><p>把QMIX看成“先算Q学习目标、再投影到单调函数空间”的算子，指出问题出在投影时所有联合动作等权；改成加权投影，把更大权重放在更好的联合动作上，证明这样能恢复正确的最优动作。</p></div><div><h4>影响</h4><p>用算子与投影的视角解释了单调值分解到底在优化什么、为什么会失败，并给出可扩展的修正（CW-QMIX、OW-QMIX），是理解值分解表示能力的常被引用的分析。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/qmix.html">QMIX值分解</a>用一个非负权重的混合网络把各智能体的 <code>Q_i</code> 合成团队的 <code>Q_tot</code>，单调性保证了各自取argmax就是联合argmax，所以能分散执行，在<a class="ln" href="../n/smac.html">星际多智能体挑战SMAC</a>上效果很好。但单调性也限制了能表示的函数：如果“我该走左还是右”取决于队友怎么走，单调混合就表示不出来。<a class="ln" href="../n/qtran.html">QTRAN变换分解</a>试图用更宽的约束绕开这一点，但在复杂任务上不稳定。问题是：QMIX失败时到底错在哪里，能不能在保留单调结构的前提下修好？</p><h2>方法</h2><p>作者把QMIX的一次更新写成 <code>Q_tot ← Π_qmix 𝒯* Q</code>：<code>𝒯*</code> 是普通的Bellman最优算子，<code>Π_qmix</code> 是投影——在所有单调可表示的函数里找一个使 <code>Σ_u w(s,u)·(y(s,u) − Q_tot(s,u))²</code> 最小的，其中y是目标值。原始QMIX相当于 <code>w ≡ 1</code>：所有联合动作同等重要。在表格情形他们证明，这种等权投影可能把最优联合动作的值压低到别的动作之下，因而即使目标是真正的 <code>Q*</code> 也恢复不出最优策略。</p><p>修正办法是加权：对“看起来更好”的联合动作权重为1，其余取一个小常数 <code>α∈(0,1]</code>。两种具体方案：中心加权（CW）——当联合动作是当前贪心动作、或其目标值高于贪心动作的估计值时权重为1；乐观加权（OW）——当 <code>Q_tot</code> 低估了目标值时权重为1。作者证明两种加权都能恢复正确的最大值动作。为计算目标值，另外学一个不受单调约束的联合Q估计 <code>Q̂*</code>，它只在训练中使用。</p><h2>结果</h2><p>摘要称，在捕食者-猎物和星际多智能体任务上，CW-QMIX与OW-QMIX比QMIX表现更好。</p><h2>后来的发展</h2><p>与<a class="ln" href="../n/qtran.html">QTRAN变换分解</a>、<a class="ln" href="../n/qplex.html">QPLEX对偶值分解</a>一起构成了“值分解能表示什么、该怎么扩展”的讨论；此后<a class="ln" href="../n/mappo.html">MAPPO</a>等工作指出，在实践中网络结构、超参数和实现细节同样会左右这些方法的排名。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要额外学习一个不受约束的联合Q估计来算目标，增加了网络和调参负担，权重α也需要按任务调。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>最优性保证只在表格情形下严格成立，函数近似下加权投影是否仍能找到最优动作没有保证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/q-learning.html">Q-learning</a><span class="yr">1992 · RL</span><div class=nt>整个分析基于Q学习的Bellman最优算子与投影的组合。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/qmix.html">QMIX值分解</a><span class="yr">2018.03 · RL</span><div class=nt>QMIX的等权投影可能恢复不出最优联合动作；加权投影把权重放在更好的联合动作上修正了这一点。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/smac.html">星际多智能体挑战SMAC</a><span class="yr">2019.02 · RL</span><div class=nt>在星际多智能体挑战上评估可扩展版本。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/qtran.html">QTRAN变换分解</a><span class="yr">2019.05 · RL</span><div class=nt>QTRAN放松结构、用软约束对齐个体与联合Q值；Weighted QMIX保留单调结构，只改变投影的权重。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/bellman-equation.html">Bellman方程</a> <a class="chip c" href="../c/policy-value.html">策略与价值函数</a> <a class="chip c" href="../c/td-error.html">时序差分与自举</a> <a class="chip c" href="../c/credit-assignment.html">信用分配</a> <a class="chip c" href="../c/loss-function.html">损失函数</a></p>
+<h2>本篇术语</h2><ul><li><b>投影</b>　在一个受限的函数集合里，找离目标函数最近（按某种加权误差）的那个函数；函数近似下的Q学习每一步都在做这样的近似。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/qmix.html">QMIX值分解</a>；用一个3×3的合作矩阵博弈，手算等权最小二乘拟合单调函数后的argmax，再改成加权拟合对比；然后读原文第4节的算子分析。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2006.10800" rel="noopener">https://arxiv.org/abs/2006.10800</a>（标题、四位作者、arXiv v1于2020-06-18；摘要中QMIX单调混合限制、把QMIX视为先算目标再投影的算子、等权投影即使有Q*也可能恢复不出最优策略、引入加权并证明两种加权方案能恢复正确最大动作、CW-QMIX与OW-QMIX、捕食者-猎物与星际任务上表现更好。两种加权的具体规则与α按原文正文通行描述；NeurIPS 2020、牛津按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Weighted%20QMIX%E5%8A%A0%E6%9D%83%E5%88%86%E8%A7%A3%EF%BC%88weighted-qmix%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aweighted-qmix%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/weighted-qmix.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="maia-chess.html"><small>本分支上一个 · 2020.06</small><b>Maia类人象棋</b></a><a class="r" href="crr.html"><small>本分支下一个 · 2020.06</small><b>CRR评论家正则化回归</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

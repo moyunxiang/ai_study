@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>ReMDM重掩码采样（2025） · AI脉络</title>
+<meta name="description" content="扩散模型的一大卖点是反复修正，但掩码离散扩散（MDLM等）里一个token一旦被解码出来就固定不变，即使它是错的也无法再改；多给采样步数，质量也很快饱和。 从一个带自定义“重掩码”反向过程的离散扩散模型推导出新的采样器：每一步不仅把一些[MASK]解码成词，也以概率σ_t把已经解码的词重新变回[M…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/remdm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ReMDM重掩码采样（2025）">
+<meta property="og:description" content="扩散模型的一大卖点是反复修正，但掩码离散扩散（MDLM等）里一个token一旦被解码出来就固定不变，即使它是错的也无法再改；多给采样步数，质量也很快饱和。 从一个带自定义“重掩码”反向过程的离散扩散模型推导出新的采样器：每一步不仅把一些[MASK]解码成词，也以概率σ_t把已经解码的词重新变回[M…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/remdm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/remdm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 非自回归与扩散</div>
+<h1>ReMDM重掩码采样</h1>
+<div class="full">Remasking Discrete Diffusion Models with Inference-Time Scaling</div>
+<div class="meta"><span>2025.03</span><span>论文</span><span>延伸</span><span>NeurIPS 2025</span><span>Guanghan Wang, Yair Schiff, Subham Sekhar Sahoo, Volodymyr Kuleshov · 康奈尔大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2503.00307" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://guanghanwang.com/remdm" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/remdm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>扩散模型的一大卖点是反复修正，但掩码离散扩散（MDLM等）里一个token一旦被解码出来就固定不变，即使它是错的也无法再改；多给采样步数，质量也很快饱和。</p></div><div><h4>方法</h4><p>从一个带自定义“重掩码”反向过程的离散扩散模型推导出新的采样器：每一步不仅把一些[MASK]解码成词，也以概率σ_t把已经解码的词重新变回[MASK]，让模型有机会改正。它直接用于已训练好的掩码扩散模型，不需要重新训练。</p></div><div><h4>影响</h4><p>让掩码扩散模型第一次有了“步数越多、质量越好”的推理时计算扩展：步数足够时生成文本质量接近自回归模型，算力受限时也更能保持质量；重掩码思路随后在扩散语言模型的采样研究中被广泛跟进。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/mdlm.html">掩码扩散语言模型MDLM</a>、<a class="ln" href="../n/md4.html">MD4简化掩码扩散</a>、<a class="ln" href="../n/sedd.html">离散扩散语言模型SEDD</a>等掩码（吸收态）离散扩散模型的前向过程逐步把token换成[MASK]，<code>q(z_t | x) = Cat(α_t x + (1−α_t) m)</code>，α_t从1降到0。标准的反向过程中，若 <code>z_t ≠ m</code>（已解码），则 <code>z_s = z_t</code> 保持不变——这正是“不能修改”的来源。</p><p><b>ReMDM反向过程</b>：作者构造了一族与原前向边缘分布一致的反向过程，引入重掩码概率σ_t：</p><ul><li>若 <code>z_t ≠ m</code>：<code>q_σ(z_s | z_t, x) = Cat((1−σ_t)·x + σ_t·m)</code>，即以概率σ_t把已解码的词重新掩掉；</li><li>若 <code>z_t = m</code>：解码为x与保持掩码的概率相应调整，使得边缘分布 <code>q(z_s|x)</code> 不变。</li></ul><p>σ_t=0时退化为MDLM原来的采样器。由于该过程的负ELBO与MDLM只差一个与σ有关的加权，预训练好的掩码扩散模型可以直接用作其去噪网络x_θ，无需重训。作者给出几种σ_t的调度方式：常数上限、随时间变化的退火调度，以及按模型置信度决定哪些词更该被重掩码（低置信度的先掩）。</p><p>结果：摘要称增加采样步数时，ReMDM生成的自然语言质量逐步接近自回归模型；算力有限时也比原采样器更好地保持质量。它同样提升了离散化图像的掩码扩散模型的样本质量；在分子设计等科学任务中，ReMDM便于做扩散引导，在可控性上优于经典的掩码扩散和均匀噪声扩散。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>重掩码引入额外的超参数（σ_t上限、调度、开始重掩码的时刻），最优设置依任务和步数而变，缺少统一的选择准则。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>要接近自回归质量需要很多采样步，抵消了扩散模型并行生成的速度优势；论文实验主要在OpenWebText规模的小模型上进行，在数十亿参数的扩散大语言模型上的效果需要另行验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/sedd.html">离散扩散语言模型SEDD</a><span class="yr">2023.10 · LLM</span><div class=nt>SEDD等也研究离散扩散的采样，ReMDM强调推理时增加步数带来的持续提升。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/token-ordering-mdm.html">掩码扩散的解码顺序</a><span class="yr">2025.02 · LLM</span><div class=nt>按置信度贪心选择位置每步只能看局部信息，可能过早确定错误的词且无法撤回。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/insertion-transformer.html">Insertion Transformer</a><span class="yr">2019.02 · LLM</span><div class=nt>插入式与掩码式并行生成都存在“写下就不能改”的问题，ReMDM给出掩码扩散中的修正机制。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/d3pm.html">离散扩散D3PM</a><span class="yr">2021.07 · LLM</span><div class=nt>在D3PM的离散扩散框架下，比较掩码噪声与均匀噪声在引导与可控性上的差别。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/mdlm.html">掩码扩散语言模型MDLM</a><span class="yr">2024.06 · LLM</span><div class=nt>MDLM采样器中已解码的token无法再修改，ReMDM引入重掩码让模型改错，且可直接复用MDLM预训练模型。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/md4.html">MD4简化掩码扩散</a><span class="yr">2024.06 · LLM</span><div class=nt>同属吸收态掩码扩散，ReMDM推广其反向过程为带重掩码的一族过程。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/elbo.html">变分推断与ELBO</a> <a class="chip c" href="../c/markov-chain.html">马尔可夫性与马尔可夫链</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a></p>
+<h2>本篇术语</h2><ul><li><b>吸收态（absorbing state）</b>　离散扩散中的[MASK]状态：前向过程中token一旦变成[MASK]就一直保持，反向过程从全[MASK]开始逐步还原。</li><li><b>推理时计算扩展</b>　不改模型参数，只增加生成时的计算（步数、采样次数），换取更好的输出质量。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/mdlm.html">掩码扩散语言模型MDLM</a>理解掩码扩散的前向与反向过程；读原文第3节ReMDM反向过程的推导和σ_t调度；动手：在开源MDLM检查点上实现ReMDM采样，画出生成困惑度或MAUVE随步数的变化，与原采样器对比。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2503.00307" rel="noopener">https://arxiv.org/abs/2503.00307</a>（标题、4位作者、arXiv v1提交日2025-03-01；摘要中现代掩码离散扩散一旦生成token就不能再更新、提出可原则性地用于预训练掩码扩散模型的ReMDM采样器、源于带自定义重掩码反向过程的离散扩散模型、带来推理时计算扩展、步数增加时接近自回归质量而预算有限时更好保持质量、改进离散化图像、分子设计中便于引导并推进可控性帕累托前沿。反向过程公式、σ_t调度方式、负ELBO关系、NeurIPS 2025为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ReMDM%E9%87%8D%E6%8E%A9%E7%A0%81%E9%87%87%E6%A0%B7%EF%BC%88remdm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aremdm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/remdm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="forgetting-transformer.html"><small>本分支上一个 · 2025.03</small><b>遗忘Transformer FoX</b></a><a class="r" href="gemini-2.5.html"><small>本分支下一个 · 2025.03</small><b>Gemini 2.5 Pro</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

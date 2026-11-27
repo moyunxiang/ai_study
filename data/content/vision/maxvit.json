@@ -1,0 +1,30 @@
+{
+  "id": "maxvit",
+  "who": "Zhengzhong Tu, Hossein Talebi, Han Zhang, Feng Yang, Peyman Milanfar, Alan Bovik, Yinxiao Li · Google Research / 得克萨斯大学奥斯汀分校",
+  "venue": "ECCV 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2204.01697"},
+    {"label": "代码", "url": "https://github.com/google-research/maxvit"}
+  ],
+  "aka": ["MaxViT", "多轴注意力", "Multi-Axis Attention", "块注意力", "block attention", "网格注意力", "grid attention"],
+  "problem": "全局自注意力的计算量随图像尺寸平方增长，所以[[swin]]只在局部窗口里算注意力，[[coatnet]]在高分辨率阶段干脆只用卷积，结果网络前半段都“看不到全局”。",
+  "idea": "把注意力拆成两步：先在不重叠的局部小块内做注意力（块注意力），再在一个稀疏的全局网格上做注意力（网格注意力，相当于空洞地间隔取点）。两步都只有线性复杂度，合起来每一层都同时有局部和全局交互。",
+  "impact": "MaxViT不用额外数据时ImageNet-1K达到86.5% top-1，用ImageNet-21K预训练达到88.7%；多轴注意力也被用于图像复原、生成等需要高分辨率全局交互的任务。",
+  "method": "设特征图为 `H×W×C`，窗口大小为P（如7）：\n\n- **块注意力**：把特征图切成 `(H/P)×(W/P)` 个 `P×P` 的小块，每块内部做自注意力，捕捉局部关系，与Swin的窗口注意力相同。\n- **网格注意力**：换一种分组：用固定的 `G×G` 网格（G=P）把图划开，每组由在整张图上间隔 `H/G`、`W/G` 均匀取出的 `G×G` 个位置组成，组内做注意力。这些位置分散在全图，因此一次就能交换远距离信息，相当于“空洞”的全局注意力。\n\n两种注意力的每组token数都固定为 `P²`，总计算量随像素数线性增长，在任意分辨率下都能用。\n\n一个MaxViT块依次是MBConv卷积（提供局部性和隐式位置信息）、块注意力、网格注意力，各自配前馈层。整个网络像CNN一样分多个阶段逐级降分辨率，只需重复这一个基本块。\n\n摘要报告：不用额外数据ImageNet-1K top-1为86.5%，ImageNet-21K预训练后为88.7%；作为骨干在目标检测和视觉美学评估上表现良好，并在ImageNet上展示了较强的生成建模能力。",
+  "legacy": "多轴注意力被同组用于图像复原（MAXIM）等低层视觉任务，也出现在一些扩散生成模型的骨干里；分类骨干方面，2022年后朴素ViT加大规模预训练（[[eva]]、[[dinov2]]）与现代卷积网络（[[convnext]]、[[convnext-v2]]）成为更常见的选择。",
+  "limits": [
+    {"text": "块和网格划分要求特征图尺寸能被窗口整除，需要填充；多次重排张量在硬件上实际速度不如理论计算量好看。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "coatnet", "type": "solves", "note": "CoAtNet高分辨率阶段只用卷积、看不到全局；MaxViT的多轴注意力是线性复杂度，在每个阶段都能做全局交互。"},
+    {"to": "swin", "type": "extends", "note": "块注意力沿用Swin的窗口注意力，再用网格注意力代替移位窗口来跨窗口交换信息。"},
+    {"to": "vit", "type": "extends", "note": "在ViT的自注意力框架上改造注意力的分组方式，使其可用于任意分辨率的层级骨干。"},
+    {"to": "cvt", "type": "rivals", "note": "同属卷积与注意力混合骨干：CvT在注意力投影里用卷积，MaxViT在每块前放MBConv并改用多轴注意力。"}
+  ],
+  "prereq": ["self-attention", "efficient-attention", "conv-layer", "image-patch", "big-o"],
+  "terms": [
+    {"t": "网格注意力", "d": "在整张图上等间隔取一组位置放在一起做注意力，用固定的计算量交换远距离信息。"}
+  ],
+  "learn": "先读Swin的窗口注意力，再读MaxViT第3节块注意力与网格注意力的示意图；用einops在PyTorch里写出两种重排，打印每组token对应原图的哪些位置。",
+  "check": {"source": "https://arxiv.org/abs/2204.01697", "confirmed": "arXiv记录：标题、七位作者、v1提交于2022-04-04；摘要中自注意力随图像尺寸的可扩展性问题、多轴注意力由分块局部与空洞全局注意力组成、任意分辨率线性复杂度、与卷积结合的层级骨干、早期高分辨率阶段也能全局“看”、无额外数据86.5%与ImageNet-21K预训练88.7% top-1、检测与美学评估、生成建模能力。P=G=7、块内MBConv-块注意力-网格注意力顺序、ECCV 2022、机构凭一般了解写。"}
+}

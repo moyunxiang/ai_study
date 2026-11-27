@@ -1,0 +1,29 @@
+{
+  "id": "online-dt",
+  "who": "Qinqing Zheng, Amy Zhang, Aditya Grover · Meta AI / UC Berkeley / UCLA",
+  "venue": "ICML 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2202.05607"}
+  ],
+  "problem": "Decision Transformer把离线RL改写成序列预测，但只会模仿离线数据；拿到环境后想继续在线微调，单纯的自回归模仿既不探索也不知道往哪改进。",
+  "idea": "在线阶段让模型自己与环境交互收集轨迹，把轨迹按真实回报重新标注后放回回放池继续做序列建模；用序列级的熵正则代替确定性输出，鼓励探索。",
+  "impact": "第一个系统把Decision Transformer推向“离线预训练+在线微调”的工作（ODT），后续序列模型RL的在线化工作普遍拿它对比。",
+  "method": "[[decision-transformer]]以“目标回报、状态、动作”交错的序列为输入，预测下一个动作；测试时给一个想要的高回报，模型就模仿数据里能得到这个回报的行为。它的问题是：在线微调时没有任何机制让它去尝试新的动作。\n\nODT做了三处改动：\n\n- **随机策略**：把输出从确定性动作换成高斯分布，训练目标变成最大化数据动作的对数似然；\n- **序列级熵约束**：要求整条序列上策略的平均熵不低于一个下限，用拉格朗日乘子自动调节，类似[[sac]]的自动温度，但作用在整段序列上；\n- **轨迹级回放与事后重标注**：在线采集的整条轨迹进入回放池，用它实际得到的回报重新计算每一步的“剩余回报”标签，这与[[her]]的事后重标注思路相近。\n\n这样同一个Transformer在离线和在线阶段用同一个目标训练。摘要称ODT在D4RL上的绝对性能与当时最好方法相当，但在微调过程中带来的提升大得多。",
+  "limits": [
+    {"text": "在线阶段仍是监督式模仿自己采到的高回报轨迹，没有价值函数做信用分配，在随机性强的环境里会把运气当成能力。"},
+    {"text": "测试时需要人为指定初始目标回报，设得太高或太低都会影响行为。"}
+  ],
+  "relations": [
+    {"to": "decision-transformer", "type": "extends", "note": "在DT上加入随机策略、熵约束和在线回放，实现在线微调。"},
+    {"to": "sac", "type": "uses", "note": "借鉴SAC的自动温度调节，把熵下限约束用在序列级别。"},
+    {"to": "her", "type": "uses", "note": "在线轨迹按实际回报重新标注回报条件，与事后重标注同理。"},
+    {"to": "iql", "type": "rivals", "note": "IQL是当时离线转在线的主要基线；ODT走纯序列建模路线。"}
+  ],
+  "prereq": ["offline-rl", "autoregressive", "entropy", "transformer-block"],
+  "terms": [
+    {"t": "回报条件（return-to-go）", "d": "从当前步到结束还要得到的累计奖励，作为输入告诉模型想要多好的结果。"}
+  ],
+  "learn": "先读[[decision-transformer]]；读ODT原文第3节的熵约束和回放机制；在D4RL的antmaze上比较DT与ODT微调前后的回报。",
+  "check": {"source": "https://arxiv.org/abs/2202.05607", "confirmed": "标题、三位作者、arXiv v1于2022-02-11；摘要中离线RL作为序列建模、实际应用需要在线微调、ODT融合离线预训练与在线微调、序列级熵正则与自回归目标、D4RL上绝对性能有竞争力且微调提升更显著。高斯策略、拉格朗日调节与重标注的细节按原文正文通行描述；ICML 2022与单位按通行引用。"},
+  "aka": ["ODT", "Online DT", "在线Decision Transformer", "在线决策Transformer"]
+}

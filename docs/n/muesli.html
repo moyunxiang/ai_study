@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Muesli策略优化（2021） · AI脉络</title>
+<meta name="description" content="在Atari上最强，但每走一步都要做几十次模型内的树搜索，计算贵、实现复杂；无模型的策略优化方法快，分数却明显落后。搜索带来的收益里，有多少其实来自「学模型」这件事本身？ Muesli不在行动时搜索：它直接用策略网络选动作，但把MuZero式的模型学习当作辅助损失，并用一个带截断优势的正则化目标（…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/muesli.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Muesli策略优化（2021）">
+<meta property="og:description" content="在Atari上最强，但每走一步都要做几十次模型内的树搜索，计算贵、实现复杂；无模型的策略优化方法快，分数却明显落后。搜索带来的收益里，有多少其实来自「学模型」这件事本身？ Muesli不在行动时搜索：它直接用策略网络选动作，但把MuZero式的模型学习当作辅助损失，并用一个带截断优势的正则化目标（…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/muesli.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/muesli">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 策略梯度与演员评论家</div>
+<h1>Muesli策略优化</h1>
+<div class="full">Muesli: Combining Improvements in Policy Optimization</div>
+<div class="meta"><span>2021.04</span><span>论文</span><span>延伸</span><span>ICML 2021</span><span>Matteo Hessel, Ivo Danihelka, Fabio Viola, Arthur Guez, Simon Schmitt, Laurent Sifre, Theophane Weber, David Silver, Hado van Hasselt · DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2104.06159" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/muesli">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/muzero.html">MuZero</a>在Atari上最强，但每走一步都要做几十次模型内的树搜索，计算贵、实现复杂；无模型的策略优化方法快，分数却明显落后。搜索带来的收益里，有多少其实来自「学模型」这件事本身？</p></div><div><h4>方法</h4><p>Muesli不在行动时搜索：它直接用策略网络选动作，但把MuZero式的模型学习当作辅助损失，并用一个带截断优势的正则化目标（CMPO）更新策略，在Atari上追平MuZero，而速度接近无模型基线。</p></div><div><h4>影响</h4><p>说明MuZero的大部分好处可以在不做深度搜索的情况下拿到，成为「策略优化＋模型辅助损失」路线的代表；它的CMPO更新和组合式设计也被后续大规模智能体研究借用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>Muesli的策略损失由两部分组成。</p><p><b>正则化策略优化</b>：先用价值网络（以及学到的模型做一步展开）估计每个动作的优势 <code>Â(s,a)</code>，构造一个目标分布 <code>π_CMPO(a|s) ∝ π_prior(a|s)·exp(clip(Â(s,a), −c, c))</code>，其中π_prior是一个缓慢更新的目标策略。优势被截断在[−c, c]之内，这保证了π_CMPO与π_prior的KL散度有一个与环境奖励尺度无关的上界——这是对<a class="ln" href="../n/mpo.html">MPO</a>的改造（CMPO = clipped MPO），省去了MPO里需要求解温度的步骤。策略网络一方面最大化带优势的策略梯度项，一方面最小化与π_CMPO的KL，二者合起来既能利用离策略数据，又不会一次走太远。</p><p><b>模型作为辅助损失</b>：和MuZero一样学一个隐空间模型，从当前隐状态出发按实际动作展开几步，要求每一步预测的奖励、价值和策略与真实数据一致。模型不用于搜索，只用来塑造表示、并帮助估计多步的优势和价值。</p><p>其他组件包括回报的归一化、Retrace式的离策略价值目标等。摘要称，Muesli在Atari上达到了MuZero的最先进水平，但不做深度搜索，直接用策略网络行动，计算速度与无模型基线相当；论文还给出大量消融，以及连续控制和9×9围棋上的结果。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>组件很多（CMPO、模型损失、回报归一化、离策略修正），各部分对最终结果的贡献依赖细致的消融，复现门槛高。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>不做搜索，在围棋等需要深度前瞻的任务上仍不如带MCTS的方法。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/muzero.html">MuZero</a><span class="yr">2019.11 · RL</span><div class=nt>沿用MuZero的模型学习，但只当辅助损失，行动时不做树搜索；在Atari上追平MuZero而计算便宜得多。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/popart.html">PopArt自适应目标归一化</a><span class="yr">2016.02 · RL</span><div class=nt>与DeepMind同期的大规模智能体一样对回报做尺度归一化，以便跨游戏使用同一组超参。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/retrace.html">Retrace离策略修正</a><span class="yr">2016.06 · RL</span><div class=nt>价值和优势估计使用Retrace式的离策略多步目标。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/mpo.html">MPO</a><span class="yr">2018.06 · RL</span><div class=nt>CMPO是对MPO目标分布的改造：截断优势使KL有与奖励尺度无关的上界，不必求解温度。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/v-mpo.html">V-MPO同策略MPO</a><span class="yr">2019.09 · RL</span><div class=nt>同属DeepMind的正则化策略迭代路线，Muesli改为可用离策略数据并加入模型辅助损失。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/model-based-rl.html">基于模型的强化学习</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a></p>
+<h2>本篇术语</h2><ul><li><b>CMPO</b>　clipped MPO：用截断后的优势对先验策略做指数加权得到的目标策略分布。</li><li><b>辅助损失</b>　不直接服务于主目标、但能帮网络学到更好表示的额外训练任务。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/muzero.html">MuZero</a>和<a class="ln" href="../n/mpo.html">MPO</a>；读原文第3–4节CMPO的定义和KL上界，再看消融图；在一个小离散动作任务上实现CMPO目标，比较不同截断c的稳定性。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2104.06159" rel="noopener">https://arxiv.org/abs/2104.06159</a>（标题、九位作者、arXiv v1于2021-04-13；摘要中结合正则化策略优化与模型学习辅助损失、Atari上追平MuZero、不用深度搜索而直接用策略网络行动、计算速度与无模型基线相当、大量消融以及连续控制与9×9围棋结果。CMPO公式与KL上界、Retrace目标与回报归一化等组件按原文正文的通行描述；ICML 2021按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Muesli%E7%AD%96%E7%95%A5%E4%BC%98%E5%8C%96%EF%BC%88muesli%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amuesli%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/muesli.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="muzero-unplugged.html"><small>本分支上一个 · 2021.04</small><b>MuZero Unplugged与重分析</b></a><a class="r" href="reward-is-enough.html"><small>本分支下一个 · 2021.05</small><b>《Reward is Enough》</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

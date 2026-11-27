@@ -1,0 +1,28 @@
+{
+  "id": "rho-1",
+  "who": "Zhenghao Lin, Zhibin Gou, Yeyun Gong, Xiao Liu, Yelong Shen, Ruochen Xu, Chen Lin, Yujiu Yang 等 · 厦门大学、清华大学、微软",
+  "venue": "NeurIPS 2024 Oral",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2404.07965"}],
+  "aka": ["Rho-1", "RHO-1", "Not All Tokens Are What You Need", "选择性语言建模", "SLM", "Selective Language Modeling", "token级数据选择"],
+  "problem": "预训练对语料里每个token一视同仁地算下一词预测损失，但很多token是噪声或早已学会的，白白消耗算力。",
+  "idea": "先用高质量数据训一个参考模型，给每个token打分，只对“参考模型认为该学、当前模型还没学会”的token计算损失。",
+  "impact": "在数学语料上续训，用约3%的预训练token就追平了DeepSeekMath；把数据筛选从文档级细化到token级。",
+  "background": "此前的数据工作（如[[textbooks]]、[[doremi]]）都在文档或数据源层面挑选，选中的文档里每个token仍然全部参与训练。作者分析训练动态发现，token的损失曲线分成几类：有的一直很低（已学会），有的一直很高且波动（多为噪声），只有一部分是从高到低、真正在被学习的。",
+  "method": "选择性语言建模（SLM）分三步：\n\n1. 用一小份高质量数据训练**参考模型**（RM），它代表“想要的分布”。\n2. 对预训练语料里的每个token计算**超额损失** `ΔL(x_i) = L_θ(x_i) − L_RM(x_i)`，即当前模型比参考模型差多少。\n3. 每个批次只保留超额损失最高的前k%个token参与反向传播，其余token的损失被屏蔽：\n\n`L_SLM = −(1/(N·k%)) Σ_i I_{k%}(x_i) · log P_θ(x_i | x_{<i})`\n\n直觉是：参考模型也学不会的token多半是噪声，当前模型早已学会的token再学没有价值，差距大的才最值得学。",
+  "results": "摘要报告：在150亿token的[[openwebmath]]上续训，Rho-1在9个数学任务上的少样本准确率最多提升30个百分点；微调后Rho-1-1B和7B在MATH上分别达到40.6%和51.8%，与DeepSeekMath相当而只用了其3%的预训练token；在800亿通用token上续训，15个任务平均提升6.8%。",
+  "legacy": "它让“不是所有token都值得学”成为常被引用的观点，入选NeurIPS 2024口头报告，后续不少token级加权、筛选的预训练与蒸馏方法以它为基线。",
+  "limits": [
+    {"text": "需要先训练一个参考模型，并且对每个token额外做一次前向打分，增加了数据处理成本。", "solved_by": []},
+    {"text": "效果依赖参考数据的选择，参考模型的偏好会被直接放大到大规模预训练中。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "textbooks", "type": "extends", "note": "把“数据质量比数量重要”从文档级筛选细化到token级。"},
+    {"to": "doremi", "type": "rivals", "note": "DoReMi也用参考模型的超额损失，但用于调整数据源配比；Rho-1用于逐token取舍。"},
+    {"to": "openwebmath", "type": "uses", "note": "在OpenWebMath数学网页语料上续训验证。"},
+    {"to": "minillm", "type": "rivals", "note": "同样借助参考或教师模型改写训练目标，但Rho-1不做蒸馏，只决定哪些token参与损失。"}
+  ],
+  "prereq": ["language-model", "cross-entropy", "loss-function", "pretrain-finetune", "autoregressive"],
+  "terms": [{"t": "超额损失", "d": "当前模型在一个token上的损失减去参考模型在同一token上的损失，越大说明越“该学而没学会”。"}],
+  "learn": "先读[[doremi]]理解参考模型的用法；读Rho-1第2节token损失的四类动态；动手：在小语料上用一个参考模型给token打分，只训练前60%，对比全量训练的验证损失。",
+  "check": {"source": "https://arxiv.org/abs/2404.07965", "confirmed": "标题、作者、arXiv首次提交2024-04-11；摘要中SLM、参考模型打分、15B OpenWebMath续训9任务最多+30%、1B/7B在MATH上40.6%/51.8%、3%预训练token、80B通用token平均+6.8%；NeurIPS 2024 oral见paper copilot列表。损失公式写法与机构为一般了解。"}
+}

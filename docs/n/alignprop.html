@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>AlignProp奖励反传（2023） · AI脉络</title>
+<meta name="description" content="用DDPO、DPOK这类强化学习方法把扩散模型对齐到奖励函数，策略梯度估计方差很大，要很多次采样才能学到东西。 如果奖励函数可微（美学评分、图文相似度等），就把奖励的梯度端到端地沿整个去噪过程反向传播到模型参数；用LoRA和梯度检查点把显存压到可承受的范围。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/alignprop.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="AlignProp奖励反传（2023）">
+<meta property="og:description" content="用DDPO、DPOK这类强化学习方法把扩散模型对齐到奖励函数，策略梯度估计方差很大，要很多次采样才能学到东西。 如果奖励函数可微（美学评分、图文相似度等），就把奖励的梯度端到端地沿整个去噪过程反向传播到模型参数；用LoRA和梯度检查点把显存压到可承受的范围。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/alignprop.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/alignprop">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 可控生成与编辑</div>
+<h1>AlignProp奖励反传</h1>
+<div class="full">Aligning Text-to-Image Diffusion Models with Reward Backpropagation</div>
+<div class="meta"><span>2023.10</span><span>论文</span><span>延伸</span><span>Mihir Prabhudesai, Anirudh Goyal, Deepak Pathak, Katerina Fragkiadaki · 卡内基梅隆大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2310.03739" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://align-prop.github.io/" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/alignprop">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>用DDPO、DPOK这类强化学习方法把扩散模型对齐到奖励函数，策略梯度估计方差很大，要很多次采样才能学到东西。</p></div><div><h4>方法</h4><p>如果奖励函数可微（美学评分、图文相似度等），就把奖励的梯度端到端地沿整个去噪过程反向传播到模型参数；用LoRA和梯度检查点把显存压到可承受的范围。</p></div><div><h4>影响</h4><p>与几天前发布的DRaFT几乎同时确立了“直接反传奖励梯度”这条路线，在更少的训练步数里拿到更高奖励，成为可微奖励下扩散对齐的常用基线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>生成一张图要跑T步去噪，AlignProp把这整个过程当作一个可微的计算图：<code>x₀ = f_θ(x_T, z)</code>，奖励<code>r(x₀, z)</code>可微，于是直接用<code>∇_θ r</code>做梯度上升。难点是显存：保存所有步、所有层的中间激活对Stable Diffusion这类模型不可行。两项工程手段解决了它：只训练LoRA低秩适配器，参数和优化器状态小得多；对每一步的去噪网络使用梯度检查点，前向时不存激活、反传时重算。作者还发现只反传最后若干步的随机截断能进一步省显存并减轻刷分。</p><p>实验覆盖多种奖励：图文语义对齐、美学评分、可压缩性、控制图中物体个数，以及它们的组合。和强化学习方法相比，AlignProp在更少的训练步数内达到更高的奖励，方法本身也更简单。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只能用可微的奖励；文字是否写对、物体位置是否正确等需要不可微检测器的目标无法直接优化。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/flow-grpo.html">Flow-GRPO</a></div></li><li>直接优化奖励很容易刷分，画面风格趋同、多样性下降，需要早停或截断反传来控制。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/adjoint-matching.html">Adjoint Matching伴随匹配</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/lora.html">LoRA</a><span class="yr">2021.06 · 系统·效率</span><div class=nt>只微调LoRA参数，使穿过整条去噪链的反传在显存上可行。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/stable-diffusion.html">Stable Diffusion开源</a><span class="yr">2022.08 · 生成</span><div class=nt>实验以Stable Diffusion为底座。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/ddpo.html">扩散模型强化学习DDPO</a><span class="yr">2023.05 · 生成</span><div class=nt>DDPO的策略梯度方差大、样本效率低；对可微奖励直接反传梯度，用更少步数达到更高奖励。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/dpok.html">DPOK带KL的扩散RL</a><span class="yr">2023.05 · 生成</span><div class=nt>策略梯度只用终点奖励，方差大、需要大量采样，每条提示都要训练较长时间。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/draft.html">DRaFT奖励反传微调</a><span class="yr">2023.09 · 生成</span><div class=nt>几乎同时提出的同一思路；DRaFT更强调只回传最后K步与降方差变体，AlignProp强调随机截断与多奖励组合。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/controlnet-pp.html">ControlNet++一致性反馈</a><span class="yr">2024.04 · 生成</span><div class=nt>AlignProp靠截断回传降低完整采样链的开销；ControlNet++改为单步去噪近似。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/adjoint-matching.html">Adjoint Matching伴随匹配</a><span class="yr">2024.09 · 生成</span><div class=nt>直接优化奖励很容易刷分，画面风格趋同、多样性下降，需要早停或截断反传来控制。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/flow-grpo.html">Flow-GRPO</a><span class="yr">2025.05 · 生成</span><div class=nt>只能用可微的奖励；文字是否写对、物体位置是否正确等需要不可微检测器的目标无法直接优化。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/backpropagation.html">反向传播</a> <a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/reward-design.html">奖励设计与奖励投机</a> <a class="chip c" href="../c/peft-concept.html">参数高效微调</a> <a class="chip c" href="../c/rlhf-concept.html">人类反馈强化学习</a></p>
+<h2>本篇术语</h2><ul><li><b>梯度检查点</b>　前向时只保存少数节点的激活，反向传播时再重算需要的部分，用计算时间换显存。</li></ul>
+<h2>怎么学</h2><p>先读DDPO的RL做法和DRaFT → 读本文第3节显存优化与截断反传 → 用美学奖励在小分辨率扩散模型上比较截断步数的影响。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2310.03739" rel="noopener">https://arxiv.org/abs/2310.03739</a>（标题、四位作者、v1日期2023-10-05、摘要中RL方法梯度估计方差高、端到端反传奖励梯度穿过去噪过程、LoRA加梯度检查点降低显存、目标包括图文对齐、美学、可压缩性、物体个数及其组合、更少训练步达到更高奖励；机构、Stable Diffusion底座、随机截断反传来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20AlignProp%E5%A5%96%E5%8A%B1%E5%8F%8D%E4%BC%A0%EF%BC%88alignprop%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aalignprop%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/alignprop.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="diffusion-generalization.html"><small>本分支上一个 · 2023.10</small><b>扩散模型泛化与调和基</b></a><a class="r" href="add.html"><small>本分支下一个 · 2023.11</small><b>对抗扩散蒸馏SDXL Turbo</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

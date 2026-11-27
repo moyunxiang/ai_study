@@ -1,0 +1,36 @@
+{
+  "id": "distmult",
+  "who": "Bishan Yang, Wen-tau Yih, Xiaodong He, Jianfeng Gao, Li Deng · 康奈尔大学、微软研究院",
+  "venue": "ICLR 2015",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1412.6575"}
+  ],
+  "aka": ["DistMult", "双线性对角模型", "Bilinear-diag", "知识图谱补全", "Knowledge Graph Completion", "链接预测", "Link Prediction"],
+  "problem": "TransE、NTN等知识库嵌入模型各说各的，没有统一框架可比；而且实体和关系的向量学出来以后，除了补全三元组还能做什么并不清楚。",
+  "idea": "把实体看成向量、关系看成线性或双线性映射，统一了此前的模型；发现最简单的「对角双线性」打分 `f(h,r,t)=Σ h_i·r_i·t_i` 效果最好，并用学到的关系矩阵相乘来挖掘逻辑规则。",
+  "impact": "DistMult参数少、训练快，成了知识图谱补全里几乎每篇论文都要比的基线；它对称打分的缺陷直接催生了ComplEx。",
+  "background": "知识库（如[[freebase]]）由（头实体，关系，尾实体）三元组组成，但缺失大量事实。[[transe]]把关系当成向量空间里的平移 `h + r ≈ t`，NTN（神经张量网络）给每种关系配一个张量，表达力强但参数多。不同论文用不同数据、不同训练细节，很难判断到底是哪一部分起作用。",
+  "method": "作者把各种模型写成同一个两层结构：实体先映射成低维向量 `h、t`，关系再用一个打分函数把它们连起来。线性形式如TransE的 `−‖h + r − t‖`，双线性形式是 `hᵀ M_r t`（每个关系一个矩阵 `M_r`）。\n\n关键发现是：把 `M_r` 限制成**对角矩阵**（只保留对角线上的向量 `r`）几乎不损失效果，打分退化为三个向量逐元素相乘再求和：\n\n`f(h, r, t) = Σ_i h_i · r_i · t_i`\n\n训练时对每个正确三元组随机替换头或尾实体造负例，用间隔排序损失让正例得分高于负例。由于对角矩阵相乘仍是对角矩阵，两条关系的组合（「出生城市」接「所在国家」）可以用 `M_r1 · M_r2` 近似，作者据此从嵌入中抽取 Horn 规则（如出生城市∧城市所属国家⇒国籍）。\n\n这个打分对头尾是**对称**的：`f(h,r,t)=f(t,r,h)`，所以它无法区分「A是B的父亲」和「B是A的父亲」。",
+  "results": "摘要报告：在Freebase上，简单的双线性打分取得top-10准确率73.2%，TransE为54.7%；基于嵌入的规则挖掘在需要组合推理的Horn规则上优于基于置信度的规则挖掘方法。",
+  "legacy": "DistMult成了知识图谱嵌入的标准基线。[[complex]]把它推广到复数向量以处理非对称关系，[[conve]]则用卷积换掉逐元素乘法；后来的研究还发现，只要训练技巧（损失、负采样、正则）到位，DistMult在不少数据上依然很有竞争力。",
+  "limits": [
+    {"text": "打分函数对头尾实体对称，无法建模「父亲」「包含」这类反对称关系。", "solved_by": ["complex", "rotate"]},
+    {"text": "每个三元组单独打分，只用到实体自己的向量，无法利用多跳路径和文本描述等额外信息。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "transe", "type": "rivals", "note": "TransE用平移距离打分，DistMult用对角双线性打分；论文在统一框架下比较，后者在Freebase上更好。"},
+    {"to": "freebase", "type": "uses", "note": "在Freebase子集上评测链接预测和规则挖掘。"},
+    {"to": "word2vec", "type": "extends", "note": "沿用把离散符号映射为低维向量、用乘积度量相容性的嵌入思路，从词扩展到实体和关系。"},
+    {"to": "maxent-nlp", "type": "rivals", "note": "以前的关系推断多靠人工特征的对数线性模型，嵌入方法改为自动学习实体与关系表示。"}
+  ],
+  "prereq": ["embedding", "dot-product", "matrix-multiplication", "loss-function", "graph-basics"],
+  "terms": [
+    {"t": "知识图谱补全（链接预测）", "d": "给定知识图谱里已知的三元组，预测缺失的（头，关系，?）或（?，关系，尾），按得分给候选实体排序，常用MRR和Hits@10评测。"},
+    {"t": "Horn规则", "d": "形如「A(x,y)∧B(y,z)⇒C(x,z)」的逻辑规则，前提成立时推出结论。"}
+  ],
+  "learn": "先读[[transe]]了解平移思路 → 读原文第3节统一框架和第4节对角双线性 → 动手：用PyKEEN在FB15k-237上训练TransE和DistMult，比较对称关系和非对称关系上的Hits@10。",
+  "check": {
+    "source": "https://arxiv.org/abs/1412.6575",
+    "confirmed": "arXiv记录：标题、五位作者、v1 2014-12-20；摘要：统一框架（实体为向量、关系为双线性/线性映射）、简单双线性形式取得新SOTA、Freebase top-10准确率73.2% vs TransE 54.7%、用关系嵌入挖掘逻辑规则、组合由矩阵乘法刻画。ICLR 2015出处、作者单位、间隔排序损失细节、对称性缺陷的表述凭一般了解。"
+  }
+}

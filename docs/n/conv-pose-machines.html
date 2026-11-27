@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>卷积姿态机CPM（2016） · AI脉络</title>
+<meta name="description" content="人体关节之间有很强的空间约束（手腕总在手肘附近），以前常用图模型显式建模，推理复杂；直接回归坐标又难以利用这些约束，遇到遮挡或左右对称时容易出错。 把姿态估计做成多阶段的逐步细化：每个阶段是一个卷积网络，输入图像特征和上一阶段输出的各关节“置信图”，输出更准的置信图。后面阶段感受野更大，能隐式学会…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/conv-pose-machines.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="卷积姿态机CPM（2016）">
+<meta property="og:description" content="人体关节之间有很强的空间约束（手腕总在手肘附近），以前常用图模型显式建模，推理复杂；直接回归坐标又难以利用这些约束，遇到遮挡或左右对称时容易出错。 把姿态估计做成多阶段的逐步细化：每个阶段是一个卷积网络，输入图像特征和上一阶段输出的各关节“置信图”，输出更准的置信图。后面阶段感受野更大，能隐式学会…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/conv-pose-machines.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/conv-pose-machines">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 人脸与人体姿态</div>
+<h1>卷积姿态机CPM</h1>
+<div class="full">Convolutional Pose Machines</div>
+<div class="meta"><span>2016.01</span><span>论文</span><span>延伸</span><span>CVPR 2016</span><span>Shih-En Wei, Varun Ramakrishna, Takeo Kanade, Yaser Sheikh · 卡内基梅隆大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1602.00134" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/shihenw/convolutional-pose-machines-release" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/conv-pose-machines">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>人体关节之间有很强的空间约束（手腕总在手肘附近），以前常用图模型显式建模，推理复杂；<a class="ln" href="../n/deeppose.html">DeepPose</a>直接回归坐标又难以利用这些约束，遇到遮挡或左右对称时容易出错。</p></div><div><h4>方法</h4><p>把姿态估计做成多阶段的逐步细化：每个阶段是一个卷积网络，输入图像特征和上一阶段输出的各关节“置信图”，输出更准的置信图。后面阶段感受野更大，能隐式学会关节之间的长距离关系；每个阶段都加监督，缓解深网络的梯度消失。</p></div><div><h4>影响</h4><p>CPM确立了“热力图回归＋多阶段细化＋中间监督”的姿态估计范式，在MPII、LSP、FLIC上取得当时最好的结果；同组的<a class="ln" href="../n/openpose.html">OpenPose</a>直接在CPM的多阶段结构上扩展到多人实时姿态估计。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><b>置信图</b>：每个关节对应一张与图像对齐的热力图，在关节真实位置附近是高斯峰，其余接近0。网络预测的是这些图而不是坐标，预测值最大的位置就是关节位置。</p><p><b>多阶段结构</b>：</p><ul><li>第1阶段只看图像，用一个卷积网络输出各关节的初始置信图。由于感受野有限，容易把左右手腕、被遮挡的关节弄混。</li><li>第t阶段（t≥2）把图像特征和第t−1阶段的全部置信图拼接起来，再经过若干层大卷积核的卷积，输出新的置信图。因为输入里已经有其他关节的大致位置，网络可以利用“手肘在这里，所以手腕应该在附近”这样的上下文；作者特意让后面阶段的有效感受野足够大，覆盖关节之间的长距离关系。</li><li>共6个阶段左右。</li></ul><p><b>中间监督</b>：每个阶段的输出都和真值置信图算L2损失并求和。这样整个很深的网络里每隔一段就有梯度注入，缓解了<a class="lc" href="../c/vanishing-exploding.html">梯度消失与梯度爆炸</a>问题，也让每个阶段都学成一个合格的预测器。</p><p>摘要称该方法隐式建模结构化预测中变量间的长距离依赖，不需要显式的图模型推理，在MPII、LSP和FLIC等标准基准上超过了当时的方法。</p><h2>后来的发展</h2><p>同期的<a class="ln" href="../n/stacked-hourglass.html">堆叠沙漏网络</a>同样采用多阶段热力图与中间监督；<a class="ln" href="../n/openpose.html">OpenPose</a>在CPM上加入部件亲和场做多人姿态；之后<a class="ln" href="../n/simple-baselines-pose.html">Simple Baselines姿态</a>、<a class="ln" href="../n/hrnet.html">HRNet</a>、<a class="ln" href="../n/vitpose.html">ViTPose</a>说明单阶段的高分辨率热力图网络也能做得很好。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只处理单人姿态，需要先把人框出来；多阶段结构计算量大，速度慢。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/openpose.html">OpenPose</a></div></li><li>热力图分辨率有限，量化误差限制了关节定位精度。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/hrnet.html">HRNet</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/deeppose.html">DeepPose</a><span class="yr">2013.12 · 视觉</span><div class=nt>DeepPose直接回归关节坐标；CPM改为预测置信图并多阶段细化，更好地利用关节间空间关系。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/googlenet.html">GoogLeNet / Inception</a><span class="yr">2014.09 · 视觉</span><div class=nt>中间监督的思想与GoogLeNet的辅助分类器一致，用来给深层网络补充梯度。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/fcn.html">全卷积网络FCN</a><span class="yr">2014.11 · 视觉</span><div class=nt>每个阶段都是全卷积网络，输出与输入对齐的逐像素置信图。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/openpose.html">OpenPose</a><span class="yr">2016.11 · 视觉</span><div class=nt>只处理单人姿态，需要先把人框出来；多阶段结构计算量大，速度慢。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/simple-baselines-pose.html">Simple Baselines姿态</a><span class="yr">2018.04 · 视觉</span><div class=nt>沿用CPM确立的关节热力图回归，但去掉多阶段细化。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/hrnet.html">HRNet</a><span class="yr">2019.02 · 视觉</span><div class=nt>热力图分辨率有限，量化误差限制了关节定位精度。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/vision-tasks.html">分类、检测、分割</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/vanishing-exploding.html">梯度消失与梯度爆炸</a> <a class="chip c" href="../c/gaussian.html">高斯分布</a></p>
+<h2>本篇术语</h2><ul><li><b>置信图</b>　为某个关节预测的热力图，每个像素的值表示这个关节在此处的可能性。</li><li><b>中间监督</b>　在网络中间若干位置也接上损失函数，而不只在最后一层，帮助深网络训练。</li></ul>
+<h2>怎么学</h2><p>先了解人体姿态估计的任务和PCK指标，再读CPM第3节多阶段结构图和第3.3节中间监督；跑官方模型，把每个阶段的置信图画出来，看左右手腕的混淆如何逐阶段被纠正。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1602.00134" rel="noopener">https://arxiv.org/abs/1602.00134</a>（arXiv记录：标题、四位作者、v1提交于2016-01-30；摘要中把卷积网络纳入姿态机框架、隐式建模长距离依赖、多阶段卷积网络直接作用于上一阶段置信图逐步细化、无需显式图模型推理、中间监督缓解梯度消失、在MPII、LSP、FLIC上超过竞争方法。6个阶段、L2损失、大卷积核感受野、CVPR 2016、与GoogLeNet辅助分类器的类比凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%8D%B7%E7%A7%AF%E5%A7%BF%E6%80%81%E6%9C%BACPM%EF%BC%88conv-pose-machines%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aconv-pose-machines%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/conv-pose-machines.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="resnet.html"><small>本分支上一个 · 2015.12</small><b>ResNet</b></a><a class="r" href="sort.html"><small>本分支下一个 · 2016.02</small><b>SORT多目标跟踪</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

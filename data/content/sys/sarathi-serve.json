@@ -1,0 +1,26 @@
+{
+ "id": "sarathi-serve",
+ "who": "Amey Agrawal, Nitin Kedia, Ashish Panwar, Jayashree Mohan, Nipun Kwatra, Bhargav S. Gulavani, Alexey Tumanov, Ramachandran Ramjee · 微软研究院印度, 佐治亚理工学院",
+ "venue": "OSDI 2024",
+ "aka": ["Sarathi-Serve", "无停顿调度", "stall-free scheduling", "分块预填充", "chunked prefill", "吞吐—延迟权衡"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2403.02310"},
+  {"label": "GitHub", "url": "https://github.com/microsoft/sarathi-serve"}
+ ],
+ "problem": "连续批处理把新请求的预填充插进正在进行的解码批次；一个长提示的预填充要跑很久，期间所有正在生成的请求都被卡住，逐词延迟出现尖峰，想要高吞吐就得忍受高尾延迟。",
+ "idea": "把每个预填充切成大小相近的块，每一轮迭代在不暂停任何正在解码的请求的前提下，只塞进一块预填充；每轮批次的计算量因此大致均匀，既能用大批次提高吞吐，又不让解码停顿。",
+ "impact": "分块预填充加无停顿调度成为vLLM、SGLang、TensorRT-LLM等主流推理引擎的默认或常用配置，是预填充—解码分离之外，同卡混合调度的代表方案。",
+ "method": "每个请求分两阶段：**预填充**一次处理整段提示，计算密集、能占满GPU；**解码**每轮每个请求只出一个词，计算量小，主要受显存带宽限制，所以要靠大批次来提高利用率。[[orca-serving]]与[[vllm]]的迭代级调度会在新请求到来时插入它的整段预填充：吞吐上去了，但这一轮迭代要等长预填充算完，所有解码请求的下一个词都被推迟（生成停顿）；若优先解码、推迟预填充，又会拖低吞吐、拉长首词延迟。\n\nSarathi-Serve在作者之前的[[sarathi]]（把解码请求“搭便车”塞进分块的预填充）基础上，做成完整的服务调度器：给每轮迭代设一个token预算，先放入所有正在解码的请求（各1个token），剩余预算再分给预填充的块，长提示被拆成多轮完成。这样任何一轮都不会因为预填充而让解码停下（无停顿调度），各轮迭代的计算量相近；在流水线并行下，均匀的批次还减少了因迭代耗时不一造成的流水线气泡。\n\n摘要报告：在尾延迟约束下，单张A100上Mistral-7B的服务容量是vLLM的2.6倍，两张A100上Yi-34B最多3.7倍；配合流水线并行的Falcon-180B端到端服务容量最多提高5.6倍。",
+ "limits": [
+  {"text": "预填充与解码仍在同一批GPU上相互争抢，块大小要在首词延迟与逐词延迟之间权衡；长提示被分块后首词延迟变长。", "solved_by": ["mooncake", "nvidia-dynamo"]}
+ ],
+ "relations": [
+  {"to": "sarathi", "type": "extends", "note": "由同一团队把分块预填充与解码搭便车扩展为完整的无停顿服务调度器。"},
+  {"to": "orca-serving", "type": "solves", "note": "Orca式迭代级调度插入整段预填充会让解码停顿，Sarathi-Serve以token预算分块插入，消除停顿。"},
+  {"to": "distserve", "type": "rivals", "note": "DistServe把预填充和解码拆到不同GPU上避免相互干扰；Sarathi-Serve留在同一批GPU上靠分块与无停顿调度缓解干扰，两条路线后来在推理引擎里并存。"},
+  {"to": "vllm", "type": "rivals", "note": "以vLLM为主要基线，在尾延迟约束下服务容量提高2.6–3.7倍，后来vLLM也采用了分块预填充。"}
+ ],
+ "prereq": ["kv-cache", "throughput-latency", "training-vs-inference", "autoregressive"],
+ "terms": [{"t": "生成停顿", "d": "正在逐词输出的请求因为批次里插入了别的请求的长预填充而被迫等待，表现为输出突然卡顿。"}],
+ "check": {"source": "https://arxiv.org/abs/2403.02310", "confirmed": "标题、八位作者、v1日期2024-03-04；摘要：预填充高延迟但能占满GPU、解码低延迟低利用率因此批处理有效、批处理导致预填充与解码交错难以同时兼顾吞吐与延迟、分块预填充把预填充切成近似等大的块、无停顿调度在不暂停解码的情况下加入新请求、均匀批次减少流水线气泡、Mistral-7B单A100服务容量2.6倍、Yi-34B两张A100最多3.7倍（对比vLLM）、Falcon-180B配合流水线并行最多5.6倍。token预算的具体机制、OSDI 2024、机构、被主流引擎采用为一般了解。"}
+}

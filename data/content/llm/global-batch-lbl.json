@@ -1,0 +1,31 @@
+{
+  "id": "global-batch-lbl",
+  "who": "Zihan Qiu, Zeyu Huang, Bo Zheng, Kaiyue Wen, Zekun Wang, Rui Men, Ivan Titov, Dayiheng Liu, Jingren Zhou, Junyang Lin · 阿里巴巴通义千问团队、爱丁堡大学、斯坦福大学",
+  "venue": "ACL 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2501.11873"}
+  ],
+  "aka": ["Global-batch LBL", "全局批负载均衡损失", "Demons in the Detail", "global-batch load balancing", "微批负载均衡的问题"],
+  "problem": "MoE训练都用负载均衡损失防止专家冷热不均，但主流框架在每个微批（micro-batch）里单独计算它；大模型的微批只有很少几条序列，等于要求每条序列内部都均匀使用所有专家，连一整段代码也被迫分散到全部专家，专家学不出领域专长。",
+  "idea": "只改实现：增加一步通信，把各个微批的专家选中频率f_i在全局批（global-batch）上汇总，再计算负载均衡损失。均衡约束从“每条序列”放宽到“整个语料”，允许单条序列集中使用少数专家。",
+  "impact": "在最多42.8B参数、4000亿token的MoE训练中显著改善预训练困惑度和下游任务，并大幅提升专家的领域专门化；这一做法被Qwen3等后续MoE模型的训练采用。",
+  "method": "背景：[[switch-transformer]]提出的负载均衡损失（LBL）写成\n\n`LBL = N_E · Σ_{i=1}^{N_E} f_i · p_i`\n\n其中N_E是专家数，f_i是一批token中选中专家i的比例，p_i是专家i的平均门控分数。f和p越均匀，LBL越小。[[gshard]]、[[deepseekmoe]]等都使用这类辅助损失；[[aux-loss-free]]则尝试用偏置调整代替辅助损失。\n\n**问题**：实际训练采用数据并行、流水线并行等，每张卡上的一个微批通常只有几条序列。框架在每个微批内统计f_i并计算LBL，再在并行组之间平均。这样的LBL几乎是在**序列级别**上要求均衡：哪怕这条序列全是代码，路由器也被推着把它的token平均分给所有专家，从而抑制专家形成领域专长。\n\n**做法**：在计算LBL前增加一步通信，把各微批的f_i同步、汇总成全局批上的f_i，再用它计算LBL。全局批包含的序列远比微批多样，于是均衡只在语料层面成立，不同领域的序列可以各自集中于不同专家。通信量只有一个长度为N_E的向量，开销很小。作者也讨论了在全局批较小时用缓冲累积多步统计的变体。\n\n结果：在最多42.8B总参数、4000亿token的MoE训练中，全局批LBL在预训练困惑度和下游任务上都带来明显提升；分析显示它大幅提高了专家的领域专门化程度。",
+  "limits": [
+    {"text": "放宽到全局批后，单个微批或单条序列内的专家负载可能很不均匀，在专家并行的推理和训练中会造成部分设备过载，需要额外的容量或调度处理。", "solved_by": []},
+    {"text": "只改变了LBL的统计范围，没有回答负载均衡损失本身是否必要；与无辅助损失的偏置方法如何取舍、能否结合没有系统比较。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "switch-transformer", "type": "solves", "note": "Switch提出的LBL在微批内计算时近乎序列级约束，抑制专家专门化；本文改为在全局批上统计。"},
+    {"to": "gshard", "type": "extends", "note": "GShard确立的辅助均衡损失在大规模并行训练中的实现细节被重新审视。"},
+    {"to": "deepseekmoe", "type": "rivals", "note": "DeepSeekMoE用共享专家和细粒度专家促进专门化，本文从均衡损失的统计范围入手。"},
+    {"to": "aux-loss-free", "type": "rivals", "note": "无辅助损失方法用偏置调节负载以免损害性能，本文保留辅助损失但放宽其统计范围。"},
+    {"to": "olmoe", "type": "uses", "note": "OLMoE等开放MoE的训练分析表明专家专门化程度是衡量MoE质量的重要指标，本文用类似分析验证效果。"}
+  ],
+  "prereq": ["mixture-of-experts", "distributed-training", "batch-size-epoch", "regularization"],
+  "terms": [
+    {"t": "微批（micro-batch）", "d": "数据并行或梯度累积时，单张卡在一次前向中处理的那一小份数据；多个微批合起来构成一次参数更新所用的全局批。"},
+    {"t": "专家专门化", "d": "不同专家倾向于处理不同类型的输入（如代码、数学、某种语言），而不是对所有输入都差不多。"}
+  ],
+  "learn": "先读[[switch-transformer]]里LBL的定义；读原文第2节微批LBL为何近似序列级约束的分析；动手：在一个小MoE训练中分别按微批和全局批统计f_i，比较训练后各领域数据的专家选择分布。",
+  "check": {"source": "https://arxiv.org/abs/2501.11873", "confirmed": "标题、10位作者、arXiv v1提交日2025-01-21；摘要中LBL定义 N_E Σ f_i p_i、现有框架在微批内计算f_i与LBL后跨并行组平均、微批序列很少导致近乎序列级均衡并迫使领域序列也均匀路由从而抑制专门化、提出全局批LBL并增加通信同步f_i、最多42.8B参数与400B token的实验在预训练困惑度与下游任务上明显提升、大幅改善领域专门化。缓冲变体、ACL 2025、Qwen3采用、作者机构为一般了解。"}
+}

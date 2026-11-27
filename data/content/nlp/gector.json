@@ -1,0 +1,37 @@
+{
+  "id": "gector",
+  "who": "Kostiantyn Omelianchuk, Vitaliy Atrasevych, Artem Chernodub, Oleksandr Skurzhanskyi · Grammarly",
+  "venue": "BEA Workshop 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2005.12592"},
+    {"label": "代码", "url": "https://github.com/grammarly/gector"}
+  ],
+  "aka": ["GECToR", "GEC", "语法纠错", "语法错误纠正", "Grammatical Error Correction", "文本纠错", "Tag, Not Rewrite", "序列标注式纠错"],
+  "problem": "语法纠错（GEC）主流做法是把它当成「错句→正句」的机器翻译，用Transformer编码器-解码器逐词重写整句，推理慢，而且大部分词其实不需要改。",
+  "idea": "不重写，而是**给每个词打一个编辑标签**：保留、删除、在后面插入某词、替换为某词，或做名词单复数、动词时态之类的「语法变换」。用预训练Transformer编码器做序列标注，反复标注几轮直到不再修改。",
+  "impact": "在当时的标准测试集上达到最好或接近最好的F0.5，推理比seq2seq纠错系统快到10倍；「标注式纠错」成为工业纠错系统常用的路线之一。",
+  "background": "语法纠错的标准评测是CoNLL-2014共享任务和BEA-2019共享任务，指标是更看重精确率的F0.5。2018年以后最好的系统都是神经机器翻译式的[[seq2seq]]：把带错的句子「翻译」成正确的句子，并用[[back-translation]]式的人造错句数据预训练。问题在于纠错时九成以上的词应原样保留，逐词生成既浪费又容易改出新错误，解码速度也满足不了实时写作助手的需要。",
+  "method": "**编辑标签。** 作者为每个源token定义一个目标操作：`$KEEP`、`$DELETE`、`$APPEND_w`（在后面加词w）、`$REPLACE_w`（换成w），以及约30种针对英语的**g变换**，如改大小写、合并两个词、名词单复数转换、动词形式转换（`$VERB_FORM_VB_VBZ` 把原形变第三人称单数）。训练前把（错句，正句）对齐，自动推出每个词的标签，常见词表约5000个标签。\n\n**模型。** 一个预训练编码器（BERT、RoBERTa或XLNet）加两个线性头：一个预测编辑标签，一个判断整句是否有错。\n\n**迭代纠正。** 一次标注只做局部修改，所以把修改后的句子再送回模型，最多几轮，直到预测全是 `$KEEP`。推理时还加了两个超参数：给 `$KEEP` 的置信度加偏置、句级错误概率低于阈值就不改，用来在精确率和召回率之间调节。\n\n**训练分三阶段**：先在900万对人造错句上预训练，再在真实学习者语料上微调，最后在少量高质量（含无错句）数据上微调。",
+  "results": "摘要报告：最好的单模型/集成在CoNLL-2014测试集上F0.5为65.3/66.5，在BEA-2019测试集上为72.4/73.6；推理速度最高可达基于Transformer的seq2seq纠错系统的10倍。",
+  "legacy": "GECToR之后，标注式与生成式纠错长期并存：工业界看重它的速度和可解释的编辑操作，学术界在其上改进标签集、多语言化。大语言模型出现后，直接提示LLM改写成了新的强基线，但LLM倾向于过度改写、F0.5偏低，标注式方法仍常用于需要「最小改动」的场景。",
+  "limits": [
+    {"text": "g变换和标签集是为英语手工设计的，换到形态复杂的语言要重新设计。", "solved_by": []},
+    {"text": "每个词只能做局部编辑，需要大幅调整语序或整句重写的错误难以修正。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "seq2seq", "type": "rivals", "note": "seq2seq纠错逐词重写整句；GECToR改为对每个词预测编辑操作，推理快得多。"},
+    {"to": "roberta", "type": "uses", "note": "用RoBERTa、BERT、XLNet等预训练编码器做序列标注骨干，其中RoBERTa与XLNet效果最好。"},
+    {"to": "bilstm-crf", "type": "extends", "note": "把语法纠错改写成逐词序列标注问题，沿用序列标注的建模方式。"},
+    {"to": "back-translation", "type": "uses", "note": "预训练阶段使用人工合成的错句-正句对，与回译造数据的思路一致。"}
+  ],
+  "prereq": ["pretrain-finetune", "transformer-block", "softmax", "classification-metrics", "data-augmentation"],
+  "terms": [
+    {"t": "语法纠错（GEC）", "d": "自动找出并改正句子中的语法、拼写、搭配等错误，输出修改后的句子。常用CoNLL-2014和BEA-2019评测。"},
+    {"t": "F0.5", "d": "F值的一种，β=0.5时精确率的权重是召回率的两倍；纠错中「改错了」比「漏改」更伤害用户，所以偏重精确率。"}
+  ],
+  "learn": "先了解序列标注和[[seq2seq]] → 读原文第3节标签设计和第4节三阶段训练 → 动手：用开源GECToR模型纠正几句带错的英文，观察每一轮迭代给出的编辑标签。",
+  "check": {
+    "source": "https://arxiv.org/abs/2005.12592",
+    "confirmed": "arXiv记录：标题GECToR -- Grammatical Error Correction: Tag, Not Rewrite、四位作者、v1 2020-05-26；摘要：用Transformer编码器的GEC序列标注器、先在合成数据预训练再分两阶段微调、自定义token级变换、单模型/集成CoNLL-2014 F0.5 65.3/66.5与BEA-2019 72.4/73.6、推理最高快10倍、开源。BEA 2020出处、标签名称示例、标签数、900万合成句、置信度偏置与LLM对比凭一般了解。"
+  }
+}

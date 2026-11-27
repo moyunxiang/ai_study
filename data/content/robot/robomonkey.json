@@ -1,0 +1,25 @@
+{
+  "id": "robomonkey",
+  "who": "Jacky Kwok, Christopher Agia, Rohan Sinha, Matt Foutter, Shulu Li, Ion Stoica, Azalia Mirhoseini, Marco Pavone · 斯坦福大学、UC Berkeley、NVIDIA",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2506.17811"}
+  ],
+  "aka": ["Robo Monkey", "Robo-Monkey", "VLA测试时扩展", "VLA测试时采样与验证", "机器人动作验证器", "VLA best-of-N"],
+  "problem": "VLA在非结构化的真实环境里不够鲁棒，一次采样的动作出错就直接执行，没有像语言模型那样在推理时多试几次再挑的机制。",
+  "idea": "部署时从VLA采几个动作，拟合高斯分布扰动出一批候选，再用一个VLM动作验证器打分选最优；验证器用合成的动作比较数据训练。",
+  "impact": "配合OpenVLA，摘要称分布外任务绝对提升25%、分布内提升9%；论文还发现动作误差随采样数呈幂律下降。",
+  "method": "动机来自语言模型的测试时计算：[[llm-monkeys]]发现重复采样能让覆盖率按幂律上升，[[genrm]]等验证器可以从多个候选里挑对的。作者先验证VLA也有类似规律：动作误差与采样数之间是指数化的幂律关系。\n\n做法：每一步从[[openvla]]以温度1.0采5个动作，对平移和旋转拟合高斯、夹爪状态用多数投票，再从中采16个候选；验证器以LLaVA-7B为底座、换上奖励头，选分数最高的执行。验证器的训练数据从[[bridgedata-v2]]自动合成，共2000万对动作比较。为了降延迟，作者扩展了SGLang来批量服务VLA，16个候选的采样加验证约650毫秒。\n\n结果：[[simpler]]上平均46.3%，比OpenVLA高7.8个百分点；真机WidowX分布外任务60%对35%；微调后的LIBERO-Long上56.5%对49.8%。",
+  "limits": [
+    {"text": "每一步都要跑VLA多次采样和一个7B验证器，单张H100上只有约1.5Hz，难以用于需要高频反应的任务。", "solved_by": []},
+    {"text": "只在单步动作上挑选，不预测动作的长远后果，长时序任务中的累积偏差无法靠它修正。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "llm-monkeys", "type": "extends", "note": "把语言模型重复采样的推理时扩展律迁移到VLA动作上，验证动作误差也随采样数呈幂律下降。"},
+    {"to": "openvla", "type": "uses", "note": "以OpenVLA为主要被增强的策略，不改其权重，只在推理时采样和挑选。"},
+    {"to": "genrm", "type": "extends", "note": "沿用“训练一个验证器在候选里挑选”的思路，验证器换成判断机器人动作好坏的VLM。"},
+    {"to": "bridgedata-v2", "type": "uses", "note": "从BridgeData V2的轨迹自动合成2000万对动作比较数据训练验证器。"}
+  ],
+  "prereq": ["vla-concept", "reasoning-tokens", "decoding-sampling", "gaussian", "scaling-law-concept"],
+  "check": {"source": "https://arxiv.org/abs/2506.17811", "confirmed": "标题、8位作者、v1日期2025-06-21、摘要中指数化幂律、25%与9%提升；HTML正文中5个初始动作、高斯扰动+多数投票、16个候选、LLaVA-7B验证器、BridgeV2合成2000万对比较、SIMPLER 46.3%（+7.8）、真机60%对35%、LIBERO-Long 56.5%对49.8%、约650毫秒与1.5Hz、SGLang扩展、机构。"}
+}

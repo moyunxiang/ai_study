@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>目标网络与软更新（Target Networks and Soft Updates） · AI脉络</title>
+<meta name="description" content="计算TD目标时不用正在训练的网络，而用一份更新得更慢的副本，让“要追的目标”暂时固定住，避免网络追着自己的影子跑。副本可以每隔一段时间整体复制（硬更新），也可以每步缓慢地插值（软更新）。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/target-network.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="目标网络与软更新（Target Networks and Soft Updates）">
+<meta property="og:description" content="计算TD目标时不用正在训练的网络，而用一份更新得更慢的副本，让“要追的目标”暂时固定住，避免网络追着自己的影子跑。副本可以每隔一段时间整体复制（硬更新），也可以每步缓慢地插值（软更新）。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/target-network.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/target-network">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>目标网络与软更新</h1><div class="full">Target Networks and Soft Updates</div>
+<p class="muted" style="font-size:13px">也叫：目标网络　target network　target net　软更新　soft update　soft target update　硬更新　hard update　Polyak更新　Polyak update　目标网络更新频率　τ　tau</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/target-network">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>计算TD目标时不用正在训练的网络，而用一份更新得更慢的副本，让“要追的目标”暂时固定住，避免网络追着自己的影子跑。副本可以每隔一段时间整体复制（硬更新），也可以每步缓慢地插值（软更新）。</b></p>
+<p class="tags">先要会：<a class="chip c" href="td-error.html">时序差分与自举</a> <a class="chip c" href="function-approximation-rl.html">强化学习中的函数逼近</a></p>
+<p>用神经网络做Q-learning时，损失是<code>(r + γ·max_{a&#x27;} Q(s&#x27;, a&#x27;; θ) − Q(s, a; θ))²</code>。目标和预测用的是<b>同一组参数θ</b>：每做一步梯度下降，预测往目标靠，目标自己也跟着动了。相邻状态的Q值又高度相关，于是容易出现振荡、发散，像一只狗追自己的尾巴。这是<a class="ln" href="../n/deadly-triad.html">致命三元组</a>在深度RL里最直接的表现。</p><p><b>目标网络</b>。再保留一份参数θ⁻，只用它来算目标：</p><p><code>y = r + γ · max_{a&#x27;} Q(s&#x27;, a&#x27;; θ⁻)</code>，损失<code>(y − Q(s, a; θ))²</code></p><p>θ⁻在一段时间内不变，这段时间里训练就是一个目标固定的普通回归问题。</p><p><b>两种更新方式</b>。</p><ul><li><b>硬更新</b>：每隔C步把θ整体复制给θ⁻。<a class="ln" href="../n/dqn-nature.html">DQN（Nature版）</a>引入了这一做法，C为1万步量级。</li><li><b>软更新</b>（Polyak更新）：每步<code>θ⁻ ← τ·θ + (1 − τ)·θ⁻</code>，τ很小。<a class="ln" href="../n/ddpg.html">DDPG</a>用τ=0.001，<a class="ln" href="../n/td3.html">TD3</a>和<a class="ln" href="../n/sac.html">SAC</a>常用0.005。等价于θ⁻是θ的指数移动平均，见<a class="ln" href="../n/polyak-averaging.html">Polyak平均与EMA</a>。</li></ul><p><b>代价与替代</b>。目标网络让信息传播变慢：一个奖励要等目标网络更新后才能影响上游状态，所以C或τ需要权衡。<a class="ln" href="../n/double-dqn.html">Double DQN</a>顺便利用了目标网络来减少高估，见<a class="lc" href="../c/maximization-bias.html">过估计与最大化偏差</a>。近年也有工作尝试去掉它：<a class="ln" href="../n/pqn.html">PQN简化深度TD</a>和<a class="ln" href="../n/crossq.html">CrossQ批归一化RL</a>借助层归一化或批归一化让网络本身更稳定，不用目标网络也能训练。</p>
+<div class="example"><h4>例子</h4><p>软更新τ=0.005：θ⁻对θ的“记忆”约为1/τ=200步。设某参数θ从0突然跳到1之后保持不变，θ⁻经过100步达到<code>1 − 0.995^100 ≈ 0.39</code>，200步约0.63，1000步约0.99。硬更新C=1000则是前999步保持0，第1000步突然变成1。</p></div>
+<h2>容易误解的地方</h2><ul><li>目标网络不能保证收敛，只是在实践中显著减少振荡和发散。</li><li>只有算目标时用θ⁻；选动作、算损失的预测部分仍然用θ。Double DQN的“在线网络选、目标网络评”容易被写反。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

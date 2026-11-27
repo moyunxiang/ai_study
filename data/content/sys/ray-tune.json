@@ -1,0 +1,26 @@
+{
+ "id": "ray-tune",
+ "who": "Richard Liaw, Eric Liang, Robert Nishihara, Philipp Moritz, Joseph E. Gonzalez, Ion Stoica · 加州大学伯克利分校RISELab",
+ "venue": "ICML 2018 AutoML Workshop",
+ "aka": ["Ray Tune", "Tune", "分布式调参", "超参数搜索框架"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1807.05118"},
+  {"label": "文档", "url": "https://docs.ray.io/en/latest/tune/index.html"}
+ ],
+ "problem": "Hyperband、PBT等调参算法需要随时暂停、复制、提前终止正在训练的试验，但大多数实现都是为单一算法、单一集群环境临时写的，难以在大集群上扩展，换个算法就要重写。",
+ "idea": "在训练脚本和搜索算法之间定义一个“窄腰”接口：训练脚本只需按步汇报指标、支持存取检查点；搜索算法只通过这个接口决定启动、暂停、终止或克隆哪个试验；分布式调度交给Ray。",
+ "impact": "成为最常用的分布式超参数搜索框架之一，作为Ray的组成部分被广泛用于深度学习和强化学习调参，也常把Optuna、HyperOpt等搜索算法作为后端接进来。",
+ "method": "超参数搜索的算法越来越多：[[random-search-hpo]]、[[bayes-opt-hpo]]只需要提交试验、拿回结果；[[hyperband]]要在训练中途按表现淘汰一部分试验；[[pbt]]还要把表现好的试验的权重复制给表现差的试验并扰动超参。这些操作都要求能控制正在运行中的训练过程。\n\nTune把这种需求抽象成一个窄腰接口：训练函数每隔一段汇报一次指标，并实现保存与恢复检查点；搜索算法分成两部分，“搜索器”负责提出新的超参组合，“试验调度器”根据中间结果决定每个试验继续、暂停、停止还是从别的试验克隆。底层借助[[ray]]的任务与actor机制把试验分配到集群的各个GPU上，并负责容错。论文展示了在这一接口下实现多种当时最先进的超参搜索算法，并能直接扩展到大型集群。",
+ "limits": [
+  {"text": "大模型时代一次训练就占满整个集群，大规模超参搜索变得不现实，调参转向在小模型上搜索再外推（如μP）等方法。", "solved_by": ["mup"]}
+ ],
+ "relations": [
+  {"to": "ray", "type": "uses", "note": "构建在Ray的分布式任务与actor框架之上，负责试验的调度与容错。"},
+  {"to": "hyperband", "type": "uses", "note": "Hyperband等需要中途淘汰试验的算法通过Tune的试验调度器实现。"},
+  {"to": "pbt", "type": "uses", "note": "PBT需要在试验间复制权重并扰动超参，Tune的检查点与克隆接口支持这类算法。"},
+  {"to": "bayes-opt-hpo", "type": "uses", "note": "贝叶斯优化等搜索算法作为“搜索器”接入同一接口。"}
+ ],
+ "prereq": ["hyperparameter", "distributed-training", "train-val-test", "learning-rate"],
+ "terms": [{"t": "窄腰接口", "d": "上下两层各自可以有很多种实现，中间只靠一个很小、很稳定的接口连接，就像互联网里的IP协议。"}],
+ "check": {"source": "https://arxiv.org/abs/1807.05118", "confirmed": "标题、六位作者、v1日期2018-07-13；摘要：许多超参搜索算法在分布式环境中的适配往往临时、提出Tune作为训练脚本与搜索算法之间的窄腰接口、满足广泛算法需求、易于扩展到大集群、简化算法实现、实现了若干最先进的超参搜索算法、作为Ray的一部分提供。搜索器与试验调度器的划分、Workshop名称、文档链接为一般了解。"}
+}

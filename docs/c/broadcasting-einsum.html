@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>广播与einsum（Broadcasting and Einsum） · AI脉络</title>
+<meta name="description" content="张量代码的两条基本语法：广播让形状不同的数组自动对齐后逐元素运算；einsum用一串下标字母一次写清楚“哪些维相乘、哪些维求和”。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/broadcasting-einsum.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="广播与einsum（Broadcasting and Einsum）">
+<meta property="og:description" content="张量代码的两条基本语法：广播让形状不同的数组自动对齐后逐元素运算；einsum用一串下标字母一次写清楚“哪些维相乘、哪些维求和”。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/broadcasting-einsum.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/broadcasting-einsum">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 数学预备 · 预备</div>
+<h1>广播与einsum</h1><div class="full">Broadcasting and Einsum</div>
+<p class="muted" style="font-size:13px">也叫：广播　广播机制　broadcasting　einsum　爱因斯坦求和　爱因斯坦求和约定　Einstein summation　Einstein notation　向量化　vectorization　张量形状　tensor shape　reshape　transpose　squeeze　unsqueeze　维度变换</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/broadcasting-einsum">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>张量代码的两条基本语法：广播让形状不同的数组自动对齐后逐元素运算；einsum用一串下标字母一次写清楚“哪些维相乘、哪些维求和”。</b></p>
+<p class="tags">先要会：<a class="chip c" href="vector-matrix.html">向量、矩阵与张量</a> <a class="chip c" href="matrix-multiplication.html">矩阵乘法与线性变换</a></p>
+<p>深度学习代码里几乎没有显式的for循环，所有计算都写成对整块张量的运算（见<a class="lc" href="../c/vector-matrix.html">向量、矩阵与张量</a>）。读懂这些代码，要先会两样东西。</p><p><b>广播（broadcasting）</b>。两个形状不同的数组做逐元素运算时，框架会自动把较小的那个“虚拟复制”到匹配的形状，而不真的占用内存。规则（<a class="ln" href="../n/numpy.html">NumPy与SciPy</a>、<a class="ln" href="../n/pytorch.html">PyTorch</a>、<a class="ln" href="../n/jax.html">JAX</a>相同）：从最后一维往前逐维对比，两维相等、或其中一个是1，就能对齐；维数少的一方在最前面补1。</p><p>例子：一批激活x的形状是(32, 768)，偏置b是(768,)，<code>x + b</code>时b被看成(1, 768)，再沿第0维复制32份。注意力里的掩码常是(1, 1, T, T)，加到(B, H, T, T)的分数上，对所有样本和所有头共用。</p><p><b>einsum（爱因斯坦求和约定）</b>。用一个字符串描述运算：输入每一维起一个字母，输出里没出现的字母就被求和。</p><ul><li><code>einsum(&#x27;ij,jk-&gt;ik&#x27;, A, B)</code>：矩阵乘法，j被求和。</li><li><code>einsum(&#x27;bhqd,bhkd-&gt;bhqk&#x27;, Q, K)</code>：批量、多头的注意力分数<code>QKᵀ</code>，见<a class="lc" href="../c/self-attention.html">自注意力与多头注意力</a>。</li><li><code>einsum(&#x27;i,j-&gt;ij&#x27;, u, v)</code>：外积，见<a class="lc" href="../c/tensor-products.html">外积、哈达玛积与克罗内克积</a>。</li><li><code>einsum(&#x27;ii-&gt;&#x27;, A)</code>：迹，见<a class="lc" href="../c/rank-trace-determinant.html">矩阵的秩、迹与行列式</a>。</li></ul><p>好处是不用记一堆transpose、reshape和bmm的组合，维度含义一目了然；很多论文的伪代码直接写einsum。</p><p><b>它为什么重要</b>。向量化的运算能交给GPU上高度优化的矩阵乘法内核（见<a class="lc" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a>），比Python循环快几个数量级；而广播错误（两个本不该对齐的维度恰好能广播）是训练代码里最隐蔽的bug之一：程序不报错，结果却悄悄错了。</p>
+<div class="example"><h4>例子</h4><p>预测pred形状(32, 1)，标签y形状(32,)。<code>pred − y</code>不会报错：y被看成(1, 32)，pred沿第1维复制，结果是(32, 32)的矩阵，均值也照算不误，损失完全错了。正确写法是先<code>pred.squeeze(-1)</code>让两者都是(32,)。</p><p>批量矩阵乘：Q形状(2, 8, 10, 64)，K同形。<code>einsum(&#x27;bhqd,bhkd-&gt;bhqk&#x27;, Q, K)</code>输出(2, 8, 10, 10)，等价于<code>Q @ K.transpose(-1, -2)</code>。</p></div>
+<h2>容易误解的地方</h2><ul><li>广播只“虚拟复制”，但运算结果是真实的大张量；一不小心把(N, 1)和(1, N)相加，会得到N×N的数组，N大时直接爆显存。</li><li>einsum的字母顺序决定输出的维度顺序，<code>-&gt;ik</code>和<code>-&gt;ki</code>结果互为转置。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

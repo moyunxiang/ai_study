@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>核密度估计（Kernel Density Estimation） · AI脉络</title>
+<meta name="description" content="不假设分布的形状，直接在每个样本点上放一个小“鼓包”（核函数），全部加起来当作密度估计。它是直方图的平滑版本，带宽决定了平滑程度。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/kernel-density-estimation.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="核密度估计（Kernel Density Estimation）">
+<meta property="og:description" content="不假设分布的形状，直接在每个样本点上放一个小“鼓包”（核函数），全部加起来当作密度估计。它是直方图的平滑版本，带宽决定了平滑程度。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/kernel-density-estimation.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/kernel-density-estimation">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 概率统计与信息论 · 入门</div>
+<h1>核密度估计</h1><div class="full">Kernel Density Estimation</div>
+<p class="muted" style="font-size:13px">也叫：核密度估计　kernel density estimation　KDE　Parzen窗　Parzen window　Parzen估计　Parzen-Rosenblatt　非参数密度估计　nonparametric density estimation　带宽　bandwidth　Silverman规则　密度估计　density estimation　kdeplot　直方图　histogram</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/kernel-density-estimation">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>不假设分布的形状，直接在每个样本点上放一个小“鼓包”（核函数），全部加起来当作密度估计。它是直方图的平滑版本，带宽决定了平滑程度。</b></p>
+<p class="tags">先要会：<a class="chip c" href="probability-basics.html">随机变量与概率分布</a> <a class="chip c" href="gaussian.html">高斯分布</a></p>
+<p>手上有一堆样本，想知道它们来自什么样的分布。参数方法先假设一个形状（比如<a class="lc" href="../c/gaussian.html">高斯分布</a>或<a class="lc" href="../c/gaussian-mixture.html">高斯混合模型</a>）再估计参数；如果形状猜错了，结果就错。<b>非参数</b>方法不做形状假设，让数据自己说话。</p><p><b>从直方图到核密度估计</b>。直方图把数轴切成格子数样本，但结果是锯齿状的，而且依赖格子从哪里开始切。<b>核密度估计（KDE）</b>，又叫Parzen窗方法，在每个样本x_i处放一个以它为中心的核函数K，然后取平均：</p><p class="formula"><code>p̂(x) = (1 / (n·h)) · Σ_i K((x − x_i) / h)</code></p><p>K常用标准高斯密度，h叫<b>带宽</b>。结果是一条光滑曲线，样本密集处高、稀疏处低。</p><p><b>带宽的选择</b>。h太小，每个样本都是一个尖峰，严重过拟合；h太大，所有结构被抹平成一个大鼓包。这是<a class="lc" href="../c/bias-variance.html">偏差-方差权衡</a>的典型体现。一维高斯核的常用经验值（Silverman规则）是<code>h ≈ 1.06·σ̂·n^(−1/5)</code>，也可以用交叉验证选。</p><p><b>维度灾难</b>。高维空间里样本极其稀疏，要覆盖空间所需的样本数随维度指数增长，KDE在十几维以上就基本失效（见<a class="lc" href="../c/curse-of-dimensionality.html">维度灾难</a>）。这也是需要深度生成模型的原因之一（见<a class="lc" href="../c/generative-modeling.html">生成建模的目标</a>）。</p><p><b>它出现在哪里</b>。</p><ul><li>早期评估生成模型：<a class="ln" href="../n/gan.html">生成对抗网络GAN</a>的原始论文用生成样本拟合高斯Parzen窗，再算测试数据的对数似然；后来的研究指出这种估计在高维图像上很不可靠，此后改用FID等指标（见<a class="lc" href="../c/generation-metrics.html">生成质量指标：IS与FID</a>）。</li><li><a class="ln" href="../n/denoising-score-matching.html">去噪分数匹配</a>：用高斯核平滑经验分布，得到的就是一个KDE，去噪分数匹配学的正是这个平滑分布的分数函数，这与扩散模型直接相关（见<a class="lc" href="../c/score-function.html">分数函数与分数匹配</a>）。</li><li><a class="ln" href="../n/mean-shift.html">Mean Shift均值漂移</a>聚类：从每个点出发，沿KDE密度的梯度往上爬，最终停在同一个峰上的点归为一类，见<a class="lc" href="../c/clustering.html">聚类</a>。</li><li>数据分析和可视化里画“平滑分布曲线”（如seaborn的kdeplot）就是KDE。</li></ul>
+<div class="example"><h4>例子</h4><p>三个样本(1, 2, 6)，高斯核、带宽h = 1。在x = 2处，三个核的值分别为<code>φ(1) ≈ 0.242</code>、<code>φ(0) ≈ 0.399</code>、<code>φ(4) ≈ 0.0001</code>，平均得p̂(2) ≈ 0.214。在x = 4处为(φ(3) + φ(2) + φ(2))/3 ≈ (0.004 + 0.054 + 0.054)/3 ≈ 0.037，处于两组样本之间的低谷。</p></div>
+<h2>容易误解的地方</h2><ul><li>KDE与“核技巧”中的核函数不是一回事：这里的核是一个平滑用的概率密度，那里的核是特征空间的内积，见<a class="lc" href="../c/kernel-trick.html">核技巧与间隔</a>。</li><li>对有边界的数据（如只能为正的量），KDE会在边界外“漏”出概率，需要边界修正。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

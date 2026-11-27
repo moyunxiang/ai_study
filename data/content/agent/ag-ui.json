@@ -1,0 +1,32 @@
+{
+  "id": "ag-ui",
+  "who": "CopilotKit及社区（与LangChain、CrewAI等框架合作）",
+  "links": [
+    {"label": "GitHub", "url": "https://github.com/ag-ui-protocol/ag-ui"},
+    {"label": "官方文档", "url": "https://docs.ag-ui.com"}
+  ],
+  "aka": ["AG-UI", "Agent-User Interaction Protocol", "智能体-用户交互协议", "智能体前端协议", "事件流协议", "生成式UI", "generative UI", "CopilotKit"],
+  "problem": "智能体不是“发一个请求、回一个答复”：它会逐字流式输出、在回答中途调用工具、更新共享状态、停下来等人确认、再派生子智能体。每个智能体框架对这些行为的接口都不同，前端要为每个框架单独写一套对接代码。",
+  "idea": "定义一个开放、轻量的事件协议：智能体通过一条双向事件流发出带类型的事件——运行开始/结束、文本消息开始/增量/结束、工具调用、状态快照与增量、子智能体等——任何前端只要会渲染这些事件，就能接入任何框架写的智能体。",
+  "impact": "2025年5月开源后，LangChain/LangGraph、CrewAI、微软Agent Framework、谷歌ADK、AWS Strands、Mastra、Pydantic AI等框架相继接入，官方把它与MCP、A2A并列为三种互补的智能体协议；后来发布了冻结规范并带JSON Schema的1.0版本。",
+  "background": "[[mcp]]统一了智能体连接工具与数据的方式，[[a2a]]统一了智能体与智能体之间的通信，但“智能体如何把自己的工作过程实时呈现给用户、并接收用户的中途干预”仍没有标准。各家框架如[[langgraph]]、[[crewai]]都有自己的流式输出格式。",
+  "method": "**基本形态**：一个AG-UI智能体就是一个HTTP端点，接收一个运行请求（包含会话线程、消息历史、工具和状态），然后以流的形式返回事件（默认可用服务器推送事件SSE等传输方式）。\n\n**事件类型**：\n- 生命周期事件：一次运行以RunStarted开始，中间可有若干StepStarted/StepFinished，最后以RunFinished或RunError结束；\n- 文本消息事件：TextMessageStart、TextMessageContent（每次一个增量片段）、TextMessageEnd，实现逐字显示；\n- 工具调用事件：报告智能体调用了什么工具、参数是什么、结果如何；也支持“前端工具”，即由用户界面执行的操作；\n- 状态管理事件：用快照和增量同步智能体与界面共享的状态，例如一份正在协同编辑的表单；\n- 子智能体与活动事件：标明某段输出来自哪个子智能体，报告进行中的任务进度。\n所有事件都有类型、时间戳和可选的元数据（如词元用量）。\n\n**人在回路**：智能体可以暂停等待用户确认或补充信息，前端把用户输入作为新事件发回。\n\n**与其他规范的关系**：A2UI、MCP Apps等“生成式UI规范”描述智能体想展示什么界面，AG-UI是承载这些内容在智能体与应用之间传输的运行时协议。",
+  "legacy": "它补上了智能体协议栈中“面向用户”的一层，使同一个智能体可以同时驱动网页、移动端、终端和Slack等聊天工具；智能体产品中常见的“实时展示思考与工具调用、允许中途打断”交互因此有了跨框架的统一实现方式。",
+  "limits": [
+    {"text": "协议只规范事件格式，不规定界面该如何设计，也不解决智能体在前端执行操作时的权限与安全问题。", "solved_by": []},
+    {"text": "主要由CopilotKit主导推动，大型模型厂商自家的应用（如ChatGPT、Claude）并不使用它，生态覆盖仍以开源框架为主。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mcp", "type": "extends", "note": "MCP连接智能体与工具，AG-UI连接智能体与用户界面，二者互补，AG-UI也能前置于使用MCP的智能体。"},
+    {"to": "a2a", "type": "extends", "note": "A2A负责智能体之间的通信，AG-UI负责智能体到用户这一侧，官方称三者常被同一个智能体同时使用。"},
+    {"to": "langgraph", "type": "uses", "note": "LangGraph是首批接入的智能体框架之一。"},
+    {"to": "crewai", "type": "uses", "note": "CrewAI作为合作框架提供AG-UI集成。"}
+  ],
+  "prereq": ["agent-loop", "tool-calling", "throughput-latency"],
+  "terms": [
+    {"t": "事件流", "d": "服务端不是一次性返回结果，而是持续推送一个个小消息（事件），前端收到一个就处理一个。"},
+    {"t": "前端工具", "d": "由用户界面而不是后端执行的工具，例如让智能体在页面上高亮某段文字或弹出确认框。"}
+  ],
+  "learn": "先读[[mcp]]和[[a2a]] → 读AG-UI文档的Events一页和README中的最小服务端示例 → 动手：照示例写一个返回RunStarted、几段TextMessageContent和RunFinished事件的端点，用官方客户端在终端里接收并打印。",
+  "check": {"source": "https://github.com/ag-ui-protocol/ag-ui", "confirmed": "GitHub README核对开放、轻量、基于事件的协议定位、智能体不适合请求/响应模型的理由、双向事件流、示例中的RunStarted/TextMessageStart/Content/End/RunFinished事件与HTTP端点、与MCP和A2A互补的三协议说法、与A2UI等生成式UI规范的区别、LangChain/CrewAI/微软Agent Framework/谷歌ADK/AWS Strands/Mastra/Pydantic AI等集成、1.0冻结规范与JSON Schema；文档Events页核对事件类别与生命周期规则、元数据；GitHub API核对仓库创建于2025-05-07，HN的Show HN帖子为2025-05-13。SSE传输与人在回路的具体机制、大厂应用不使用的判断凭一般了解。"}
+}

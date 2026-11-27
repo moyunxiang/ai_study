@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>梯度累积（Gradient Accumulation） · AI脉络</title>
+<meta name="description" content="显存放不下想要的批大小时，把一个大批次拆成几个小批次依次前向、反向，梯度先累加起来，攒够了再更新一次参数。效果上等价于用大批次训练，代价是更慢。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/gradient-accumulation.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="梯度累积（Gradient Accumulation）">
+<meta property="og:description" content="显存放不下想要的批大小时，把一个大批次拆成几个小批次依次前向、反向，梯度先累加起来，攒够了再更新一次参数。效果上等价于用大批次训练，代价是更慢。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/gradient-accumulation.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/gradient-accumulation">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 优化与训练 · 入门</div>
+<h1>梯度累积</h1><div class="full">Gradient Accumulation</div>
+<p class="muted" style="font-size:13px">也叫：梯度累积　梯度累加　gradient accumulation　grad accumulation　accumulation steps　累积步数　gradient_accumulation_steps　微批　micro-batch　microbatch　有效批大小　effective batch size　全局批大小　global batch size</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/gradient-accumulation">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>显存放不下想要的批大小时，把一个大批次拆成几个小批次依次前向、反向，梯度先累加起来，攒够了再更新一次参数。效果上等价于用大批次训练，代价是更慢。</b></p>
+<p class="tags">先要会：<a class="chip c" href="sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="batch-size-epoch.html">批大小、步数与轮数</a> <a class="chip c" href="backpropagation.html">反向传播</a></p>
+<p>训练时希望用较大的批大小（见<a class="lc" href="../c/batch-size-epoch.html">批大小、步数与轮数</a>）：梯度噪声更小、训练更稳，很多论文给出的超参数也是在大批次下调好的。但一个批次的激活值要全部存在显存里等待反向传播（见<a class="lc" href="../c/params-flops.html">参数量、计算量与显存</a>），单张GPU可能只放得下8个样本，而配方要求256。</p><p><b>做法</b>。设想要的批大小是B，每次只能放下b，令<code>k = B / b</code>：</p><p>1. 清零梯度； 2. 循环k次：取一个大小为b的小批次，前向算损失，把损失除以k，反向传播，梯度自动累加到参数的<code>.grad</code>上； 3. 循环结束后调用一次优化器更新参数，再清零。</p><p>因为总损失是k个小批次损失的平均，累加出来的梯度与一次性用B个样本算出的梯度在数学上相同（见<a class="lc" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a>）。</p><p><b>它和其他省显存手段的关系</b>。</p><ul><li><a class="ln" href="../n/grad-checkpointing.html">梯度检查点</a>：不存中间激活、反向时重算，用计算换显存，可以与梯度累积同时使用。</li><li>数据并行（见<a class="lc" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a>）：多张卡各算一部分样本再把梯度平均，相当于在“空间”上累积；梯度累积是在“时间”上累积。实际的大模型训练里，全局批大小 = 每卡微批大小 × 累积步数 × 数据并行卡数。</li><li><a class="ln" href="../n/mixed-precision.html">混合精度训练</a>训练时，梯度累积通常在FP32的主梯度上进行，避免多次相加的精度损失。</li></ul><p><b>不完全等价的地方</b>。依赖批内统计量的层会表现不同：<a class="ln" href="../n/batchnorm.html">Batch Normalization</a>在每个小批次上分别计算均值和方差，小批次太小时统计量很不准，这也是大模型普遍改用LayerNorm的原因之一（见<a class="lc" href="../c/normalization-layer.html">归一化层</a>）。另外，学习率调度和预热按“优化器步数”而不是“小批次数”计算。</p>
+<div class="example"><h4>例子</h4><p>目标批大小256，单卡最多放下32个样本，于是累积8步：每个小批次的损失除以8再反向，8次后更新一次。若有4张卡做数据并行、每卡微批32，只需累积2步就能得到256的全局批大小。代价：单卡时每次参数更新要串行做完8次前向和反向，GPU每次只处理32个样本，硬件利用率通常也比一次处理大批次低。</p></div>
+<h2>容易误解的地方</h2><ul><li>忘记把损失除以累积步数k，梯度会被放大k倍，相当于学习率变成k倍。</li><li>按token求平均的语言模型损失里，各小批次的有效token数不同时，简单地除以k并不精确，需要按总token数归一化。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

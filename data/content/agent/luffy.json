@@ -1,0 +1,34 @@
+{
+  "id": "luffy",
+  "who": "Jianhao Yan, Yafu Li, Zican Hu, Zhi Wang, Ganqu Cui, Xiaoye Qu, Yu Cheng, Yue Zhang · 西湖大学 / 上海人工智能实验室等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2504.14945"},
+    {"label": "GitHub", "url": "https://github.com/ElliottYan/LUFFY"}
+  ],
+  "aka": ["LUFFY", "Learning to reason Under oFF-policY guidance", "离策略引导", "off-policy guidance", "混合策略GRPO", "Mixed-Policy GRPO", "策略塑形", "policy shaping", "SFT与RL结合"],
+  "problem": "可验证奖励的强化学习是在策略的：模型只能从自己采样出的回答里学习，若某类题它一次都做不对，就永远拿不到正面信号，很难学到超出初始能力的推理；而直接用强模型的推理轨迹做监督微调，又容易变成生硬的模仿、泛化差。",
+  "idea": "在GRPO的每组采样里混入一条更强模型（DeepSeek-R1）写的正确推理轨迹，与模型自己的回答一起计算组内优势；再对这条外来轨迹的重要性权重做变换，加大模型原本认为概率很低、但其实关键的词元的学习信号，避免只学到表面模式。",
+  "impact": "在Qwen2.5-Math-7B上六个数学基准平均比此前的RLVR方法高6.4分、分布外任务高6.2分，并能训练纯在策略RL训不动的较弱模型；它把“RL里怎样用好离策略的示范数据”变成2025年RLVR的一个活跃方向。",
+  "background": "[[deepseek-r1]]之后，主流做法分两条：用R1的长推理轨迹蒸馏（监督微调），或在模型上直接做[[grpo]]式在策略强化学习。[[rlvr-boundary]]等工作发现，在策略RL主要是把模型已有的正确解法变得更常出现，很难扩展它的能力边界。能不能在RL里引入外部的好轨迹，又不退化成纯模仿？",
+  "method": "**混合策略GRPO**：每道题采样7条模型自己的回答，再加1条来自OpenR1-Math数据集、由DeepSeek-R1生成的正确轨迹。8条回答一起算组均值和优势——外来轨迹通常是对的，所以在模型全做错的难题上也有正优势。外来轨迹不是当前策略采样的，所以对它的梯度要乘上重要性权重 `π_θ(词元) / π_φ(词元)` 来校正（π_φ 是生成它的策略；作者把它近似为1，并对外来轨迹不做PPO式截断）。论文给出了这一目标的收敛性分析。\n\n**策略塑形**：作者观察到，单纯混合会让熵比纯在策略RL坍缩得更快——模型只强化外来轨迹里那些自己本来就会写的词，而忽略自己概率很低、代表新能力的关键词。于是把重要性权重 r 换成 `f(r) = r / (r + γ)`，γ取0.1。这个函数在 r 很小时斜率很大，等于放大低概率词元的梯度，鼓励模型真正学会它不熟悉的推理步骤。\n\n其他设置沿用[[dr-grpo]]，去掉长度归一化和标准差归一化；奖励只用Math-Verify判答案，不加格式或长度奖励。\n\n**结果**：在AIME24/25、AMC、OlympiadBench、Minerva、MATH-500上平均比此前RLVR方法高6.4分；在ARC-c、GPQA-diamond、MMLU-Pro三个分布外任务上平均高6.2分；同样优于“先SFT再RL”等组合方式。在Llama-3.1-8B上，纯在策略RL只能在简化数据上训练，LUFFY在各难度数据上都能训练。",
+  "legacy": "此后出现了大量“在RL中混入示范或提示”的工作（离策略引导、部分前缀提示、SFT与RL交替等），LUFFY常作为主要对照；其“放大低概率关键词元”的视角也与[[forking-tokens]]等关于少数高熵词元的研究相呼应。",
+  "limits": [
+    {"text": "需要一个更强的模型提供正确轨迹，能力上限在一定程度上仍受这个“老师”限制。", "solved_by": []},
+    {"text": "把生成外来轨迹的策略概率近似为1，重要性权重并不精确；塑形函数的γ也是经验设定。", "solved_by": []},
+    {"text": "只在数学推理上训练，外来轨迹混入比例（每组1条）等设置在代码、智能体任务上是否适用未验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "grpo", "type": "extends", "note": "把GRPO的组内优势扩展为在策略回答与离策略示范混合计算。"},
+    {"to": "deepseek-r1", "type": "uses", "note": "离策略示范轨迹由DeepSeek-R1生成（取自OpenR1-Math数据集）。"},
+    {"to": "rlvr-boundary", "type": "solves", "note": "该文指出在策略RLVR难以超出基础模型的能力边界；LUFFY引入外部轨迹，让模型在原本全错的题上也有学习信号。"},
+    {"to": "dr-grpo", "type": "uses", "note": "沿用其去掉长度归一化与标准差归一化的损失形式。"},
+    {"to": "limo", "type": "rivals", "note": "LIMO用少量精选长推理轨迹做监督微调；LUFFY把这类外部轨迹放进RL里与自采样回答混合学习，并报告优于单纯SFT。"}
+  ],
+  "prereq": ["on-off-policy", "importance-sampling", "policy-gradient-concept", "imitation-learning", "entropy"],
+  "terms": [
+    {"t": "离策略（off-policy）数据", "d": "不是由当前正在训练的模型生成的数据，例如另一个更强模型写的解答。"},
+    {"t": "重要性采样权重", "d": "用“当前模型生成它的概率/原生成者生成它的概率”给样本加权，校正数据来源不同带来的偏差。"}
+  ],
+  "learn": "先读[[grpo]]和[[c:importance-sampling]] → 读原文第3节混合策略目标（公式4）和策略塑形（图2） → 动手：画出 f(r)=r/(r+0.1) 及其导数，对比 r 本身，理解它为何放大低概率词元的梯度。",
+  "check": {"source": "https://arxiv.org/abs/2504.14945", "confirmed": "标题、作者、v1提交于2025-04-21；摘要中在策略RLVR局限、混合离策略示范、Mixed-Policy GRPO收敛保证、正则化重要性采样的策略塑形、六个数学基准+6.4与分布外+6.2、能训练在策略RL失败的弱模型；正文（arxiv.org/html/2504.14945）核对1条离策略加7条在策略、OpenR1-Math-220k与DeepSeek-R1轨迹、离策略不做截断、熵更快坍缩、f(x)=x/(x+γ)且γ=0.1、沿用Dr.GRPO、Math-Verify、ARC-c/GPQA-diamond/MMLU-Pro、Llama3.1-8B、与SFT+RL对比。π_φ取1已在正文核对；单位凭一般了解；未写venue。"}
+}

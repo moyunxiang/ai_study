@@ -1,0 +1,26 @@
+{
+ "id": "deepspeed-moe",
+ "who": "Samyam Rajbhandari, Conglong Li, Zhewei Yao, Minjia Zhang, Reza Yazdani Aminabadi, Ammar Ahmad Awan, Jeff Rasley, Yuxiong He · 微软",
+ "venue": "ICML 2022",
+ "aka": ["DeepSpeed-MoE", "PR-MoE", "Pyramid-Residual MoE", "MoS", "Mixture-of-Students", "MoE推理"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2201.05596"},
+  {"label": "GitHub", "url": "https://github.com/microsoft/DeepSpeed"}
+ ],
+ "problem": "MoE能用远低于同等质量稠密模型的算力训练，但参数总量大好几倍，推理时要把所有专家都放进显存并在多卡间分发token，当时缺少能快速、便宜地服务大MoE模型的方案。",
+ "idea": "在DeepSpeed里做一套端到端的MoE训练与推理方案：改模型结构（金字塔-残差MoE）和蒸馏出更小的学生MoE来减参数，再用专家并行、张量并行与定制内核组合的推理系统压低延迟。",
+ "impact": "让自回归语言模型的MoE从“训练便宜但没法部署”变得可服务，DeepSpeed的MoE模块成为后来开源MoE训练与推理常用的实现之一。",
+ "method": "[[sparse-moe]]、[[gshard]]、[[switch-transformer]]证明MoE用固定计算量就能把参数扩得很大，但主要在编码器-解码器模型上，而且推理时所有专家的参数都要常驻显存。论文先在自回归语言模型上验证：同等质量下MoE的训练成本约为稠密模型的五分之一。\n\n减参数有两招：**PR-MoE**（金字塔-残差MoE）让靠后的层用更多专家、靠前的层用更少专家，并让每个token固定经过一个稠密MLP、再加一个专家的输出作为残差修正；**MoS**（学生混合）用知识蒸馏把它压成层数更少的学生模型。合起来模型尺寸最多缩小3.7倍。推理系统则在[[zero]]所在的DeepSpeed中，把专家并行、张量并行和数据并行组合起来，并优化跨卡的all-to-all通信与MoE专用内核。\n\n摘要报告：比当时已有的MoE推理方案延迟和成本好7.3倍；与同等质量的稠密模型相比，推理最多快4.5倍、便宜9倍。",
+ "limits": [
+  {"text": "专家并行依赖大量跨卡all-to-all通信，规模越大通信越成瓶颈；固定专家容量下的丢token问题也没有从根上解决。", "solved_by": ["megablocks", "deepseek-infra-week"]}
+ ],
+ "relations": [
+  {"to": "sparse-moe", "type": "extends", "note": "沿用稀疏门控MoE的结构，把它推到自回归语言模型的训练与推理。"},
+  {"to": "gshard", "type": "extends", "note": "GShard给出了专家并行训练的做法，DeepSpeed-MoE补上了推理侧的系统与模型压缩。"},
+  {"to": "switch-transformer", "type": "solves", "note": "Switch等MoE参数总量巨大、难以部署，DeepSpeed-MoE用PR-MoE、蒸馏与推理系统缓解了这一问题。"},
+  {"to": "zero", "type": "uses", "note": "构建在DeepSpeed库之上，训练侧与ZeRO等显存优化共同使用。"}
+ ],
+ "prereq": ["mixture-of-experts", "knowledge-distillation", "distributed-training", "throughput-latency"],
+ "terms": [{"t": "专家并行", "d": "把MoE层里的不同专家放在不同GPU上，每个token通过all-to-all通信被发到它选中的专家所在的卡。"}],
+ "check": {"source": "https://arxiv.org/abs/2201.05596", "confirmed": "标题、八位作者、v1日期2022-01-14；摘要：自回归语言模型上MoE约5倍训练成本节省、新的MoE结构设计与模型压缩使模型最多缩小3.7倍、推理系统比现有MoE推理方案延迟与成本好7.3倍、比同等质量稠密模型推理快4.5倍且便宜9倍。PR-MoE与MoS的具体结构、ICML 2022为一般了解。"}
+}

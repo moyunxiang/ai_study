@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>残差流（Residual Stream） · AI脉络</title>
+<meta name="description" content="看待Transformer的一种视角：每个token有一条贯穿所有层的d维“主干”向量，各层的注意力和前馈模块都只是从中读取、再把自己的结果加回去。它是机制可解释性研究的基本框架。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/residual-stream.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="残差流（Residual Stream）">
+<meta property="og:description" content="看待Transformer的一种视角：每个token有一条贯穿所有层的d维“主干”向量，各层的注意力和前馈模块都只是从中读取、再把自己的结果加回去。它是机制可解释性研究的基本框架。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/residual-stream.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/residual-stream">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>残差流</h1><div class="full">Residual Stream</div>
+<p class="muted" style="font-size:13px">也叫：residual stream　残差流　残差主干　残差通路　residual pathway　残差流视角　共享黑板　中间层表示　hidden states　各层隐状态</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/residual-stream">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>看待Transformer的一种视角：每个token有一条贯穿所有层的d维“主干”向量，各层的注意力和前馈模块都只是从中读取、再把自己的结果加回去。它是机制可解释性研究的基本框架。</b></p>
+<p class="tags">先要会：<a class="chip c" href="residual-connection.html">残差连接</a> <a class="chip c" href="transformer-block.html">Transformer层的结构</a></p>
+<p>Transformer的每个子层都带残差连接（见<a class="lc" href="../c/residual-connection.html">残差连接</a>）：<code>x ← x + Attn(x)</code>，<code>x ← x + FFN(x)</code>。把公式展开，最后一层的输出等于：</p><p class="formula"><code>x_L = x_0 + Σ_层 Attn_l(…) + Σ_层 FFN_l(…)</code></p><p>其中x_0是词嵌入加位置信息（见<a class="lc" href="../c/token-embedding.html">词嵌入层</a>）。也就是说，最终表示是<b>所有模块输出的总和</b>。<a class="ln" href="../n/transformer-circuits.html">Transformer电路的数学框架</a>据此提出把这条不断被“加上东西”的向量称为<b>残差流</b>（residual stream）：它像一条总线或一块共享的黑板，每个模块从黑板上读一部分信息，处理后把结果写回黑板，自己并不覆盖别人写的内容。</p><p><b>这个视角带来什么</b>。</p><ul><li><b>模块之间通过残差流通信</b>。第3层的注意力头可以读取第1层某个头写进去的信息，不必经过中间层。这让研究者能把模型拆成一条条“电路”来分析（见<a class="lc" href="../c/circuit-discovery.html">电路发现与电路追踪</a>）。</li><li><b>可以随时“解码”</b>。最后一层的LM head（见<a class="lc" href="../c/lm-head.html">语言模型头与输出层</a>）读的就是残差流。<a class="ln" href="../n/logit-lens.html">Logit Lens</a>把LM head直接用在中间层的残差流上，发现模型往往在中间层就已经“想好”了答案的雏形；<a class="ln" href="../n/tuned-lens.html">Tuned Lens</a>给每层加一个小的变换使这种读出更准确。</li><li><b>方向即特征</b>。残差流的维度d有限（几千维），要表示的概念却远多于d个。研究认为模型把很多特征编码为残差流中近乎正交的方向，彼此叠加（<a class="ln" href="../n/superposition.html">叠加假说</a>）；<a class="lc" href="../c/sparse-autoencoder-interp.html">稀疏自编码器与字典学习</a>就是从残差流里把这些方向分解出来。</li><li><b>干预</b>。往残差流里加上某个方向的向量，可以改变模型行为，例如让回答更积极或更倾向拒答（见<a class="lc" href="../c/representation-steering.html">激活引导与表示工程</a>）。</li></ul><p><b>与架构的关系</b>。<a class="lc" href="../c/transformer-block.html">Transformer层的结构</a>是从“怎么搭”的角度讲同一个结构，残差流是从“信息怎么流”的角度讲。前置归一化（<a class="ln" href="../n/pre-ln.html">Pre-LN Transformer</a>）让主干上只有加法，没有被归一化打断，这也是残差流视角在现代模型上特别自然的原因；<a class="ln" href="../n/transformerlens.html">TransformerLens可解释性库</a>等工具库就以它为核心来组织激活的读取与修改。</p>
+<div class="example"><h4>例子</h4><p>一个2层、每层1个注意力头的玩具模型，处理第t个token：</p><p>输入是“法国的首都是”，当前位置是最后一个token“是”，要预测“巴黎”。</p><ul><li>x_0 = 嵌入(“是”) + 位置，维度d = 512。</li><li>第1层注意力写入a_1（比如从前文搬来“法国”“首都”的信息），FFN写入m_1。</li><li>第2层注意力写入a_2，FFN写入m_2。</li><li>最终 x_2 = x_0 + a_1 + m_1 + a_2 + m_2，LM head读取x_2预测下一个词。</li></ul><p>用logit lens看x_0 + a_1 + m_1（只到第1层），如果LM head已经把“巴黎”排在前列，说明这一信息在第1层就已经写进去了。</p></div>
+<h2>容易误解的地方</h2><ul><li>残差流视角是一种分析框架，并不意味着各模块的贡献可以简单相加来解释：后面的模块读到的是前面所有模块之和，非线性会让贡献相互纠缠。</li><li>归一化层会对残差流的读出做缩放，直接比较不同层的向量大小要小心。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>ElasticFusion面元SLAM（2015） · AI脉络</title>
+<meta name="description" content="用固定大小的体素网格融合深度图，只能重建一个小房间；而且只做帧到模型的跟踪，没有回环，走一圈回到原处时模型会错位。传统做法是建位姿图再优化，但稠密模型很难跟着位姿图一起改。 用“面元”（带位置、法向、颜色、半径的小圆片）而不是体素表示地图；发现回到见过的地方时，不优化位姿图，而是直接把整张稠密地图…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/elasticfusion.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ElasticFusion面元SLAM（2015）">
+<meta property="og:description" content="用固定大小的体素网格融合深度图，只能重建一个小房间；而且只做帧到模型的跟踪，没有回环，走一圈回到原处时模型会错位。传统做法是建位姿图再优化，但稠密模型很难跟着位姿图一起改。 用“面元”（带位置、法向、颜色、半径的小圆片）而不是体素表示地图；发现回到见过的地方时，不优化位姿图，而是直接把整张稠密地图…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/elasticfusion.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/elasticfusion">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 多视图几何与重建</div>
+<h1>ElasticFusion面元SLAM</h1>
+<div class="full">ElasticFusion: Dense SLAM Without A Pose Graph</div>
+<div class="meta"><span>2015.07</span><span>论文</span><span>延伸</span><span>RSS 2015</span><span>Thomas Whelan, Stefan Leutenegger, Renato Salas-Moreno, Ben Glocker, Andrew J. Davison · 帝国理工学院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.15607/rss.2015.xi.001" rel="noopener">DOI ↗</a><a class="btn sm" href="https://github.com/mp3guy/ElasticFusion" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/elasticfusion">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/kinectfusion.html">KinectFusion</a>用固定大小的体素网格融合深度图，只能重建一个小房间；而且只做帧到模型的跟踪，没有回环，走一圈回到原处时模型会错位。传统做法是建位姿图再优化，但稠密模型很难跟着位姿图一起改。</p></div><div><h4>方法</h4><p>用“面元”（带位置、法向、颜色、半径的小圆片）而不是体素表示地图；发现回到见过的地方时，不优化位姿图，而是直接把整张稠密地图当成可变形的物体，用一个稀疏的“形变图”把它非刚性地拉回对齐。</p></div><div><h4>影响</h4><p>以面元加地图形变实现了房间到楼层尺度、带回环的实时稠密RGB-D重建，成为稠密SLAM的经典开源系统和常用比较对象，面元表示也被后续很多工作沿用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>系统对每一帧RGB-D图像做三件事：</p><ul><li><b>跟踪</b>：把当前地图从上一帧位姿渲染出来，联合最小化几何误差（点到平面的ICP）和光度误差，求新相机位姿；</li><li><b>融合</b>：把新深度图的点并入面元地图，相近的面元按置信度加权平均位置、法向和颜色；地图分成“活跃”（最近看到的）和“不活跃”（一段时间没看到的）两部分；</li><li><b>形变回环</b>：当活跃部分与不活跃部分重新重合（局部回环），或用随机蕨（randomized ferns）编码的关键帧识别出回到旧地点（全局回环）时，求一组约束，把两部分对齐。对齐通过一个稀疏的<b>形变图</b>完成：图上每个节点带一个局部的仿射变换，地图里每个面元按附近节点的变换加权移动，于是整张地图被平滑地“掰”回一致。</li></ul><p>整个过程不维护位姿图，而是“以地图为中心”地持续修正，在GPU上实时运行。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>假设场景静止，运动的人或物体会污染地图；依赖深度相机，室外强光和远距离下深度不可用。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/droid-slam.html">DROID-SLAM</a></div></li><li>面元地图的内存随场景面积增长，难以扩展到整栋楼或城市尺度。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/orb-slam.html">ORB-SLAM</a><span class="yr">2015.02 · 视觉</span><div class=nt>ORB-SLAM用稀疏特征和位姿图做回环；ElasticFusion保留稠密地图，回环时直接形变地图而不建位姿图。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/kinectfusion.html">KinectFusion</a><span class="yr">2011.10 · 视觉</span><div class=nt>KinectFusion受固定体素体积限制、没有回环；ElasticFusion用面元地图和非刚性地图形变实现更大场景和回环。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/dtam.html">DTAM稠密单目SLAM</a><span class="yr">2011.11 · 视觉</span><div class=nt>同一实验室的稠密SLAM路线：跟踪时同样使用逐像素的光度误差，并与几何误差联合优化。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/droid-slam.html">DROID-SLAM</a><span class="yr">2021.08 · 视觉</span><div class=nt>假设场景静止，运动的人或物体会污染地图；依赖深度相机，室外强光和远距离下深度不可用。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a></p>
+<h2>本篇术语</h2><ul><li><b>面元（surfel）</b>　带有位置、法向、颜色和半径的小圆盘，许多面元拼起来表示物体表面。</li><li><b>形变图</b>　撒在地图上的稀疏节点，每个节点带一个局部变换；移动节点就能平滑地带动周围的地图点一起变形。</li></ul>
+<h2>怎么学</h2><p>先读KinectFusion理解TSDF融合和ICP跟踪，再读本文第4节的形变图与回环约束；可以用开源代码在TUM RGB-D或ICL-NUIM序列上跑一次，观察回环时地图被拉回对齐的过程。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.15607/rss.2015.xi.001" rel="noopener">https://doi.org/10.15607/rss.2015.xi.001</a>（Crossref记录：标题“ElasticFusion: Dense SLAM Without A Pose Graph”、作者Whelan、Leutenegger、Salas-Moreno、Glocker、Davison，Robotics: Science and Systems XI，2015-07-13；另有2016年IJRR扩展版。面元表示、ICP加光度联合跟踪、活跃与不活跃地图、随机蕨回环检测、形变图、GPU实时、机构凭一般了解写，没有读到原文。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ElasticFusion%E9%9D%A2%E5%85%83SLAM%EF%BC%88elasticfusion%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aelasticfusion%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/elasticfusion.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="crnn.html"><small>本分支上一个 · 2015.07</small><b>CRNN文字识别</b></a><a class="r" href="voxnet.html"><small>本分支下一个 · 2015.09</small><b>VoxNet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

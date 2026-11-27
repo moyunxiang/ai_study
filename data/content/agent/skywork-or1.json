@@ -1,0 +1,33 @@
+{
+  "id": "skywork-or1",
+  "who": "Jujie He, Jiacai Liu, Chris Yuhao Liu, Rui Yan, Chaojie Wang, Peng Cheng, Xiaoyu Zhang, Fuxiang Zhang et al. · 昆仑万维Skywork AI",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2505.22312"},
+    {"label": "GitHub", "url": "https://github.com/SkyworkAI/Skywork-OR1"}
+  ],
+  "aka": ["Skywork-OR1", "Skywork Open Reasoner", "天工推理模型", "MAGIC", "自适应熵控制", "adaptive entropy control", "熵坍缩", "entropy collapse"],
+  "problem": "在已经很强的长思维链蒸馏模型（DeepSeek-R1-Distill）上继续做强化学习，常见的现象是训练一段时间后模型输出变得越来越确定、熵迅速降到很低，之后成绩不再上升；各家报告对这个现象和对策说法不一。",
+  "idea": "给出一套在长思维链模型上做RL的完整配方MAGIC：多阶段逐步加长上下文、离线与在线过滤题目、只保留有区分度的样本组、去掉KL项，并用“目标熵”自动调节熵奖励系数，防止过早的熵坍缩；同时系统地做消融，找出影响熵变化的因素。",
+  "impact": "把32B蒸馏模型在AIME24、AIME25和LiveCodeBench上的平均成绩从57.8%提到72.8%，并完整开源权重、训练代码和数据；其中关于熵坍缩的系统实验是“RL中的熵为什么重要”这一讨论的重要实证来源。",
+  "background": "[[deepseek-r1]]发布了从R1蒸馏出的一系列小模型；在它们之上再做[[grpo]]式强化学习，成为2025年上半年开源界提升推理能力的主要办法。[[dapo]]等工作指出熵坍缩会限制探索，但何种因素导致坍缩、怎样控制，缺少系统的对照实验。",
+  "method": "**数据**：训练前去掉基础模型全对或全错的题；每个阶段开始时，再去掉上一阶段已经全对的题，让模型始终练难题。训练批次只保留组内回答有对有错（优势不为零）的题目。\n\n**训练策略**：仿照开源的DeepScaleR，分多个阶段逐步加大上下文长度，前期短、后期长，大幅节省计算；实验发现，对被截断的超长回答直接给负分并不妨碍后期提升，还更省词元，所以不做特殊屏蔽。\n\n**损失**：词元级的策略损失（对整批所有词元求平均，不按每个回答长度归一化）；去掉KL项——作者发现它在后期阶段明显拖累提升。\n\n**自适应熵控制**：在损失里加熵奖励 `α_k·H`，但不固定系数，而是设定一个目标熵：当前熵低于目标时自动调大 `α_k`，高于目标时调小，保证熵不会掉到目标以下。\n\n**熵坍缩的分析**：消融显示，每批数据做多次梯度更新（更偏离在策略）会加速坍缩，而过早坍缩的运行最终测试成绩更差。\n\n**结果**：32B模型三项平均从57.8%到72.8%，7B从43.6%到57.5%；32B在AIME24和AIME25上超过DeepSeek-R1和Qwen3-32B，LiveCodeBench上相当。",
+  "legacy": "与同期的[[entropy-rl]]、[[forking-tokens]]等工作一起，让“监控并控制策略熵”成为RLVR训练的常规环节；其开源数据与代码常被用作后续RL研究的起点。",
+  "limits": [
+    {"text": "建立在已经蒸馏过R1长思维链的模型上，提升里有多少来自RL本身、多少依赖蒸馏起点，没有完全分开。", "solved_by": []},
+    {"text": "目标熵仍是需要人工设定的超参数，合适的值随模型和数据变化。", "solved_by": []},
+    {"text": "只在数学和代码这类答案可自动判定的题目上训练和评测，向开放任务的推广未验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "grpo", "type": "extends", "note": "MAGIC是改造过的GRPO：词元级损失、去KL、过滤零优势组、自适应熵奖励。"},
+    {"to": "deepseek-r1", "type": "uses", "note": "以DeepSeek-R1-Distill系列为起点继续做RL，并在AIME上与R1对比。"},
+    {"to": "dapo", "type": "extends", "note": "同样关注熵坍缩与零优势样本，进一步给出按目标熵自动调节的控制方法和系统消融。"},
+    {"to": "entropy-rl", "type": "rivals", "note": "同期研究RL中的熵坍缩：该文从协方差角度解释机制并提出限制高协方差词元，本文用目标熵自适应调节熵奖励。"}
+  ],
+  "prereq": ["policy-gradient-concept", "entropy", "exploration-exploitation", "reward-design", "reasoning-tokens"],
+  "terms": [
+    {"t": "熵坍缩", "d": "强化学习中策略的输出分布越来越集中，几乎每次都生成同样的内容，模型失去探索新解法的能力。"},
+    {"t": "目标熵", "d": "预先设定的熵下限；训练中根据当前熵与它的差距自动调节熵奖励的权重。"}
+  ],
+  "learn": "先读[[grpo]]和[[dapo]] → 读原文第3.1节MAGIC配方和第4节熵坍缩的对照实验 → 动手：在小模型RL训练中记录每步的平均词元熵，比较每批更新1次和4次时的熵曲线。",
+  "check": {"source": "https://arxiv.org/abs/2505.22312", "confirmed": "标题、作者、v1提交于2025-05-28；摘要中基于R1-Distill、32B平均57.8%→72.8%、7B 43.6%→57.5%、32B在AIME24/25超过R1与Qwen3-32B、熵坍缩研究与完整开源；正文（arxiv.org/html/2505.22312）核对MAGIC名称、离线与在线过滤、非零优势组、仿DeepScaleR的多阶段加长、截断回答不屏蔽、词元级损失、去KL、目标熵tgt-ent调节α_k、离策略更新加速坍缩。单位按通讯邮箱kunlun-inc.com；未写venue。"}
+}

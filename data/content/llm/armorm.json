@@ -1,0 +1,35 @@
+{
+  "id": "armorm",
+  "who": "Haoxiang Wang, Wei Xiong, Tengyang Xie, Han Zhao, Tong Zhang · UIUC等",
+  "venue": "Findings of EMNLP 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2406.12845"},
+    {"label": "代码", "url": "https://github.com/RLHFlow/RLHF-Reward-Modeling"}
+  ],
+  "aka": ["ArmoRM", "Absolute-Rating Multi-Objective Reward Model", "多目标奖励模型", "可解释奖励模型", "ArmoRM-Llama3-8B", "MoE奖励模型"],
+  "problem": "常规奖励模型只输出一个黑箱分数，人看不出它为什么觉得一个回答好，也就难以发现它在偏爱啰嗦、讨好等错误特征，这些正是奖励作弊的入口。",
+  "idea": "先让奖励模型同时预测多个人能看懂的维度（诚实、安全、啰嗦程度等）的绝对评分，再用一个小的门控网络根据提示内容决定各维度的权重，加权得到最终分数，并显式扣除与长度相关的部分。",
+  "impact": "8B的ArmoRM-Llama3-8B发布时在RewardBench上排名第一，超过以GPT-4为评判的方法、接近340B的Nemotron-4奖励模型，成为2024年开源RLHF流程里常用的现成奖励模型。",
+  "background": "[[instructgpt]]式奖励模型用成对偏好训练，只学“谁更好”，输出一个标量。这个分数既不能解释，也容易混入与质量无关的偏好，比如偏爱更长的回答（见[[lc-alpacaeval]]对长度偏差的讨论）。同时，[[helpsteer2]]、[[ultrafeedback]]等数据集已经提供了按维度打分的绝对评分（有用性、正确性、啰嗦程度……），但成对训练用不上这些细粒度信息。",
+  "method": "**第一阶段：多目标绝对评分**。以Llama-3 8B为骨干，取回答最后一个词元的隐藏向量h，接一个线性层同时回归k个维度的评分（论文用了约十九个来自多个数据集的维度）：\n`r = W·h ∈ ℝ^k`\n每一维对应一个人能理解的目标，比如“诚实”“安全”“啰嗦”。只有这一层在多维评分数据上训练，骨干冻结。\n\n**第二阶段：混合专家式门控**。不同提示该看重的维度不同：写代码看正确性，敏感问题看安全。作者在提示的隐藏向量上接一个浅层[[c:mlp]]作为门控网络，输出非负、和为1的权重g(x)，最终奖励为\n`R(x,y) = Σ_i g_i(x) · r_i′(x,y)`\n其中r_i′是去掉了与“啰嗦”维度相关成分的评分，用来抑制长度偏差。门控网络用成对偏好数据和Bradley-Terry损失训练。\n\n这样每一次打分都能拆开看：哪几个维度贡献最大、门控给了它们多少权重。",
+  "results": "ArmoRM-Llama3-8B在RewardBench上取得当时最好成绩，以明显差距超过用GPT-4当评判的方法，接近大得多的Nemotron-4 340B奖励模型。",
+  "legacy": "ArmoRM与同组的[[rlhf-workflow]]一起被大量开源迭代DPO、SimPO类工作直接用作打分器；“多维评分+按提示加权”的可解释奖励思路被后续的多目标与条件奖励模型沿用。",
+  "limits": [
+    {"text": "可解释性停留在“哪些预设维度贡献了分数”，维度本身来自现有数据集的标注体系，标注质量和覆盖面决定了上限。", "solved_by": []},
+    {"text": "在RewardBench上的领先并不等于用作RL奖励时最好；后来发现奖励基准成绩与下游策略效果相关性有限。", "solved_by": ["rewardbench-2"]}
+  ],
+  "relations": [
+    {"to": "instructgpt", "type": "solves", "note": "InstructGPT式奖励模型输出不可解释的单一分数；ArmoRM拆成可读的多维评分再加权。"},
+    {"to": "helpsteer2", "type": "uses", "note": "用HelpSteer系列等数据集的多维绝对评分训练第一阶段。"},
+    {"to": "sparse-moe", "type": "uses", "note": "借用混合专家的门控思想，按提示内容为各目标分配权重。"},
+    {"to": "rewardbench", "type": "uses", "note": "主要用RewardBench评测并取得当时第一。"},
+    {"to": "llama-3", "type": "uses", "note": "以Llama-3 8B作为奖励模型骨干。"}
+  ],
+  "prereq": ["rlhf-concept", "linear-regression", "mixture-of-experts", "logistic-regression", "feature-representation"],
+  "terms": [
+    {"t": "绝对评分", "d": "给单个回答在某一维度上打一个分（比如1–5分），而不是比较两个回答谁更好。"},
+    {"t": "门控网络", "d": "一个小网络，根据输入算出一组权重，决定各个专家或各个目标在最终结果里占多少比重。"}
+  ],
+  "learn": "先读[[instructgpt]]的奖励模型和[[rewardbench]]；读本文第2–3节两阶段训练与长度去偏；动手：取一个开源奖励模型的最后层特征，用HelpSteer2的五个维度训练线性头，看各维度与回答长度的相关性。",
+  "check": {"source": "https://arxiv.org/abs/2406.12845", "confirmed": "标题、5位作者、arXiv首次提交2024-06-18；摘要中常规RM黑箱不可解释、两阶段方法、多维绝对评分且每一维对应可解释目标（诚实、啰嗦、安全）、MoE门控按上下文选择目标、Llama-3 8B与浅层MLP门控、RewardBench当时最好、明显超过GPT-4评判、接近Nemotron-4 340B奖励模型。约十九个维度、最后词元特征与线性回归、长度去偏方式、Findings of EMNLP 2024与机构为对正文的一般了解。"}
+}

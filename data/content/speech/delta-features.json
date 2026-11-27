@@ -1,0 +1,31 @@
+{
+  "id": "delta-features",
+  "who": "Sadaoki Furui · NTT",
+  "venue": "IEEE TASSP 1986",
+  "links": [
+    {"label": "IEEE", "url": "https://doi.org/10.1109/tassp.1986.1164788"}
+  ],
+  "problem": "识别特征（倒谱系数）每帧只描述一个约20毫秒的静态频谱快照，而区分音素的关键线索往往在频谱怎样随时间变化，例如辅音到元音的共振峰过渡。",
+  "idea": "对每一维倒谱系数在前后若干帧上做线性回归，取回归斜率作为「动态特征」（delta），与静态倒谱拼在一起作为识别输入。",
+  "impact": "静态特征加一阶、二阶差分（delta、delta-delta）成为此后三十年语音识别特征的标准配置，典型的39维MFCC输入就是13维静态加各13维一阶和二阶差分。",
+  "method": "20世纪80年代的识别系统用[[lpc]]倒谱或[[mfcc]]描述每一帧语音，再用[[dtw]]或HMM比较帧序列。单帧特征是静态的，帧与帧之间的变化只能靠模型去隐式捕捉；而在HMM里，每个状态的输出概率又假设帧与帧条件独立，很难利用变化趋势。\n\nFurui提出直接把**变化率**算成特征：对第t帧的第k维倒谱c_k，在前后各K帧（典型K=2，约±20–40毫秒）上拟合一条直线，斜率就是动态特征 `Δc_k(t) = Σ_{n=−K..K} n·c_k(t+n) / Σ n²`。它对频谱的缓慢整体偏移（如电话信道的固定频率响应）不敏感，因为常数偏移在差分中被消掉了。论文在说话人无关的孤立词识别上，把这种回归系数与静态倒谱结合，报告了比只用静态特征明显更好的结果（具体数字未核对）。\n\n后来人们把同样的回归再做一次得到二阶差分（加速度特征）。在HMM时代，「MFCC＋Δ＋ΔΔ」几乎是所有系统的默认输入，[[htk]]和[[kaldi]]都内置这一计算。参数语音合成（[[hts]]）也借用动态特征来生成平滑的参数轨迹。",
+  "limits": [
+    {"text": "差分窗口长度是固定的手工选择，只能捕捉几十毫秒范围内的局部变化。", "solved_by": ["tdnn-kaldi", "lstm-am"]},
+    {"text": "神经网络声学模型能直接从拼接的多帧或原始频谱中学到动态信息，显式差分逐渐变得多余。", "solved_by": ["cd-dnn-hmm"]}
+  ],
+  "relations": [
+    {"to": "lpc", "type": "uses", "note": "在LPC导出的倒谱系数上计算回归斜率作为动态特征。"},
+    {"to": "cepstrum", "type": "extends", "note": "在倒谱的静态描述之外，加入倒谱随时间的变化率。"},
+    {"to": "mfcc", "type": "extends", "note": "后来最常见的用法是在MFCC上计算一阶、二阶差分。"}
+  ],
+  "prereq": ["waveform-spectrogram", "linear-regression", "phoneme-acoustic", "feature-representation"],
+  "terms": [
+    {"t": "动态特征（delta）", "d": "特征随时间的变化率，用前后几帧的线性回归斜率计算。"},
+    {"t": "二阶差分（delta-delta）", "d": "对一阶差分再求一次变化率，相当于加速度。"}
+  ],
+  "aka": ["delta特征", "差分特征", "动态特征", "delta-delta", "Δ特征", "回归系数"],
+  "check": {
+    "source": "https://doi.org/10.1109/tassp.1986.1164788",
+    "confirmed": "Crossref记录：标题Speaker-independent isolated word recognition using dynamic features of speech spectrum、作者S. Furui、IEEE TASSP 1986-02。回归公式、K取值、对信道偏移不敏感、39维配置为一般了解，未逐项对照原文；论文中的具体识别率未写。"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "rtrl",
+  "who": "Ronald J. Williams, David Zipser · 美国东北大学、加州大学圣迭戈分校",
+  "venue": "Neural Computation 1989",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1162/neco.1989.1.2.270"}
+  ],
+  "aka": ["RTRL", "Real-Time Recurrent Learning", "实时循环学习", "前向模式梯度", "Teacher Forcing", "教师强制"],
+  "problem": "[[backprop]]只适用于前馈网络；带任意反馈连接、在时间上一直运行的循环网络怎么算梯度？把整段序列存下来再倒着算，既费内存，也做不到边运行边学习。",
+  "idea": "沿时间向前递推每个神经元状态对每个权重的偏导（敏感度），每读入一个输入就能立即得到精确梯度并更新权重，不需要存储历史；同时提出在训练时把网络的输出替换成正确答案再喂回去的教师强制技巧。",
+  "impact": "与[[bptt]]并列为训练循环网络的两种基本梯度算法：BPTT省计算但要存整段历史，RTRL能在线学习但代价高；“教师强制”成为此后所有自回归序列模型的默认训练方式。",
+  "method": "考虑一个全连接的循环网络，n个神经元，每个时刻的状态 `y_k(t+1) = f(Σ_l w_kl·z_l(t))`，z包括上一时刻的所有神经元输出和当前外部输入。RTRL维护敏感度 `p^k_ij(t) = ∂y_k(t)/∂w_ij`，并按链式法则沿时间向前递推：`p^k_ij(t+1) = f'(s_k(t))·[Σ_l w_kl·p^l_ij(t) + δ_ik·z_j(t)]`。每一时刻用当前误差乘以敏感度，立刻得到损失对每个权重的梯度并更新，因此可以边运行边学，序列多长都不用存。\n\n代价是敏感度有 `n×n²` 个，每步更新需要约 `O(n⁴)` 的计算，网络稍大就算不动。这正是后来人们多用截断的[[bptt]]、而RTRL主要作为“精确在线梯度”的理论参照的原因。\n\n论文还提出了**教师强制**（teacher forcing）：训练时，把网络在某一步本该输出的正确值（而不是网络自己的输出）喂回给下一步。这样误差不会沿时间不断累积，训练更快更稳；它也带来了训练与推理不一致的曝光偏差问题（见[[c:teacher-forcing]]）。作者用这套方法让网络学会了延迟记忆、类似图灵机的状态控制等任务。",
+  "limits": [
+    {"text": "每步需要约O(n⁴)计算和O(n³)存储，网络规模一大就无法使用。", "solved_by": []},
+    {"text": "教师强制让训练时总看到正确的历史，推理时却要接着自己的输出生成，错误会累积（曝光偏差）。", "solved_by": ["scheduled-sampling"]}
+  ],
+  "relations": [
+    {"to": "backprop", "type": "extends", "note": "把梯度下降从前馈网络推广到在时间上持续运行、带任意反馈连接的循环网络。"},
+    {"to": "jordan-network", "type": "solves", "note": "Jordan网络只有固定的输出反馈；RTRL给出任意全连接循环网络的精确在线梯度。"},
+    {"to": "hopfield", "type": "extends", "note": "Hopfield网络的循环连接靠能量函数设定；RTRL让循环连接可以按任务误差学出来。"}
+  ],
+  "prereq": ["recurrent-layer", "chain-rule", "backpropagation", "big-o", "teacher-forcing"],
+  "terms": [
+    {"t": "前向模式梯度", "d": "沿计算的方向同步维护“状态对参数的导数”，算到哪梯度就到哪；与反向传播从输出往回算正好相反。"}
+  ],
+  "learn": "先读[[backprop]]和[[c:chain-rule]]；对照[[bptt]]理解两种算法在内存和计算上的取舍；用numpy写一个5个神经元的RTRL，学习“延迟3步复述输入”的任务。",
+  "check": {"source": "https://doi.org/10.1162/neco.1989.1.2.270", "confirmed": "Crossref记录：标题、2位作者、Neural Computation第1卷第2期、1989-06。敏感度递推公式、O(n⁴)复杂度、教师强制的提出与所演示的任务、机构均来自一般了解，没有对照原文。"}
+}

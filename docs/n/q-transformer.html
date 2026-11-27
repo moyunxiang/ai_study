@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Q-Transformer自回归Q函数（2023） · AI脉络</title>
+<meta name="description" content="机器人大规模多任务数据里既有人类示范也有自主采集的失败尝试；模仿学习用不好后者，而离线Q学习在高维连续动作上又难以和Transformer这样的大模型结合。 把动作的每一维离散成若干档，每一维的Q值作为一个token，像语言模型一样按维度自回归地预测；用离线TD备份加保守正则训练这个“Transf…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/q-transformer.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Q-Transformer自回归Q函数（2023）">
+<meta property="og:description" content="机器人大规模多任务数据里既有人类示范也有自主采集的失败尝试；模仿学习用不好后者，而离线Q学习在高维连续动作上又难以和Transformer这样的大模型结合。 把动作的每一维离散成若干档，每一维的Q值作为一个token，像语言模型一样按维度自回归地预测；用离线TD备份加保守正则训练这个“Transf…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/q-transformer.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/q-transformer">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 离线RL与序列建模</div>
+<h1>Q-Transformer自回归Q函数</h1>
+<div class="full">Q-Transformer: Scalable Offline Reinforcement Learning via Autoregressive Q-Functions</div>
+<div class="meta"><span>2023.09</span><span>论文</span><span>延伸</span><span>CoRL 2023</span><span>Yevgen Chebotar, Quan Vuong, Alex Irpan, Karol Hausman, Fei Xia, Yao Lu, Aviral Kumar, Tianhe Yu et al. · Google DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2309.10150" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://qtransformer.github.io" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/q-transformer">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>机器人大规模多任务数据里既有人类示范也有自主采集的失败尝试；模仿学习用不好后者，而离线Q学习在高维连续动作上又难以和Transformer这样的大模型结合。</p></div><div><h4>方法</h4><p>把动作的每一维离散成若干档，每一维的Q值作为一个token，像语言模型一样按维度自回归地预测；用离线TD备份加保守正则训练这个“Transformer形式的Q函数”。</p></div><div><h4>影响</h4><p>展示了离线Q学习可以像RT-1那样用Transformer做规模化训练，是“大模型+价值学习”路线的一个代表，常被后来的机器人离线RL和VLA加RL的工作引用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>连续动作空间里做Q学习，最大的麻烦是 <code>max_a Q(s, a)</code> 很难算。Q-Transformer的做法是把动作拆开：</p><ul><li>每个动作维度均匀离散成256档；</li><li>把第i维的选择看成一个“token”，Transformer以状态（图像和语言指令）和前i−1维已选的值为条件，输出第i维每一档的Q值：<code>Q(s, a_1:i−1, a_i)</code>；</li><li>取max时按维度依次贪心：先选第1维最好的档，再在它的条件下选第2维……把指数大的联合动作空间变成线性次数的逐维最大化。</li></ul><p>逐维的贝尔曼备份里，中间维度的目标是下一维的最大Q值，最后一维的目标才是 <code>r + γ max Q(s′, ·)</code>。为适配离线训练，作者加了几项设计：类似<a class="ln" href="../n/cql.html">离线强化学习CQL</a>的保守正则，把没在数据里出现的动作档Q值压向0（奖励为非负的稀疏成功信号）；用蒙特卡洛回报作为Q值下界加速传播；n步回报。</p><p>骨干沿用<a class="ln" href="../n/rt-1.html">RT-1</a>的结构。摘要称在大型多样的真实机器人操作任务集上，Q-Transformer超过了此前的离线RL算法和模仿学习方法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>逐维贪心取max只是联合最大的近似，动作维度之间强耦合时可能选不到真正最好的组合。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>依赖大量真实机器人数据和稀疏的成功奖励，在奖励更复杂或数据较少的场景下效果没有验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:96" href="../n/qt-opt.html">QT-Opt</a><span class="yr">2018.06 · 具身·世界模型</span><div class=nt>同属谷歌机器人用Q学习做抓取和操作的路线，从CEM取max换成逐维自回归取max。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/decision-transformer.html">Decision Transformer</a><span class="yr">2021.06 · RL</span><div class=nt>DT用Transformer做回报条件的模仿；Q-Transformer用Transformer表示Q函数并做TD学习。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/rt-1.html">RT-1</a><span class="yr">2022.12 · 具身·世界模型</span><div class=nt>骨干网络和动作离散化方式沿用RT-1。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/cql.html">离线强化学习CQL</a><span class="yr">2020.06 · RL</span><div class=nt>加入CQL式的保守正则，压低数据外动作档的Q值。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/offline-rl.html">离线强化学习</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/bellman-equation.html">Bellman方程</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a></p>
+<h2>本篇术语</h2><ul><li><b>逐维离散化</b>　把连续动作的每一维单独切成若干档，变成多个小的离散选择。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/rt-1.html">RT-1</a>和<a class="ln" href="../n/cql.html">离线强化学习CQL</a>；读Q-Transformer原文第4节的逐维备份公式；在一个二维连续动作的小环境里实现逐维取max，对比联合离散化的计算量。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2309.10150" rel="noopener">https://arxiv.org/abs/2309.10150</a>（标题、作者列表（共25位，前八位与Google DeepMind）、arXiv v1于2023-09-18；摘要中多任务大规模离线数据含人类示范和自主数据、Transformer表示Q函数并做离线TD备份、每个动作维度离散化并作为单独token、在大型真实机器人操作任务集上超过离线RL和模仿学习。256档、保守正则、蒙特卡洛下界等细节按原文正文通行描述；CoRL 2023按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Q-Transformer%E8%87%AA%E5%9B%9E%E5%BD%92Q%E5%87%BD%E6%95%B0%EF%BC%88q-transformer%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aq-transformer%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/q-transformer.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="minigrid.html"><small>本分支上一个 · 2023.06</small><b>Minigrid与Miniworld</b></a><a class="r" href="motif.html"><small>本分支下一个 · 2023.09</small><b>Motif AI反馈内在奖励</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

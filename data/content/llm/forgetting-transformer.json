@@ -1,0 +1,32 @@
+{
+  "id": "forgetting-transformer",
+  "who": "Zhixuan Lin, Evgenii Nikishin, Xu Owen He, Aaron Courville · Mila、蒙特利尔大学等",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2503.02130"},
+    {"label": "GitHub", "url": "https://github.com/zhixuan-lin/forgetting-transformer"}
+  ],
+  "aka": ["FoX", "Forgetting Transformer", "遗忘注意力", "Forgetting Attention", "带遗忘门的softmax注意力"],
+  "problem": "LSTM、Mamba、GLA等循环模型都靠遗忘门决定“多快忘掉旧信息”，这是它们的关键部件；Transformer没有显式循环形式，似乎无法直接装上遗忘门，只能靠位置编码间接表达远近。",
+  "idea": "把遗忘门写成对未归一化注意力分数的、依赖数据的衰减：每个位置算一个遗忘门 `f_t = σ(w·x_t + b)`，从位置j到i的分数加上 `Σ_{l=j+1..i} log f_l`，越远、门越小的位置被压得越低，仍然是softmax注意力。",
+  "impact": "FoX在长上下文语言建模、长度外推和短上下文下游任务上都超过标准Transformer，不需要任何位置编码，且兼容FlashAttention；它把循环模型的遗忘门思想带回了softmax注意力，是2025年“注意力与循环融合”路线中被频繁比较的基线之一。",
+  "method": "背景：门控线性注意力（[[gla]]）、[[mamba-2]]、[[gated-deltanet]]都依赖随数据变化的遗忘门来控制记忆衰减；[[alibi]]则用一个与位置距离成正比的固定偏置让远处的注意力变弱，但它与内容无关。\n\n**遗忘注意力**：对每个时刻t计算标量遗忘门 `f_t = σ(w_fᵀ x_t + b_f) ∈ (0,1)`（每个头一个）。令 `F_ij = Π_{l=j+1}^{i} f_l`，注意力改为\n\n`o_i = Σ_j F_ij · exp(q_iᵀk_j) v_j / Σ_j F_ij · exp(q_iᵀk_j)`\n\n等价地，在对数域里给分数加偏置 `D_ij = Σ_{l=j+1}^{i} log f_l`，即 `softmax(QKᵀ + D)`。D可以用前缀和一次算出，作为加到注意力分数上的偏置矩阵，所以能直接放进[[flashattention-2]]这类分块实现。若所有f都等于同一个常数，它就退化成ALiBi式的线性距离衰减；f依赖内容时，模型可以在某些位置“清空记忆”，在另一些位置长期保留。\n\n作者还提出“Pro”块设计，把循环模型中常见的组件（如输出门、QK归一化、短卷积）加入，发现它同时提升FoX和Transformer。\n\n结果：摘要称FoX在长上下文语言建模、长度外推和短上下文下游任务上优于Transformer，在长上下文下游任务上与Transformer相当，不需要位置编码；大海捞针等分析显示它保留了Transformer相对Mamba-2、HGRN2、DeltaNet等循环模型在长上下文上的优势。",
+  "limits": [
+    {"text": "仍是完整的softmax注意力，计算随长度平方增长、需要完整KV缓存，遗忘门本身并不降低推理开销（作者后续工作才研究按遗忘门裁剪KV）。", "solved_by": []},
+    {"text": "实验规模在数亿到十亿参数左右，与RoPE相比在大规模预训练和长上下文下游任务上的收益尚未在主流大模型中得到验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "extends", "note": "保留softmax注意力，只在分数上加一项由遗忘门累积得到的对数偏置。"},
+    {"to": "alibi", "type": "extends", "note": "ALiBi是固定的线性距离衰减，FoX让衰减速度随内容变化；遗忘门取常数时退化为ALiBi式偏置。"},
+    {"to": "gla", "type": "uses", "note": "借用门控线性注意力等循环模型中的数据依赖遗忘门。"},
+    {"to": "mamba-2", "type": "rivals", "note": "与Mamba-2等循环模型比较，FoX在长上下文检索上保留了注意力的优势。"},
+    {"to": "flashattention-2", "type": "uses", "note": "遗忘偏置可写成加到分数上的矩阵，能放进FlashAttention式的分块计算。"}
+  ],
+  "prereq": ["self-attention", "gating", "positional-encoding", "recurrent-layer", "softmax"],
+  "terms": [
+    {"t": "遗忘门（forget gate）", "d": "循环网络里一个0到1之间的系数，乘在旧状态上，决定保留多少过去的信息。"},
+    {"t": "长度外推", "d": "模型在比训练时更长的序列上仍能正常工作的能力。"}
+  ],
+  "learn": "先补[[c:gating]]和[[alibi]]；读原文第2节从遗忘门推出对数偏置的推导；动手：在小GPT里去掉RoPE，加上 `D = cumsum(log f)` 形式的偏置，训练后在2倍训练长度上比较困惑度。",
+  "check": {"source": "https://arxiv.org/abs/2503.02130", "confirmed": "标题、4位作者、arXiv v1提交日2025-03-03；摘要中以数据依赖方式降低未归一化注意力分数来引入遗忘门、命名Forgetting Attention与FoX、在长上下文语言建模/长度外推/短上下文下游任务上优于Transformer而在长上下文下游任务上相当、兼容FlashAttention、不需要位置编码、大海捞针显示优于Mamba-2/HGRN2/DeltaNet、Pro块设计同时提升FoX与Transformer。门的具体公式、Pro块组成、ICLR 2025与机构为一般了解。"}
+}

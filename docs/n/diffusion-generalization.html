@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>扩散模型泛化与调和基（2023） · AI脉络</title>
+<meta name="description" content="扩散模型能生成高质量新图，看起来像是绕开了维数灾难；可同期又有报告发现它会背下训练图。它学到的到底是数据的真实密度，还是训练集的拷贝？ 把训练集拆成两半不重叠的子集分别训练两个去噪网络，看它们学到的分数函数是否一致；再分析去噪器在每张图附近的线性化，找出网络自带的归纳偏置。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/diffusion-generalization.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="扩散模型泛化与调和基（2023）">
+<meta property="og:description" content="扩散模型能生成高质量新图，看起来像是绕开了维数灾难；可同期又有报告发现它会背下训练图。它学到的到底是数据的真实密度，还是训练集的拷贝？ 把训练集拆成两半不重叠的子集分别训练两个去噪网络，看它们学到的分数函数是否一致；再分析去噪器在每张图附近的线性化，找出网络自带的归纳偏置。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/diffusion-generalization.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/diffusion-generalization">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 扩散与流匹配</div>
+<h1>扩散模型泛化与调和基</h1>
+<div class="full">Generalization in diffusion models arises from geometry-adaptive harmonic representations</div>
+<div class="meta"><span>2023.10</span><span>论文</span><span>延伸</span><span>ICLR 2024</span><span>Zahra Kadkhodaie, Florentin Guth, Eero P. Simoncelli, Stéphane Mallat · 纽约大学、Flatiron研究所、法兰西公学院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2310.02557" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/diffusion-generalization">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>扩散模型能生成高质量新图，看起来像是绕开了维数灾难；可同期又有报告发现它会背下训练图。它学到的到底是数据的真实密度，还是训练集的拷贝？</p></div><div><h4>方法</h4><p>把训练集拆成两半不重叠的子集分别训练两个去噪网络，看它们学到的分数函数是否一致；再分析去噪器在每张图附近的线性化，找出网络自带的归纳偏置。</p></div><div><h4>影响</h4><p>用干净的实验区分了“记忆”与“泛化”两种状态，并把泛化归因到网络偏好的几何自适应调和基，成为讨论扩散模型为何能泛化时最常引用的分析工作之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>实验设计：在同一类人脸图上，用两份互不重叠的训练集各训一个去噪网络，然后从同一个初始噪声出发各自采样。训练图很少时，两个模型各自吐出自己训练集里的图（记忆）；训练图增加到足够多之后，两个模型从同一噪声生成几乎相同的新图，说明它们学到了几乎相同的分数函数、也就是同一个密度，而且生成图与训练集都不同（强泛化）。</p><p>机制分析：去噪器在某个输入附近可以近似成一个线性映射，对它做特征分解，相当于在一组“自适应基”上对系数做收缩（大系数保留、小系数压掉）。作者发现这些基向量沿着图像轮廓和平滑区域呈振荡的调和结构，称为几何自适应调和基（GAHB）。在已知最优基就是GAHB的合成图像类上，网络的去噪性能接近最优；而在最优基不是GAHB的低维流形数据上，网络仍然学出GAHB，说明这是网络自己的归纳偏置，而不是数据逼出来的。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>实验集中在小分辨率的人脸和合成图像上，强泛化所需的样本量与模型规模、数据复杂度之间的定量关系还不清楚。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/diffusion-memorization.html">扩散模型为何不记忆</a></div></li><li>GAHB是对现象的刻画，网络为什么偏好这类基（架构、训练动力学各占多少）仍未给出理论证明。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/ddpm.html">DDPM</a><span class="yr">2020.06 · 生成</span><div class=nt>研究对象就是DDPM式训练得到的去噪网络和反向扩散采样。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/score-matching.html">分数匹配生成模型</a><span class="yr">2019.07 · 生成</span><div class=nt>沿分数生成模型的视角，追问学到的分数函数是不是真实数据密度的分数。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/edm.html">EDM设计空间</a><span class="yr">2022.06 · 生成</span><div class=nt>采样与去噪器的设定沿用了EDM式的连续噪声水平参数化。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/diffusion-convergence.html">扩散采样收敛理论</a><span class="yr">2022.09 · 生成</span><div class=nt>结论以分数已经学好为前提，没有回答用有限样本和神经网络能否、需要多少数据才能把分数学到这个精度。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/diffusion-memorization.html">扩散模型为何不记忆</a><span class="yr">2025.05 · 生成</span><div class=nt>实验集中在小分辨率的人脸和合成图像上，强泛化所需的样本量与模型规模、数据复杂度之间的定量关系还不清楚。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/score-function.html">分数函数与分数匹配</a> <a class="chip c" href="../c/generalization.html">泛化与过拟合</a> <a class="chip c" href="../c/eigen-svd.html">特征分解与奇异值分解</a> <a class="chip c" href="../c/inductive-bias.html">归纳偏置</a> <a class="chip c" href="../c/curse-of-dimensionality.html">维度灾难</a></p>
+<h2>本篇术语</h2><ul><li><b>收缩</b>　在某组基下把信号分解成系数，大的系数基本保留、小的系数压向0；经典的小波去噪就是这样做的。</li><li><b>强泛化</b>　文中指两个在不同数据上训练的模型生成几乎相同的样本，说明结果由数据分布决定而非由具体训练样本决定。</li></ul>
+<h2>怎么学</h2><p>先读DDPM和Tweedie公式对去噪与分数关系的说明 → 读本文第2节的两份子集实验和第3节的去噪器特征分解 → 在MNIST上用不同大小的训练集复现“记忆到泛化”的转变。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2310.02557" rel="noopener">https://arxiv.org/abs/2310.02557</a>（标题、四位作者、v1日期2023-10-04、摘要中两个在不重叠子集上训练的网络学到几乎相同分数函数、强泛化区生成图不同于训练集、归纳偏置表现为自适应基下的收缩、轮廓与平滑区的振荡调和结构、在低维流形数据上仍出现、在最优基为GAHB的图像类上接近最优；机构、ICLR 2024、人脸数据与EDM式设定来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%89%A9%E6%95%A3%E6%A8%A1%E5%9E%8B%E6%B3%9B%E5%8C%96%E4%B8%8E%E8%B0%83%E5%92%8C%E5%9F%BA%EF%BC%88diffusion-generalization%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adiffusion-generalization%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/diffusion-generalization.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="wonder3d.html"><small>本分支上一个 · 2023.10</small><b>Wonder3D跨域多视图</b></a><a class="r" href="alignprop.html"><small>本分支下一个 · 2023.10</small><b>AlignProp奖励反传</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

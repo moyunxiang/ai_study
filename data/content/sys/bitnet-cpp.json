@@ -1,0 +1,24 @@
+{
+ "id": "bitnet-cpp",
+ "who": "Jinheng Wang, Hansong Zhou, Ting Song, Shaoguang Mao, Shuming Ma, Hongyu Wang, Yan Xia, Furu Wei · 微软研究院",
+ "aka": ["bitnet.cpp", "1-bit AI Infra", "三值模型推理", "ternary inference", "BitNet推理框架"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2410.16144"},
+  {"label": "GitHub", "url": "https://github.com/microsoft/BitNet"}
+ ],
+ "problem": "BitNet b1.58这类权重只取−1、0、+1的三值模型理论上又快又省电，但通用推理框架把它当普通低比特模型处理，算不出应有的速度，也难保证与训练时完全一致的结果。",
+ "idea": "专门为三值权重写一套CPU内核（基于查表和三值打包等做法），在x86和ARM上做到无损、快速地运行BitNet b1.58模型。",
+ "impact": "是1比特（1.58比特）模型的官方推理框架，让BitNet路线从论文里的理论收益变成笔记本CPU上可以实际运行的模型。",
+ "method": "[[bitnet]]的b1.58版本把每个权重限制在 {−1, 0, +1}，矩阵乘中的乘法因此只剩加、减和跳过。但现有框架（如[[llama-cpp]]）的低比特内核是为4比特、2比特这类均匀量化设计的，处理三值权重时要么要先转换格式，要么做不到与原模型逐位一致的“无损”推理。\n\nbitnet.cpp在llama.cpp的框架上添加了专门针对三值权重的内核：把三值权重紧凑打包，并借鉴[[t-mac]]的查表思路，把若干个激活与三值权重组合的结果预先算好、按权重编码查表累加；也提供直接做整数加减的内核变体，在不同CPU与模型尺寸下各有优势。所有内核都保证与全精度参考实现的结果一致。\n\n摘要报告：x86 CPU上相对基线加速2.37–6.17倍，ARM CPU上加速1.37–5.07倍，随模型尺寸不同而变化。",
+ "limits": [
+  {"text": "只对原生用三值权重训练的模型有效，已有的FP16模型不能直接受益；高质量的大尺寸BitNet模型仍很少。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "bitnet", "type": "uses", "note": "为BitNet b1.58的三值权重模型提供专用推理内核。"},
+  {"to": "llama-cpp", "type": "extends", "note": "在llama.cpp的框架上加入三值权重专用内核，以它为速度对比基线。"},
+  {"to": "t-mac", "type": "uses", "note": "借鉴T-MAC的查表式低比特矩阵乘内核。"}
+ ],
+ "prereq": ["quantization-concept", "matrix-multiplication", "cpu-gpu", "training-vs-inference"],
+ "terms": [{"t": "三值权重", "d": "每个权重只能取−1、0、+1三个值，约需1.58比特（log₂3）存储，乘法退化为加减。"}],
+ "check": {"source": "https://arxiv.org/abs/2410.16144", "confirmed": "标题、八位作者、v1日期2024-10-21；摘要：BitNet与BitNet b1.58提升速度与能效、推出bitnet.cpp软件栈、一组支持三值BitNet b1.58在CPU上快速无损推理的内核、x86上2.37–6.17倍、ARM上1.37–5.07倍。基于llama.cpp、查表与整数加减两类内核、借鉴T-MAC为一般了解。"}
+}

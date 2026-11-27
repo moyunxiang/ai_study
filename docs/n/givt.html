@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>GIVT连续token生成（2023） · AI脉络</title>
+<meta name="description" content="Transformer做图像生成都要先把图像量化成有限码本里的离散token（VQ-GAN、MaskGIT），量化丢信息，码本训练也麻烦。能不能让Transformer直接生成实数向量序列？ 只对解码器式Transformer做两处改动：输入端把查词表换成对实数向量的线性投影；输出端把对词表的lo…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/givt.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="GIVT连续token生成（2023）">
+<meta property="og:description" content="Transformer做图像生成都要先把图像量化成有限码本里的离散token（VQ-GAN、MaskGIT），量化丢信息，码本训练也麻烦。能不能让Transformer直接生成实数向量序列？ 只对解码器式Transformer做两处改动：输入端把查词表换成对实数向量的线性投影；输出端把对词表的lo…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/givt.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/givt">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 自回归与视觉分词</div>
+<h1>GIVT连续token生成</h1>
+<div class="full">GIVT: Generative Infinite-Vocabulary Transformers</div>
+<div class="meta"><span>2023.12</span><span>论文</span><span>延伸</span><span>ECCV 2024</span><span>Michael Tschannen, Cian Eastwood, Fabian Mentzer · Google DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2312.02116" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/givt">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Transformer做图像生成都要先把图像量化成有限码本里的离散token（VQ-GAN、MaskGIT），量化丢信息，码本训练也麻烦。能不能让Transformer直接生成实数向量序列？</p></div><div><h4>方法</h4><p>只对解码器式Transformer做两处改动：输入端把查词表换成对实数向量的线性投影；输出端把对词表的logits换成一个多元高斯混合模型的参数。于是可以直接对β-VAE的连续隐变量序列做自回归或掩码式生成。</p></div><div><h4>影响</h4><p>较早证明了“不量化的连续token”也能用Transformer建模，在类条件生成上超过VQ-GAN与MaskGIT，与半年后用扩散头的MAR一起推动了连续token自回归这条路线。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>离散token的语言模型在每个位置输出一个K类的softmax分布。GIVT把每个位置的输出换成k个分量的高斯混合：网络输出混合权重、每个分量的均值和（对角）方差，训练时直接最大化真实下一个向量在这个混合分布下的对数似然，采样时先选分量再从高斯里采样。输入端，上一步的实数向量经线性层映射到模型维度，替代查表。</p><p>要让这样的连续序列好建模，隐空间不能太“复杂”：作者用β-VAE作为分词器，通过调节β控制隐变量里的信息量与平滑程度，发现必须有足够的KL正则，GIVT才学得好。此外，作者把语言模型里的技巧搬了过来，如温度采样、无分类器引导，并给出了在连续分布上的对应做法；同一框架既可以按光栅顺序自回归，也可以像MaskGIT那样掩码并行生成。</p><p>在ImageNet类条件生成上，GIVT优于VQ-GAN及其改进版和MaskGIT，与当时的潜扩散模型相当；它还用于全景分割和深度估计（基于UViM框架的VAE变体）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>高斯混合对高维隐向量的表达力有限，需要用β-VAE把隐空间压得很平滑，限制了重建质量。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/mar.html">无量化自回归MAR</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/maskgit.html">MaskGIT并行掩码生成</a><span class="yr">2022.02 · 生成</span><div class=nt>沿用MaskGIT式的掩码并行生成与VQ-GAN两阶段范式，但去掉量化，直接在连续隐变量上生成。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/beta-vae.html">β-VAE与解耦表示</a><span class="yr">2016.11 · 生成</span><div class=nt>用β-VAE作分词器，靠β控制隐空间的信息量与平滑度。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/vqgan.html">VQGAN</a><span class="yr">2020.12 · 生成</span><div class=nt>VQ-GAN的量化会丢信息、码本难训练；GIVT不需要码本，直接建模连续向量。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/mar.html">无量化自回归MAR</a><span class="yr">2024.06 · 生成</span><div class=nt>高斯混合对高维隐向量的表达力有限，需要用β-VAE把隐空间压得很平滑，限制了重建质量。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/nextstep-1.html">NextStep-1连续token自回归</a><span class="yr">2025.08 · 生成</span><div class=nt>GIVT用高斯混合头建模连续token，表达力有限；本文用流匹配头，可表示更复杂的分布。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/gaussian.html">高斯分布</a> <a class="chip c" href="../c/vector-quantization.html">向量量化与离散token</a> <a class="chip c" href="../c/elbo.html">变分推断与ELBO</a> <a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a></p>
+<h2>本篇术语</h2><ul><li><b>高斯混合模型</b>　把若干个高斯分布按权重加在一起得到的分布，能表示多峰的连续分布。</li><li><b>连续token</b>　每个位置是一段实数向量而不是码本里的编号；不经过量化，信息损失更小。</li></ul>
+<h2>怎么学</h2><p>先读VQGAN与MaskGIT的两阶段范式和β-VAE → 读本文第3节两处改动与β的影响 → 在MNIST的VAE隐变量上训练一个带高斯混合头的小Transformer。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2312.02116" rel="noopener">https://arxiv.org/abs/2312.02116</a>（标题、三位作者、v1日期2023-12-04、摘要中生成实数向量序列、输入端用线性投影替代词表查找、输出端用多元高斯混合参数替代logits、对β-VAE的未量化隐序列建模、类条件生成优于VQ-GAN及改进版和MaskGIT并与潜扩散相当、在全景分割与深度估计上用UViM的VAE变体；机构、ECCV 2024、β需要足够大、温度与CFG的连续版本、光栅与掩码两种顺序来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20GIVT%E8%BF%9E%E7%BB%ADtoken%E7%94%9F%E6%88%90%EF%BC%88givt%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Agivt%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/givt.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="photomaker.html"><small>本分支上一个 · 2023.12</small><b>PhotoMaker人像定制</b></a><a class="r" href="sit.html"><small>本分支下一个 · 2024.01</small><b>SiT插值Transformer</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

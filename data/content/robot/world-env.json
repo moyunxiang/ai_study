@@ -1,0 +1,32 @@
+{
+  "id": "world-env",
+  "who": "Junjin Xiao, Yandan Yang, Xinyuan Chang, Ronghan Chen, Feng Xiong, Mu Xu, Wei-Shi Zheng, Qing Zhang · 中山大学、阿里巴巴高德",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2509.24948"},
+    {"label": "代码", "url": "https://github.com/amap-cvlab/world-env"}
+  ],
+  "aka": ["World-Env", "WorldEnv", "World Env", "世界模型虚拟环境", "世界模型当环境做VLA后训练", "即时反思器", "instant reflector"],
+  "problem": "示范很少时VLA模仿学习效果差；RL后训练能补，但真实环境不能随便重置，工业场景里一次失败可能无法复原；VLA还不知道何时任务已完成，会多做多余动作。",
+  "idea": "用视频世界模型代替物理交互当虚拟环境，再用视觉语言模型做“即时反思器”：持续给出成功概率作奖励，并在概率超过阈值时判定任务结束。",
+  "impact": "在LIBERO每个任务只有5条示范的设置下，把OpenVLA-OFT的四套件平均成功率从74.85%提到79.6%，物体套件提升12.4个百分点。",
+  "method": "**卡在哪**：[[simplevla-rl]]这类在线RL需要能反复重置的仿真器，真实场景做不到；另外VLA通常跑满固定步数，任务完成了还在动，反而可能把成功的状态弄乱。\n\n**做法**：World-Env由两部分组成。**世界模拟器**基于EVAC框架的扩散式动作条件视频模型：把要执行的动作和由正运动学算出的下一时刻机械臂状态渲染成一张“动作图”，与历史画面一起作为像素级条件，预测下一帧。训练数据除了[[libero]]的人类成功示范，还加入[[openvla-oft]]在动作上加拉普拉斯噪声后自主跑出的轨迹，其中包含失败，使模拟器也能逼真地生成失败过程。**即时反思器**用冻结的[[llava]]加一个训练出的奖励头：取32帧画面问“视频是否完成了任务”，经sigmoid输出0到1之间的连续分数，用逐帧成功标签的二元交叉熵训练；分数超过0.5就终止，并在终止时给出奖励。策略训练用LOOP算法，即[[rloo]]式留一法基线配合[[ppo]]裁剪目标（ε=0.1），每轮8条rollout；视觉语言主干用秩32的[[lora]]，动作头和尺度头全量训练。\n\n**结果**：每任务5条示范时，OpenVLA-OFT监督微调四套件平均74.85%，加World-Env后79.6%，其中Goal 84.0→86.4、Object 74.2→86.6、Spatial 84.2→87.6、Long 57.0→57.8。去掉仿真器提供的真实终止信号后，World-Env平均74.9%，OpenVLA-OFT只有63.05%，说明自动判断结束本身就很有用。",
+  "limits": [
+    {"text": "长时序任务（LIBERO-Long）几乎没有提升，世界模型在长时间想象中的误差累积仍是瓶颈。", "solved_by": []},
+    {"text": "只在LIBERO仿真上评测，标榜的真实不可重置场景并没有实机实验；世界模型和反思器都需要针对任务收集数据训练。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "openvla-oft", "type": "uses", "note": "以OpenVLA-OFT为待后训练的策略，并用它自主采集带失败的轨迹训练世界模型。"},
+    {"to": "llava", "type": "uses", "note": "冻结的LLaVA加奖励头构成即时反思器，给出连续奖励和终止判断。"},
+    {"to": "rloo", "type": "uses", "note": "LOOP算法用留一法基线计算优势，再配PPO裁剪更新。"},
+    {"to": "libero", "type": "uses", "note": "在LIBERO四个套件、每任务5条示范的低数据设置下评测。"},
+    {"to": "simplevla-rl", "type": "rivals", "note": "SimpleVLA-RL在物理仿真器中做在线RL；World-Env用学到的视频世界模型代替仿真器，并自带终止判断。"}
+  ],
+  "prereq": ["vla-concept", "world-model-concept", "model-based-rl", "policy-gradient-concept", "diffusion-process", "reward-design"],
+  "terms": [
+    {"t": "即时反思器", "d": "World-Env里的视觉语言模型模块，边看生成的视频边打分，既当奖励函数又负责喊停。"},
+    {"t": "正运动学", "d": "已知各关节角度，计算机械臂末端在空间中位置和姿态的方法。"}
+  ],
+  "learn": "先了解[[c:world-model-concept]]和[[rloo]]，再看原文第3节系统框图（模拟器、反思器、策略三者的循环），最后看表1和去掉终止信号的表3。",
+  "check": {"source": "https://arxiv.org/abs/2509.24948", "confirmed": "标题、8位作者、v1日期2025-09-29、摘要中不可重置与终止检测问题、5条示范；HTML v1：机构、EVAC扩散模型与动作图条件、自主rollout含失败数据、LLaVA+奖励头、32帧、阈值0.5、LOOP（ε=0.1，N=8）、LoRA秩32、表1四套件数字与平均74.85/79.6、表3 74.9/63.05。"}
+}

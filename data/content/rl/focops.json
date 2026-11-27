@@ -1,0 +1,67 @@
+{
+  "id": "focops",
+  "who": "Yiming Zhang, Quan Vuong, Keith W. Ross · NYU / UCSD / NYU Shanghai",
+  "venue": "NeurIPS 2020",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2002.06506"
+    }
+  ],
+  "problem": "CPO、PCPO要在参数空间里做二阶近似（Fisher矩阵、共轭梯度），实现复杂且近似误差会导致违规。",
+  "idea": "分两步但只用一阶优化：先在“非参数化的策略空间”里解出带约束问题的最优更新策略（有闭式），再用一阶梯度把神经网络策略拟合到这个目标策略上。",
+  "impact": "实现简单、效果稳定，成为安全RL标准基线之一，OmniSafe等库都内置，常与CPO、PCPO、PPO-Lagrangian一起出现在对比表里。",
+  "method": "FOCOPS（First Order Constrained Optimization in Policy Space）每轮用当前策略采样数据，然后：\n\n1. **在策略空间里求解**：把策略看作任意分布，求解“最大化回报优势、代价不超限、与当前策略的KL不超过δ”的问题。在非参数空间里这个问题有闭式最优解：\n\n`π*(a|s) ∝ π_k(a|s) · exp( (A_R(s, a) − ν·A_C(s, a)) / λ )`\n\n其中A_R、A_C分别是回报和代价的优势函数，λ对应KL约束的乘子，ν是代价约束的乘子；\n\n2. **投影回参数空间**：最小化神经网络策略π_θ与π*之间的KL散度。展开后损失只涉及当前数据上的重要性比和优势，可以直接用一阶梯度下降优化，并只在KL不太大的状态上更新。\n\n3. 乘子ν按约束违反程度做梯度更新，与拉格朗日法类似。\n\n整个算法是一阶的，形式上很接近[[ppo]]，实现简单。作者给出了训练过程中最坏情况约束违反的近似上界。摘要称在一组带约束的机器人运动任务上表现更好。",
+  "limits": [
+    {
+      "text": "乘子ν的更新仍是拉格朗日式的事后调整，训练中约束仍会有一定超出。"
+    },
+    {
+      "text": "需要准确的代价优势估计，代价稀疏时估计噪声大。"
+    }
+  ],
+  "relations": [
+    {
+      "to": "cpo-rl",
+      "type": "solves",
+      "note": "CPO依赖二阶近似；FOCOPS改为非参数空间闭式解加一阶拟合，实现简单。"
+    },
+    {
+      "to": "ppo",
+      "type": "extends",
+      "note": "最终的一阶损失与PPO形式相近，可视为带约束的近端策略优化。"
+    },
+    {
+      "to": "cmdp",
+      "type": "uses",
+      "note": "以CMDP为问题框架。"
+    },
+    {
+      "to": "trpo",
+      "type": "rivals",
+      "note": "TRPO类方法在参数空间用二阶近似保证信赖域；FOCOPS只用一阶梯度。"
+    }
+  ],
+  "prereq": [
+    "policy-gradient-concept",
+    "kl-divergence",
+    "lagrange-duality",
+    "importance-sampling"
+  ],
+  "terms": [
+    {
+      "t": "非参数化策略空间",
+      "d": "把策略当成任意的条件分布来优化，不受神经网络结构限制，常能得到闭式解。"
+    }
+  ],
+  "learn": "先读[[cpo-rl]]和[[ppo]]；读FOCOPS原文第4节闭式解的推导；用OmniSafe跑FOCOPS并与CPO比较墙钟时间与代价曲线。",
+  "check": {
+    "source": "https://arxiv.org/abs/2002.06506",
+    "confirmed": "标题、三位作者、arXiv v1于2020-02-16；摘要中用约束表达安全、先在非参数化策略空间解约束优化得到最优更新策略、再投影回参数化策略空间、训练全程最坏违规的近似上界、一阶方法易实现、在带约束的机器人运动任务上表现更好。闭式解的具体形式按原文正文通行描述；NeurIPS 2020与单位按通行引用。"
+  },
+  "aka": [
+    "FOCOPS",
+    "First Order Constrained Optimization in Policy Space",
+    "一阶约束策略优化"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+ "id": "min-k-prob",
+ "who": "Weijia Shi, Anirudh Ajith, Mengzhou Xia, Yangsibo Huang, Daogao Liu, Terra Blevins, Danqi Chen, Luke Zettlemoyer · 华盛顿大学、普林斯顿大学",
+ "venue": "ICLR 2024",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2310.16789"}
+ ],
+ "aka": ["Min-K% Prob", "Min-K%", "预训练数据检测", "WikiMIA", "pretraining data detection"],
+ "problem": "大模型的训练数据很少公开，其中几乎必然含有受版权保护的书、个人信息和评测题；想知道某段文字是否被用来训练，传统[[membership-inference]]要训练与预训练数据分布相近的参考模型，对万亿词元的语料几乎做不到。",
+ "idea": "一个简单假设：没见过的文本里往往有几个模型觉得很意外的低概率词，见过的文本则少有这种词。于是只看文本中概率最低的那k%个词元的平均对数概率，越高越可能是训练数据。",
+ "impact": "成为大模型预训练数据检测和成员推断最常用的基线之一，配套的WikiMIA基准被广泛使用，并引出Min-K%++等改进和“这类方法到底靠不靠谱”的反思。",
+ "method": "给定一段文本x和只能黑盒查询的语言模型，计算每个词元在上文条件下的对数概率 `log p(x_i | x_<i)`；取其中最低的k%（例如20%）个词元，求平均：\n\n`Min-K%(x) = (1/|S|) Σ_{i∈S} log p(x_i | x_<i)`，S为概率最低的k%词元集合。\n\n分数高于阈值就判定x在训练集中。直觉是：模型读过的文本，连其中罕见的词都被“记住”了，不会给出极低的概率；没读过的文本总有几处出乎模型意料。和直接看整体[[c:perplexity]]相比，只看最低的那部分词元，能减少常见词对分数的稀释。这一方法不需要知道预训练语料，也不需要额外训练参考模型，这与[[lira]]等依赖影子模型的方法不同。\n\n为了有可靠的标准答案，作者构建动态基准WikiMIA：用维基百科中模型训练截止之前的条目当“成员”，截止之后新写的条目当“非成员”，时间分界保证了标签正确。摘要报告Min-K% Prob在WikiMIA上比以往方法提升7.4%。\n\n作者还把它用在三个实际场景：检测受版权书籍是否进了训练集、检测下游评测题是否被污染、审计机器遗忘后数据是否真的被删掉，均表现有效。",
+ "limits": [
+  {"text": "WikiMIA用时间切分成员与非成员，两组文本本身在主题和用词上就有分布差异，检测效果可能部分来自这种差异而非真正的“记忆”。", "solved_by": []},
+  {"text": "在去重充分、只训练一遍的大规模预训练语料上，单条文本的成员推断信号很弱，准确率接近随机。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "membership-inference", "type": "extends", "note": "把成员推断问题搬到大模型预训练数据上，并去掉对影子模型或参考模型的依赖。"},
+  {"to": "lira", "type": "rivals", "note": "LiRA需要训练大量影子模型做似然比检验，Min-K%只用目标模型的词元概率。"},
+  {"to": "training-data-extraction", "type": "extends", "note": "提取攻击用低困惑度等信号判断生成文本是否来自训练集，Min-K%把类似的概率信号细化到最低概率词元上。"}
+ ],
+ "prereq": ["language-model", "perplexity", "probability-basics", "data-contamination", "classification-metrics"],
+ "terms": [
+  {"t": "预训练数据检测", "d": "只凭对模型的查询，判断一段文本是否出现在它的预训练语料里。"}
+ ],
+ "learn": "先读[[membership-inference]]和[[training-data-extraction]] → 读原文方法与WikiMIA构造 → 用一个开源模型对几段旧维基条目和新闻稿计算Min-K%分数，比较分布。",
+ "check": {"source": "https://arxiv.org/abs/2310.16789", "confirmed": "arXiv记录：标题、8位作者、2023-10-25 v1；摘要所述预训练数据检测问题、黑盒访问、WikiMIA动态基准（训练前后数据）、Min-K% Prob假设（未见文本含少数低概率离群词）、无需知道预训练语料或额外训练、比以往方法在WikiMIA上提升7.4%、版权书籍/下游污染/机器遗忘审计三个应用。公式写法、k取20%的例子、ICLR 2024与机构、后续关于分布差异和效果接近随机的质疑凭一般了解写。"}
+}

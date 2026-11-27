@@ -1,0 +1,35 @@
+{
+  "id": "lm-eval-sota",
+  "who": "Gábor Melis, Chris Dyer, Phil Blunsom · DeepMind、牛津大学",
+  "venue": "ICLR 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1707.05589"}
+  ],
+  "aka": ["On the State of the Art of Evaluation", "Melis et al. 2017", "语言模型评测的现状", "LSTM baseline revisited"],
+  "problem": "循环网络结构的新设计不断在语言建模基准上报告「最好结果」，但这些结果来自不同的代码库、有限的调参算力，超参数这一不受控的变量可能让结论站不住。",
+  "idea": "用大规模自动黑盒超参数优化（Google Vizier）给每种模型、每个参数预算都充分调参，再在同样条件下比较LSTM、循环高速网络（RHN）和架构搜索得到的NAS单元。",
+  "impact": "得出「出人意料」的结论：调参和正则化得当的标准LSTM优于更新的结构，并在Penn Treebank和WikiText-2上创下新的最好结果；它和AWD-LSTM一起让「先调好强基线」成为语言建模和更广泛深度学习评测中常被引用的教训。",
+  "method": "**问题**。模型的测得表现不仅取决于结构和数据，还强烈依赖学习率、dropout强度、嵌入大小等超参数。如果新模型的作者调参更细，而基线沿用旧论文的设置，「新结构更好」就可能只是调参差异。\n\n**做法**。作者统一实现了三类模型：带跳跃连接的多层[[lstm]]、每个输入做多步处理的循环高速网络（基于[[highway]]的门控）、以及[[nas]]搜索出的循环单元。可调的成分包括输入/输出/层间/循环状态上的dropout（循环状态用跨时间共享掩码的变分dropout）、可选的降维投影层，并默认共享输入输出嵌入（[[weight-tying]]）。对每个模型和参数预算（1000万和2400万参数，对应Zaremba等的中、大模型），由Google Vizier这种黑盒优化器搜索大量超参数组合，选验证集最好的配置。论文还讨论了调参器过拟合验证集的问题：浮点运算顺序、随机初始化等都会带来噪声。\n\n**结果**。在Penn Treebank上，参数1000万的浅层LSTM就以明显优势胜过RHN，2400万参数时各深度LSTM结果接近，4层达到58.3困惑度；NAS（其结构本就是在这个数据集上搜出来的）与之几乎持平。WikiText-2上最好结果为65.9。单项消融显示：解除输入输出嵌入共享使困惑度普遍变差约6点；降维投影在小模型上能改善2–5点（WikiText-2上10–18点）；变分dropout与循环dropout没有一致的优劣。",
+  "limits": [
+    {"text": "大规模黑盒调参本身需要极多的计算，普通研究组难以对每个新模型都这样做，也就难以普及这种评测标准。", "solved_by": []},
+    {"text": "只在PTB、WikiText-2和Hutter Prize这些中小规模数据上比较，结论能否推广到大语料和更大模型没有检验。", "solved_by": []},
+    {"text": "没有给出调参预算与模型排序之间关系的系统方法，不同论文之间仍缺少可比的调参规程。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "lstm", "type": "uses", "note": "被重新评估并最终胜出的基础结构是标准LSTM。"},
+    {"to": "nas", "type": "rivals", "note": "NAS循环单元是被比较的新结构之一；充分调参后标准LSTM与它持平甚至更好。"},
+    {"to": "highway", "type": "rivals", "note": "循环高速网络是基于Highway门控的新结构，充分调参后不如浅层LSTM。"},
+    {"to": "weight-tying", "type": "uses", "note": "模型默认共享输入输出嵌入；消融显示解除共享会使困惑度变差约6点。"},
+    {"to": "lstm-lm", "type": "extends", "note": "沿着LSTM语言模型的路线，说明它的潜力被后来的比较低估了。"}
+  ],
+  "prereq": ["language-model", "hyperparameter", "ablation-baseline", "dropout-concept", "perplexity", "statistical-significance"],
+  "terms": [
+    {"t": "黑盒超参数优化", "d": "把「给定一组超参数→训练→验证集得分」当作一个看不到内部的函数，用贝叶斯优化等方法自动搜索使得分最好的超参数。"},
+    {"t": "变分dropout", "d": "在循环网络中对每个序列只采样一次dropout掩码，并在所有时间步共用，避免每步随机丢弃破坏记忆。"}
+  ],
+  "learn": "先读[[lstm-lm]]和[[weight-tying]]的讲解 → 读原文第3节模型、第5–7节实验与消融 → 动手：在PTB上用随机搜索给一个2层LSTM调30组dropout和学习率，看最好与最差配置的困惑度差距有多大。",
+  "check": {
+    "source": "https://arxiv.org/abs/1707.05589",
+    "confirmed": "arXiv：标题、作者Melis、Dyer、Blunsom、2017-07-18提交、摘要（不同代码库与有限算力造成不受控变量；大规模自动黑盒调参重估多种结构与正则；调好正则的标准LSTM优于新模型；PTB与WikiText-2新的最好结果；Hutter Prize强基线）；PDF正文：LSTM/RHN/NAS、变分dropout、降维投影、Google Vizier、1000万与2400万预算对应Zaremba中大模型、PTB 4层58.3、WikiText-2最好65.9、解除嵌入共享约差6点、降维投影2–5点与10–18点、变分与循环dropout无一致优劣、调参器过拟合与噪声来源。DeepMind机构凭一般了解；ICLR 2018见PDF页眉（投稿状态）。"
+  }
+}

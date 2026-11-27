@@ -1,0 +1,35 @@
+{
+  "id": "rest-mcts",
+  "who": "Dan Zhang, Sining Zhoubian, Ziniu Hu, Yisong Yue, Yuxiao Dong, Jie Tang · 清华大学 / 加州理工学院",
+  "venue": "NeurIPS 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2406.03816"},
+    {"label": "GitHub", "url": "https://github.com/THUDM/ReST-MCTS"}
+  ],
+  "aka": ["ReST-MCTS*", "ReST-MCTS", "MCTS*", "过程奖励引导树搜索", "process reward guided tree search", "树搜索自训练", "推理距离", "reasoning distance"],
+  "problem": "STaR、ReST这类自训练方法只按最终答案对错筛选模型自己生成的解答，答案碰巧对、中间步骤错的解答也会被拿来训练；训练过程奖励模型又需要逐步的人工标注。",
+  "idea": "用带过程奖励的树搜索（MCTS*）收集解答：已知正确答案时，通过从某一步出发多次模拟、看它多快能走到正确答案，自动估出这一步的价值；这些估计值一边用来训练过程奖励模型，一边用来挑高质量轨迹训练策略模型，两者交替迭代。",
+  "impact": "把“自动标注过程奖励”“树搜索找轨迹”“策略与奖励模型一起自训练”三件事合在一个循环里，多轮迭代后持续超过ReST-EM和自奖励语言模型；是o1出现前后“搜索+过程奖励+自我改进”路线的代表工作之一。",
+  "background": "[[star]]和[[rest]]让模型生成多份解答，只保留答案正确的用于微调，信号只有最终对错。[[prm]]证明逐步打分的过程奖励更有用，但PRM800K靠人工逐步标注；[[math-shepherd]]改用“从这一步出发多次补完，看有多少次能答对”来自动标注。另一方面，[[tot]]等树搜索方法能找到更好的推理路径，却没有把找到的路径用于训练。",
+  "method": "**价值的定义**：部分解答 `p_k = [s₁…s_k]` 的质量值 `v_k`，在0到1之间。引入**推理距离** `m_k`：从 `p_k` 出发，策略模型最少还要几步才能得到正确答案，通过模拟采样估计。单步的加权奖励为 `w_k = (1 − v_{k−1}) / (m_k + 1) · (1 − 2r_k)`，其中 `r_k` 是类似Math-Shepherd的步骤对错信号；再递推 `v_k = max(v_{k−1} + w_k, 0)`。直觉是：一步若让离正确答案的距离变短、又是对的，价值就上升得多。\n\n**MCTS***：每个树节点是一步推理，用过程奖励模型给出的 `v_k` 引导选择与扩展，并做多次模拟回传价值。\n\n**自训练循环**：\n1. 用当前策略和过程奖励模型做MCTS*，对训练题目收集推理树；\n2. 已知正确答案，用模拟结果为树上每个节点推断 `v_k`，作为过程奖励模型的新训练目标；\n3. 从树中挑出价值高且答案正确的完整轨迹，微调策略模型；\n4. 用更新后的两个模型重复。\n\n**结果**：在同样的搜索预算下，MCTS*在MATH和科学推理基准SciBench上的准确率高于[[self-consistency]]和Best-of-N，在科学推理上也超过思维链和思维树。用LLaMA-3-8B-Instruct、Mistral-7B（MetaMath版）和SciGLM-6B三个策略模型多轮自训练，均持续超过ReST-EM和[[self-rewarding]]。",
+  "legacy": "同期与之后的[[rstar-math]]等工作走的是相近的路：用树搜索加自动过程标注生成高质量数据、多轮自我进化。DeepSeek-R1之后，主流转向只用结果奖励的强化学习，这类“显式树搜索+PRM”路线更多保留在小模型与测试时搜索的研究中。",
+  "limits": [
+    {"text": "推断过程奖励需要已知正确答案，而且每个节点都要多次模拟，数据构造成本高，只适用于答案可自动判对错的题目。", "solved_by": []},
+    {"text": "过程奖励模型与策略模型互相提供训练数据，奖励模型的偏差会被策略利用并逐轮放大。", "solved_by": []},
+    {"text": "推理时也要做树搜索，单题计算量远大于直接生成；后来的结果奖励RL把能力练进模型本身，推理时不再需要外部搜索。", "solved_by": ["deepseek-r1"]}
+  ],
+  "relations": [
+    {"to": "rest", "type": "solves", "note": "ReST只按最终答案筛选自生成数据；ReST-MCTS*用逐步价值筛选，避免“答案对、过程错”的样本进入训练，多轮迭代后超过ReST-EM。"},
+    {"to": "math-shepherd", "type": "extends", "note": "沿用“从中间步骤多次补完来自动标注过程奖励”的思路，并加入推理距离作为权重。"},
+    {"to": "mcts", "type": "uses", "note": "以过程奖励引导的蒙特卡洛树搜索作为搜索策略。"},
+    {"to": "star", "type": "extends", "note": "同属让模型用自己生成并筛选过的推理来训练自己的自训练路线。"},
+    {"to": "self-rewarding", "type": "rivals", "note": "自奖励语言模型让模型自己当评委打分；本文用已知答案加模拟来推断奖励，对比实验中更优。"}
+  ],
+  "prereq": ["tree-search", "monte-carlo", "reward-return", "policy-value", "pretrain-finetune"],
+  "terms": [
+    {"t": "推理距离", "d": "从当前这几步出发，模型最少还要再走几步才能得到正确答案；距离越短说明当前进展越好。"},
+    {"t": "自训练（self-training）", "d": "让模型生成数据、筛选后再用来训练自己，循环多轮。"}
+  ],
+  "learn": "先读[[star]]、[[prm]]和[[math-shepherd]] → 读原文第3.1节价值与加权奖励的定义（公式2–3）和图1的自训练循环 → 动手：对一道题的若干中间步骤各做10次补完，统计能答对的比例，体会自动过程标注。",
+  "check": {"source": "https://arxiv.org/abs/2406.03816", "confirmed": "标题、作者、v1提交于2024-06-06；摘要中过程奖励引导的MCTS*、已知答案推断过程奖励、同时训练PRM与策略、同预算下超过Best-of-N与ToT、多轮超过ReST-EM与Self-Rewarding；正文（arxiv.org/html/2406.03816）核对推理距离m_k、加权奖励公式w=(1−v)/(m+1)·(1−2r)与v_k递推、SciBench与MATH、三个策略模型（LLaMA-3-8B-Instruct、Mistral-7B MetaMath、SciGLM-6B）。venue凭一般了解；legacy中的路线判断为一般了解。"}
+}

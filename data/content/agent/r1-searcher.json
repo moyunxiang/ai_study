@@ -1,0 +1,27 @@
+{
+  "id": "r1-searcher",
+  "who": "Huatong Song, Jinhao Jiang, Yingqian Min, Jie Chen, Zhipeng Chen, Wayne Xin Zhao, Lei Fang, Ji-Rong Wen · 中国人民大学高瓴人工智能学院 / 九章云极DataCanvas",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2503.05592"},
+    {"label": "GitHub", "url": "https://github.com/RUCAIBox/R1-Searcher"}
+  ],
+  "aka": ["R1-Searcher", "R1 Searcher", "R1Searcher", "两阶段搜索强化学习", "RL搜索推理"],
+  "problem": "R1式推理模型只靠参数里的知识，遇到时效性强或知识密集的问题容易答错编造；让模型在推理中调用搜索，以往要靠提示词或蒸馏数据冷启动。",
+  "idea": "完全用结果奖励的强化学习、分两个阶段：先只奖励“会按格式发起检索”，再奖励答案F1，让模型自己学会何时检索、检索什么；检索回来的文字不参与梯度。",
+  "impact": "与同月的Search-R1一起，说明不需要过程奖励和冷启动蒸馏，只用RL就能教会7B/8B模型在推理中使用搜索，并能迁移到真实网页搜索。",
+  "method": "[[deepseek-r1]]证明结果奖励的RL能教会模型长推理；[[search-o1]]让推理模型在思考中途调用搜索，但只靠提示。R1-Searcher直接用RL训练这种行为。\n\n**两阶段奖励**。第一阶段只给检索奖励（至少发起一次检索得0.5）和格式奖励，不看答案对错，先让模型学会用规定标签发出查询；第二阶段去掉检索奖励，改为按答案F1给分，格式错误罚−2。\n\n**算法**。主算法是改造过的[[reinforce-pp]]：生成过程中遇到查询就调用检索器，把文档插回上下文；计算损失时屏蔽这些外部文档的token。论文也对比了[[grpo]]：GRPO生成更长、检索更多，域外泛化更好；REINFORCE++在域内更好。\n\n**训练与评测**。底座为Qwen-2.5-7B-Base和Llama-3.1-8B-Instruct，从HotpotQA和2WikiMultiHopQA中按难度选出约8000道题训练；在这两个数据集及域外的Musique、Bamboogle上评测。官方称Llama版在HotpotQA上比基于GPT-4o-mini的ReARTeR高48.2%（LLM评判）。换成Google在线搜索后，Qwen版在Bamboogle上比本地检索版高18.2%，比32B的Search-o1高11.4%。",
+  "limits": [
+    {"text": "训练只用维基百科本地检索和两个多跳问答集，约8000道题，短答案问答以外的开放研究任务没有涉及。", "solved_by": ["deepresearcher"]},
+    {"text": "训练时每次rollout都要真实调用检索，规模扩大到网页搜索API时成本高、返回质量不可控。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "deepseek-r1", "type": "extends", "note": "沿用R1只用结果奖励、无冷启动的RL做法，把纯内部推理扩展为推理中调用检索。"},
+    {"to": "search-o1", "type": "solves", "note": "Search-o1只靠提示让推理模型搜索；R1-Searcher用RL直接优化检索行为，在线搜索的Bamboogle上7B模型超过32B的Search-o1。"},
+    {"to": "reinforce-pp", "type": "uses", "note": "主训练算法为改造过的REINFORCE++，加入检索式rollout和外部文档屏蔽。"},
+    {"to": "grpo", "type": "uses", "note": "作为对照算法比较：GRPO检索次数更多、域外泛化更好。"},
+    {"to": "search-r1", "type": "rivals", "note": "同月发布的同类工作，都用结果奖励RL训练会搜索的模型；R1-Searcher多了先学格式的第一阶段，Search-R1用精确匹配奖励并比较PPO与GRPO。"}
+  ],
+  "prereq": ["retrieval", "policy-gradient-concept", "reward-design", "tool-calling", "agent-loop"],
+  "learn": "先读[[deepseek-r1]]和[[search-o1]] → 读原文第2节（两阶段奖励、检索屏蔽）和与GRPO的对比 → 动手：只用第一阶段的检索奖励训练几百步，观察模型发起检索的比例怎样上升。",
+  "check": {"source": "https://arxiv.org/abs/2503.05592", "confirmed": "标题、8位作者、v1提交于2025-03-07（早于Search-R1的2025-03-12）；正文（arxiv.org/html/2503.05592）核对两阶段奖励（0.5检索奖励、F1答案奖励、格式错误−2）、改造的REINFORCE++与检索屏蔽、与GRPO对比结论、Qwen-2.5-7B-Base与Llama-3.1-8B-Instruct、约8000道HotpotQA与2Wiki训练题、四个评测集、对ReARTeR的48.2%、在线搜索18.2%与11.4%、人大高瓴与DataCanvas单位。"}
+}

@@ -1,0 +1,27 @@
+{
+  "id": "cluster-gcn",
+  "who": "Wei-Lin Chiang, Xuanqing Liu, Si Si, Yang Li, Samy Bengio, Cho-Jui Hsieh · 台湾大学、加州大学洛杉矶分校、Google Research",
+  "venue": "KDD 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1905.07953"}
+  ],
+  "aka": ["Cluster-GCN", "图聚类小批量训练", "子图采样训练", "大规模GCN训练", "Amazon2M"],
+  "problem": "在百万节点的大图上训练[[gcn]]：全图训练要把所有节点嵌入放进显存；按节点采样小批量时，每多一层要展开的邻居就成倍增加（邻居爆炸），计算随层数指数增长。",
+  "idea": "先用图聚类算法把大图切成许多内部连接紧密的子图，每个训练步只取一个（或几个）子图，消息传递只在子图内部进行；这样小批量内的边大多被保留，计算和显存都只与子图大小有关。",
+  "impact": "让多层GCN第一次能在单卡上训练到数百万节点规模，与GraphSAINT等一起确立了“子图采样”这一大图GNN训练范式，被PyTorch Geometric、DGL等库内置。",
+  "method": "按节点做小批量的困难在于：L层GCN算一个节点的输出，需要它L跳内的所有邻居，层数一多几乎就要牵动整张图，这就是[[graphsage]]等方法要做邻居采样的原因。\n\nCluster-GCN换一个角度看：一个小批量的计算效率，取决于批内节点之间有多少条边被保留（“嵌入利用率”）。如果批内节点彼此紧密相连，算出来的嵌入能被同批的其他节点反复使用。于是先用METIS等图划分算法把图切成c个簇，簇内边多、簇间边少；训练时每步只在一个簇构成的子图上做完整的多层GCN前向与反向，忽略簇间边。\n\n只用单个簇会丢掉簇间边、并让小批量之间分布差异大。作者提出**随机多簇**：每步随机挑q个簇合成一个批次，并把它们之间的边加回来，降低方差、提升收敛。\n\n摘要报告：作者构造了包含200万节点、6100万条边的Amazon2M数据集；训练3层GCN时比此前最好的VR-GCN更快（1523秒对1961秒）且显存少得多（2.2GB对11.2GB）；训练4层GCN约36分钟完成，而已有算法都因显存不足无法训练。",
+  "limits": [
+    {"text": "忽略簇间边会带来有偏的梯度；簇的划分是预先固定的，标签在簇内分布不均时小批量的类别分布与全图差异较大。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "gcn", "type": "solves", "note": "解决GCN在大图上全图训练显存不足、逐节点小批量训练计算随层数指数增长的问题。"},
+    {"to": "graphsage", "type": "rivals", "note": "GraphSAGE按节点采样固定数量的邻居；Cluster-GCN改为按图聚类采样整块子图。"},
+    {"to": "spectral-clustering", "type": "uses", "note": "依赖图划分（聚类）算法把大图切成内部连接紧密的子图。"}
+  ],
+  "prereq": ["graph-basics", "message-passing", "sgd-minibatch", "clustering", "memory-bandwidth"],
+  "terms": [
+    {"t": "邻居爆炸", "d": "多层GNN里每多一层，一个节点需要的邻居数就乘上平均度数，几层之后几乎覆盖整张图。"}
+  ],
+  "learn": "先读[[gcn]]和[[graphsage]]；读论文第3节嵌入利用率的分析和随机多簇算法；用PyTorch Geometric的ClusterData与ClusterLoader在ogbn-products或Reddit数据上训练一个3层GCN。",
+  "check": {"source": "https://arxiv.org/abs/1905.07953", "confirmed": "标题、6位作者、arXiv v1提交于2019-05-20；摘要中现有SGD算法要么计算随层数指数增长要么需存整图嵌入、按图聚类得到的稠密子图采样并限制邻居搜索、Amazon2M（200万节点、6100万条边）、3层GCN 1523秒对VR-GCN 1961秒、显存2.2GB对11.2GB、4层GCN约36分钟而已有算法无法训练。METIS、随机多簇、KDD 2019与机构来自一般了解。"}
+}

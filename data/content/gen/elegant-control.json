@@ -1,0 +1,28 @@
+{
+  "id": "elegant-control",
+  "who": "Masatoshi Uehara, Yulai Zhao, Kevin Black, Ehsan Hajiramezanali, Gabriele Scalia, Nathaniel Lee Diamant, Alex M Tseng, Tommaso Biancalani et al. · Genentech、普林斯顿大学、UC Berkeley",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2402.15194"}
+  ],
+  "aka": ["ELEGANT", "熵正则控制微调", "Entropy-Regularized Control", "奖励坍缩", "Reward Collapse", "扩散模型随机最优控制微调"],
+  "problem": "用奖励微调扩散模型时，奖励模型只是对“真正想要的性质”的近似。直接最大化它会出现多样性下降、偏离训练分布、甚至画质变差，作者把这些统称为“奖励坍缩”。",
+  "idea": "把微调写成相对预训练扩散模型的熵正则化随机最优控制问题：在连续时间的神经SDE上直接优化“奖励减去与原模型的KL”，并同时学习初始分布，使最优解恰好是“预训练分布按exp(奖励/α)重新加权”的目标分布。",
+  "impact": "给扩散模型奖励微调提供了一个有明确最优解的控制论框架，解释了为什么必须同时约束初始分布和整条路径；后来的Adjoint Matching等工作在这一控制视角上继续发展。",
+  "method": "设预训练扩散模型的反向过程是一个SDE，微调就是在漂移项上加一个控制u，并可能改变初始噪声分布。目标是`max E[r(x_T)] − α·KL(微调后的整条路径分布 ‖ 预训练的路径分布)`。作者证明：当KL同时包括路径上的控制代价和初始分布的偏离时，最优的终点分布恰好是`p*(x) ∝ p_pre(x)·exp(r(x)/α)`——也就是在预训练分布的支撑上按奖励加权，不会跑到训练数据完全没有覆盖的区域去。如果只约束路径、而初始分布仍用标准高斯，得到的分布会有偏差。\n\n算法上，作者先学一个初始分布的修正（同样表示为一个扩散过程），再把控制问题当作神经SDE，用可微的奖励直接反传优化。理论与实验都表明，这样微调后的样本在“真实奖励”上更高、多样性保持得更好，能缓解对不完美奖励模型的过度优化。实验包括图像美学奖励和蛋白质等生物序列的性质优化。",
+  "limits": [
+    {"text": "需要额外学习初始分布并沿神经SDE反传，计算和实现都比普通奖励反传复杂得多。", "solved_by": ["adjoint-matching"]},
+    {"text": "仍依赖可微奖励；对只能黑盒打分的目标无法直接使用。", "solved_by": ["flow-grpo"]}
+  ],
+  "relations": [
+    {"to": "dpok", "type": "extends", "note": "DPOK在离散步上加KL正则；本文在连续时间下把KL正则写成控制问题，并给出最优解的闭式刻画。"},
+    {"to": "draft", "type": "solves", "note": "DRaFT类直接反传奖励容易过度优化；熵正则控制让最优解停留在预训练分布的奖励加权版本上，缓解奖励坍缩。"},
+    {"to": "score-sde", "type": "uses", "note": "以分数SDE的反向过程作为被控制的动力系统。"}
+  ],
+  "prereq": ["ode-sde", "kl-divergence", "reward-design", "rlhf-concept", "diffusion-process", "entropy"],
+  "terms": [
+    {"t": "随机最优控制", "d": "在带随机噪声的动力系统里选择控制输入，使累计收益最大、控制代价最小；可以看作连续时间版的强化学习。"},
+    {"t": "奖励坍缩", "d": "文中术语：过度优化不完美的奖励模型导致多样性下降、偏离训练分布和质量变差。"}
+  ],
+  "learn": "先补RLHF里KL正则目标的最优解形式`π* ∝ π_ref·exp(r/β)` → 读本文第4节初始分布为何也要正则 → 对照Adjoint Matching的无记忆噪声调度结论。",
+  "check": {"source": "https://arxiv.org/abs/2402.15194", "confirmed": "标题、作者、v1日期2024-02-23、摘要中对图像美学与蛋白质功能性质的奖励微调、奖励坍缩的定义（多样性下降、偏离训练分布、利用不完美奖励导致质量差）、将微调写成相对预训练模型的熵正则控制、用神经SDE直接优化、理论与实验上缓解过度优化；机构、方法名ELEGANT、最优分布的闭式、学习初始分布的做法来自一般了解"}
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>EnvPool并行环境引擎（2022） · AI脉络</title>
+<meta name="description" content="RL训练系统的优化（、等）大多集中在学习端，而并行运行环境这一步常常是整个系统最慢的部分：标准做法是用Python子进程各跑一个环境，进程间通信开销很大。 用C++实现一个专门的并行环境执行引擎：环境实例放在C++线程池里运行，对外提供与兼容的批量接口，同时支持同步和异步两种模式，异步模式下先完成…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/envpool.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="EnvPool并行环境引擎（2022）">
+<meta property="og:description" content="RL训练系统的优化（、等）大多集中在学习端，而并行运行环境这一步常常是整个系统最慢的部分：标准做法是用Python子进程各跑一个环境，进程间通信开销很大。 用C++实现一个专门的并行环境执行引擎：环境实例放在C++线程池里运行，对外提供与兼容的批量接口，同时支持同步和异步两种模式，异步模式下先完成…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/envpool.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/envpool">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 环境与评测</div>
+<h1>EnvPool并行环境引擎</h1>
+<div class="full">EnvPool: A Highly Parallel Reinforcement Learning Environment Execution Engine</div>
+<div class="meta"><span>2022.06</span><span>系统</span><span>延伸</span><span>NeurIPS 2022 Datasets and Benchmarks</span><span>Jiayi Weng, Min Lin, Shengyi Huang, Bo Liu, Denys Makoviichuk, Viktor Makoviychuk, Zichen Liu, Yufan Song et al. · Sea AI Lab 等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2206.10558" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/sail-sg/envpool" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/envpool">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>RL训练系统的优化（<a class="ln" href="../n/impala.html">IMPALA与V-trace</a>、<a class="ln" href="../n/apex.html">Ape-X</a>等）大多集中在学习端，而并行运行环境这一步常常是整个系统最慢的部分：标准做法是用Python子进程各跑一个环境，进程间通信开销很大。</p></div><div><h4>方法</h4><p>用C++实现一个专门的并行环境执行引擎：环境实例放在C++线程池里运行，对外提供与<a class="ln" href="../n/openai-gym.html">OpenAI Gym</a>兼容的批量接口，同时支持同步和异步两种模式，异步模式下先完成的环境先返回。</p></div><div><h4>影响</h4><p>让Atari、MuJoCo等常用环境在单机上的模拟速度提高到每秒百万帧量级，被<a class="ln" href="../n/cleanrl.html">CleanRL单文件实现</a>等训练库直接集成，大幅缩短了在常用基准上做实验的时间。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>一次RL训练的时间大体分成三块：环境模拟、神经网络推理（选动作）和梯度更新。分布式框架如<a class="ln" href="../n/impala.html">IMPALA与V-trace</a>、<a class="ln" href="../n/apex.html">Ape-X</a>靠多机多进程提升了总吞吐，但单机上跑多个环境时，最常见的方法仍是Python的多进程向量化环境：每个子进程跑一个环境，主进程通过管道收发观测和动作。Python的全局解释器锁、序列化和进程切换让这一步成了瓶颈，在GPU上做推理时尤其明显——GPU在等环境。</p><h2>方法</h2><p>EnvPool把环境本身（Atari模拟器、MuJoCo等）在C++中封装，用一个线程池同时推进很多个环境实例，观测直接写进预先分配好的共享内存缓冲区，避免了Python层的序列化和进程通信。</p><p>对外它提供两种接口：<b>同步模式</b>与普通的向量化环境相同，一次输入一批动作、返回一批观测；<b>异步模式</b>允许设置一个比环境总数小的批大小，每次只返回最先完成的那一批环境，智能体只对这批环境推理，其他环境继续在后台运行，这样慢的环境不会拖住整批。接口与Gym/dm_env兼容，现有训练代码只需替换环境构造函数。</p><h2>结果</h2><p>摘要称，在高端机器（NVIDIA DGX-A100）上，EnvPool在Atari环境上达到每秒一百万帧、在MuJoCo环境上达到每秒三百万帧；在笔记本上速度是Python子进程方式的2.8倍；在笔记本上训练Atari Pong和MuJoCo Ant的示例只需五分钟；已与CleanRL、rl_games、DeepMind Acme等库兼容。</p><h2>后来的发展</h2><p>EnvPool是“让环境不再是瓶颈”这条思路在CPU环境上的代表；另一条路线是把环境整个用JAX重写、放到GPU上与智能体一起编译，例如<a class="ln" href="../n/jaxmarl.html">JaxMARL</a>、<a class="ln" href="../n/craftax.html">Craftax极速开放式基准</a>和物理引擎<a class="ln" href="../n/brax.html">Brax加速器物理引擎</a>，后者在可JAX化的环境上更快，但需要重写环境。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只能加速已经被封装进C++的环境，新环境要单独移植；环境本身仍在CPU上，与GPU之间有数据搬运。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/jaxmarl.html">JaxMARL</a> <a class="chip hue" style="--h:120" href="../n/craftax.html">Craftax极速开放式基准</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/ale.html">Arcade学习环境ALE</a><span class="yr">2012.07 · RL</span><div class=nt>Atari环境基于ALE模拟器，在C++层直接驱动。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/impala.html">IMPALA与V-trace</a><span class="yr">2018.02 · RL</span><div class=nt>IMPALA等分布式架构提升学习端吞吐；EnvPool把同样的关注放到单机的环境执行上。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/openai-gym.html">OpenAI Gym</a><span class="yr">2016.06 · RL</span><div class=nt>对外提供与Gym兼容的批量环境接口，现有代码可直接替换。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/apex.html">Ape-X</a><span class="yr">2018.03 · RL</span><div class=nt>Ape-X用大量分布式actor加速采样；EnvPool在单机内用C++线程池做到高吞吐采样。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/dopamine.html">Dopamine研究框架</a><span class="yr">2018.12 · RL</span><div class=nt>环境仍以单进程Python方式运行，大规模Atari实验的速度受环境模拟拖累。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/jaxmarl.html">JaxMARL</a><span class="yr">2023.11 · RL</span><div class=nt>只能加速已经被封装进C++的环境，新环境要单独移植；环境本身仍在CPU上，与GPU之间有数据搬运。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/craftax.html">Craftax极速开放式基准</a><span class="yr">2024.02 · RL</span><div class=nt>只能加速已经被封装进C++的环境，新环境要单独移植；环境本身仍在CPU上，与GPU之间有数据搬运。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/benchmark.html">基准、排行榜与SOTA</a> <a class="chip c" href="../c/state-action-observation.html">状态、观测与动作</a></p>
+<h2>本篇术语</h2><ul><li><b>向量化环境</b>　同时运行多个环境副本、一次接收一批动作并返回一批观测的封装，用于让神经网络批量推理、提高采样效率。</li><li><b>异步环境执行</b>　不等所有环境都走完一步，而是谁先完成先处理谁，避免最慢的环境拖住整批。</li></ul>
+<h2>怎么学</h2><p>先了解<a class="ln" href="../n/openai-gym.html">OpenAI Gym</a>的向量化环境；读原文第3节系统设计和第4节速度测试；用EnvPool替换一个PPO示例中的环境构造函数，比较每秒帧数。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2206.10558" rel="noopener">https://arxiv.org/abs/2206.10558</a>（标题、作者列表（共12位）、arXiv v1于2022-06-21；摘要中IMPALA/Apex/Seed RL/Sample Factory提升吞吐、并行环境执行常是最慢环节、DGX-A100上Atari每秒一百万帧与MuJoCo每秒三百万帧、笔记本上为Python子进程的2.8倍、与CleanRL/rl_games/Acme兼容、笔记本上五分钟训练Pong和Ant。C++线程池、同步/异步模式按原文正文与仓库说明的通行描述；NeurIPS 2022 Datasets and Benchmarks、机构按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20EnvPool%E5%B9%B6%E8%A1%8C%E7%8E%AF%E5%A2%83%E5%BC%95%E6%93%8E%EF%BC%88envpool%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aenvpool%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/envpool.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mmd.html"><small>本分支上一个 · 2022.06</small><b>磁性镜像下降MMD</b></a><a class="r" href="alberta-plan.html"><small>本分支下一个 · 2022.08</small><b>Alberta研究计划</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

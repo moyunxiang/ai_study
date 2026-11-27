@@ -1,0 +1,67 @@
+{
+  "id": "sortformer",
+  "who": "Taejin Park, Ivan Medennikov, Kunal Dhawan, Weiqing Wang, He Huang, Nithin Rao Koluguri, Krishna C. Puvvada, Jagadeesh Balam et al. · NVIDIA",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2409.06656"
+    }
+  ],
+  "problem": "端到端说话人日志靠置换不变损失（PIL）解决「输出第几路对应哪个人」的问题，但这种无序的输出很难直接接到语音识别模型上，让转写文字带上说话人标签。",
+  "idea": "提出排序损失（Sort Loss）：规定说话人按首次开口的先后排序，模型的第k路输出就固定代表第k个开口的人；再把这种有序的说话人预测用正弦核函数注入识别编码器，监督多说话人转写里的说话人标签。",
+  "impact": "给「谁在什么时候说了什么」提供了一条把说话人日志并进识别模型的简单路线；模型和代码随NVIDIA NeMo发布，后续有流式版本。",
+  "method": "[[eend]]把说话人日志看成多标签分类：每一帧输出N路「某人是否在说话」的概率。因为说话人的编号是任意的，训练时要用[[pit]]式的置换不变损失，在所有排列里挑损失最小的那个。问题是这样得到的N路输出没有固定含义，下游的识别模型无法知道「第1路」是谁。\n\nSortformer换了一种约定：**按每个人第一次开口的时间排序**，第一个开口的人对应第1路，第二个对应第2路，以此类推。有了这个确定的顺序，就可以直接用普通的二元交叉熵训练（即Sort Loss），也可以和PIL一起用。编码器本身是常见的Transformer结构。\n\n更重要的是第二部分：作者提出一个多说话人语音转文字结构，把Sortformer逐帧给出的说话人活动概率通过正弦核函数编码成向量，加到识别编码器的特征上，这样识别解码器输出的每个词都能带上有序的说话人标签，时间戳和文字通过排序后的目标连接起来。摘要报告：Sort Loss能提升说话人日志效果，加入Sortformer的说话人监督能提高多说话人转写的准确率；代码和模型在[[nemo]]中开源。",
+  "limits": [
+    {
+      "text": "按首次开口排序要求说话人数有上限（输出路数固定），说话人很多或长时间录音中有新人加入时需要额外处理。",
+      "solved_by": []
+    },
+    {
+      "text": "离线版本要看完整段录音才能排序，实时会议转写需要另做流式改造。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "eend",
+      "type": "extends",
+      "note": "沿用EEND逐帧多标签预测说话人活动的端到端做法，改变了输出的排列约定。"
+    },
+    {
+      "to": "pit",
+      "type": "solves",
+      "note": "PIT式置换不变训练让输出顺序任意；Sort Loss以首次开口时间给出确定顺序，可单用或与PIL联用。"
+    },
+    {
+      "to": "nemo",
+      "type": "uses",
+      "note": "在NeMo框架中实现并发布代码与模型。"
+    }
+  ],
+  "prereq": [
+    "cross-entropy",
+    "transformer-block",
+    "word-error-rate",
+    "end-to-end"
+  ],
+  "terms": [
+    {
+      "t": "说话人日志",
+      "d": "diarization，回答「谁在什么时候说话」：把一段多人录音切成按说话人标注的片段。"
+    },
+    {
+      "t": "排序损失",
+      "d": "Sort Loss，按说话人首次开口的先后固定输出顺序后，直接用逐帧二元交叉熵训练。"
+    }
+  ],
+  "aka": [
+    "Sortformer",
+    "Sort Loss",
+    "排序损失",
+    "多说话人转写"
+  ],
+  "check": {
+    "source": "https://arxiv.org/abs/2409.06656",
+    "confirmed": "arXiv官方记录：标题Sortformer: A Novel Approach for Permutation-Resolved Speaker Supervision in Speech-to-Text Systems、Park等9位作者、v1提交2024-09-10；摘要中Sort Loss解决置换问题、可单用或与PIL联用、用正弦核函数把说话人标签嵌入编码器、提升说话人日志与多说话人转写准确率、代码模型通过NeMo公开。Transformer编码器结构、按首次开口排序的具体约定、流式版本为一般了解。"
+  }
+}

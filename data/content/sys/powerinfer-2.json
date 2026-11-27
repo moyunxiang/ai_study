@@ -1,0 +1,24 @@
+{
+ "id": "powerinfer-2",
+ "who": "Zhenliang Xue, Yixin Song, Zeyu Mi, Xinrui Zheng, Yubin Xia, Haibo Chen · 上海交通大学",
+ "aka": ["PowerInfer-2", "手机大模型推理", "神经元簇", "neuron cluster", "NPU+CPU异构推理"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2406.06282"},
+  {"label": "项目页", "url": "https://powerinfer.ai/v2/"}
+ ],
+ "problem": "手机内存只有十几GB，放不下几十亿以上参数的模型，只能跑小模型；把权重放在闪存里按需读取，又会因为闪存读取慢而卡住。",
+ "idea": "把矩阵运算拆成“神经元簇”作为基本单位：激活稠密的簇交给NPU算、稀疏的簇交给CPU算；存储侧按簇做细粒度的计算与闪存读取流水线，并用分段的神经元缓存减少读取次数。",
+ "impact": "在手机上以每秒十余个词的速度跑起了47B参数的MoE模型，是端侧“超出内存的大模型推理”路线的代表系统。",
+ "method": "[[powerinfer]]在PC上利用了激活稀疏性：大模型的FFN里每次只有少数“热”神经元被激活，热的常驻GPU，冷的放CPU。[[llm-in-a-flash]]则把权重放在闪存里，只读当前需要的部分。手机的情况更复杂：有CPU、GPU、NPU多种计算单元，闪存带宽和延迟远不如PC的显存。\n\nPowerInfer-2的核心是以**神经元簇**作为计算和存储的基本单位：把一层的权重按神经元分组，簇的大小可以按情况调整。计算侧，预填充阶段或激活较稠密的簇用NPU做大块矩阵乘，解码阶段激活稀疏的簇由CPU按预测结果只算被激活的神经元。存储侧，按簇进行细粒度的“读一点、算一点”流水线，把闪存I/O与计算重叠；内存里维护一个分段的神经元缓存，常用的热神经元留在内存里，减少重复读取。\n\n摘要报告：比当时最先进的框架最快27.8倍；首次在手机上服务47B参数的模型，速度达每秒11.68个词，精度损失可以忽略（“首次”为论文自述）。",
+ "limits": [
+  {"text": "依赖模型具有较高的激活稀疏性（如ReLU化或MoE），对稠密激活的模型收益有限；需要离线分析每个模型的激活规律。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "powerinfer", "type": "extends", "note": "把PowerInfer基于激活稀疏性的冷热神经元划分从PC推广到手机的NPU+CPU异构环境。"},
+  {"to": "llm-in-a-flash", "type": "extends", "note": "同样把权重放在闪存中按需读取，PowerInfer-2以神经元簇为单位做更细粒度的读取与计算流水线。"},
+  {"to": "llama-cpp", "type": "rivals", "note": "以llama.cpp等端侧框架为基线，在内存放不下的模型上最多快27.8倍。"}
+ ],
+ "prereq": ["memory-bandwidth", "cpu-gpu", "training-vs-inference", "mixture-of-experts"],
+ "terms": [{"t": "NPU", "d": "手机芯片里专门做神经网络矩阵运算的处理单元，擅长大块稠密计算、能效高。"}],
+ "check": {"source": "https://arxiv.org/abs/2406.06282", "confirmed": "标题、六位作者、v1日期2024-06-10；摘要：手机资源限制只能部署小模型、把矩阵运算分解为神经元簇作为基本处理单元、稠密簇在NPU而稀疏簇在CPU、存储引擎做簇级计算与I/O流水线、分段神经元缓存、比最先进框架最多快27.8倍、首个在手机上服务47B模型、11.68 tokens/s、精度损失可忽略。项目页链接、47B模型为MoE、机构为一般了解。"}
+}

@@ -1,0 +1,33 @@
+{
+  "id": "seed-thinking",
+  "who": "字节跳动Seed团队（Jiaze Chen, Tiantian Fan, Xin Liu, Lingjun Liu, Zhiqi Lin, Mingxuan Wang, Chengyi Wang, Xiangpeng Wei et al.）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2504.13914"}
+  ],
+  "aka": ["Seed1.5-Thinking", "Seed-Thinking-v1.5", "豆包深度思考", "字节推理模型", "Seed-Verifier", "Seed-Thinking-Verifier", "流式采样系统", "SRS", "BeyondAIME"],
+  "problem": "推理模型的RL训练很不稳定（同样设置跑两次，分数可能差10分），而数学之外的很多任务没有标准答案可以规则判分；能否用一个激活参数不大的MoE模型做到与DeepSeek-R1相当甚至更好的推理？",
+  "idea": "200B总参数、20B激活的MoE模型，先长思维链监督微调，再用可验证题（数学、代码、逻辑）和不可验证题（创意写作等）混合做RL；用自家的VAPO/DAPO算法稳定训练，用会“先思考再判断”的LLM验证器给答案判对错，并用流式采样系统解决长尾生成拖慢训练的问题。",
+  "impact": "AIME 2024 86.7分、Codeforces 55.0、GPQA 77.3，在非推理任务上的胜率比DeepSeek-R1高8%；报告公开了验证器设计、RL基础设施等大量工程细节，是字节Seed后续推理与智能体模型的基础。",
+  "background": "[[deepseek-r1]]证明了大规模RL的效果。字节Seed团队此前提出了不用价值网络的[[dapo]]和带价值网络的[[vapo]]，分别针对策略梯度和演员-评论家两类RL的不稳定问题。另一个难题是奖励：竞赛题的标准答案常有多种等价写法，规则匹配容易误判，而写作类任务根本没有标准答案。",
+  "method": "**数据**：可验证题包括约10万道竞赛级STEM题（数学占80%以上，并尽量改写成整数答案）、带单元测试的算法编程题，以及可自动验证的逻辑谜题；不可验证题如写作、问答，用人类偏好的奖励模型打分；还有同时用验证器和奖励模型打分的混合数据。作者称推理能力主要来自可验证题，并能推广到不可验证题。\n\n**验证器**：Seed-Verifier按人工写好的原则，让LLM判断“题目、参考答案、模型答案”三者中模型答案与参考答案是否数学上等价，回答YES或NO；Seed-Thinking-Verifier则先写出详细的推理过程再下结论，更不容易被投机的回答骗过，判定更准。\n\n**RL算法**：长思维链下价值模型偏差大、奖励稀疏，于是沿用VAPO与DAPO中的技巧，例如用固定策略的蒙特卡洛回报预训练价值模型、分离式GAE、Clip-Higher等。\n\n**基础设施**：基于HybridFlow编程抽象，训练与生成共置在同一批GPU上。长思维链的回答长度差异极大，少数超长样本会让大量GPU空等；流式采样系统（SRS）让部分样本跨模型版本继续生成，并用比例 α 控制在策略与离策略样本的比例。\n\n**结果**：AIME 2024 86.7、Codeforces 55.0、GPQA 77.3；团队还构建了更难的BeyondAIME和Codeforces内部评测并承诺公开。",
+  "legacy": "它与[[minimax-m1]]、[[magistral]]等一起构成2025年中各家推理模型技术报告的一批，其中“用会思考的LLM验证器代替规则判分”“用流式/异步采样处理长尾生成”成为后续RL系统的常见设计。",
+  "limits": [
+    {"text": "模型权重没有公开，报告中的数字只能通过官方API核实，训练数据也不可复现。", "solved_by": []},
+    {"text": "LLM验证器本身也会出错或被投机回答欺骗，验证器的偏差会直接成为RL优化的目标。", "solved_by": []},
+    {"text": "不可验证任务仍依赖人类偏好奖励模型，长思维链在这类任务上的收益和风险（如奖励黑客）没有充分分析。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "deepseek-r1", "type": "rivals", "note": "同为“长思维链SFT+大规模RL”的推理模型；官方称在非推理任务上胜率比R1高8%。"},
+    {"to": "dapo", "type": "uses", "note": "同团队提出的无价值网络RL算法，用于稳定训练。"},
+    {"to": "vapo", "type": "uses", "note": "同团队提出的带价值网络的RL算法，其价值预训练等技巧被沿用。"},
+    {"to": "sparse-moe", "type": "uses", "note": "模型为200B总参数、20B激活的稀疏MoE。"},
+    {"to": "verl", "type": "uses", "note": "训练基于HybridFlow编程抽象（即verl框架的设计）。"}
+  ],
+  "prereq": ["policy-gradient-concept", "actor-critic", "mixture-of-experts", "reward-design", "reasoning-tokens"],
+  "terms": [
+    {"t": "LLM验证器", "d": "用一个语言模型判断模型答案与参考答案是否等价，代替死板的字符串或规则匹配。"},
+    {"t": "长尾生成", "d": "一批样本中少数回答特别长，其余早已完成却要等它们，造成GPU空闲。"}
+  ],
+  "learn": "先读[[dapo]]和[[vapo]] → 读报告第3节两种验证器和第5节流式采样系统 → 动手：用一个小模型做答案等价判断（如“1/2”与“0.5”），比较直接回答YES/NO和先写推理再判断的准确率。",
+  "check": {"source": "https://arxiv.org/abs/2504.13914", "confirmed": "标题、作者、v1提交于2025-04-10；摘要中AIME 2024 86.7、Codeforces 55.0、GPQA 77.3、非推理任务胜率比R1高8%、200B总参数20B激活、BeyondAIME与Codeforces内部评测；正文（arxiv.org/html/2504.13914）核对两次运行可差10分、VAPO与DAPO、可验证与不可验证数据、10万道STEM题且数学超过80%、Seed-Verifier的三元组YES/NO与Seed-Thinking-Verifier、价值预训练、HybridFlow与共置混合引擎、SRS与比例α。“分离式GAE、Clip-Higher”出自VAPO/DAPO的一般了解；verl与HybridFlow的对应凭一般了解；未写venue。"}
+}

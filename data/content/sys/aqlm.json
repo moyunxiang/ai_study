@@ -1,0 +1,26 @@
+{
+ "id": "aqlm",
+ "who": "Vage Egiazarian, Andrei Panferov, Denis Kuznedelev, Elias Frantar, Artem Babenko, Dan Alistarh · Yandex, 奥地利科学技术研究所等",
+ "venue": "ICML 2024",
+ "aka": ["AQLM", "加性量化", "Additive Quantization", "多码本量化", "MCQ", "Multi-Codebook Quantization", "2比特量化"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2401.06118"},
+  {"label": "GitHub", "url": "https://github.com/Vahe1994/AQLM"}
+ ],
+ "problem": "GPTQ、AWQ在4比特上已接近无损，但压到每参数2–3比特时，逐个标量四舍五入的量化误差急剧增大，模型质量大幅下降。",
+ "idea": "借用信息检索里的加性量化：把一组权重（如8个）当作一个向量，用几个码本里各选一个码字相加来表示它，只存码字编号；码本按校准数据学习，并在每个Transformer块内联合优化。",
+ "impact": "把2比特LLM量化的精度推到新的水平，与QuIP#一起代表“向量量化”路线，被Hugging Face Transformers和vLLM等支持，成为极低比特量化的常用基线。",
+ "method": "[[gptq]]等方法属于**标量量化**：每个权重独立地映射到少数几个格点之一。比特数一低，格点太稀，误差就大。**向量量化**把若干个权重合成一个向量一起编码，可以更好地贴合权重的实际分布。\n\nAQLM采用多码本的加性量化（AQ）：把每一行权重切成长度为g（如8）的小组，每组向量用M个码本中各选一个码字相加来近似，`w ≈ C₁[i₁] + C₂[i₂] + … + C_M[i_M]`，只需存储M个编号。例如g=8、一个16比特编号的码本，就相当于每个参数2比特。两点改进使它适合LLM：一是**输入自适应**——优化目标不是让权重本身接近，而是让该层在校准数据上的输出接近原来（与[[gptq]]相同的层输出误差），用束搜索选码字、再更新码本；二是**块内联合微调**——量化完一个Transformer块后，把块内所有码本和缩放参数一起微调，让整块输出接近原模型。\n\n摘要称：AQLM是压到每参数3比特以下时，首个在精度—模型大小上达到帕累托最优的方案，在2比特区间显著优于已知方法；同时提供GPU和CPU上的快速生成内核，速度可达到或超过优化过的FP16实现，而内存占用小得多。",
+ "limits": [
+  {"text": "量化过程需要大量校准优化，比GPTQ慢得多；查码本解码的推理内核在大批量时难以达到标量量化的吞吐。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "gptq", "type": "solves", "note": "GPTQ类标量量化在2比特时误差急剧增大，AQLM用多码本向量量化显著降低极低比特下的损失。"},
+  {"to": "quip", "type": "rivals", "note": "同为极低比特量化：QuIP/QuIP#用非相干处理加格点码本，AQLM用学习的加性多码本，二者在2比特区间互为主要对比。"},
+  {"to": "vq-vae", "type": "uses", "note": "沿用向量量化的码本思想，只是对象从神经网络的表示换成了权重本身。"},
+  {"to": "llama-2", "type": "uses", "note": "以Llama 2等开源模型为主要实验对象。"}
+ ],
+ "prereq": ["quantization-concept", "vector-quantization", "clustering", "memory-bandwidth"],
+ "terms": [{"t": "加性量化", "d": "用多个码本中各选一个码字相加来表示一个向量，码本越多表示越精细，存储的只是各码本里的编号。"}],
+ "check": {"source": "https://arxiv.org/abs/2401.06118", "confirmed": "标题、六位作者、v1日期2024-01-11；摘要：极端压缩指每参数2–3比特、从多码本量化（MCQ）角度重新审视、推广信息检索中的加性量化、两项创新为输入自适应的学习加性量化和Transformer块内码本参数联合优化、首个在3比特以下达到精度—大小帕累托最优、2比特区间显著改进、GPU与CPU快速实现可匹配或超过优化的FP16速度。分组长度与码本大小示例、束搜索、ICML 2024、机构、被Transformers/vLLM支持为一般了解。"}
+}

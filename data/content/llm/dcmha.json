@@ -1,0 +1,27 @@
+{
+  "id": "dcmha",
+  "who": "Da Xiao, Qingye Meng, Shengping Li, Xingyuan Yuan · 彩云科技、北京邮电大学",
+  "venue": "ICML 2024 Oral",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2405.08553"}, {"label": "代码", "url": "https://github.com/Caiyun-AI/DCFormer"}],
+  "aka": ["DCMHA", "DCFormer", "动态可组合多头注意力", "Dynamically Composable Multi-Head Attention", "DCPythia"],
+  "problem": "多头注意力的各个头独立计算，注意力分数矩阵存在低秩瓶颈，很多头又彼此冗余。",
+  "idea": "用一个依赖输入的Compose函数，动态地把各头的注意力分数和权重重新组合，相当于让头的组合方式随上下文变化。",
+  "impact": "作为多头注意力的即插即用替换，在多种规模上达到约1.7到2倍算力的Transformer效果。",
+  "background": "在[[transformer]]的多头注意力里，每个头只用 `d/h` 维的查询和键，一张 `n×n` 的注意力图秩最多为 `d/h`，表达力受限；而且研究发现不少头学到的模式高度相似。[[talking-heads]]用固定的跨头矩阵混合各头，但混合方式与输入无关。",
+  "method": "DCMHA的核心是Compose函数：对注意力分数张量（形状为头数×查询×键）和softmax后的权重张量，各做一次沿“头”这一维的变换，变换矩阵由当前查询和键动态生成。为了控制开销，这个动态矩阵被分解成一个静态的 `h×h` 矩阵加上若干低秩、对角的输入相关项，例如\n\n`A'_{:,i,j} = (W_static + Σ_k q_i 生成的低秩项 + k_j 生成的低秩项) · A_{:,i,j}`\n\n于是每对(查询, 键)位置都能按上下文决定“从哪些头借信息”。把多头注意力替换成DCMHA后的模型称为DCFormer，可以用在任何Transformer架构里。",
+  "results": "摘要报告：DCFormer在不同架构和规模的语言建模上显著优于Transformer，效果相当于用了约1.7到2.0倍的算力；例如DCPythia-6.9B在预训练困惑度和下游评测上都超过了开源的Pythia-12B。",
+  "legacy": "它把“头之间应该交流”从固定混合推进到动态组合，入选ICML 2024口头报告；但跨头运算同样增加了内核实现难度，主流大模型尚未普遍采用。",
+  "limits": [
+    {"text": "跨头的动态组合打破了按头独立并行的结构，训练和推理都需要定制内核，实际吞吐低于同参数的标准注意力。", "solved_by": []},
+    {"text": "验证集中在数十亿参数以内，是否在百亿以上和超长上下文中保持同等收益尚不清楚。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "talking-heads", "type": "extends", "note": "把固定的跨头混合矩阵推广为依赖输入的动态组合。"},
+    {"to": "transformer", "type": "solves", "note": "缓解多头注意力分数矩阵的低秩瓶颈和头冗余。"},
+    {"to": "pythia", "type": "uses", "note": "在Pythia的设置上训练DCPythia做对照，6.9B超过Pythia-12B。"}
+  ],
+  "prereq": ["self-attention", "low-rank", "softmax", "matrix-multiplication"],
+  "terms": [{"t": "低秩瓶颈", "d": "每个头的查询和键维度很小，它们相乘得到的注意力矩阵秩不超过这个维度，能表示的注意力模式因此受限。"}],
+  "learn": "先读[[talking-heads]]理解跨头混合；再读DCMHA第3节Compose函数的分解；动手：在小模型上对比固定混合和动态混合的验证损失。",
+  "check": {"source": "https://arxiv.org/abs/2405.08553", "confirmed": "标题、作者、arXiv首次提交2024-05-14；摘要中Compose函数、约1.7–2.0倍算力等效、DCPythia-6.9B超过Pythia-12B；ICML 2024 oral见paper copilot会议列表。机构为一般了解。"}
+}

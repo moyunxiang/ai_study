@@ -1,0 +1,32 @@
+{
+  "id": "opera",
+  "aka": ["OPERA", "过度信任惩罚", "Over-Trust Penalty", "回溯重分配", "Retrospection-Allocation", "幻觉缓解解码"],
+  "who": "Qidong Huang, Xiaoyi Dong, Pan Zhang, Bin Wang, Conghui He, Jiaqi Wang, Dahua Lin, Weiming Zhang, Nenghai Yu · 中国科学技术大学、上海人工智能实验室",
+  "venue": "CVPR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2311.17911"},
+    {"label": "代码", "url": "https://github.com/shikiw/OPERA"}
+  ],
+  "problem": "多模态大模型常描述图里不存在的东西（幻觉）；已有缓解办法要么用专门数据重新训练，要么调用外部知识，都有额外成本。",
+  "idea": "观察到幻觉常伴随注意力“只盯着少数总结token”的模式，于是在束搜索解码时对这种过度信任加惩罚，必要时回退重选，不需要额外数据、知识或训练。",
+  "impact": "与VCD同期成为“免训练解码阶段缓解幻觉”的两种代表做法，常被后续幻觉研究当作对照基线。",
+  "method": "[[c:hallucination]]在多模态大模型里表现为：描述图片时说出图中并没有的物体或属性。此前的缓解方法如[[llava-rlhf]]需要专门的数据重新训练，另一些方法借助外部检测器或知识库核对，都要额外成本。\n\nOPERA的出发点是一个观察：查看模型生成时的自注意力矩阵，会发现很多幻觉出现前，模型在生成新token时把注意力集中到前面少数几个“总结token”（常是标点、换行等）上，而不是均匀参考之前所有token，尤其是图像token。作者称之为**部分过度信任**：模型依赖这些总结token里聚合的信息，反而忽略了图像本身，于是开始“编”内容。\n\n据此OPERA修改束搜索（beam search）解码：一是**过度信任惩罚**——在候选token的得分上减去一个惩罚项，惩罚项根据局部注意力窗口里是否出现“柱状”的集中注意力模式来计算；二是**回溯重分配**——如果发现同一个总结token在最近几步里持续被过度关注，就回退到那个位置，换一个候选重新生成。整个过程只改解码，不改模型参数。摘要报告，OPERA在不同多模态大模型和多种幻觉指标上都有显著的缓解效果。",
+  "limits": [
+    {"text": "依赖束搜索并需要检查注意力矩阵和回退重生成，解码速度明显慢于贪心解码。", "solved_by": []},
+    {"text": "只在解码时补救，模型本身对图像的依赖不足并没有被训练改变。", "solved_by": ["rlhf-v"]}
+  ],
+  "relations": [
+    {"to": "llava-1.5", "type": "uses", "note": "在LLaVA-1.5等开源多模态大模型上验证解码方法。"},
+    {"to": "instructblip", "type": "uses", "note": "InstructBLIP是被测试的模型之一。"},
+    {"to": "pope", "type": "uses", "note": "用POPE等幻觉评测衡量效果。"},
+    {"to": "llava-rlhf", "type": "rivals", "note": "LLaVA-RLHF靠额外数据和强化学习训练来减少幻觉，OPERA不训练、只改解码。"},
+    {"to": "vcd", "type": "rivals", "note": "同期的免训练解码方法；VCD对比原图与加噪图的输出分布，OPERA依据注意力模式惩罚过度信任。"}
+  ],
+  "prereq": ["hallucination", "decoding-sampling", "self-attention", "language-model"],
+  "terms": [
+    {"t": "束搜索（beam search）", "d": "解码时每一步保留得分最高的若干条候选序列，而不是只保留一条，最后选总分最高的输出。"},
+    {"t": "总结token", "d": "OPERA的说法，指生成过程中吸收了大量前文信息、之后被反复重点关注的少数token，常见于句号、换行等位置。"}
+  ],
+  "learn": "先了解[[pope]]如何测物体幻觉和束搜索的基本流程，再看OPERA论文中注意力“柱状模式”的可视化图，理解惩罚项是怎么算出来的。",
+  "check": {"source": "https://arxiv.org/abs/2311.17911", "confirmed": "标题、九位作者、arXiv v1提交2023-11-29；摘要中已有方法需要特定数据或外部知识、OPERA基于过度信任惩罚与回溯重分配、无需额外数据知识或训练、幻觉与自注意力中只关注少数总结token的知识聚合模式相关、在束搜索中对logits加惩罚并带回滚策略、在不同MLLM与指标上显著缓解。局部窗口与柱状模式的计算细节、被测模型名单、使用POPE、机构与CVPR 2024为一般了解，未逐项核对。"}
+}

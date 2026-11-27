@@ -1,0 +1,29 @@
+{
+  "id": "alignprop",
+  "who": "Mihir Prabhudesai, Anirudh Goyal, Deepak Pathak, Katerina Fragkiadaki · 卡内基梅隆大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2310.03739"},
+    {"label": "项目页", "url": "https://align-prop.github.io/"}
+  ],
+  "aka": ["AlignProp", "奖励反向传播", "Reward Backpropagation", "奖励梯度微调"],
+  "problem": "用DDPO、DPOK这类强化学习方法把扩散模型对齐到奖励函数，策略梯度估计方差很大，要很多次采样才能学到东西。",
+  "idea": "如果奖励函数可微（美学评分、图文相似度等），就把奖励的梯度端到端地沿整个去噪过程反向传播到模型参数；用LoRA和梯度检查点把显存压到可承受的范围。",
+  "impact": "与几天前发布的DRaFT几乎同时确立了“直接反传奖励梯度”这条路线，在更少的训练步数里拿到更高奖励，成为可微奖励下扩散对齐的常用基线。",
+  "method": "生成一张图要跑T步去噪，AlignProp把这整个过程当作一个可微的计算图：`x₀ = f_θ(x_T, z)`，奖励`r(x₀, z)`可微，于是直接用`∇_θ r`做梯度上升。难点是显存：保存所有步、所有层的中间激活对Stable Diffusion这类模型不可行。两项工程手段解决了它：只训练LoRA低秩适配器，参数和优化器状态小得多；对每一步的去噪网络使用梯度检查点，前向时不存激活、反传时重算。作者还发现只反传最后若干步的随机截断能进一步省显存并减轻刷分。\n\n实验覆盖多种奖励：图文语义对齐、美学评分、可压缩性、控制图中物体个数，以及它们的组合。和强化学习方法相比，AlignProp在更少的训练步数内达到更高的奖励，方法本身也更简单。",
+  "limits": [
+    {"text": "只能用可微的奖励；文字是否写对、物体位置是否正确等需要不可微检测器的目标无法直接优化。", "solved_by": ["flow-grpo"]},
+    {"text": "直接优化奖励很容易刷分，画面风格趋同、多样性下降，需要早停或截断反传来控制。", "solved_by": ["adjoint-matching"]}
+  ],
+  "relations": [
+    {"to": "ddpo", "type": "solves", "note": "DDPO的策略梯度方差大、样本效率低；对可微奖励直接反传梯度，用更少步数达到更高奖励。"},
+    {"to": "draft", "type": "rivals", "note": "几乎同时提出的同一思路；DRaFT更强调只回传最后K步与降方差变体，AlignProp强调随机截断与多奖励组合。"},
+    {"to": "lora", "type": "uses", "note": "只微调LoRA参数，使穿过整条去噪链的反传在显存上可行。"},
+    {"to": "stable-diffusion", "type": "uses", "note": "实验以Stable Diffusion为底座。"}
+  ],
+  "prereq": ["backpropagation", "diffusion-process", "reward-design", "peft-concept", "rlhf-concept"],
+  "terms": [
+    {"t": "梯度检查点", "d": "前向时只保存少数节点的激活，反向传播时再重算需要的部分，用计算时间换显存。"}
+  ],
+  "learn": "先读DDPO的RL做法和DRaFT → 读本文第3节显存优化与截断反传 → 用美学奖励在小分辨率扩散模型上比较截断步数的影响。",
+  "check": {"source": "https://arxiv.org/abs/2310.03739", "confirmed": "标题、四位作者、v1日期2023-10-05、摘要中RL方法梯度估计方差高、端到端反传奖励梯度穿过去噪过程、LoRA加梯度检查点降低显存、目标包括图文对齐、美学、可压缩性、物体个数及其组合、更少训练步达到更高奖励；机构、Stable Diffusion底座、随机截断反传来自一般了解"}
+}

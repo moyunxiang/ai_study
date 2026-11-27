@@ -1,0 +1,32 @@
+{
+  "id": "promptagent",
+  "who": "Xinyuan Wang, Chenxi Li, Zhen Wang, Fan Bai, Haotian Luo, Jiayou Zhang, Nebojsa Jojic, Eric P. Xing et al. · UC圣迭戈 / 佐治亚理工 / MBZUAI / 微软研究院 / CMU",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2310.16427"},
+    {"label": "GitHub", "url": "https://github.com/XinyuanWangCS/PromptAgent"}
+  ],
+  "aka": ["PromptAgent", "Prompt Agent", "规划式提示优化", "MCTS提示优化", "专家级提示优化", "strategic planning prompt optimization"],
+  "problem": "专家手写的好提示里有大量领域知识和细致的规则；已有的自动提示优化大多只做局部改写或随机采样，搜索很浅，写不出这种专家级提示。",
+  "idea": "把提示优化看成规划问题：每个提示版本是一个状态，根据错例写出的修改意见是一个动作，用蒙特卡洛树搜索在提示空间里向前看多步，找到回报最高的改写路径。",
+  "impact": "在BBH、生物医学和通用NLU共12个任务上明显超过思维链提示和APE，并显示树搜索比贪心、束搜索、随机采样更适合提示优化。",
+  "method": "PromptAgent把提示优化写成一个[[c:mdp]]：**状态**是当前提示；**动作**是“错误反馈”——让被优化的模型（默认GPT-3.5）在一批训练样本上答题，把答错的样本交给优化器LLM（GPT-4）反思，写出“提示应如何修正”的意见；**转移**是按意见改写出新提示；**奖励**是新提示在一份留出数据上的准确率。\n\n搜索用[[mcts]]：选择时用UCT公式平衡“已知得分高”和“尝试较少”的分支；扩展时用新采样的错例生成几个子提示；模拟时沿得分最高的子节点贪心往下展开到深度上限；再把回报回传更新各节点的价值。默认跑12轮迭代，最后输出平均回报最高路径上的最佳提示。因为每一步都基于真实错例，提示会逐渐积累具体的领域规则，变得又长又细，接近专家写法；论文也在GPT-4和PaLM 2上做了测试，平均结果仍高于APE。\n\n结果：[[bbh]]六个任务平均0.802，思维链0.707，[[ape]]0.690；三个通用NLU任务平均0.868，APE为0.778。在部分任务上比较搜索策略的消融实验中，MCTS平均0.754，贪心0.698、束搜索0.697、随机采样0.635。",
+  "limits": [
+    {"text": "一次优化要反复调用GPT-4反思、生成子提示，并在上百条留出样本上评测每个节点，成本高；树的宽度、深度等超参数要按任务调。", "solved_by": []},
+    {"text": "得到的提示很长、针对具体任务写满细则，既占用上下文，也可能过拟合训练集里的那批错例。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ape", "type": "solves", "note": "APE靠采样候选再筛选，搜索浅、不利用错误信息；PromptAgent基于错例定向改写并做多步前瞻，三类任务上平均都超过APE。"},
+    {"to": "mcts", "type": "uses", "note": "直接套用UCT式蒙特卡洛树搜索的选择、扩展、模拟、回传四步，状态换成提示、动作换成错误反馈。"},
+    {"to": "opro", "type": "rivals", "note": "OPRO让LLM沿着历史得分轨迹逐步提议新提示，相当于单链搜索；PromptAgent显式维护一棵搜索树并做前瞻。"},
+    {"to": "reflexion", "type": "extends", "note": "沿用“对失败做语言反思”的思路，但反思结果用来改写提示，并纳入树搜索比较。"},
+    {"to": "tot", "type": "extends", "note": "思维树在推理步骤上做树搜索，PromptAgent把树搜索搬到提示本身的改写空间。"}
+  ],
+  "prereq": ["mdp", "tree-search", "exploration-exploitation", "in-context-learning", "train-val-test"],
+  "terms": [
+    {"t": "UCT", "d": "树搜索中选子节点的公式：平均回报加上一个随访问次数减小的探索奖励，既偏向好分支，又给少试过的分支机会。"},
+    {"t": "错误反馈", "d": "优化器LLM读过错例后写的修改意见，例如（示意）“题目给出的表格若新增了行，计数时也要算上”，在PromptAgent里充当动作。"}
+  ],
+  "learn": "先补[[c:tree-search]]和[[mcts]]，再读[[ape]] → 读原文第3节MDP定义和图2、表1 → 动手：用一个BBH子任务，把树深度设为2、宽度设为2，手动跑一轮“错例—反馈—改写—评测”的树搜索。",
+  "check": {"source": "https://arxiv.org/abs/2310.16427", "confirmed": "标题、作者、v1提交于2023-10-25；arxiv.org/html/2310.16427v2核对单位、MDP各要素、GPT-3.5为被优化模型与GPT-4为优化器、12个任务、12轮迭代、BBH平均0.802/0.707/0.690、NLU平均0.868对0.778、搜索消融0.754/0.698/0.697/0.635；GitHub README注明ICLR 2024。"}
+}

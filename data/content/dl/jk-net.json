@@ -1,0 +1,28 @@
+{
+  "id": "jk-net",
+  "who": "Keyulu Xu, Chengtao Li, Yonglong Tian, Tomohiro Sonobe, Ken-ichi Kawarabayashi, Stefanie Jegelka · MIT、日本国立情报学研究所",
+  "venue": "ICML 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1806.03536"}
+  ],
+  "aka": ["JK-Net", "JKNet", "Jumping Knowledge Networks", "跳跃知识网络", "层聚合", "Layer Aggregation"],
+  "problem": "[[gcn]]、[[graphsage]]这类邻居聚合网络每层看固定跳数，k层就看k跳邻居。但在图的稠密核心区，几跳就覆盖了大半张图，表示被“抹平”；在稀疏的边缘，几跳又看不到足够的信息——同一个层数不可能对所有节点都合适。",
+  "idea": "把每一层的节点表示都保留下来，在最后一层“跳跃”连接到输出，再用拼接、逐元素取最大或LSTM注意力为每个节点自适应地组合不同层（即不同邻域范围）的表示。",
+  "impact": "给出了分析GNN感受野的随机游走视角，“聚合所有层的输出”成为缓解过平滑、加深GNN的常用技巧，可以直接套在GCN、GraphSAGE、GAT等模型上。",
+  "method": "作者先做分析：在k层GCN里，节点x的最终表示受节点y影响的程度，与从x出发走k步随机游走到达y的概率成正比。因此每个节点的“有效感受野”取决于局部图结构，就像随机游走的扩散范围——在扩张性强的子图上，层数稍多影响分布就接近整张图的平稳分布，节点之间失去区分度（这与[[gcn-oversmoothing]]观察到的现象一致）。\n\nJK网络的做法：照常堆叠L层邻居聚合，但把每层的输出 `h_v^(1), …, h_v^(L)` 都送到最后的聚合层。三种聚合方式：拼接（对所有节点用同一组合）、逐元素最大池化（每个特征维度挑最有信息的那层）、用双向LSTM给各层打注意力分数后加权（每个节点自己决定依赖哪个范围）。后两种让不同节点自适应地选用不同大小的邻域。\n\n摘要报告：在社交网络、生物信息和引文网络的多项实验中达到当时最好；把JK框架与GCN、GraphSAGE、GAT组合，都能稳定提升这些模型的性能。",
+  "limits": [
+    {"text": "只是在输出端组合各层，中间层本身仍会随深度过平滑；网络深到几十层时效果仍会下降。", "solved_by": ["appnp"]}
+  ],
+  "relations": [
+    {"to": "gcn", "type": "solves", "note": "缓解GCN固定层数导致的邻域范围对部分节点过大、对另一些节点过小的问题。"},
+    {"to": "graphsage", "type": "extends", "note": "可直接套在GraphSAGE上，把各层聚合结果一起送到输出。"},
+    {"to": "gat", "type": "extends", "note": "实验中与GAT组合，同样带来提升。"},
+    {"to": "gcn-oversmoothing", "type": "solves", "note": "用随机游走分析解释层数加深后表示趋同的现象，并通过跨层聚合缓解它。"}
+  ],
+  "prereq": ["graph-basics", "message-passing", "markov-chain", "residual-connection"],
+  "terms": [
+    {"t": "影响分布", "d": "衡量节点y的输入特征对节点x最终表示有多大影响的归一化分布；作者证明它与随机游走的到达概率相关。"}
+  ],
+  "learn": "先读[[gcn]]和[[gcn-oversmoothing]]；读论文第3节随机游走影响分析；在Cora上训练2到8层的GCN，再加上JK最大池化，比较准确率随层数的变化。",
+  "check": {"source": "https://arxiv.org/abs/1806.03536", "confirmed": "标题、6位作者、arXiv v1提交于2018-06-09；摘要中邻居聚合的节点范围强烈依赖图结构、类似随机游走的扩散、提出JK网络为每个节点灵活利用不同邻域范围、社交/生物信息/引文网络上达到最好、与GCN/GraphSAGE/GAT组合稳定提升。三种聚合方式、影响分布与随机游走的定理、ICML 2018与机构来自一般了解。"}
+}

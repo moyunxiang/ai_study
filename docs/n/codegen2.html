@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>CodeGen2训练教训（2023） · AI脉络</title>
+<meta name="description" content="训练代码大模型很贵，架构（编码器还是解码器）、目标（因果语言建模、片段损坏还是填空）、采样方式、数据配比都有很多选择，此前各家各选一种，缺少在同一设定下的系统比较。 在1B规模上做一系列控制实验，试图把这四个方面统一起来：用前缀LM统一编码器与解码器，把因果建模、片段损坏和填空统一成一个简单目标，…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/codegen2.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CodeGen2训练教训（2023）">
+<meta property="og:description" content="训练代码大模型很贵，架构（编码器还是解码器）、目标（因果语言建模、片段损坏还是填空）、采样方式、数据配比都有很多选择，此前各家各选一种，缺少在同一设定下的系统比较。 在1B规模上做一系列控制实验，试图把这四个方面统一起来：用前缀LM统一编码器与解码器，把因果建模、片段损坏和填空统一成一个简单目标，…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/codegen2.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/codegen2">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 代码大模型</div>
+<h1>CodeGen2训练教训</h1>
+<div class="full">CodeGen2: Lessons for Training LLMs on Programming and Natural Languages</div>
+<div class="meta"><span>2023.05</span><span>论文</span><span>延伸</span><span>ICLR 2023 Workshop</span><span>Erik Nijkamp, Hiroaki Hayashi, Caiming Xiong, Silvio Savarese, Yingbo Zhou · Salesforce Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2305.02309" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/salesforce/CodeGen" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/codegen2">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>训练代码大模型很贵，架构（编码器还是解码器）、目标（因果语言建模、片段损坏还是填空）、采样方式、数据配比都有很多选择，此前各家各选一种，缺少在同一设定下的系统比较。</p></div><div><h4>方法</h4><p>在1B规模上做一系列控制实验，试图把这四个方面统一起来：用前缀LM统一编码器与解码器，把因果建模、片段损坏和填空统一成一个简单目标，检验填空“免费午餐”假说和多轮代码—文本混合训练，总结成五条经验。</p></div><div><h4>影响</h4><p>以“成功和失败都报告”的方式给出了训练代码模型的五条教训——包括统一架构并没有带来好处——并开源1B到16B的CodeGen2模型，为后来的代码模型训练配方提供了参考。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/codegen.html">CodeGen</a>是纯解码器的因果语言模型；<a class="ln" href="../n/codet5.html">CodeT5</a>和<a class="ln" href="../n/plbart.html">PLBART代码去噪预训练</a>是编码器—解码器；<a class="ln" href="../n/incoder.html">InCoder代码补全</a>和<a class="ln" href="../n/fim.html">中间填充FIM</a>为了支持“在中间填空”提出了因果掩码和把中间片段移到末尾的训练方式。作者希望在固定的计算预算下找出最省、最好的组合。</p><p><b>四个方面的统一尝试</b>：</p><ul><li><b>架构</b>：用<b>前缀LM</b>统一编码器和解码器：输入的前缀部分用双向注意力（像编码器），后面的生成部分用因果注意力（像解码器），一个模型同时适合理解和生成；</li><li><b>学习目标</b>：把因果语言建模、<a class="ln" href="../n/t5.html">T5</a>式的片段损坏、填空三种目标合并成一个简单的混合目标，每条样本随机选用；</li><li><b>填空采样</b>：检验“免费午餐”假说——在训练中加入填空目标，是否完全不损害从左到右的生成能力；</li><li><b>数据分布</b>：研究编程语言和自然语言混合的比例，以及多轮（多个epoch）重复训练的影响。</li></ul><p><b>五条教训</b>（基于1B模型的大量实验，摘要称“成功与失败”都提炼成了教训）：作者报告前缀LM统一架构在代码生成上并没有超过纯解码器，于是最终配方回到因果解码器；填空目标可以与因果建模混合训练，但“免费午餐”并不完全成立，会带来一些从左到右生成上的代价；自然语言与代码混合、多轮训练对性能的影响也有具体结论。</p><p><b>发布</b>：按最终配方训练并开源CodeGen2的1B、3.7B、7B、16B四个规模及训练框架。</p><h2>后来的发展</h2><p>CodeGen2及随后的CodeGen2.5为2023年的开源代码模型提供了基线；“统一架构不如纯解码器”的负结果与业界最终全面转向解码器代码模型的趋势一致。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>主要结论来自1B规模的实验，能否外推到数十亿以上参数没有充分验证；最终模型在HumanEval上的绝对成绩不如同期的StarCoder。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/starcoder.html">StarCoder</a> <a class="chip hue" style="--h:0" href="../n/code-llama.html">Code Llama</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/t5.html">T5</a><span class="yr">2019.10 · LLM</span><div class=nt>统一目标中包含T5式的片段损坏。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/fim.html">中间填充FIM</a><span class="yr">2022.07 · LLM</span><div class=nt>把填空目标纳入统一训练，并检验其“免费午餐”说法。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/codegen.html">CodeGen</a><span class="yr">2022.03 · LLM</span><div class=nt>同一团队的第二代代码模型，系统检验了架构、目标、采样和数据的组合。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/incoder.html">InCoder代码补全</a><span class="yr">2022.04 · LLM</span><div class=nt>InCoder用因果掩码实现填空，CodeGen2尝试用前缀LM和混合目标统一理解、生成与填空。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/starcoder.html">StarCoder</a><span class="yr">2023.05 · LLM</span><div class=nt>主要结论来自1B规模的实验，能否外推到数十亿以上参数没有充分验证；最终模型在HumanEval上的绝对成绩不如同期的StarCoder。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/code-llama.html">Code Llama</a><span class="yr">2023.08 · LLM</span><div class=nt>主要结论来自1B规模的实验，能否外推到数十亿以上参数没有充分验证；最终模型在HumanEval上的绝对成绩不如同期的StarCoder。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/batch-size-epoch.html">批大小、步数与轮数</a></p>
+<h2>本篇术语</h2><ul><li><b>前缀LM</b>　输入的前半段用双向注意力、后半段用只看左边的因果注意力的Transformer，介于编码器和解码器之间。</li><li><b>免费午餐假说</b>　认为在训练中加入填空目标，能获得填空能力而完全不损害普通从左到右的生成能力。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/fim.html">中间填充FIM</a>的填空训练方式和<a class="ln" href="../n/t5.html">T5</a>的片段损坏；读本文第3–4节五条教训对应的实验表；动手：用CodeGen2-1B做一次中间填空和一次普通补全，比较两种模式的输出质量。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2305.02309" rel="noopener">https://arxiv.org/abs/2305.02309</a>（标题、5位作者、arXiv首次提交2023-05-03；摘要中统一模型架构、学习方法、填空采样、数据分布四个方面、前缀LM统一编码器与解码器、因果语言建模、片段损坏、填空统一成简单学习算法、检验“免费午餐”假说、编程语言与自然语言混合及多轮训练的影响、1B模型上的系列实验提炼成五条教训、发布1B/3.7B/7B/16B模型与训练框架。各条教训的具体结论（前缀LM无收益、免费午餐不完全成立）、ICLR 2023研讨会为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20CodeGen2%E8%AE%AD%E7%BB%83%E6%95%99%E8%AE%AD%EF%BC%88codegen2%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acodegen2%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/codegen2.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="symbol-tuning.html"><small>本分支上一个 · 2023.05</small><b>符号微调</b></a><a class="r" href="textbooks.html"><small>本分支下一个 · 2023.06</small><b>教科书级数据phi-1</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

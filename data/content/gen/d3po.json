@@ -1,0 +1,29 @@
+{
+  "id": "d3po",
+  "who": "Kai Yang, Jian Tao, Jiafei Lyu, Chunjiang Ge, Jiaxin Chen, Qimai Li, Weihan Shen, Xiaolong Zhu et al. · 清华大学深圳国际研究生院等",
+  "venue": "CVPR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2311.13231"},
+    {"label": "代码", "url": "https://github.com/yk7333/D3PO"}
+  ],
+  "aka": ["D3PO", "Direct Preference for Denoising Diffusion Policy Optimization", "扩散DPO", "无奖励模型的扩散对齐"],
+  "problem": "扩散模型的RLHF要先收集大量数据训练奖励模型，再做RL，成本高。语言模型的DPO能省掉奖励模型，但它要算整条输出的似然，扩散模型的多步去噪让这在显存上做不到。",
+  "idea": "把去噪过程当作多步MDP，把DPO的偏好损失下放到每一个去噪步上：对同一提示的一对“好图/坏图”轨迹，在每一步上提高好轨迹那一步的相对概率、降低坏轨迹的，从而不需要整条链的似然。",
+  "impact": "和同一周的Diffusion-DPO一起把DPO引入扩散模型；D3PO走在线、逐步的RL式路线，Diffusion-DPO走离线、基于ELBO的路线，后者因可直接用大规模偏好数据集而被采用得更多。",
+  "method": "DPO的核心是：给定偏好对(y_w, y_l)，最小化`−log σ(β·[log π(y_w)/π_ref(y_w) − log π(y_l)/π_ref(y_l)])`，其中似然比代替了显式奖励。扩散模型生成一张图要T步，整条轨迹的似然是T个高斯转移的乘积，直接对整条轨迹反传需要保存所有步的激活，显存不可承受。\n\nD3PO把每一步去噪`π_θ(x_{t−1}|x_t, z)`看成策略的一个动作。作者在一些假设下推导出：把DPO损失分别作用在每一步的状态—动作对上，就可以逐步更新，而每次只需对单步做反传。训练时从同一提示、同一初始噪声出发采样两条轨迹，由人（或用某个指标代替人）挑出更好的那张，然后对两条轨迹的各步施加DPO损失。理论分析表明，这样做等价于用最优的奖励模型来引导学习。\n\n实验中作者用目标量的相对大小（如可压缩性、美学分）充当人类偏好，取得与使用真实奖励的方法相当的结果；还用真人反馈降低了图像畸变率（如手部畸形）、生成更安全的图。",
+  "limits": [
+    {"text": "仍需在线采样成对轨迹并获得偏好，无法直接利用现成的大规模离线偏好数据集。", "solved_by": ["diffusion-dpo"]},
+    {"text": "逐步分解依赖每一步偏好与最终图像偏好一致的假设，这在实际中并不严格成立。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "dpo", "type": "extends", "note": "把DPO的偏好损失从整条输出下放到扩散模型的每一个去噪步上。"},
+    {"to": "ddpo", "type": "solves", "note": "DDPO需要一个奖励函数；D3PO直接用偏好对更新，不训练奖励模型。"},
+    {"to": "diffusion-dpo", "type": "rivals", "note": "同一周提出的扩散DPO：Diffusion-DPO离线用ELBO近似似然，D3PO在线逐步更新；前者可以直接用Pick-a-Pic等现成偏好数据。"}
+  ],
+  "prereq": ["rlhf-concept", "mdp", "policy-gradient-concept", "diffusion-process", "kl-divergence"],
+  "terms": [
+    {"t": "偏好对", "d": "同一条提示下的两张生成图，标注出哪一张更好；DPO类方法只需要这种相对比较，而不需要绝对打分。"}
+  ],
+  "learn": "先读DPO的损失推导 → 读本文把去噪写成MDP、逐步施加DPO的部分 → 与Diffusion-DPO对照两种近似的取舍。",
+  "check": {"source": "https://arxiv.org/abs/2311.13231", "confirmed": "标题、作者、v1日期2023-11-22、摘要中训练奖励模型成本高、扩散去噪过程显存需求阻碍直接用DPO、提出D3PO、理论上等价于用最优奖励模型引导、用目标的相对大小代替人类偏好并与用真实奖励的方法相当、降低图像畸变率并生成更安全的图；机构、CVPR 2024、逐步DPO损失的具体写法、同一初始噪声采样两条轨迹来自一般了解"}
+}

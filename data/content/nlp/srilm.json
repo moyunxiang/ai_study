@@ -1,0 +1,94 @@
+{
+  "id": "srilm",
+  "who": "Andreas Stolcke · SRI International",
+  "venue": "ICSLP 2002",
+  "links": [
+    {
+      "label": "ISCA Archive",
+      "url": "https://www.isca-archive.org/icslp_2002/stolcke02_icslp.html"
+    },
+    {
+      "label": "DOI",
+      "url": "https://doi.org/10.21437/ICSLP.2002-303"
+    }
+  ],
+  "aka": [
+    "SRILM",
+    "SRI Language Modeling Toolkit",
+    "SRI语言模型工具包",
+    "ngram-count",
+    "Stolcke 2002",
+    "ARPA格式语言模型"
+  ],
+  "problem": "n-gram语言模型的平滑方法在1990年代已经很多，但每个语音识别或翻译团队都要自己写一套计数、平滑、剪枝、评测困惑度的代码，结果难以复现，新方法也难以公平比较。",
+  "idea": "做一套免费给研究用的C++库加命令行工具：统一实现主流平滑（Good-Turing、Katz、Kneser-Ney、Witten-Bell等）、插值、剪枝、类模型，以及对N-best列表和词图的重打分，输出标准的ARPA文本格式。",
+  "impact": "成为2000年代语音识别和统计机器翻译里训练n-gram语言模型的事实标准；Moses等翻译系统的教程直接用它的 ngram-count 命令建语言模型，后来的KenLM也以它作为主要对照。",
+  "background": "到2000年前后，[[ngram-smoothing]]等对照研究已经说明修正版[[kneser-ney]]等方法效果最好，但具体实现细节多：计数要截断、各阶折扣要估计、回退权重要归一化、模型要剪枝才能装进内存。语音识别工具包（如[[htk]]）的语言模型部分功能有限，研究者常常各写各的脚本，换一套代码困惑度就对不上。",
+  "method": "SRILM由几个C++库和一组可组合的命令行程序组成。最常用的是 `ngram-count`：读入文本，统计各阶n元组计数，按选定的平滑方法估计概率，写出ARPA格式模型——每一行是 `log10 p(w|h)  w_1…w_n  log10 α(w_1…w_n)`，即该n元组的概率和它作为历史时的回退权重。另一个程序 `ngram` 负责计算测试集困惑度、混合多个模型、按熵准则剪掉对困惑度影响小的n元组，以及给N-best列表和词图重新打分。\n\n平滑方法覆盖Good-Turing折扣加[[katz-backoff]]、绝对折扣、Witten-Bell、原版与修正版Kneser-Ney等，并可在回退式和插值式之间切换；此外还支持基于[[brown-clustering]]式词类的类语言模型、隐藏事件模型（用于断句、标点恢复）等。论文本身主要介绍功能和设计：工具小而可组合，便于快速做实验。",
+  "results": "这是一篇工具论文，没有提出新模型，也不报告新的基准成绩；它总结了工具包的功能、设计和实现。",
+  "legacy": "SRILM在之后十年里几乎是语言模型训练的默认选择：语音识别系统、[[moses]]统计翻译流水线、许多论文里的“5-gram KN语言模型”基线都由它训练。它的ARPA格式成为各种解码器读取n-gram模型的通用接口。2011年的[[kenlm]]专门针对它在查询速度和内存上的不足重新设计了数据结构；大规模数据上，[[large-lm-mt]]则用分布式计数和简化平滑绕开了单机工具的限制。",
+  "limits": [
+    {
+      "text": "整个模型要装进单机内存，语料到几十亿词时计数和估计都很吃力，往往只能剪枝或降阶。",
+      "solved_by": [
+        "large-lm-mt",
+        "kenlm"
+      ]
+    },
+    {
+      "text": "解码时频繁查询概率的速度和内存占用并不是设计重点，在翻译解码器里会成为瓶颈。",
+      "solved_by": [
+        "kenlm"
+      ]
+    },
+    {
+      "text": "按非商业研究许可发布，企业使用需另行授权，这也是后来开源替代品流行的原因之一。",
+      "solved_by": [
+        "kenlm"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "kneser-ney",
+      "type": "uses",
+      "note": "把Kneser-Ney及其修正版实现为可直接调用的平滑选项。"
+    },
+    {
+      "to": "katz-backoff",
+      "type": "uses",
+      "note": "实现了Good-Turing折扣加Katz回退这一经典组合，并以回退权重的形式写进ARPA模型。"
+    },
+    {
+      "to": "ngram-smoothing",
+      "type": "extends",
+      "note": "Chen与Goodman比较过的多种平滑方法，在SRILM里都能用同一套命令复现和对照。"
+    },
+    {
+      "to": "htk",
+      "type": "rivals",
+      "note": "HTK是声学建模的标准工具，语言模型部分较弱；SRILM专门补上了语言模型训练与重打分这一块，两者常被搭配使用。"
+    }
+  ],
+  "prereq": [
+    "language-model",
+    "n-gram",
+    "perplexity",
+    "probability-basics"
+  ],
+  "terms": [
+    {
+      "t": "ARPA格式",
+      "d": "一种纯文本的n-gram模型格式：按阶列出每个n元组的对数概率和回退权重，几乎所有解码器都能读。"
+    },
+    {
+      "t": "熵剪枝",
+      "d": "删掉那些删了之后对模型（相对熵）影响最小的n元组，以换取更小的模型。"
+    }
+  ],
+  "learn": "先学n-gram与平滑（[[ngram-smoothing]]）→ 读论文第2–3节了解工具组成 → 动手：用ngram-count在一份小语料上分别训练Witten-Bell和修正版Kneser-Ney三元模型，用ngram -ppl比较困惑度。",
+  "check": {
+    "source": "https://www.isca-archive.org/icslp_2002/stolcke02_icslp.html",
+    "confirmed": "ISCA Archive：标题SRILM - an extensible language modeling toolkit、作者Andreas Stolcke、ICSLP 2002第901–904页、DOI；摘要：C++库、可执行程序和辅助脚本，免费用于非商业目的，支持多种基于N-gram统计的语言模型及统计标注、N-best列表与词图处理，强调快速原型、可复用与可组合。ICSLP 2002于2002年9月举行（日期取2002-09）。具体平滑方法清单、ARPA格式行结构、熵剪枝、类模型与隐藏事件模型凭一般了解（SRILM文档与教材），未逐页对照原文。"
+  }
+}

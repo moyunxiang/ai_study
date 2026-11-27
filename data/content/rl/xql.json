@@ -1,0 +1,32 @@
+{
+  "id": "xql",
+  "who": "Divyansh Garg, Joey Hejna, Matthieu Geist, Stefano Ermon · Stanford / Google",
+  "venue": "ICLR 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2301.02328"},
+    {"label": "项目页", "url": "https://div99.github.io/XQL/"}
+  ],
+  "problem": "Q学习的目标需要“下一状态所有动作里的最大Q值”，连续动作下没法直接算，只能靠策略采样动作去近似，离线时采到的往往是数据外的动作，误差很大。",
+  "idea": "借用极值理论：最大熵RL里的软价值 `V = α log Σ exp(Q/α)` 可以通过一个Gumbel回归损失直接从数据里的Q值估出来，不需要采样策略的动作，也不需要算熵。",
+  "impact": "给出了与IQL并列的“只用数据内样本”的离线RL做法，后续IVR（SQL/EQL）等工作把它放进同一个“隐式价值正则”框架里比较。",
+  "method": "最大熵RL（见[[sac]]、[[soft-q-learning]]）的软贝尔曼方程里，状态价值是对动作做LogSumExp：`V(s) = α log E_a[exp(Q(s, a)/α)]`。直接算它要对所有动作积分或从策略采样。\n\n论文的关键观察来自经济学里的离散选择模型：若在Q值上加独立的Gumbel噪声再取最大，得到的最大值服从Gumbel分布，其位置参数正是LogSumExp。于是作者设计了一个“Gumbel回归”损失，用数据中出现过的 `(s, a)` 的Q值来拟合V：\n\n`L(V) = E[exp(z) − z − 1]，z = (Q(s, a) − V(s)) / β`\n\n这个损失在 `Q > V` 时增长得快，最优解恰好是软价值。这样价值网络只看数据内动作，不碰分布外动作；Q网络照常用 `r + γV(s′)` 做TD目标；最后用类似[[awr]]的优势加权回归提取策略。同一更新规则可用于在线（替代SAC的价值估计）和离线。摘要称在D4RL上表现稳定，在Franka Kitchen任务上比此前方法高10分以上，在线DMC任务上对SAC、TD3有中等提升。",
+  "limits": [
+    {"text": "Gumbel回归损失里有指数项，`Q − V` 较大时梯度会爆，需要截断和调温度β，训练稳定性对超参数敏感。", "solved_by": ["ivr"]},
+    {"text": "策略仍靠加权回归从数据里提取，改进幅度受数据覆盖限制，难以大幅超越数据中最好的行为。"}
+  ],
+  "relations": [
+    {"to": "soft-q-learning", "type": "extends", "note": "沿用最大熵RL的软贝尔曼方程，给出估计软价值的新办法。"},
+    {"to": "iql", "type": "rivals", "note": "IQL用期望分位数回归近似数据内的最大Q；XQL用Gumbel回归估计软最大值，两者都不查询分布外动作。"},
+    {"to": "sac", "type": "rivals", "note": "在线版本替代SAC中靠策略采样估计软价值的做法。"},
+    {"to": "awr", "type": "uses", "note": "离线时用优势加权回归从学到的Q和V中提取策略。"},
+    {"to": "d4rl", "type": "uses", "note": "在D4RL上评测离线性能。"}
+  ],
+  "prereq": ["offline-rl", "bellman-equation", "entropy", "mle"],
+  "terms": [
+    {"t": "极值理论（EVT）", "d": "研究一组随机变量最大值分布的统计理论；独立Gumbel噪声下的最大值仍服从Gumbel分布。"},
+    {"t": "软价值", "d": "最大熵RL里的状态价值，用LogSumExp代替硬的max，对所有动作做平滑的取大。"}
+  ],
+  "learn": "先读[[iql]]理解“数据内学习”；读XQL原文第3节Gumbel回归的推导；在D4RL上把IQL的期望分位数损失换成Gumbel损失对比稳定性。",
+  "check": {"source": "https://arxiv.org/abs/2301.02328", "confirmed": "标题、四位作者、arXiv v1于2023-01-05；摘要中连续域难以计算最大Q、用极值理论直接建模最大值、避免用OOD动作、直接估计最优软价值（LogSumExp）无需从策略采样、首个离线MaxEnt Q学习、D4RL表现、Franka Kitchen高10分以上、在线DMC上对SAC和TD3有中等提升。Gumbel损失的具体形式按原文正文通行描述；ICLR 2023与单位按通行引用。"},
+  "aka": ["XQL", "X-QL", "Extreme Q-Learning", "极值Q学习", "Gumbel回归", "Gumbel regression"]
+}

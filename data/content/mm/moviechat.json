@@ -1,0 +1,30 @@
+{
+  "id": "moviechat",
+  "aka": ["MovieChat", "MovieChat-1K", "长视频记忆", "短期/长期记忆视频对话"],
+  "who": "Enxin Song, Wenhao Chai, Guanhong Wang, Yucheng Zhang, Haoyang Zhou, Feiyang Wu, Haozhe Chi, Xun Guo et al. · 浙江大学、华盛顿大学、微软亚洲研究院等",
+  "venue": "CVPR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2307.16449"},
+    {"label": "代码", "url": "https://github.com/rese1f/MovieChat"}
+  ],
+  "problem": "早期视频大模型只能处理很少的帧；一部电影动辄上万帧，全部转成视觉token会让计算量、显存和长距离时间关联都失控。",
+  "idea": "借用心理学的Atkinson-Shiffrin记忆模型，把视觉token当作记忆载体：新帧先进入固定长度的短期记忆，满了就把相邻相似的token合并后转入长期记忆，语言模型只读压缩后的记忆。",
+  "impact": "较早把“记忆+token合并”用于超长视频对话，并发布了含1K个长视频、14K条人工标注的MovieChat-1K基准，成为长视频理解工作的常用对照和评测之一。",
+  "method": "[[video-llama]]、[[video-chatgpt]]等第一批视频大模型通常只采样几帧到几十帧，再把每帧编码成视觉token交给语言模型。这对几秒到几十秒的短视频可行，但对电影、长节目来说，帧数多出几个数量级，token序列远超语言模型的上下文长度，显存也撑不住。\n\nMovieChat把视频按滑动窗口逐段读入。每帧先由图像编码器（沿用[[blip-2]]式的视觉编码器与Q-Former）转成视觉token，放入**短期记忆**——一个固定长度的先进先出缓冲区。短期记忆满了之后，执行**记忆合并**：反复找出时间上相邻、特征最相似的两帧token并取平均，直到压缩到预定数量，然后把结果放入**长期记忆**。回答问题时，语言模型读取长期记忆（以及在“断点模式”下当前时刻的短期记忆），因此无论视频多长，送入语言模型的token数都有上限。\n\n摘要报告，MovieChat在长视频理解上取得最好表现，作者同时发布了MovieChat-1K基准，包含1K个长视频和14K条人工标注，用于验证方法有效性。",
+  "limits": [
+    {"text": "相邻相似帧的合并是无条件的，与用户问题无关，问题涉及的细节可能早已被合并掉。", "solved_by": ["llama-vid"]},
+    {"text": "语言模型实际看到的视觉token很少，对需要精确时间定位或计数的长视频问题仍然吃力。", "solved_by": ["longva", "timechat"]}
+  ],
+  "relations": [
+    {"to": "video-llama", "type": "extends", "note": "沿用视觉编码器加Q-Former接入语言模型的视频对话框架，并加入记忆机制处理长视频。"},
+    {"to": "blip-2", "type": "uses", "note": "帧特征由BLIP-2式的视觉编码器与Q-Former提取。"},
+    {"to": "video-chatgpt", "type": "solves", "note": "Video-ChatGPT只能处理少量帧，MovieChat用记忆合并把可处理长度扩展到上万帧。"},
+    {"to": "tome", "type": "uses", "note": "记忆合并与ToMe的相似token合并思路相近（一般了解）。"}
+  ],
+  "prereq": ["context-window", "embedding", "transformer-block", "benchmark"],
+  "terms": [
+    {"t": "Atkinson-Shiffrin记忆模型", "d": "心理学中把人的记忆分为感觉记忆、短期记忆和长期记忆的经典模型；MovieChat借用其中短期到长期的转移思路。"}
+  ],
+  "learn": "先读[[video-llama]]了解视频大模型的基本结构，再读MovieChat第3节记忆合并的伪代码，体会它如何让token数与视频长度脱钩。",
+  "check": {"source": "https://arxiv.org/abs/2307.16449", "confirmed": "标题、作者（13位）、arXiv v1提交2023-07-31；摘要中现有系统只能处理很少帧、长视频的计算复杂度/内存/长期时间关联挑战、借鉴Atkinson-Shiffrin记忆模型以token为记忆载体、长视频理解上最好、MovieChat-1K含1K长视频与14K人工标注。短期/长期记忆缓冲与相邻相似帧合并的细节、基于Video-LLaMA与Q-Former、断点模式、机构与CVPR 2024为一般了解，未逐项核对。"}
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>坐标下降与交替优化（Coordinate Descent and Alternating Optimization） · AI脉络</title>
+<meta name="description" content="每次只优化一个变量（或一组变量），其余固定不动，轮流进行。单个变量的子问题常有闭式解，所以在Lasso、SVM、矩阵分解、k-means和EM里都很高效。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/coordinate-descent.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="坐标下降与交替优化（Coordinate Descent and Alternating Optimization）">
+<meta property="og:description" content="每次只优化一个变量（或一组变量），其余固定不动，轮流进行。单个变量的子问题常有闭式解，所以在Lasso、SVM、矩阵分解、k-means和EM里都很高效。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/coordinate-descent.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/coordinate-descent">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 优化与训练 · 进阶</div>
+<h1>坐标下降与交替优化</h1><div class="full">Coordinate Descent and Alternating Optimization</div>
+<p class="muted" style="font-size:13px">也叫：坐标下降　坐标下降法　coordinate descent　坐标上升　coordinate ascent　块坐标下降　block coordinate descent　BCD　交替优化　alternating optimization　交替最小化　alternating minimization　交替最小二乘　ALS　alternating least squares　对偶坐标下降　dual coordinate descent　glmnet</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/coordinate-descent">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>每次只优化一个变量（或一组变量），其余固定不动，轮流进行。单个变量的子问题常有闭式解，所以在Lasso、SVM、矩阵分解、k-means和EM里都很高效。</b></p>
+<p class="tags">先要会：<a class="chip c" href="gradient-descent.html">梯度下降</a> <a class="chip c" href="convexity.html">凸函数与凸优化</a></p>
+<p>多元函数整体很难最小化，但固定其他变量后，只看一个变量往往很简单，甚至能直接解出最优值。<b>坐标下降</b>就利用这一点：</p><p>1. 选一个坐标i（按顺序轮流，或随机选）； 2. 固定其余坐标，求解<code>x_i ← argmin_{x_i} f(x_1, …, x_i, …, x_n)</code>，或者只沿这一维走一小步梯度； 3. 重复直到收敛。</p><p>每一步函数值都不会上升。对光滑的凸函数，它收敛到全局最优；对“光滑凸函数 + 可分的非光滑项”（如L1正则）也成立。</p><p><b>为什么好用</b>。</p><ul><li><b>闭式子问题</b>：<a class="ln" href="../n/lasso.html">Lasso与L1稀疏</a>固定其他权重后，单个权重的最优值就是一次软阈值运算（见<a class="lc" href="../c/subgradient.html">次梯度与不可导点</a>），不需要选学习率；glmnet等经典软件用坐标下降配合正则化路径求解Lasso和弹性网。</li><li><b>计算便宜</b>：更新一个坐标通常只需要O(样本数)的计算，对高维稀疏数据尤其划算。<a class="ln" href="../n/liblinear.html">LIBLINEAR线性分类库</a>用对偶坐标下降训练线性SVM和逻辑回归，在大规模稀疏文本分类上非常快；<a class="ln" href="../n/smo.html">SMO序列最小优化</a>每次只优化两个对偶变量（因为有一个等式约束，至少要同时动两个），使SVM训练变得可行。</li></ul><p><b>块坐标下降与交替优化</b>。把变量分成几组，轮流优化每一组，叫块坐标下降，也常叫交替优化。许多经典算法都是这种结构：</p><ul><li><a class="ln" href="../n/k-means.html">k-means聚类</a>：固定中心、为每个点分配最近的簇；再固定分配、把中心更新为均值。</li><li><a class="lc" href="../c/em-algorithm.html">EM算法</a>：可以看作在“隐变量分布”和“参数”两组变量之间交替做坐标上升。</li><li>推荐系统的交替最小二乘（ALS）：固定物品向量求用户向量，再反过来，每一步都是最小二乘问题（见<a class="lc" href="../c/recommender-systems.html">推荐系统与协同过滤</a>）。</li><li>GAN的训练在判别器和生成器之间交替更新（但那是博弈而不是共同最小化一个函数，见<a class="lc" href="../c/adversarial-training.html">对抗训练</a>）。</li></ul><p><b>局限</b>。变量之间耦合很强时（损失曲面是一条斜着的窄谷），沿坐标轴走会走出很多小台阶，收敛很慢；目标非光滑且不可分时，坐标下降可能卡在非最优点。深度网络参数之间高度耦合，所以训练整体都用梯度方法。</p>
+<div class="example"><h4>例子</h4><p>最小化f(x, y) = x² + y² + xy − 3x，从(0, 0)开始：</p><ul><li>固定y = 0，对x求导2x − 3 = 0，x = 1.5；</li><li>固定x = 1.5，2y + 1.5 = 0，y = −0.75；</li><li>固定y = −0.75，2x − 0.75 − 3 = 0，x = 1.875；</li><li>再更新y = −0.9375……</li></ul><p>逐步逼近真正的最优点(2, −1)，每轮误差缩小为原来的1/4。</p></div>
+<h2>容易误解的地方</h2><ul><li>对非光滑、不可分的函数（如<code>|x − y|</code>），坐标下降可能停在一个任何单坐标都无法改进、但并非最优的点上。</li><li>交替优化只保证每一步不变差，结果通常依赖初始化，k-means和EM都需要多次重启。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

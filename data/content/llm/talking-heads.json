@@ -1,0 +1,26 @@
+{
+  "id": "talking-heads",
+  "who": "Noam Shazeer, Zhenzhong Lan, Youlong Cheng, Nan Ding, Le Hou · Google",
+  "venue": "arXiv 2020",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2003.02436"}],
+  "aka": ["Talking-Heads Attention", "talking heads", "THA", "会说话的头"],
+  "problem": "多头注意力里各个头完全独立地算注意力权重，头与头之间不交换信息。",
+  "idea": "在softmax前后各加一个跨头维度的线性映射，让各头的注意力分数和权重互相混合。",
+  "impact": "以很少的额外参数换来更好的掩码语言模型困惑度和下游迁移效果，是后来“头之间组合”一类改进的起点。",
+  "background": "[[transformer]]的多头注意力把查询、键投影到h个子空间，各自算一张注意力图再拼接。每个头只能用自己那份 `d/h` 维的查询和键，头数越多每个头越窄，注意力图的表达力受到限制；而头与头之间没有任何交流。",
+  "method": "设第i个头的注意力logit为 `L_i = Q_i K_iᵀ/√d`。Talking-Heads在softmax前用一个 `h×h` 的矩阵 `P_l` 沿“头”这一维做线性组合，softmax后再用另一个矩阵 `P_w` 组合一次：\n\n`L' = P_l · [L_1 … L_h]`，`W = softmax(L')`，`W' = P_w · W`\n\n然后用 `W'_j` 去加权第j个头的值。这样每张注意力图都可以是所有头的logit的混合，相当于让“窄头”借用其他头的信息。额外参数只有两个 `h×h` 矩阵，计算增加有限。",
+  "results": "摘要称它在掩码语言建模上取得更低的困惑度，迁移到语言理解和问答任务时质量也更好。",
+  "legacy": "这一想法后来被[[dcmha]]推广为依赖输入的动态组合；在主流大模型里并没有普遍采用，原因之一是它让注意力内核难以按头独立并行，不便与[[flashattention]]一类实现结合。",
+  "limits": [
+    {"text": "跨头混合打破了各头独立计算的结构，难以套用按头分块的高效注意力内核。", "solved_by": []},
+    {"text": "混合矩阵是固定的、与输入无关，不同上下文下的头组合方式无法自适应。", "solved_by": ["dcmha"]}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "extends", "note": "在多头注意力的softmax前后加跨头线性映射。"},
+    {"to": "mqa", "type": "rivals", "note": "同一作者的另一种改头设计：MQA让头共享键值省内存，Talking-Heads让头互相混合增强表达。"},
+    {"to": "bert", "type": "uses", "note": "以掩码语言模型预训练和下游迁移作为评测设定。"}
+  ],
+  "prereq": ["self-attention", "softmax", "matrix-multiplication"],
+  "learn": "先弄清多头注意力每个头的形状；读论文第2–3节的伪代码；动手：在注意力logit上加一个h×h矩阵，观察训练损失。",
+  "check": {"source": "https://arxiv.org/abs/2003.02436", "confirmed": "标题、作者、arXiv首次提交2020-03-05；摘要中softmax前后跨头线性投影、掩码语言建模困惑度更好。"}
+}

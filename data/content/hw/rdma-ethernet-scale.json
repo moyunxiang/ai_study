@@ -1,0 +1,31 @@
+{
+  "id": "rdma-ethernet-scale",
+  "who": "Chuanxiong Guo, Haitao Wu, Zhong Deng, Gaurav Soni, Jianxi Ye, Jitu Padhye, Marina Lipshteyn · Microsoft",
+  "venue": "SIGCOMM 2016",
+  "aka": ["RDMA over Commodity Ethernet at Scale", "微软RoCEv2部署", "PFC死锁", "PFC Deadlock", "DSCP-based PFC", "暂停帧风暴"],
+  "links": [
+    {"label": "ACM DOI", "url": "https://doi.org/10.1145/2934872.2934908"}
+  ],
+  "problem": "[[roce]]让以太网也能跑RDMA，[[dcqcn]]解决了拥塞控制，但真正在整个数据中心规模部署时，PFC流控带来的死锁、网卡异常引起的暂停帧风暴、VLAN限制等安全和扩展问题没人系统处理过。",
+  "idea": "总结微软一年半大规模运行RoCEv2的经验：改用基于DSCP的PFC摆脱VLAN限制，逐一定位并解决PFC死锁、RDMA传输活锁和网卡暂停帧风暴，再建设专门的监控和管理系统。",
+  "impact": "证明在普通以太网上大规模运行RDMA的安全性和扩展性问题都可以解决，RDMA可以替代TCP做数据中心内部通信；它和DCQCN一起成为后来AI训练集群用以太网RDMA的经验基础。",
+  "method": "RoCEv2依靠优先级流控（PFC）保证不丢包：下游缓冲快满时向上游发暂停帧。原先的PFC按VLAN标签区分优先级，而VLAN与数据中心的三层IP路由配合不好，难以扩展。作者改为按IP包头里的DSCP字段标记优先级，PFC就能在纯三层网络中工作，从而大规模部署。\n\n规模上去后出现了几类安全问题。**PFC死锁**：几台交换机的缓冲互相等待对方释放，形成循环依赖，整片网络卡住——论文特意注明“是的，真的发生了”。**RDMA传输活锁**：网卡在丢包后的重传方式不当，导致链路一直在忙却没有进展。**暂停帧风暴**：某块网卡故障后不停向外发暂停帧，暂停沿着网络扩散，影响大片服务器。作者为每一类问题设计了对策，并建设了监控与管理系统，确保RDMA按预期工作。\n\n作者在一年半的时间里用RoCEv2支撑微软内部若干高可靠、延迟敏感的服务，结论是：大规模运行RoCEv2的安全和扩展问题都能被解决，RDMA可以在数据中心内部取代TCP，获得低延迟、低CPU开销和高吞吐。",
+  "limits": [
+    {"text": "方案仍以PFC为前提，死锁和风暴只能靠检测与规避兜底；AI训练的同步突发流量又带来新的拥塞形态，需要新的传输与网络设计。", "solved_by": ["meta-roce", "uec"]}
+  ],
+  "relations": [
+    {"to": "roce", "type": "extends", "note": "把RoCEv2从小规模试验推进到整个数据中心规模的生产部署。"},
+    {"to": "dcqcn", "type": "uses", "note": "同一批微软团队的拥塞控制方案，与本文的PFC改造和安全机制一起构成RoCEv2部署方案。"},
+    {"to": "infiniband", "type": "rivals", "note": "主张用普通以太网而非专用InfiniBand承载数据中心规模的RDMA。"}
+  ],
+  "prereq": ["interconnect", "throughput-latency"],
+  "terms": [
+    {"t": "DSCP", "d": "IP包头里用来标记服务等级的6位字段，交换机据此区分优先级，不依赖二层VLAN标签。"},
+    {"t": "死锁与活锁", "d": "死锁是各方互相等待而全部停住；活锁是各方都在动作却没有任何进展。"}
+  ],
+  "learn": "先读[[roce]]和[[dcqcn]]；再读本文关于PFC死锁的一节，画出三台交换机缓冲互相等待形成环的示意图。",
+  "check": {
+    "source": "https://doi.org/10.1145/2934872.2934908",
+    "confirmed": "OpenAlex核对标题、7位作者（Microsoft）、SIGCOMM 2016（2016-08-22）与摘要：一年半使用RoCEv2支撑高可靠低延迟服务、基于DSCP的PFC以突破VLAN、PFC死锁（yes, it happened!）、RDMA传输活锁、网卡暂停帧风暴、监控与管理系统、RDMA可替代TCP。各问题的具体成因解释按一般了解写。"
+  }
+}

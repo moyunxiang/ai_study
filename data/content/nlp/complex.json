@@ -1,0 +1,35 @@
+{
+  "id": "complex",
+  "who": "Théo Trouillon, Johannes Welbl, Sebastian Riedel, Éric Gaussier, Guillaume Bouchard · 施乐欧洲研究中心、伦敦大学学院、格勒诺布尔大学",
+  "venue": "ICML 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1606.06357"}
+  ],
+  "aka": ["ComplEx", "复数嵌入", "复数知识图谱嵌入", "Complex Embeddings", "Hermitian dot product"],
+  "problem": "DistMult这种对角双线性模型又快又好，但打分对头尾对称，分不清「A是B的父亲」和「B是A的父亲」；能处理非对称关系的模型（NTN、全矩阵双线性）参数又太多。",
+  "idea": "把实体和关系的向量放到复数空间，用厄米特点积（尾实体取共轭）打分：`f(h,r,t)=Re(Σ h_i·r_i·conj(t_i))`。共轭让交换头尾后得分改变，于是同一个模型既能表示对称关系也能表示反对称关系，参数量仍和DistMult同级。",
+  "impact": "ComplEx成为知识图谱补全的标准强基线之一，「把关系放到复数空间」的思路被RotatE等后续模型直接继承。",
+  "background": "[[distmult]]（2014）把每个关系当成对角矩阵，打分 `Σ h_i r_i t_i` 交换h和t不变，所以只能表达对称关系；而知识库里大量关系是反对称的（包含、父亲、位于）。全矩阵双线性（RESCAL）或神经张量网络能表达方向性，但每个关系要 `d×d` 个参数，大图上难训练、易过拟合。[[transe]]的平移能表达方向，却难以处理一对多关系和对称关系。",
+  "method": "每个实体和关系都是 `d` 维**复数向量**（每一维有实部和虚部）。打分函数取复数三线性乘积的实部：\n\n`f(h, r, t) = Re( Σ_i h_i · r_i · conj(t_i) )`\n\n其中 `conj` 表示复共轭。展开后：\n\n`f = ⟨Re h, Re r, Re t⟩ + ⟨Im h, Re r, Im t⟩ + ⟨Re h, Im r, Im t⟩ − ⟨Im h, Im r, Re t⟩`\n\n前两项对头尾对称，后两项反对称。关系向量的虚部为0时模型退化为DistMult，只能表示对称关系；虚部越大，方向性越强。这样一个参数化就覆盖了对称、反对称以及介于两者之间的关系。\n\n训练把 `f` 经过sigmoid当成三元组为真的概率，用对数损失加L2正则，负例由随机替换头或尾实体得到。时间和空间复杂度都与维度 `d` 线性相关，和DistMult一样可扩展到大图。",
+  "results": "摘要称：在标准链接预测基准上，ComplEx稳定优于神经张量网络和全息嵌入（HolE）等方法，同时更简单、只用厄米特点积，空间和时间都是线性复杂度。具体数字未核对。",
+  "legacy": "ComplEx和DistMult、[[conve]]、[[rotate]]一起构成知识图谱补全论文对比表里的固定几行。2018年有工作指出，配合N3正则和更大的维度，ComplEx在FB15k-237、WN18RR上依然名列前茅。RotatE进一步把复数关系约束为单位模长的旋转，从而能解释逆关系和组合关系。",
+  "limits": [
+    {"text": "只在单个三元组层面打分，不能显式建模关系的组合（如「父亲的父亲=祖父」）。", "solved_by": ["rotate"]},
+    {"text": "仍是浅层的逐元素交互，实体只能看到自己的向量，难以利用邻居结构和文本描述。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "distmult", "type": "solves", "note": "DistMult打分对头尾对称、无法表达反对称关系；ComplEx改用复数向量和共轭乘积解决了这一点，参数量不变。"},
+    {"to": "transe", "type": "rivals", "note": "TransE用平移距离打分，ComplEx用复数双线性打分；后者能同时处理对称和反对称关系。"},
+    {"to": "freebase", "type": "uses", "note": "在由Freebase和WordNet导出的链接预测基准上评测。"}
+  ],
+  "prereq": ["embedding", "dot-product", "logistic-regression", "regularization", "graph-basics"],
+  "terms": [
+    {"t": "厄米特点积（Hermitian dot product）", "d": "复数向量的内积：把其中一个向量取共轭再逐元素相乘求和，结果一般是复数。ComplEx取它的实部当得分。"},
+    {"t": "对称/反对称关系", "d": "对称关系满足r(a,b)⇔r(b,a)，如「配偶」；反对称关系在a≠b时r(a,b)成立则r(b,a)不成立，如「父亲」。"}
+  ],
+  "learn": "先读[[distmult]]理解对角双线性 → 读原文第2节「为什么要复数」的推导 → 动手：在PyKEEN里训练ComplEx，把关系向量虚部置零，看非对称关系上的效果下降多少。",
+  "check": {
+    "source": "https://arxiv.org/abs/1606.06357",
+    "confirmed": "arXiv记录：标题Complex Embeddings for Simple Link Prediction、五位作者、v1 2016-06-20；摘要：链接预测、潜在分解、复数嵌入、可处理对称与反对称关系、只用厄米特点积、优于NTN与HolE、空间和时间线性。ICML 2016出处、作者单位、展开式四项、对数损失训练、N3正则的后续工作凭一般了解，未写具体数字。"
+  }
+}

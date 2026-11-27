@@ -1,0 +1,26 @@
+{
+  "id": "concrete-gumbel",
+  "who": "Eric Jang, Shixiang Gu, Ben Poole（Gumbel-Softmax）；Chris J. Maddison, Andriy Mnih, Yee Whye Teh（Concrete） · Google Brain、剑桥大学、DeepMind、牛津大学",
+  "venue": "ICLR 2017",
+  "links": [{"label": "arXiv（Gumbel-Softmax）", "url": "https://arxiv.org/abs/1611.01144"}, {"label": "arXiv（Concrete）", "url": "https://arxiv.org/abs/1611.00712"}],
+  "aka": ["Gumbel-Softmax", "Concrete分布", "Concrete distribution", "Gumbel Softmax", "Categorical Reparameterization", "Relaxed Categorical", "Gumbel-Max技巧", "Straight-Through Gumbel"],
+  "problem": "重参数化技巧让连续随机变量可以反向传播，但离散的类别变量采样不可导，含离散隐变量的网络只能用方差很大的REINFORCE式估计器训练。",
+  "idea": "利用Gumbel-Max采样法，把其中的argmax换成带温度τ的softmax，得到一个可导的“连续松弛”样本；τ→0时它趋近真正的one-hot类别样本。两篇论文几乎同时独立提出同一分布。",
+  "impact": "成为在神经网络里处理离散选择的标准工具，用于离散VAE、可微架构搜索、硬注意力、MoE路由和离散token生成等。",
+  "background": "[[vae]]能训练，是因为高斯隐变量可以写成 `z = μ + σ·ε`：随机性放在与参数无关的噪声ε里，梯度就能穿过采样步骤。很多问题却天然需要离散选择——选哪个类别、哪条路径、哪个专家、哪个词。对离散变量，采样结果是跳变的，没有这样的写法，只能用[[reinforce]]式的得分函数估计器，它无偏但方差很大，训练慢且不稳定。",
+  "method": "从类别分布p₁…p_k采样有个经典技巧（Gumbel-Max）：给每个 `log pᵢ` 加一个独立的Gumbel噪声 `gᵢ = −log(−log uᵢ)`（u为均匀随机数），取最大者的下标，结果恰好服从原分布。argmax不可导，于是改成 `yᵢ = softmax((log pᵢ + gᵢ)/τ)`：得到一个落在单纯形上的连续向量，对p可导，随机性全部来自与参数无关的噪声g——这就是对类别变量的[[c:reparameterization]]。\n\n温度τ控制松弛程度：τ大时y接近均匀，梯度方差小但偏差大；τ趋于0时y趋近one-hot，但梯度方差变大，实践中常从较大的τ逐步退火。还有“直通”版本：前向用argmax得到严格的one-hot，反向用softmax的梯度（结合[[ste]]）。Jang等称之为Gumbel-Softmax，在结构化输出预测和带类别隐变量的生成模型上优于当时的梯度估计器，并显著加速半监督分类；Maddison等称之为Concrete分布，给出了闭式密度，并在密度估计和结构化预测上验证。",
+  "legacy": "它很快成为神经网络里处理离散选择的默认工具：[[darts]]等可微架构搜索用它在候选操作间做软选择，离散VAE与早期离散token图像生成用它训练码本选择，硬注意力和稀疏路由也常借助它的直通版本。PyTorch提供了 `torch.nn.functional.gumbel_softmax`。",
+  "limits": [
+    {"text": "得到的是有偏梯度；温度太低方差大、太高偏差大，需要退火时间表。", "solved_by": []},
+    {"text": "类别数很大（如整个词表）时，每次都要对所有类别加噪声和做softmax，开销大。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "vae", "type": "extends", "note": "把VAE依赖的重参数化技巧推广到离散类别隐变量。"},
+    {"to": "reinforce", "type": "solves", "note": "用低方差的重参数化梯度代替REINFORCE式得分函数估计器训练离散随机节点。"},
+    {"to": "ste", "type": "uses", "note": "直通版本前向取硬one-hot、反向用软样本的梯度。"}
+  ],
+  "prereq": ["reparameterization", "softmax", "gumbel-softmax", "probability-basics", "latent-variable"],
+  "terms": [{"t": "Gumbel分布", "d": "极值分布的一种，可由均匀随机数u通过 −log(−log u) 得到；给对数概率加Gumbel噪声再取最大，就等价于按这些概率采样。"}],
+  "learn": "先读概念[[c:gumbel-softmax]]和[[vae]]的重参数化；读Jang等论文第2节与Maddison等论文第3节；动手实现一个类别隐变量VAE，比较不同温度退火方案。",
+  "check": {"source": "https://arxiv.org/abs/1611.01144", "confirmed": "两篇的标题、作者与arXiv v1日期（Gumbel-Softmax 2016-11-03，Concrete 2016-11-02）；Jang摘要中可退火到类别分布、优于其他梯度估计器、半监督分类加速；Maddison摘要中连续松弛、闭式密度、低方差有偏梯度、密度估计与结构化预测。Gumbel-Max公式、直通版本、ICLR 2017及应用场景凭一般了解。"}
+}

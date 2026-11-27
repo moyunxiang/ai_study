@@ -1,0 +1,30 @@
+{
+  "id": "deq",
+  "who": "Shaojie Bai, J. Zico Kolter, Vladlen Koltun · 卡内基梅隆大学、Intel Labs",
+  "venue": "NeurIPS 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1909.01377"},
+    {"label": "代码", "url": "https://github.com/locuslab/deq"}
+  ],
+  "aka": ["DEQ", "Deep Equilibrium Model", "深度平衡模型", "隐式层", "Implicit Layer", "无限深度网络", "隐函数微分"],
+  "problem": "更深的网络更强，但反向传播要存下每一层的激活，显存随深度线性增长，成为训练大型序列模型的瓶颈。",
+  "idea": "观察到权重共享的深层网络各层隐状态会收敛到一个不动点，于是直接用求根算法求这个不动点 `z* = f(z*, x)` 作为输出，相当于无限深的网络；反向传播时用隐函数定理直接对不动点求导，只需常数显存。",
+  "impact": "和[[neural-ode]]一起把“隐式层”（输出由方程定义而不是由层层堆叠定义）带进深度学习主流，后续发展到图像分类、分割和隐式表示；也为“循环深度、用迭代换深度”的模型提供了训练工具。",
+  "method": "设一层变换为 `z_{i+1} = f_θ(z_i; x)`，所有层共享参数θ（像[[universal-transformer]]那样）。作者观察到很多这样的深层序列模型，隐状态随层数增加会趋于稳定。DEQ干脆跳过逐层迭代，直接求解方程 `z* = f_θ(z*; x)`，用Broyden法等拟牛顿求根算法几十步内找到不动点，把z*当作“无限层之后”的输出。\n\n关键在反向：不必记住求根的中间过程。根据隐函数定理，损失对参数的梯度为 `∂L/∂θ = ∂L/∂z* · (I − ∂f/∂z*)⁻¹ · ∂f/∂θ`。其中的逆矩阵不显式求，而是再解一个线性不动点方程得到向量-雅可比积。于是训练和推理的显存与“有效深度”无关，只需存一层的激活。\n\n摘要报告：作者把DEQ套在自注意力Transformer和trellis网络两种当时最好的序列模型上；在WikiText-103等大规模语言建模任务上，同等参数量下效果常常更好，计算量相近，显存最多减少88%。",
+  "limits": [
+    {"text": "求根的迭代次数不固定，训练中不动点可能越来越难收敛，导致前向和反向都变慢甚至不稳定，往往需要额外的正则化来保持收敛。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "neural-ode", "type": "extends", "note": "同属隐式层：Neural ODE把输出定义为微分方程的解，DEQ定义为不动点方程的解，两者都用隐式求导省去存储中间状态。"},
+    {"to": "universal-transformer", "type": "extends", "note": "把权重共享、层层迭代的Transformer推到无限深度极限，直接求其不动点。"},
+    {"to": "transformer", "type": "uses", "note": "把自注意力Transformer层作为不动点方程里的变换f。"},
+    {"to": "tcn", "type": "extends", "note": "同一作者组的序列建模工作；DEQ把同类卷积序列模型（trellis网络）也改写成平衡形式。"}
+  ],
+  "prereq": ["backpropagation", "jacobian-hessian", "chain-rule", "transformer-block", "params-flops"],
+  "terms": [
+    {"t": "不动点", "d": "满足 z = f(z) 的点；把它代回函数，输出等于输入。"},
+    {"t": "隐函数定理", "d": "当变量由方程隐式定义时，不必知道求解过程，也能直接写出它对参数的导数。"}
+  ],
+  "learn": "先补[[c:jacobian-hessian]]；读论文第3节前向求根与反向隐式求导；用PyTorch写一个小DEQ层，前向用简单迭代求不动点，反向用torch.autograd.grad解线性方程，在MNIST上比较与等价深度网络的显存。",
+  "check": {"source": "https://arxiv.org/abs/1909.01377", "confirmed": "标题、3位作者、arXiv v1提交于2019-09-03；摘要中深层序列模型隐层收敛到不动点、用求根直接找平衡点、等价于无限深权重共享网络、用隐式微分解析反传、常数显存、应用于自注意力Transformer与trellis网络、WikiText-103上常更好、计算量相近、显存最多减少88%、代码地址。Broyden法、梯度公式、NeurIPS 2019与机构来自一般了解。"}
+}

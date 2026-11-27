@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Primer平方ReLU（2021） · AI脉络</title>
+<meta name="description" content="大Transformer的训练成本增长很快；以往的架构搜索多在“换哪个模块”这一高层级上搜，找到的改进常常难以迁移到别的代码库和规模。 在更底层——组成Transformer的TensorFlow原语程序上做进化搜索，找到训练更省的变体Primer；其收益主要来自两处简单改动：把ReLU换成平方R…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/primer.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Primer平方ReLU（2021）">
+<meta property="og:description" content="大Transformer的训练成本增长很快；以往的架构搜索多在“换哪个模块”这一高层级上搜，找到的改进常常难以迁移到别的代码库和规模。 在更底层——组成Transformer的TensorFlow原语程序上做进化搜索，找到训练更省的变体Primer；其收益主要来自两处简单改动：把ReLU换成平方R…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/primer.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/primer">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 架构与组件</div>
+<h1>Primer平方ReLU</h1>
+<div class="full">Primer: Searching for Efficient Transformers for Language Modeling</div>
+<div class="meta"><span>2021.09</span><span>论文</span><span>延伸</span><span>NeurIPS 2021</span><span>David R. So, Wojciech Mańke, Hanxiao Liu, Zihang Dai, Noam Shazeer, Quoc V. Le · Google Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2109.08668" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/primer">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>大Transformer的训练成本增长很快；以往的架构搜索多在“换哪个模块”这一高层级上搜，找到的改进常常难以迁移到别的代码库和规模。</p></div><div><h4>方法</h4><p>在更底层——组成Transformer的TensorFlow原语程序上做进化搜索，找到训练更省的变体Primer；其收益主要来自两处简单改动：把ReLU换成平方ReLU，以及在Q、K、V投影后各加一个沿序列方向的深度卷积。</p></div><div><h4>影响</h4><p>平方ReLU后来作为一种常见的FFN激活出现在多个模型和速通训练（如NanoGPT speedrun）中；“Q/K/V后加短卷积”的思路也在线性注意力和SSM类模型（如Mamba的短卷积）中反复出现。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/nas.html">神经架构搜索NAS</a>（神经架构搜索）已经被用来设计视觉网络，也有人用它搜索翻译Transformer（Evolved Transformer）。但这些搜索空间由人预先定义好的模块组成，结论受搜索空间限制。</p><p><b>搜索</b>：作者把一个自回归语言模型的Transformer写成由基本运算（加、乘、卷积、激活等）组成的程序，用进化算法在C4语言建模上直接对程序做变异和选择，目标是固定训练算力下的困惑度。搜索得到的Primer有许多改动，但作者通过消融发现，大部分收益来自两项，合起来称为<b>Primer-EZ</b>：</p><ul><li><b>平方ReLU</b>：FFN激活由 <code>ReLU(x)</code> 改为 <code>ReLU(x)²</code>。</li><li><b>多头深度卷积注意力（MDHA）</b>：在Q、K、V三个投影之后，各接一个宽度为3、沿序列维度、每个通道独立的深度卷积，让每个位置的q、k、v先混合相邻几个token的信息，再做注意力。</li></ul><p>结果：摘要称Primer相对Transformer的收益随算力增大而增大，并在最优模型规模下的质量上呈幂律。在500M参数、C4自回归语言建模上，Primer让原始<a class="ln" href="../n/t5.html">T5</a>架构的训练成本降低到1/4；在与GPT-3 XL相近的1.9B配置下，Primer只用1/3的训练算力就达到与Transformer相同的单样本（one-shot）表现。作者还验证了它可以不调参直接放进不同代码库。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>收益在原文的T5/C4设定与相应超参数下测得，后来的大模型主流选择的是SwiGLU等门控FFN，平方ReLU与它们的优劣在更大规模下没有定论。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>深度卷积引入了对相邻token的局部依赖，与KV缓存、序列并行等推理和训练工程的配合需要额外处理，主流Transformer大模型多数没有采用这一项。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>在相同算力下降低原始Transformer语言模型的训练成本，500M规模上约为1/4。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/gpt-3.html">GPT-3</a><span class="yr">2020.05 · LLM</span><div class=nt>用与GPT-3 XL相近的1.9B配置验证单样本性能的算力节省。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/nas.html">神经架构搜索NAS</a><span class="yr">2016.11 · 基础</span><div class=nt>把架构搜索的粒度从预定义模块降到构成程序的基本运算。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/t5.html">T5</a><span class="yr">2019.10 · LLM</span><div class=nt>在T5代码库和C4数据上做搜索与对比。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/swiglu.html">GLU变体与SwiGLU</a><span class="yr">2020.02 · 基础</span><div class=nt>同为改进FFN激活的方案，SwiGLU用门控，Primer用平方ReLU；后来的大模型多用SwiGLU。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/neuron-activation.html">神经元与激活函数</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/convolution-op.html">卷积运算</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/scaling-law-concept.html">幂律与规模定律</a></p>
+<h2>本篇术语</h2><ul><li><b>深度卷积（depthwise convolution）</b>　每个通道单独做卷积、通道之间不混合的卷积，参数和计算都很少。</li><li><b>进化搜索</b>　维护一群候选结构，反复随机变异、训练评估、保留好的，像自然选择一样逐步改进。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/neuron-activation.html">神经元与激活函数</a>和<a class="lc" href="../c/convolution-op.html">卷积运算</a>；读原文第3节Primer-EZ两项改动的消融；动手：在nanoGPT里把GELU换成平方ReLU、在q/k/v后加宽度3的因果深度卷积，比较相同步数下的验证损失。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2109.08668" rel="noopener">https://arxiv.org/abs/2109.08668</a>（标题、6位作者、arXiv v1提交日2021-09-17；摘要中在定义Transformer的TensorFlow原语层级做搜索、收益主要来自平方ReLU与在Q/K/V投影后加深度卷积、收益随算力增大并呈幂律、500M规模上T5在C4自回归建模训练成本降为1/4、1.9B类GPT-3 XL配置用1/3算力达到相同one-shot性能、可直接放入不同代码库。卷积宽度3、Primer-EZ名称、NeurIPS 2021、后续采用情况为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Primer%E5%B9%B3%E6%96%B9ReLU%EF%BC%88primer%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aprimer%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/primer.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="codet5.html"><small>本分支上一个 · 2021.09</small><b>CodeT5</b></a><a class="r" href="flan.html"><small>本分支下一个 · 2021.09</small><b>指令微调FLAN</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

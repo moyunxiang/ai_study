@@ -1,0 +1,30 @@
+{
+  "id": "openelm",
+  "who": "Sachin Mehta, Mohammad Hossein Sekhavat, Qingqing Cao, Maxwell Horton, Yanzi Jin, Chenfan Sun, Iman Mirzadeh, Mohammad Rastegari et al. · Apple",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2404.14619"},
+    {"label": "代码", "url": "https://github.com/apple/corenet"}
+  ],
+  "aka": ["OpenELM", "逐层缩放", "Layer-wise Scaling", "CoreNet", "苹果开源模型"],
+  "problem": "Transformer通常每一层都用相同的头数和FFN宽度，参数分配未必最优；同时多数开源模型只放权重和推理代码，用私有数据训练，难以复现。",
+  "idea": "用逐层缩放：靠近输入的层少分参数、靠近输出的层多分参数，在相同参数预算下提高准确率；并且完整公开在公开数据上的训练与评测框架、训练日志、多个检查点和配置。",
+  "impact": "约1B规模时比OLMo准确率高2.36%，而预训练词元只用一半；是苹果第一批公开完整训练流程的语言模型，附带在苹果设备上用MLX运行的转换代码。",
+  "method": "背景：开源模型如[[llama-2]]、[[olmo]]几乎都采用“各层同构”的Transformer：每层的注意力头数和前馈网络宽度一样。苹果研究者此前的DeLighT工作提出，不同深度的层承担的作用不同，参数可以不均匀分配。\n\n**逐层缩放**：设模型共有N层，第i层的注意力头数和FFN的扩张倍数随i线性变化：\n`n_heads(i) = α_i · d_model / d_head`，`ffn_mult(i) = β_i`\n其中α_i从α_min线性增加到α_max，β_i从β_min线性增加到β_max。效果是：前面的层更窄（头少、FFN窄），后面的层更宽。在总参数量相同的情况下，这种分配让模型在下游任务上更准。其余组件沿用当时的通用做法：不带偏置的线性层、RMSNorm预归一化、RoPE位置编码、分组查询注意力、SwiGLU前馈层、FlashAttention等。\n\n**完全公开**：与只发布权重的做法不同，OpenELM在公开数据（RefinedWeb、去重的Pile、RedPajama子集、Dolma子集等）上预训练，并发布了完整的训练与评测框架（CoreNet库）、训练日志、多个中间检查点和预训练配置；还提供把模型转换到苹果MLX库、在苹果设备上推理和微调的代码。模型有270M、450M、1.1B、3B四个规模，各有指令微调版本。\n\n**结果**（摘要）：参数预算约10亿时，OpenELM的准确率比OLMo高2.36%，而所需的预训练词元少一半。",
+  "legacy": "逐层缩放被后续一些小模型研究借鉴；OpenELM也代表了2024年大公司以“训练全流程公开”而非仅权重开放的方式发布模型的一种做法。",
+  "limits": [
+    {"text": "作者在报告中指出，虽然准确率更高，但由于逐层不同的结构和实现上的原因，推理速度比同规模的OLMo慢。", "solved_by": []},
+    {"text": "最大只有3B，和同期的Phi-3、Qwen等小模型相比整体能力并不突出。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "olmo", "type": "rivals", "note": "同样强调完全开放，摘要称在约1B规模上准确率高2.36%且预训练词元少一半。"},
+    {"to": "llama-2", "type": "uses", "note": "沿用LLaMA系列的RMSNorm、RoPE、SwiGLU等标准组件。"},
+    {"to": "flashattention", "type": "uses", "note": "训练中使用FlashAttention计算注意力。"}
+  ],
+  "prereq": ["transformer-block", "self-attention", "params-flops", "pretrain-finetune", "normalization-layer"],
+  "terms": [
+    {"t": "逐层缩放", "d": "让Transformer不同层的注意力头数和前馈网络宽度随层数逐渐变化，而不是每层一样，以更合理地分配参数。"},
+    {"t": "MLX", "d": "苹果为自家芯片设计的机器学习数组框架，可在Mac等设备上高效运行模型。"}
+  ],
+  "learn": "先读[[olmo]]了解“完全开放”的含义；读本文第2节逐层缩放的公式和第4节与OLMo的对比；动手：用两种配置（各层同宽与逐层缩放）训练两个参数量相同的小模型，比较验证损失。",
+  "check": {"source": "https://arxiv.org/abs/2404.14619", "confirmed": "标题、11位作者（列前8位）、arXiv首次提交2024-04-22；摘要中强调可复现与透明、逐层缩放策略在每层内高效分配参数提升准确率、约10亿参数时比OLMo准确率高2.36%且预训练词元少一半、发布在公开数据上训练和评测的完整框架、训练日志、多个检查点和预训练配置、提供转换到MLX在苹果设备上推理和微调的代码、CoreNet与HuggingFace地址。逐层缩放公式、组件清单、预训练数据组成、四个规模、推理较慢的说法为对正文的一般了解；未写发表处。"}
+}

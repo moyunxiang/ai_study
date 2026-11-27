@@ -1,0 +1,34 @@
+{
+  "id": "lstm-lm",
+  "who": "Martin Sundermeyer, Ralf Schlüter, Hermann Ney · 亚琛工业大学",
+  "venue": "Interspeech 2012",
+  "links": [
+    {"label": "ISCA Archive", "url": "https://www.isca-archive.org/interspeech_2012/sundermeyer12_interspeech.html"}
+  ],
+  "aka": ["LSTM LM", "LSTM语言模型", "Sundermeyer LSTM LM", "LSTM Neural Networks for Language Modeling"],
+  "problem": "前馈神经语言模型只看固定长度的前文；普通循环网络理论上能利用全部历史，但众所周知很难训练（梯度消失），实际上发挥不出循环模型的潜力。",
+  "idea": "把语言模型中的普通循环层换成长短期记忆（LSTM）单元，输出层用词类分解加速，在英语和大规模法语语料上系统检验其困惑度与语音识别效果。",
+  "impact": "困惑度比标准RNN语言模型相对降低约8%，在当时最好的法语语音识别系统上进一步降低词错误率；这是较早把LSTM用于语言建模并系统报告收益的工作，此后LSTM取代普通RNN成为神经语言模型的默认结构，直到Transformer出现。",
+  "method": "**背景**。回退式n-gram模型遇到没见过的n-gram只能退回更短的历史；[[nplm]]用连续表示缓解了稀疏，但仍是固定窗口；[[rnnlm]]用循环隐状态把全部历史压进一个向量，可训练时误差信号经过多步反向传播会指数衰减，远处的词实际上影响不到预测。\n\n**做法**。LSTM（见[[lstm]]）在每个时间步维护一个记忆单元`c_t`，由输入门`i_t`、遗忘门`f_t`、输出门`o_t`控制：`c_t = f_t ⊙ c_{t−1} + i_t ⊙ tanh(W·[x_t; h_{t−1}])`，`h_t = o_t ⊙ tanh(c_t)`。记忆单元的更新是加法式的，梯度可以沿`c`较少衰减地传回去。网络结构为：词的独热输入→投影层→LSTM隐藏层→输出层。为了避免在大词表上做完整softmax，输出层采用**词类分解**：先把词分到互不相交的类里，`p(w_m|h) = p(c(w_m)|h)·p(w_m|c(w_m), h)`，先预测类、再在类内预测词，计算量从V降到大约类数加类大小。\n\n**结果**。在英语Treebank-3语料（1万词表）上，不同隐藏层大小下LSTM的困惑度都比标准RNN低约8%。在Quaero项目的大词表法语广播播客识别任务上，把LSTM模型插值进当时最好的识别系统做重打分，开发集和测试集的词错误率分别再降0.5和0.3个百分点。",
+  "limits": [
+    {"text": "按时间步串行计算，长序列训练慢，难以在大语料上扩展到很大的模型。", "solved_by": ["transformer"]},
+    {"text": "词类分解要事先确定类别划分，类的好坏影响速度与效果。", "solved_by": ["nce-lm"]},
+    {"text": "论文只比较了单层LSTM，正则化不足时大模型容易过拟合。", "solved_by": ["awd-lstm"]}
+  ],
+  "relations": [
+    {"to": "rnnlm", "type": "solves", "note": "普通RNN语言模型难以训练、用不上远处的历史；换成LSTM后困惑度相对降低约8%。"},
+    {"to": "lstm", "type": "uses", "note": "直接采用带门控记忆单元的LSTM作为循环层。"},
+    {"to": "nplm", "type": "extends", "note": "同样把词映射到连续空间预测下一个词，但用循环结构取代固定窗口。"},
+    {"to": "brown-clustering", "type": "uses", "note": "输出层的词类分解沿用了基于类的语言模型思想，先预测词类再预测类内的词。"}
+  ],
+  "prereq": ["language-model", "recurrent-layer", "gating", "vanishing-exploding", "perplexity", "word-error-rate"],
+  "terms": [
+    {"t": "词类分解", "d": "把下一个词的概率写成「属于哪一类」乘以「类内是哪个词」，从而避免每步对整个词表做softmax。"},
+    {"t": "重打分", "d": "语音识别先用简单模型生成候选句子，再用更强但更慢的语言模型重新打分排序。"}
+  ],
+  "learn": "先读[[rnnlm]]和[[lstm]]的讲解 → 读原文第2–3节LSTM结构与类分解 → 动手：在Penn Treebank上分别训练同尺寸的RNN和LSTM语言模型，比较困惑度和训练曲线。",
+  "check": {
+    "source": "https://www.isca-archive.org/interspeech_2012/sundermeyer12_interspeech.pdf",
+    "confirmed": "ISCA Archive论文PDF：标题、作者Sundermeyer、Schlüter、Ney（亚琛工业大学）、Interspeech 2012、摘要（前馈只用固定上下文，RNN难训练，用LSTM解决；英语与大规模法语任务；困惑度比标准RNN LM相对降低约8%；在最先进识别系统上显著降低WER）、正文：回退模型公式、词类分解、Treebank-3（1万词表）与Quaero法语语料、困惑度持续低约8%、开发集/测试集WER分别降0.5%/0.3%。LSTM门控公式按标准形式写，未逐字对照原文的变体（如peephole）。"
+  }
+}

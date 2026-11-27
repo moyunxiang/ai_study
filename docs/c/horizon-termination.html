@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>时域、分幕任务与终止（Horizon, Episodic Tasks and Termination） · AI脉络</title>
+<meta name="description" content="任务有没有终点、最多走多少步：分幕任务在终止状态结束，持续任务永不结束；γ决定智能体实际“看多远”；因为超时被截断和真正终止要区别对待。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/horizon-termination.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="时域、分幕任务与终止（Horizon, Episodic Tasks and Termination）">
+<meta property="og:description" content="任务有没有终点、最多走多少步：分幕任务在终止状态结束，持续任务永不结束；γ决定智能体实际“看多远”；因为超时被截断和真正终止要区别对待。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/horizon-termination.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/horizon-termination">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 入门</div>
+<h1>时域、分幕任务与终止</h1><div class="full">Horizon, Episodic Tasks and Termination</div>
+<p class="muted" style="font-size:13px">也叫：episodic task　分幕任务　回合制任务　continuing task　持续任务　持续性任务　终止状态　terminal state　有限时域　finite horizon　无限时域　infinite horizon　有效时域　effective horizon　截断　truncation　termination　time limit　时间截断　truncation vs termination　timeout bootstrapping　terminated　truncated</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/horizon-termination">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>任务有没有终点、最多走多少步：分幕任务在终止状态结束，持续任务永不结束；γ决定智能体实际“看多远”；因为超时被截断和真正终止要区别对待。</b></p>
+<p class="tags">先要会：<a class="chip c" href="reward-return.html">奖励、回报与折扣</a> <a class="chip c" href="td-error.html">时序差分与自举</a></p>
+<p>同样是“最大化回报”，下一盘棋和管理一台永不停机的空调是两类问题。前者有明确的终点，后者没有；而很多仿真任务虽然本身没有终点，却被人为限制在1000步。这些区别直接决定价值目标该怎么写，处理错了会让价值估计系统性地出错。</p><p><b>分幕任务与持续任务</b>。分幕任务（episodic）会到达<b>终止状态</b>，之后再无奖励，所以终止状态的价值定义为0，TD目标在这里只剩<code>r</code>。持续任务（continuing）没有终点，必须靠折扣<code>γ &lt; 1</code>让回报有限，或改用<a class="lc" href="../c/average-reward.html">平均奖励准则</a>准则。</p><p><b>有限时域与无限时域</b>。有限时域问题规定最多H步，最优策略一般与“还剩几步”有关（最后一步不必为将来打算），价值函数要写成<code>V_h(s)</code>。无限时域加折扣的问题，最优策略可以只依赖当前状态。</p><p><b>有效时域</b>。折扣让很远的奖励几乎不计：权重γ^k在<code>k ≈ 1/(1−γ)</code>附近已明显衰减，这个量常被称为有效时域。γ=0.99大约对应100步，γ=0.999约1000步。γ越接近1看得越远，但价值方差更大、学习更慢，见<a class="lc" href="../c/reward-return.html">奖励、回报与折扣</a>。</p><p><b>终止与截断</b>。回合结束有两种原因：真的到了终点（摔倒、赢棋），或者只是到了人为设定的时间上限。前者之后确实没有未来；后者之后世界还在继续，智能体只是看不到。正确做法是：终止时目标为<code>r</code>，截断时仍用<code>r + γ·V(s&#x27;)</code>自举。把超时当终止，会让价值函数学到一个它根本观察不到的“剩余时间”效应，状态里又没有时间信息，于是估计变得自相矛盾。<a class="ln" href="../n/gymnasium.html">Gymnasium</a>的接口把两者分成<code>terminated</code>和<code>truncated</code>两个标志，就是为了让算法能区分。</p>
+<div class="example"><h4>例子</h4><p>γ=0.99时，第100步之后的奖励权重为0.99^100 ≈ 0.37，第500步为0.99^500 ≈ 0.007，基本不再影响决策。</p><p>一个行走任务限时1000步。第1000步时机器人正稳稳地走着，r=1，V(s&#x27;)≈90。若误当作终止，目标是1；正确的截断处理目标是<code>1 + 0.99×90 ≈ 90.1</code>。两者相差近90倍，而且同一个状态在第10步和第1000步会得到完全不同的目标。</p></div>
+<h2>容易误解的地方</h2><ul><li>很多早期代码把done当成一个标志，超时和失败不分，这是价值估计偏差的常见来源。</li><li>有效时域只是一个数量级上的说法，不是严格的截断点。</li><li>评估时报告的回报通常不打折扣，而训练用的是打折扣的回报，两者数值不能直接比较。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

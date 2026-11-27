@@ -1,0 +1,93 @@
+{
+  "id": "rstar2-agent",
+  "who": "Ning Shang, Yifei Liu, Yi Zhu, Li Lyna Zhang, Weijiang Xu, Xinyu Guan, Buze Zhang, Bingcheng Dong et al. · 微软研究院",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2508.20722"
+    },
+    {
+      "label": "GitHub",
+      "url": "https://github.com/microsoft/rStar"
+    }
+  ],
+  "aka": [
+    "rStar2-Agent",
+    "rStar2-Agent-14B",
+    "GRPO-RoC",
+    "Resample-on-Correct",
+    "智能体强化学习",
+    "agentic RL",
+    "工具集成推理RL",
+    "代码工具推理"
+  ],
+  "problem": "把代码工具放进推理的强化学习时，报错等环境噪声会混进轨迹，只看答案的奖励又无法惩罚“代码错了几次但最后蒙对”的轨迹，一批训练还可能触发数万次并发工具调用。",
+  "idea": "让14B模型在思考中多轮写Python、看结果再推理；用GRPO-RoC先多采样一倍，失败轨迹均匀保留、成功轨迹只留工具出错少的一半，并配上高并发代码沙箱与多阶段训练。",
+  "impact": "只用64张MI300X、一周时间、510步RL，就让14B模型在AIME24上达到80.6%、AIME25 69.8%，超过671B的DeepSeek-R1，回答还明显更短；把“推理中调用代码工具”的RL训练做成了可复现的完整配方。",
+  "background": "[[pal]]、[[tora]]较早让模型写代码交给解释器计算，但主要靠模仿学习。[[deepseek-r1]]之后，纯文本长思维链的RL成为主流；[[retool]]等工作开始把代码工具放进RL，但缺少大规模训练时对工具噪声和基础设施的系统处理。同团队此前的[[rstar-math]]靠测试时树搜索，而这一次是把能力直接练进模型。",
+  "method": "**交互方式**：模型在推理时可以输出一段代码，环境执行后把输出或报错返回，模型据此继续思考，可多次往返，直到给出答案。奖励只看最终答案对错。\n\n**GRPO-RoC（正确时重采样）**：标准[[grpo]]每题采样G条轨迹；RoC先采样2G条，分成答对与答错两组。答错的不做筛选，按原分布随机保留一半，让模型见识各种失败方式；答对的则优先保留工具调用错误少、格式问题少的一半。这样负样本保持多样，正样本强调高质量，比直接在奖励里扣分更不容易被钻空子。\n\n**基础设施**：隔离的代码执行服务可处理4.5万个并发工具调用，平均0.3秒返回；推理调度器按各GPU剩余的KV缓存容量动态分配采样请求，减少等待。\n\n**训练配方**：先做“非推理”监督微调，只教指令遵循、JSON格式和基本的代码工具用法（使用了[[toolace]]等函数调用数据），不灌入长推理数据；然后分多个阶段RL，逐步提高题目难度和最大长度（8K到12K），而不是像别的工作那样拉到48K以上。\n\n**结果**：起点为Qwen3-14B-Base。AIME24 80.6%、AIME25 69.8%、HMMT25 52.7%，DeepSeek-R1分别为79.8%、70.0%、44.4%。只用数学训练，却在GPQA-Diamond科学推理上超过DeepSeek-V3，在BFCL v3工具调用上表现良好。分析还发现模型学会了针对执行反馈的反思。",
+  "legacy": "它与[[kimi-researcher]]、[[asearcher]]等工作一起，代表2025年下半年从“纯思维链RL”走向“带工具的智能体RL”的转变；RoC这种对正负样本不对称筛选的做法常被后续智能体RL工作借鉴。",
+  "limits": [
+    {
+      "text": "只在数学题上用Python工具做RL，向搜索、浏览器、多种工具混用的任务推广未验证。",
+      "solved_by": []
+    },
+    {
+      "text": "成功轨迹的“质量”按工具错误和格式问题这类可自动统计的指标判断，推理本身是否合理并未被评估。",
+      "solved_by": []
+    },
+    {
+      "text": "需要专门搭建的高并发代码沙箱和调度系统，普通研究者复现门槛不低。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "grpo",
+      "type": "extends",
+      "note": "在GRPO的采样阶段加入“先多采样、再对正负样本不对称下采样”的RoC策略。"
+    },
+    {
+      "to": "rstar-math",
+      "type": "extends",
+      "note": "同团队的前作靠MCTS与代码验证做测试时搜索，rStar2-Agent改为用智能体RL把能力练进模型。"
+    },
+    {
+      "to": "retool",
+      "type": "rivals",
+      "note": "同为在RL中让模型调用代码解释器；rStar2-Agent重点处理工具噪声与大规模训练基础设施。"
+    },
+    {
+      "to": "deepseek-r1",
+      "type": "rivals",
+      "note": "14B模型在AIME24上80.6%对R1的79.8%，回答更短。"
+    },
+    {
+      "to": "toolace",
+      "type": "uses",
+      "note": "非推理监督微调阶段使用了ToolACE等函数调用数据。"
+    }
+  ],
+  "prereq": [
+    "policy-gradient-concept",
+    "tool-calling",
+    "agent-loop",
+    "reward-design",
+    "kv-cache"
+  ],
+  "terms": [
+    {
+      "t": "智能体强化学习（agentic RL）",
+      "d": "让模型在与环境（工具、代码执行器、网页等）多轮交互的过程中做强化学习，奖励通常在交互结束后给出。"
+    },
+    {
+      "t": "环境噪声",
+      "d": "工具返回的报错、超时等与解题本身无关的信息，会干扰模型推理。"
+    }
+  ],
+  "learn": "先读[[grpo]]和[[retool]] → 读原文第3节GRPO-RoC（正负样本的不同采样规则）与第4节基础设施 → 动手：对同一批RL轨迹统计工具报错次数，比较“答对且报错多”和“答对且报错少”两类轨迹的回答长度。",
+  "check": {
+    "source": "https://arxiv.org/abs/2508.20722",
+    "confirmed": "标题、作者、v1提交于2025-08-28；摘要中14B、64张MI300X、GRPO-RoC、非推理SFT加多阶段RL、510步一周、AIME24 80.6%与AIME25 69.8%超过DeepSeek-R1、回答更短、泛化到对齐/科学/工具任务；正文（arxiv.org/html/2508.20722）核对2G过采样与正负样本各取一半的规则、4.5万并发调用0.3秒、按KV缓存的调度、Qwen3-14B-Base、ToolACE数据、8K到12K、图1中HMMT25与R1的79.8/70.0/44.4、GPQA-Diamond超过DeepSeek-V3、BFCL v3。未写venue。"
+  }
+}

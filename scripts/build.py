@@ -380,7 +380,7 @@ def check_links(nodes, content, concepts):
             ref = m.group(1).strip()
             if ref.startswith("c:"):
                 if ref[2:] not in concepts:
-                    err(where, f"[[{ref}]] 指向未登记的概念")
+                    (warn if WIP else err)(where, f"[[{ref}]] 指向未登记的概念" + ("（--wip：先显示成普通文字）" if WIP else ""))
             elif ref not in nodes:
                 (warn if WIP else err)(where, f"[[{ref}]] 指向不存在的节点" + ("（--wip：先显示成普通文字）" if WIP else ""))
     for nid, c in content.items():

@@ -1,0 +1,33 @@
+{
+  "id": "streamspeech",
+  "who": "Shaolei Zhang, Qingkai Fang, Shoutao Guo, Zhengrui Ma, Min Zhang, Yang Feng · 中国科学院计算技术研究所",
+  "venue": "ACL 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2406.03049"},
+    {"label": "GitHub", "url": "https://github.com/ictnlp/StreamSpeech"}
+  ],
+  "problem": "同声传译式的语音到语音翻译要一边听一边说，不仅要翻得对，还要有一个「策略」决定何时开口；以往系统要么只做离线翻译，要么把识别、翻译、合成和读写策略拼成复杂级联。",
+  "idea": "在一个两遍式直接语音翻译模型里，用多任务学习同时训练识别和翻译的CTC辅助任务，让模型从CTC的对齐中自己判断「已经听够了，可以输出这部分译文了」。",
+  "impact": "StreamSpeech是开源的端到端同声语音翻译代表工作之一，在CVSS基准上同时刷新离线和同声两种设定的结果，并能在翻译过程中给出识别和文字翻译的中间结果；常被后续同传系统作为基线。",
+  "method": "直接语音到语音翻译的两遍式模型（[[unity]]）先生成目标语言文字，再生成目标语音的离散单元（见[[s2ut]]）。要把它改成同声传译，需要一个**读写策略**：每接收一段源语音，决定是继续「读」（听）还是「写」（输出译文）。传统做法是固定等待k个词（wait-k）或另训一个策略模块。\n\nStreamSpeech把策略学习融进多任务学习：分块的流式编码器处理源语音，在上面接两个[[ctc]]解码器，分别做源语言识别和目标语言文字翻译。CTC的输出天然带有对齐信息——它会告诉你目前听到的语音已经对应了多少个源词、多少个目标词。推理时，当CTC预测的目标词数增加，模型就输出相应的文字翻译，再经过非自回归的文本到单元模块生成语音单元，最后由单元声码器合成语音。这样一个模型同时完成离线/同声的识别、语音到文字翻译和语音到语音翻译，所谓All-in-One。\n\n摘要称，在CVSS基准上StreamSpeech在离线和同声语音到语音翻译两项任务上都达到当时最好的水平，同时能在同传过程中给出高质量的中间结果（识别或翻译文字）。",
+  "limits": [
+    {"text": "生成的是通用声音，不保留原说话人的音色和语气。", "solved_by": ["hibiki"]},
+    {"text": "主要在CVSS（法、西、德译英）这类朗读语料上验证，真实会议中的口语、长篇和多说话人场景效果未知。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "unity", "type": "extends", "note": "沿用UnitY的两遍式结构（先文字后语音单元），把它改造为可流式的同声翻译模型。"},
+    {"to": "ctc", "type": "uses", "note": "用识别和翻译两个CTC解码器的对齐结果来决定何时输出译文。"},
+    {"to": "s2ut", "type": "uses", "note": "目标语音以离散单元表示，再由单元声码器合成。"},
+    {"to": "seamless", "type": "rivals", "note": "SeamlessStreaming用专门训练的单调注意力策略做流式翻译；StreamSpeech把策略并入多任务学习，模型更小、完全开源。"}
+  ],
+  "prereq": ["sequence-alignment", "encoder-decoder", "throughput-latency", "vocoder-codec", "text-metrics"],
+  "terms": [
+    {"t": "读写策略", "d": "同声传译中决定什么时候继续听、什么时候输出译文的规则或模型。"},
+    {"t": "CVSS", "d": "从Common Voice和CoVoST 2构建的多语言到英语的语音到语音翻译基准。"}
+  ],
+  "aka": ["StreamSpeech", "同声语音翻译", "Simul-S2ST", "streaming speech translation"],
+  "check": {
+    "source": "https://arxiv.org/abs/2406.03049",
+    "confirmed": "arXiv官方记录：标题StreamSpeech: Simultaneous Speech-to-Speech Translation with Multi-task Learning、Zhang/Fang/Guo/Ma/Zhang/Feng、v1提交2024-06-05；摘要中Simul-S2ST的翻译与策略双重挑战、多任务学习统一学习翻译与同声策略、All-in-One离线与同声ASR/ST/TTS、CVSS上离线与同声S2ST均SOTA、提供中间结果。两遍式结构与CTC策略细节、ACL 2024、机构、CVSS语言对为一般了解。"
+  }
+}

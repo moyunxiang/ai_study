@@ -1,0 +1,36 @@
+{
+  "id": "trade-dst",
+  "who": "Chien-Sheng Wu, Andrea Madotto, Ehsan Hosseini-Asl, Caiming Xiong, Richard Socher, Pascale Fung · 香港科技大学、Salesforce Research",
+  "venue": "ACL 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1905.08743"},
+    {"label": "GitHub", "url": "https://github.com/jasonwu0731/trade-dst"}
+  ],
+  "aka": ["TRADE", "Transferable Dialogue State Generator", "生成式对话状态追踪", "DST"],
+  "problem": "对话状态追踪通常把每个槽位当成在预先给定的取值表（本体）上做分类，可餐馆名、出发时间这类取值多得无法穷举；MultiWOZ这样的多领域数据有30个（领域，槽位）对和4500多个取值，各领域分开建模又无法共享知识、难以迁移到新领域。",
+  "idea": "不做分类而是生成：一个在所有领域间共享的编码器读入最近几轮对话，状态生成器以（领域，槽位）的嵌入为起点，用软门控的指针-生成器解码出取值——既可以从词表生成，也可以从对话历史里复制；另有一个三分类的槽位门判断这个槽位是否被提到（需要取值、无、不在乎）。",
+  "impact": "在MultiWOZ五个领域上取得48.62%的联合目标准确率，为当时最好；在零样本设置下某个未见领域达到60.58%，少样本适应时借助持续学习方法不遗忘旧领域。生成式、不依赖本体的状态追踪随后成为多领域任务型对话的主流做法。",
+  "method": "**任务**。对话状态是一组（领域，槽位，取值）三元组，例如用户先订便宜的市中心餐馆、再找附近景点、最后叫出租车，状态就要逐轮累积：Restaurant(price=cheap, area=centre)、Attraction(area=centre)……其中景点的area可能要从前面讲餐馆的话里推出来（多轮映射）。\n\n**结构**。**对话编码器**：把最近l轮的用户话语和系统回复拼成一个序列，用双向GRU编码成`H_t`。**状态生成器**：对每个（领域，槽位）对j，用领域嵌入与槽位嵌入之和作为GRU解码器的第一个输入，逐词生成取值。第k步的隐状态`h_jk`一方面投影到词表得到`P_vocab = softmax(E·h_jk)`，另一方面对对话历史做注意力得到`P_history = softmax(H_t·h_jk)`；两者按一个可学习的生成概率`p_gen`加权：`P_final = p_gen·P_vocab + (1−p_gen)·P_history`，这就是[[pointer-generator]]式的软门控复制。作者解释说，按位置复制不适用，因为正确取值不一定原样出现在话语中；硬门控复制又需要额外监督。**槽位门**：用第一步的上下文向量做一个三分类（ptr/none/dontcare），只有预测为ptr时才采用生成的取值。由于所有参数在领域间共享，新领域的槽位（如出租车的出发时间）可以借用其他领域学到的「时间」表达。\n\n**迁移实验**。零样本：训练时完全不见某个领域，测试时直接追踪它的槽位；少样本：用少量新领域数据微调，并比较普通微调、弹性权重巩固（EWC）和梯度情景记忆（GEM）等持续学习方法，看是否会遗忘原有领域。",
+  "limits": [
+    {"text": "每一轮都要对全部30个（领域，槽位）对各解码一次，且每次都重新读入对话历史，推理开销随槽位数线性增长。", "solved_by": []},
+    {"text": "零样本表现很不均衡：只有与已见领域共享槽位多的领域效果尚可，完全新的槽位类型仍难以追踪。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "wen-e2e-dialog", "type": "extends", "note": "Wen等的系统用逐槽位的分类式信念追踪器、只针对单一领域；TRADE改为生成式追踪，并在多领域间共享参数。"},
+    {"to": "pointer-generator", "type": "uses", "note": "状态生成器采用软门控的指针-生成器，在生成与从对话历史复制之间按概率混合。"},
+    {"to": "copynet", "type": "extends", "note": "沿用序列到序列模型中的复制思想，用来输出不在预定义取值表里的槽位值。"},
+    {"to": "cho-encdec", "type": "uses", "note": "编码器和状态生成器都使用GRU。"},
+    {"to": "ewc", "type": "uses", "note": "少样本适应新领域时用弹性权重巩固防止遗忘旧领域。"}
+  ],
+  "prereq": ["encoder-decoder", "attention-concept", "recurrent-layer", "softmax", "continual-learning", "zero-few-shot"],
+  "terms": [
+    {"t": "联合目标准确率", "d": "对话状态追踪的主要指标：一轮中所有（领域，槽位，取值）都预测正确才算对。"},
+    {"t": "本体", "d": "任务型对话中预先定义好的领域、槽位及每个槽位所有可能取值的清单。"},
+    {"t": "槽位门", "d": "TRADE中判断某个槽位在当前对话里是否被提到、是否用户表示无所谓的三分类器。"}
+  ],
+  "learn": "先读[[wen-e2e-dialog]]和[[pointer-generator]]的讲解 → 读原文第2节三个模块和第4节零样本、少样本实验 → 动手：用开源代码在MultiWOZ上去掉出租车领域训练，再测试出租车领域的零样本联合准确率。",
+  "check": {
+    "source": "https://arxiv.org/abs/1905.08743",
+    "confirmed": "arXiv：标题、六位作者、2019-05-21提交、摘要（过度依赖本体与缺乏跨领域知识共享；用复制机制生成对话状态；话语编码器、槽位门、状态生成器在领域间共享；MultiWOZ五个领域联合目标准确率48.62%；某零样本领域60.58%；少样本适应不遗忘）；PDF正文：30个（领域，槽位）对与4500多个取值、多轮映射例子、拼接最近l轮历史、三种复制方式的取舍与软门控指针-生成器、领域与槽位嵌入之和作第一步输入、P_vocab与P_history公式、ptr/none/dontcare三分类、EWC与GEM。编码器为双向GRU与机构凭一般了解。"
+  }
+}

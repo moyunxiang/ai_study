@@ -1,0 +1,28 @@
+{
+  "id": "rest-em",
+  "who": "Avi Singh, John D. Co-Reyes, Rishabh Agarwal, Ankesh Anand, Piyush Patil, Xavier Garcia, Peter J. Liu, James Harrison et al. · Google DeepMind",
+  "venue": "TMLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2312.06585"}
+  ],
+  "aka": ["ReST-EM", "ReST^EM", "ReSTEM", "Beyond Human Data", "自训练", "self-training", "迭代拒绝采样微调", "expert iteration for LLM"],
+  "problem": "微调语言模型做数学和编程，主要靠人写的高质量解答，而这类数据又少又贵，限制了模型能达到的水平。",
+  "idea": "在答案能自动判对错的任务上，让模型自己大量生成解答，只保留判为正确的，用它们微调，再用新模型重新生成，反复几轮——把这个过程解释为期望最大化（EM）。",
+  "impact": "在PaLM 2上说明“模型自己生成、经过验证的数据”可以超过人类写的数据，成为后来拒绝采样微调、专家迭代式推理训练和RLVR的重要参照。",
+  "method": "方法非常简单，每一轮两步：\n- **E步（生成）**：对训练集里的每道题，用当前模型采样多个解答，用二值反馈（数学题比对最终答案，编程题跑测试用例）筛掉错误的；\n- **M步（改进）**：用筛下来的正确解答做监督微调。\n然后用新模型回到E步，重复几轮。与[[star]]相比，它不需要让模型在错题上根据正确答案“反推”解释，也不只看第一个对的答案；与[[rest]]相比，它每轮都从**基座模型**重新微调，而不是在上一轮模型上继续训，以减轻过拟合。作者把它表述为对“期望奖励”下界做EM优化，从而和强化学习联系起来——本质上就是[[expert-iteration]]在语言模型上的版本。\n\n实验在[[math-dataset]]和[[apps]]上用不同规模的PaLM 2模型。结论是：自训练的收益随模型规模变大而增加，显著超过只在人类解答上微调；在GSM8K、匈牙利高中数学期末考试、[[humaneval]]和Big-Bench Hard等未参与训练的基准上也有提升。消融显示迭代轮数过多会在训练集上过拟合。",
+  "limits": [
+    {"text": "只能用于有自动判对错信号的任务；只看最终答案会把“推理错但答案碰巧对”的解答也当成正样本。", "solved_by": ["prm", "math-shepherd"]},
+    {"text": "只从对的样本里学，丢掉了错误样本里的信息，也无法区分好答案和勉强及格的答案；之后的在线强化学习用相对优势同时利用正负样本。", "solved_by": ["grpo", "deepseek-r1"]},
+    {"text": "迭代多轮后容易在训练题上过拟合，收益很快饱和。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "star", "type": "extends", "note": "沿用“自己生成、按答案筛选、再微调”的自举思路，去掉了在错题上反推解释的步骤，并在更大模型和代码任务上验证。"},
+    {"to": "rest", "type": "extends", "note": "继承ReST的生成—改进两步循环，改为每轮从基座模型重新微调，并用EM框架解释。"},
+    {"to": "expert-iteration", "type": "extends", "note": "生成后筛选再模仿的结构就是专家迭代，这里的“专家”是带验证器的模型自身。"},
+    {"to": "palm-2", "type": "uses", "note": "全部实验在不同规模的PaLM 2模型上完成。"},
+    {"to": "math-dataset", "type": "uses", "note": "MATH竞赛题是主要训练与评测任务之一，另一个是APPS编程题。"}
+  ],
+  "prereq": ["em-algorithm", "pretrain-finetune", "reward-return", "policy-gradient-concept"],
+  "learn": "先读[[star]]和[[c:em-algorithm]] → 读原文第3节方法和第5节规模与迭代轮数的消融 → 动手：用一个小模型在GSM8K上做两轮“采样8次—留下答对的—微调”，记录每轮的准确率变化。",
+  "check": {"source": "https://arxiv.org/abs/2312.06585", "confirmed": "标题、作者、v1提交于2023-12-11；摘要中的二值反馈筛选、微调、重复几轮，PaLM-2在MATH与APPS上随规模变大收益更大、显著超过只用人类数据；正文（arxiv.org/html/2312.06585）核对EM表述、GSM8K/匈牙利高中数学/HumanEval/Big-Bench Hard的迁移评测、迭代轮数消融。“每轮从基座模型重新微调”、TMLR 2024凭一般了解。"}
+}

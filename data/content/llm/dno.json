@@ -1,0 +1,33 @@
+{
+  "id": "dno",
+  "who": "Corby Rosset, Ching-An Cheng, Arindam Mitra, Michael Santacroce, Ahmed Awadallah, Tengyang Xie · Microsoft Research",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2404.03715"}
+  ],
+  "aka": ["DNO", "Direct Nash Optimization", "直接纳什优化", "DNO-Prct", "Orca-2.5"],
+  "problem": "DPO把奖励学习和策略优化合成一个对比损失，稳定好用，但仍绑在“最大化点式奖励”的框架里；NLHF一类一般偏好方法理论上更好，却不好实现、不好扩展。",
+  "idea": "保留DPO式对比回归的简单，把目标换成一般偏好下的纳什均衡：每一轮用当前模型在线采样，请强教师（GPT-4）比较打分，构造差距大的回答对做回归式训练，迭代地自我改进，并证明各轮单调提升。",
+  "impact": "把“一般偏好+批量在线迭代”的思路做成可复现的配方，7B模型在AlpacaEval 2.0上对GPT-4-Turbo的长度控制胜率从7%升到33%，说明迭代对齐可以超过提供偏好的教师本身。",
+  "background": "[[instructgpt]]式RLHF先学奖励再优化策略；[[dpo]]证明二者可以合成一个对比损失，但它依赖Bradley-Terry点式奖励，而且只在固定的离线偏好对上训练。[[nlhf]]提出直接对一般偏好 `P(y≻y′|x)` 求纳什均衡，能表达不传递的偏好，但算法需要复杂的采样，难以用于大模型。[[self-rewarding]]等迭代方法让模型自评自练，却缺少收敛保证。",
+  "method": "**目标**：在一般偏好下找一个策略，使它对自己的胜率不再能提高（对称博弈的纳什均衡）。理论版本每一轮把“回答y对当前策略π_t的胜率” `r_t(x,y) = P(y≻π_t|x)` 当作这一轮的奖励，用KL正则的最优解形式更新，并把更新写成一个回归问题：让新旧策略的对数概率差去拟合奖励差。作者证明在这种批量在线（batched on-policy）更新下，各轮策略单调变好。\n\n**实用版DNO-Prct**：每一轮对每个提示从当前模型采样若干回答，再加上教师模型GPT-4-Turbo的回答；请GPT-4给所有回答打分，只挑分差足够大的“好—差”对，用类似DPO的对比损失训练一轮，得到下一轮模型。与普通DPO的区别有三点：回答来自当前模型（在线）；偏好来自一般偏好判断而非奖励模型；只保留差距大的对，降低噪声。\n\n用更强的教师回答当正例，使模型能逐轮逼近甚至超过教师；单调改进的性质保证迭代不会来回震荡。",
+  "results": "从Orca-2.5（7B）出发，经DNO对齐后在AlpacaEval 2.0上对GPT-4-Turbo的胜率达到33%（控制回答长度后仍成立），比初始模型的7%绝对提高26个百分点；超过参数多得多的Mistral Large、70B的Self-Rewarding LM和较早版本的GPT-4。",
+  "legacy": "DNO与稍晚的[[sppo]]并列，常被一起称为“纳什式”或“一般偏好”迭代对齐；它强调的在线采样、强教师标注、按分差筛选偏好对，也成了迭代DPO配方中的常见做法。",
+  "limits": [
+    {"text": "实用版依赖GPT-4同时当教师和评判，标注成本高，评测（AlpacaEval）也是GPT-4评判，存在自我偏好的风险。", "solved_by": []},
+    {"text": "单调改进的证明针对理论版本；DNO-Prct用DPO式损失和分差筛选近似，二者之间没有严格对应。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "nlhf", "type": "solves", "note": "NLHF的一般偏好纳什目标难以在大模型上求解；DNO用批量在线的回归式对比损失实现，并证明单调改进。"},
+    {"to": "dpo", "type": "extends", "note": "沿用DPO把奖励与策略合成一个对比损失的做法，但换成一般偏好、改为在线迭代。"},
+    {"to": "self-rewarding", "type": "rivals", "note": "同为迭代自我改进；自奖励模型自己当评判，DNO用强教师判断一般偏好，并给出理论保证。"},
+    {"to": "orca-2", "type": "uses", "note": "以Orca系列7B模型为起点，得到Orca-2.5。"},
+    {"to": "lc-alpacaeval", "type": "uses", "note": "主要成绩在长度控制的AlpacaEval 2.0上报告。"}
+  ],
+  "prereq": ["rlhf-concept", "nash-equilibrium", "kl-divergence", "on-off-policy", "logistic-regression"],
+  "terms": [
+    {"t": "一般偏好", "d": "直接用“y比y′好的概率”描述偏好，不假设每个回答背后有一个可比较的绝对分数，因此可以有循环偏好。"},
+    {"t": "批量在线", "d": "每一轮先用当前模型批量生成并标注一批数据，再离线训练一轮，介于完全离线与逐步在线之间。"}
+  ],
+  "learn": "先读[[dpo]]和[[nlhf]]；读本文第3节的理论算法和第4节DNO-Prct流程；动手：用一个小模型做两轮“采样—打分—挑分差大的对—DPO”，比较只用离线数据的DPO。",
+  "check": {"source": "https://arxiv.org/abs/2404.03715", "confirmed": "标题、6位作者、arXiv首次提交2024-04-04；摘要中点式奖励无法表达不传递或循环偏好、DPO合并奖励学习与策略优化仍属奖励最大化框架、DNO可证明且可扩展、批量在线、回归式目标、各轮单调改进、可超过GPT-4这样的强教师、7B的Orca-2.5在AlpacaEval 2.0对GPT-4-Turbo胜率33%（控制长度后）、从7%提高26个百分点、超过Mistral Large、70B的Self-Rewarding LM和旧版GPT-4。DNO-Prct的具体流程（加入教师回答、按分差筛选）与机构为对正文的一般了解。"}
+}

@@ -1,0 +1,33 @@
+{
+  "id": "grape",
+  "who": "Zijian Zhang, Kaiyuan Zheng, Zhaorun Chen, Joel Jang, Yi Li, Siwei Han, Chaoqi Wang, Mingyu Ding et al. · 北卡罗来纳大学教堂山分校、华盛顿大学、芝加哥大学",
+  "venue": "arXiv 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2411.19309"},
+    {"label": "项目主页", "url": "https://grape-vla.github.io/"}
+  ],
+  "aka": ["GRAPE", "GRAPE VLA", "Generalizing Robot Policy via Preference Alignment", "VLA偏好对齐", "轨迹级偏好优化", "TPO", "Trajectory-wise Preference Optimization"],
+  "problem": "VLA只对成功示范做行为克隆，学不到失败里的信息，对没见过的任务泛化差；也没法按安全、效率等不同目标调整行为。",
+  "idea": "把DPO搬到整条轨迹上：让VLA自己采样多条轨迹，用大模型分阶段、按关键点约束自动打分排序，再用轨迹级偏好损失对齐，迭代几轮。",
+  "impact": "摘要称在域内和未见任务上成功率分别提高51.79%和58.20%；换成安全或效率目标后，碰撞率降低37.44%、步数减少11.15%。",
+  "method": "**卡在哪**：[[openvla]]等VLA通过[[c:imitation-learning]]只模仿成功的示范，从不知道哪些动作会导致失败；示范又是专家在特定条件下采的，策略只会照搬，换个物体或场景就失灵。大语言模型里[[dpo]]能用“好/坏回答对”直接调模型，GRAPE问：机器人能不能也用“好/坏轨迹对”来调？\n\n**做法**：核心是**轨迹级偏好优化（TPO）**：`L = −E[log σ(β(log πθ(ζw)/πref(ζw) − log πθ(ζl)/πref(ζl)))]`，ζw和ζl分别是较好和较差的轨迹，整条轨迹的似然拆成每一步动作概率的乘积，所以可以直接用VLA逐步输出的token概率计算。难点是怎样给轨迹排序而不靠人工：先让视觉语言模型把任务拆成几个阶段，再用检测和分割模型找出每个阶段的关键点，由GPT-4o为每个阶段写出代价函数（例如夹爪离杯把手的距离、是否碰到障碍）。各阶段代价连乘成外部奖励，再加上策略自身似然和任务是否成功，得到总分。每轮让当前策略每个任务采样5条轨迹，取分最高和最低的配对，做一轮TPO更新，再进入下一轮。改代价函数就能把对齐目标换成安全或效率。\n\n**结果**：真机28个任务、280次试验，域内成功率67.5%，OpenVLA监督微调为45%、[[octo]]监督微调为20%；在[[simpler]]上平均比OpenVLA监督微调高13.57%，[[libero]]上高2.7%。",
+  "limits": [
+    {"text": "排序依赖GPT-4o写代价函数和多个视觉模型找关键点，链条长、调用成本高，任何一环出错都会让偏好标签变成噪声。", "solved_by": []},
+    {"text": "每轮只用少量自采轨迹做离线式的偏好更新，没有利用大规模并行环境做真正的在线策略梯度，提升幅度受限。", "solved_by": ["simplevla-rl", "pi-rl"]},
+    {"text": "在LIBERO上提升只有几个百分点，在已经很强的基座上空间有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "dpo", "type": "extends", "note": "把DPO的成对偏好损失从单个回答推广到整条机器人轨迹。"},
+    {"to": "openvla", "type": "uses", "note": "以7B的OpenVLA为主要对齐对象，用LoRA微调。"},
+    {"to": "octo", "type": "uses", "note": "Octo监督微调版本作为另一条基线。"},
+    {"to": "simpler", "type": "uses", "note": "在SIMPLER仿真评测上测域内和泛化表现。"},
+    {"to": "gpt-4o", "type": "uses", "note": "由GPT-4o为每个任务阶段生成代价函数，替代人工设计奖励。"}
+  ],
+  "prereq": ["vla-concept", "rlhf-concept", "imitation-learning", "reward-design", "generalization"],
+  "terms": [
+    {"t": "偏好对齐", "d": "不给模型标准答案，只告诉它两个输出里哪个更好，让模型提高好输出的概率、降低差输出的概率。"},
+    {"t": "关键点约束", "d": "用图像中几个关键位置（如物体把手、夹爪尖端）之间的距离或关系来定义某个阶段做得好不好。"}
+  ],
+  "learn": "先读[[dpo]]理解成对偏好损失，再看原文第3节TPO公式和自动偏好生成流程图，最后看真机任务表和安全/效率对齐的表2。",
+  "check": {"source": "https://arxiv.org/abs/2411.19309", "confirmed": "标题、作者、v1日期2024-11-28、摘要（v2）中51.79%/58.20%/37.44%/11.15%；HTML v1：机构、TPO公式、VLM分阶段+关键点+GPT-4o代价、每任务5条采样、真机280次试验67.5%对45%/20%、SIMPLER平均+13.57%、LIBERO +2.7%。"}
+}

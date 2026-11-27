@@ -169,7 +169,7 @@ function create(core, sd) {
     if (!res.some(x => x.sc >= 40)) {      // 没有像样的结果：按相近拼写再找一遍（tranformer → transformer）
       const seen = new Set(res.map(x => x.k + x.id)), fz = [];
       for (const w of ws) {
-        if (!/^[a-z][a-z0-9]{4,}$/.test(w)) continue;
+        if (!/^[a-z][a-z0-9]{4,}$/.test(w) || tokens.has(w)) continue;      // 索引里本来就有的词不是拼错的（“gemini”不该去找“gemmini”）
         const max = w.length >= 9 ? 2 : 1;
         for (const [tok, items] of tokens) {
           if (tok[0] !== w[0] && tok[1] !== w[1]) continue;

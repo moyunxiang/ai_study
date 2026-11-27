@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>ArmoRM多目标奖励模型（2024） · AI脉络</title>
+<meta name="description" content="常规奖励模型只输出一个黑箱分数，人看不出它为什么觉得一个回答好，也就难以发现它在偏爱啰嗦、讨好等错误特征，这些正是奖励作弊的入口。 先让奖励模型同时预测多个人能看懂的维度（诚实、安全、啰嗦程度等）的绝对评分，再用一个小的门控网络根据提示内容决定各维度的权重，加权得到最终分数，并显式扣除与长度相关的…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/armorm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ArmoRM多目标奖励模型（2024）">
+<meta property="og:description" content="常规奖励模型只输出一个黑箱分数，人看不出它为什么觉得一个回答好，也就难以发现它在偏爱啰嗦、讨好等错误特征，这些正是奖励作弊的入口。 先让奖励模型同时预测多个人能看懂的维度（诚实、安全、啰嗦程度等）的绝对评分，再用一个小的门控网络根据提示内容决定各维度的权重，加权得到最终分数，并显式扣除与长度相关的…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/armorm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/armorm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 指令与偏好对齐</div>
+<h1>ArmoRM多目标奖励模型</h1>
+<div class="full">Interpretable Preferences via Multi-Objective Reward Modeling and Mixture-of-Experts</div>
+<div class="meta"><span>2024.06</span><span>论文</span><span>延伸</span><span>Findings of EMNLP 2024</span><span>Haoxiang Wang, Wei Xiong, Tengyang Xie, Han Zhao, Tong Zhang · UIUC等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2406.12845" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/RLHFlow/RLHF-Reward-Modeling" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/armorm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>常规奖励模型只输出一个黑箱分数，人看不出它为什么觉得一个回答好，也就难以发现它在偏爱啰嗦、讨好等错误特征，这些正是奖励作弊的入口。</p></div><div><h4>方法</h4><p>先让奖励模型同时预测多个人能看懂的维度（诚实、安全、啰嗦程度等）的绝对评分，再用一个小的门控网络根据提示内容决定各维度的权重，加权得到最终分数，并显式扣除与长度相关的部分。</p></div><div><h4>影响</h4><p>8B的ArmoRM-Llama3-8B发布时在RewardBench上排名第一，超过以GPT-4为评判的方法、接近340B的Nemotron-4奖励模型，成为2024年开源RLHF流程里常用的现成奖励模型。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/instructgpt.html">InstructGPT与RLHF</a>式奖励模型用成对偏好训练，只学“谁更好”，输出一个标量。这个分数既不能解释，也容易混入与质量无关的偏好，比如偏爱更长的回答（见<a class="ln" href="../n/lc-alpacaeval.html">AlpacaEval长度控制</a>对长度偏差的讨论）。同时，<a class="ln" href="../n/helpsteer2.html">HelpSteer2多属性偏好</a>、<a class="ln" href="../n/ultrafeedback.html">UltraFeedback AI反馈数据</a>等数据集已经提供了按维度打分的绝对评分（有用性、正确性、啰嗦程度……），但成对训练用不上这些细粒度信息。</p><h2>方法</h2><p><b>第一阶段：多目标绝对评分</b>。以Llama-3 8B为骨干，取回答最后一个词元的隐藏向量h，接一个线性层同时回归k个维度的评分（论文用了约十九个来自多个数据集的维度）： <code>r = W·h ∈ ℝ^k</code> 每一维对应一个人能理解的目标，比如“诚实”“安全”“啰嗦”。只有这一层在多维评分数据上训练，骨干冻结。</p><p><b>第二阶段：混合专家式门控</b>。不同提示该看重的维度不同：写代码看正确性，敏感问题看安全。作者在提示的隐藏向量上接一个浅层<a class="lc" href="../c/mlp.html">多层感知机</a>作为门控网络，输出非负、和为1的权重g(x)，最终奖励为 <code>R(x,y) = Σ_i g_i(x) · r_i′(x,y)</code> 其中r_i′是去掉了与“啰嗦”维度相关成分的评分，用来抑制长度偏差。门控网络用成对偏好数据和Bradley-Terry损失训练。</p><p>这样每一次打分都能拆开看：哪几个维度贡献最大、门控给了它们多少权重。</p><h2>结果</h2><p>ArmoRM-Llama3-8B在RewardBench上取得当时最好成绩，以明显差距超过用GPT-4当评判的方法，接近大得多的Nemotron-4 340B奖励模型。</p><h2>后来的发展</h2><p>ArmoRM与同组的<a class="ln" href="../n/rlhf-workflow.html">RLHF Workflow在线迭代DPO</a>一起被大量开源迭代DPO、SimPO类工作直接用作打分器；“多维评分+按提示加权”的可解释奖励思路被后续的多目标与条件奖励模型沿用。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>可解释性停留在“哪些预设维度贡献了分数”，维度本身来自现有数据集的标注体系，标注质量和覆盖面决定了上限。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>在RewardBench上的领先并不等于用作RL奖励时最好；后来发现奖励基准成绩与下游策略效果相关性有限。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:264" href="../n/rewardbench-2.html">RewardBench 2</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/instructgpt.html">InstructGPT与RLHF</a><span class="yr">2022.03 · LLM</span><div class=nt>InstructGPT式奖励模型输出不可解释的单一分数；ArmoRM拆成可读的多维评分再加权。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/sparse-moe.html">稀疏门控MoE层</a><span class="yr">2017.01 · LLM</span><div class=nt>借用混合专家的门控思想，按提示内容为各目标分配权重。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/llama-3.html">Llama 3</a><span class="yr">2024.04 · LLM</span><div class=nt>以Llama-3 8B作为奖励模型骨干。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/rlhf-length-bias.html">RLHF中的长度偏差</a><span class="yr">2023.10 · LLM</span><div class=nt>论文诊断了问题，但测试的干预都不理想，没有给出既能保留真实质量提升又能消除长度偏差的方法。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/rewardbench.html">RewardBench奖励模型评测</a><span class="yr">2024.03 · 数据·评测</span><div class=nt>主要用RewardBench评测并取得当时第一。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/helpsteer2.html">HelpSteer2多属性偏好</a><span class="yr">2024.06 · 数据·评测</span><div class=nt>用HelpSteer系列等数据集的多维绝对评分训练第一阶段。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:264" href="../n/rewardbench-2.html">RewardBench 2</a><span class="yr">2025.06 · 数据·评测</span><div class=nt>在RewardBench上的领先并不等于用作RL奖励时最好；后来发现奖励基准成绩与下游策略效果相关性有限。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/rlhf-concept.html">人类反馈强化学习</a> <a class="chip c" href="../c/linear-regression.html">线性回归</a> <a class="chip c" href="../c/mixture-of-experts.html">混合专家</a> <a class="chip c" href="../c/logistic-regression.html">逻辑回归</a> <a class="chip c" href="../c/feature-representation.html">特征与表示学习</a></p>
+<h2>本篇术语</h2><ul><li><b>绝对评分</b>　给单个回答在某一维度上打一个分（比如1–5分），而不是比较两个回答谁更好。</li><li><b>门控网络</b>　一个小网络，根据输入算出一组权重，决定各个专家或各个目标在最终结果里占多少比重。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/instructgpt.html">InstructGPT与RLHF</a>的奖励模型和<a class="ln" href="../n/rewardbench.html">RewardBench奖励模型评测</a>；读本文第2–3节两阶段训练与长度去偏；动手：取一个开源奖励模型的最后层特征，用HelpSteer2的五个维度训练线性头，看各维度与回答长度的相关性。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2406.12845" rel="noopener">https://arxiv.org/abs/2406.12845</a>（标题、5位作者、arXiv首次提交2024-06-18；摘要中常规RM黑箱不可解释、两阶段方法、多维绝对评分且每一维对应可解释目标（诚实、啰嗦、安全）、MoE门控按上下文选择目标、Llama-3 8B与浅层MLP门控、RewardBench当时最好、明显超过GPT-4评判、接近Nemotron-4 340B奖励模型。约十九个维度、最后词元特征与线性回归、长度去偏方式、Findings of EMNLP 2024与机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ArmoRM%E5%A4%9A%E7%9B%AE%E6%A0%87%E5%A5%96%E5%8A%B1%E6%A8%A1%E5%9E%8B%EF%BC%88armorm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aarmorm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/armorm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="codegemma.html"><small>本分支上一个 · 2024.06</small><b>CodeGemma</b></a><a class="r" href="md4.html"><small>本分支下一个 · 2024.06</small><b>MD4简化掩码扩散</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

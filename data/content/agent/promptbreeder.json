@@ -1,0 +1,31 @@
+{
+  "id": "promptbreeder",
+  "who": "Chrisantha Fernando, Dylan Banarse, Henryk Michalewski, Simon Osindero, Tim Rocktäschel · Google DeepMind",
+  "venue": "ICML 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2309.16797"}
+  ],
+  "aka": ["Promptbreeder", "Prompt Breeder", "提示进化", "自指提示进化", "自我改进提示", "prompt evolution", "self-referential self-improvement"],
+  "problem": "思维链这类提示策略都是人手写的，往往不是最优；APE那样迭代让LLM改写提示，几轮之后提升就停滞了。",
+  "idea": "用遗传算法进化一群提示，由LLM执行变异；关键是“怎么变异”的指令本身也是会被进化的提示，系统同时改进提示和改进提示的方法。",
+  "impact": "在PaLM 2-L上把GSM8K零样本准确率做到83.9%，高于人写的先计划后求解提示和同期的OPRO，展示了让LLM在提示层面自我改进的一种做法。",
+  "method": "种群里每个个体通常包含两条**任务提示**（真正拿去答题的那段话，如“一步一步想”）和一条**变异提示**（告诉LLM如何改写任务提示，如“把这句话改得更有创意”）。初始化时，把人工准备的“思维风格”和变异提示随机组合，再加上问题描述，让LLM生成最初的任务提示。\n\n进化用二元锦标赛：随机抽两个个体，在一小批训练题上比准确率（适应度），赢家经变异后覆盖输家。变异算子有五类：直接让LLM生成或改写提示；把一组高分提示交给LLM、让它写出新的同类提示（分布估计）；用另一条“超变异提示”去改写变异提示本身（这就是**自指**）；从答对的解题过程反推一条提示（拉马克式变异）；以及提示交叉和打乱少样本示例。种群50个，一般进化20到30代。\n\n在[[gsm8k]]上，进化出的零样本提示得到83.9%，PaLM 2-L上的[[plan-and-solve]]为59.0%，[[opro]]为80.2%；实验还覆盖其他五个算术数据集、两个常识推理数据集和ETHOS仇恨言论分类，并为后者进化出较复杂的任务提示。",
+  "limits": [
+    {"text": "50个个体进化二三十代，每次评估适应度都要在训练题上调用LLM，总调用量很大；进化出的提示针对PaLM 2-L和具体数据集，换模型是否仍有效没有保证。", "solved_by": []},
+    {"text": "适应度只是一个准确率数字，变异时LLM看不到具体错在哪道题、为什么错，改写方向主要靠随机试探。", "solved_by": ["gepa"]}
+  ],
+  "relations": [
+    {"to": "ape", "type": "solves", "note": "APE发现迭代改写三轮后收益递减而放弃迭代；Promptbreeder用保持多样性的进化算法和可进化的变异提示来缓解这个停滞。"},
+    {"to": "opro", "type": "rivals", "note": "同月发表、同样让LLM当提示优化器：OPRO把历史提示和得分排成轨迹让LLM续写，Promptbreeder用种群进化；GSM8K上两者分别为80.2%和83.9%。"},
+    {"to": "plan-and-solve", "type": "rivals", "note": "先计划后求解是人工设计的零样本推理提示，被拿来作为主要对照，在PaLM 2-L上明显低于进化出的提示。"},
+    {"to": "genetic-algorithm", "type": "uses", "note": "以二元锦标赛遗传算法为骨架，只是把变异和交叉交给LLM在文字上执行。"},
+    {"to": "cot", "type": "extends", "note": "思维链的“一步一步想”这类提示是被进化的对象之一，Promptbreeder自动搜索比它更好的任务提示。"}
+  ],
+  "prereq": ["in-context-learning", "zero-few-shot", "exploration-exploitation", "meta-learning"],
+  "terms": [
+    {"t": "变异提示", "d": "交给LLM的一段指令，说明怎样改写任务提示；在Promptbreeder里它也会被改写和筛选。"},
+    {"t": "自指", "d": "系统改进的对象包括它自己的改进方法，这里指变异提示也被另一条提示改写。"}
+  ],
+  "learn": "先读[[ape]]和[[opro]]，再补[[genetic-algorithm]]的选择和变异 → 读原文第3节的个体结构与九种变异算子、表1 → 动手：用一个小模型和50道算术题，跑一个10个个体、5代的简化版进化，记录最好提示的变化。",
+  "check": {"source": "https://arxiv.org/abs/2309.16797", "confirmed": "标题、5位作者、v1提交于2023-09-28，单位Google DeepMind；arxiv.org/html/2309.16797v1核对PaLM 2-L、个体结构、二元锦标赛、五类九种变异算子、种群50与20–30代、数据集列表、GSM8K零样本83.9%（PS 59.0%、OPRO 80.2%）。"}
+}

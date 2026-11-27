@@ -1,0 +1,26 @@
+{
+ "id": "slicegpt",
+ "who": "Saleh Ashkboos, Maximilian L. Croci, Marcelo Gennari do Nascimento, Torsten Hoefler, James Hensman · 苏黎世联邦理工学院, 微软研究院",
+ "venue": "ICLR 2024",
+ "aka": ["SliceGPT", "计算不变性", "computational invariance", "删行删列", "嵌入维度剪枝"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2401.15024"},
+  {"label": "GitHub", "url": "https://github.com/microsoft/TransformerCompression"}
+ ],
+ "problem": "SparseGPT、Wanda等训练后剪枝把单个权重置零，得到的稀疏矩阵要额外的数据结构存储，在现有硬件上加速有限。",
+ "idea": "利用Transformer的“计算不变性”：在残差流上插入正交旋转不改变模型输出，选用PCA方向做旋转后，直接删掉方差最小的那些行和列，把每个权重矩阵换成更小的稠密矩阵。",
+ "impact": "给出了一种“训练后变小但保持稠密”的LLM压缩方式，它提出的旋转不变性观察也直接启发了QuaRot等旋转量化方法。",
+ "method": "训练后剪枝的主流（[[sparsegpt]]、[[wanda]]）是把一部分权重置零，模型参数量下降，但矩阵形状不变，GPU只在特定稀疏格式下才能加速。SliceGPT换了一个思路：缩小网络的**嵌入维度**本身。\n\n关键观察是**计算不变性**：在使用RMSNorm的Transformer里，残差流上的隐藏向量x如果左乘一个正交矩阵Q（`x → xQ`），同时把读取它的权重换成 `QᵀW`、写入它的权重换成 `WQ`，模型输出完全不变（LayerNorm模型可先转换成RMSNorm形式）。既然可以任意旋转，就选一个有用的旋转：用少量校准数据计算每层残差流激活的主成分（PCA），把Q取成主成分方向，旋转后各维度按方差从大到小排列。然后直接删掉方差最小的那部分维度——对应权重矩阵删掉若干行和列，矩阵变小但仍是稠密的。\n\n摘要报告：对LLAMA2-70B、OPT-66B和Phi-2可删掉最多25%的参数（含嵌入），分别保持稠密模型99%、99%和90%的零样本任务性能；无需额外代码优化，在24GB消费级GPU上LLAMA2-70B的推理总计算降到稠密模型的64%，在40GB A100上降到66%。",
+ "limits": [
+  {"text": "删掉25%参数后，较小模型（如Phi-2）的性能损失明显，压缩率再高就掉得更快，通常需要后续微调来恢复。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "sparsegpt", "type": "solves", "note": "SparseGPT得到的非结构化稀疏在硬件上加速有限，SliceGPT删行删列得到更小的稠密矩阵，无需特殊内核即可提速。"},
+  {"to": "llama-2", "type": "uses", "note": "以LLAMA2-70B等模型为主要压缩对象。"},
+  {"to": "opt", "type": "uses", "note": "在OPT-66B上验证，删掉25%参数保持99%零样本性能。"},
+  {"to": "phi-2", "type": "uses", "note": "在较小的Phi-2上测试，同样压缩率下保持约90%性能。"}
+ ],
+ "prereq": ["eigen-svd", "dimensionality-reduction", "normalization-layer", "residual-connection", "transformer-block"],
+ "terms": [{"t": "计算不变性", "d": "对网络内部表示做某种变换（这里是正交旋转）并相应改写权重后，模型的输出保持完全不变的性质。"}],
+ "check": {"source": "https://arxiv.org/abs/2401.15024", "confirmed": "标题、五位作者、v1日期2024-01-26；摘要：现有稀疏化需要额外数据结构且在现有硬件上加速受限、用更小的稠密矩阵替换每个权重矩阵以降低嵌入维度、LLAMA2-70B/OPT 66B/Phi-2最多删25%参数保持99%/99%/90%零样本性能、24GB消费级GPU上计算降到64%、40GB A100上降到66%、提出Transformer中的计算不变性、代码在microsoft/TransformerCompression。PCA旋转、RMSNorm转换细节、ICLR 2024、对QuaRot的启发为一般了解。"}
+}

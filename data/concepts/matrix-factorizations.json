@@ -1,0 +1,9 @@
+{
+  "key": "matrix-factorizations",
+  "short": "把一个矩阵拆成几个结构简单（三角、正交）的矩阵相乘：LU分解解一般方程组，Cholesky分解专门处理正定矩阵，QR分解用于最小二乘和正交化。",
+  "body": "求解`Ax = b`、计算行列式、做最小二乘、从高斯分布采样，数值软件背后都在做同一件事：先把A分解成几个“好算”的矩阵。三角矩阵的方程可以从一端逐个回代求解，正交矩阵的逆就是转置（见[[c:orthogonal-psd]]），所以目标就是拆成这两类。\n\n**LU分解**。`A = LU`，L是下三角、U是上三角（实际中带行交换，写作`PA = LU`）。它就是高斯消元法的矩阵形式。分解一次花O(n³)，之后对每个新的b只需两次三角回代，O(n²)。行列式等于U对角元之积（考虑行交换的符号）。\n\n**Cholesky分解**。A对称正定时，`A = LLᵀ`，L是下三角且对角元为正。计算量约为LU的一半，数值上也更稳定。最典型的用途：\n\n- 从多元[[c:gaussian]] `N(μ, Σ)`采样：分解`Σ = LLᵀ`，取标准正态向量z，`x = μ + Lz`即可。\n- [[gaussian-process]]的预测和对数似然都要用核矩阵的Cholesky分解来代替直接求逆，见[[c:matrix-inverse]]。\n- `log det(Σ) = 2 Σ_i log L_ii`，避免行列式本身上溢或下溢。\n\n**QR分解**。`A = QR`，Q的列是正交单位向量，R是上三角。它是把A的列做Gram–Schmidt正交化的结果。最小二乘`min ‖Ax − b‖²`可以化为`Rx = Qᵀb`，比解正规方程`AᵀAx = Aᵀb`稳定得多，因为后者把条件数平方了（见[[c:numerical-stability]]）。QR也是计算特征值的标准迭代算法的核心，还常用来生成随机正交矩阵做初始化。\n\n**和SVD的关系**。[[c:eigen-svd]]揭示的信息最多（秩、主方向），但也最贵；需要的只是解方程时，LU、Cholesky、QR就够了。一些优化器需要对矩阵做正交化或求逆平方根，[[muon]]用牛顿–舒尔茨迭代近似正交化，就是为了避开在GPU上做精确分解的开销。",
+  "example": "A = [[4, 2], [2, 3]]是对称正定的。Cholesky：L = [[2, 0], [1, √2]]，验证LLᵀ = [[4, 2], [2, 1 + 2]] = A。log det(A) = 2(ln 2 + ln √2) = ln 8，而det(A) = 12 − 4 = 8，一致。\n\n采样：要从协方差为A的二维高斯采样，抽z = (0.5, −1)，得x = Lz = (1, 0.5 − 1.414) = (1, −0.914)。",
+  "pitfalls": "- 矩阵只是数值上接近半正定（例如浮点误差让最小特征值变成−1e−9）时，Cholesky会失败；常见补救是在对角线上加一个很小的数（jitter）。\n- 这些“分解”是数值线性代数里的精确拆分，和推荐系统里的矩阵分解（用两个低秩矩阵近似评分矩阵）不是一回事，后者见[[c:low-rank]]。",
+  "needs": ["matrix-inverse", "orthogonal-psd"],
+  "aka": ["LU分解", "LU decomposition", "Cholesky分解", "Cholesky decomposition", "乔列斯基分解", "QR分解", "QR decomposition", "Gram-Schmidt", "格拉姆-施密特正交化", "施密特正交化", "高斯消元", "Gaussian elimination", "三角分解", "回代", "back substitution", "matrix decomposition"]
+}

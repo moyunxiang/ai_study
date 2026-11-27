@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Sarathi-Serve无停顿调度（2024） · AI脉络</title>
+<meta name="description" content="连续批处理把新请求的预填充插进正在进行的解码批次；一个长提示的预填充要跑很久，期间所有正在生成的请求都被卡住，逐词延迟出现尖峰，想要高吞吐就得忍受高尾延迟。 把每个预填充切成大小相近的块，每一轮迭代在不暂停任何正在解码的请求的前提下，只塞进一块预填充；每轮批次的计算量因此大致均匀，既能用大批次提高…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sarathi-serve.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Sarathi-Serve无停顿调度（2024）">
+<meta property="og:description" content="连续批处理把新请求的预填充插进正在进行的解码批次；一个长提示的预填充要跑很久，期间所有正在生成的请求都被卡住，逐词延迟出现尖峰，想要高吞吐就得忍受高尾延迟。 把每个预填充切成大小相近的块，每一轮迭代在不暂停任何正在解码的请求的前提下，只塞进一块预填充；每轮批次的计算量因此大致均匀，既能用大批次提高…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sarathi-serve.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sarathi-serve">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 推理服务引擎</div>
+<h1>Sarathi-Serve无停顿调度</h1>
+<div class="full">Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve</div>
+<div class="meta"><span>2024.03</span><span>论文</span><span>延伸</span><span>OSDI 2024</span><span>Amey Agrawal, Nitin Kedia, Ashish Panwar, Jayashree Mohan, Nipun Kwatra, Bhargav S. Gulavani, Alexey Tumanov, Ramachandran Ramjee · 微软研究院印度, 佐治亚理工学院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2403.02310" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/microsoft/sarathi-serve" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/sarathi-serve">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>连续批处理把新请求的预填充插进正在进行的解码批次；一个长提示的预填充要跑很久，期间所有正在生成的请求都被卡住，逐词延迟出现尖峰，想要高吞吐就得忍受高尾延迟。</p></div><div><h4>方法</h4><p>把每个预填充切成大小相近的块，每一轮迭代在不暂停任何正在解码的请求的前提下，只塞进一块预填充；每轮批次的计算量因此大致均匀，既能用大批次提高吞吐，又不让解码停顿。</p></div><div><h4>影响</h4><p>分块预填充加无停顿调度成为vLLM、SGLang、TensorRT-LLM等主流推理引擎的默认或常用配置，是预填充—解码分离之外，同卡混合调度的代表方案。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>每个请求分两阶段：<b>预填充</b>一次处理整段提示，计算密集、能占满GPU；<b>解码</b>每轮每个请求只出一个词，计算量小，主要受显存带宽限制，所以要靠大批次来提高利用率。<a class="ln" href="../n/orca-serving.html">Orca连续批处理</a>与<a class="ln" href="../n/vllm.html">vLLM与PagedAttention</a>的迭代级调度会在新请求到来时插入它的整段预填充：吞吐上去了，但这一轮迭代要等长预填充算完，所有解码请求的下一个词都被推迟（生成停顿）；若优先解码、推迟预填充，又会拖低吞吐、拉长首词延迟。</p><p>Sarathi-Serve在作者之前的<a class="ln" href="../n/sarathi.html">分块预填充Sarathi</a>（把解码请求“搭便车”塞进分块的预填充）基础上，做成完整的服务调度器：给每轮迭代设一个token预算，先放入所有正在解码的请求（各1个token），剩余预算再分给预填充的块，长提示被拆成多轮完成。这样任何一轮都不会因为预填充而让解码停下（无停顿调度），各轮迭代的计算量相近；在流水线并行下，均匀的批次还减少了因迭代耗时不一造成的流水线气泡。</p><p>摘要报告：在尾延迟约束下，单张A100上Mistral-7B的服务容量是vLLM的2.6倍，两张A100上Yi-34B最多3.7倍；配合流水线并行的Falcon-180B端到端服务容量最多提高5.6倍。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>预填充与解码仍在同一批GPU上相互争抢，块大小要在首词延迟与逐词延迟之间权衡；长提示被分块后首词延迟变长。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/mooncake.html">Mooncake以KV缓存为中心</a> <a class="chip hue" style="--h:192" href="../n/nvidia-dynamo.html">NVIDIA Dynamo</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/orca-serving.html">Orca连续批处理</a><span class="yr">2022.07 · 系统·效率</span><div class=nt>Orca式迭代级调度插入整段预填充会让解码停顿，Sarathi-Serve以token预算分块插入，消除停顿。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/vllm.html">vLLM与PagedAttention</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>以vLLM为主要基线，在尾延迟约束下服务容量提高2.6–3.7倍，后来vLLM也采用了分块预填充。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/sarathi.html">分块预填充Sarathi</a><span class="yr">2023.08 · 系统·效率</span><div class=nt>由同一团队把分块预填充与解码搭便车扩展为完整的无停顿服务调度器。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/distserve.html">预填充-解码分离部署</a><span class="yr">2024.01 · 系统·效率</span><div class=nt>DistServe把预填充和解码拆到不同GPU上避免相互干扰；Sarathi-Serve留在同一批GPU上靠分块与无停顿调度缓解干扰，两条路线后来在推理引擎里并存。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/mooncake.html">Mooncake以KV缓存为中心</a><span class="yr">2024.06 · 系统·效率</span><div class=nt>预填充与解码仍在同一批GPU上相互争抢，块大小要在首词延迟与逐词延迟之间权衡；长提示被分块后首词延迟变长。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/nvidia-dynamo.html">NVIDIA Dynamo</a><span class="yr">2025.03 · 系统·效率</span><div class=nt>预填充与解码仍在同一批GPU上相互争抢，块大小要在首词延迟与逐词延迟之间权衡；长提示被分块后首词延迟变长。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a> <a class="chip c" href="../c/training-vs-inference.html">训练与推理的算力差别</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a></p>
+<h2>本篇术语</h2><ul><li><b>生成停顿</b>　正在逐词输出的请求因为批次里插入了别的请求的长预填充而被迫等待，表现为输出突然卡顿。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2403.02310" rel="noopener">https://arxiv.org/abs/2403.02310</a>（标题、八位作者、v1日期2024-03-04；摘要：预填充高延迟但能占满GPU、解码低延迟低利用率因此批处理有效、批处理导致预填充与解码交错难以同时兼顾吞吐与延迟、分块预填充把预填充切成近似等大的块、无停顿调度在不暂停解码的情况下加入新请求、均匀批次减少流水线气泡、Mistral-7B单A100服务容量2.6倍、Yi-34B两张A100最多3.7倍（对比vLLM）、Falcon-180B配合流水线并行最多5.6倍。token预算的具体机制、OSDI 2024、机构、被主流引擎采用为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Sarathi-Serve%E6%97%A0%E5%81%9C%E9%A1%BF%E8%B0%83%E5%BA%A6%EF%BC%88sarathi-serve%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asarathi-serve%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sarathi-serve.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="galore.html"><small>本分支上一个 · 2024.03</small><b>GaLore梯度低秩投影</b></a><a class="r" href="llm-c.html"><small>本分支下一个 · 2024.04</small><b>llm.c</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

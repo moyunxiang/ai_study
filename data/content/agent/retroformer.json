@@ -1,0 +1,27 @@
+{
+  "id": "retroformer",
+  "who": "Weiran Yao, Shelby Heinecke, Juan Carlos Niebles, Zhiwei Liu, Yihao Feng, Le Xue, Rithesh Murthy, Zeyuan Chen et al. · Salesforce AI Research",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2308.02151"}
+  ],
+  "aka": ["Retroformer", "回顾模型", "retrospective model", "反思模型强化学习", "可学习的反思"],
+  "problem": "Reflexion这类智能体靠模型写“反思”来改进下一次尝试，但写反思的模型是固定的，不会因为环境奖励而变得更会反思；而直接微调智能体本身又往往做不到（比如它是闭源API）。",
+  "idea": "单独训练一个较小的“回顾模型”：它读失败的轨迹，总结出错的根本原因并提出新计划，写进智能体的提示里；用环境奖励的变化，以策略梯度来微调这个回顾模型。",
+  "impact": "把语言反思和梯度学习接了起来：智能体主体保持冻结，只学习“怎样给它写反思”，是“用强化学习优化提示/反思”这条路线的早期代表。",
+  "method": "[[reflexion]]的流程是：智能体做一次任务，失败后由LLM写一段文字反思（哪里错了、下次怎么做），放进记忆，下一次尝试时作为提示的一部分。问题在于反思的质量全看那个LLM本身，环境给出的奖励并没有被用来改进“反思”这件事。\n\nRetroformer把系统拆成两部分：\n- **行动者**：一个冻结的大模型（可以是GPT这类闭源API），负责实际在环境里行动；\n- **回顾模型**：一个可训练的较小语言模型，读入上一次的轨迹和得分，写出总结失败根因、提出行动计划的反思，拼进行动者的提示。\n\n训练回顾模型的奖励是：用了这段反思之后，下一次尝试的得分比上一次提高了多少。作者把多个环境、多个任务上收集的“反思—奖励提升”数据用于策略梯度微调（实现上参考了[[instructgpt]]式的奖励模型加[[ppo]]流程）。在[[hotpotqa]]、[[alfworld]]、[[webshop]]等任务上，智能体随尝试次数增加持续变好，并明显超过不利用环境梯度的反思基线。",
+  "limits": [
+    {"text": "改进只能通过提示传递给冻结的行动者，行动者本身缺乏的能力无法靠反思补上。", "solved_by": []},
+    {"text": "依赖同一任务可以多次重试，并把得分提升当奖励；对一次性、不能重来的真实任务不适用。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "reflexion", "type": "extends", "note": "保留语言反思进记忆的机制，但让写反思的模型能根据环境奖励被训练。"},
+    {"to": "ppo", "type": "uses", "note": "用策略梯度（PPO式流程）微调回顾模型。"},
+    {"to": "react", "type": "uses", "note": "行动者以ReAct式的推理—行动方式在环境中执行任务。"},
+    {"to": "hotpotqa", "type": "uses", "note": "多跳问答HotpotQA是评测环境之一。"},
+    {"to": "alfworld", "type": "uses", "note": "文字家务环境ALFWorld是评测环境之一。"}
+  ],
+  "prereq": ["policy-gradient-concept", "rlhf-concept", "agent-loop", "in-context-learning"],
+  "learn": "先读[[reflexion]]和[[ppo]] → 读原文第3节两模块结构和奖励定义 → 动手：收集一个任务上几条“反思前后得分”数据，看哪些反思真正带来了提升。",
+  "check": {"source": "https://arxiv.org/abs/2308.02151", "confirmed": "标题、作者、v1提交于2023-08-04；摘要中现有语言智能体不用环境奖励优化、学习回顾模型通过策略梯度根据环境反馈自动调整提示、总结先前失败根因并提出行动计划、跨多个环境和任务学习、智能体随时间改进并超过不用梯度的基线。行动者冻结、奖励定义为得分提升、PPO式流程、具体评测环境与ICLR 2024凭一般了解。"}
+}

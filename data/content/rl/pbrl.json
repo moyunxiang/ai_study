@@ -1,0 +1,29 @@
+{
+  "id": "pbrl",
+  "who": "Chenjia Bai, Lingxiao Wang, Zhuoran Yang, Zhihong Deng, Animesh Garg, Peng Liu, Zhaoran Wang · 哈工大 / Northwestern / Princeton / Toronto",
+  "venue": "ICLR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2202.11566"}
+  ],
+  "problem": "离线RL的主流做法要么压低分布外动作的Q值，要么约束策略靠近行为策略，都会妨碍价值函数在数据外的泛化，也说不清楚哪些数据算“分布外”。",
+  "idea": "完全靠不确定性做悲观：训练一组自举Q网络，用它们之间的分歧当作不确定性，在TD目标里减去与不确定性成正比的惩罚；再专门采样分布外动作施加更强惩罚。",
+  "impact": "把线性MDP里“悲观值迭代”的理论思想落到深度离线RL上，与EDAC一起代表“基于不确定性、无显式策略约束”的路线。",
+  "method": "理论上，离线RL的悲观原则（见[[pevi]]）是：在估计价值时减去一个不确定性项，数据覆盖少的地方减得多。PBRL（Pessimistic Bootstrapping for offline RL）把这个原则用深度网络实现：\n\n- 训练K个独立初始化的Q网络（类似[[bootstrapped-dqn]]），它们在数据覆盖充分的地方意见一致，在数据稀少处分歧大，用标准差 `U(s, a) = Std_k Q_k(s, a)` 作为不确定性；\n- 对数据内转移，TD目标变成 `y = r + γ(Q_k(s′, a′) − β_in·U(s′, a′))`；\n- 为了直接约束分布外区域，再从当前策略采样分布外动作 `a_ood`，让它们的Q值回归到 `Q_k(s, a_ood) − β_ood·U(s, a_ood)`，并让β_ood随训练逐渐减小。\n\n这样不需要估计行为策略，也没有显式的策略约束。作者证明在线性MDP里这种自举分歧与LSVI式的不确定性量化相当，因此给出了理论依据。摘要称在D4RL上优于当时的最好算法。",
+  "limits": [
+    {"text": "需要维护一组Q网络并额外采样分布外动作，计算开销比单网络方法大。"},
+    {"text": "两个惩罚系数和分布外惩罚的衰减方式需要调，不同数据集上最优值不同。"}
+  ],
+  "relations": [
+    {"to": "pevi", "type": "extends", "note": "把线性MDP里减去不确定性项的悲观值迭代推广到深度网络。"},
+    {"to": "bootstrapped-dqn", "type": "uses", "note": "用多个自举Q网络之间的分歧来量化不确定性。"},
+    {"to": "edac", "type": "rivals", "note": "EDAC靠大集成取最小值隐式惩罚；PBRL显式减去标准差惩罚并额外采样分布外动作。"},
+    {"to": "cql", "type": "rivals", "note": "CQL压低所有分布外动作；PBRL按不确定性大小有区别地惩罚。"}
+  ],
+  "prereq": ["offline-rl", "ensemble", "expectation-variance", "bellman-equation"],
+  "terms": [
+    {"t": "悲观原则", "d": "离线时对数据没有覆盖的部分往坏处估计，避免策略被不可靠的高估值误导。"}
+  ],
+  "learn": "先读[[pevi]]了解悲观的理论版本，再读[[edac]]；读PBRL原文第4节的两个惩罚项；比较K=10时标准差在数据内外的分布。",
+  "check": {"source": "https://arxiv.org/abs/2202.11566", "confirmed": "标题、七位作者、arXiv v1于2022-02-23；摘要中OOD动作的外推误差、以往方法妨碍泛化、纯不确定性驱动无显式策略约束、自举Q函数分歧量化不确定性、悲观更新、新的OOD采样方法、线性MDP中可证明的不确定性量化、D4RL上优于当时最好。惩罚项的具体写法按原文正文通行描述；ICLR 2022与单位按通行引用。"},
+  "aka": ["PBRL", "Pessimistic Bootstrapping", "悲观自举", "不确定性离线RL"]
+}

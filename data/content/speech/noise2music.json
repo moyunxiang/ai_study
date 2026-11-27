@@ -1,0 +1,32 @@
+{
+  "id": "noise2music",
+  "who": "Qingqing Huang, Daniel S. Park, Tao Wang, Timo I. Denk, Andy Ly, Nanxin Chen, Zhengdong Zhang, Zhishuai Zhang et al. · Google",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2302.03917"},
+    {"label": "示例页", "url": "https://google-research.github.io/noise2music"}
+  ],
+  "problem": "文生音乐需要大量「音乐-文字描述」配对，现实中几乎没有；MusicLM用离散token自回归生成，另一种可能的路线——扩散模型——在长音乐上还没被验证。",
+  "idea": "仿照Imagen的级联扩散：先用一个生成器扩散模型从文字生成低保真的中间表示（频谱或低采样率音频），再用级联扩散模型生成高保真的30秒音乐；训练用的文字描述由大语言模型批量造出来。",
+  "impact": "Noise2Music证明了级联扩散可以直接生成30秒的高质量音乐，与MusicLM代表的token自回归路线并列；用LLM为音乐生成伪描述的做法被后来的文生音乐工作普遍采用。",
+  "method": "几周前发布的[[musiclm]]走的是[[audiolm]]的路线：把音乐变成离散token，用Transformer逐个预测。图像领域的[[imagen]]则展示了另一条路：用一串[[cascaded-diffusion]]模型，先生成小图，再逐级放大。\n\nNoise2Music把这条路搬到音乐上。**生成器**扩散模型以文本为条件，生成一个中间表示；论文比较了两种选择——对数梅尔频谱，或3.2 kHz的低保真音频。**级联器**扩散模型再以中间表示（必要时加上文本）为条件，生成16 kHz的高保真音频；对频谱路线，还需要一个把频谱变成波形的扩散声码器。模型主体是一维的U-Net（见[[unet]]）。\n\n数据方面，作者用一个大语言模型生成大量描述音乐的句子（流派、情绪、乐器、年代等），再用音乐-文本联合嵌入模型（MuLan）把这些句子匹配给训练集里的音乐片段，得到伪标注；文本提示则由预训练语言模型（[[t5]]）编码。摘要称生成的音频不仅忠实反映了流派、速度、乐器、情绪、年代等关键要素，还能落实提示里更细的语义。",
+  "limits": [
+    {"text": "模型和数据都未公开，只有示例页，外界难以复现；输出采样率16 kHz，离CD音质还有差距。", "solved_by": ["stable-audio-open", "musicgen"]},
+    {"text": "每段只有30秒，没有歌词和人声的可控生成，难以形成完整的歌曲结构。", "solved_by": ["diffrhythm"]}
+  ],
+  "relations": [
+    {"to": "imagen", "type": "extends", "note": "沿用Imagen的级联扩散加冻结语言模型文本编码器的设计，从图像搬到音乐。"},
+    {"to": "cascaded-diffusion", "type": "uses", "note": "生成器加级联器的两阶段结构即级联扩散。"},
+    {"to": "musiclm", "type": "rivals", "note": "MusicLM用离散token自回归生成，Noise2Music用连续表示上的级联扩散，两者同为Google在文生音乐上的不同路线。"},
+    {"to": "t5", "type": "uses", "note": "用预训练语言模型编码文本提示。"}
+  ],
+  "prereq": ["diffusion-process", "waveform-spectrogram", "language-model", "embedding", "conv-layer"],
+  "terms": [
+    {"t": "级联扩散", "d": "先用一个扩散模型生成低分辨率结果，再用另一个扩散模型以它为条件生成高分辨率结果。"},
+    {"t": "伪标注", "d": "不是人工写的，而是由模型自动生成并匹配到数据上的标签或描述。"}
+  ],
+  "aka": ["Noise2Music", "级联扩散文生音乐"],
+  "check": {
+    "source": "https://arxiv.org/abs/2302.03917",
+    "confirmed": "arXiv官方记录：标题Noise2Music: Text-conditioned Music Generation with Diffusion Models、Huang等15位作者、v1提交2023-02-08；摘要中生成30秒音乐、生成器与级联器两类扩散模型、中间表示用频谱或低保真音频、反映流派速度乐器情绪年代、LLM生成配对文本并提取文本嵌入。3.2kHz/16kHz采样率、MuLan匹配、T5编码器、一维U-Net为一般了解，未逐项对照原文。"
+  }
+}

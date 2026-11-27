@@ -1,0 +1,23 @@
+{
+  "id": "prodigy",
+  "who": "Konstantin Mishchenko, Aaron Defazio · 三星AI中心、Meta AI",
+  "venue": "ICML 2024",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2306.06101"}],
+  "aka": ["Prodigy优化器", "Prodigy optimizer", "免学习率Adam"],
+  "problem": "[[d-adaptation]]能自动估计学习率，但对“到最优解距离D”的估计增长太慢，前期步子偏小。",
+  "idea": "改写D的估计方式，让它更快逼近真实值，可证明收敛率比D-Adaptation提高 `O(√log(D/d₀))` 倍，用在Adam式自适应方法里。",
+  "impact": "因为基本不用调学习率，在扩散模型LoRA微调等社区训练脚本里被广泛采用，成为最常见的免学习率优化器之一。",
+  "method": "自适应方法（AdaGrad、Adam）的最优学习率同样依赖起点到最优解的距离D。D-Adaptation从一个很小的初值d₀出发、逐步增大对D的下界估计；当d₀比D小很多个数量级时，需要很多步才能长上去。\n\nProdigy修改了估计D所用的加权方式：在累积梯度信息时给后面的步赋予与当前d成比例的权重，使估计量增长得更快，同时仍保证它不超过真实D。由此证明收敛率比D-Adaptation提高 `O(√log(D/d₀))` 倍。实现上它包在Adam外面：Adam的两条滑动平均照常计算，全局学习率由估计出的d决定，用户通常只把学习率设为1。\n\n摘要列出的实验覆盖12个逻辑回归数据集、CIFAR-10上的VGG11与ResNet-50、ImageNet上的ViT、IWSLT14上的LSTM、Criteo上的DLRM、膝关节MRI上的VarNet，以及BookWiki上的RoBERTa和GPT，结果稳定优于D-Adaptation，测试精度接近手调的Adam。",
+  "limits": [
+    {"text": "仍需要配合预热和学习率衰减时间表，学习率时间表本身没有被免掉。", "solved_by": ["schedule-free"]},
+    {"text": "估计的d只增不减，训练后期若需要更小步长要靠外部时间表。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "d-adaptation", "type": "solves", "note": "改进D的估计方式，解决D-Adaptation前期估计增长慢的问题。"},
+    {"to": "adam", "type": "uses", "note": "作为Adam的外壳，替它决定全局学习率。"},
+    {"to": "adagrad", "type": "extends", "note": "理论分析建立在AdaGrad式自适应方法上。"}
+  ],
+  "prereq": ["learning-rate", "adaptive-optimizer", "convexity"],
+  "learn": "先读[[d-adaptation]]；读本文第2–3节对估计量的修改；动手在一个LoRA微调脚本里把AdamW换成Prodigy（学习率设1），观察有效学习率d随步数的变化。",
+  "check": {"source": "https://arxiv.org/abs/2306.06101", "confirmed": "标题、2位作者、arXiv v1 2023-06-09；摘要中估计到解的距离D、改进D-Adaptation的收敛率O(√log(D/d₀))、实验数据集与模型列表、接近手调Adam。加权方式的细节、学习率设为1的用法、ICML 2024、在扩散模型LoRA社区的流行凭一般了解。"}
+}

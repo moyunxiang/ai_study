@@ -1,0 +1,32 @@
+{
+  "id": "mega-tts",
+  "who": "Ziyue Jiang, Yi Ren, Zhenhui Ye, Jinglin Liu, Chen Zhang, Qian Yang, Shengpeng Ji, Rongjie Huang et al. · 浙江大学、字节跳动",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2306.03509"},
+    {"label": "示例", "url": "https://mega-tts.github.io/demo-page"}
+  ],
+  "problem": "大规模零样本TTS大多把语音整个压成编解码器latent，再交给自回归语言模型或扩散模型生成，忽视了语音本身的结构，结果有时不稳定、难以控制。",
+  "idea": "把语音拆成内容、音色、韵律、相位几种属性，各用合适的归纳偏置建模：仍用梅尔谱做中间表示（相位交给GAN声码器），音色用全局向量，韵律用潜码语言模型，频谱由VQGAN式声学模型生成。",
+  "impact": "在VALL-E式「一切交给语言模型」的路线之外，提出了「按属性分解、各取所长」的零样本TTS设计；Mega-TTS 2等后续工作沿用这种分解思路。",
+  "method": "[[vall-e]]把语音变成编解码器token，用一个语言模型生成全部信息；[[naturalspeech-2]]则用扩散模型生成编解码器的连续latent。Mega-TTS认为语音的几种成分性质不同，应该区别对待：\n\n- **相位**：变化极快、规律性弱，交给语言模型很浪费。所以中间表示仍用梅尔谱（不含相位），相位由[[hifi-gan]]式的GAN声码器重建。\n- **音色**：在一句话里基本不变，是全局属性，用一个从参考语音提取的**全局向量**表示。\n- **韵律**：在句子内变化快，又有长程依赖，适合用语言模型建模。作者先用[[vqgan]]式的声学模型把韵律压成离散潜码，再训练一个**潜码语言模型**（P-LLM）根据参考语音的韵律续写目标句的韵律。\n- **内容**：由文本（音素）编码器提供。\n\n生成时，内容、参考音色向量和P-LLM生成的韵律码一起送入声学模型得到梅尔谱，再由声码器转波形。模型在2万小时多领域数据上训练。摘要报告：在零样本TTS、语音编辑和跨语言TTS上，Mega-TTS的自然度、鲁棒性和说话人相似度都超过当时的最好系统。",
+  "limits": [
+    {"text": "多模块串联，训练和推理流程比单一模型复杂；音色只用一个全局向量，难以刻画随情绪变化的音色细节。", "solved_by": ["e2-tts", "f5-tts"]},
+    {"text": "参考语音只用几秒，长句的韵律续写多样性有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "vall-e", "type": "rivals", "note": "VALL-E用编解码器token加一个语言模型生成全部信息；Mega-TTS按属性分解，只让语言模型负责韵律。"},
+    {"to": "naturalspeech-2", "type": "rivals", "note": "同期大规模零样本TTS，NaturalSpeech 2用扩散生成编解码器latent，Mega-TTS保留梅尔谱。"},
+    {"to": "vqgan", "type": "uses", "note": "用VQGAN式的向量量化加对抗训练的声学模型生成频谱、提取韵律离散码。"},
+    {"to": "hifi-gan", "type": "uses", "note": "相位不建模，由GAN声码器从梅尔谱重建。"}
+  ],
+  "prereq": ["zero-few-shot", "vector-quantization", "language-model", "waveform-spectrogram", "inductive-bias"],
+  "terms": [
+    {"t": "韵律", "d": "说话的抑扬顿挫：音高的起伏、节奏、重音和停顿。"},
+    {"t": "P-LLM", "d": "Mega-TTS里专门续写韵律离散码的潜码语言模型。"}
+  ],
+  "aka": ["Mega-TTS", "MegaTTS", "Mega-TTS 2", "属性分解零样本TTS"],
+  "check": {
+    "source": "https://arxiv.org/abs/2306.03509",
+    "confirmed": "arXiv官方记录：标题Mega-TTS: Zero-Shot Text-to-Speech at Scale with Intrinsic Inductive Bias、Jiang等12位作者、v1提交2023-06-06；摘要中以往工作用编解码器latent加自回归或扩散的局限、语音分解为内容/音色/韵律/相位、用频谱而非编解码器latent、相位交给GAN声码器、音色用全局向量、VQGAN声学模型、韵律用潜码语言模型、2万小时多领域数据、零样本TTS/语音编辑/跨语言TTS超过SOTA。P-LLM名称、机构、Mega-TTS 2的沿用为一般了解。"
+  }
+}

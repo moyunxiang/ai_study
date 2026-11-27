@@ -1,0 +1,25 @@
+{
+ "id": "tflite-micro",
+ "who": "Robert David, Jared Duke, Advait Jain, Vijay Janapa Reddi, Nat Jeffries, Jian Li, Nick Kreeger, Ian Nappier et al. · Google, 哈佛大学",
+ "venue": "MLSys 2021",
+ "aka": ["TensorFlow Lite Micro", "TFLM", "TF Micro", "TinyML", "微控制器推理"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2010.08678"},
+  {"label": "GitHub", "url": "https://github.com/tensorflow/tflite-micro"}
+ ],
+ "problem": "微控制器的算力、内存和功耗比手机还低100到1000倍，往往只有几十到几百KB内存，没有操作系统、动态内存分配和虚拟内存，芯片型号又极其分散，手机上的推理框架放不进去也移植不动。",
+ "idea": "做一个解释器式的极简推理框架：模型照样用TensorFlow Lite的格式，运行时只链接用到的算子，所有内存在启动时从一块预先给定的数组里静态划分，厂商可以替换成针对自家芯片优化的算子内核。",
+ "impact": "成为TinyML（在微控制器上跑机器学习）的事实标准运行时之一，被大量嵌入式芯片厂商、MLPerf Tiny基准和教学课程采用。",
+ "method": "[[tflite]]面向手机，依赖操作系统、动态内存和较完整的C++标准库。微控制器上这些都可能没有：内存只有几十到几百KB，指令集、是否有浮点单元各不相同。为每种芯片做一个专门的代码生成器又会导致生态碎片化。\n\nTF Micro选择**解释器**而不是编译成固定代码：模型仍是TensorFlow Lite的FlatBuffer文件，运行时读取模型的计算图，逐个调用算子。为了适应嵌入式环境，它做了几项设计：只把模型实际用到的算子编译进固件，代码体积可以很小；不使用动态内存分配，应用预先提供一块“竞技场”数组，框架在初始化时根据各张量的生命周期在其中规划好位置并复用；算子接口统一，芯片厂商可以提供针对自家指令集的优化内核（如Arm的CMSIS-NN）来替换参考实现。模型通常配合8比特整数量化（[[integer-quant]]）使用。\n\n论文的评测展示其资源占用低、运行时额外开销很小；具体数字因硬件而异，此处不引用。",
+ "limits": [
+  {"text": "只负责运行时，模型本身要足够小才能放进几百KB内存，如何为微控制器设计和压缩网络需要另外解决（同期的MCUNet把网络结构与推理引擎联合设计）；解释器方式也比专门生成的代码多一些开销。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "tflite", "type": "extends", "note": "沿用TensorFlow Lite的模型格式与算子定义，把运行时缩到能在无操作系统的微控制器上运行。"},
+  {"to": "integer-quant", "type": "uses", "note": "部署时通常配合8比特整数量化，以适应没有浮点单元的芯片和极小的内存。"},
+  {"to": "mcunet", "type": "rivals", "note": "MCUNet的TinyEngine用代码生成而非解释器，并与网络结构联合设计；TF Micro优先可移植性。"}
+ ],
+ "prereq": ["training-vs-inference", "quantization-concept", "cpu-gpu", "memory-bandwidth"],
+ "terms": [{"t": "TinyML", "d": "在功耗只有毫瓦级、内存只有KB级的微控制器上运行机器学习模型的方向，例如语音唤醒词检测。"}],
+ "check": {"source": "https://arxiv.org/abs/2010.08678", "confirmed": "标题、作者（13位）、v1日期2020-10-17；摘要：嵌入式处理器与移动端相差100–1000倍、模型与框架必须在几KB内存中运行、生态碎片化、厂商常省去动态内存分配与虚拟内存、硬件指令集与FPU各异、提出开源的TF Micro、采用独特的解释器方式、评测显示资源需求低运行开销小。只编译用到的算子、竞技场内存规划、厂商替换内核、MLSys 2021为一般了解。"}
+}

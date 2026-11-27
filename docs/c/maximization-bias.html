@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>过估计与最大化偏差（Overestimation and Maximization Bias） · AI脉络</title>
+<meta name="description" content="对带噪声的估计取最大值，结果系统性地偏高。Q-learning的目标里有max，于是Q值普遍被高估；双Q学习把“选动作”和“评估动作”交给两个独立的估计来消除这种偏差。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/maximization-bias.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="过估计与最大化偏差（Overestimation and Maximization Bias）">
+<meta property="og:description" content="对带噪声的估计取最大值，结果系统性地偏高。Q-learning的目标里有max，于是Q值普遍被高估；双Q学习把“选动作”和“评估动作”交给两个独立的估计来消除这种偏差。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/maximization-bias.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/maximization-bias">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>过估计与最大化偏差</h1><div class="full">Overestimation and Maximization Bias</div>
+<p class="muted" style="font-size:13px">也叫：最大化偏差　maximization bias　过估计　高估　overestimation　overestimation bias　Q值高估　双Q学习　double Q-learning　clipped double Q　截断双Q　双Q</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/maximization-bias">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>对带噪声的估计取最大值，结果系统性地偏高。Q-learning的目标里有max，于是Q值普遍被高估；双Q学习把“选动作”和“评估动作”交给两个独立的估计来消除这种偏差。</b></p>
+<p class="tags">先要会：<a class="chip c" href="td-error.html">时序差分与自举</a> <a class="chip c" href="optimal-policy.html">最优策略与最优价值函数</a></p>
+<p>Q-learning的目标是<code>r + γ·max_{a&#x27;} Q(s&#x27;, a&#x27;)</code>。Q是估计出来的，每个动作的估计都有误差，有的偏高有的偏低。max总是挑最大的那个，也就更容易挑中<b>恰好被高估</b>的动作。即使每个估计本身都无偏，取max之后也是有偏的：</p><p class="formula"><code>E[max_a Q̂(a)] ≥ max_a E[Q̂(a)]</code></p><p>这就是<b>最大化偏差</b>。在强化学习里它还会被<a class="lc" href="../c/td-error.html">时序差分与自举</a>的自举一层层传播：高估的Q成为别人的目标，进一步抬高其他状态的估计。用神经网络近似时，任何拟合误差都扮演“噪声”的角色，所以<a class="ln" href="../n/dqn.html">DQN</a>在许多Atari游戏上的Q值明显高于实际回报。</p><p><b>双Q学习</b>。偏差来自用同一组估计既<b>选</b>最大动作又<b>评</b>它的值。<a class="ln" href="../n/double-q.html">Double Q-learning</a>维护两组独立的Q^A和Q^B，更新A时用A选动作、用B估值：</p><p class="formula"><code>y = r + γ · Q^B(s&#x27;, argmax_{a&#x27;} Q^A(s&#x27;, a&#x27;))</code></p><p>两组估计的噪声独立，B对A选中的动作不会系统性地偏高。<a class="ln" href="../n/double-dqn.html">Double DQN</a>把这一思想套用到DQN上，不新增网络：用在线网络选动作、用<a class="lc" href="../c/target-network.html">目标网络与软更新</a>估值，改动只有一行，却显著降低了高估并提高了分数。</p><p><b>连续动作中的版本</b>。Actor-Critic里策略会朝critic的梯度方向走，同样会钻高估的空子。<a class="ln" href="../n/td3.html">TD3</a>训练两个critic，目标取两者中较小的那个（clipped double Q），宁可略微低估；<a class="ln" href="../n/sac.html">SAC</a>也采用了这个做法；<a class="ln" href="../n/redq.html">REDQ随机集成双Q</a>用更多critic的随机子集取最小来进一步控制偏差。离线RL里这个问题更严重，因为无法通过交互纠正，见<a class="lc" href="../c/offline-pessimism.html">离线RL的悲观与保守</a>。</p>
+<div class="example"><h4>例子</h4><p>某状态有10个动作，真实价值都是0，估计值各带一个标准正态噪声。真实的max是0，但10个标准正态数的最大值期望约为1.54，于是目标被平均高估约1.54。若改用双Q：用一组估计选出最大者，再用另一组独立估计去看它，得到的值期望为0，偏差消失。</p></div>
+<h2>容易误解的地方</h2><ul><li>双Q学习不是没有偏差，而是倾向于略微低估；TD3取最小更是有意低估，低估过多也会让学习变慢。</li><li>高估本身不一定有害：如果所有动作被均匀高估，贪心策略不变。真正有害的是不均匀的高估把策略引向坏动作。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

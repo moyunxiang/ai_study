@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>资格迹与TD(λ)（Eligibility Traces and TD(λ)） · AI脉络</title>
+<meta name="description" content="TD(λ)用参数λ对所有n步回报做指数加权平均；资格迹是它的高效实现：给最近访问过的状态记一个逐步衰减的“功劳记号”，每个TD误差按记号大小分给它们。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/eligibility-trace.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="资格迹与TD(λ)（Eligibility Traces and TD(λ)）">
+<meta property="og:description" content="TD(λ)用参数λ对所有n步回报做指数加权平均；资格迹是它的高效实现：给最近访问过的状态记一个逐步衰减的“功劳记号”，每个TD误差按记号大小分给它们。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/eligibility-trace.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/eligibility-trace">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>资格迹与TD(λ)</h1><div class="full">Eligibility Traces and TD(λ)</div>
+<p class="muted" style="font-size:13px">也叫：资格迹　eligibility trace　eligibility traces　TD(λ)　TD lambda　TD-lambda　λ回报　λ-return　lambda return　前向视角　forward view　后向视角　backward view　累积迹　accumulating trace　替换迹　replacing trace　SARSA(λ)　Q(λ)　Watkins Q(λ)</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/eligibility-trace">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>TD(λ)用参数λ对所有n步回报做指数加权平均；资格迹是它的高效实现：给最近访问过的状态记一个逐步衰减的“功劳记号”，每个TD误差按记号大小分给它们。</b></p>
+<p class="tags">先要会：<a class="chip c" href="td-error.html">时序差分与自举</a> <a class="chip c" href="n-step-return.html">n步回报与多步TD</a></p>
+<p><a class="lc" href="../c/n-step-return.html">n步回报与多步TD</a>要选一个n，而最好的n因任务而异。TD(λ)的做法是不选：把所有n的回报都用上，按指数衰减加权。</p><p><b>λ回报（前向视角）</b>。</p><p class="formula"><code>G_t^λ = (1 − λ) · Σ_{n≥1} λ^{n−1} · G_t^(n)</code></p><p>权重<code>(1−λ)λ^{n−1}</code>加起来为1。λ=0时只剩1步回报，就是TD(0)；λ=1时（分幕任务里）就是蒙特卡洛回报。问题是这要看到未来很多步才能算，不能在线更新。</p><p><b>资格迹（后向视角）</b>。换个角度：每走一步，就把当前TD误差δ分给<b>过去</b>所有对它有贡献的状态，越近的分得越多。给每个状态维护一个迹e(s)：</p><p><code>e(s) ← γλ·e(s)</code>（所有状态先衰减），<code>e(s_t) ← e(s_t) + 1</code></p><p><code>δ_t = r_{t+1} + γV(s_{t+1}) − V(s_t)</code>，<code>V(s) ← V(s) + α·δ_t·e(s)</code>（对所有s）</p><p>这叫<b>累积迹</b>；若把<code>+1</code>改成直接设为1，叫<b>替换迹</b>，在状态反复出现时更稳定。可以证明，在离线更新（一个回合结束后才统一更新）时后向视角与前向λ回报完全等价；在线时两者略有差别，<a class="ln" href="../n/true-online-td.html">True Online TD(λ)</a>给出了精确等价的在线版本。用函数逼近时，迹记在参数上：<code>e ← γλe + ∇V(s_t)</code>。</p><p><b>来龙去脉</b>。“资格”一词来自Klopf的神经元假说，<a class="ln" href="../n/actor-critic-1983.html">Actor-Critic（ASE/ACE）</a>用资格迹解决倒立摆的信用分配，<a class="ln" href="../n/td-learning.html">时序差分学习</a>系统给出了TD(λ)，见<a class="lc" href="../c/credit-assignment.html">信用分配</a>。控制版本有SARSA(λ)；Watkins的Q(λ)在执行探索动作时把迹清零，因为之后的经验不再对应贪心策略，离策略情形下的系统处理见<a class="ln" href="../n/tree-backup.html">树备份与离策略资格迹</a>。深度RL里很少直接维护迹（与批量随机更新不兼容），但<a class="ln" href="../n/gae.html">广义优势估计GAE</a>把同样的λ加权用在优势估计上，是今天最常见的形式。</p>
+<div class="example"><h4>例子</h4><p>γ=1，λ=0.5，依次经过A、B、C，此前迹都为0。到达C时迹为：e(A)=0.5×0.5=0.25，e(B)=0.5，e(C)=1（C刚被访问）。此时出现δ=2，α=0.1，则V(C)加0.2，V(B)加0.1，V(A)加0.05：越早经过的状态分到的功劳越少。λ=0时只有C被更新，λ=1时三者各加0.2。</p></div>
+<h2>容易误解的地方</h2><ul><li>λ不是折扣：γ定义了目标（未来奖励值多少），λ只决定怎么估计这个目标，改λ不改变要学的价值函数。</li><li>离策略地使用资格迹而不做修正，会让迹把行为策略的探索动作也算进功劳里，导致偏差甚至发散。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SMPLify单图人体拟合（2016） · AI脉络</title>
+<meta name="description" content="从一张普通照片恢复人的三维姿态和体型极其困难：关节会动、有遮挡和衣服，从二维到三维本身又有歧义；当时的方法多半只估计三维关节点，或需要人工交互。 分两步走：先用现成的卷积网络（DeepCut）自下而上检测二维关节点，再自上而下把参数化人体模型拟合上去——优化SMPL的姿态和体型参数，让它的三维关节…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/smplify.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SMPLify单图人体拟合（2016）">
+<meta property="og:description" content="从一张普通照片恢复人的三维姿态和体型极其困难：关节会动、有遮挡和衣服，从二维到三维本身又有歧义；当时的方法多半只估计三维关节点，或需要人工交互。 分两步走：先用现成的卷积网络（DeepCut）自下而上检测二维关节点，再自上而下把参数化人体模型拟合上去——优化SMPL的姿态和体型参数，让它的三维关节…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/smplify.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/smplify">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 人脸与人体姿态</div>
+<h1>SMPLify单图人体拟合</h1>
+<div class="full">Keep it SMPL: Automatic Estimation of 3D Human Pose and Shape from a Single Image</div>
+<div class="meta"><span>2016.07</span><span>论文</span><span>延伸</span><span>ECCV 2016</span><span>Federica Bogo, Angjoo Kanazawa, Christoph Lassner, Peter Gehler, Javier Romero, Michael J. Black · 马普智能系统研究所 等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1607.08128" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://smplify.is.tue.mpg.de/" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/smplify">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>从一张普通照片恢复人的三维姿态和体型极其困难：关节会动、有遮挡和衣服，从二维到三维本身又有歧义；当时的方法多半只估计三维关节点，或需要人工交互。</p></div><div><h4>方法</h4><p>分两步走：先用现成的卷积网络（DeepCut）自下而上检测二维关节点，再自上而下把参数化人体模型<a class="ln" href="../n/smpl.html">SMPL人体模型</a>拟合上去——优化SMPL的姿态和体型参数，让它的三维关节投影到图上后与检测到的二维关节尽量重合，同时用先验防止不合理的姿势和身体自相穿插。</p></div><div><h4>影响</h4><p>SMPLify是第一个从单张无约束图像自动估计三维人体姿态和体型的方法（论文自述），“检测二维关键点＋拟合SMPL”的优化流程成为人体网格重建的标准工具，也被大量用来为图片生成伪三维标注。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>SMPL用约10个体型参数β和72个姿态参数θ（24个关节的旋转）生成一个6890个顶点的人体网格。SMPLify要找到β、θ以及相机平移，使下面的目标函数最小：</p><ul><li><b>关节项</b>：SMPL的三维关节经透视投影到图像后，与DeepCut检测到的二维关节之间的距离，用检测置信度加权，并用鲁棒的Geman-McClure函数降低错检的影响。</li><li><b>姿态先验</b>：用在动作捕捉数据上训练的高斯混合模型，惩罚不常见的姿态；另有一项专门惩罚肘部、膝盖的反向弯曲。</li><li><b>体型先验</b>：惩罚偏离平均体型太远的β。</li><li><b>防穿插项</b>：用一组胶囊体近似身体各部分，惩罚它们互相穿透（比如手穿进躯干）。</li></ul><p>优化分阶段进行：先估计相机平移和身体朝向，再逐步降低先验权重、细化姿态。由于SMPL从大量人体扫描中学到了体型之间的相关性，即使只有十几个二维关节，也能估计出合理的体型。</p><p>摘要称二维关节本身就携带了出乎意料多的体型信息，并在Leeds Sports、HumanEva和Human3.6M上取得了优于当时方法的姿态精度。</p><h2>后来的发展</h2><p><a class="ln" href="../n/hmr.html">HMR人体网格重建</a>把SMPLify的迭代优化换成一个直接回归SMPL参数的网络；SPIN等方法把回归和SMPLify优化放在一个循环里互相提供监督；SMPLify-X把模型扩展到包含手和脸的SMPL-X。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每张图都要做数十秒的迭代优化，对初始化敏感，容易陷入局部最优。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/hmr.html">HMR人体网格重建</a></div></li><li>只用稀疏的二维关节，体型估计依赖先验，难以反映真实体型和衣着。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/deeppose.html">DeepPose</a><span class="yr">2013.12 · 视觉</span><div class=nt>沿着卷积网络检测二维关节的路线，把二维检测结果抬升为完整的三维人体网格。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/smpl.html">SMPL人体模型</a><span class="yr">2015.11 · 视觉</span><div class=nt>以SMPL参数化人体模型为拟合对象，优化其姿态和体型参数。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/hmr.html">HMR人体网格重建</a><span class="yr">2017.12 · 视觉</span><div class=nt>每张图都要做数十秒的迭代优化，对初始化敏感，容易陷入局部最优。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/gaussian.html">高斯分布</a> <a class="chip c" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a></p>
+<h2>本篇术语</h2><ul><li><b>参数化人体模型</b>　用少量参数（体型和各关节旋转）就能生成完整三维人体网格的模型，如SMPL。</li><li><b>防穿插项</b>　惩罚身体不同部位在三维空间中互相穿透的损失项。</li></ul>
+<h2>怎么学</h2><p>先了解SMPL的参数含义和透视投影，再读SMPLify第3节目标函数的各项；用开源的SMPLify-X或PyTorch复现，把一张运动照片的二维关节拟合成网格，关掉防穿插项看会出什么问题。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1607.08128" rel="noopener">https://arxiv.org/abs/1607.08128</a>（arXiv记录：标题、六位作者、v1提交于2016-07-27；摘要中首个从单张无约束图像自动估计三维姿态和体型的方法、用DeepCut自下而上预测二维关节、自上而下拟合SMPL、最小化投影三维关节与检测二维关节误差、二维关节携带大量体型信息、利用三维模型防止穿插、在Leeds Sports、HumanEva、Human3.6M上优于当时方法。SMPL参数维度、各先验的具体形式、分阶段优化、ECCV 2016、SPIN与SMPLify-X等后续凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SMPLify%E5%8D%95%E5%9B%BE%E4%BA%BA%E4%BD%93%E6%8B%9F%E5%90%88%EF%BC%88smplify%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asmplify%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/smplify.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="dso.html"><small>本分支上一个 · 2016.07</small><b>DSO直接稀疏里程计</b></a><a class="r" href="densenet.html"><small>本分支下一个 · 2016.08</small><b>DenseNet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SERAC记忆式编辑（2022） · AI脉络</title>
+<meta name="description" content="ROME、MEND等方法直接改模型参数来更新知识，但很难准确把握一次编辑应该影响哪些输入：和编辑只沾点边的问题会被误改，编辑次数一多，模型往往整体失效。 不改基础模型的参数，把每条编辑以原文形式存进显式记忆；来了新输入时，先用一个分类器判断它是否落在某条编辑的范围内，在范围内就交给一个小的“反事实…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/serac.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SERAC记忆式编辑（2022）">
+<meta property="og:description" content="ROME、MEND等方法直接改模型参数来更新知识，但很难准确把握一次编辑应该影响哪些输入：和编辑只沾点边的问题会被误改，编辑次数一多，模型往往整体失效。 不改基础模型的参数，把每条编辑以原文形式存进显式记忆；来了新输入时，先用一个分类器判断它是否落在某条编辑的范围内，在范围内就交给一个小的“反事实…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/serac.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/serac">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 能力的机理</div>
+<h1>SERAC记忆式编辑</h1>
+<div class="full">Memory-Based Model Editing at Scale</div>
+<div class="meta"><span>2022.06</span><span>论文</span><span>延伸</span><span>ICML 2022</span><span>Eric Mitchell, Charles Lin, Antoine Bosselut, Christopher D. Manning, Chelsea Finn · 斯坦福大学、洛桑联邦理工学院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2206.06520" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://sites.google.com/view/serac-editing" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/serac">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>ROME、MEND等方法直接改模型参数来更新知识，但很难准确把握一次编辑应该影响哪些输入：和编辑只沾点边的问题会被误改，编辑次数一多，模型往往整体失效。</p></div><div><h4>方法</h4><p>不改基础模型的参数，把每条编辑以原文形式存进显式记忆；来了新输入时，先用一个分类器判断它是否落在某条编辑的范围内，在范围内就交给一个小的“反事实模型”结合该编辑作答，否则照常用基础模型。</p></div><div><h4>影响</h4><p>提出了与“定位并修改参数”并列的另一条知识编辑路线——把编辑放在模型外部的记忆里，并提供了问答、事实核查、对话三个更难的编辑评测，后续的检索式、上下文式编辑都把它作为代表。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/mend.html">MEND快速模型编辑</a>训练一个超网络，把编辑样本的梯度变换成参数更新；<a class="ln" href="../n/rome.html">ROME知识定位与编辑</a>定位存放事实的MLP层并做秩一修改。它们都把编辑“写进”参数，作者指出两个问题：一是<b>表达力不足</b>，难以准确建模一次编辑的作用范围（哪些输入应该受影响），对与编辑措辞不同但相关的问题，或者只是表面相似的无关问题，经常判断错；二是<b>连续编辑后失效</b>，编辑一多，模型行为崩坏。</p><p><b>SERAC的三个部件</b>：</p><ul><li><b>编辑记忆</b>：所有编辑（例如“英国首相是X”）以文本形式原样存储，不做任何参数修改；</li><li><b>范围分类器</b>：输入x到来时，估计它与记忆中每条编辑e的相关概率 <code>p(in-scope | x, e)</code>，取最相关的一条，若超过阈值就认为x落在该编辑范围内；</li><li><b>反事实模型</b>：一个较小的序列模型，以（编辑e，输入x）为输入，给出“假如e为真，x的答案是什么”。</li></ul><p>若x不在任何编辑范围内，就直接用原基础模型的输出，因此基础模型在无关输入上的行为完全不变。范围分类器和反事实模型都用编辑数据单独训练，基础模型可以当作黑盒。</p><p><b>评测</b>：作者构造了问答、事实核查和对话生成三类更难的编辑问题，包括措辞改写过的相关输入和容易混淆的“难负例”。摘要报告：只有SERAC在三个问题上都表现良好，持续以明显优势超过已有的编辑方法。</p><h2>后来的发展</h2><p>SERAC代表的“外部记忆+路由”思路后来在GRACE、WISE、MeLLo和基于上下文的编辑中延续，与ROME/MEMIT一系的参数编辑形成两大路线。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要额外训练范围分类器和反事实模型，推理时每个输入都要与记忆中的编辑比对，编辑越多开销越大。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>编辑只在分类器判定的范围内生效，基础模型本身的知识没有改变，涉及多跳推理时更新难以传播。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:336" href="../n/rag.html">检索增强生成RAG</a><span class="yr">2020.05 · 推理·智能体</span><div class=nt>借用检索增强的思路，从编辑记忆中找出与输入相关的编辑再条件化生成。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/t5.html">T5</a><span class="yr">2019.10 · LLM</span><div class=nt>反事实模型等部件使用较小的预训练序列模型实现。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/rome.html">ROME知识定位与编辑</a><span class="yr">2022.02 · LLM</span><div class=nt>ROME定位并修改存储事实的权重，SERAC完全不改权重，走检索加反事实模型的半参数化路线。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/mend.html">MEND快速模型编辑</a><span class="yr">2021.10 · LLM</span><div class=nt>MEND等参数编辑难以把握编辑范围、多次编辑后失效，SERAC把编辑放在外部记忆中，不改基础模型参数。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/retrieval.html">检索与向量数据库</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/classification-metrics.html">准确率、精确率、召回率与F1</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/embedding.html">嵌入向量</a></p>
+<h2>本篇术语</h2><ul><li><b>编辑范围</b>　一次知识编辑应该影响的所有输入，包括同一事实的不同问法和它的直接推论，但不包括无关的问题。</li><li><b>反事实模型</b>　接收一条编辑和一个输入，回答“假如这条编辑为真，这个输入的答案是什么”的小模型。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/mend.html">MEND快速模型编辑</a>和<a class="ln" href="../n/rome.html">ROME知识定位与编辑</a>了解参数编辑；读本文第3节三部件的结构和第5节三类编辑问题上的对比；动手：用一个句向量模型和一个小seq2seq模型搭一个简化版SERAC，存入几条编辑，测试相关问法和无关问题的输出。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2206.06520" rel="noopener">https://arxiv.org/abs/2206.06520</a>（标题、5位作者、arXiv首次提交2022-06-13；摘要中现有编辑器表达力不足、难以建模编辑范围、多次编辑后失效、SERAC把编辑存入显式记忆并学习在其上推理以调节基础模型预测、提出基于问答、事实核查和对话生成的三个编辑问题、只有SERAC在三者上都表现好并显著超过已有方法。范围分类器与反事实模型的细节、T5实现、ICML 2022与机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SERAC%E8%AE%B0%E5%BF%86%E5%BC%8F%E7%BC%96%E8%BE%91%EF%BC%88serac%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aserac%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/serac.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="emergent-abilities.html"><small>本分支上一个 · 2022.06</small><b>涌现能力</b></a><a class="r" href="lm-know-what-they-know.html"><small>本分支下一个 · 2022.07</small><b>模型知道自己知道什么</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

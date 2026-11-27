@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>NFNet无归一化网络（2021） · AI脉络</title>
+<meta name="description" content="依赖批大小、让样本之间相互影响，带来许多麻烦；等工作已能不用归一化训练深层ResNet，但精度比不上最好的BN网络，而且在大学习率或强数据增强下容易不稳定。 提出自适应梯度裁剪（AGC）：按“梯度范数与参数范数之比”逐单元裁剪梯度，压住无归一化网络在大学习率下的不稳定；再配合缩放权重标准化和精心设…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/nfnet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="NFNet无归一化网络（2021）">
+<meta property="og:description" content="依赖批大小、让样本之间相互影响，带来许多麻烦；等工作已能不用归一化训练深层ResNet，但精度比不上最好的BN网络，而且在大学习率或强数据增强下容易不稳定。 提出自适应梯度裁剪（AGC）：按“梯度范数与参数范数之比”逐单元裁剪梯度，压住无归一化网络在大学习率下的不稳定；再配合缩放权重标准化和精心设…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/nfnet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/nfnet">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 深层训练配方</div>
+<h1>NFNet无归一化网络</h1>
+<div class="full">High-Performance Large-Scale Image Recognition Without Normalization</div>
+<div class="meta"><span>2021.02</span><span>论文</span><span>延伸</span><span>ICML 2021</span><span>Andrew Brock, Soham De, Samuel L. Smith, Karen Simonyan · DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2102.06171" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/deepmind/deepmind-research/tree/master/nfnets" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/nfnet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p><a class="ln" href="../n/batchnorm.html">Batch Normalization</a>依赖批大小、让样本之间相互影响，带来许多麻烦；<a class="ln" href="../n/fixup.html">Fixup无归一化初始化</a>等工作已能不用归一化训练深层ResNet，但精度比不上最好的BN网络，而且在大学习率或强数据增强下容易不稳定。</p></div><div><h4>方法</h4><p>提出自适应梯度裁剪（AGC）：按“梯度范数与参数范数之比”逐单元裁剪梯度，压住无归一化网络在大学习率下的不稳定；再配合缩放权重标准化和精心设计的结构，得到一族无归一化的NFNet。</p></div><div><h4>影响</h4><p>首次让无归一化的图像分类网络在ImageNet上达到当时最好精度、且训练快于EfficientNet，有力回应了“没有BN就训不好”的看法；AGC也被后来的一些大模型训练当作稳定化手段借鉴。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>去掉BN后，残差网络的激活尺度会随深度增长。作者沿用同组此前的做法：每个残差分支写成 <code>h_{i+1} = h_i + α·f_i(h_i/β_i)</code>，β_i是按理论推算的输入标准差，α是控制残差累加速度的小常数，并对卷积权重做缩放的<a class="ln" href="../n/weight-standardization.html">权重标准化WS</a>，使各层激活在初始化时保持合适的尺度。</p><p>仅靠这些，网络在大批量、大学习率和强数据增强下仍会发散。核心改进是<b>AGC</b>：对每个输出单元，计算梯度范数与对应权重范数之比 <code>‖G_i‖/‖W_i‖</code>，超过阈值λ就把梯度按比例缩小。它的直觉是：一步更新不应该把权重改变超过其自身大小的一定比例。与<a class="ln" href="../n/grad-clipping.html">梯度裁剪</a>按全局梯度范数裁剪不同，AGC是逐单元、相对于参数大小的。</p><p>摘要报告：较小的NFNet与EfficientNet-B7在ImageNet上测试精度相当，而训练快最多8.7倍；最大的模型达到86.5%的top-1精度，创当时新高；在3亿张有标注图像上预训练后再在ImageNet上微调时，NFNet明显好于带BN的对应模型，最好达到89.2%。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要按网络结构推算缩放常数，并额外调AGC阈值，换一种结构就要重新推导；训练稳定性依赖强正则化和精心的超参数组合。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/batchnorm.html">Batch Normalization</a><span class="yr">2015.02 · 基础</span><div class=nt>完全去掉BN，并在ImageNet精度上反超带BN的同类网络。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/grad-clipping.html">梯度裁剪</a><span class="yr">2012.11 · 基础</span><div class=nt>把按全局范数裁剪梯度改为按每个单元的梯度与参数范数之比自适应裁剪。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/fixup.html">Fixup无归一化初始化</a><span class="yr">2019.01 · 基础</span><div class=nt>此前的无归一化ResNet精度不及最好的BN网络、大学习率下不稳定；NFNet用AGC解决了不稳定并追上精度。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/weight-standardization.html">权重标准化WS</a><span class="yr">2019.03 · 基础</span><div class=nt>采用缩放后的权重标准化来控制无归一化网络的激活尺度。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:216" href="../n/efficientnet.html">EfficientNet</a><span class="yr">2019.05 · 视觉</span><div class=nt>以EfficientNet-B7为主要对手，在同等精度下训练快得多。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/residual-connection.html">残差连接</a> <a class="chip c" href="../c/gradient-clipping.html">梯度裁剪</a> <a class="chip c" href="../c/initialization.html">参数初始化</a> <a class="chip c" href="../c/norm.html">范数与距离</a></p>
+<h2>本篇术语</h2><ul><li><b>自适应梯度裁剪</b>　按每个单元“梯度大小相对于权重大小”的比例来决定是否裁剪，权重越小允许的更新越小。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/fixup.html">Fixup无归一化初始化</a>和<a class="ln" href="../n/grad-clipping.html">梯度裁剪</a>；读论文第3节AGC的定义与消融；在一个去掉BN的ResNet上分别用全局梯度裁剪与AGC训练，用较大学习率观察哪个不发散。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2102.06171" rel="noopener">https://arxiv.org/abs/2102.06171</a>（标题、4位作者、arXiv v1提交于2021-02-11；摘要中BN的批依赖问题、已有无归一化ResNet精度不及BN网络且在大学习率或强增强下不稳定、提出自适应梯度裁剪、改进的Normalizer-Free ResNets、小模型与EfficientNet-B7精度相当训练快最多8.7倍、最大模型top-1 86.5%、3亿张图预训练后微调最好89.2%。残差缩放公式与AGC的具体形式、ICML 2021来自一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20NFNet%E6%97%A0%E5%BD%92%E4%B8%80%E5%8C%96%E7%BD%91%E7%BB%9C%EF%BC%88nfnet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Anfnet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/nfnet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="causal-representation.html"><small>本分支上一个 · 2021.02</small><b>因果表示学习</b></a><a class="r" href="edge-of-stability.html"><small>本分支下一个 · 2021.03</small><b>稳定性边缘</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

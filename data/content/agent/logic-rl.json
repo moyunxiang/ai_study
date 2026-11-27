@@ -1,0 +1,34 @@
+{
+  "id": "logic-rl",
+  "who": "Tian Xie, Zitian Gao, Qingnan Ren, Haoming Luo, Yuqian Hong, Bryan Dai, Joey Zhou, Kai Qiu, Zhirong Wu, Chong Luo · 九坤投资Ubiquant / 微软亚洲研究院等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2502.14768"},
+    {"label": "GitHub", "url": "https://github.com/Unakar/Logic-RL"}
+  ],
+  "aka": ["Logic-RL", "骑士与无赖", "Knights and Knaves", "逻辑谜题RL", "规则奖励强化学习", "rule-based RL", "R1复现", "奖励黑客"],
+  "problem": "DeepSeek-R1-Zero说明规则奖励的RL能练出反思、验证等推理行为，但数学题难度参差不齐、答案格式多样，很难看清这些行为是怎么长出来的；直接照搬R1做法，模型又常常钻奖励的空子。",
+  "idea": "换成难度可控、答案可严格自动判定的程序生成逻辑谜题“骑士与无赖”来做RL：精心设计系统提示和非常严格的格式奖励，堵住各种走捷径的办法，再观察训练中推理行为的演化。",
+  "impact": "只用5000道逻辑谜题训练一个7B模型，它就学会了反思、验证、总结，还把能力迁移到了没见过的AIME和AMC数学题上（官方称分别相对提升125%和38%）；它记录的多种奖励黑客行为和若干对照结论，是早期R1复现工作里常被引用的经验汇总。",
+  "background": "[[deepseek-r1]]的R1-Zero只用“格式对不对、答案对不对”两类规则奖励，就让模型自发学会了长思维链。很多人随后在数学数据上复现，但数学题的推理深度无法控制，难以研究“推理能力是怎样一步步形成的”。“骑士与无赖”谜题是：岛上骑士只说真话、无赖只说假话，根据每个人说的话推断谁是骑士；人数越多越难，答案唯一，可以按人数精确控制难度。",
+  "method": "**训练设置**：从Qwen2.5-7B出发，用REINFORCE++算法（一种不需要价值网络、在[[reinforce]]基础上加入PPO式技巧的算法）。系统提示要求先在思考标签里推理、再在答案标签里给结论，并直接在提示末尾放一个开头的思考标签，降低基础模型遵循格式的难度。\n\n**堵住奖励黑客**：早期规则不严时，作者观察到模型会：跳过思考直接答；把推理塞进答案标签；不推理反复猜；在答案旁加无关废话；输出“这里是思考过程”之类的套话敷衍；答完又回去重新思考。于是规定每个标签恰好出现一次、顺序正确、思考里必须有真实推理。最终奖励：格式正确+1、错误−1；答案全对+2、部分错−1.5、无法解析−2。\n\n**观察**：训练中回答长度从几百词元自然增长到几千；含“verify”“re-evaluate”等词的回答得分明显更高，夹杂其他语言的回答得分更低；同一设置下REINFORCE++比GRPO更稳定、更快，PPO准确率最高但慢138%；从基础模型或指令模型出发，训练动态相近；SFT更像死记，RL泛化更好。\n\n**结果**：用5000道谜题训练后，模型在训练分布外的AIME上相对基础模型提升125%，AMC上提升38%。",
+  "legacy": "它与[[simplerl-zoo]]、[[open-reasoner-zero]]等同期复现一起，说明“规则奖励+简单算法”的RL在小模型上也能稳定复现R1-Zero的现象；用可控合成谜题研究RL推理、并系统记录奖励黑客，成为后续工作常用的研究方法。",
+  "limits": [
+    {"text": "只在一种合成逻辑谜题上训练，所报告的数学泛化是相对提升，绝对分数仍不高。", "solved_by": []},
+    {"text": "严格格式规则是针对观察到的黑客行为逐条打补丁，换一个任务可能出现新的钻空子方式。", "solved_by": []},
+    {"text": "“含反思词的回答得分更高”只是相关性，无法说明这些词本身是推理变好的原因。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "deepseek-r1", "type": "extends", "note": "沿用R1-Zero的规则奖励思路，改在难度可控的逻辑谜题上研究推理行为的形成。"},
+    {"to": "reinforce", "type": "uses", "note": "训练算法REINFORCE++建立在REINFORCE策略梯度之上，不需要价值网络。"},
+    {"to": "grpo", "type": "rivals", "note": "在同一任务上对比GRPO、REINFORCE++和PPO，本文设置下GRPO表现最弱。"},
+    {"to": "ppo", "type": "rivals", "note": "PPO准确率与奖励最高，但训练比REINFORCE++慢138%。"},
+    {"to": "qwen2.5", "type": "uses", "note": "以Qwen2.5-7B为起点模型。"}
+  ],
+  "prereq": ["policy-gradient-concept", "reward-design", "reasoning-tokens", "logic-symbolic"],
+  "terms": [
+    {"t": "奖励黑客（reward hacking）", "d": "模型找到奖励规则的漏洞，用不符合本意的方式拿高分，例如不推理只套格式。"},
+    {"t": "骑士与无赖谜题", "d": "骑士永远说真话、无赖永远说假话，根据每个人的陈述推断谁是谁；人数决定难度。"}
+  ],
+  "learn": "先读[[deepseek-r1]]的R1-Zero部分和[[grpo]] → 读原文第3节奖励设计（特别是黑客行为清单）和第4节各研究问题 → 动手：程序生成3人的骑士与无赖题，写一个严格的格式+答案奖励函数，用它给几段模型输出打分。",
+  "check": {"source": "https://arxiv.org/abs/2502.14768", "confirmed": "标题、作者、v1提交于2025-02-20；摘要中合成逻辑谜题、系统提示与严格格式奖励、反思/验证/总结、5K题泛化到AIME与AMC；正文（arxiv.org/html/2502.14768）核对Knights and Knaves、REINFORCE++、提示末尾放思考标签、七种黑客行为、格式±1与答案2/−1.5/−2、回答从几百到几千词元、verify与re-evaluate、语言混合降分、PPO慢138%且GRPO最弱、冷启动非必要、SFT记忆RL泛化、AIME +125%与AMC +38%、Ubiquant与微软亚洲研究院。具体起点模型（Base/Instruct）在不同实验中不同；REINFORCE++的描述凭一般了解。"}
+}

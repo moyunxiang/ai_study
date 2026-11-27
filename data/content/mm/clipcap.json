@@ -1,0 +1,30 @@
+{
+  "id": "clipcap",
+  "aka": ["ClipCap", "CLIP前缀描述", "CLIP prefix captioning", "CLIP_prefix_caption"],
+  "who": "Ron Mokady, Amir Hertz, Amit H. Bermano · 特拉维夫大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2111.09734"},
+    {"label": "代码", "url": "https://github.com/rmokady/CLIP_prefix_caption"}
+  ],
+  "problem": "图像描述模型通常要在大规模图文数据上做专门的视觉语言预训练，或依赖目标检测特征，训练重、流程复杂。",
+  "idea": "把CLIP的图像嵌入经过一个小映射网络变成一串“前缀”向量，接在GPT-2的输入前面，让语言模型接着写出描述；甚至可以冻结CLIP和GPT-2，只训练映射网络。",
+  "impact": "在Conceptual Captions和nocaps上与当时最好方法相当，却更简单、更快、更轻；“冻结视觉编码器+冻结语言模型+只训一个映射层”的做法预示了后来多模态大模型的标准接法。",
+  "method": "此前的强描述模型，如[[bottom-up-top-down]]、[[oscar]]，要么依赖离线检测器提的区域特征，要么在大量图文对上做专门预训练。ClipCap的出发点是：[[clip]]的图像嵌入本身就是和文字一起训练出来的，语义很丰富；[[gpt-2]]本身就会写流畅的句子。把两者接上，可能只需要很少的训练。\n\n做法：CLIP图像编码器把一张图压成一个向量，再用一个**映射网络**把它变成k个与GPT-2词嵌入同维度的向量，作为“前缀”放在句子前面（思路与[[prefix-tuning]]的连续前缀相同）。之后GPT-2按普通的语言建模方式，根据前缀逐词生成描述，用描述的交叉熵训练。\n\n论文给了两种版本：映射网络用MLP，同时微调GPT-2；或者映射网络用Transformer，CLIP与GPT-2都**冻结**、只训映射网络。后者可训练参数少得多，效果依然不错。两者都不需要额外标注或预训练，在Conceptual Captions和nocaps上达到与最好方法相当的结果。",
+  "limits": [
+    {"text": "整张图只压成一个CLIP向量，细节和空间位置信息丢失较多，描述往往笼统，回答不了需要局部细节的问题。", "solved_by": ["blip-2", "llava"]},
+    {"text": "只会生成描述，不能按指令回答问题或进行对话。", "solved_by": ["llava", "instructblip"]}
+  ],
+  "relations": [
+    {"to": "clip", "type": "uses", "note": "用CLIP图像嵌入作为唯一的视觉输入。"},
+    {"to": "gpt-2", "type": "uses", "note": "以GPT-2为描述生成器，前缀向量接在其输入前面。"},
+    {"to": "prefix-tuning", "type": "extends", "note": "借用连续前缀向量引导冻结语言模型的思路，把前缀改为由图像嵌入映射而来。"},
+    {"to": "bottom-up-top-down", "type": "rivals", "note": "不用检测器区域特征和专门预训练，只靠CLIP加GPT-2就达到相当效果。"},
+    {"to": "cc3m", "type": "uses", "note": "在Conceptual Captions上训练和评测。"}
+  ],
+  "prereq": ["embedding", "language-model", "autoregressive", "transfer-learning", "mlp"],
+  "terms": [
+    {"t": "前缀（prefix）", "d": "放在语言模型输入最前面的一串连续向量，它们不对应任何真实词，但能引导模型接下来生成什么内容。"}
+  ],
+  "learn": "先读[[clip]]和[[prefix-tuning]]的讲解，再读ClipCap论文第3节的两种映射网络，用开源代码在COCO上训练一个只训映射层的版本，比较生成的描述。",
+  "check": {"source": "https://arxiv.org/abs/2111.09734", "confirmed": "标题、三位作者、v1提交2021-11-18；摘要：CLIP编码作为描述的前缀、简单映射网络、微调GPT-2、冻结CLIP与LM只训映射网络也有效、无需额外标注或预训练、在Conceptual Captions和nocaps上与最好方法相当且更简单更快更轻。MLP与Transformer两种映射网络的对应关系、机构为一般了解。"}
+}

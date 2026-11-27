@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Cal-QL校准离线预训练（2023） · AI脉络</title>
+<meta name="description" content="先离线预训练、再在线微调本是离线RL最有用的场景，但CQL这类保守方法一转到在线，回报往往先大幅下跌，要很久才恢复。 指出原因是保守的Q值被压得比真实尺度低太多，在线数据一来就要先“纠偏”；于是要求离线学到的Q值既是策略真实价值的下界、又不低于某个参考策略（如行为策略）的价值，这叫校准。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/cal-ql.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Cal-QL校准离线预训练（2023）">
+<meta property="og:description" content="先离线预训练、再在线微调本是离线RL最有用的场景，但CQL这类保守方法一转到在线，回报往往先大幅下跌，要很久才恢复。 指出原因是保守的Q值被压得比真实尺度低太多，在线数据一来就要先“纠偏”；于是要求离线学到的Q值既是策略真实价值的下界、又不低于某个参考策略（如行为策略）的价值，这叫校准。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/cal-ql.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/cal-ql">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 离线RL与序列建模</div>
+<h1>Cal-QL校准离线预训练</h1>
+<div class="full">Cal-QL: Calibrated Offline RL Pre-Training for Efficient Online Fine-Tuning</div>
+<div class="meta"><span>2023.03</span><span>论文</span><span>延伸</span><span>NeurIPS 2023</span><span>Mitsuhiko Nakamoto, Yuexiang Zhai, Anikait Singh, Max Sobol Mark, Yi Ma, Chelsea Finn, Aviral Kumar, Sergey Levine · UC Berkeley / Stanford</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2303.05479" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://nakamotoo.github.io/Cal-QL" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/cal-ql">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>先离线预训练、再在线微调本是离线RL最有用的场景，但CQL这类保守方法一转到在线，回报往往先大幅下跌，要很久才恢复。</p></div><div><h4>方法</h4><p>指出原因是保守的Q值被压得比真实尺度低太多，在线数据一来就要先“纠偏”；于是要求离线学到的Q值既是策略真实价值的下界、又不低于某个参考策略（如行为策略）的价值，这叫校准。</p></div><div><h4>影响</h4><p>成为离线转在线微调的标准基线之一，在CQL上只改一行代码；CORL、后来的WSRL等工作都拿它对比。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/cql.html">离线强化学习CQL</a>在离线时把分布外动作的Q值往下压，得到一个保守的下界。问题是这个下界可能低得离谱：Q值的尺度和真实回报差很多。一开始在线微调，新收集的数据给出的回报远高于这些Q值，策略就会被误导去尝试一些看起来“没那么差”的动作，表现先跌一大截，这就是论文说的初期“遗忘”。</p><p>Cal-QL的办法是让Q值“校准”：学到的Q值应满足 <code>V_ref(s) ≤ Q_θ(s, π(s)) ≤ V_π(s)</code> 的意义上，不高于学到的策略的真实价值，同时不低于某个参考策略的价值。实现上，参考策略取行为策略，用数据里蒙特卡洛回报估计它的价值 <code>V_μ</code>；在CQL把分布外动作Q值往下压的那一项里，把被压的Q值和 <code>V_μ</code> 取较大值：<code>max(Q_θ(s, a), V_μ(s))</code>。这样Q值不会被压到行为策略价值之下。论文称这只是在CQL上改一行代码。</p><p>摘要称Cal-QL在所研究的11个微调基准任务中的9个上超过当时最好的方法。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要数据里的完整轨迹来算蒙特卡洛回报作为参考值，数据是零散转移或回报很稀疏时参考值不好估。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>仍沿用CQL的保守正则，在线阶段也要保留并回放离线数据，微调时的计算和存储开销不小。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/wsrl.html">WSRL热启动在线微调</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/iql.html">隐式Q学习IQL</a><span class="yr">2021.10 · RL</span><div class=nt>IQL也常用于离线转在线，论文把它作为主要对比基线之一。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/d4rl.html">D4RL离线RL基准</a><span class="yr">2020.04 · RL</span><div class=nt>在D4RL的AntMaze、Adroit、Kitchen等任务上做离线转在线评测。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/cql.html">离线强化学习CQL</a><span class="yr">2020.06 · RL</span><div class=nt>在CQL的保守正则上加一个下限，只改一行代码。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/awac.html">AWAC优势加权</a><span class="yr">2020.06 · RL</span><div class=nt>AWAC用优势加权回归做离线转在线；Cal-QL保留CQL式保守价值但修正其尺度。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/v-gps.html">V-GPS</a><span class="yr">2024.10 · 具身·世界模型</span><div class=nt>用Cal-QL在离线数据上训练语言条件Q函数。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/wsrl.html">WSRL热启动在线微调</a><span class="yr">2024.12 · RL</span><div class=nt>Cal-QL微调时仍要保留离线数据和保守正则；WSRL用热身替代，完全丢掉离线数据。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/pa-rl.html">PA-RL</a><span class="yr">2024.12 · 具身·世界模型</span><div class=nt>以Cal-QL作为评论家训练算法，并用优化后的动作计算TD目标。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/co-rft.html">CO-RFT</a><span class="yr">2025.08 · 具身·世界模型</span><div class=nt>把Cal-QL的保守正则扩展到动作块级别的评论家上。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/offline-rl.html">离线强化学习</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/monte-carlo.html">蒙特卡洛采样</a> <a class="chip c" href="../c/distribution-shift.html">分布偏移</a></p>
+<h2>本篇术语</h2><ul><li><b>校准（calibration）</b>　这里指Q值的尺度合理：不高于当前策略的真实价值，也不低于参考策略的价值。</li><li><b>离线转在线微调</b>　先用固定数据集训练，再让策略与环境交互继续学习。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/cql.html">离线强化学习CQL</a>；读Cal-QL原文第4节看在线初期的“遗忘”现象和校准的定义；在CORL里对比CQL与Cal-QL在antmaze上的微调曲线。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2303.05479" rel="noopener">https://arxiv.org/abs/2303.05479</a>（标题、八位作者、arXiv v1于2023-03-09；摘要中现有离线方法微调表现差、保守且校准的价值初始化、校准的定义（策略价值下界与参考策略价值上界）、参考策略可取行为策略、在CQL上一行代码、11个微调任务中9个最好。max(Q, V_μ)的实现形式按原文正文通行描述；NeurIPS 2023按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Cal-QL%E6%A0%A1%E5%87%86%E7%A6%BB%E7%BA%BF%E9%A2%84%E8%AE%AD%E7%BB%83%EF%BC%88cal-ql%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acal-ql%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/cal-ql.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="redo.html"><small>本分支上一个 · 2023.02</small><b>休眠神经元与ReDo</b></a><a class="r" href="ivr.html"><small>本分支下一个 · 2023.03</small><b>IVR隐式价值正则（SQL/EQL）</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

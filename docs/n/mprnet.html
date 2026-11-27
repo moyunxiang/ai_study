@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MPRNet多阶段复原（2021） · AI脉络</title>
+<meta name="description" content="图像复原既要大范围的上下文（判断哪里是雨痕、哪里是模糊）又要像素级的细节；编码器-解码器擅长前者但下采样丢细节，全分辨率网络保细节但看不远，单阶段网络很难兼顾。 把复原拆成三个阶段逐步完成：前两个阶段用编码器-解码器学上下文，最后一个阶段在原始分辨率上保细节；阶段之间用“监督注意力模块”传递信息，…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/mprnet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MPRNet多阶段复原（2021）">
+<meta property="og:description" content="图像复原既要大范围的上下文（判断哪里是雨痕、哪里是模糊）又要像素级的细节；编码器-解码器擅长前者但下采样丢细节，全分辨率网络保细节但看不远，单阶段网络很难兼顾。 把复原拆成三个阶段逐步完成：前两个阶段用编码器-解码器学上下文，最后一个阶段在原始分辨率上保细节；阶段之间用“监督注意力模块”传递信息，…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/mprnet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/mprnet">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 图像复原</div>
+<h1>MPRNet多阶段复原</h1>
+<div class="full">Multi-Stage Progressive Image Restoration</div>
+<div class="meta"><span>2021.02</span><span>论文</span><span>延伸</span><span>CVPR 2021</span><span>Syed Waqas Zamir, Aditya Arora, Salman Khan, Munawar Hayat, Fahad Shahbaz Khan, Ming-Hsuan Yang, Ling Shao · 起源人工智能研究院 / MBZUAI / 加州大学默塞德分校</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2102.02808" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/swz30/MPRNet" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/mprnet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>图像复原既要大范围的上下文（判断哪里是雨痕、哪里是模糊）又要像素级的细节；编码器-解码器擅长前者但下采样丢细节，全分辨率网络保细节但看不远，单阶段网络很难兼顾。</p></div><div><h4>方法</h4><p>把复原拆成三个阶段逐步完成：前两个阶段用编码器-解码器学上下文，最后一个阶段在原始分辨率上保细节；阶段之间用“监督注意力模块”传递信息，每个阶段都输出一张图并接受监督，还加了跨阶段的横向特征连接防止信息丢失。</p></div><div><h4>影响</h4><p>在去雨、去模糊、去噪的十个数据集上取得当时最好或很强的结果，是2021年图像复原的主要基线之一；同一作者团队随后提出<a class="ln" href="../n/restormer.html">Restormer复原Transformer</a>。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>MPRNet把输入图像在第一阶段切成4块、第二阶段切成2块、第三阶段用整张图，逐步扩大处理范围：</p><ul><li><b>阶段1、2</b>：U形编码器-解码器，提取多尺度上下文特征；</li><li><b>阶段3</b>：不做下采样的原分辨率子网络（由带通道注意力的残差块组成），专门恢复细节；</li><li><b>监督注意力模块（SAM）</b>：每个阶段末尾先预测一张复原图，用真值监督；再用这张图算出逐像素的注意力图，去重新加权本阶段的特征后传给下一阶段，相当于告诉后面“哪些地方已经修好、哪些还需要处理”；</li><li><b>跨阶段特征融合</b>：前一阶段编码器和解码器的特征也直接横向送入后一阶段，信息不只沿“输出图”这一条路传递。</li></ul><p>摘要称这种紧密互连的多阶段结构在去雨、去模糊和去噪的十个数据集上带来明显提升。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>三阶段结构加大量注意力模块，参数和计算量大，高分辨率图像上推理慢。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/nafnet.html">NAFNet</a></div></li><li>基于卷积，感受野仍有限，难以建模整张图的长距离依赖。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/uformer.html">Uformer复原Transformer</a> <a class="chip hue" style="--h:216" href="../n/restormer.html">Restormer复原Transformer</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/unet.html">U-Net</a><span class="yr">2015.05 · 视觉</span><div class=nt>前两个阶段采用U形编码器-解码器来获取多尺度上下文。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/dncnn.html">DnCNN去噪</a><span class="yr">2016.08 · 视觉</span><div class=nt>从单任务的单阶段去噪网络推进到一个架构同时覆盖去雨、去模糊、去噪的多阶段设计。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/deblurgan.html">DeblurGAN对抗去模糊</a><span class="yr">2017.11 · 视觉</span><div class=nt>DeblurGAN靠对抗损失追求视觉效果，保真度指标偏低；MPRNet用多阶段监督在PSNR上明显提升。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/rcan.html">RCAN通道注意力超分</a><span class="yr">2018.07 · 视觉</span><div class=nt>原分辨率阶段由带通道注意力的残差块构成，沿用RCAN式通道注意力。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/uformer.html">Uformer复原Transformer</a><span class="yr">2021.06 · 视觉</span><div class=nt>MPRNet等卷积复原网络感受野有限；Uformer用窗口注意力加U形层级扩大有效感受野。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/restormer.html">Restormer复原Transformer</a><span class="yr">2021.11 · 视觉</span><div class=nt>基于卷积，感受野仍有限，难以建模整张图的长距离依赖。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/nafnet.html">NAFNet</a><span class="yr">2022.04 · 视觉</span><div class=nt>三阶段结构加大量注意力模块，参数和计算量大，高分辨率图像上推理慢。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/image-tensor.html">图像作为张量</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a> <a class="chip c" href="../c/attention-concept.html">注意力机制</a></p>
+<h2>本篇术语</h2><ul><li><b>多阶段复原</b>　把一次难的复原拆成几次较易的复原，每一阶段在上一阶段的结果上继续修。</li></ul>
+<h2>怎么学</h2><p>先看U-Net和RCAN的结构，再读本文第3节的三阶段框图和SAM模块；在GoPro去模糊数据上跑预训练模型，分别取出三个阶段的中间输出比较。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2102.02808" rel="noopener">https://arxiv.org/abs/2102.02808</a>（arXiv记录：标题、七位作者、v1提交于2021-02-04；摘要中的多阶段渐进复原、先编码器-解码器学上下文再结合保留局部信息的高分辨率分支、逐像素自适应的监督注意力、阶段间顺序与横向信息交换、去雨/去模糊/去噪十个数据集。CVPR 2021、机构、4/2/1切块方式、通道注意力残差块凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MPRNet%E5%A4%9A%E9%98%B6%E6%AE%B5%E5%A4%8D%E5%8E%9F%EF%BC%88mprnet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amprnet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/mprnet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="pvt.html"><small>本分支上一个 · 2021.02</small><b>PVT金字塔ViT</b></a><a class="r" href="barlow-twins.html"><small>本分支下一个 · 2021.03</small><b>Barlow Twins</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>鲁棒MDP与鲁棒强化学习（Robust MDPs and Robust RL） · AI脉络</title>
+<meta name="description" content="环境模型本身不确定时的决策框架：给转移概率划一个“可能的范围”（不确定集），寻找在这个范围内最坏情况下表现仍然最好的策略。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/robust-mdp.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="鲁棒MDP与鲁棒强化学习（Robust MDPs and Robust RL）">
+<meta property="og:description" content="环境模型本身不确定时的决策框架：给转移概率划一个“可能的范围”（不确定集），寻找在这个范围内最坏情况下表现仍然最好的策略。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/robust-mdp.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/robust-mdp">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>鲁棒MDP与鲁棒强化学习</h1><div class="full">Robust MDPs and Robust RL</div>
+<p class="muted" style="font-size:13px">也叫：鲁棒MDP　robust MDP　鲁棒强化学习　robust RL　robust reinforcement learning　不确定集　uncertainty set　ambiguity set　分布鲁棒强化学习　distributionally robust RL　鲁棒Bellman方程　robust Bellman　矩形性　rectangularity　最坏情况优化　worst-case　模型不确定性</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/robust-mdp">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>环境模型本身不确定时的决策框架：给转移概率划一个“可能的范围”（不确定集），寻找在这个范围内最坏情况下表现仍然最好的策略。</b></p>
+<p class="tags">先要会：<a class="chip c" href="mdp.html">马尔可夫决策过程</a> <a class="chip c" href="bellman-equation.html">Bellman方程</a></p>
+<p>强化学习常在仿真器或从数据估计出的模型里训练，但真实环境的摩擦、质量、用户行为都和模型有出入。一个在模型里最优的策略，可能恰好利用了模型里不真实的细节，到真实环境中大幅退化。<b>鲁棒MDP</b>不假设我们知道唯一正确的转移概率，而是假设它落在某个集合里。</p><p><b>定义</b>。对每个(s, a)，转移分布<code>P(·|s, a)</code>属于一个<b>不确定集</b><code>𝒫_{s,a}</code>，例如以估计的分布为中心、KL散度或总变差距离不超过ε的球。目标是最坏情况下的回报最大：</p><p class="formula"><code>max_π min_{P ∈ 𝒫} J(π, P)</code></p><p>可以理解为与一个“自然”对手博弈：我们选策略，对手在允许范围内选最不利的环境。</p><p><b>鲁棒Bellman方程</b>。当不确定集对每个(s, a)独立选取（称为<b>矩形性</b>）时，问题仍然可以用动态规划求解：</p><p class="formula"><code>V(s) = max_a [ r(s, a) + γ · min_{p ∈ 𝒫_{s,a}} Σ_{s&#x27;} p(s&#x27;)·V(s&#x27;) ]</code></p><p>对应的鲁棒Bellman算子仍是压缩映射（见<a class="lc" href="../c/bellman-operator.html">Bellman算子与压缩映射</a>），鲁棒价值迭代收敛。内层的min对KL球、总变差球等常见集合有闭式或可高效求解的形式。没有矩形性时，问题一般是计算困难的。</p><p><b>深度RL中的做法</b>。精确的不确定集很难给出，实践中常用近似：<a class="ln" href="../n/rarl.html">RARL鲁棒对抗RL</a>训练一个对抗智能体对系统施加扰动力，与主智能体轮流优化；在一族随机化的仿真参数上训练（见<a class="ln" href="../n/domain-randomization.html">域随机化与Sim2Real</a>）优化的是平均情形，若只用其中表现最差的那部分环境训练，就更接近鲁棒目标，与<a class="lc" href="../c/risk-sensitive-rl.html">风险敏感强化学习与CVaR</a>里的CVaR相通。这些思路在<a class="lc" href="../c/sim2real.html">仿真到现实的差距</a>中很常见。</p><p><b>代价</b>。不确定集选得太大，策略会过度保守（为了防最坏情况，平常也表现平庸）；选得太小又起不到保护作用。离线RL中的悲观原则可以看作一种由数据量决定不确定集大小的鲁棒性，见<a class="lc" href="../c/offline-pessimism.html">离线RL的悲观与保守</a>。</p>
+<div class="example"><h4>例子</h4><p>某状态有两个动作。动作A：名义模型下以0.9的概率到达价值10的状态、0.1的概率到达价值0的状态，期望9；动作B：一定到达价值8的状态。不确定集允许每个概率最多偏移0.2。最坏情况下A变成0.7和0.3，期望7；B仍是8。名义最优选A，鲁棒最优选B。</p></div>
+<h2>容易误解的地方</h2><ul><li>鲁棒性是针对指定的不确定集而言的，环境偏离超出这个集合时没有任何保证。</li><li>矩形性假设允许“自然”在每个状态独立地选最坏情况，这常比真实的物理不确定性更悲观。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

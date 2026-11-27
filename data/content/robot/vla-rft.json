@@ -1,0 +1,33 @@
+{
+  "id": "vla-rft",
+  "who": "Hengtao Li, Pengxiang Ding, Runze Suo, Yihao Wang, Zirui Ge, Dongyuan Zang, Kexian Yu, Mingyang Sun et al. · 西湖大学、浙江大学、OpenHelix团队、复旦大学等",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2510.00406"},
+    {"label": "项目主页", "url": "https://vla-rft.github.io/"}
+  ],
+  "aka": ["VLA-RFT", "VLARFT", "VLA RFT", "VLA reinforcement fine-tuning", "世界模拟器里的VLA强化微调", "可验证奖励VLA强化微调", "世界模型RFT"],
+  "problem": "VLA靠模仿学习，误差累积、对扰动不鲁棒；RL能缓解，但真机交互昂贵，物理仿真器又有仿真到现实的差距。",
+  "idea": "用真实交互数据训练一个动作条件的世界模型当可控模拟器，让策略在里面rollout，把生成画面与参考轨迹画面的差距作为稠密奖励，用GRPO微调。",
+  "impact": "在LIBERO上只用400步微调就把平均成功率从86.6%提到91.1%，而基于仿真器的在线RL基线要1万步；在物体、目标、机器人状态扰动下也更稳。",
+  "method": "**卡在哪**：[[simplevla-rl]]等方法在物理仿真器里做大量在线RL，样本需求大，且仿真器和真实世界有差距（见[[c:sim2real]]）；直接在真机上做又贵又不安全。[[dreamer]]一系早就提出在学到的模型里训练策略，问题是对VLA来说，世界模型要能逐帧生成逼真的画面，奖励也要有办法算。\n\n**做法**：世界模型是约1.38亿参数的自回归Transformer（LLaMA结构）：图像用类似[[vqgan]]的编码器离散成token，动作也离散成token，给定当前画面和一段动作就逐个预测未来画面的token。它在[[libero]]数据上预训练15万步，强化微调时冻结。奖励不靠成功分类器，而是“可验证”的：把策略的动作和数据集中参考轨迹的动作都送进同一个世界模型生成视频，按逐帧L1距离和LPIPS感知距离比较，越接近奖励越高，因此每条轨迹都有稠密的打分。策略是带[[flow-matching]]动作头的轻量VLA（VLA-Adapter），视觉语言部分冻结，只更新动作头。为了能算概率，作者加一个小网络预测每个去噪步的方差，把去噪变成高斯随机过程，再用[[grpo]]每组16条rollout计算组内优势。\n\n**结果**：LIBERO上，SFT基线（15万步）平均86.6%，VLA-RFT微调400步后91.1%；对比之下，基于仿真器的在线RL方法VLA-RL训练1万步只从76.5%到81.0%。在物体位置、目标位置、机器人初始状态的扰动测试中，成功率全面提高，例如目标位置大扰动从44.8%到51.5%。",
+  "limits": [
+    {"text": "奖励是“和参考轨迹的画面有多像”，本质上仍在向示范靠拢，难以奖励比示范更好或不同的成功方式，也依赖数据集里有对应的参考轨迹。", "solved_by": ["wmpo"]},
+    {"text": "世界模型很小且只在LIBERO数据上训练，实验也只在LIBERO仿真中进行，没有真机验证。", "solved_by": []},
+    {"text": "提升幅度是在已经很高的SFT基线上取得的约4.5个百分点，能否在更难、更长的任务上带来大的提升未知。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "grpo", "type": "uses", "note": "在世界模型生成的rollout上做GRPO，每组16条。"},
+    {"to": "simplevla-rl", "type": "rivals", "note": "SimpleVLA-RL在物理仿真器里做在线RL；VLA-RFT把仿真器换成数据驱动的世界模型，步数少一个数量级以上。"},
+    {"to": "dreamer", "type": "extends", "note": "沿用“在学到的模型里训练策略”的思路，改为逐帧生成像素级画面以适配VLA。"},
+    {"to": "libero", "type": "uses", "note": "世界模型在LIBERO数据上训练，评测也在LIBERO上进行。"},
+    {"to": "flow-matching", "type": "uses", "note": "被微调的策略用流匹配动作头，通过预测去噪步方差得到可计算的似然。"}
+  ],
+  "prereq": ["vla-concept", "world-model-concept", "model-based-rl", "policy-gradient-concept", "normalizing-flow", "autoregressive"],
+  "terms": [
+    {"t": "LPIPS", "d": "用预训练神经网络特征比较两张图像的感知距离，比逐像素差更接近人眼对相似度的判断。"},
+    {"t": "可验证奖励", "d": "奖励能按明确规则计算出来（这里是与参考画面的距离），而不是靠另一个学出来的打分模型。"}
+  ],
+  "learn": "先读[[dreamer]]了解在世界模型里训练策略，再读[[grpo]]；然后看原文第3节世界模型与奖励设计，第4节LIBERO表格和扰动实验。",
+  "check": {"source": "https://arxiv.org/abs/2510.00406", "confirmed": "标题、作者、v1日期2025-10-01、摘要中少于400步、超过仿真器RL；HTML正文：机构、VLA-Adapter流匹配头、约138M参数LLaMA结构自回归世界模型、VQGAN式tokenizer、LIBERO预训练1.5×10⁵步、L1+LPIPS奖励、Sigma Net、GRPO组16、86.6→91.1、VLA-RL 1万步76.5→81.0、目标大扰动44.8→51.5。"}
+}

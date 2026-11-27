@@ -1,0 +1,89 @@
+{
+  "id": "ivideogpt",
+  "who": "Jialong Wu, Shaofeng Yin, Ningya Feng, Xu He, Dong Li, Jianye Hao, Mingsheng Long · 清华大学、华为诺亚方舟实验室、天津大学",
+  "venue": "arXiv 2024",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2405.15223"
+    },
+    {
+      "label": "项目主页",
+      "url": "https://thuml.github.io/iVideoGPT"
+    }
+  ],
+  "aka": [
+    "iVideoGPT",
+    "i-VideoGPT",
+    "Interactive VideoGPT",
+    "交互式VideoGPT",
+    "可交互视频GPT",
+    "视频GPT世界模型"
+  ],
+  "problem": "视频生成模型画质好但一次生成整段，不能一步一步接收动作、给出奖励；而强化学习里的世界模型交互性好，却都是小模型、只在单一环境里训练，难以规模化。",
+  "idea": "把画面、动作、奖励都变成token，用GPT式Transformer逐个预测；未来帧以历史帧为条件只用16个token编码，从而能在约150万条操作轨迹上预训练。",
+  "impact": "同一个预训练模型可微调用于动作条件视频预测、视觉规划和模型式强化学习；Meta-World上比DrQ-v2更省样本，作者称与DreamerV3相当或更好。",
+  "method": "**卡在哪**：[[iris]]、[[dreamerv3]]这类世界模型能逐步响应动作，但每个环境从头训练，规模小；视频扩散模型能在海量视频上预训练，却一次生成固定长度的片段，没法插入动作、输出奖励。要让视频模型当强化学习的交互环境，需要[[c:autoregressive]]的结构，而直接把每帧切成256个token，序列会太长。\n\n**做法**：iVideoGPT用条件[[vqgan]]做“压缩式分词”（见[[c:vector-quantization]]）：开头几帧上下文各编码成16×16个token；之后的每个未来帧以上下文帧为条件，只用4×4=16个token编码变化的部分，序列缩短16倍。所有token交给一个LLaMA结构、GPT-2规模（1.38亿参数，另有4.36亿版本）的Transformer做下一个token预测。预训练不需要动作：用[[open-x]]的35个数据集加[[something-something]]人手视频，约150万条轨迹。下游微调时，动作经线性层加到每帧的分隔token上，奖励由最后一个token上的线性头回归。\n\n**结果**：BAIR数据集动作条件视频预测FVD为60.8，加动作比不加改善约20%；RoboNet 256×256上FVD 197.9，优于MaskViT的211.7。用作[[mbpo]]式模型RL的环境，以[[drq]]-v2为策略学习器，在Meta-World六个任务上样本效率高于不用模型的DrQ-v2。作者也指出离散token和低分辨率会丢细节，在VP2规划的开滑盖任务上表现差。",
+  "limits": [
+    {
+      "text": "主要实验在64×64分辨率，离散token会丢失夹爪接触等细节，作者在开滑盖任务上的失败也归因于此。",
+      "solved_by": []
+    },
+    {
+      "text": "强化学习只在Meta-World的六个仿真任务上验证，没有在真机或真实场景的世界模型里训练策略。",
+      "solved_by": [
+        "wmpo"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "iris",
+      "type": "extends",
+      "note": "同样用离散token加Transformer做世界模型，但从单个Atari游戏扩展到在百万级操作视频上预训练、再迁移到多个下游任务。"
+    },
+    {
+      "to": "vqgan",
+      "type": "uses",
+      "note": "以条件VQGAN为分词器，未来帧以上下文帧为条件压缩到每帧16个token。"
+    },
+    {
+      "to": "open-x",
+      "type": "uses",
+      "note": "预训练数据主要来自Open X-Embodiment的35个子数据集。"
+    },
+    {
+      "to": "mbpo",
+      "type": "uses",
+      "note": "把预训练后微调的模型当作MBPO的环境模型，用想象轨迹扩充DrQ-v2的训练数据。"
+    },
+    {
+      "to": "dreamerv3",
+      "type": "rivals",
+      "note": "DreamerV3在潜空间里从头训练世界模型；iVideoGPT用可预训练的视频token模型，作者称在Meta-World上与之相当或更好。"
+    }
+  ],
+  "prereq": [
+    "world-model-concept",
+    "model-based-rl",
+    "vector-quantization",
+    "autoregressive",
+    "tokenization",
+    "pretrain-finetune"
+  ],
+  "terms": [
+    {
+      "t": "压缩式分词",
+      "d": "只把前几帧完整编码，后续帧以它们为条件只编码变化部分，因此每帧token很少，长视频也能放进Transformer。"
+    },
+    {
+      "t": "FVD",
+      "d": "Fréchet Video Distance，把真实视频和生成视频都送进视频分类网络提特征，比较两组特征分布的距离，越低越好。"
+    }
+  ],
+  "learn": "先读[[iris]]理解“离散token世界模型”，再读[[mbpo]]理解如何用学到的模型扩充RL数据；然后读原文第3节分词器设计和第4节的视频预测与Meta-World结果。",
+  "check": {
+    "source": "https://arxiv.org/abs/2405.15223",
+    "confirmed": "标题、7位作者、arXiv v1 2024-05-24；HTML正文中16×16与4×4 token、约150万条轨迹（35个OXE数据集+SSv2）、138M/436M模型、动作与奖励注入方式、BAIR FVD 60.8与约20%改进、RoboNet 256×256 FVD 197.9对MaskViT 211.7、Meta-World六任务MBPO+DrQ-v2、开滑盖任务失败归因。"
+  }
+}

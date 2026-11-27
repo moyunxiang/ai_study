@@ -1,0 +1,29 @@
+{
+  "id": "long-clip",
+  "aka": ["Long-CLIP", "LongCLIP", "长文本CLIP"],
+  "who": "Beichen Zhang, Pan Zhang, Xiaoyi Dong, Yuhang Zang, Jiaqi Wang · 上海人工智能实验室 / 上海交通大学 / 香港中文大学",
+  "venue": "ECCV 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2403.15378"},
+    {"label": "代码", "url": "https://github.com/beichenzbc/Long-CLIP"}
+  ],
+  "problem": "CLIP的文本编码器最多只收77个token，实测有效长度不到20个，长而细的图像描述读不进去，检索和文生图都受影响。",
+  "idea": "在原CLIP上做高效微调：只“拉伸”靠后位置的位置编码、保住前面训练充分的位置；再让长描述与图像的整体特征、短描述与图像的主成分特征分别对齐。",
+  "impact": "把输入上限从77提到248个token，长描述检索R@5提高约20%，可直接替换Stable Diffusion等框架里的CLIP，是“给CLIP加长文本能力”最常被比较的方案。",
+  "method": "[[clip]]训练时用的图文对说明文字都很短，文本端的绝对位置编码只开到77个位置，而且论文的实验发现第20个位置之后的编码几乎没训好。直接把位置编码插值拉长再微调，会破坏CLIP原有的零样本能力；换一个长上下文语言模型当文本编码器，又得从头做海量预训练。\n\nLong-CLIP给出两个小改动：\n- **保知识的位置编码拉伸**：前20个位置的编码原样保留，只对后面的位置做插值扩展，总长度扩到248。\n- **主成分匹配**：长描述对应图像的完整特征；短描述只说了最显著的内容，所以让它与图像特征的主要成分（取前几个主成分重建的特征）对齐，避免短文本能力退化。\n\n只用约一百万条额外的长描述图文对微调，长描述图文检索提升约20%，COCO、Flickr30k等传统检索提升约6%；由于嵌入空间与原CLIP对齐，可以即插即用地替换[[stable-diffusion]]、[[sdxl]]里的文本编码器，让文生图读懂更长的提示。",
+  "limits": [
+    {"text": "仍以原CLIP的小文本编码器为基础，248个token对整段文档或多段落描述依然不够，也缺乏语言模型级的语义理解。", "solved_by": []},
+    {"text": "只在约一百万对长描述上微调，长文本数据本身由模型生成，细粒度对齐的上限受限于这些合成描述的质量。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "clip", "type": "solves", "note": "解决CLIP文本输入只有77个token、有效长度不足20的问题，并保持与原嵌入空间对齐。"},
+    {"to": "sharegpt4v", "type": "uses", "note": "微调用的约一百万条长描述图文对来自ShareGPT4V式的详细描述数据。"},
+    {"to": "sdxl", "type": "uses", "note": "即插即用替换SDXL的CLIP文本编码器，演示长提示文生图。"}
+  ],
+  "prereq": ["contrastive-learning", "positional-encoding", "embedding", "dimensionality-reduction", "pretrain-finetune"],
+  "terms": [
+    {"t": "位置编码拉伸（positional embedding stretching）", "d": "把只训练到固定长度的位置编码用插值扩展到更多位置，让模型能读更长的输入。"}
+  ],
+  "learn": "先弄懂[[clip]]的文本编码器和绝对位置编码，再读Long-CLIP第3节两种策略，用官方代码比较原CLIP与Long-CLIP在一段长描述上的检索结果。",
+  "check": {"source": "https://arxiv.org/abs/2403.15378", "confirmed": "标题、五位作者、v1提交2024-03-22；摘要：77 token上限、有效长度不足20、保知识的位置编码拉伸、主成分匹配、约一百万额外长描述图文对、长描述检索约+20%、COCO/Flickr30k等传统检索约+6%、即插即用替换用于文生图；ar5iv首页确认机构；GitHub页确认ECCV 2024和77→248。“前20个位置保留”的具体切分、主成分匹配的操作细节、数据来自ShareGPT4V为一般了解，未逐项核对正文。"}
+}

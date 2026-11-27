@@ -1,0 +1,29 @@
+{
+ "id": "struq",
+ "who": "Sizhe Chen, Julien Piet, Chawin Sitawarin, David Wagner · UC Berkeley",
+ "venue": "USENIX Security 2025",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2402.06363"},
+  {"label": "代码", "url": "https://github.com/Sizhe-Chen/StruQ"}
+ ],
+ "aka": ["StruQ", "结构化查询", "structured queries", "提示与数据分离"],
+ "problem": "[[prompt-injection]]之所以有效，是因为LLM把开发者的指令和要处理的数据（网页、邮件、用户文本）拼成同一串文字，模型既善于遵循指令、又分不清哪段是指令哪段是数据。",
+ "idea": "借鉴数据库防SQL注入的“参数化查询”：把提示和数据放进两个分开的通道，由安全前端用特殊分隔符编码；再训练模型只服从提示通道里的指令，对数据通道里出现的指令视而不见。",
+ "impact": "把“指令与数据分离”从提示技巧变成训练目标，开启了一批通过微调抵御提示注入的防御（同组随后有SecAlign），也是[[instruction-hierarchy]]同一思路的早期版本。",
+ "method": "传统软件里，SQL注入的根治办法是不让用户输入被解释成代码：查询语句和参数分开传。StruQ把同样的思想用在LLM上，系统由两部分组成。\n\n- 安全前端：把开发者的提示和外部数据格式化成一种特殊格式，用保留的分隔词元标出“这是指令”“这是数据”，并把数据里可能伪造这些分隔符的字符过滤掉，攻击者因此无法在数据里冒充指令通道。\n- 结构化指令微调：从一个未经指令微调的基础模型出发，用改造过的指令微调数据训练。除了普通样本，还加入数据部分里夹带了额外指令的样本，训练目标是仍然只完成提示通道里的任务、忽略数据中的指令。这样模型学会的“遵循指令”从一开始就只针对指令通道。\n\n摘要报告：该系统显著提高了对提示注入攻击的抵抗力，对输出质量几乎没有影响。作者也指出，基于优化的强攻击（如[[gcg]]式）仍是挑战，这成为后续工作的出发点。\n\n与[[spotlighting]]这类只在提示里加标记、不改模型的做法相比，StruQ把分离写进了权重，代价是需要自己微调模型。",
+ "limits": [
+  {"text": "对基于梯度优化的强提示注入攻击，防御效果明显下降。", "solved_by": ["attacker-moves-second"]},
+  {"text": "需要模型提供方配合改变输入格式并重新微调，无法直接保护已部署的闭源模型。", "solved_by": ["camel-defense"]}
+ ],
+ "relations": [
+  {"to": "prompt-injection", "type": "solves", "note": "针对指令与数据混在一起导致的提示注入，用分开的通道和专门训练加以缓解。"},
+  {"to": "indirect-prompt-injection", "type": "solves", "note": "间接注入把指令藏在网页、邮件等数据里，StruQ训练模型忽略数据通道中的指令。"},
+  {"to": "alpaca", "type": "uses", "note": "在Alpaca式指令微调数据的基础上构造带注入指令的训练样本。"}
+ ],
+ "prereq": ["language-model", "instruction-tuning", "tokenization", "pretrain-finetune"],
+ "terms": [
+  {"t": "参数化查询", "d": "数据库编程中把查询语句和用户数据分开传递的做法，使用户输入永远不会被当作代码执行。"}
+ ],
+ "learn": "先读[[prompt-injection]]和[[indirect-prompt-injection]] → 读原文的前端格式和训练数据构造 → 设计几条把指令藏在数据中的样例，比较普通指令模型和StruQ模型的反应。",
+ "check": {"source": "https://arxiv.org/abs/2402.06363", "confirmed": "arXiv记录：标题、4位作者、2024-02-09 v1；摘要所述提示注入依赖模型遵循指令且无法区分提示与数据、结构化查询分两个通道、安全前端加专门训练的LLM、从基础模型做结构化指令微调、在数据部分加入指令并训练忽略、显著提升抵抗且几乎不损效用。分隔符过滤、对优化攻击效果下降、SecAlign后续、USENIX Security 2025凭一般了解写。"}
+}

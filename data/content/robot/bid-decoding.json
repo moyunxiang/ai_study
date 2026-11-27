@@ -1,0 +1,26 @@
+{
+  "id": "bid-decoding",
+  "who": "Yuejiang Liu, Jubayer Ibn Hamid, Annie Xie, Yoonho Lee, Maximilian Du, Chelsea Finn · 斯坦福大学",
+  "venue": "arXiv 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2408.17355"},
+    {"label": "项目主页", "url": "https://bid-robot.github.io"}
+  ],
+  "aka": ["BID", "Bidirectional Decoding", "双向解码", "动作块双向解码", "action chunking解码"],
+  "problem": "动作分块（一次预测并执行一串动作）有的研究说关键、有的说有害；它能学到示范里的时间依赖，却在执行中途对意外状态反应迟钝。",
+  "idea": "测试时每步采多个候选动作块，按两条准则挑选：与上一步已执行计划衔接的“后向一致”，以及更像强策略而不像弱策略的“前向对比”。",
+  "impact": "不重训策略，把Diffusion Policy在7个仿真任务上的平均成功率从0.60提到0.76，在动态拾放的真机任务上也明显优于原始采样，代价是2–3倍计算。",
+  "method": "[[aloha-act]]和[[diffusion-policy]]都用[[c:action-chunking]]，一次输出未来多步动作。作者先分析：块越长，学生越能捕捉示范中跨时间步的依赖，但块执行期间不再看新观测，环境一变就来不及纠正；每步重新规划又会让相邻决策互相矛盾、动作抖动。\n\nBID的做法：每个时间步采样一批候选块（Diffusion Policy默认30个）。**后向一致**：与上一步选中块的重叠部分越接近越好，距离按0.9的衰减加权，保证动作连贯。**前向对比**：用一个训练充分的强策略和一个欠训练（或预测更短）的弱策略分别采样，候选应靠近强策略的样本、远离弱策略的样本，从而偏向高质量的长期计划。两者结合后，策略可以每步重新决策而不失连贯。\n\n结果：Push-T、[[robomimic]]、Franka Kitchen的7个任务上平均0.60→0.76（Franka Kitchen 0.22→0.60）；对[[vq-bet]]在Push-T上也有提升；真机动态拾放任务中成功率至少是基线的2倍。",
+  "limits": [
+    {"text": "每步要多次采样并比较，计算量增加2–3倍，作者也指出在低成本机器人上做高频控制可能太贵。", "solved_by": ["rtc"]},
+    {"text": "前向对比需要额外准备一个弱策略检查点，效果依赖强弱策略之间差异的选择。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "diffusion-policy", "type": "extends", "note": "主要实验对象，不改权重，只在推理时从多个采样块中挑选。"},
+    {"to": "aloha-act", "type": "rivals", "note": "ACT用时间集成平滑相邻动作块；BID改为采样多个候选并按一致性与对比挑选，仿真中优于指数平滑基线（0.76对0.69）。"},
+    {"to": "vq-bet", "type": "uses", "note": "在VQ-BeT上验证方法对另一类生成式策略同样有效。"},
+    {"to": "robomimic", "type": "uses", "note": "仿真评测中的Lift、Can、Square、Transport、Tool Hang任务来自robomimic。"}
+  ],
+  "prereq": ["action-chunking", "imitation-learning", "diffusion-process", "control-loop", "decoding-sampling"],
+  "check": {"source": "https://arxiv.org/abs/2408.17355", "confirmed": "标题、6位作者、v1日期2024-08-30、摘要中后向一致与前向对比；HTML正文中Diffusion Policy默认30个候选、衰减0.9、强/弱策略定义、表1平均0.60/0.69/0.76与Franka Kitchen 0.22→0.60、VQ-BeT结果、2–3倍开销、真机至少2倍、斯坦福大学。"}
+}

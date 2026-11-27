@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>树备份与离策略资格迹（2000） · AI脉络</title>
+<meta name="description" content="离策略评估：用行为策略b收集的数据，估计另一个目标策略π的价值。多步TD与资格迹在同策略下很好用，但离策略时，式的多步版本（Watkins的Q(λ)）一遇到非贪心动作就得切断资格迹，学得很慢；简单乘重要性权重又会让方差爆炸。 系统研究带资格迹的离策略评估，提出并比较几种算法：逐决策重要性采样的TD…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/tree-backup.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="树备份与离策略资格迹（2000）">
+<meta property="og:description" content="离策略评估：用行为策略b收集的数据，估计另一个目标策略π的价值。多步TD与资格迹在同策略下很好用，但离策略时，式的多步版本（Watkins的Q(λ)）一遇到非贪心动作就得切断资格迹，学得很慢；简单乘重要性权重又会让方差爆炸。 系统研究带资格迹的离策略评估，提出并比较几种算法：逐决策重要性采样的TD…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/tree-backup.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/tree-backup">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 价值函数与时序差分</div>
+<h1>树备份与离策略资格迹</h1>
+<div class="full">Eligibility Traces for Off-Policy Policy Evaluation</div>
+<div class="meta"><span>2000.06</span><span>论文</span><span>延伸</span><span>ICML 2000</span><span>Doina Precup, Richard S. Sutton, Satinder Singh · 马萨诸塞大学阿默斯特分校 / AT&amp;T实验室</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://scholarworks.umass.edu/cs_faculty_pubs/80" rel="noopener">UMass存档 ↗</a><a class="btn sm" href="../index.html#/n/tree-backup">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>离策略评估：用行为策略b收集的数据，估计另一个目标策略π的价值。多步TD与资格迹在同策略下很好用，但离策略时，<a class="ln" href="../n/q-learning.html">Q-learning</a>式的多步版本（Watkins的Q(λ)）一遇到非贪心动作就得切断资格迹，学得很慢；简单乘重要性权重又会让方差爆炸。</p></div><div><h4>方法</h4><p>系统研究带资格迹的离策略评估，提出并比较几种算法：逐决策重要性采样的TD(λ)变体，以及<b>树备份</b>（Tree Backup）——每一步都按目标策略的概率对所有动作求期望，只沿实际走的那个动作继续往后看，因此根本不需要重要性权重。</p></div><div><h4>影响</h4><p>这篇论文是离策略多步学习的起点：树备份算法进入了Sutton与Barto教材，<a class="ln" href="../n/retrace.html">Retrace离策略修正</a>把树备份和重要性采样的优点结合起来，<a class="ln" href="../n/q-sigma.html">Q(σ)多步统一算法</a>把树备份与Sarsa统一成一个连续谱。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>多步TD的目标把未来几步的奖励和估值串起来。离策略时问题在于：数据里实际走的是b选的动作，而我们关心π下的回报。</p><p><b>重要性采样方法</b>：每一步给后续的修正乘上比值 <code>ρ_t = π(a_t|s_t) / b(a_t|s_t)</code>。它是无偏的，但多步连乘后方差可能极大。论文讨论了按每次决策加权的几种资格迹版本，并证明了它们在表格情形下的收敛性。</p><p><b>树备份</b>：在状态s_{t+1}，把目标写成「对没走的动作直接用当前估值按π的概率加权，只对实际走的a_{t+1}继续向后展开」： <code>G_t = r_{t+1} + γ Σ_{a ≠ a_{t+1}} π(a|s_{t+1}) Q(s_{t+1},a) + γ π(a_{t+1}|s_{t+1}) G_{t+1}</code>。 展开后，第k步之后的部分被乘上 <code>Π π(a_i|s_i)</code>——也就是目标策略的概率，而不是π/b的比值。因为这些概率都不超过1，方差始终有界，也完全不需要知道行为策略b。代价是：当π对实际动作给的概率很小时，迹衰减得很快，多步回报的好处就用不上了（π是贪心策略时它退化成类似Watkins Q(λ)的行为）。</p><p>作者在小型马尔可夫链上的实验比较了这些算法的偏差与方差特性。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>当目标策略与行为策略差别大时，树备份的迹衰减很快，几乎退化为一步更新，无法利用长回报。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/retrace.html">Retrace离策略修正</a> <a class="chip hue" style="--h:120" href="../n/q-sigma.html">Q(σ)多步统一算法</a></div></li><li>收敛性分析限于表格情形，与线性或非线性函数近似结合时可能发散。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/gradient-td.html">梯度TD（GTD/TDC）</a> <a class="chip hue" style="--h:120" href="../n/emphatic-td.html">强调TD（Emphatic TD）</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/td-learning.html">时序差分学习</a><span class="yr">1988 · RL</span><div class=nt>把TD(λ)的资格迹推广到离策略评估。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/q-learning.html">Q-learning</a><span class="yr">1992 · RL</span><div class=nt>Q-learning的多步版本遇到非贪心动作就切断资格迹；树备份对任意目标策略都能做多步离策略备份。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/sarsa.html">SARSA</a><span class="yr">1994 · RL</span><div class=nt>Sarsa沿实际动作采样后续（同策略），树备份对未选动作取期望，是采样与期望两个极端。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/baird-counterexample.html">Baird反例与发散问题</a><span class="yr">1995 · RL</span><div class=nt>Baird反例揭示了离策略加函数近似的发散风险，本文先在表格情形下把离策略多步评估做稳。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/gradient-td.html">梯度TD（GTD/TDC）</a><span class="yr">2009 · RL</span><div class=nt>收敛性分析限于表格情形，与线性或非线性函数近似结合时可能发散。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/greedy-gq.html">Greedy-GQ离策略梯度控制</a><span class="yr">2010.06 · RL</span><div class=nt>延续Precup等人的离策略学习路线，从表格多步评估推进到带函数近似的控制。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/emphatic-td.html">强调TD（Emphatic TD）</a><span class="yr">2015.03 · RL</span><div class=nt>收敛性分析限于表格情形，与线性或非线性函数近似结合时可能发散。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/retrace.html">Retrace离策略修正</a><span class="yr">2016.06 · RL</span><div class=nt>当目标策略与行为策略差别大时，树备份的迹衰减很快，几乎退化为一步更新，无法利用长回报。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/q-sigma.html">Q(σ)多步统一算法</a><span class="yr">2017.03 · RL</span><div class=nt>把Precup等人的树备份作为σ=0的多步端点，并与Sarsa连成一个连续谱。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/td-error.html">时序差分与自举</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a> <a class="chip c" href="../c/importance-sampling.html">重要性采样</a> <a class="chip c" href="../c/bellman-equation.html">Bellman方程</a></p>
+<h2>本篇术语</h2><ul><li><b>离策略评估</b>　用一个策略收集的数据，估计另一个策略的价值。</li><li><b>资格迹</b>　对过去访问过的状态-动作按时间衰减地记账，使当前的TD误差也能更新更早的估值。</li><li><b>重要性采样比</b>　目标策略与行为策略选同一动作的概率之比，用来把行为策略下的回报改写成目标策略下的期望。</li></ul>
+<h2>怎么学</h2><p>先学<a class="ln" href="../n/td-learning.html">时序差分学习</a>的资格迹和<a class="lc" href="../c/importance-sampling.html">重要性采样</a>；读Sutton与Barto第二版第7.5节树备份；在一个小随机游走上分别用重要性采样和树备份做离策略评估，比较方差。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://scholarworks.umass.edu/cs_faculty_pubs/80" rel="noopener">https://scholarworks.umass.edu/cs_faculty_pubs/80</a>（通过OpenAlex记录核对了标题Eligibility Traces for Off-Policy Policy Evaluation、三位作者Precup/Sutton/Singh、2000-06（UMass ScholarWorks存档，ICML 2000论文）。未打开全文：重要性采样变体、树备份的递推式、收敛性与实验结论均按教材第二版的通行描述写；机构与ICML 2000凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%A0%91%E5%A4%87%E4%BB%BD%E4%B8%8E%E7%A6%BB%E7%AD%96%E7%95%A5%E8%B5%84%E6%A0%BC%E8%BF%B9%EF%BC%88tree-backup%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Atree-backup%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/tree-backup.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="inverse-rl.html"><small>本分支上一个 · 2000</small><b>逆强化学习IRL</b></a><a class="r" href="regret-matching.html"><small>本分支下一个 · 2000.09</small><b>遗憾匹配</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

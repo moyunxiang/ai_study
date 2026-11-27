@@ -1,0 +1,37 @@
+{
+  "id": "mrasp",
+  "who": "Zehui Lin, Xiao Pan, Mingxuan Wang, Xipeng Qiu, Jiangtao Feng, Hao Zhou, Lei Li · 字节跳动AI Lab、复旦大学",
+  "venue": "EMNLP 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2010.03142"},
+    {"label": "代码", "url": "https://github.com/linzehui/mRASP"}
+  ],
+  "aka": ["mRASP", "随机对齐替换", "Random Aligned Substitution", "RAS", "多语言翻译预训练", "mRASP2", "通用翻译预训练"],
+  "problem": "mBART这类多语言预训练只用单语文本做去噪，和翻译任务之间存在差距；能不能直接用多语言平行语料预训练出一个「通用」翻译模型，再微调到任意语言对，包括低资源和预训练时没见过的语言？",
+  "idea": "在32个语言对的公开平行语料上联合预训练一个多语言Transformer翻译模型，并提出**随机对齐替换（RAS）**：训练时把源句中的一些词随机换成它在其他语言里的同义词（来自双语词典），迫使不同语言中意义相同的词在表示空间里靠近。",
+  "impact": "mRASP表明翻译专用的多语言预训练能显著帮助低资源、甚至预训练时完全没出现过的语言对，后续的mRASP2进一步加入对比学习，这一系列被字节跳动用于火山翻译。",
+  "background": "[[multilingual-nmt]]让一个模型同时翻译多个语言对，[[mbart]]和[[xlm]]用单语去噪或掩码任务预训练再微调翻译。前者的知识共享局限于同一训练过程，后者的预训练目标不是翻译。低资源语言对平行数据少，单独训练效果很差；而不同语言的词向量在模型内部往往并不对齐，迁移效果受限。",
+  "method": "**数据**：从公开数据集收集32个英语-X语言对的平行语料（PC32），双向使用，每个句子前加目标语言标签。\n\n**随机对齐替换（RAS）**：对源句中的每个词，以一定概率用MUSE双语词典查到的其他语言同义词替换。例如英语句子「I like singing and dancing」中的「singing」被换成法语「chanter」、「dancing」换成德语「tanzen」，目标端保持不变。这样同一个意思在不同语言里的写法会对应同一个翻译目标，模型被迫把它们映射到相近的表示：\n\n`L = − Σ_{(x,y)} log P(y | RAS(x); θ)`\n\n**模型**：标准Transformer-large编码器-解码器，所有语言共享联合BPE词表。\n\n**微调**：预训练模型作为初始化，在每个下游语言对上单独微调，得到专门的翻译模型。",
+  "results": "摘要报告：在42个翻译方向（低、中、高资源以及「外来」语言对）上，mRASP相比直接在目标语言对上训练都有显著提升；首次验证了多个低资源语言对可以用来改进高资源翻译；对预训练语料里从未出现过的语言也能提升翻译质量。",
+  "legacy": "后续mRASP2（2021）加入跨语言对比学习，把多对多翻译和零样本翻译做得更好。随着大语言模型兴起，通用翻译能力更多来自LLM的多语言预训练，但「用平行数据做翻译专用预训练」的思路仍在[[nllb]]这类大规模多语言翻译模型中延续。",
+  "limits": [
+    {"text": "RAS依赖双语词典，只能替换单个词，短语和多义词的对齐不准确。", "solved_by": []},
+    {"text": "仍以英语为中心的平行语料预训练，非英语语言对之间的直接翻译质量较弱。", "solved_by": ["nllb"]}
+  ],
+  "relations": [
+    {"to": "mbart", "type": "rivals", "note": "mBART用单语去噪预训练，mRASP直接用多语言平行语料做翻译预训练，与下游任务更一致。"},
+    {"to": "multilingual-nmt", "type": "extends", "note": "沿用单模型多语言、目标语言标签的做法，扩展为「先预训练再微调」的通用翻译模型。"},
+    {"to": "muse", "type": "uses", "note": "随机对齐替换使用MUSE发布的双语词典。"},
+    {"to": "transformer", "type": "uses", "note": "模型是标准的Transformer编码器-解码器。"}
+  ],
+  "prereq": ["pretrain-finetune", "encoder-decoder", "transfer-learning", "embedding", "tokenization"],
+  "terms": [
+    {"t": "随机对齐替换（RAS）", "d": "预训练时把源句中的词随机换成其他语言里意思相同的词，让模型把不同语言的同义词映射到相近的表示。"},
+    {"t": "外来语言对（exotic pairs）", "d": "论文中指源语言、目标语言或两者都没有出现在预训练语料中的语言对。"}
+  ],
+  "learn": "先读[[multilingual-nmt]]和[[mbart]] → 读原文第2节RAS和第4节对低资源与外来语言的实验 → 动手：用MUSE词典对一批英语句子做随机替换，观察替换后句子在多语言编码器中的表示距离。",
+  "check": {
+    "source": "https://arxiv.org/abs/2010.03142",
+    "confirmed": "arXiv记录：标题Pre-training Multilingual Neural Machine Translation by Leveraging Alignment Information、七位作者、v1 2020-10-07；摘要：能否有单一通用MT模型作为种子、提出mRASP、随机对齐替换使相似意义的词跨语言靠近、只用公开数据在32个语言对上预训练、42个翻译方向实验、显著优于直接训练、首次验证多个低资源语言对可改进高资源MT、对预训练语料未出现的语言也有提升。EMNLP 2020、作者单位、MUSE词典、Transformer-large、例句、mRASP2与火山翻译凭一般了解。"
+  }
+}

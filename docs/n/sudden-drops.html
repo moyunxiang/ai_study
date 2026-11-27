@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>损失骤降与句法习得（2023） · AI脉络</title>
+<meta name="description" content="可解释性研究大多只分析训练好的模型，看不到能力是怎样在训练中出现的；训练曲线上偶尔出现的“损失突然骤降”到底对应模型内部发生了什么，也不清楚。 以BERT类掩码语言模型的句法习得为案例，追踪“句法注意力结构”（某些注意力头专门关注特定句法关系）在训练中的演化，并通过在训练中人为抑制或促进它来检验它…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sudden-drops.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="损失骤降与句法习得（2023）">
+<meta property="og:description" content="可解释性研究大多只分析训练好的模型，看不到能力是怎样在训练中出现的；训练曲线上偶尔出现的“损失突然骤降”到底对应模型内部发生了什么，也不清楚。 以BERT类掩码语言模型的句法习得为案例，追踪“句法注意力结构”（某些注意力头专门关注特定句法关系）在训练中的演化，并通过在训练中人为抑制或促进它来检验它…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sudden-drops.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sudden-drops">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 能力的机理</div>
+<h1>损失骤降与句法习得</h1>
+<div class="full">Sudden Drops in the Loss: Syntax Acquisition, Phase Transitions, and Simplicity Bias in MLMs</div>
+<div class="meta"><span>2023.09</span><span>论文</span><span>延伸</span><span>ICLR 2024</span><span>Angelica Chen, Ravid Shwartz-Ziv, Kyunghyun Cho, Matthew L. Leavitt, Naomi Saphra · 纽约大学、DatologyAI、哈佛大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2309.07311" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/sudden-drops">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>可解释性研究大多只分析训练好的模型，看不到能力是怎样在训练中出现的；训练曲线上偶尔出现的“损失突然骤降”到底对应模型内部发生了什么，也不清楚。</p></div><div><h4>方法</h4><p>以BERT类掩码语言模型的句法习得为案例，追踪“句法注意力结构”（某些注意力头专门关注特定句法关系）在训练中的演化，并通过在训练中人为抑制或促进它来检验它的因果作用。</p></div><div><h4>影响</h4><p>发现预训练早期有一个短暂窗口，模型突然获得句法注意力结构，同时损失骤降，之后才习得语法能力；短暂抑制这一结构反而能得到更好的模型，为“训练中的相变”和简单性偏置提供了真实模型中的例子。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/bert.html">BERT</a>的注意力头被发现会自发地对应句法依存关系，例如某个头让动词关注它的宾语，这称为<b>句法注意力结构（SAS）</b>。<a class="ln" href="../n/induction-heads.html">归纳头与ICL</a>在自回归模型中观察到，归纳头的形成与损失曲线上的一个“鼓包”同时发生；<a class="ln" href="../n/grokking.html">Grokking</a>则展示了训练中能力突然出现的现象。作者想知道在真实的掩码语言模型中，句法能力是否也是这样“突然”出现的。</p><p><b>测量SAS</b>：用依存句法标注，计算每个注意力头分配给句法相关词对的注意力比例，取最好的头作为SAS强度的指标；同时用BLiMP等语法判断基准评估模型的语法能力。</p><p><b>观察</b>：在多次随机种子的BERT预训练中，存在一个短暂窗口：SAS突然出现，损失同时陡降（第一次相变）；随后才出现第二次转折，模型的语法能力在这之后明显提升。也就是说，SAS的出现促成了后续语言能力的获得。</p><p><b>干预</b>：在训练损失中加入一个正则项，惩罚或鼓励注意力集中在句法相关的词对上：</p><ul><li>一直<b>抑制SAS</b>的模型，语法能力明显更差，说明SAS对语法能力的发展是必要的；</li><li>但SAS与其他有益的能力在训练中存在竞争。只在训练早期<b>短暂抑制</b>SAS、之后再放开，模型反而在最终质量上更好——先学其他东西，再学这个“简单的”句法捷径，避免模型过早依赖它。</li></ul><p>作者把这解释为真实模型中的<b>简单性偏置</b>和突破式训练动态的例子。</p><h2>后来的发展</h2><p>“沿训练轨迹做可解释性”的做法被后续工作广泛采用，用于研究能力涌现、相变和训练早期的关键窗口。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只研究了BERT规模的掩码语言模型和句法这一种能力，自回归大模型中其他能力是否遵循相同的“结构先出现、能力后跟上”的模式没有验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/bert.html">BERT</a><span class="yr">2018.10 · LLM</span><div class=nt>以BERT式掩码语言模型的预训练为研究对象，追踪其注意力头中句法结构的出现。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/induction-heads.html">归纳头与ICL</a><span class="yr">2022.03 · LLM</span><div class=nt>归纳头工作把一个电路的形成与损失曲线的突变对应起来，本文在掩码语言模型的句法结构上找到类似的相变并做了因果干预。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/grokking.html">Grokking</a><span class="yr">2022.01 · 基础</span><div class=nt>同样研究训练中能力的突然出现，本文的例子来自真实语言模型预训练而不是小算法任务。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/regularization.html">正则化与权重衰减</a> <a class="chip c" href="../c/inductive-bias.html">归纳偏置</a></p>
+<h2>本篇术语</h2><ul><li><b>句法注意力结构（SAS）</b>　掩码语言模型中某些注意力头会专门让一个词关注与它有句法依存关系的词，例如动词关注其主语或宾语。</li><li><b>简单性偏置</b>　神经网络倾向于先学会简单、容易利用的规律，有时会因此推迟或妨碍学会更有用的复杂规律。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/induction-heads.html">归纳头与ICL</a>中损失曲线与电路形成的对应；读本文第3节SAS度量和训练曲线、第4节抑制与促进实验；动手：用MultiBERTs公开的中间检查点，计算某几个头对依存关系的注意力比例随训练步数的变化，与损失曲线对照。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2309.07311" rel="noopener">https://arxiv.org/abs/2309.07311</a>（标题、5位作者、arXiv首次提交2023-09-13；摘要中研究掩码语言模型的句法习得、句法注意力结构SAS的定义、预训练中存在短暂窗口突然获得SAS且损失陡降、这一突破促成后续语言能力习得、在训练中操控SAS证明其对语法能力必要、SAS与其他有益特性竞争、短暂抑制SAS能提升模型质量、简单性偏置与突破式训练动态。SAS度量方法、BLiMP、正则项形式、ICLR 2024与机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E6%8D%9F%E5%A4%B1%E9%AA%A4%E9%99%8D%E4%B8%8E%E5%8F%A5%E6%B3%95%E4%B9%A0%E5%BE%97%EF%BC%88sudden-drops%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asudden-drops%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sudden-drops.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="dola.html"><small>本分支上一个 · 2023.09</small><b>DoLa层间对比解码</b></a><a class="r" href="rso.html"><small>本分支下一个 · 2023.09</small><b>RSO统计拒绝采样</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

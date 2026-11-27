@@ -1,0 +1,34 @@
+{
+  "id": "hipporag-2",
+  "who": "Bernal Jiménez Gutiérrez, Yiheng Shu, Weijian Qi, Sizhe Zhou, Yu Su · 俄亥俄州立大学",
+  "venue": "ICML 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2502.14802"},
+    {"label": "GitHub", "url": "https://github.com/OSU-NLP-Group/HippoRAG"}
+  ],
+  "aka": ["HippoRAG 2", "HippoRAG2", "From RAG to Memory", "非参数持续学习", "non-parametric continual learning", "图记忆检索", "个性化PageRank检索"],
+  "problem": "GraphRAG、HippoRAG等给检索加上知识图谱，在多跳联想问题上变好了，但在“谁是某国总统”这类简单事实题上反而明显不如一个强向量检索模型。",
+  "idea": "在HippoRAG的个性化PageRank图检索上做三处修补：把原文段落也作为节点放进图里；用整个问题去匹配图中的三元组而不是只匹配实体；再让LLM过滤一遍匹配到的三元组，挑出真正相关的作为图搜索的起点。",
+  "impact": "让结构化RAG在事实、理解、联想三类记忆任务上同时超过最强的向量检索基线（NV-Embed-v2），并把RAG明确表述为LLM的“非参数持续学习”，常被智能体长期记忆工作引用。",
+  "background": "[[hipporag]]模仿海马体索引：用LLM从每段文字里做开放信息抽取，得到（主语，关系，宾语）三元组，连成一张不预设结构的知识图谱；提问时找出问题里的实体，以它们为起点在图上跑[[pagerank]]的个性化版本，按概率扩散找到相关段落。[[graphrag]]、[[raptor]]、[[lightrag]]则先对语料做摘要再检索。作者发现这些方法都有“概念与语境”的取舍：图上的节点是短短的概念词，丢掉了原文语境。在论文的表格里，原版HippoRAG在NQ上F1为55.3，低于NV-Embed-v2的61.9。",
+  "method": "**离线建图**：沿用HippoRAG，用LLM抽三元组，并用向量相似度在相近的短语节点之间加“同义”边。新增的一步是：**每个段落本身也成为一个节点**，用“包含”边连到从它抽出的所有短语——论文称之为稠密-稀疏结合，短语是稀疏的概念，段落向量是稠密的语境。\n\n**在线检索**：\n- **问题到三元组**：不再先识别问题中的实体，而是把整句问题编码，直接检索最相近的前k个三元组，比只用实体保留了更多语义。\n- **识别记忆**：仿照人类记忆中“回忆”与“再认”的区分，让LLM从这些三元组里过滤掉无关的。\n- **图搜索**：从过滤后三元组里的短语节点、以及所有段落节点出发设置重置概率，运行个性化PageRank，按段落节点的最终得分排序取回段落。若过滤后一个三元组都不剩，就直接退回普通向量检索。\n\n**结果**：全部方法都用Llama-3.3-70B-Instruct作阅读器、NV-Embed-v2作检索器。七个数据集上的平均F1，HippoRAG 2为59.8，NV-Embed-v2为57.0，原版HippoRAG为53.1，GraphRAG为49.6；NQ上从HippoRAG的55.3回升到63.3，多跳的MuSiQue为48.6（NV-Embed-v2为45.7）。摘要称联想类任务比最强嵌入模型提升7%。",
+  "legacy": "它把“图结构RAG一定牺牲简单事实召回”这个现象摆上台面，并给出一种不必在两者间二选一的做法；智能体记忆系统（如[[a-mem]]、[[zep]]一类）讨论“检索即记忆”时常把它作为参照。",
+  "limits": [
+    {"text": "建图需要用LLM对每个段落做三元组抽取，在线检索还要多调用一次LLM过滤，语料大、更新频繁时成本高。", "solved_by": []},
+    {"text": "图里没有时间信息，新旧事实冲突时无法判断哪条仍然成立，离真正的“持续学习”还差这一层。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "hipporag", "type": "solves", "note": "原版在简单事实问答上低于强向量检索；加入段落节点和问题到三元组匹配后，NQ的F1从55.3回到63.3。"},
+    {"to": "graphrag", "type": "rivals", "note": "GraphRAG靠社区摘要做全局理解，HippoRAG 2靠图上概率扩散；同一设置下平均F1为49.6对59.8。"},
+    {"to": "pagerank", "type": "uses", "note": "检索核心是从种子节点出发的个性化PageRank。"},
+    {"to": "rag", "type": "extends", "note": "把RAG重新表述为不改参数的长期记忆与持续学习机制。"},
+    {"to": "raptor", "type": "rivals", "note": "RAPTOR用层次摘要树组织语料，同一设置下平均F1为48.8。"}
+  ],
+  "prereq": ["retrieval", "embedding", "graph-basics", "markov-chain", "language-model"],
+  "terms": [
+    {"t": "个性化PageRank", "d": "在图上随机游走，每一步有一定概率跳回指定的起点节点；最终停留概率高的节点就是与起点关系最紧密的节点。"},
+    {"t": "开放信息抽取（OpenIE）", "d": "不预先规定关系类型，直接从句子里抽出（主语，关系，宾语）三元组。"}
+  ],
+  "learn": "先读[[hipporag]]和[[c:markov-chain]] → 读原文第3节三处改进与第6节消融（三种问题链接方式的比较） → 动手：用networkx对一张小图跑personalized_pagerank，改变起点节点，看排名怎么变。",
+  "check": {"source": "https://arxiv.org/abs/2502.14802", "confirmed": "标题、作者、v1提交于2025-02-20；摘要中“非参数持续学习”、个性化PageRank、联想任务+7%；正文（arxiv.org/html/2502.14802）核对OpenIE三元组与同义边、段落节点与contains边、NER/问题到节点/问题到三元组三种链接、默认问题到三元组、LLM过滤三元组、无三元组时退回向量检索、Llama-3.3-70B阅读器与NV-Embed-v2、表2平均F1 59.8/57.0/53.1/49.6/48.8及NQ 55.3/61.9/63.3与MuSiQue 48.6/45.7。venue与单位凭一般了解。"}
+}

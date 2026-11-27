@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>自适应softmax（2016） · AI脉络</title>
+<meta name="description" content="大词表语言模型（One Billion Word的词表约80万）每一步都要算一个与词表一样大的softmax；层次softmax、采样类方法要么测试时仍需完整softmax，要么在GPU上并不快，要么效果下降。 利用词频的齐普夫分布：把少数高频词和几个「尾部簇」的代表放在第一层softmax里直接…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/adaptive-softmax.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="自适应softmax（2016）">
+<meta property="og:description" content="大词表语言模型（One Billion Word的词表约80万）每一步都要算一个与词表一样大的softmax；层次softmax、采样类方法要么测试时仍需完整softmax，要么在GPU上并不快，要么效果下降。 利用词频的齐普夫分布：把少数高频词和几个「尾部簇」的代表放在第一层softmax里直接…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/adaptive-softmax.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/adaptive-softmax">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 语言模型</div>
+<h1>自适应softmax</h1>
+<div class="full">Efficient softmax approximation for GPUs</div>
+<div class="meta"><span>2016.09</span><span>论文</span><span>延伸</span><span>ICML 2017</span><span>Edouard Grave, Armand Joulin, Moustapha Cissé, David Grangier, Hervé Jégou · Facebook AI Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1609.04309" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/facebookresearch/adaptive-softmax" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/adaptive-softmax">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>大词表语言模型（One Billion Word的词表约80万）每一步都要算一个与词表一样大的softmax；层次softmax、采样类方法要么测试时仍需完整softmax，要么在GPU上并不快，要么效果下降。</p></div><div><h4>方法</h4><p>利用词频的齐普夫分布：把少数高频词和几个「尾部簇」的代表放在第一层softmax里直接预测，低频词分到若干尾部簇中、只在需要时再计算；簇的大小按GPU上矩阵乘法的真实耗时模型优化，尾部簇用降维投影减小容量。</p></div><div><h4>影响</h4><p>比标准softmax快2到10倍，精度接近完整softmax；在One Billion Word上单GPU训练5天达到困惑度48。它成为大词表语言模型的常用输出层，Transformer-XL等模型在WikiText-103和One Billion Word上都采用了它的变体。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><b>观察一：词频极不均衡</b>。在Penn Treebank里，20%的词覆盖了87%的文本。如果把词表分成高频的头部<code>V_h</code>和低频的尾部<code>V_t</code>，绝大多数时候只用到头部。<b>观察二：GPU上的耗时不是线性的</b>。作者实测，隐状态矩阵（批大小×d）乘以词向量矩阵（d×k）的耗时在k较小时几乎不变，k超过某个阈值后才线性增长；因此把计算拆成太多很小的块反而不划算。</p><p><b>结构</b>。第一层（根节点）是一个短名单：包含头部所有词加上每个尾部簇各一个「簇记号」。若目标词在头部，概率就是根节点softmax给出的值；若在第i个尾部簇，则<code>p(w|h) = p₁(簇i|h) × p₂(w|簇i, h)</code>，第二个因子只在该簇内做softmax。与把所有簇都放在叶子上的两层树不同，高频词只经过一次softmax，作者指出把所有词都放进叶子会带来5%–10%左右的效果下降。</p><p><b>按代价优化</b>。给定词频分布和耗时模型<code>g(k, d)</code>，期望计算时间约为<code>g(k_h + J, d) + Σ_i p_i·g(k_i, d_i)</code>（J为尾部簇数，p_i为第i簇的概率质量），据此用动态规划选出各簇的边界。由于尾部词见得少，不需要高容量，尾部簇先把隐状态投影到更低维（如d/4）再做softmax，进一步加速。</p><p><b>结果</b>。在Text8、Europarl和One Billion Word上，相对标准softmax有2–10倍加速，且在最大语料上同等训练数据下精度没有损失；比同样改进过的层次softmax快2–3倍。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>簇的划分依赖训练语料的词频，换领域后高频词变化时需要重新划分。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>仍然要在每步计算头部的完整softmax，词表结构固定，不能处理训练时没有的新词。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/brown-clustering.html">Brown聚类</a><span class="yr">1992 · NLP</span><div class=nt>延续基于词类分解softmax的思路，但按词频和计算代价而不是分布相似性分簇。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/lm-limits.html">探索语言模型的极限</a><span class="yr">2016.02 · NLP</span><div class=nt>在One Billion Word这一大词表基准上，把单GPU训练LSTM语言模型的成本降到数天。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/hierarchical-softmax.html">层次softmax语言模型</a><span class="yr">2005 · NLP</span><div class=nt>层次softmax把所有词放到树叶上，效果下降且不贴合GPU；自适应softmax让高频词留在根节点、按GPU耗时设计簇，速度更快且效果接近完整softmax。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/nce-lm.html">NCE训练语言模型</a><span class="yr">2012.06 · NLP</span><div class=nt>NCE等采样方法只在训练时近似，测试仍要完整softmax；自适应softmax训练和测试都快。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/lstm-lm.html">LSTM语言模型</a><span class="yr">2012.09 · NLP</span><div class=nt>实验中被加速的语言模型是LSTM语言模型，词类分解输出层是它的前身。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/matrix-multiplication.html">矩阵乘法与线性变换</a> <a class="chip c" href="../c/dynamic-programming.html">动态规划</a> <a class="chip c" href="../c/perplexity.html">困惑度</a></p>
+<h2>本篇术语</h2><ul><li><b>齐普夫分布</b>　词的频率大致与其频率排名成反比：极少数词非常常见，绝大多数词很罕见。</li><li><b>短名单</b>　放在第一层直接预测的高频词集合，罕见词通过簇记号间接预测。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/hierarchical-softmax.html">层次softmax语言模型</a>和<a class="ln" href="../n/nce-lm.html">NCE训练语言模型</a>的讲解 → 读原文第4节GPU耗时模型和簇的优化 → 动手：用PyTorch的AdaptiveLogSoftmaxWithLoss在WikiText-103上训练一个LSTM语言模型，比较与完整softmax的每步耗时。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1609.04309" rel="noopener">https://arxiv.org/abs/1609.04309</a>（arXiv：标题、五位作者、2016-09-14提交、摘要（利用不平衡词分布形成显式最小化期望计算时间的簇、利用GPU矩阵运算特点、EuroParl与One Billion Word上大幅提效且精度接近完整softmax）；PDF正文：One Billion Word约80万词表、PTB中20%的词覆盖87%文本、K40/Maxwell实测耗时、头部作为根节点短名单、全部放叶子约5–10%下降、尾部投影降容量、2×–10×加速、比改进的层次softmax快2–3倍、单GPU五个epoch约5天困惑度48。期望代价公式按论文思路概括，d/4的投影比例和Transformer-XL采用其变体凭一般了解；ICML 2017出处凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E8%87%AA%E9%80%82%E5%BA%94softmax%EF%BC%88adaptive-softmax%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aadaptive-softmax%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/adaptive-softmax.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="joint-intent-slot.html"><small>本分支上一个 · 2016.09</small><b>意图识别与槽填充联合模型</b></a><a class="r" href="gnmt.html"><small>本分支下一个 · 2016.09</small><b>谷歌神经机器翻译</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

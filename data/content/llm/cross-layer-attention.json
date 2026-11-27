@@ -1,0 +1,29 @@
+{
+  "id": "cross-layer-attention",
+  "who": "William Brandon, Mayank Mishra, Aniruddha Nrusimha, Rameswar Panda, Jonathan Ragan-Kelley · MIT、MIT-IBM Watson AI Lab",
+  "venue": "NeurIPS 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2405.12981"}
+  ],
+  "aka": ["CLA", "Cross-Layer Attention", "跨层注意力", "跨层KV共享", "cross-layer KV sharing"],
+  "problem": "长序列、大批量推理时KV缓存占满显存；MQA和GQA已经让多个查询头共享键值头（在“头”这一维度上压缩），能否再在另一个维度上压缩？",
+  "idea": "在“层”这一维度上共享：相邻的若干层只有第一层计算并缓存自己的K、V，后面的层直接复用这份K、V，只计算各自的查询。在MQA基础上再省一半KV缓存，精度几乎不变。",
+  "impact": "给出KV缓存压缩的另一条正交路线，可以与MQA/GQA、量化叠加；腾讯Hunyuan-Large、NVIDIA Hymba等模型都采用了跨层KV共享。",
+  "method": "背景：推理时每生成一个token，都要读取之前所有token在每一层的键和值，KV缓存大小为 `2 × 层数 × KV头数 × 头维度 × 序列长度 × 批量`。[[mqa]]让所有查询头共用一个KV头，[[gqa]]让每组查询头共用一个KV头，把KV头数这一项大幅降低，精度损失很小。\n\n**CLA**处理“层数”这一项。把网络的层按共享因子分组，例如共享因子为2时，第1层正常计算K、V并写入缓存，第2层不再有自己的K、V投影，而是直接用第1层的K、V，只计算自己的Q；第3层重新计算，第4层复用，依此类推。于是缓存中只需要保存一半层的K、V。这一改动在训练时就要采用（从头训练），因为被共享的层失去了自己的K、V参数。作者把它与MQA结合（称为CLA2加MQA等配置），并系统扫描了学习率、共享因子和头维度。\n\n结果：在从头训练的1B和3B参数模型上，CLA在MQA的基础上把KV缓存再缩小一半，困惑度与未修改的MQA几乎相同；在“显存—精度”权衡曲线上，CLA给出了比单纯MQA更好的帕累托点，从而支持更长的序列和更大的批量。",
+  "limits": [
+    {"text": "只在1B和3B规模、从头训练的设定下验证；能否把已训练好的模型改造成CLA，以及在数十亿参数以上和长上下文任务上的精度影响，原文没有给出。", "solved_by": []},
+    {"text": "共享KV减少的是显存而不是计算，每层仍要对完整的K、V做注意力；KV缓存的读写带宽问题也只减半。", "solved_by": ["deepseek-v2"]}
+  ],
+  "relations": [
+    {"to": "mqa", "type": "extends", "note": "MQA在头维度上共享KV，CLA在层维度上再共享一次，两者可叠加。"},
+    {"to": "gqa", "type": "extends", "note": "同属减少KV头数的方案，CLA与GQA正交，可以组合使用。"},
+    {"to": "transformer", "type": "solves", "note": "原始Transformer每层都要缓存自己的键值，长序列推理显存开销大，CLA让相邻层共用一份。"},
+    {"to": "flashattention", "type": "uses", "note": "注意力计算本身不变，仍可使用FlashAttention等高效实现，节省来自缓存而非算子。"}
+  ],
+  "prereq": ["kv-cache", "self-attention", "memory-bandwidth", "transformer-block"],
+  "terms": [
+    {"t": "共享因子", "d": "多少个相邻层共用一份KV；共享因子为2表示每两层只缓存一份键值。"}
+  ],
+  "learn": "先读[[mqa]]和[[gqa]]，自己算一遍KV缓存大小公式；读原文第2节CLA结构图和第3节帕累托曲线；动手：在小GPT里实现共享因子2的CLA，比较KV缓存大小和验证困惑度。",
+  "check": {"source": "https://arxiv.org/abs/2405.12981", "confirmed": "标题、5位作者、arXiv v1提交日2024-05-21；摘要中KV缓存在长序列大批量时显存过大、MQA与GQA是最有效的两种干预、在相邻层之间共享键值头得到CLA、在MQA基础上再缩小2倍且精度几乎相同、1B与3B从头训练、显存精度权衡的帕累托改进。机构、NeurIPS 2024、Hunyuan-Large与Hymba采用跨层KV共享为一般了解。"}
+}

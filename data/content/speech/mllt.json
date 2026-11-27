@@ -1,0 +1,31 @@
+{
+  "id": "mllt",
+  "who": "Ramesh A. Gopinath · IBM",
+  "venue": "ICASSP 1998",
+  "links": [
+    {"label": "IEEE", "url": "https://doi.org/10.1109/icassp.1998.675351"}
+  ],
+  "problem": "GMM-HMM为了节省计算只用对角协方差高斯，假设特征各维互不相关，但拼接了相邻帧的声学特征各维之间明显相关，对角假设造成建模误差。",
+  "idea": "找一个全局的线性变换矩阵，把特征旋转到「各维尽量不相关」的坐标系里，再用对角协方差高斯建模；变换矩阵按最大似然估计。",
+  "impact": "最大似然线性变换（MLLT，与Gales的半绑定协方差STC等价）和LDA组合成「LDA+MLLT」特征变换，成为Kaldi等工具中GMM-HMM训练的标准阶段。",
+  "method": "GMM-HMM的每个状态用若干高斯描述声学特征分布（见[[c:gaussian]]）。完整协方差矩阵参数太多、计算太慢，几乎所有系统都只用对角协方差，相当于假设特征各维独立。[[mfcc]]经过离散余弦变换后各维相关性已降低，但为了引入上下文，系统通常把相邻若干帧拼接起来，再用线性判别分析（LDA）降维；LDA只照顾类别可分性，不保证降维后的各维不相关。\n\nGopinath提出在特征上乘一个可逆方阵A：`y = A x`，然后在y空间中用对角高斯建模。A和高斯参数一起按最大似然估计（见[[c:mle]]），目标函数中多出一项 `log|det A|` 以保证变换后的概率密度正确。直观上，A把特征旋转到一个让所有状态的协方差「尽量接近对角」的坐标系，用一个全局矩阵换来了接近全协方差的建模能力，计算量却几乎不变。同一时期Gales从模型角度提出半绑定协方差（STC），数学上与之等价。\n\n后来的标准流程是：拼接约9帧MFCC → LDA降到40维 → MLLT → 再叠加[[fmllr]]和[[sat]]。Kaldi里经典的「tri2b/tri3b」训练阶段就是这一组合。",
+  "limits": [
+    {"text": "只有一个全局线性变换，无法同时适配所有状态各自不同的相关结构。", "solved_by": []},
+    {"text": "整套特征变换是为对角GMM服务的；神经网络声学模型能直接处理相关特征，这些变换在DNN时代逐渐不再必要。", "solved_by": ["cd-dnn-hmm"]}
+  ],
+  "relations": [
+    {"to": "hmm-asr", "type": "extends", "note": "改进GMM-HMM声学模型中对角协方差高斯的建模误差。"},
+    {"to": "mfcc", "type": "uses", "note": "作用在拼接后的MFCC类特征上，常与LDA降维连用。"},
+    {"to": "mllr", "type": "rivals", "note": "MLLR用线性变换做说话人自适应；MLLT用同类最大似然线性变换解决特征相关性问题，二者目的不同、形式相近。"}
+  ],
+  "prereq": ["gaussian", "covariance", "mle", "dimensionality-reduction", "hmm-concept"],
+  "terms": [
+    {"t": "对角协方差", "d": "只保留每一维自己的方差、假设不同维之间不相关的协方差矩阵，参数少、计算快。"},
+    {"t": "LDA（线性判别分析）", "d": "找一个投影方向，使不同类别的数据尽量分开、同类尽量聚拢，常用来给拼接的特征降维。"}
+  ],
+  "aka": ["MLLT", "最大似然线性变换", "maximum likelihood linear transform", "STC", "半绑定协方差", "LDA+MLLT"],
+  "check": {
+    "source": "https://doi.org/10.1109/icassp.1998.675351",
+    "confirmed": "Crossref记录：标题Maximum likelihood modeling with Gaussian distributions for classification、作者R.A. Gopinath、ICASSP 1998会议论文集。会议月份（1998-05）、log|det A|目标、与Gales的STC等价、LDA+MLLT流程和Kaldi阶段名为一般了解，未逐项对照原文。"
+  }
+}

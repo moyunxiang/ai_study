@@ -1,0 +1,28 @@
+{
+  "id": "nextstep-1",
+  "who": "NextStep Team（Chunrui Han, Guopeng Li, Jingwei Wu, Quan Sun, Yan Cai, Yuang Peng, Zheng Ge, Deyu Zhou et al.） · 阶跃星辰",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2508.10711"}
+  ],
+  "aka": ["NextStep-1", "连续token自回归文生图", "Flow Matching Head", "流匹配头"],
+  "problem": "自回归文生图有两条路：用VQ把图像变成离散token，会有量化损失；或在连续token上自回归，但往往要靠一个很重的扩散模型来处理每个token，计算量大。",
+  "idea": "用一个14B参数的自回归Transformer，对“离散的文字token+连续的图像token”统一做下一个token预测；每个图像token的连续值由一个只有157M参数的轻量流匹配头生成。",
+  "impact": "在文生图任务上取得了自回归模型中的领先成绩，并能直接做图像编辑，是2025年把MAR式“连续token+小生成头”路线扩展到十亿级参数文生图的代表工作之一。",
+  "method": "图像先由一个连续隐空间的自编码器编码成一串连续向量token（不量化），文字仍是普通的离散token，二者拼在同一序列里。主干是一个14B参数的解码器式Transformer，用因果注意力做下一个token预测：遇到文字位置，输出词表上的softmax，用交叉熵训练；遇到图像位置，主干输出一个条件向量，交给157M参数的流匹配头，由它从噪声出发生成该位置的连续向量，用[[flow-matching]]损失训练。\n\n这种设计让大部分计算集中在主干上，生成头很小，避免了用重型扩散模型逐token去噪；同时连续token没有量化损失。同一个模型在图文交错数据上训练，因此也能接受“原图+编辑指令”的输入输出编辑后的图像。作者表示将开源代码和模型。",
+  "limits": [
+    {"text": "仍逐token串行生成，十亿级主干加上每个token的多步流匹配采样，推理速度远慢于少步扩散模型。", "solved_by": []},
+    {"text": "连续隐空间的统计性质（如方差大小）对自回归训练稳定性影响很大，需要仔细设计归一化与噪声。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mar", "type": "extends", "note": "沿用MAR“自回归主干+小型生成头处理连续token”的思路，把它扩展到14B参数的文生图并改用流匹配头。"},
+    {"to": "fluid", "type": "extends", "note": "Fluid已把连续token自回归扩展到文生图；本文进一步做大规模、统一文字与图像的下一个token预测。"},
+    {"to": "flow-matching", "type": "uses", "note": "每个图像token由一个157M参数的流匹配头生成。"},
+    {"to": "givt", "type": "rivals", "note": "GIVT用高斯混合头建模连续token，表达力有限；本文用流匹配头，可表示更复杂的分布。"}
+  ],
+  "prereq": ["autoregressive", "latent-space", "language-model", "diffusion-process", "cross-entropy"],
+  "terms": [
+    {"t": "流匹配头", "d": "接在主干后面的一个小网络，以主干输出为条件、用流匹配把噪声变成当前位置的连续token。"}
+  ],
+  "learn": "先读MAR的扩散头和流匹配 → 读本文模型结构与训练配方 → 对比离散VQ自回归与连续token自回归在同一提示下的细节差异。",
+  "check": {"source": "https://arxiv.org/abs/2508.10711", "confirmed": "标题、作者（NextStep Team等）、v1日期2025-08-14、摘要中两种现有路线（依赖重型扩散处理连续token或VQ量化损失）、14B自回归模型加157M流匹配头、在离散文字token与连续图像token上用下一个token预测训练、文生图在自回归模型中领先、具备图像编辑能力、将开源；机构（阶跃星辰）、连续自编码器细节、隐空间归一化问题来自一般了解"}
+}

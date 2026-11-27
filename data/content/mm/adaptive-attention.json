@@ -1,0 +1,29 @@
+{
+  "id": "adaptive-attention",
+  "aka": ["Knowing When to Look", "自适应注意力", "Adaptive Attention", "视觉哨兵", "visual sentinel"],
+  "who": "Jiasen Lu, Caiming Xiong, Devi Parikh, Richard Socher · 弗吉尼亚理工 / Salesforce Research",
+  "venue": "CVPR 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1612.01887"}
+  ],
+  "problem": "注意力式描述模型每生成一个词都强制看一遍图像，但像the、of这类词根本不需要视觉信息，有些词（stop sign里的sign）仅凭前文就能猜出来，强行看图反而引入噪声。",
+  "idea": "给解码器加一个“视觉哨兵”向量，代表语言模型自己的记忆；每一步在图像各区域和这个哨兵之间一起分配注意力，由一个门控系数决定这一步该看图还是靠语言模型。",
+  "impact": "在COCO 2015描述挑战数据集和Flickr30K上以明显优势刷新最好成绩；“何时看图”的门控思路被后续描述模型（如AoANet）沿用。",
+  "method": "[[show-attend-tell]]让描述模型在生成每个词时对图像网格特征做一次注意力，挑出相关区域。但生成一句话里，大量词是功能词或可从语言上下文推出的词，此时图像信息帮不上忙。\n\n自适应注意力的做法是在LSTM解码器里额外产生一个**视觉哨兵**向量`s_t`，它由当前隐状态和记忆单元经过一个门得到，可以理解为“语言模型已经知道的东西”。每一步的上下文向量改为：\n\n`ĉ_t = β_t · s_t + (1 − β_t) · c_t`\n\n其中`c_t`是对图像各区域做空间注意力得到的视觉上下文，`β_t∈[0,1]`是“哨兵门”，它是在图像区域和哨兵这k+1个候选上做softmax时分给哨兵的那份权重。`β_t`接近1时，模型主要依赖语言模型；接近0时主要看图。\n\n论文的分析显示，模型在生成名词类视觉词时`β_t`较低，在生成功能词时较高，与直觉一致。",
+  "limits": [
+    {"text": "视觉特征仍是CNN的规则网格，注意力对象不是完整的物体，容易只看到物体的一部分。", "solved_by": ["bottom-up-top-down"]},
+    {"text": "训练仍用逐词交叉熵，与CIDEr等评测指标不一致，测试时还有曝光偏差。", "solved_by": ["scst"]}
+  ],
+  "relations": [
+    {"to": "show-attend-tell", "type": "solves", "note": "Show, Attend and Tell每一步都强制看图，自适应注意力用视觉哨兵让模型自己决定何时不看。"},
+    {"to": "lstm", "type": "uses", "note": "解码器是LSTM，视觉哨兵从其隐状态与记忆单元门控得到。"},
+    {"to": "coco", "type": "uses", "note": "在COCO描述挑战数据集上评测，刷新最好成绩。"},
+    {"to": "flickr30k", "type": "uses", "note": "同时在Flickr30K上评测。"}
+  ],
+  "prereq": ["attention-concept", "recurrent-layer", "gating", "softmax", "encoder-decoder"],
+  "terms": [
+    {"t": "视觉哨兵（visual sentinel）", "d": "解码器里一个额外的候选向量，与图像区域一起参与注意力；当模型把注意力分给它时，就表示这一步主要依靠语言模型而不看图。"}
+  ],
+  "learn": "先读[[show-attend-tell]]的软注意力公式，再读本论文第2节哨兵门的推导，画出一句描述里每个词的β_t曲线体会“何时看图”。",
+  "check": {"source": "https://arxiv.org/abs/1612.01887", "confirmed": "标题、四位作者、v1提交2016-12-06；摘要：多数方法强制每个词都注意图像、the/of与sign/phone的例子、带视觉哨兵的自适应注意力、每步决定看图还是看哨兵、COCO 2015描述挑战数据集与Flickr30K上明显刷新最好。ĉ_t与β_t的公式写法、哨兵由LSTM门控产生、β_t随词类变化的分析、CVPR 2017、机构为一般了解。"}
+}

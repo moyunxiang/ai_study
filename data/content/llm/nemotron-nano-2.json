@@ -1,0 +1,27 @@
+{
+  "id": "nemotron-nano-2",
+  "who": "NVIDIA（Aarti Basant, Abhijit Khairnar, Abhinav Khattar, Akhiad Bercovich 等200余位作者）",
+  "venue": "arXiv 2025",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2508.14444"}],
+  "aka": ["Nemotron Nano 2", "Nemotron-Nano-9B-v2", "Nemotron-Nano-12B-v2", "NVIDIA Nemotron Nano", "nemotron nano"],
+  "problem": "推理模型要生成成千上万token的长思维链，纯Transformer每生成一个token都要读越来越大的KV缓存，小模型在单卡上的推理吞吐很低。",
+  "idea": "沿用Nemotron-H的混合Mamba-Transformer架构，先用FP8预训练12B基座，再用Minitron剪枝蒸馏压到9B，使其能在单张A10G上跑128K上下文。",
+  "impact": "在推理基准上与Qwen3-8B相当或更好，而在8K输入、16K输出的推理场景下吞吐最高高6倍；并开放大部分预训练和后训练数据。",
+  "background": "[[nemotron-h]]把Transformer里大部分自注意力层换成[[mamba-2]]层，长序列下内存和计算都大幅下降。推理模型（如[[deepseek-r1]]、[[qwen3]]的思考模式）的输出动辄上万token，解码阶段正是混合架构最占优势的地方。NVIDIA希望得到一个能在入门级数据中心GPU上部署的小推理模型。",
+  "method": "训练流程分三步：\n\n- **预训练**：用FP8训练方案在20万亿token上预训练12B参数的Nemotron-Nano-12B-v2-Base，架构为Nemotron-H式混合，绝大多数层为Mamba-2，仅保留少量注意力层；\n- **对齐**：在基座上做SFT和偏好/强化学习等后训练，支持推理与非推理两种用法；\n- **压缩**：用[[minitron]]的剪枝加蒸馏策略，把对齐后的12B模型压缩到9B，目标是在单张NVIDIA A10G（22GiB显存、bfloat16）上支持最长128K token推理。",
+  "results": "摘要报告：与同级模型（如Qwen3-8B）相比，Nemotron-Nano-9B-v2在推理基准上准确率相当或更好，在8K输入、16K输出这类推理设置下推理吞吐最高达6倍；NVIDIA在Hugging Face上开放了9B、12B基座和9B基座检查点，以及大部分预训练与后训练数据集。",
+  "legacy": "它是混合Mamba架构在“小推理模型”场景的代表，后续的[[nemotron-3]]系列延续了混合架构加大规模开放数据的路线。",
+  "limits": [
+    {"text": "为单卡部署而剪枝蒸馏，知识容量和复杂推理上限受限于9B规模。", "solved_by": []},
+    {"text": "吞吐优势依赖推理框架对Mamba层的高效支持，在通用推理引擎上未必能完全兑现。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "nemotron-h", "type": "extends", "note": "沿用其以Mamba-2层为主、少量注意力层的混合架构。"},
+    {"to": "minitron", "type": "uses", "note": "用剪枝加蒸馏把12B对齐模型压缩到9B。"},
+    {"to": "qwen3", "type": "rivals", "note": "以Qwen3-8B为主要对照，准确率相当而吞吐最高6倍。"},
+    {"to": "mamba-2", "type": "uses", "note": "大部分层采用Mamba-2以降低长输出时的解码成本。"}
+  ],
+  "prereq": ["state-space-model", "kv-cache", "knowledge-distillation", "reasoning-tokens", "floating-point"],
+  "learn": "先读[[nemotron-h]]和[[minitron]]；读报告第2节架构与第4节压缩；动手：在同一张GPU上比较9B模型与Qwen3-8B生成16K token时的速度。",
+  "check": {"source": "https://arxiv.org/abs/2508.14444", "confirmed": "标题、arXiv首次提交2025-08-20；摘要中基于Nemotron-H、FP8预训练12B基座20T token、Minitron压缩到9B、单张A10G（22GiB、bf16）支持128K、对比Qwen3-8B准确率相当或更好且吞吐最高6倍、开放检查点与大部分数据集。后训练具体方法为一般了解。"}
+}

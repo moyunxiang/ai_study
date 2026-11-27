@@ -1,0 +1,31 @@
+{
+  "id": "tqc",
+  "who": "Arsenii Kuznetsov, Pavel Shvechikov, Alexander Grishin, Dmitry Vetrov · Samsung AI Center / HSE",
+  "venue": "ICML 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2005.04269"},
+    {"label": "SB3-Contrib实现", "url": "https://sb3-contrib.readthedocs.io/en/master/modules/tqc.html"}
+  ],
+  "problem": "连续控制的离策略演员-评论家会高估Q值；TD3那样取两个评论家的最小值只能粗粒度地压低估计，压多压少没法细调。",
+  "idea": "让每个评论家输出回报分布的一组分位数，把多个评论家的分位数混在一起排序，丢掉最大的那几个再算目标，丢多少就控制压低多少。",
+  "impact": "成为SAC之后MuJoCo连续控制上被反复比较的强基线，SB3-Contrib和TorchRL都内置了它，常与REDQ、DroQ等高更新比方法一起对比。",
+  "method": "离策略方法的目标里有一个对动作的“取大”操作，估计噪声会被系统性地放大成高估。[[td3]]的办法是训两个Q网络、取较小的那个，但“两个里取小”这个力度是固定的。\n\nTQC把三件事合在一起。第一是分布式评论家：沿用[[qr-dqn]]的分位数表示，每个评论家对状态-动作输出M个分位数原子，表示回报分布而不是一个均值。第二是集成：训练N个这样的评论家（论文默认N=5、M=25）。第三是截断：计算目标时把N个评论家在下一状态的N×M个原子合在一起排序，只保留最小的kN个，丢掉每个评论家平均d=M−k个最大的原子，用剩下的原子构造分位数回归的目标：\n\n`Z_target = { r + γ (z_(i)(s′, a′) − α log π(a′|s′)) : i = 1…kN }`\n\n其中 `z_(i)` 是排序后的第i小原子，熵项沿用[[sac]]。丢弃数d是一个连续可调的旋钮：d越大越保守，论文在不同环境上用不同的d。策略更新照SAC，最大化所有原子均值减去熵惩罚。\n\n摘要称TQC在当时的连续控制基准所有环境上超过此前最好结果，在最难的Humanoid上提升约25%。",
+  "limits": [
+    {"text": "每个环境最好的丢弃数d不同，需要按环境调，换一个新任务没有现成的取值规则。"},
+    {"text": "5个评论家各输出25个分位数，前向和反向的计算量比SAC大好几倍，样本效率的提升以更多算力换取。", "solved_by": ["crossq", "simba"]}
+  ],
+  "relations": [
+    {"to": "qr-dqn", "type": "uses", "note": "评论家用QR-DQN的分位数表示和分位数回归损失来学回报分布。"},
+    {"to": "sac", "type": "extends", "note": "在SAC的最大熵演员-评论家框架上把标量评论家换成截断的分布式评论家集成。"},
+    {"to": "td3", "type": "solves", "note": "TD3取两个Q的最小值只能固定力度地压低高估；TQC用丢弃的原子数连续调节保守程度。"},
+    {"to": "double-q", "type": "extends", "note": "同属对抗“取大带来的高估偏差”这一路线，从两个估计器推广到截断的分位数混合。"}
+  ],
+  "prereq": ["actor-critic", "bellman-equation", "on-off-policy", "ensemble"],
+  "terms": [
+    {"t": "分位数原子", "d": "用若干个等概率的点来表示一个分布，每个点是某个分位数位置上的取值。"},
+    {"t": "截断", "d": "排序后丢掉最大的一部分原子，只用较小的那部分做学习目标，从而压低高估。"}
+  ],
+  "learn": "先读[[td3]]理解双Q取小，再读[[qr-dqn]]的分位数回归；读原文第3节的截断目标公式；用SB3-Contrib的TQC在Humanoid上和SAC对比，并调整丢弃数观察回报曲线。",
+  "check": {"source": "https://arxiv.org/abs/2005.04269", "confirmed": "标题、四位作者、arXiv v1于2020-05-08；摘要中高估偏差、三要素（分布式评论家、截断、集成）、在连续控制基准所有环境超过此前最好、Humanoid提升25%。N=5、M=25等默认超参数按原文正文与SB3-Contrib文档的通行描述，ICML 2020按通行引用。"},
+  "aka": ["TQC", "Truncated Quantile Critics", "截断分位数评论家", "截断分位数critic"]
+}

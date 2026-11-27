@@ -1,0 +1,31 @@
+{
+  "id": "a3-attention",
+  "who": "Tae Jun Ham, Sung Jun Jung, Seonghak Kim, Young H. Oh, Yeonhong Park, Yoonho Song, Jung-Hun Park, Sanghee Lee et al. · 首尔大学 / SK海力士",
+  "venue": "HPCA 2020",
+  "aka": ["A3", "A^3", "注意力加速器", "Attention Accelerator", "近似注意力硬件"],
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2002.10941"},
+    {"label": "IEEE DOI", "url": "https://doi.org/10.1109/HPCA47549.2020.00035"}
+  ],
+  "problem": "当时的神经网络加速器几乎都围绕卷积网络和循环网络设计，很少有人专门处理注意力机制；而注意力已被视觉、语言和翻译模型广泛采用，占了总执行时间的很大一块。",
+  "idea": "把注意力看成“按内容检索”：查询只和少数几个键真正相关，大部分乘法算完也用不上。A3先用近似算法挑出可能得分高的键，只对它们做精确计算，再配上专门的硬件流水线。",
+  "impact": "较早的注意力专用加速器之一，提出“先粗筛、再精算”的近似思路；后来的[[spatten]]等稀疏注意力硬件和各种近似注意力加速器都与它比较。",
+  "method": "注意力的标准实现是矩阵-向量乘法：查询向量和所有键做点积，经过[[c:softmax]]得到权重，再对值向量加权求和（见[[c:attention-concept]]）。作者观察到，从语义上看这是一次基于内容的搜索：softmax之后绝大多数键的权重接近零，对应的点积白算了。\n\nA3因此分两步。第一步用代价很低的近似方法估计哪些键可能和查询的点积最大——例如事先把键的各个分量排好序，按查询各分量的正负和大小优先挑贡献最大的项累加，只保留候选；第二步只对候选键算精确点积、softmax和加权求和。硬件上，A3为候选筛选、点积、指数运算和累加分别设计了流水线单元，让近似算法的好处真正变成时间和能耗的节省。\n\n摘要称，与当时先进的通用硬件相比，A3在能效（每瓦性能）上提升了几个数量级，速度也有显著提升。",
+  "limits": [
+    {"text": "评估针对的是记忆网络、BERT等当时规模的模型，近似筛选会带来少量精度损失；面对长序列大模型时，键值的存储和搬运本身成为瓶颈，单靠减少计算不够。", "solved_by": ["spatten", "flashattention"]}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "solves", "note": "Transformer让注意力成为主要计算负载，A3专门为这一负载设计硬件。"},
+    {"to": "memory-networks", "type": "uses", "note": "记忆网络里的基于内容检索的注意力是A3论述和评估的典型负载。"},
+    {"to": "eie", "type": "extends", "note": "沿用“跳过无用计算”的专用加速器思路，把它从稀疏权重推广到注意力得分。"}
+  ],
+  "prereq": ["attention-concept", "softmax", "dot-product", "chip-basics"],
+  "terms": [
+    {"t": "近似计算", "d": "允许结果有很小误差，换取大幅减少运算量或能耗。"}
+  ],
+  "learn": "先弄懂[[c:attention-concept]]的点积—softmax—加权求和三步；然后随便造一个查询和100个键，算出softmax权重，看看前几名占了多少比例，就能理解A3为什么只算候选。",
+  "check": {
+    "source": "https://arxiv.org/abs/2002.10941",
+    "confirmed": "arXiv记录核对标题、11位作者、v1 2020-02-22与摘要：现有加速器聚焦CNN/RNN、注意力占执行时间很大部分、矩阵-向量乘实现次优、语义上是基于内容的搜索、近似算法加硬件专用、能效提升多个数量级。HPCA 2020由Semantic Scholar核对。作者单位、候选筛选的具体算法（按分量排序）与评估模型按一般了解写。"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "id": "epr",
+  "who": "Ohad Rubin, Jonathan Herzig, Jonathan Berant · 特拉维夫大学",
+  "venue": "NAACL 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2112.08633"},
+    {"label": "GitHub", "url": "https://github.com/OhadRubin/EPR"}
+  ],
+  "aka": ["EPR", "Efficient Prompt Retrieval", "示例检索", "demonstration retrieval", "上下文示例选择", "in-context example selection", "提示检索", "prompt retrieval"],
+  "problem": "上下文学习的效果很依赖放进提示的那几个示例，可当时挑示例只能靠BM25或句向量找“表面上像”的训练样本，而表面相似不等于对模型有帮助。",
+  "idea": "让语言模型自己给候选示例打分：看加上某个示例后，模型生成正确答案的概率有多高；高的当正例、低的当负例，用对比学习训练一个专门挑示例的稠密检索器。",
+  "impact": "把“选示例”变成一个可以用LM信号监督训练的检索问题，在三个语义解析任务上明显超过此前的示例选择方法；此后的示例检索与“用LM反馈训练检索器”的工作大多以它为起点或基线。",
+  "background": "[[gpt-3]]让“在提示里放几个例子、不更新参数”的[[c:in-context-learning]]流行起来，但[[good-icl-examples]]等工作发现，换一组示例，准确率可以相差很大。常见做法是用[[bm25]]或[[sentence-bert]]找与测试问题字面或语义最近的训练样本，这只是代理指标。",
+  "method": "**造训练数据**：对训练集中的每一对 `(x, y)`，先用无监督检索器（BM25或SBERT）从其余训练样本里召回约50个候选 ē。然后把每个候选当作单个示例放在 x 前面，让一个**打分LM**（实验里主要用GPT-Neo）计算生成正确输出的概率 `Prob(y | ē, x)`。概率最高的k个标为正例，最低的k个标为负例。因为召回时能用到正确答案 y，候选本身就和目标很接近，负例因此是“看起来像但帮不上忙”的难负例。\n\n**训练检索器**：仿照[[dpr]]用两个BERT编码器，一个编码测试输入，一个编码候选示例，用对比损失让正例的内积高于负例和同批其他样本。\n\n**推理**：测试时只用这个检索器取最相关的若干训练样本拼成提示，交给推理LM（可以与打分LM不同，例如更大的GPT-J、GPT-3或Codex）。\n\n**结果**：任务是把自然语言映射成结构化表示的Break、MTop、SMCalFlow。打分LM与推理LM都用GPT-Neo时，相比最好的基线，Break从26%到31.9%，MTop从57%到64.2%，SMCalFlow从51.4%到54.3%；用GPT-Neo打分、换更大的模型推理，提升同样存在。",
+  "legacy": "“用目标模型的似然给检索结果打标签”这个信号，后来也被[[replug]]用来训练文档检索器；示例选择、示例排序和自动构造示例（如[[auto-cot]]）此后成为提示工程中的独立研究方向。",
+  "limits": [
+    {"text": "每个训练样本都要让打分LM把几十个候选各算一遍，造数据的计算量随训练集大小线性增长。", "solved_by": []},
+    {"text": "每个候选是单独打分的，没有考虑多个示例放在一起时的组合效果和先后顺序。", "solved_by": []},
+    {"text": "只在三个语义解析任务上验证，对开放式生成或推理类任务的效果没有检验。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "gpt-3", "type": "uses", "note": "上下文学习范式的来源，也是测试时的推理LM之一。"},
+    {"to": "good-icl-examples", "type": "solves", "note": "该文用现成句向量找最近邻示例；EPR改用LM打分训练专门的检索器，在三个任务上都更好。"},
+    {"to": "dpr", "type": "uses", "note": "检索器沿用双编码器结构和对比学习目标。"},
+    {"to": "bm25", "type": "uses", "note": "召回候选示例，也是主要对照基线。"},
+    {"to": "gpt-neo", "type": "uses", "note": "主要的打分LM，同时作为推理LM。"}
+  ],
+  "prereq": ["in-context-learning", "retrieval", "embedding", "contrastive-learning", "language-model"],
+  "terms": [
+    {"t": "打分LM", "d": "专门用来评估“这个示例对生成正确答案有没有帮助”的语言模型，只在造训练数据时使用。"},
+    {"t": "难负例", "d": "表面上和正例很像、但其实是错的样本，用它训练能逼模型学会细微区别。"}
+  ],
+  "learn": "先读[[good-icl-examples]]和[[dpr]] → 读原文第3节打分与训练流程 → 动手：对一个小分类任务，用小模型计算不同示例下正确标签的对数概率，看它和句向量相似度的排名差多少。",
+  "check": {"source": "https://arxiv.org/abs/2112.08633", "confirmed": "标题、作者、v1提交于2021-12-16；摘要中用LM估计条件概率标正负例、训练稠密检索器、三个语义解析任务；正文（arxiv.org/html/2112.08633）核对BM25/SBERT召回、top-k与bottom-k标签、GPT-Neo打分、迁移到GPT-J/GPT-3/Codex、Break 26%→31.9%、MTop 57%→64.2%、SMCalFlow 51.4%→54.3%。约50个候选、BERT双编码器、venue与单位凭一般了解。"}
+}

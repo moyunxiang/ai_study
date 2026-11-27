@@ -1,0 +1,29 @@
+{
+  "id": "mobileclip",
+  "aka": ["MobileCLIP", "多模态强化训练", "multi-modal reinforced training", "DataCompDR", "端侧CLIP"],
+  "who": "Pavan Kumar Anasosalu Vasu, Hadi Pouransari, Fartash Faghri, Raviteja Vemulapalli, Oncel Tuzel · Apple",
+  "venue": "CVPR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2311.17049"},
+    {"label": "代码", "url": "https://github.com/apple/ml-mobileclip"}
+  ],
+  "problem": "CLIP类模型的图文编码器是大Transformer，内存和延迟都高，放到手机上跑不动；小模型直接按CLIP方式训练又掉点严重。",
+  "idea": "设计一族为手机延迟优化的图文编码器，并用“多模态强化训练”：把图像描述模型生成的文字和多个强CLIP教师的嵌入预先存进数据集，训练时直接读取做蒸馏。",
+  "impact": "在零样本分类和检索上给出当时最好的“延迟-精度”折中，MobileCLIP-S2比此前最好的ViT-B/16 CLIP快2.3倍且更准；“把知识存进数据集”的强化训练思路被后续高效CLIP工作沿用。",
+  "method": "[[clip]]的零样本能力来自大编码器，但大编码器在iPhone上一次推理就要几十到上百毫秒。小编码器直接用图文对训练，学到的对齐又差很多。\n\nMobileCLIP的做法分两部分。一是模型：一族专门按手机端延迟设计的图像和文本编码器。二是训练：作者提出**多模态强化训练**，本质是[[c:knowledge-distillation]]，但把蒸馏需要的东西提前算好——对[[datacomp]]里的每张图，先用一个图像描述模型生成若干条合成描述，再用一组强CLIP模型（教师集成）算出图像和文本嵌入，全部存进新数据集DataCompDR。训练学生时只需读出这些存好的嵌入算蒸馏损失，不必在线运行教师，训练开销几乎不增加。\n\n摘要报告：MobileCLIP-S2比此前最好的ViT-B/16 CLIP快2.3倍且更准；同样的强化训练用于ViT-B/16，在38个评测基准上平均提高2.9%；相比不做强化的CLIP训练，学习效率提高10到1000倍。",
+  "limits": [
+    {"text": "强化数据集要先用多个大教师离线处理全部图片，生成和存储成本转移到了数据准备阶段，换数据或换教师就要重做一遍。", "solved_by": []},
+    {"text": "只是双塔对比模型，能做检索和零样本分类，但不能像VLM那样回答开放问题；手机上的多模态问答需要另配语言模型。", "solved_by": ["fastvlm"]}
+  ],
+  "relations": [
+    {"to": "clip", "type": "solves", "note": "CLIP编码器太大无法端侧运行，MobileCLIP用专门设计的小编码器加离线蒸馏把精度保住。"},
+    {"to": "datacomp", "type": "uses", "note": "在DataComp图文数据上加入合成描述和教师嵌入，构成强化数据集DataCompDR。"},
+    {"to": "openclip", "type": "uses", "note": "作为对比对象的公开CLIP模型（含OpenCLIP复现的各尺寸）是衡量延迟-精度折中的基线。"}
+  ],
+  "prereq": ["contrastive-learning", "knowledge-distillation", "embedding", "throughput-latency", "zero-few-shot"],
+  "terms": [
+    {"t": "强化数据集（reinforced dataset）", "d": "把教师模型的输出（合成描述、嵌入）预先算好、和原始图文一起存下来的数据集，训练学生时直接读取，省去在线运行教师的开销。"}
+  ],
+  "learn": "先懂[[clip]]的对比损失和知识蒸馏的基本形式，再读MobileCLIP第3节DataCompDR的构造，用官方仓库在手机或CPU上测一次延迟。",
+  "check": {"source": "https://arxiv.org/abs/2311.17049", "confirmed": "标题、五位作者、v1提交2023-11-28；摘要：多模态强化训练、借助图像描述模型和强CLIP教师集成、把知识存进强化数据集、S2比ViT-B/16 CLIP快2.3倍且更准、38个基准平均+2.9%、学习效率10–1000倍；arXiv HTML正文确认数据集名DataCompDR、延迟在iPhone12 Pro Max上测。CVPR 2024、Apple机构、关系中与FastVLM同团队为一般了解。"}
+}

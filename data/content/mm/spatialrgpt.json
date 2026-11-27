@@ -1,0 +1,30 @@
+{
+  "id": "spatialrgpt",
+  "aka": ["SpatialRGPT", "Spatial Region GPT", "SpatialRGPT-Bench", "区域级空间推理"],
+  "who": "An-Chieh Cheng, Hongxu Yin, Yang Fu, Qiushan Guo, Ruihan Yang, Jan Kautz, Xiaolong Wang, Sifei Liu · UC San Diego / NVIDIA",
+  "venue": "NeurIPS 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2406.01584"},
+    {"label": "项目页", "url": "https://www.anjiecheng.me/SpatialRGPT"}
+  ],
+  "problem": "VLM在二维图文任务上很强，却说不清“左边那把椅子离桌子多远、在它哪个方向”这类空间关系，也没法针对用户指定的某个区域推理。",
+  "idea": "从三维场景图自动生成区域级的空间问答数据，并给VLM的视觉编码器加一个可插拔的深度模块；推理时用户框出区域，模型回答这些区域间的方向和距离。",
+  "impact": "显著提升带区域提示和不带提示两种设置下的空间推理，发布带三维真值标注的评测SpatialRGBT-Bench，还可当机器人任务的区域级稠密奖励标注器。",
+  "method": "[[spatialvlm]]已经证明，用深度估计把网络图片“抬升”成三维点云，再自动生成空间问答，可以教会VLM估计距离。但它的问题针对整张图，用户没法指着某个具体区域问；而且模型只看RGB，深度信息要靠语言数据间接学。\n\nSpatialRGPT做了两件事：\n- **数据**：一条数据管线从图像构建三维场景图（每个物体的区域、三维位置和大小），再据此生成大量“区域A在区域B的哪个方向、相距多远、哪个更高”之类的问答。问题里的物体用区域（框或掩码）指代，模型因此学到区域级表示，做法类似[[gpt4roi]]的区域指令。\n- **深度插件**：在已有VLM的视觉编码器旁接一个灵活的深度模块，把相对深度图的特征一并送进语言模型，让三维线索直接可见。\n\n推理时，用户给出区域提议，模型就能回答它们之间的相对方向和距离。作者提出的SpatialRGBT-Bench覆盖室内、室外和仿真场景，带三维真值，用来评测VLM的三维空间认知。",
+  "limits": [
+    {"text": "三维场景图和距离真值来自单目深度估计与自动管线，尺度估计误差会直接变成训练标签里的噪声。", "solved_by": []},
+    {"text": "只处理单张图像，无法从视频或多视角中累积对整个场景的空间理解。", "solved_by": ["spatial-mllm", "cambrian-s"]}
+  ],
+  "relations": [
+    {"to": "spatialvlm", "type": "extends", "note": "沿用“从图像重建三维再自动生成空间问答”的思路，扩展到用户指定区域之间的推理。"},
+    {"to": "gpt4roi", "type": "uses", "note": "采用区域级指令的形式，让问题里的物体用框或掩码指代。"},
+    {"to": "depth-anything", "type": "uses", "note": "相对深度由单目深度模型估计，供数据管线和深度插件使用。"},
+    {"to": "vila", "type": "uses", "note": "在NVIDIA的VILA类VLM上加深度模块训练。"}
+  ],
+  "prereq": ["camera-geometry", "3d-representation", "vision-tasks", "instruction-tuning", "benchmark"],
+  "terms": [
+    {"t": "三维场景图（3D scene graph）", "d": "把场景里的每个物体表示成带三维位置、大小的节点，物体间的空间关系表示成边，可据此自动生成空间问答。"}
+  ],
+  "learn": "先读[[spatialvlm]]了解自动生成空间问答的管线，再看SpatialRGPT论文的数据管线图和深度插件结构，最后在项目页看几个区域提示的推理示例。",
+  "check": {"source": "https://arxiv.org/abs/2406.01584", "confirmed": "标题、八位作者、v1提交2024-06-03；摘要：从三维场景图学习区域表示的数据管线、可插拔深度模块接入现有VLM的视觉编码器、推理时根据用户区域提议回答方向与距离、SpatialRGBT-Bench覆盖室内室外仿真并带三维真值、有无区域提示都提升、可作机器人任务的区域级稠密奖励标注器。基座为VILA、深度来自Depth Anything类模型、NeurIPS 2024、机构为一般了解。"}
+}

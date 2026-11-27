@@ -1,0 +1,22 @@
+{
+  "id": "graph-unet",
+  "who": "Hongyang Gao, Shuiwang Ji · 德州农工大学",
+  "venue": "ICML 2019",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/1905.05178"}],
+  "aka": ["Graph U-Net", "Graph U-Nets", "gPool", "gUnpool", "TopKPooling", "Top-k图池化", "图池化"],
+  "problem": "图像上的U-Net靠池化和上采样做编码—解码，但图没有规则的网格，池化和上采样都没有自然的定义。",
+  "idea": "提出图池化gPool：用一个可训练的投影向量给每个节点打分，只保留得分最高的k个节点构成小图；对应的gUnpool按记下的位置把节点放回原图。用它们搭出图上的U-Net。",
+  "impact": "gPool就是PyG里的TopKPooling，是“按分数选节点”这一类图池化方法的起点，后续的SAGPool等都在此基础上改进。",
+  "method": "gPool层：设节点特征矩阵为X（N个节点），可训练向量p。每个节点的得分 `y = Xp/‖p‖`，取得分最高的k个节点下标idx，新图的特征为 `X' = X[idx] ⊙ tanh(y[idx])`（用得分做门控，使p能通过梯度学习），邻接矩阵取对应的子矩阵 `A' = A[idx, idx]`。这样图被缩小为k个节点，相当于图像上的下采样。\n\ngUnpool层是逆操作：新建一个N个节点的零矩阵，把小图的节点特征按记下的idx放回原位置，图结构恢复为原来的邻接矩阵。\n\nGraph U-Net由若干“GCN + gPool”的编码块和对应的“gUnpool + GCN”解码块组成，编码与解码之间有跳跃连接；为了缓解池化后小图连通性变差，作者先对邻接矩阵取平方（连接二跳邻居）再池化。摘要提到实验在节点分类和图分类任务上进行，表现优于以往模型。",
+  "limits": [
+    {"text": "打分只看节点自身特征，不考虑图结构，可能保留一堆互不相连的节点。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "unet", "type": "extends", "note": "把U-Net的编码-解码与跳跃连接结构搬到图上。"},
+    {"to": "diffpool", "type": "rivals", "note": "DiffPool学习软的簇分配矩阵，代价随节点数平方增长；gPool只选Top-k节点，更省内存。"},
+    {"to": "gcn", "type": "uses", "note": "编码与解码块中使用GCN层。"}
+  ],
+  "prereq": ["graph-basics", "message-passing", "conv-layer", "encoder-decoder"],
+  "learn": "先读[[unet]]和[[diffpool]]；读论文第3节gPool与gUnpool的公式；动手在PyG里用TopKPooling搭一个图分类网络，在PROTEINS数据集上测试。",
+  "check": {"source": "https://arxiv.org/abs/1905.05178", "confirmed": "标题、2位作者、arXiv v1 2019-05-11；摘要中图上缺乏自然的池化与上采样、gPool按可训练投影向量上的标量投影选节点、gUnpool用位置信息还原、组成Graph U-Net。打分与门控公式、邻接矩阵取平方、与PyG TopKPooling的对应、节点与图分类实验、ICML 2019凭一般了解。"}
+}

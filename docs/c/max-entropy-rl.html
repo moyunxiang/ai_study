@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>熵正则与最大熵强化学习（Entropy Regularization and Maximum-Entropy RL） · AI脉络</title>
+<meta name="description" content="在回报之外再奖励策略的熵，让智能体在达成目标的同时尽量保持随机。轻则作为防止过早收敛的正则项，重则改写整个目标：最优策略变成按Q值做softmax的“玻尔兹曼策略”。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/max-entropy-rl.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="熵正则与最大熵强化学习（Entropy Regularization and Maximum-Entropy RL）">
+<meta property="og:description" content="在回报之外再奖励策略的熵，让智能体在达成目标的同时尽量保持随机。轻则作为防止过早收敛的正则项，重则改写整个目标：最优策略变成按Q值做softmax的“玻尔兹曼策略”。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/max-entropy-rl.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/max-entropy-rl">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>熵正则与最大熵强化学习</h1><div class="full">Entropy Regularization and Maximum-Entropy RL</div>
+<p class="muted" style="font-size:13px">也叫：最大熵强化学习　maximum entropy RL　MaxEnt RL　熵正则　熵正则化　entropy regularization　entropy bonus　熵奖励　软价值函数　soft value function　soft Q　软Q　软Bellman方程　soft Bellman equation　温度系数　temperature　玻尔兹曼策略　Boltzmann policy　KL正则强化学习　KL-regularized RL</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/max-entropy-rl">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>在回报之外再奖励策略的熵，让智能体在达成目标的同时尽量保持随机。轻则作为防止过早收敛的正则项，重则改写整个目标：最优策略变成按Q值做softmax的“玻尔兹曼策略”。</b></p>
+<p class="tags">先要会：<a class="chip c" href="entropy.html">信息量与熵</a> <a class="chip c" href="policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="bellman-equation.html">Bellman方程</a></p>
+<p>策略梯度训练中常见的一个失败是：策略很快变得近乎确定，只选某一个动作，之后再也探索不到更好的选项。另一个问题是：有多种同样好的做法时，确定性策略只学会其中一种，环境一变就失效。给策略的<a class="lc" href="../c/entropy.html">信息量与熵</a>加一项奖励可以同时缓解这两点。</p><p><b>熵正则（熵奖励）</b>。最轻的用法是在策略梯度的损失里加<code>−β·H(π(·|s))</code>，β很小（例如0.01）。<a class="ln" href="../n/a3c.html">A3C</a>和<a class="ln" href="../n/ppo.html">PPO</a>的常见实现都带这一项。它只是一个正则，不改变问题的定义。</p><p><b>最大熵强化学习</b>。把熵直接写进目标：</p><p class="formula"><code>J(π) = E[Σ_t γ^t · (r_t + α · H(π(·|s_t)))]</code></p><p>α叫<b>温度</b>，平衡回报和随机性。相应地价值函数变成“软”的：</p><p><code>Q(s, a) = r + γ · E_{s&#x27;}[V(s&#x27;)]</code>，<code>V(s) = E_{a~π}[Q(s, a) − α · log π(a|s)]</code></p><p>这组式子叫<b>软Bellman方程</b>。最优策略有闭式：</p><p><code>π*(a|s) ∝ exp(Q*(s, a) / α)</code>，<code>V*(s) = α · log Σ_a exp(Q*(s, a) / α)</code></p><p>即对Q做温度为α的<a class="lc" href="../c/softmax.html">Softmax与logits</a>；α→0时退化为普通的贪心策略和max。</p><p><b>算法</b>。<a class="ln" href="../n/soft-q-learning.html">软Q学习（能量策略）</a>按这一框架学习能量形式的策略；<a class="ln" href="../n/sac.html">SAC</a>是它的Actor-Critic版本，并自动调节α，使策略熵维持在一个目标值附近（连续动作常取负的动作维数），成为连续控制最常用的离策略算法之一。<a class="ln" href="../n/munchausen-rl.html">Munchausen RL</a>在此基础上加入对数策略项。逆强化学习里同样的结构见<a class="ln" href="../n/maxent-irl.html">最大熵逆强化学习</a>。</p><p><b>与KL正则的关系</b>。把熵换成与参考策略的KL散度，目标<code>E[r] − β·KL(π ‖ π_ref)</code>的最优解是<code>π ∝ π_ref · exp(r/β)</code>。这正是RLHF里KL惩罚的形式，见<a class="lc" href="../c/rlhf-concept.html">人类反馈强化学习</a>和<a class="lc" href="../c/kl-divergence.html">KL散度</a>。</p>
+<div class="example"><h4>例子</h4><p>某状态两个动作，Q=1和Q=0。α=1时，最优软策略为<code>e¹/(e¹+e⁰) ≈ 0.73</code>和0.27，软价值<code>V = log(e + 1) ≈ 1.31</code>，比max的1还大，多出来的部分就是熵的价值。α=0.1时概率变成<code>1/(1+e^{−10}) ≈ 0.99995</code>，几乎就是贪心；α=10时约为0.52和0.48，接近均匀随机。</p></div>
+<h2>容易误解的地方</h2><ul><li>α的量纲与奖励相同，换一个奖励尺度就要重新调α，这是SAC要自动调温度的原因。</li><li>最大熵目标下学到的Q值包含熵奖励，不能直接当作“真实回报”的估计来解读。</li><li>熵奖励不能替代有方向的探索：在需要走很长一段特定路线才能拿到奖励的任务里，局部随机性帮助有限，见<a class="lc" href="../c/intrinsic-reward.html">内在动机与内在奖励</a>。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

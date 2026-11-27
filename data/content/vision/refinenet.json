@@ -1,0 +1,30 @@
+{
+  "id": "refinenet",
+  "who": "Guosheng Lin, Anton Milan, Chunhua Shen, Ian Reid · 阿德莱德大学 / 澳大利亚机器人视觉中心",
+  "venue": "CVPR 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1611.06612"},
+    {"label": "代码", "url": "https://github.com/guosheng/refinenet"}
+  ],
+  "aka": ["RefineNet", "多路径细化网络", "链式残差池化", "chained residual pooling", "CRP"],
+  "problem": "深层网络反复池化和步长卷积后分辨率只剩1/32；[[deeplab]]用空洞卷积保住分辨率但计算和显存很贵，[[fcn]]式跳连又只是简单相加，细节恢复得不够。",
+  "idea": "把下采样过程中每一级的特征都用起来：从最深层开始，逐级和更浅、更高分辨率的特征融合，每次融合都经过残差卷积单元、多分辨率融合和“链式残差池化”，全部用残差连接便于端到端训练。",
+  "impact": "成为2017年前后语义分割的代表性多尺度解码器之一，在七个数据集上刷新当时结果；其“自顶向下逐级融合”的思路与同期的[[fpn]]相近。",
+  "method": "[[resnet]]有4个阶段，输出分别是原图的1/4、1/8、1/16、1/32。RefineNet给每个阶段配一个细化模块，从1/32那一级开始往上串：每个模块接收本级的ResNet特征和上一个模块的输出，做三件事：\n\n- **残差卷积单元**：两层3×3卷积加恒等捷径，先把骨干特征调整成适合分割的形式；\n- **多分辨率融合**：把低分辨率的输入上采样到本级大小，与本级特征逐元素相加；\n- **链式残差池化**：连续几次“池化＋卷积”，每次结果都加回主路，相当于用越来越大的窗口汇集背景上下文。\n\n所有部件都按[[preact-resnet]]的恒等映射思路设计，梯度可以从输出直接流回各层骨干。最后一个模块输出1/4分辨率的预测，再上采样到原图。\n\n摘要报告在七个公开数据集上取得新的最好结果，其中PASCAL VOC 2012的IoU为83.4。相比空洞卷积方案，它不需要在高分辨率上跑整个深层网络，显存更省。后续[[deeplabv3plus]]用更轻的解码器结合空洞卷积，[[pspnet]]和[[ocrnet]]则把重点放在上下文聚合上。",
+  "limits": [
+    {"text": "每一级都有完整的细化模块，解码器本身很重，速度不适合实时场景。", "solved_by": ["deeplabv3plus", "segformer"]},
+    {"text": "上下文只靠局部池化链来汇集，对整张图级别的全局关系建模有限。", "solved_by": ["pspnet", "ocrnet"]}
+  ],
+  "relations": [
+    {"to": "resnet", "type": "uses", "note": "以ResNet四个阶段的特征为输入，每级接一个细化模块。"},
+    {"to": "deeplab", "type": "rivals", "note": "DeepLab靠空洞卷积在高分辨率上保持特征；RefineNet改为多级融合恢复分辨率，显存开销更小。"},
+    {"to": "fcn", "type": "solves", "note": "FCN的跳连只是简单相加得分图；RefineNet在每一级用残差卷积和链式池化做更充分的融合，细节更好。"},
+    {"to": "preact-resnet", "type": "uses", "note": "各部件按恒等映射的残差设计，保证长距离梯度传递、可端到端训练。"}
+  ],
+  "prereq": ["vision-tasks", "conv-layer", "residual-connection", "encoder-decoder", "iou-map"],
+  "terms": [
+    {"t": "链式残差池化", "d": "连续做几次池化加卷积，每一步的结果都加回主干，用逐步扩大的窗口收集周围背景信息。"}
+  ],
+  "learn": "先弄清ResNet各阶段的分辨率，再读本文第3节的模块结构图；可以和FPN的自顶向下路径对照着看两者的异同。",
+  "check": {"source": "https://arxiv.org/abs/1611.06612", "confirmed": "arXiv记录：标题、四位作者、v1提交于2016-11-20；摘要中的多路径细化、长距离残差连接、恒等映射、链式残差池化、七个数据集、VOC 2012上IoU 83.4。CVPR 2017、机构、各模块的具体卷积配置凭一般了解写。"}
+}

@@ -1,0 +1,35 @@
+{
+  "id": "tora",
+  "who": "Zhibin Gou, Zhihong Shao, Yeyun Gong, Yelong Shen, Yujiu Yang, Minlie Huang, Nan Duan, Weizhu Chen · 清华大学 / 微软",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2309.17452"},
+    {"label": "GitHub", "url": "https://github.com/microsoft/ToRA"}
+  ],
+  "aka": ["ToRA", "Tool-Integrated Reasoning", "TIR", "工具集成推理", "ToRA-Code", "输出空间塑形", "output space shaping"],
+  "problem": "数学题有两种做法：思维链用自然语言推理，善于分析却常算错；PAL式方法直接写程序交给解释器，算得准却不擅长需要分析的步骤。2023年开源模型在竞赛级MATH上还普遍远低于50%。",
+  "idea": "把两者交错起来：模型先用自然语言分析，需要解方程、做符号运算时写一段Python代码调用SymPy等库，拿到执行结果再继续推理，可多轮往返。用GPT-4合成这类“推理—代码—结果”交错的轨迹来训练开源模型，再用“输出空间塑形”扩充有效轨迹。",
+  "impact": "ToRA-7B在MATH上比当时最好的开源模型WizardMath-70B高22个百分点，ToRA-Code-34B以50.8%成为首个在MATH上超过50%的开源模型（论文原话）；“工具集成推理（TIR）”格式此后被DeepSeekMath、Qwen-Math等数学模型直接采用。",
+  "background": "[[cot]]用文字推理，[[pal]]和[[faithful-cot]]把题目整个转成程序交给求解器。前者计算不可靠，后者在需要先理解题意、分类讨论的题上吃力，而且一次性写完的程序无法根据中间结果调整思路。同期GPT-4的代码解释器展示了“边想边算”的威力，但开源模型没有这种能力。",
+  "method": "**推理格式**：给定题目q，模型生成一段推理 r₁；到了适合用工具的地方，写出程序 a₁（例如用SymPy解方程）；环境执行得到输出 o₁；模型把 o₁ 放进上下文继续写推理 r₂……如此最多3轮，最后给出答案。\n\n**第一步：模仿学习**。对GSM8K和MATH训练集，用GPT-4按这种格式贪心生成轨迹，只保留答案正确的；做错的题再用核采样多试10次，每题最多保留4条正确轨迹。最终为98.2%的GSM8K题和83.1%的MATH题拿到了轨迹，过滤掉工具出错的之后得到1.6万条，称为ToRA-Corpus，用它微调LLaMA-2和CodeLLaMA系列。\n\n**第二步：输出空间塑形**。只模仿GPT-4的一条轨迹会让模型的解法单一。于是让微调后的模型对每题采样多条轨迹：正确的直接保留；错误的，从出错处截断，交给一个更强的教师模型（在ToRA-Corpus上训练的CodeLLaMA-34B）续写修正。共得到23.3万条有效样本和6.9万条修正样本，与原语料合并后重新训练。\n\n**结果**：7B到70B的模型在10个数学数据集上平均比同规模开源模型高13%到19%。ToRA-7B在MATH上为44.6%；ToRA-Code-34B为50.8%，高于GPT-4思维链的42.5%，接近GPT-4用代码解题的51.8%。",
+  "legacy": "TIR格式与“模型推理、解释器计算”的分工成为数学大模型的标配，后来的[[retool]]、[[rstar2-agent]]则把同样的交互格式放进强化学习，让模型自己学会何时调用代码。",
+  "limits": [
+    {"text": "训练轨迹依赖GPT-4合成，MATH上仍有约17%的题拿不到正确轨迹，最难的题恰恰学不到。", "solved_by": []},
+    {"text": "靠模仿学习，模型只学会照着示范的时机和方式调用工具，没有通过与环境交互的反馈去改进策略。", "solved_by": ["retool", "rstar2-agent"]},
+    {"text": "工具只覆盖Python数值与符号计算，几何作图、严格证明这类题帮助有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "pal", "type": "solves", "note": "PAL一次性写完程序，缺少自然语言分析；ToRA把推理与代码交错，并能根据执行结果调整后续推理。"},
+    {"to": "cot", "type": "extends", "note": "保留自然语言推理，在需要精确计算的步骤插入代码调用。"},
+    {"to": "gpt-4", "type": "uses", "note": "用GPT-4合成ToRA-Corpus训练轨迹，也是主要对照。"},
+    {"to": "code-llama", "type": "uses", "note": "ToRA-Code系列以CodeLLaMA为基础，CodeLLaMA-34B还充当输出空间塑形的教师。"},
+    {"to": "math-dataset", "type": "uses", "note": "主要训练与评测数据之一，ToRA-Code-34B在其上首次让开源模型超过50%。"}
+  ],
+  "prereq": ["tool-calling", "pretrain-finetune", "imitation-learning", "language-model", "decoding-sampling"],
+  "terms": [
+    {"t": "工具集成推理（TIR）", "d": "在一段推理里交替出现自然语言分析、代码和代码执行结果的格式。"},
+    {"t": "输出空间塑形", "d": "用模型自己采样出的多种正确解法，加上教师修正过的错误解法，扩充训练数据，让模型掌握更多样的合理解题路径。"}
+  ],
+  "learn": "先读[[cot]]和[[pal]] → 读原文第2节图2三种推理格式对比与图3两步训练流程 → 动手：写一个循环，让模型输出代码块时自动执行并把结果拼回提示，用几道MATH题试一试多轮交互。",
+  "check": {"source": "https://arxiv.org/abs/2309.17452", "confirmed": "标题、作者、v1提交于2023-09-29；摘要中工具集成推理、模仿学习与输出空间塑形、10个数据集平均+13%–19%、ToRA-7B在MATH上44.6%超过WizardMath-70B 22%、ToRA-Code-34B首个超过50%；正文（arxiv.org/html/2309.17452）核对推理格式r/a/o、最多3轮、GPT-4贪心与核采样10次且每题至多4条、98.2%与83.1%、1.6万条ToRA-Corpus、CodeLLaMA-34B教师、23.3万与6.9万条、50.8%对GPT-4 CoT 42.5%与GPT-4-Code 51.8%、清华与微软署名。DeepSeekMath、Qwen-Math采用TIR格式凭一般了解；venue凭一般了解。"}
+}

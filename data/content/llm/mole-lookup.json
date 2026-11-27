@@ -1,0 +1,27 @@
+{
+  "id": "mole-lookup",
+  "who": "Shibo Jie, Yehui Tang, Kai Han, Yitong Li, Duyu Tang, Zhi-Hong Deng, Yunhe Wang · 北京大学、华为诺亚方舟实验室",
+  "venue": "ICML 2025 Oral",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2503.15798"}],
+  "aka": ["MoLE", "Mixture of Lookup Experts", "查表专家", "查找表专家混合", "LUT experts"],
+  "problem": "MoE推理时计算量小，但所有专家的参数都得放在显存里；把专家卸载到内存或硬盘再按需加载，又会让延迟大增。",
+  "idea": "训练时专家是以词嵌入为输入的FFN；推理前把它们预先算成按词id索引的查找表，推理时只查表、不再计算专家。",
+  "impact": "在相同FLOPs和显存下，推理速度接近稠密模型、明显快于卸载专家的MoE，效果与MoE相当。",
+  "background": "[[sparse-moe]]、[[mixtral]]、[[deepseekmoe]]让每个token只激活少数专家，但路由是动态的，事先不知道会用到哪个专家，于是全部专家都要驻留显存。显存不够时只能把专家放到CPU内存或SSD，按需搬运，通信开销抵消了MoE省下的计算。",
+  "method": "MoLE的关键是让专家的输入只依赖词id，从而可以离线穷举：\n\n- 训练时，专家仍是普通FFN，但它们的输入是**嵌入层的输出** `e(x)`，而不是中间层的隐藏状态；各专家输出按路由权重加权后加到对应层上。训练阶段所有专家都参与计算，不存在负载均衡问题。\n- 推理前做重参数化：对词表里每个词id预先计算 `FFN_i(e(x))`，存成查找表（LUT）并卸载到存储设备。\n- 推理时根据输入id直接取出各专家的结果送入显存，路由权重仍按上下文计算。\n\n因为取回的只是几个向量而不是整个专家的权重，通信量可以忽略，也不需要专家计算。",
+  "results": "摘要报告：在相同推理FLOPs和显存占用下，MoLE的推理速度与稠密模型相当，显著快于采用专家卸载的MoE，同时性能与MoE持平。",
+  "legacy": "它与[[engram]]等“按token查表的条件记忆”思路相呼应，把“参数放在存储里、按需取回”推进为一种模型结构设计；入选ICML 2025口头报告。",
+  "limits": [
+    {"text": "专家只能看到词嵌入、看不到上下文，表达能力弱于以隐藏状态为输入的常规MoE专家。", "solved_by": []},
+    {"text": "查找表大小正比于词表大小乘专家数乘隐藏维度，存储占用很大，依赖便宜的外部存储。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "sparse-moe", "type": "solves", "note": "解决MoE所有专家都要驻留显存、卸载又太慢的部署问题。"},
+    {"to": "deepseekmoe", "type": "rivals", "note": "同为扩大参数而不增计算，但MoLE把专家计算提前到离线查表。"},
+    {"to": "mixtral", "type": "rivals", "note": "对比对象之一：常规MoE需要卸载专家时延迟显著上升。"}
+  ],
+  "prereq": ["mixture-of-experts", "embedding", "mlp", "memory-bandwidth", "training-vs-inference"],
+  "terms": [{"t": "重参数化", "d": "训练后把一种计算结构等价地换成另一种更适合推理的形式，这里是把FFN换成按词id索引的表。"}],
+  "learn": "先读[[sparse-moe]]理解路由与专家；读MoLE第3节训练与推理两种形态；动手：对一个以嵌入为输入的小FFN，枚举词表算出查找表，验证查表输出与直接计算一致。",
+  "check": {"source": "https://arxiv.org/abs/2503.15798", "confirmed": "标题、作者、arXiv首次提交2025-03-20；摘要中专家以嵌入层输出为输入、推理前重参数化为LUT并卸载、同FLOPs与显存下速度接近稠密模型；ICML 2025 oral见paper copilot列表。机构为一般了解。"}
+}

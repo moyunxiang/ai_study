@@ -1,0 +1,31 @@
+{
+  "id": "droq",
+  "who": "Takuya Hiraoka, Takahisa Imagawa, Taisei Hashimoto, Takashi Onishi, Yoshimasa Tsuruoka · NEC / 产业技术综合研究所 / 东京大学",
+  "venue": "ICLR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2110.02034"}
+  ],
+  "problem": "[[redq]]靠10个Q网络的集成加高更新-数据比，在连续控制上达到了当时最高的样本效率，但计算量远大于[[sac]]：每次更新都要前向和反向传播整个大集成。",
+  "idea": "DroQ用一个很小的集成（2个）代替REDQ的大集成，每个Q网络都加上[[dropout]]和[[layernorm]]：dropout让每次前向传播都相当于从一个隐式的大集成里抽样，层归一化则保证加了dropout之后训练仍然稳定。",
+  "impact": "DroQ以接近SAC的计算量达到了REDQ的样本效率，成为高UTD连续控制里的常用基线，后来被[[crossq]]、[[bro]]拿来比较，也被用于真实机器人上的快速在线学习。",
+  "method": "REDQ的样本效率来自两点：高UTD比（每采一步更新20次）和用随机子集取最小来抑制Q值高估，而后者需要一个足够多样的集成。DroQ的出发点是：dropout本身就能产生多样的预测——同一个网络每次随机丢掉不同的神经元，相当于从许多共享参数的子网络中抽一个，这与[[mc-dropout]]把dropout解释为近似贝叶斯推断的思路一致。\n\n具体做法：\n- Q函数集成大小从10降到2（与SAC、TD3相同），目标值仍取两者的最小值；\n- 每个Q网络的每个隐藏层后面依次接dropout和层归一化；\n- 保持REDQ的高UTD比（如20）。\n\n作者发现层归一化是关键：只加dropout时训练不稳定、性能下降，加上层归一化后dropout带来的随机性才能有效地替代大集成。消融也比较了把dropout换成其他正则方式的效果。\n\n摘要称，DroQ在样本效率上与REDQ相当，计算效率远好于REDQ，并与SAC的计算效率相当——即在样本和计算两方面都高效（doubly efficient）。",
+  "limits": [
+    {"text": "仍需要高UTD比，每步20次更新的墙钟时间比UTD=1的方法长得多。", "solved_by": ["crossq"]},
+    {"text": "dropout率等超参需要按任务调，关于dropout为何能替代集成的分析主要是经验性的。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "redq", "type": "solves", "note": "REDQ需要10个Q网络、计算昂贵；DroQ用2个带dropout和层归一化的Q网络达到相近的样本效率，计算量接近SAC。"},
+    {"to": "sac", "type": "extends", "note": "整体仍是SAC式的最大熵演员-评论家，只改评论家的结构和更新频率。"},
+    {"to": "dropout", "type": "uses", "note": "用dropout在单个网络里产生近似集成的随机性。"},
+    {"to": "layernorm", "type": "uses", "note": "层归一化使加入dropout后的Q学习保持稳定，消融显示两者缺一不可。"},
+    {"to": "mc-dropout", "type": "extends", "note": "借用把dropout看作近似集成或贝叶斯推断的观点，用到Q值估计上。"}
+  ],
+  "prereq": ["actor-critic", "dropout-concept", "normalization-layer", "ensemble", "td-error"],
+  "terms": [
+    {"t": "UTD比", "d": "update-to-data ratio，每收集一步新数据对网络做多少次梯度更新。"},
+    {"t": "隐式集成", "d": "通过dropout等随机机制，让一个网络在多次前向时给出不同预测，起到类似多个独立网络的作用。"}
+  ],
+  "learn": "先读[[redq]]和[[sac]]；读原文第3节DroQ的结构和消融；在MuJoCo的Hopper上比较SAC（UTD=1）、REDQ和DroQ的样本效率与每步耗时。",
+  "check": {"source": "https://arxiv.org/abs/2110.02034", "confirmed": "标题、五位作者、arXiv v1于2021-10-05；摘要中REDQ靠大Q函数集成达到最高样本效率但计算远不如SAC、DroQ是使用小规模dropout Q函数集成的REDQ变体、dropout Q函数是带dropout连接和层归一化的简单Q函数、样本效率与REDQ相当、计算效率远好于REDQ并与SAC相当。集成大小为2、UTD=20、层归一化的消融作用、ICLR 2022、机构和真实机器人应用按原文正文与通行引用。"},
+  "aka": ["DroQ", "Dropout Q-Functions", "Dropout Q函数", "DroQ-SAC"]
+}

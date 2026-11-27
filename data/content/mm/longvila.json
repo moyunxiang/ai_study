@@ -1,0 +1,32 @@
+{
+  "id": "longvila",
+  "aka": ["LongVILA", "MM-SP", "多模态序列并行", "Multi-Modal Sequence Parallelism"],
+  "who": "Yukang Chen, Fuzhao Xue, Dacheng Li, Qinghao Hu, Ligeng Zhu, Xiuyu Li, Yunhao Fang, Haotian Tang et al. · NVIDIA / MIT / UC Berkeley等",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2408.10188"},
+    {"label": "代码", "url": "https://github.com/NVlabs/VILA"}
+  ],
+  "problem": "长视频要几千帧、上百万个视觉token，现有VLM只看8到几十帧；而在这样长的序列上训练，显存和通信开销让普通的并行方案跑不动。",
+  "idea": "算法和系统一起设计：给VILA加上“长上下文扩展”和“长视频监督微调”两个训练阶段，并实现多模态序列并行MM-SP，把一条超长多模态序列切到多张GPU上训练和推理。",
+  "impact": "把VILA能看的帧数从8扩到2048，6000帧（超过100万token）视频大海捞针准确率99.8%；MM-SP在256张GPU上支持200万长度训练，比环形序列并行快2.1–5.7倍。",
+  "method": "视频大模型的瓶颈有两层。模型层面，[[vila]]这类VLM只在短视频、少量帧上训练过，上下文一长就失效。系统层面，100万token的序列在一张GPU上放不下，需要把序列切分到多卡（序列并行），而已有的方案如[[ring-attention]]为纯文本设计，遇到图像token和文字token长度极不均衡的多模态序列时负载不平衡、通信多。\n\nLongVILA的训练流程在VILA原有阶段之后加两步：先用长文本数据把语言模型的上下文窗口拉长（长上下文扩展），再用长视频的问答数据做监督微调。系统上提出**MM-SP**：针对多模态序列做负载均衡的切分，结合环形与[[deepspeed-ulysses]]式的all-to-all两种通信，在256张GPU上实现200万长度的训练，不需要梯度检查点；并且直接接入Hugging Face Transformers。\n\n论文报告LongVILA-7B在9个视频基准上表现强，例如带字幕的[[video-mme]]为65.1%；MM-SP比环形序列并行快2.1–5.7倍，比混合上下文与张量并行的Megatron快1.1–1.4倍。",
+  "limits": [
+    {"text": "把所有帧的token都塞进上下文，计算量随视频长度线性甚至更快增长，部署时的推理成本仍很高。", "solved_by": []},
+    {"text": "大海捞针测的是找到单个插入片段，不等于真正理解长视频中跨越很长时间的因果和情节。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "vila", "type": "extends", "note": "在VILA的训练配方后增加长上下文扩展与长视频微调两个阶段。"},
+    {"to": "ring-attention", "type": "solves", "note": "环形序列并行在多模态长序列上负载不均，MM-SP改进切分与通信，速度快2.1–5.7倍。"},
+    {"to": "lwm", "type": "extends", "note": "LWM已在百万长度上训练视频-语言模型，LongVILA把这条路线做成可复用的完整训练与推理系统。"},
+    {"to": "longva", "type": "rivals", "note": "LongVA靠把语言模型的长上下文能力迁移到视频，LongVILA则直接在长视频数据上训练并解决系统瓶颈。"},
+    {"to": "deepspeed-ulysses", "type": "uses", "note": "MM-SP结合了Ulysses式的all-to-all序列并行。"}
+  ],
+  "prereq": ["context-window", "distributed-training", "self-attention", "memory-bandwidth", "instruction-tuning"],
+  "terms": [
+    {"t": "序列并行（sequence parallelism）", "d": "把一条很长的输入序列切成几段放到不同GPU上，各自算注意力的一部分再通信汇总，用来训练单卡放不下的长上下文。"},
+    {"t": "视频大海捞针（video needle-in-a-haystack）", "d": "在很长的视频里插入一小段特殊画面，问模型相关问题，测它能否在长上下文中找到这一段。"}
+  ],
+  "learn": "先读[[ring-attention]]和[[deepspeed-ulysses]]理解两种序列并行，再看LongVILA论文的训练阶段图和MM-SP的切分示意，对比它与[[longva]]的思路差别。",
+  "check": {"source": "https://arxiv.org/abs/2408.10188", "confirmed": "标题、作者、v1提交2024-08-19；摘要：算法与系统协同设计、长上下文扩展与长视频SFT两个新增阶段、MM-SP在256 GPU上无梯度检查点训练2M长度、帧数8→2048、6000帧超100万token大海捞针99.8%、9个视频基准、Video-MME带字幕65.1%、比环形序列并行快2.1–5.7倍、比Megatron混合并行快1.1–1.4倍、集成Hugging Face Transformers。MM-SP结合Ulysses式all-to-all、ICLR 2025、机构为一般了解。"}
+}

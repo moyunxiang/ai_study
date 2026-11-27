@@ -1,0 +1,30 @@
+{
+  "id": "d4pg",
+  "who": "Gabriel Barth-Maron, Matthew W. Hoffman, David Budden, Will Dabney, Dan Horgan, Dhruva TB, Alistair Muldal, Nicolas Heess, Timothy Lillicrap · DeepMind",
+  "venue": "ICLR 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1804.08617"}
+  ],
+  "problem": "离散动作这边，[[c51]]的分布式价值、[[apex]]的分布式采集与优先回放已经大幅提升了DQN；连续控制的[[ddpg]]却还停留在单机、标量Q值、一步TD目标的状态，在难的操作和运动任务上表现不稳。",
+  "idea": "把这些改进一起搬到DDPG上：评论家学回报的分布而不是期望，用多个并行actor采集数据、优先经验回放和N步回报，得到D4PG（分布式的、分布型的深度确定性策略梯度）。",
+  "impact": "D4PG成为DeepMind连续控制的标准强基线，在DeepMind Control Suite和后来的Acme库里被反复使用；它也展示了「分布式价值」在连续动作里同样有效。",
+  "method": "D4PG在[[ddpg]]的演员-评论家结构上做了四处改动：\n\n**分布型评论家**：评论家不输出一个数Q(s,a)，而是输出回报Z(s,a)的分布。文中试了两种参数化：像[[c51]]那样在固定支撑点上的类别分布，以及混合高斯。目标是分布式Bellman方程 `Z(s,a) =ᵈ r + γ Z(s', π(s'))`，类别分布时把目标投影回支撑点再用交叉熵训练。演员的梯度变成对分布期望求导：`∇_θ J ≈ E[∇_θ π_θ(s) · ∇_a E[Z(s,a)]|_{a=π(s)}]`。\n\n**N步回报**：目标用N步累计奖励再接分布，`Σ_{k<N} γ^k r_{t+k} + γ^N Z(s_{t+N}, ·)`，更快地传播奖励（这里没有做离策略修正）。\n\n**分布式采集**：像[[apex]]那样让多个actor并行与环境交互，把数据写入共享的回放缓冲区，单个learner更新网络。\n\n**优先经验回放**：按TD误差的大小优先采样（[[per]]）。\n\n摘要称，作者逐一考察了各组件的贡献及其相互作用；在多种简单控制任务、困难的操作任务以及一组带障碍的运动任务上，D4PG都达到了当时最好的表现。按通行描述，分布型评论家和N步回报贡献最大，优先回放的作用相对较小。",
+  "limits": [
+    {"text": "N步回报不做离策略修正，回放数据较旧时会带来偏差。", "solved_by": []},
+    {"text": "依赖大规模并行采集，墙钟效率高但样本效率并不突出。", "solved_by": ["sac", "td3"]}
+  ],
+  "relations": [
+    {"to": "ddpg", "type": "extends", "note": "保留确定性策略梯度的演员-评论家框架，替换评论家并加入分布式采集。"},
+    {"to": "c51", "type": "uses", "note": "评论家采用C51式的类别回报分布与投影后的交叉熵损失。"},
+    {"to": "apex", "type": "uses", "note": "多actor并行采集、共享回放缓冲区的架构来自Ape-X。"},
+    {"to": "per", "type": "uses", "note": "使用优先经验回放，但消融显示其作用相对有限。"}
+  ],
+  "prereq": ["actor-critic", "bellman-equation", "td-error", "cross-entropy", "distributed-training"],
+  "terms": [
+    {"t": "分布型评论家", "d": "评论家输出整个回报分布（如若干个固定回报值上的概率），而不只是期望。"},
+    {"t": "N步回报", "d": "用之后N步的真实奖励加第N步的估值作目标，比一步TD传播奖励更快。"}
+  ],
+  "learn": "先读[[ddpg]]和[[c51]]；读原文第3节算法框图和第4节消融图；在DM Control的一个任务上把DDPG的评论家换成51个原子的类别分布，比较学习曲线。",
+  "check": {"source": "https://arxiv.org/abs/1804.08617", "confirmed": "标题、九位作者、arXiv v1于2018-04-23；摘要中把分布式视角用到连续控制、结合分布式离策略学习框架、加入N步回报和优先经验回放、考察各组件贡献及相互作用、在简单控制、困难操作和带障碍运动任务上达到当时最好。混合高斯参数化、各组件贡献大小、ICLR 2018按原文正文与通行引用，未逐项核对。"},
+  "aka": ["D4PG", "Distributed Distributional DDPG", "分布式分布型DDPG"]
+}

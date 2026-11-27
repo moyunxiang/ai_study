@@ -1,0 +1,25 @@
+{
+ "id": "powersgd",
+ "who": "Thijs Vogels, Sai Praneeth Karimireddy, Martin Jaggi · 洛桑联邦理工学院（EPFL）",
+ "venue": "NeurIPS 2019",
+ "aka": ["PowerSGD", "低秩梯度压缩", "low-rank gradient compression", "幂迭代压缩", "error feedback", "误差反馈"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1905.13727"},
+  {"label": "GitHub", "url": "https://github.com/epfml/powersgd"}
+ ],
+ "problem": "数据并行训练每一步都要全量交换梯度，通信成了瓶颈；已有的梯度压缩要么不能用all-reduce高效聚合、扩展性差，要么达不到原来的测试精度。",
+ "idea": "把每层的梯度矩阵用一步幂迭代近似成两个瘦长矩阵的乘积（低秩分解），只传输这两个小矩阵；它们可以直接相加，所以能用all-reduce聚合；再用误差反馈把压缩丢掉的部分留到下一步补上。",
+ "impact": "论文称是所评测方法中唯一在优化过的通信后端上对比普通SGD仍稳定取得墙钟加速的；后来被并入PyTorch DDP的通信钩子，成为最常用的梯度压缩方法之一。",
+ "method": "[[qsgd]]把梯度量化成少量比特，[[dgc]]只传最大的少数梯度分量。问题在于：稀疏或量化后的梯度，在不同机器上位置、尺度各不相同，不能直接相加，只能用all-gather或参数服务器聚合，机器一多通信量又上去了；而高度压缩又常常损失最终精度。\n\nPowerSGD把一层的梯度看成矩阵 `M`（n×m），用秩r的近似 `M ≈ P Qᵀ`，其中P是n×r、Q是m×r，r很小（如1–4）。计算只用一步幂迭代：`P = M Q`，所有机器对P做all-reduce求和后正交化，`Q = Mᵀ P`，再对Q做all-reduce。由于矩阵乘是线性的，各机器的P、Q直接相加就等于对平均梯度做近似，于是可以沿用高效的[[ring-allreduce]]。Q在步与步之间复用上一步的结果（热启动），一步幂迭代就足够准确。每台机器还保存压缩误差 `M − PQᵀ`，加到下一步的梯度上（误差反馈），保证长期看没有信息丢失。\n\n摘要报告：在卷积网络和LSTM上缩短了训练时间，测试性能与SGD持平。",
+ "limits": [
+  {"text": "每一步仍要同步，只是传得少了；跨数据中心等极低带宽、高延迟的网络下，需要连同步频率一起降低。", "solved_by": ["diloco"]}
+ ],
+ "relations": [
+  {"to": "qsgd", "type": "solves", "note": "QSGD式量化梯度难以用all-reduce直接相加；PowerSGD的低秩因子是线性的，可直接all-reduce。"},
+  {"to": "dgc", "type": "rivals", "note": "DGC靠稀疏化与动量修正，PowerSGD靠低秩近似与误差反馈，后者在优化过的通信后端上更容易拿到实际加速。"},
+  {"to": "ring-allreduce", "type": "uses", "note": "压缩后的P、Q矩阵用标准all-reduce聚合，保留集合通信的扩展性。"}
+ ],
+ "prereq": ["distributed-training", "low-rank", "eigen-svd", "sgd-minibatch"],
+ "terms": [{"t": "幂迭代", "d": "反复用矩阵去乘一个向量（或矩阵）并归一化，结果会逐渐对齐到矩阵最主要的奇异方向，是求主成分的廉价方法。"}],
+ "check": {"source": "https://arxiv.org/abs/1905.13727", "confirmed": "标题、三位作者、v1日期2019-05-31；摘要：研究缓解数据并行通信瓶颈的梯度压缩、现有方案扩展性差或达不到目标精度、基于幂迭代的低秩梯度压缩、快速压缩并可用all-reduce聚合、测试性能与SGD持平、是所评测方法中唯一在优化通信后端下对比普通SGD稳定取得墙钟加速的、卷积网络与LSTM上缩短训练时间。P/Q计算步骤、热启动、误差反馈细节、NeurIPS 2019、并入PyTorch DDP通信钩子为一般了解。"}
+}

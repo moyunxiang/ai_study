@@ -1,0 +1,33 @@
+{
+  "id": "policy-decorator",
+  "who": "Xiu Yuan, Tongzhou Mu, Stone Tao, Yunhao Fang, Mengke Zhang, Hao Su · UC San Diego",
+  "venue": "arXiv 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2412.13630"},
+    {"label": "项目主页", "url": "https://policydecorator.github.io"}
+  ],
+  "aka": ["PolicyDecorator", "残差策略在线精调", "残差策略RL", "residual policy", "模型无关残差策略"],
+  "problem": "大模型模仿学习策略受限于示范的数量和质量，成功率卡在中间；直接用RL微调它们不稳定，从零训练纯RL策略又动作抖动。",
+  "idea": "冻结原策略，外挂一个小的残差策略做RL：执行动作=原动作+残差，残差幅度用α限死，并让残差介入的概率从0逐渐升到1，控制探索。",
+  "impact": "在ManiSkill和Adroit的8个任务上，把BeT和Diffusion Policy两种基座提升到状态输入下接近满分，并保留模仿策略平滑的动作。",
+  "method": "**卡在哪**：[[diffusion-policy]]、[[bet]]这类离线模仿学习模型的上限由示范决定。用环境交互继续改进它们有两条老路：直接微调大模型（如[[cal-ql]]、[[rlpd]]加LoRA），在ManiSkill任务上基本失败；或者从零训练RL策略，常出现抖动、怪异的动作。\n\n**做法**：保持基座策略不动，另训练一个小MLP或CNN残差策略，最终执行 `a = π_base(s) + π_res(s)`。三处设计让在线学习稳定：一是**有界残差**，[[sac]]输出经tanh压缩后乘以α，残差只能在 `(−α, α)` 内微调，例如StackCube的α=0.03；二是**渐进探索**，每一步以概率ε加上残差，否则只用基座动作，ε在H步内从0线性升到1，早期由基座保证能拿到成功信号；三是残差策略只看观测，评论家看的是基座与残差之和。整个方法不需要基座可微，因此叫模型无关：对BeT只能调它的偏移量，对扩散策略则完全当黑盒。\n\n**结果**：基座在每个ManiSkill任务用1000条示范、Adroit任务用25条人类示范训练。论文报告Policy Decorator在状态输入下所有任务接近满分，视觉输入也有效；对照中经典Residual RL只在6个扩散策略任务里的3个上有提升，DIPO在所有任务上都拿不到成功信号。",
+  "limits": [
+    {"text": "残差幅度α和探索调度H要按任务手调（StackCube的α=0.03，PegInsertion为0.3），换任务需要重新搜参。", "solved_by": []},
+    {"text": "实验都在ManiSkill和Adroit仿真中完成，残差在线RL在真机上的样本效率和安全性没有验证。", "solved_by": []},
+    {"text": "基座只有约1M到4M参数的小模型，论文没有在数十亿参数的VLA上验证残差方法。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "diffusion-policy", "type": "extends", "note": "以Diffusion Policy为基座之一，不改其权重，用有界残差在线修正其动作。"},
+    {"to": "bet", "type": "extends", "note": "另一类基座是行为Transformer，残差可以修正其离散聚类加偏移的动作输出。"},
+    {"to": "sac", "type": "uses", "note": "残差策略用SAC训练，tanh输出乘以α得到有界残差。"},
+    {"to": "dppo", "type": "rivals", "note": "DPPO直接对扩散策略的去噪链做策略梯度微调；Policy Decorator不碰基座，只学外挂残差。"},
+    {"to": "rlpd", "type": "rivals", "note": "RLPD类方法直接微调策略，在ManiSkill任务上基本失败，这是残差路线的主要对照。"}
+  ],
+  "prereq": ["imitation-learning", "actor-critic", "exploration-exploitation", "residual-connection", "diffusion-process"],
+  "terms": [
+    {"t": "残差策略", "d": "不替换原策略，只学习在原动作上加多少修正量；修正量为0时就退回原策略。"},
+    {"t": "渐进探索", "d": "训练初期大多数步只执行原策略，之后逐渐提高使用残差的概率，避免一开始乱探索导致拿不到奖励。"}
+  ],
+  "learn": "先读[[diffusion-policy]]和[[sac]]，再读原文第4节的有界残差与渐进探索，对照附录表8各任务的α与H取值。",
+  "check": {"source": "https://arxiv.org/abs/2412.13630", "confirmed": "标题、6位作者、v1日期2024-12-18、摘要中8个任务、两个基准、两种基座；HTML正文中a=π_base+π_res、α有界残差、ε线性升到1、SAC主干、表8中StackCube α=0.03与PegInsertion α=0.3、ManiSkill每任务1000条示范和Adroit 25条、Residual RL 3/6、DIPO无成功信号、UCSD。"}
+}

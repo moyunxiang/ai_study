@@ -1,0 +1,28 @@
+{
+  "id": "safety-layer",
+  "who": "Gal Dalal, Krishnamurthy Dvijotham, Matej Vecerik, Todd Hester, Cosmin Paduraru, Yuval Tassa · DeepMind",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1801.08757"}
+  ],
+  "problem": "把RL部署到数据中心冷却、机器人这类物理系统上时，有些约束（温度、关节极限）在学习过程中一次都不能违反，而奖励塑形和期望约束都做不到“从不违反”。",
+  "idea": "在策略输出后面加一个“安全层”：用历史数据学一个代价随动作线性变化的近似模型，每一步求一个最小修改动作的二次规划，使下一步代价不超限；这个问题有闭式解。",
+  "impact": "“安全层/动作投影”式安全RL的代表做法，与Shielding一起被安全RL综述作为“动作修正”类方法的起点，后来的安全滤波器、控制屏障函数结合RL的工作常引用它。",
+  "method": "设每个约束是一个逐步代价 `c_i(s, a)`，要求每一步 `c_i(s′) ≤ C_i`。安全层的关键假设是：物理系统的动力学通常是光滑的，下一步代价可以对动作做一阶近似：\n\n`c_i(s′) ≈ c_i(s) + g_i(s; w_i)^T a`\n\n其中 `g_i` 是一个用历史轨迹（由任意行为策略产生的动作）离线训练的小网络。有了这个线性模型，每一步把策略给出的动作 `μ(s)` 修正为离它最近的安全动作：\n\n`a* = argmin_a ½‖a − μ(s)‖²   s.t.  c_i(s) + g_i(s)^T a ≤ C_i`\n\n当同一时刻最多只有一个约束处于临界时，这个二次规划有闭式解：`a* = μ(s) − λ_i* g_i(s)`，其中 `λ_i* = max(0, (g_i^T μ(s) + c_i(s) − C_i) / (g_i^T g_i))`。也就是说，动作只在快要违规时沿着代价增长最快的方向被往回推，推多少恰好让约束取等号。\n\n安全层是可微的，可以直接接在[[ddpg]]这类策略后面一起训练。摘要称在新构造的几个物理环境上，该方法在学习过程中保持零约束违反，而奖励塑形做不到。",
+  "limits": [
+    {"text": "线性化只对一步之后的代价有效，无法预见多步之后才会发生的违规；动力学剧烈变化时线性模型失效。", "solved_by": ["recovery-rl"]},
+    {"text": "闭式解假设同时最多只有一个约束激活，多约束同时临界时只能近似。"}
+  ],
+  "relations": [
+    {"to": "ddpg", "type": "uses", "note": "实验中把安全层接在DDPG策略之后，一起训练。"},
+    {"to": "data-center-cooling", "type": "extends", "note": "动机之一正是数据中心冷却这类不能违规的物理控制任务。"},
+    {"to": "cpo-rl", "type": "rivals", "note": "CPO保证期望代价近似满足；安全层逐步修正动作，追求训练中每一步都不违规。"},
+    {"to": "reward-shaping", "type": "solves", "note": "把代价塑形进奖励无法避免违规，安全层通过显式修正动作做到零违反。"}
+  ],
+  "prereq": ["state-action-observation", "lagrange-duality", "derivative-gradient", "control-loop"],
+  "terms": [
+    {"t": "安全层", "d": "接在策略后面的一个模块，把可能违规的动作投影到最近的安全动作上。"}
+  ],
+  "learn": "先补[[c:lagrange-duality]]；读原文第4节的闭式解推导；在一个带速度上限的点质量环境里实现安全层，对比加与不加时的违规次数。",
+  "check": {"source": "https://arxiv.org/abs/1801.08757", "confirmed": "标题、六位作者、arXiv v1于2018-01-26；摘要中数据中心冷却或机器人等不能违反关键约束的物理系统、利用光滑动力学、在策略上直接加一个逐状态解析求解动作修正的安全层、闭式解来自用任意动作的历史轨迹学到的线性化模型、新的物理环境、奖励塑形失败而本法保持零约束违反。闭式解的具体形式按原文正文通行描述；发表处未核对。"},
+  "aka": ["Safety Layer", "安全层", "动作投影安全RL", "Safe Exploration in Continuous Action Spaces"]
+}

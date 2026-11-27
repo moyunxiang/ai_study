@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>离线到在线微调（Offline-to-Online RL） · AI脉络</title>
+<meta name="description" content="先用已有数据离线预训练策略和价值函数，再上线交互继续微调。难点是切换的那一刻性能常会先掉一截，而离线阶段的保守又会拖慢在线改进。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/offline-to-online.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="离线到在线微调（Offline-to-Online RL）">
+<meta property="og:description" content="先用已有数据离线预训练策略和价值函数，再上线交互继续微调。难点是切换的那一刻性能常会先掉一截，而离线阶段的保守又会拖慢在线改进。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/offline-to-online.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/offline-to-online">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>离线到在线微调</h1><div class="full">Offline-to-Online RL</div>
+<p class="muted" style="font-size:13px">也叫：离线到在线　offline-to-online　offline-to-online RL　离线预训练在线微调　在线微调　online fine-tuning　热启动RL　warm-start RL　先验数据在线RL　混合离线在线　hybrid RL</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/offline-to-online">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>先用已有数据离线预训练策略和价值函数，再上线交互继续微调。难点是切换的那一刻性能常会先掉一截，而离线阶段的保守又会拖慢在线改进。</b></p>
+<p class="tags">先要会：<a class="chip c" href="offline-rl.html">离线强化学习</a> <a class="chip c" href="on-off-policy.html">on-policy与off-policy</a></p>
+<p>纯<a class="lc" href="../c/offline-rl.html">离线强化学习</a>的上限受数据质量限制，纯在线RL又要从零开始大量试错。实际系统（尤其是真实机器人）最常见的流程是两者结合：先用示范和历史日志离线学一个还不错的起点，再在线收集少量新数据把它练好。语言模型的“先监督微调、再强化学习”也是同一种结构。</p><p><b>为什么不是简单地接着训</b>。</p><ul><li><b>初始掉点</b>：离线学到的Q在数据覆盖之外不可靠。上线后策略一探索就进入这些状态，Q的错误估计立刻驱动策略更新，表现可能先大幅下滑，甚至遗忘离线阶段学到的东西。</li><li><b>过度保守</b>：离线算法为了安全刻意压低分布外动作的价值（见<a class="lc" href="../c/offline-pessimism.html">离线RL的悲观与保守</a>）。上线后这些动作其实可以试了，但被压低的Q让策略迟迟不去尝试，改进很慢。</li><li><b>数据比例</b>：离线数据量往往远大于新收集的在线数据，均匀采样时新数据几乎没有影响力。</li></ul><p><b>代表性做法</b>。</p><ul><li>用天然适合在线继续训练的离线算法：<a class="ln" href="../n/awac.html">AWAC优势加权</a>用优势加权的策略更新，离线和在线阶段用同一个目标；<a class="ln" href="../n/iql.html">隐式Q学习IQL</a>的样本内学习也能平滑过渡。</li><li><b>校准保守性</b>：<a class="ln" href="../n/cal-ql.html">Cal-QL校准离线预训练</a>让保守的Q值不低于行为策略的真实价值，避免压得过低，从而减少初始掉点。</li><li><b>不预训练，只把离线数据放进回放</b>：<a class="ln" href="../n/rlpd.html">RLPD先验数据在线RL</a>直接用在线离策略算法，每个批次按固定比例混合离线和在线数据，并配合层归一化和集成，往往比先离线后在线更简单有效。</li><li><b>热启动但不保留离线数据</b>：<a class="ln" href="../n/wsrl.html">WSRL热启动在线微调</a>用离线策略先收集少量在线数据作为热身，之后完全丢掉离线数据。</li></ul><p>在真实机器人上，这一路线与人类示范和人工纠正结合得很紧密，例如<a class="ln" href="../n/hil-serl.html">HIL-SERL人在回路RL</a>。</p>
+<div class="example"><h4>例子</h4><p>一个抓取任务，离线阶段学到的策略成功率60%。直接切到普通的在线SAC微调，前2万步成功率掉到20%，之后才慢慢回升；若继续使用强保守的CQL，在线10万步后只升到70%。理想的方法应当是不掉点且持续上升。这里的数字是为说明现象设的假想值，不同任务差别很大。</p></div>
+<h2>容易误解的地方</h2><ul><li>比较离线到在线方法时，要同时看初始掉点的幅度、最终表现和在线所需步数，只看最终表现会掩盖部署时的风险。</li><li>离线预训练不一定比把离线数据直接放进在线回放更好，后者常常是一个很强的基线。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

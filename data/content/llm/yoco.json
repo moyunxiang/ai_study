@@ -1,0 +1,28 @@
+{
+  "id": "yoco",
+  "who": "Yutao Sun, Li Dong, Yi Zhu, Shaohan Huang, Wenhui Wang, Shuming Ma, Quanlu Zhang, Jianyong Wang, Furu Wei · 微软研究院、清华大学",
+  "venue": "NeurIPS 2024 Oral",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2405.05254"}, {"label": "代码", "url": "https://aka.ms/YOCO"}],
+  "aka": ["YOCO", "You Only Cache Once", "解码器-解码器架构", "decoder-decoder", "只缓存一次"],
+  "problem": "仅解码器Transformer每一层都要保存自己的KV缓存，上下文一长，显存和预填充时间都随层数和长度一起暴涨。",
+  "idea": "把模型拆成上下两半：下半部分用高效注意力生成一份全局KV缓存，上半部分所有层通过交叉注意力共用这份缓存。",
+  "impact": "在保留全局注意力能力的同时，把推理显存、预填充延迟和吞吐改善了数量级，并扩展到百万token上下文。",
+  "background": "标准[[transformer]]解码时，L层各存一份键值，缓存大小正比于 `L × n × d`。[[gqa]]、[[mqa]]在头之间共享键值，只能省一个常数倍；[[retnet]]等线性模型状态恒定，但牺牲了对任意位置的精确检索。",
+  "method": "YOCO由两段堆叠：\n\n- **自解码器（self-decoder）**：前一半层用滑动窗口注意力或门控保留（gated retention）这类内存恒定的机制，处理整个输入，最后输出一份全局的 `K, V`。\n- **交叉解码器（cross-decoder）**：后一半层不再自己算键值，而是用交叉注意力去读这一份共享缓存。\n\n整体仍是因果的、从外部看与仅解码器模型一样，但全局KV只缓存一次，缓存从 `L` 份降到约1份。另一个好处是预填充可以“提前退出”：输入文本只需跑完自解码器就能得到全部缓存，交叉解码器只在生成新token时才需要运行，因此长提示的预填充大幅提速，而最终输出不变。",
+  "results": "摘要报告：在扩大模型规模和训练token数的多种设置下，YOCO与Transformer相比表现有竞争力；扩展到100万token上下文时大海捞针检索接近满分；推理显存、预填充延迟和吞吐在各种长度和规模下都改善了数量级。",
+  "legacy": "它是“跨层共享KV”路线的代表之一，入选NeurIPS 2024口头报告，与[[cross-layer-attention]]等方法一起推动了缓存压缩的架构设计；后续的混合注意力模型也常借鉴“少数全局层加大量高效层”的分工。",
+  "limits": [
+    {"text": "交叉解码器所有层读同一份KV，表达上弱于每层独立的键值，需要更大的模型或数据来弥补。", "solved_by": []},
+    {"text": "需要从头预训练成这种结构，难以直接改造现有的仅解码器模型。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "solves", "note": "解决每层各存KV导致缓存随层数线性增长的问题。"},
+    {"to": "retnet", "type": "uses", "note": "自解码器可采用同团队RetNet的门控保留机制来保持恒定内存。"},
+    {"to": "gqa", "type": "rivals", "note": "GQA在头之间共享KV，YOCO在层之间共享KV，两者都为压缩缓存。"},
+    {"to": "longformer", "type": "uses", "note": "自解码器可用滑动窗口注意力处理局部上下文。"}
+  ],
+  "prereq": ["kv-cache", "self-attention", "encoder-decoder", "context-window", "memory-bandwidth"],
+  "terms": [{"t": "预填充（prefill）", "d": "生成前先把整段提示一次性跑过模型、建好KV缓存的阶段，长提示时它决定首个token的等待时间。"}],
+  "learn": "先弄懂[[c:kv-cache]]和交叉注意力；读YOCO第2节架构图；动手：估算一个32层模型在128K上下文下普通缓存与YOCO缓存的显存差。",
+  "check": {"source": "https://arxiv.org/abs/2405.05254", "confirmed": "标题、作者、arXiv首次提交2024-05-08；摘要中self-decoder加cross-decoder、只缓存一次、预填充提前退出、1M上下文针检索近满分；NeurIPS 2024 oral见paper copilot列表。机构为一般了解。"}
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>策略梯度的方差缩减：基线与reward-to-go（Variance Reduction for Policy Gradients） · AI脉络</title>
+<meta name="description" content="让策略梯度估计不那么“随机”的一组技巧：只用动作之后的奖励（reward-to-go）、减去一个与动作无关的基线、用价值函数做控制变量，期望不变而方差大幅下降。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/pg-variance-reduction.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="策略梯度的方差缩减：基线与reward-to-go（Variance Reduction for Policy Gradients）">
+<meta property="og:description" content="让策略梯度估计不那么“随机”的一组技巧：只用动作之后的奖励（reward-to-go）、减去一个与动作无关的基线、用价值函数做控制变量，期望不变而方差大幅下降。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/pg-variance-reduction.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/pg-variance-reduction">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>策略梯度的方差缩减：基线与reward-to-go</h1><div class="full">Variance Reduction for Policy Gradients</div>
+<p class="muted" style="font-size:13px">也叫：方差缩减　variance reduction　基线　REINFORCE基线　REINFORCE with baseline　baseline (RL)　策略梯度基线　reward-to-go　未来回报　因果性技巧　causality trick　控制变量　control variate　control variates</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/pg-variance-reduction">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>让策略梯度估计不那么“随机”的一组技巧：只用动作之后的奖励（reward-to-go）、减去一个与动作无关的基线、用价值函数做控制变量，期望不变而方差大幅下降。</b></p>
+<p class="tags">先要会：<a class="chip c" href="policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="expectation-variance.html">期望与方差</a></p>
+<p>最朴素的策略梯度用整条轨迹的回报G给每一步的动作打分：<code>∇J ≈ Σ_t ∇log π(a_t|s_t) · G</code>。它无偏，但方差大到常常学不动：回报里混着所有步的随机性，而且所有回报都是正数时，每个动作的概率都会被往上推，只是推得多少不同。下面几种方法都不改变梯度的期望，只降低方差。</p><p><b>reward-to-go（因果性）</b>。t时刻的动作影响不了t之前的奖励，所以只用它之后的回报：</p><p class="formula"><code>∇J ≈ Σ_t ∇log π(a_t|s_t) · Σ_{t&#x27;≥t} γ^{t&#x27;−t} r_{t&#x27;+1}</code></p><p>去掉的那部分期望为0，只贡献噪声。</p><p><b>基线</b>（baseline）。由<a class="lc" href="../c/log-derivative-trick.html">对数导数技巧与得分函数估计</a>，<code>E[∇log π(a|s)] = 0</code>，所以从回报里减去任何<b>只依赖状态、不依赖动作</b>的b(s)，期望不变：<code>(G_t − b(s_t))</code>。好的基线让“比平时好”的动作得正分、“比平时差”的得负分。最常用的基线是状态价值V(s)，此时<code>G_t − V(s_t)</code>就是优势的一个估计，这便是<a class="lc" href="../c/actor-critic.html">Actor-Critic与优势函数</a>的出发点。理论上方差最小的常数基线是按<code>‖∇log π‖²</code>加权的回报平均，但实践中直接用V(s)已足够。</p><p><b>控制变量</b>（control variate）。更一般的思路：从估计量中减去一个期望已知、与它高度相关的量。基线是最简单的控制变量；<a class="ln" href="../n/q-prop.html">Q-Prop控制变量策略梯度</a>用critic的一阶泰勒展开作控制变量。</p><p><b>其他常用手段</b>。用<a class="ln" href="../n/gae.html">广义优势估计GAE</a>在偏差和方差之间调节优势估计；在一个批次内把优势标准化为均值0、方差1（见c:rl-normalization）；对同一个状态（或同一道题）采多个样本，用彼此的平均奖励作基线，如<a class="ln" href="../n/rloo.html">RLOO回归REINFORCE</a>和<a class="ln" href="../n/grpo.html">GRPO</a>，省掉了单独训练的价值网络。</p>
+<div class="example"><h4>例子</h4><p>某状态下两个动作（softmax策略，概率各0.5）的回报分别是101和99。看对第一个动作logit的梯度：采到动作1时<code>∇log π = 0.5</code>，采到动作2时为−0.5。不加基线，单样本估计是<code>101×0.5 = 50.5</code>或<code>99×(−0.5) = −49.5</code>，期望0.5，但正负剧烈摇摆。以b=100为基线，两种情况分别是<code>1×0.5 = 0.5</code>和<code>(−1)×(−0.5) = 0.5</code>，期望仍是0.5，方差变成0。</p></div>
+<h2>容易误解的地方</h2><ul><li>基线不能依赖当前动作a，否则期望就变了，梯度有偏。依赖动作的基线需要额外的修正项（Q-Prop就是这样做的）。</li><li>用学出来的V(s)作基线本身没有偏差，但再用V去自举（如TD误差、GAE的λ&lt;1）就会引入偏差，二者要区分。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

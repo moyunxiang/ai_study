@@ -1,0 +1,27 @@
+{
+  "id": "step-dpo",
+  "who": "Xin Lai, Zhuotao Tian, Yukang Chen, Senqiao Yang, Xiangru Peng, Jiaya Jia · 香港中文大学等",
+  "venue": "arXiv 2024",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2406.18629"}, {"label": "代码", "url": "https://github.com/dvlab-research/Step-DPO"}],
+  "aka": ["Step-DPO", "StepDPO", "步级DPO", "逐步偏好优化", "step-wise preference optimization", "步骤级偏好对齐"],
+  "problem": "DPO对整条回答做偏好比较，在长链数学推理上收益有限：模型很难从“整题错了”里看出具体错在哪一步。",
+  "idea": "把推理的单个步骤作为偏好优化的单位：共享前面正确的步骤，只比较第一个出错的步骤和一个正确的替代步骤。",
+  "impact": "仅用1万对步级偏好数据、不到500步训练，就让70B以上模型在MATH上提升近3个百分点。",
+  "background": "[[dpo]]把[[c:rlhf-concept]]简化为在偏好对上直接优化策略，但偏好是整条回答级别的。数学题的错误常常只出在中间一步，整条回答的胜负信号太粗，相当于缺少[[prm]]那样的过程监督。",
+  "method": "设推理过程为步骤序列 `s_1, …, s_k`，前 `k−1` 步正确、第 `k` 步开始出错。Step-DPO构造的偏好对是：在相同前缀 `x, s_1…s_{k−1}` 下，正确的下一步 `s_win` 优于错误的下一步 `s_lose`，目标与DPO同形：\n\n`L = −log σ( β·log(π_θ(s_win|x,s_{<k}) / π_ref(s_win|x,s_{<k})) − β·log(π_θ(s_lose|x,s_{<k}) / π_ref(s_lose|x,s_{<k})) )`\n\n数据构造流水线：用模型自己生成解题过程，定位第一个错误步骤（借助更强模型或人工核对），再让模型从该前缀重新采样出正确步骤。作者还发现，DPO里由模型自己生成的数据比人类或GPT-4写的数据更有效，因为后者对当前模型来说是分布外的。",
+  "results": "摘要报告：只需约1万对步级偏好数据和不到500步Step-DPO训练，70B以上模型在MATH上准确率提升近3%；应用到Qwen2-72B-Instruct后，MATH和GSM8K测试集分别达到70.8%和94.0%，超过GPT-4-1106、Claude-3-Opus和Gemini-1.5-Pro等闭源模型。",
+  "legacy": "它是把DPO与过程监督结合的代表做法之一，后续多篇“步级/token级偏好优化”工作以它为基线；随着可验证奖励强化学习兴起，这类离线步级偏好方法更多用作推理模型的补充训练手段。",
+  "limits": [
+    {"text": "定位第一个错误步骤需要更强的模型或人工核对，数据构造成本和噪声随任务难度上升。", "solved_by": []},
+    {"text": "仍是离线偏好学习，模型改进后旧数据会变成分布外，难以像在线强化学习那样持续提升。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "dpo", "type": "extends", "note": "把DPO的偏好单位从整条回答细化到单个推理步骤。"},
+    {"to": "prm", "type": "uses", "note": "借鉴过程监督的思想，在步骤层面提供偏好信号。"},
+    {"to": "qwen2", "type": "uses", "note": "在Qwen2-72B-Instruct上应用并取得MATH 70.8%。"},
+    {"to": "self-rewarding", "type": "rivals", "note": "同样强调用模型自己生成的数据做偏好优化，Step-DPO聚焦数学推理的步级比较。"}
+  ],
+  "prereq": ["rlhf-concept", "kl-divergence", "logistic-regression", "reasoning-tokens", "credit-assignment"],
+  "learn": "先读[[dpo]]推导；读Step-DPO第3节的数据构造流程；动手：在一组数学解答里人工标出第一个错误步骤，构造几十对步级偏好样本，用TRL的DPOTrainer训练一个小模型。",
+  "check": {"source": "https://arxiv.org/abs/2406.18629", "confirmed": "标题、作者、arXiv首次提交2024-06-26；摘要中以步骤为单位做偏好优化、1万对数据、不到500步、70B以上模型MATH近+3%、Qwen2-72B-Instruct上MATH 70.8%和GSM8K 94.0%、自生成数据更有效。机构为一般了解。"}
+}

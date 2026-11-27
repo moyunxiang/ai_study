@@ -1,0 +1,37 @@
+{
+  "id": "rnng",
+  "who": "Chris Dyer, Adhiguna Kuncoro, Miguel Ballesteros, Noah A. Smith · 卡内基梅隆大学等",
+  "venue": "NAACL 2016",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1602.07776"}
+  ],
+  "aka": ["RNNG", "循环神经网络文法", "Recurrent Neural Network Grammar", "句法语言模型", "Syntactic Language Model"],
+  "problem": "RNN语言模型把句子当成一串词，完全不显式表示句法；而生成式句法模型如PCFG又受独立性假设限制，用不上长距离信息。",
+  "idea": "把一棵成分树写成一串「开短语、生成词、关短语」的动作，用栈式LSTM对整个历史建模，关短语时用一个组合函数把子成分压成一个向量，从而得到一个同时生成句子和句法树的神经模型。",
+  "impact": "当时在英语上给出了最好的单一有监督生成式句法分析结果，并在英语和汉语上取得比序列RNN更低的语言模型困惑度；它成为「句法感知语言模型」和神经模型句法能力研究的代表模型。",
+  "background": "[[pcfg]]和[[collins-parser]]这类生成式句法模型对规则做很强的独立性假设，看不到远处的上下文；[[rnnlm]]和LSTM语言模型能利用任意长的历史，但把句子当成平铺的词序列。[[stack-lstm-parser]]已经展示了怎样用LSTM表示转移式分析器的整个栈。RNNG想把两者合起来：一个能生成树的语言模型，用神经网络对完整的推导历史建模。",
+  "method": "**动作序列。** 生成式RNNG用三种动作自顶向下、从左到右地写出一棵树和它的句子：`NT(X)` 打开一个标签为X的短语（如NP）；`GEN(w)` 生成下一个词w；`REDUCE` 关闭最近打开的短语。例如「(S (NP the cat) (VP meows))」对应 NT(S) NT(NP) GEN(the) GEN(cat) REDUCE NT(VP) GEN(meows) REDUCE REDUCE。联合概率 `p(x, y) = Π_t p(a_t | a_<t)`。\n\n**状态表示。** 每一步的动作分布由三个部分算出：栈（用栈式LSTM编码，已经关闭的短语以一个向量出现在栈中）、已生成的词序列、已执行的动作历史。\n\n**组合函数。** 执行REDUCE时，把这个短语的各子成分向量连同短语标签送进一个双向LSTM，输出一个向量代表整个短语，再压回栈中。这让模型在后续预测时看到的是「一个NP」而不是一串零散的词。\n\n**判别式版本与推断。** 把GEN换成从输入中移进词的SHIFT，就得到给定句子预测树的判别式RNNG。生成式模型无法直接精确求解 `argmax_y p(x, y)` 或边缘概率 `p(x) = Σ_y p(x, y)`，作者用判别式模型作为提议分布，采样若干候选树，再用重要性采样估计 p(x)、用生成式模型给候选重新打分。",
+  "results": "摘要称：在英语上，生成式RNNG的句法分析优于此前任何已发表的单一有监督生成式模型；作为语言模型，在英语和汉语上都优于当时最好的序列RNN语言模型。",
+  "legacy": "Kuncoro等在2017年分析了RNNG学到了什么（发现组合函数里中心词起主导作用），后续工作把RNNG用于检验神经语言模型的句法泛化，并有Transformer版本的句法语言模型。它和[[on-lstm]]一起代表了「在语言模型中引入句法结构」的方向。",
+  "limits": [
+    {"text": "生成式模型不能高效精确解码，依赖判别式模型提供候选和重要性采样，推断开销大。", "solved_by": []},
+    {"text": "训练需要人工标注的句法树，无法像普通语言模型那样直接在海量纯文本上训练。", "solved_by": ["on-lstm"]}
+  ],
+  "relations": [
+    {"to": "stack-lstm-parser", "type": "extends", "note": "沿用栈式LSTM表示分析器状态，并把转移式分析推广为生成整棵成分树与句子的模型。"},
+    {"to": "rnnlm", "type": "extends", "note": "同样是逐个预测下一个符号的神经语言模型，但预测的对象里加入了短语的开闭动作。"},
+    {"to": "pcfg", "type": "solves", "note": "PCFG的规则独立性假设看不到长距离上下文，RNNG用神经网络对整段推导历史建模。"},
+    {"to": "lstm", "type": "uses", "note": "栈、词序列、动作历史和组合函数都由LSTM实现。"},
+    {"to": "penn-treebank", "type": "uses", "note": "英语实验在宾州树库上训练和评测。"}
+  ],
+  "prereq": ["language-model", "recurrent-layer", "perplexity", "importance-sampling", "discriminative-generative"],
+  "terms": [
+    {"t": "组合函数", "d": "关闭一个短语时，把它的所有子成分合成一个向量的网络，RNNG用双向LSTM实现。"},
+    {"t": "自顶向下生成", "d": "先决定外层短语，再一层层展开到词，词按从左到右顺序出现。"}
+  ],
+  "learn": "先读[[stack-lstm-parser]] → 读原文第2–3节的动作定义和组合函数、第5节的重要性采样 → 动手：把一个小树库的句子转成NT/GEN/REDUCE动作序列，训练一个只看动作历史的LSTM，观察它生成的树是否括号配对。",
+  "check": {
+    "source": "https://arxiv.org/abs/1602.07776",
+    "confirmed": "arXiv：标题、四位作者、v1提交2016-02-25；摘要：带显式短语结构的句子概率模型、可用于句法分析和语言建模的高效推断、英语上优于此前任何单一有监督生成式模型、英语和汉语上语言建模优于序列RNN。NT/GEN/REDUCE动作、栈式LSTM和双向LSTM组合函数、重要性采样推断的细节、NAACL 2016发表处、Kuncoro 2017后续凭一般了解。"
+  }
+}

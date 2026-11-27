@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>ReZero零初始化残差（2020） · AI脉络</title>
+<meta name="description" content="很深的网络信号传播差，梯度容易消失或爆炸；当时的补救办法（精心设计的残差结构、归一化、复杂初始化）都比较繁琐。 每个残差分支乘一个初始化为0的可学习标量α： x ← x + α·F(x) 。训练开始时整个网络就是恒等映射，满足动力学等距，之后α自己学大。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/rezero.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ReZero零初始化残差（2020）">
+<meta property="og:description" content="很深的网络信号传播差，梯度容易消失或爆炸；当时的补救办法（精心设计的残差结构、归一化、复杂初始化）都比较繁琐。 每个残差分支乘一个初始化为0的可学习标量α： x ← x + α·F(x) 。训练开始时整个网络就是恒等映射，满足动力学等距，之后α自己学大。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/rezero.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/rezero">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:48"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">树干 · 学习方法 › <a href="../t/dl.html">机器学习与深度学习基础</a> › 深层训练配方</div>
+<h1>ReZero零初始化残差</h1>
+<div class="full">ReZero is All You Need: Fast Convergence at Large Depth</div>
+<div class="meta"><span>2020.03</span><span>论文</span><span>延伸</span><span>UAI 2021</span><span>Thomas Bachlechner, Bodhisattwa Prasad Majumder, Huanru Henry Mao, Garrison W. Cottrell, Julian McAuley · 加州大学圣地亚哥分校</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2003.04887" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/rezero">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>很深的网络信号传播差，梯度容易消失或爆炸；当时的补救办法（精心设计的残差结构、归一化、复杂初始化）都比较繁琐。</p></div><div><h4>方法</h4><p>每个残差分支乘一个初始化为0的可学习标量α：<code>x ← x + α·F(x)</code>。训练开始时整个网络就是恒等映射，满足动力学等距，之后α自己学大。</p></div><div><h4>影响</h4><p>成为“零初始化残差分支”这一类技巧最常被引用的版本，与<a class="ln" href="../n/fixup.html">Fixup无归一化初始化</a>、SkipInit一起说明深网络可以不依赖归一化层稳定训练。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>残差块写作 <code>x_{i+1} = x_i + α_i·F(x_i)</code>，α_i是每层一个标量，初值为0，不再在残差路径上放LayerNorm或BatchNorm。初始时每层都是恒等映射，输入输出的雅可比矩阵是单位阵，所有奇异值都等于1——这正是Pennington等人用自由概率论指出的“动力学等距”条件，信号与梯度都不会随深度衰减或放大。随着训练，梯度会把α推离0，各层逐渐“接通”。</p><p>与Transformer常见的Post-LN、Pre-LN相比，ReZero把归一化完全去掉，只多出每层一个参数。摘要报告：它能训练上千层的全连接网络并收敛很快；在CIFAR-10上的ResNet收敛更快、测试表现更好；能轻松训练120层的Transformer；用在12层Transformer上时，在enwik8上收敛快56%。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>在大规模语言模型中没有取代Pre-LN/RMSNorm，去掉归一化后对学习率和激活尺度更敏感。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只保证初始化时的信号传播，训练中后期的稳定性仍需其他手段。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/resnet.html">ResNet</a><span class="yr">2015.12 · 视觉</span><div class=nt>在残差连接上加一个零初始化的门控标量。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/highway.html">Highway网络</a><span class="yr">2015.05 · 基础</span><div class=nt>延续门控跳连的思路，但门不依赖输入、只是一个可学习标量。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/layernorm.html">Layer Normalization</a><span class="yr">2016.07 · 基础</span><div class=nt>在Transformer里直接去掉LayerNorm，用ReZero门代替。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:48" href="../n/fixup.html">Fixup无归一化初始化</a><span class="yr">2019.01 · 基础</span><div class=nt>两者都用初始化让深网络免归一化；Fixup按深度缩放并把最后一层置零，ReZero只用一个零初始化标量。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/residual-connection.html">残差连接</a> <a class="chip c" href="../c/initialization.html">参数初始化</a> <a class="chip c" href="../c/vanishing-exploding.html">梯度消失与梯度爆炸</a> <a class="chip c" href="../c/normalization-layer.html">归一化层</a></p>
+<h2>本篇术语</h2><ul><li><b>动力学等距（dynamical isometry）</b>　网络输入输出雅可比矩阵的所有奇异值都接近1，信号和梯度经过任意多层都不会被放大或缩小。</li></ul>
+<h2>怎么学</h2><p>先理解<a class="ln" href="../n/resnet.html">ResNet</a>和<a class="ln" href="../n/layernorm.html">Layer Normalization</a>在深网络中的作用；读论文第3节动力学等距的论证；动手把一个小Transformer的LayerNorm换成ReZero，比较不同深度下的收敛速度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2003.04887" rel="noopener">https://arxiv.org/abs/2003.04887</a>（标题、5位作者、arXiv v1 2020-03-10；摘要中零初始化单参数门控残差、动力学等距与Pennington等、上千层全连接、CIFAR-10 ResNet、120层Transformer、12层enwik8快56%。UAI 2021、机构、与Fixup的比较凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ReZero%E9%9B%B6%E5%88%9D%E5%A7%8B%E5%8C%96%E6%AE%8B%E5%B7%AE%EF%BC%88rezero%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Arezero%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/rezero.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="lightgcn.html"><small>本分支上一个 · 2020.02</small><b>LightGCN图推荐</b></a><a class="r" href="rex.html"><small>本分支下一个 · 2020.03</small><b>REx风险外推</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

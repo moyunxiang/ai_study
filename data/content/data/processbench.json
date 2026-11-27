@@ -1,0 +1,33 @@
+{
+  "id": "processbench",
+  "who": "Chujie Zheng, Zhenru Zhang, Beichen Zhang, Runji Lin, Keming Lu, Bowen Yu, Dayiheng Liu, Jingren Zhou, Junyang Lin · 阿里巴巴Qwen团队",
+  "venue": "ACL 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2412.06559"},
+    {"label": "GitHub", "url": "https://github.com/QwenLM/ProcessBench"}
+  ],
+  "problem": "过程奖励模型（PRM）要给推理的每一步打分，但大家通常只用它在Best-of-N选答案时的最终准确率间接评价它，并不直接检验它能否找出推理过程中错在哪一步。",
+  "idea": "收集3400道以竞赛和奥赛难度为主的数学题的逐步解答，由人类专家标注最早出错的那一步；模型要么指出这一步，要么判断全部正确。",
+  "impact": "成为评测PRM和“批评模型”逐步纠错能力的标准基准，揭示了很多开源PRM在比GSM8K、MATH更难的题目上泛化很差。",
+  "method": "**背景**。[[prm]]发布了PRM800K，证明逐步监督比只看最终答案更有效；[[math-shepherd]]等工作用自动方法生成步级标签训练PRM。评价这些PRM的常用办法是：让策略模型采样N个解答，用PRM挑出得分最高的那个，看最终答对率。这个指标混入了策略模型的能力，而且答案对了不代表过程对，PRM可能只是学会了猜答案。\n\n**怎么构造**。题目来自[[gsm8k]]、[[math-dataset]]以及[[olympiadbench]]、[[omni-math]]等竞赛与奥赛级数据，后两者占大头。作者用多个开源模型生成逐步解答，统一重新切分步骤后，由人类专家逐步检查，标出**最早出错的那一步**的编号；如果整个过程都正确，标为没有错误。最终得到3400个测试样本，错误样本和正确样本都有。\n\n**怎么评**。被测模型拿到题目和逐步解答，输出最早错误步骤的编号，或输出“全部正确”。分别计算在错误样本上和正确样本上的准确率，取二者的调和平均（F1）作为总分，这样既惩罚漏报错误，也惩罚把正确过程误判为错误。\n\n**两类被测模型**。一类是PRM，取第一个得分低于阈值的步骤为预测；另一类是**批评模型**，即直接提示通用大模型逐步审查解答。\n\n**发现**。摘要报告两点：现有PRM一般无法泛化到GSM8K和MATH之外更难的数学题，表现不如提示式的批评模型，也不如作者直接在PRM800K上微调得到的PRM；最好的开源模型[[qwq]]-32B-Preview的批评能力可与GPT-4o相当，但仍落后于专门做推理的o1-mini。",
+  "limits": [
+    {"text": "只标注“最早一个错误”，不评后续步骤和错误类型；只覆盖数学，代码和其他领域的过程评测仍缺少同类基准。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "prm", "type": "extends", "note": "PRM800K提供了步级训练数据，ProcessBench提供了直接检验步级判断能力的测试集，并发现直接在PRM800K上微调的PRM泛化更好。"},
+    {"to": "math-shepherd", "type": "solves", "note": "Math-Shepherd等用自动步级标签训练的PRM只用Best-of-N间接评价，ProcessBench直接测它们找错的能力，发现在难题上泛化差。"},
+    {"to": "omni-math", "type": "uses", "note": "以Omni-MATH、OlympiadBench等奥赛级题目为主要题源。"},
+    {"to": "qwq", "type": "uses", "note": "QwQ-32B-Preview作为批评模型被评测，是表现最好的开源模型。"}
+  ],
+  "prereq": ["reward-design", "reasoning-tokens", "benchmark", "classification-metrics"],
+  "terms": [
+    {"t": "过程奖励模型", "d": "对推理过程的每一步分别打分的模型，用来判断推理在哪一步出了问题，而不只看最终答案。"},
+    {"t": "批评模型", "d": "用提示让通用大模型扮演审稿人，逐步检查一份解答并指出错误。"}
+  ],
+  "learn": "先读[[prm]]了解过程监督；读ProcessBench原文的数据统计表和PRM与批评模型的对比表；动手找一份有错的数学解答，分别让一个PRM和一个通用模型指出第一个错误步骤。",
+  "aka": ["ProcessBench", "过程错误识别基准", "PRM评测"],
+  "check": {
+    "source": "https://arxiv.org/abs/2412.06559",
+    "confirmed": "arXiv记录：标题、9位作者、v1提交于2024-12-09；摘要中识别数学推理中的错误步骤、3400个测试样本、以竞赛和奥赛级题为主、人类专家标注错误位置、要求找出最早错误步骤或判断全部正确、评测PRM与批评模型、现有PRM难以泛化到GSM8K和MATH之外、不如批评模型和直接在PRM800K上微调的PRM、QwQ-32B-Preview批评能力可比GPT-4o但落后o1-mini。题源构成、步骤重切分、F1计分、阈值取步、ACL 2025凭一般了解。"
+  }
+}

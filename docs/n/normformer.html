@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>NormFormer额外归一化（2021） · AI脉络</title>
+<meta name="description" content="Pre-LN Transformer虽然好训练，但预训练时各层梯度大小不匹配：靠近输入的浅层梯度远大于深层梯度，深层更新偏慢，学习率也难以调高。 在每层多加三个几乎不花算力的操作：自注意力输出后加一个LayerNorm，对每个注意力头的输出乘一个可学习的缩放系数，在FFN第一个全连接层（激活之后）…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/normformer.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="NormFormer额外归一化（2021）">
+<meta property="og:description" content="Pre-LN Transformer虽然好训练，但预训练时各层梯度大小不匹配：靠近输入的浅层梯度远大于深层梯度，深层更新偏慢，学习率也难以调高。 在每层多加三个几乎不花算力的操作：自注意力输出后加一个LayerNorm，对每个注意力头的输出乘一个可学习的缩放系数，在FFN第一个全连接层（激活之后）…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/normformer.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/normformer">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 架构与组件</div>
+<h1>NormFormer额外归一化</h1>
+<div class="full">NormFormer: Improved Transformer Pretraining with Extra Normalization</div>
+<div class="meta"><span>2021.10</span><span>论文</span><span>延伸</span><span>Sam Shleifer, Jason Weston, Myle Ott · Facebook AI Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2110.09456" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/pytorch/fairseq/tree/main/examples/normformer" rel="noopener">fairseq代码 ↗</a><a class="btn sm" href="../index.html#/n/normformer">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Pre-LN Transformer虽然好训练，但预训练时各层梯度大小不匹配：靠近输入的浅层梯度远大于深层梯度，深层更新偏慢，学习率也难以调高。</p></div><div><h4>方法</h4><p>在每层多加三个几乎不花算力的操作：自注意力输出后加一个LayerNorm，对每个注意力头的输出乘一个可学习的缩放系数，在FFN第一个全连接层（激活之后）再加一个LayerNorm。</p></div><div><h4>影响</h4><p>参数只增加0.4%，在125M到2.7B的因果和掩码语言模型上都降低了困惑度、加快了收敛，是“Pre-LN之后怎样再稳一点”的代表性改进之一；子层输出再归一化的做法后来在Gemma 2等模型的“三明治归一化”中也能看到。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/pre-ln.html">Pre-LN Transformer</a>把LayerNorm放在每个子层的输入处，使残差通路畅通、训练稳定，成为GPT-3等大模型的标准做法。但作者测量发现，Pre-LN预训练时浅层参数的梯度范数远大于深层，即<b>梯度大小失配</b>；深层的更新相对过小，而为了不让浅层发散，学习率又不能调大。</p><p><b>NormFormer</b>在Pre-LN的基础上加三处：</p><ul><li><b>注意力后LN</b>：多头自注意力的输出先过一个LayerNorm，再加回残差，即 <code>x + LN(MHA(LN(x)))</code>。</li><li><b>头级缩放（head-wise scaling）</b>：把每个注意力头的输出乘一个可学习的标量γ_i后再拼接，让模型可以调低或调高单个头的贡献。</li><li><b>FFN中间LN</b>：FFN第一个线性层加激活之后、第二个线性层之前，再加一个LayerNorm。</li></ul><p>作者展示这些操作把各层的梯度范数拉得更平均，从而允许使用更大的学习率。</p><p>结果：额外参数只占约0.4%，计算开销可以忽略。在最强的1.3B因果语言模型基线上加入NormFormer，达到相同困惑度快24%，或在相同算力下困惑度低0.27；达到GPT-3 Large（1.3B）零样本性能的速度快60%。对掩码语言模型，微调后的GLUE平均提升1.9%。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>实验最大到2.7B参数，作者也报告在更大规模上收益会减小或需要调整；额外的LayerNorm在极深网络上能否根治不稳定没有验证。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/deepnet.html">DeepNet千层Transformer</a></div></li><li>主要解决梯度大小失配，对注意力logit爆炸等大模型训练中的其他不稳定来源没有直接处理。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/gpt-3.html">GPT-3</a><span class="yr">2020.05 · LLM</span><div class=nt>以GPT-3论文中1.3B的GPT-3 Large零样本表现为参照衡量收敛速度。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/roberta.html">RoBERTa</a><span class="yr">2019.07 · LLM</span><div class=nt>掩码语言模型部分沿用RoBERTa式预训练并在GLUE上微调评测。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/pre-ln.html">Pre-LN Transformer</a><span class="yr">2020.02 · LLM</span><div class=nt>Pre-LN浅层梯度远大于深层，NormFormer加三处归一化与缩放使各层梯度更均衡。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/admin.html">Admin：Post-LN为何难训</a><span class="yr">2020.04 · LLM</span><div class=nt>Admin用初始化和残差缩放调节各层贡献，NormFormer改为在网络中加归一化和可学习缩放。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/qk-norm.html">QK归一化</a><span class="yr">2020.10 · LLM</span><div class=nt>同样在注意力内部加约束，QK-Norm约束点积，NormFormer约束注意力输出并加头级缩放。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/deepnet.html">DeepNet千层Transformer</a><span class="yr">2022.03 · LLM</span><div class=nt>实验最大到2.7B参数，作者也报告在更大规模上收益会减小或需要调整；额外的LayerNorm在极深网络上能否根治不稳定没有验证。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/peri-ln.html">Peri-LN前后双归一化</a><span class="yr">2025.02 · LLM</span><div class=nt>NormFormer也在子层后加额外归一化，Peri-LN系统分析了这一类放法。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/residual-connection.html">残差连接</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/learning-rate.html">学习率与学习率调度</a> <a class="chip c" href="../c/perplexity.html">困惑度</a></p>
+<h2>本篇术语</h2><ul><li><b>梯度大小失配</b>　网络不同层的参数梯度范数相差很大，使统一的学习率对一部分层太大、对另一部分层太小。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/pre-ln.html">Pre-LN Transformer</a>理解Pre-LN与Post-LN；读原文图1的梯度范数分布和第3节三处改动；动手：在小GPT里记录各层梯度范数，分别训练Pre-LN与加了三处归一化的版本，比较能承受的最大学习率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2110.09456" rel="noopener">https://arxiv.org/abs/2110.09456</a>（标题、3位作者、arXiv v1提交日2021-10-18；摘要中Pre-LN预训练时浅层梯度远大于深层的梯度失配、三处操作（注意力后LN、注意力输出的头级缩放、第一个全连接层后LN）、参数增加0.4%、125M到2.7B的因果与掩码模型、1.3B基线快24%达到同困惑度或同算力低0.27、快60%达到GPT3-Large零样本、GLUE平均提升1.9%。更大规模收益减小、与Gemma 2三明治归一化的联系为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20NormFormer%E9%A2%9D%E5%A4%96%E5%BD%92%E4%B8%80%E5%8C%96%EF%BC%88normformer%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Anormformer%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/normformer.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="yuan-1.html"><small>本分支上一个 · 2021.10</small><b>浪潮源1.0</b></a><a class="r" href="icl-bayesian.html"><small>本分支下一个 · 2021.11</small><b>ICL即隐式贝叶斯推断</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

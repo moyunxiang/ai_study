@@ -1,0 +1,32 @@
+{
+  "id": "lyra",
+  "who": "W. Bastiaan Kleijn, Andrew Storus, Michael Chinen, Tom Denton, Felicia S. C. Lim, Alejandro Luebs, Jan Skoglund, Hengchin Yeh · Google",
+  "venue": "ICASSP 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2102.09660"},
+    {"label": "Google博客", "url": "https://ai.googleblog.com/2021/02/lyra-new-very-low-bitrate-codec-for.html"}
+  ],
+  "problem": "用WaveNet类生成模型做极低码率语音编码，在干净语音上很惊艳，但遇到真实世界的噪声、混响和多人声时质量急剧下降。",
+  "idea": "解码端用自回归生成模型从约3 kb/s的特征重建语音，并提出「预测方差正则化」降低最大似然训练对异常值的敏感，再在编码前加降噪去掉不需要的信号。",
+  "impact": "这项工作是Google开源的Lyra极低码率语音编解码器的技术基础，展示了生成模型可以在3 kb/s下给出可用于真实通话的音质；其后SoundStream等端到端神经编解码器把这一方向推向通用音频。",
+  "method": "传统语音编码器（如Opus）在6 kb/s以下音质会迅速变差。2017年后的研究发现，可以只传输很少的特征（如梅尔频谱或LPC参数），在接收端用[[wavenet]]或[[wavernn]]这类生成模型把波形「想象」出来，码率可以大幅降低。但这类模型在真实输入上表现很差。\n\n作者认为原因有两个：一是**最大似然训练对异常值敏感**——训练中偶尔出现的难以预测的样本会让模型把预测分布的方差撑大，生成时声音变得嘈杂；二是用**单个自回归模型去拟合几个独立信号之和**（语音加噪声）本身就很难。对应的解决办法是：在损失中加入**预测方差正则化**，惩罚过大的预测方差，降低对异常值的敏感；在编码前对输入做**降噪**，只保留需要传输的语音。\n\n摘要报告：大量主观评测显示，这套基于生成模型的系统在3 kb/s下对真实世界语音达到当时最好的编码质量，计算复杂度也在合理范围内。Google随后以Lyra之名开源了这一编解码器，用于低带宽网络下的语音通话；更晚的端到端神经编解码器[[soundstream]]则用编码器、量化器、解码器联合训练取代了手工特征。",
+  "limits": [
+    {"text": "只面向语音，音乐和一般音频的编码质量没有保证；编码端仍是手工设计的特征提取。", "solved_by": ["soundstream"]},
+    {"text": "自回归解码在低端手机上计算压力仍然较大，码率也固定在约3 kb/s。", "solved_by": ["soundstream"]}
+  ],
+  "relations": [
+    {"to": "wavernn", "type": "uses", "note": "解码端的自回归生成模型属于WaveRNN一类，用于从低码率特征重建波形。"},
+    {"to": "wavenet", "type": "extends", "note": "延续用WaveNet类生成模型做低码率语音编码的路线，解决其在真实输入上退化的问题。"},
+    {"to": "lpcnet", "type": "rivals", "note": "LPCNet同样把神经生成模型用于低码率编码与合成，借助线性预测减轻网络负担；Lyra着重解决噪声输入下的鲁棒性。"}
+  ],
+  "prereq": ["autoregressive", "mle", "vocoder-codec", "waveform-spectrogram", "regularization"],
+  "terms": [
+    {"t": "码率", "d": "每秒传输的比特数；3 kb/s意味着每秒只用3000个比特描述语音。"},
+    {"t": "预测方差正则化", "d": "在训练损失中惩罚模型给出过大的预测方差，减少异常样本对模型的影响。"}
+  ],
+  "aka": ["Lyra", "Lyra codec", "生成式语音编码", "低码率语音编解码"],
+  "check": {
+    "source": "https://arxiv.org/abs/2102.09660",
+    "confirmed": "arXiv官方记录：标题Generative Speech Coding with Predictive Variance Regularization、8位作者、v1提交2021-02-18；摘要中生成模型在真实输入上退化、最大似然对异常值敏感与单个自回归模型拟合独立信号之和的问题、预测方差正则化、降噪、3 kb/s下真实语音的领先编码性能。Google AI博客2021-02-25文章Lyra: A New Very Low-Bitrate Codec for Speech Compression确认Lyra用生成模型从低码率特征重建语音、以WaveNet类模型为基线；论文与Lyra的对应、WaveRNN类解码器、ICASSP 2021、博客链接为一般了解。"
+  }
+}

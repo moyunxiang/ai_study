@@ -1,0 +1,24 @@
+{
+  "id": "bohb",
+  "who": "Stefan Falkner, Aaron Klein, Frank Hutter · 弗莱堡大学",
+  "venue": "ICML 2018",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/1807.01774"}],
+  "aka": ["BOHB", "Bayesian Optimization and HyperBand", "贝叶斯优化+Hyperband", "HpBandSter"],
+  "problem": "贝叶斯优化调参每次都要完整训练一个模型，深度学习里太贵；Hyperband靠早停便宜地评估大量随机配置，但缺少引导，收敛到最好配置较慢。",
+  "idea": "保留Hyperband的多预算早停框架，但把“随机抽配置”换成基于模型的采样：用类似TPE的核密度估计器，根据已评估结果提议更有希望的配置。",
+  "impact": "成为AutoML里最常用的多保真度调参方法之一，被Ray Tune、Auto-PyTorch等工具集成，也是后续多保真度HPO论文的标准对比基线。",
+  "method": "[[hyperband]]把预算（如训练epoch数）分成多档：先用很小的预算评估很多配置，按“逐次减半”只让表现好的进入下一档更大的预算。它的配置来自随机采样，所以前期很快能找到不错的解（随时性能好），但后期收敛到最优较慢。\n\nBOHB的改动是：每次需要新配置时，不再完全随机，而是用已在某一预算下评估过的结果拟合两个核密度估计——表现好的配置的密度l(x)和表现差的配置的密度g(x)——再挑使 `l(x)/g(x)` 大的候选（这是TPE式的贝叶斯优化）。模型总是用观测数足够多的最大预算上的数据拟合，并保留一小部分随机采样以保证探索。\n\n摘要报告：在高维玩具函数、支持向量机、前馈网络、贝叶斯神经网络、深度强化学习和卷积网络等多类问题上，BOHB稳定优于单独的贝叶斯优化和Hyperband，兼顾了很强的随时性能和快速收敛。",
+  "limits": [
+    {"text": "依赖“小预算上的排序能预测大预算上的排序”，学习率等超参数在不同预算下最优值不同时会误导早停。", "solved_by": []},
+    {"text": "核密度估计在很高维、混合类型的搜索空间中效率下降。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "hyperband", "type": "extends", "note": "保留Hyperband的多预算逐次减半框架，把随机采样换成模型引导。"},
+    {"to": "bayes-opt-hpo", "type": "extends", "note": "把贝叶斯优化与早停结合，降低每次评估的代价。"},
+    {"to": "random-search-hpo", "type": "solves", "note": "解决随机搜索式配置采样缺乏引导、后期收敛慢的问题。"}
+  ],
+  "prereq": ["hyperparameter", "train-val-test", "probability-basics"],
+  "terms": [{"t": "多保真度优化（multi-fidelity）", "d": "用便宜但不精确的评估（少训几个epoch、用部分数据）来近似昂贵的完整评估，从而在同样预算内试更多配置。"}],
+  "learn": "先读[[hyperband]]的逐次减半；读本文第3节的模型构建；动手用Ray Tune或Optuna的同类调度器给一个CNN调学习率与权重衰减，比较与随机搜索的效率。",
+  "check": {"source": "https://arxiv.org/abs/1807.01774", "confirmed": "标题、3位作者、arXiv v1 2018-07-04；摘要中贝叶斯优化太贵、基于随机搜索的老虎机方法缺乏引导、结合两者、问题类型列表、稳定优于BO与Hyperband。TPE式核密度估计、l/g比、随机比例、ICML 2018、工具集成凭一般了解。"}
+}

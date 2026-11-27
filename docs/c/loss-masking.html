@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>损失掩码：只对回答计算损失（Loss Masking） · AI脉络</title>
+<meta name="description" content="训练时只在一部分token上计算损失，其余位置的标签设为忽略值（常用−100）。指令微调里最典型：提示和系统指令只作为条件，只对助手的回答部分计算损失。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/loss-masking.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="损失掩码：只对回答计算损失（Loss Masking）">
+<meta property="og:description" content="训练时只在一部分token上计算损失，其余位置的标签设为忽略值（常用−100）。指令微调里最典型：提示和系统指令只作为条件，只对助手的回答部分计算损失。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/loss-masking.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/loss-masking">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>损失掩码：只对回答计算损失</h1><div class="full">Loss Masking</div>
+<p class="muted" style="font-size:13px">也叫：loss masking　loss mask　损失掩码　只对回答计算损失　completion-only loss　train on completions only　response-only loss　ignore_index　-100　标签掩码　label masking　prompt loss　提示损失</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/loss-masking">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>训练时只在一部分token上计算损失，其余位置的标签设为忽略值（常用−100）。指令微调里最典型：提示和系统指令只作为条件，只对助手的回答部分计算损失。</b></p>
+<p class="tags">先要会：<a class="chip c" href="cross-entropy.html">交叉熵</a> <a class="chip c" href="instruction-tuning.html">指令微调与对话模板</a></p>
+<p>语言模型的标准损失是在每个位置上预测下一个token的<a class="lc" href="../c/cross-entropy.html">交叉熵</a>，再取平均。但并不是每个位置都值得学：</p><ul><li>指令微调时，用户的问题是给定的，我们不希望模型学会“生成用户的问题”，只希望它学会“看到问题后怎么回答”。</li><li>填充位置（见<a class="lc" href="../c/padding-attention-mask.html">填充、截断与注意力掩码</a>）不是真实内容。</li><li>多轮对话中，工具返回的结果、检索到的文档是外部输入，不该由模型来“编”。</li></ul><p><b>损失掩码</b>就是给每个位置一个0/1权重，只在权重为1的位置算损失。</p><p><b>实现</b>。最常见的做法是把不需要学习的位置的标签设为一个特殊值，PyTorch的交叉熵函数用<code>ignore_index = −100</code>跳过这些位置：</p><p><code>L = −(1/|M|) · Σ_(t∈M) log p(y_t | y_&lt;t)</code>，M是需要计算损失的位置集合</p><p>注意这只影响损失，不影响注意力：被掩掉的提示token仍然输入模型、仍然可以被后面的回答看到。它和<a class="lc" href="../c/causal-mask.html">因果掩码</a>、attention_mask是不同的“掩码”。</p><p><b>在哪里出现</b>。</p><ul><li><b>指令微调</b>（见<a class="lc" href="../c/instruction-tuning.html">指令微调与对话模板</a>）：只对回答计算损失（completion-only loss）。多轮对话可以对每一轮助手回复都计算，也可以只对最后一轮计算。</li><li><b>预训练中的打包</b>（见<a class="lc" href="../c/sequence-packing.html">序列打包与文档掩码</a>）：通常所有位置都算损失，但若用到填充，填充位置要掩掉。</li><li><b>掩码语言模型</b>（见<a class="lc" href="../c/masked-modeling.html">掩码建模</a>）：只在被遮住的约15%位置上计算损失，其余位置的标签都是忽略值。</li><li><b>强化学习后训练</b>：智能体与环境交互的轨迹中，环境返回的观察不由策略生成，计算策略梯度时要掩掉（见<a class="lc" href="../c/agentic-rl.html">智能体强化学习</a>）。</li></ul><p><b>对不对提示算损失</b>。经验上，只对回答计算损失通常更好或相当，但有工作发现提示很长、回答很短时，适当保留一部分提示上的损失也有帮助。这取决于数据，没有统一结论。</p>
+<div class="example"><h4>例子</h4><p>一条对话样本按模板拼成9个token：</p><p class="formula"><code>&lt;user&gt; 1 + 1 = ? &lt;assistant&gt; 2 &lt;eos&gt;</code></p><p>位置：0 <code>&lt;user&gt;</code>、1 <code>1</code>、2 <code>+</code>、3 <code>1</code>、4 <code>=</code>、5 <code>?</code>、6 <code>&lt;assistant&gt;</code>、7 <code>2</code>、8 <code>&lt;eos&gt;</code>。</p><p>标签（每个位置预测下一个token）：前6个位置的标签设为−100；位置6的标签是“2”，位置7的标签是“&lt;eos&gt;”。于是损失只在2个位置上计算，模型只学“看到问题后回答2并结束”。如果把位置7的标签也错设为−100，模型就学不会在回答后停下来（见<a class="lc" href="../c/stopping-criteria.html">生成的停止条件</a>）。</p></div>
+<h2>容易误解的地方</h2><ul><li>损失是按有效token取平均，还是先按样本平均再跨样本平均，会改变长短回答的相对权重，结果可能差别明显。</li><li>对话模板和分词器的边界不一致时（例如回答开头的空格被并入了助手标记里），掩码位置可能偏一位，模型会学到奇怪的开头。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

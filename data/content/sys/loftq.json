@@ -1,0 +1,24 @@
+{
+ "id": "loftq",
+ "who": "Yixiao Li, Yifan Yu, Chen Liang, Pengcheng He, Nikos Karampatziakis, Weizhu Chen, Tuo Zhao · 佐治亚理工学院, 微软",
+ "venue": "ICLR 2024",
+ "aka": ["LoftQ", "LoRA感知量化", "LoRA-Fine-Tuning-aware Quantization", "量化LoRA初始化"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2310.08659"},
+  {"label": "GitHub", "url": "https://github.com/yxli2123/LoftQ"}
+ ],
+ "problem": "QLoRA先把基座量化、再以零初始化的LoRA去微调；量化误差在微调一开始就存在，LoRA要先花力气弥补它，2比特这种极低精度下与全精度微调的差距尤其大。",
+ "idea": "量化与LoRA初始化一起做：交替地量化“原权重减去当前低秩部分”的残差，再对剩余误差做SVD求出新的低秩矩阵，使“量化权重+LoRA初值”尽量逼近原始的全精度权重。",
+ "impact": "表明LoRA的初始化可以用来吸收量化误差，被Hugging Face PEFT库收录为LoRA的一种初始化选项，与PiSSA等“非零初始化LoRA”的工作一起被比较。",
+ "method": "[[qlora]]把预训练权重 `W` 量化成 `Q`（如4比特NF4），再加零初始化的 `B·A`（[[lora]]）去微调。开始微调时模型其实是 `Q`，与 `W` 之间已经差了量化误差 `W − Q`，比特越低这个误差越大。\n\nLoftQ的目标是让 `Q + B·A` 在微调开始前就尽量接近 `W`，即最小化 `‖W − Q − B·A‖`。做法是交替优化，重复几轮：\n- 固定低秩部分，把 `W − B·A` 量化得到新的 `Q`；\n- 固定 `Q`，对残差 `W − Q` 做奇异值分解（SVD），取前r个奇异值方向作为新的 `B·A`。\n得到的 `Q` 作为冻结的量化基座，`A`、`B` 作为LoRA的初值继续正常微调。这一步只需在微调前做一次，额外开销很小，可配合均匀量化或NF4使用。\n\n摘要报告：在自然语言理解、问答、摘要和生成任务上都优于已有的量化微调方法，尤其在2比特和2/4比特混合精度这类困难设定下优势明显。",
+ "limits": [
+  {"text": "初始化只保证起点接近原权重，微调过程中量化的基座仍然固定不变；量化误差主要集中在少数方向之外时，低秩近似能吸收的部分有限。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "qlora", "type": "solves", "note": "QLoRA零初始化LoRA不处理量化误差，LoftQ让量化权重与LoRA初值联合逼近原权重，缩小与全精度微调的差距。"},
+  {"to": "lora", "type": "extends", "note": "不改LoRA的结构，只改变它的初始化方式。"}
+ ],
+ "prereq": ["peft-concept", "low-rank", "eigen-svd", "quantization-concept"],
+ "terms": [{"t": "SVD（奇异值分解）", "d": "把一个矩阵分解成若干个秩1成分按重要性排序之和，取前r个就是它最好的秩r近似。"}],
+ "check": {"source": "https://arxiv.org/abs/2310.08659", "confirmed": "标题、七位作者、v1日期2023-10-12；摘要：量化与LoRA微调一起使用时与全精度微调有一致的差距、LoftQ同时量化LLM并为LoRA找到合适的低秩初始化、缓解量化模型与全精度模型的差异、在NLU、问答、摘要、生成任务上优于现有量化方法、尤其2比特与2/4比特混合精度。交替量化与SVD的具体步骤、ICLR 2024、PEFT库收录为一般了解。"}
+}

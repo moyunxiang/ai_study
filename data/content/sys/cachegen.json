@@ -1,0 +1,25 @@
+{
+ "id": "cachegen",
+ "who": "Yuhan Liu, Hanchen Li, Yihua Cheng, Siddhant Ray, Yuyang Huang, Qizheng Zhang, Kuntai Du, Jiayi Yao et al. · 芝加哥大学, 微软",
+ "venue": "SIGCOMM 2024",
+ "aka": ["CacheGen", "KV缓存编码", "KV缓存流式传输", "KV cache streaming", "上下文加载"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2310.07240"},
+  {"label": "GitHub", "url": "https://github.com/UChi-JCL/CacheGen"}
+ ],
+ "problem": "长上下文要先全部预填充完才能出第一个词；把某段上下文的KV缓存存起来给别的请求复用可以省掉预填充，但KV张量很大，从远端存储经网络取回来本身就很慢。",
+ "idea": "把KV缓存当作一种媒体数据来压缩：利用KV值的分布特点设计专门的编码器，把它压成紧凑的比特流；再像视频流一样按当前带宽为不同片段选压缩档位，带宽太低时甚至改为现场重算。",
+ "impact": "把“KV缓存可以跨机器存取和传输”变成一个独立的系统问题，同一团队随后做了CacheBlend并汇总成LMCache缓存层。",
+ "method": "复用KV缓存的想法是：同一份文档、同一段系统提示被许多请求共用时，只做一次预填充，把得到的[[c:kv-cache]]存起来，其他请求直接取用（如[[vllm]]的前缀共享）。但缓存往往放在别的机器或存储里；一个几千token的上下文的KV张量有数GB之大，经网络取回的时间可能比重新预填充还长。\n\nCacheGen做两件事。一是**定制的张量编码器**：根据KV缓存的分布特性（例如相邻token的KV值相近、不同层对精度的敏感度不同），先做差分与分层量化，再用算术编码压成比特流，解码开销很小。二是**按带宽自适应**：把上下文切成若干片段，每段准备多个压缩档位，像视频流选码率那样根据实时带宽为每段挑档位，以控制加载延迟和生成质量；带宽太差时可改为在GPU上直接重算这一段。\n\n摘要报告：与当时复用KV缓存的系统相比，KV缓存大小减少3.5–4.3倍，取回并处理上下文的总延迟降低3.2–3.7倍，对回答质量影响可以忽略。",
+ "limits": [
+  {"text": "只能复用作为前缀出现的上下文；RAG里多段检索文本拼接时，非前缀片段的KV缺少与前文的交叉注意力，不能直接拼接复用。", "solved_by": ["cacheblend"]}
+ ],
+ "relations": [
+  {"to": "vllm", "type": "extends", "note": "在单机前缀KV共享的基础上，把KV缓存的复用扩展到跨网络的存储与传输。"},
+  {"to": "rag", "type": "uses", "note": "主要面向检索增强等带长上下文的场景，复用文档的KV缓存来缩短首词延迟。"},
+  {"to": "h2o", "type": "rivals", "note": "H2O靠丢弃token缩小KV，CacheGen保留全部token、用编码与量化压缩比特数。"}
+ ],
+ "prereq": ["kv-cache", "quantization-concept", "throughput-latency", "context-window"],
+ "terms": [{"t": "算术编码", "d": "一种无损熵编码，出现概率高的符号用更少的比特表示，压缩率可以逼近信息熵。"}],
+ "check": {"source": "https://arxiv.org/abs/2310.07240", "confirmed": "标题、作者（14位）、v1日期2023-10-11；摘要：长上下文需处理完才能生成、复用KV缓存可降延迟但网络取回大张量带来额外延迟、定制张量编码器利用KV分布特性编成紧凑比特流、按带宽变化调整各部分压缩级别、带宽下降时可现场重算、KV缓存缩小3.5–4.3倍、取回与处理总延迟降低3.2–3.7倍。差分与分层量化的细节、SIGCOMM 2024、机构为一般了解。"}
+}

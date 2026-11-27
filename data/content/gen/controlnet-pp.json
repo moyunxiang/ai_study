@@ -1,0 +1,53 @@
+{
+  "id": "controlnet-pp",
+  "who": "Ming Li, Taojiannan Yang, Huafeng Kuang, Jie Wu, Zhaoning Wang, Xuefeng Xiao, Chen Chen · 中佛罗里达大学、字节跳动",
+  "venue": "ECCV 2024",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2404.07987"
+    }
+  ],
+  "aka": [
+    "ControlNet++",
+    "ControlNet Plus Plus",
+    "ControlNetPlusPlus",
+    "循环一致性奖励"
+  ],
+  "problem": "ControlNet能按边缘图、分割图、深度图出图，但生成结果和输入的控制条件常常对不上，比如分割区域画歪、深度关系不一致。",
+  "idea": "用现成的判别模型（如分割、深度模型）从生成图里重新提取条件，直接优化它与输入条件之间的像素级一致性；为省显存，只在加噪后单步去噪的图上算这个奖励。",
+  "impact": "在多种控制条件下显著提高可控性，例如分割条件下mIoU比ControlNet高11.1%，“用奖励模型反馈提升控制精度”成为后续可控生成的常用做法。",
+  "method": "一个自然的想法是：生成图像后，用预训练的分割或深度估计网络把条件“读”回来，与用户给的条件比较，再把差值作为损失回传，形成循环一致性。但从纯噪声开始完整采样再回传梯度，需要保存几十个采样步的计算图，时间和显存都承受不了。\n\nControlNet++的高效奖励策略是：拿一张训练图像，先加上一定程度的噪声，再让模型单步去噪得到估计的干净图，在这张图上提取条件并计算一致性损失。噪声不太大时单步去噪的图已足够清晰，判别模型可以可靠地提取条件，于是训练只需一步前向和回传。作者在分割、边缘、深度等多种条件上评测，可控性普遍提升，摘要给出的例子是分割条件mIoU比[[controlnet]]提高11.1%。思路与[[draft]]、[[alignprop]]这类奖励反传微调一脉相承，但奖励换成了控制一致性。",
+  "limits": [
+    {
+      "text": "只在加噪不多的时间步上施加奖励，对构图主要在高噪声阶段决定的控制条件帮助有限；也依赖判别模型本身的准确度。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "controlnet",
+      "type": "solves",
+      "note": "ControlNet生成结果与条件不一致；用像素级循环一致性奖励微调来提升控制精度。"
+    },
+    {
+      "to": "draft",
+      "type": "extends",
+      "note": "同样把可微奖励回传到扩散模型，但只在单步去噪图上计算以避免长链回传。"
+    },
+    {
+      "to": "alignprop",
+      "type": "rivals",
+      "note": "AlignProp靠截断回传降低完整采样链的开销；ControlNet++改为单步去噪近似。"
+    }
+  ],
+  "prereq": [
+    "diffusion-process",
+    "loss-function",
+    "pretrain-finetune"
+  ],
+  "check": {
+    "source": "https://arxiv.org/abs/2404.07987",
+    "confirmed": "标题、七位作者、v1日期2024-04-11、摘要中现有方法与条件对齐不足、优化像素级循环一致性、用预训练判别奖励模型提取条件、完整采样回传代价高而改为加噪后单步去噪、mIoU比ControlNet提升11.1%；机构、ECCV 2024、与DRaFT/AlignProp的关系来自一般了解"
+  }
+}

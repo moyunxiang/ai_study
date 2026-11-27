@@ -1,0 +1,26 @@
+{
+ "id": "optuna",
+ "who": "Takuya Akiba, Shotaro Sano, Toshihiko Yanase, Takeru Ohta, Masanori Koyama · Preferred Networks",
+ "venue": "KDD 2019",
+ "aka": ["Optuna", "超参数优化框架", "define-by-run调参", "TPE", "剪枝早停"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/1907.10902"},
+  {"label": "GitHub", "url": "https://github.com/optuna/optuna"}
+ ],
+ "problem": "已有调参工具要求先把整个搜索空间写成静态配置；但实际的空间常常是有条件的（选了某个优化器才有某些参数、层数决定有几组宽度），写起来别扭，也难把搜索、提前终止和分布式运行组合起来。",
+ "idea": "把Chainer、PyTorch的“边运行边定义”（define-by-run）用到调参上：在目标函数里用普通Python代码边执行边询问下一个超参，搜索空间随代码动态生成；同时内置高效的采样和剪枝（提前终止差的试验），并能从笔记本扩展到分布式。",
+ "impact": "成为机器学习和Kaggle社区最常用的超参数优化库之一，也常作为Ray Tune等分布式框架的搜索算法后端。",
+ "method": "超参搜索的基本循环是：选一组超参，训练、评估，根据结果选下一组。常用的算法有[[random-search-hpo]]、[[bayes-opt-hpo]]和[[hyperband]]式的早停。Optuna提出三条设计准则：\n- **define-by-run API**：用户写一个目标函数，里面像 `n = trial.suggest_int('层数', 1, 4)`、再在循环里为每层 `suggest` 宽度这样边执行边要超参，条件分支、循环都可以自然表达，这一思路来自[[chainer]]的动态计算图（同一家公司开发）。\n- **高效的搜索与剪枝**：采样默认用TPE（树结构Parzen估计器），也支持CMA-ES等；训练过程中可以向框架汇报中间指标，框架用中位数规则或异步Successive Halving等规则把明显没希望的试验提前终止。\n- **易部署的架构**：试验记录存放在关系数据库等存储中，多个进程或机器连到同一存储即可并行搜索，也能在笔记本里交互式使用并可视化。\n\n论文用实验和实际应用展示了这些设计的效果；它自称是第一个按define-by-run原则设计的优化软件。",
+ "limits": [
+  {"text": "仍需要完整训练（或至少训练一段）许多组超参，在大模型上代价极高；搜索得到的超参也难以直接迁移到更大的模型。", "solved_by": ["mup"]}
+ ],
+ "relations": [
+  {"to": "chainer", "type": "extends", "note": "把Chainer的define-by-run思想从构建计算图搬到构建超参搜索空间。"},
+  {"to": "bayes-opt-hpo", "type": "uses", "note": "TPE等基于模型的贝叶斯式采样是其默认搜索算法。"},
+  {"to": "hyperband", "type": "uses", "note": "内置Successive Halving/Hyperband类剪枝规则，提前终止表现差的试验。"},
+  {"to": "ray-tune", "type": "rivals", "note": "Ray Tune侧重分布式试验调度，Optuna侧重搜索空间定义与采样剪枝，两者常组合使用。"}
+ ],
+ "prereq": ["hyperparameter", "train-val-test", "gaussian", "learning-rate"],
+ "terms": [{"t": "剪枝（调参中）", "d": "根据训练中途的指标，提前停掉明显不会胜出的超参试验，把算力留给更有希望的组合；与模型剪枝不是一回事。"}],
+ "check": {"source": "https://arxiv.org/abs/1907.10902", "confirmed": "标题、五位作者、v1日期2019-07-25；摘要：三条新设计准则（允许动态构建参数搜索空间的define-by-run API、搜索与剪枝策略的高效实现、从可扩展分布式计算到交互界面轻量实验的易部署架构）、称其为首个按define-by-run原则设计的优化软件、MIT许可证。TPE/CMA-ES、中位数剪枝与异步SH、数据库存储、KDD 2019为一般了解。"}
+}

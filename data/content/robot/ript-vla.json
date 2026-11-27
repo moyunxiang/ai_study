@@ -1,0 +1,31 @@
+{
+  "id": "ript-vla",
+  "who": "Shuhan Tan, Kairan Dou, Yue Zhao, Philipp Krähenbühl · UT Austin、南开大学",
+  "venue": "arXiv 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2505.17016"}
+  ],
+  "aka": ["RIPT-VLA", "RIPT", "RIPTVLA", "Reinforcement Interactive Post-Training", "VLA交互式后训练", "VLA交互后训练", "留一法优势VLA强化学习"],
+  "problem": "VLA训练只靠离线示范加监督模仿，示范很少时适应新任务、新环境的能力很差，而真正的RL训练又被认为复杂、不稳定。",
+  "idea": "在预训练、监督微调之后加第三阶段：只用0/1成功奖励交互训练，每个初始状态采K条轨迹，用留一法基线算优势，全成或全败的状态直接丢掉重采。",
+  "impact": "把7B的OpenVLA-OFT在LIBERO四个套件上从96.7%提到97.5%；摘要称只给1条示范时，能把成功率4%的模型在15轮内练到97%。",
+  "method": "**卡在哪**：当时的VLA流水线是先大规模预训练，再在少量任务示范上做监督微调（SFT）。示范越少，SFT模型越差；而在线RL通常要设计稠密奖励、训练价值网络，对大模型来说既复杂又不稳。RIPT-VLA想要一个和大模型RL一样简单的配方：只看任务成没成。\n\n**做法**：对每个采样到的初始状态（上下文），用当前策略跑K条轨迹（OpenVLA-OFT取8，QueST取16），每条得到0或1的奖励。每条轨迹的优势等于它自己的奖励减去其余K−1条的平均奖励，这就是[[rloo]]的留一法基线，不需要价值网络。如果K条全部成功或全部失败，所有优势都是0，这组数据没有学习信号，就丢掉换一个初始状态（与[[dapo]]的动态采样同一思路），直到攒满一批。更新用[[ppo]]式的裁剪目标。对输出连续动作的[[openvla-oft]]，作者额外训练一个小的尺度头，把原来的L1回归头看作拉普拉斯分布的均值，这样就能算出动作的对数概率并在采样时加入探索。\n\n**结果**：在[[libero]]上，约2000万参数的QueST在LIBERO-Long的5条示范设置中从50.2%提到71.4%；OpenVLA-OFT四套件平均从96.7%到97.5%。只用1条示范时，一组跨场景实验从3.5%提到97.2%。在MetaWorld ML45上也有提升。",
+  "limits": [
+    {"text": "训练全部在可重置的仿真环境里完成，需要反复从同一初始状态采多条轨迹，这在真机上很难做到。", "solved_by": ["wmpo"]},
+    {"text": "只用稀疏的成功奖励，最初完全不会做的任务（K条全失败）没有学习信号，依赖SFT模型已有一定成功率。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "openvla-oft", "type": "uses", "note": "为OpenVLA-OFT的回归头加尺度头，转成拉普拉斯分布以便计算似然，再做RL后训练。"},
+    {"to": "rloo", "type": "uses", "note": "采用留一法基线计算优势，不需要训练价值网络。"},
+    {"to": "ppo", "type": "uses", "note": "策略更新用PPO式裁剪目标。"},
+    {"to": "libero", "type": "uses", "note": "主要在LIBERO各套件和LIBERO-90上评测。"},
+    {"to": "dapo", "type": "extends", "note": "丢弃全成或全败的组、重新采样，与DAPO的动态采样思路一致。"}
+  ],
+  "prereq": ["vla-concept", "policy-gradient-concept", "reward-return", "imitation-learning", "action-chunking"],
+  "terms": [
+    {"t": "留一法基线", "d": "同一起点采K条轨迹，每条的基线取另外K−1条奖励的平均，用来判断这条比同伴好还是差。"},
+    {"t": "拉普拉斯分布", "d": "形状像尖顶帐篷的概率分布，对应L1误差；给定均值和尺度就能写出对数概率。"}
+  ],
+  "learn": "先读[[rloo]]和[[grpo]]理解无价值网络的组内优势，再看原文第3节动态采样算法和第4节LIBERO表格。",
+  "check": {"source": "https://arxiv.org/abs/2505.17016", "confirmed": "标题、4位作者、v1日期2025-05-22、摘要中21.2%、97.5%、1条示范4%→97%/15轮；HTML正文：机构、三阶段流程、K=8/16、留一法优势、PPO裁剪、尺度头+拉普拉斯、QueST 50.2→71.4（LIBERO-Long 5-shot）、OFT 96.7→97.5、跨场景3.5→97.2、MetaWorld ML45。"}
+}

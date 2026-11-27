@@ -1,0 +1,9 @@
+{
+  "key": "numerical-stability",
+  "short": "计算机里的数有范围和精度上限：太大会上溢成inf，太小会下溢成0，相近的数相减会丢精度。数值稳定的算法通过改写公式（如log-sum-exp技巧）避开这些坑。",
+  "body": "数学上正确的公式，直接照抄成代码可能得到inf或NaN。原因是浮点数（见[[c:floating-point]]）只能表示有限范围、有限位数：FP32最大约3.4×10³⁸，FP16只到65504。训练时一出现NaN，往往整个模型就废了。\n\n**三类典型问题**。\n\n- **上溢**：`exp(100)`约2.7×10⁴³，超出FP32，变成inf；inf/inf就是NaN。\n- **下溢**：很多小概率相乘，例如一句话里200个词、每个概率0.01，乘积是10⁻⁴⁰⁰，直接变成0，取对数得−inf。\n- **灾难性抵消**：两个很接近的大数相减，有效数字大半被抵消，例如在FP32里`1e8 + 1 − 1e8`会得到0。\n\n**标准对策**。\n\n- **在对数空间计算**：概率连乘改为对数概率相加，所以损失函数都写成负对数似然，见[[c:mle]]。\n- **log-sum-exp技巧**：要算`log Σ exp(x_i)`时，先减去最大值m：`LSE(x) = m + log Σ exp(x_i − m)`。这样最大的那一项变成exp(0) = 1，不会上溢，也至少有一项不会下溢。[[c:softmax]]、交叉熵、[[c:hmm-concept]]的前向算法都这样实现；[[online-softmax]]把它改写成分块、逐块更新最大值的形式，[[flashattention]]依赖的正是这一点。\n- **加小常数**：除法和开方前加ε，如[[c:normalization-layer]]里的`√(σ² + ε)`和Adam的分母。\n- **损失缩放**：[[mixed-precision]]训练时把损失乘一个大数，防止FP16的梯度下溢为0，更新前再除回去。\n\n**条件数**。另一类不稳定来自问题本身：矩阵A的条件数`κ(A) = σ_max / σ_min`（最大与最小奇异值之比，见[[c:eigen-svd]]）衡量输入的相对误差在解`Ax = b`时最多被放大多少倍。κ = 10⁶时，FP32约7位有效数字只剩1位可信。病态的海森矩阵也让[[c:gradient-descent]]收敛极慢，这是预条件和[[c:adaptive-optimizer]]要解决的问题。",
+  "example": "logits为(1000, 1001, 1002)。直接算exp(1000)溢出，softmax得到NaN。减去最大值1002后变成(−2, −1, 0)，exp为(0.135, 0.368, 1)，和为1.503，softmax = (0.090, 0.245, 0.665)，与数学结果一致。\n\nLSE = 1002 + log 1.503 ≈ 1002.41。",
+  "pitfalls": "- 先算softmax、再对结果取log，比直接调用`log_softmax`更不稳定：小概率先下溢成0，再取log就是−inf。\n- 训练中途出现NaN，未必是学习率太大，也可能是某处除以0、对负数开方或取log(0)；可以打开框架的异常检测逐层定位。",
+  "needs": ["floating-point"],
+  "aka": ["数值稳定性", "numerical stability", "数值稳定", "上溢", "下溢", "上溢和下溢", "overflow", "underflow", "log-sum-exp", "logsumexp", "log-sum-exp trick", "LSE", "条件数", "condition number", "病态矩阵", "ill-conditioned", "NaN", "inf", "灾难性抵消", "catastrophic cancellation", "数值溢出", "梯度NaN"]
+}

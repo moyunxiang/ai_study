@@ -1,0 +1,29 @@
+{
+  "id": "q-chunking",
+  "who": "Qiyang Li, Zhiyuan Zhou, Sergey Levine · UC Berkeley",
+  "venue": "NeurIPS 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2507.07969"}
+  ],
+  "problem": "长视界、稀疏奖励的操作任务里，即使有离线数据，在线RL也很难探索：每一步独立采样的动作前后不连贯，难以复现数据里那种有目的的连续动作。",
+  "idea": "把模仿学习里的“动作分块”搬进TD学习：策略一次输出未来h步的动作块，评论家学的是“状态+整个动作块”的Q值，用块结束后的状态做h步备份。",
+  "impact": "把动作分块从模仿学习（ACT、扩散策略）推广到基于价值的RL，2025年下半年以来被机器人离线转在线RL和VLA的RL微调工作频繁引用和沿用。",
+  "method": "动作分块（见[[aloha-act]]、[[diffusion-policy]]）是指策略每次预测接下来一段动作序列而不是一个动作。Q-chunking直接在“分块后的动作空间”里做RL：\n\n- 动作块 `A_t = (a_t, …, a_(t+h−1))`，评论家学 `Q(s_t, A_t)`；\n- TD目标用块内的真实奖励和块结束后的状态：\n\n`Q(s_t, A_t) ← Σ_(i=0)^(h−1) γ^i r_(t+i) + γ^h Q(s_(t+h), A_(t+h))`\n\n因为整个块就是一个“动作”，这里的h步回报没有普通n步回报在离策略时的偏差（块内动作就是被评估的那个动作），同时信息一次传h步，训练更快更稳；\n- 策略输出整个块，论文的实现以[[fql]]为底座，用流匹配的行为策略加一步策略来生成块；也给了一个从行为策略采样多个块、按Q值挑最好的变体。\n\n好处有两个：在线探索时执行的是时间上连贯的动作块，更像离线数据里有目的的行为；价值备份是无偏的多步备份。摘要称在一系列长视界、稀疏奖励的操作任务上，离线表现强、在线样本效率高，超过此前最好的离线转在线方法。",
+  "limits": [
+    {"text": "块长h固定，执行块内动作时不看新的观测，属于开环执行，对需要快速反应的任务不利。"},
+    {"text": "动作块使动作空间维度乘以h，策略和评论家的学习更依赖离线数据提供的行为先验。"}
+  ],
+  "relations": [
+    {"to": "fql", "type": "uses", "note": "以FQL的流匹配行为策略和一步策略作为实现底座。"},
+    {"to": "aloha-act", "type": "extends", "note": "把ACT等模仿学习里的动作分块用到TD学习中。"},
+    {"to": "rlpd", "type": "rivals", "note": "RLPD等离线转在线方法逐步选动作；Q-chunking以动作块为单位探索和备份。"},
+    {"to": "horizon-reduction", "type": "extends", "note": "同一组作者的思路：块级备份也是一种缩短有效视界的手段。"}
+  ],
+  "prereq": ["offline-rl", "action-chunking", "td-error", "exploration-exploitation"],
+  "terms": [
+    {"t": "动作块（action chunk）", "d": "策略一次性输出的、接下来若干步要依次执行的动作序列。"}
+  ],
+  "learn": "先读[[aloha-act]]了解动作分块，再读[[fql]]；读原文第4节的块级备份；在OGBench的cube任务上比较h=1与h=5的在线微调曲线。",
+  "check": {"source": "https://arxiv.org/abs/2507.07969", "confirmed": "标题、三位作者、arXiv v1于2025-07-10；摘要中面向长视界稀疏奖励、离线转在线设定、把动作分块用于TD方法、在分块动作空间直接做RL、利用离线数据的时间一致行为探索、无偏n步备份、超过此前最好的离线转在线方法。以FQL为底座等实现细节按原文正文通行描述；NeurIPS 2025按通行引用。"},
+  "aka": ["Q-chunking", "QC", "Q chunking", "动作分块RL", "action chunking RL", "块级TD备份"]
+}

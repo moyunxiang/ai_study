@@ -1,0 +1,81 @@
+{
+  "id": "stanford-pos-tagger",
+  "who": "Kristina Toutanova, Dan Klein, Christopher D. Manning, Yoram Singer · 斯坦福大学、Google",
+  "venue": "HLT-NAACL 2003",
+  "links": [
+    {
+      "label": "ACL Anthology",
+      "url": "https://aclanthology.org/N03-1033/"
+    }
+  ],
+  "aka": [
+    "Stanford POS Tagger",
+    "斯坦福词性标注器",
+    "循环依存网络",
+    "Cyclic Dependency Network",
+    "双向词性标注",
+    "Bidirectional Tagging"
+  ],
+  "problem": "HMM和最大熵马尔可夫模型都只从左往右看：决定当前词性时只能用前面的标签，后面词的标签信息用不上，而很多歧义（如that是限定词还是连词）要看后文才能定。",
+  "idea": "用「依存网络」同时以前一个和后一个标签为条件给每个位置建局部对数线性模型，配合大量词汇特征、高斯先验正则化和细致的未登录词特征，再用类似Viterbi的动态规划求整句最优。",
+  "impact": "在宾州树库WSJ上达到97.24%的准确率，比此前最好的单一自动学习标注器误差降低4.4%；该标注器成为斯坦福工具包和CoreNLP中的标准词性标注器，十年内被大量下游研究使用。",
+  "background": "到2000年前后，英语词性标注准确率在96.5–97%附近：[[church-tagger]]、TnT用HMM，[[ratnaparkhi-tagger]]和[[memm]]用最大熵模型从左到右逐词分类。这些方法在决定第i个词的标签时都只把t_{i−1}（及更早）当作条件。例如「will to fight」中的will，看到后面是to才更容易判为名词。[[crf]]（2001）在理论上能同时考虑两侧，但当时训练大规模CRF词性标注器的代价还很高。",
+  "method": "**依存网络。** 对每个位置i，建一个局部的条件对数线性模型 `P(t_i | t_{i−1}, t_{i+1}, w)`，同时以左右两边的标签和整句的词为条件。这些局部条件分布连成一个有环的「依存网络」，并不对应一个归一化的联合分布，但可以把整句的打分定义为各局部条件概率的乘积 `score(t) = Π_i P(t_i | t_{i−1}, t_{i+1}, w)`，再用与Viterbi类似的动态规划找出得分最高的标签序列。\n\n**丰富的词汇特征。** 除了当前词、前后词，还联合使用连续几个词作为条件（例如同时看w_{i−1}和w_i），能直接捕捉固定搭配。\n\n**先验正则化。** 特征上百万，作者在对数线性模型的权重上加高斯先验（相当于L2正则），而不是简单删掉低频特征，显著减少过拟合。\n\n**未登录词特征。** 包括前后缀、大小写、是否含数字或连字符、词形类别等细粒度特征。",
+  "results": "摘要报告：在宾州树库WSJ上准确率为97.24%，比此前最好的单一自动学习标注结果误差降低4.4%。",
+  "legacy": "Manning后来在2011年的「Part-of-Speech Tagging from 97% to 100%: Is It Time for Some Linguistics?」中分析了这一水平下剩余错误的来源，指出相当一部分来自标注本身的不一致。Stanford POS Tagger随[[corenlp]]广泛分发；之后神经模型（[[bilstm-crf]]、[[stanza]]）把准确率继续推到97.5%以上，但幅度已很小，英语词性标注被普遍视为基本解决。",
+  "limits": [
+    {
+      "text": "依存网络的分数不是归一化的联合概率，理论上可能存在标签偏置以外的不一致，训练与解码目标不完全对应。",
+      "solved_by": []
+    },
+    {
+      "text": "特征全部人工设计，移植到新语言或社交媒体文本时需要重做特征工程。",
+      "solved_by": [
+        "bilstm-cnn-crf"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "ratnaparkhi-tagger",
+      "type": "extends",
+      "note": "同样使用最大熵（对数线性）局部模型和大量特征，但改为同时以左右两侧标签为条件。"
+    },
+    {
+      "to": "memm",
+      "type": "solves",
+      "note": "MEMM只从左到右条件化，看不到后文标签；依存网络同时使用前后标签。"
+    },
+    {
+      "to": "maxent-nlp",
+      "type": "uses",
+      "note": "局部模型是带高斯先验的条件最大熵模型。"
+    },
+    {
+      "to": "penn-treebank",
+      "type": "uses",
+      "note": "在宾州树库WSJ部分上训练和评测。"
+    }
+  ],
+  "prereq": [
+    "logistic-regression",
+    "regularization",
+    "graphical-model",
+    "dynamic-programming"
+  ],
+  "terms": [
+    {
+      "t": "依存网络（dependency network）",
+      "d": "为每个变量单独建一个以其邻居为条件的局部模型，允许依赖关系形成环。"
+    },
+    {
+      "t": "高斯先验",
+      "d": "假设权重服从均值为0的正态分布，等价于在损失里加L2正则项，防止稀有特征权重过大。"
+    }
+  ],
+  "learn": "先读[[ratnaparkhi-tagger]]和[[memm]] → 读原文第2节的双向依存网络和第3节的特征 → 动手：用sklearn的逻辑回归训练一个只用左侧标签的标注器，再加入右侧标签（训练时用标准标签、测试时迭代两遍），比较准确率。",
+  "check": {
+    "source": "https://aclanthology.org/N03-1033/",
+    "confirmed": "OpenAlex：标题、作者Toutanova、Klein、Manning、Singer、HLT-NAACL 2003、DOI 10.3115/1073445.1073478；摘要：通过依存网络表示显式使用前后标签上下文、广泛使用词汇特征（包括联合以多个连续词为条件）、在条件对数线性模型中有效使用先验、细粒度建模未登录词特征、WSJ准确率97.24%、比此前最好的单一自动学习标注结果误差降低4.4%。依存网络打分与解码细节、Manning 2011后续论文、Anthology编号与作者机构凭一般了解。"
+  }
+}

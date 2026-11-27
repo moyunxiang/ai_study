@@ -1,0 +1,33 @@
+{
+  "id": "envpool",
+  "who": "Jiayi Weng, Min Lin, Shengyi Huang, Bo Liu, Denys Makoviichuk, Viktor Makoviychuk, Zichen Liu, Yufan Song et al. · Sea AI Lab 等",
+  "venue": "NeurIPS 2022 Datasets and Benchmarks",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2206.10558"},
+    {"label": "GitHub", "url": "https://github.com/sail-sg/envpool"}
+  ],
+  "problem": "RL训练系统的优化（[[impala]]、[[apex]]等）大多集中在学习端，而并行运行环境这一步常常是整个系统最慢的部分：标准做法是用Python子进程各跑一个环境，进程间通信开销很大。",
+  "idea": "用C++实现一个专门的并行环境执行引擎：环境实例放在C++线程池里运行，对外提供与[[openai-gym]]兼容的批量接口，同时支持同步和异步两种模式，异步模式下先完成的环境先返回。",
+  "impact": "让Atari、MuJoCo等常用环境在单机上的模拟速度提高到每秒百万帧量级，被[[cleanrl]]等训练库直接集成，大幅缩短了在常用基准上做实验的时间。",
+  "background": "一次RL训练的时间大体分成三块：环境模拟、神经网络推理（选动作）和梯度更新。分布式框架如[[impala]]、[[apex]]靠多机多进程提升了总吞吐，但单机上跑多个环境时，最常见的方法仍是Python的多进程向量化环境：每个子进程跑一个环境，主进程通过管道收发观测和动作。Python的全局解释器锁、序列化和进程切换让这一步成了瓶颈，在GPU上做推理时尤其明显——GPU在等环境。",
+  "method": "EnvPool把环境本身（Atari模拟器、MuJoCo等）在C++中封装，用一个线程池同时推进很多个环境实例，观测直接写进预先分配好的共享内存缓冲区，避免了Python层的序列化和进程通信。\n\n对外它提供两种接口：**同步模式**与普通的向量化环境相同，一次输入一批动作、返回一批观测；**异步模式**允许设置一个比环境总数小的批大小，每次只返回最先完成的那一批环境，智能体只对这批环境推理，其他环境继续在后台运行，这样慢的环境不会拖住整批。接口与Gym/dm_env兼容，现有训练代码只需替换环境构造函数。",
+  "results": "摘要称，在高端机器（NVIDIA DGX-A100）上，EnvPool在Atari环境上达到每秒一百万帧、在MuJoCo环境上达到每秒三百万帧；在笔记本上速度是Python子进程方式的2.8倍；在笔记本上训练Atari Pong和MuJoCo Ant的示例只需五分钟；已与CleanRL、rl_games、DeepMind Acme等库兼容。",
+  "legacy": "EnvPool是“让环境不再是瓶颈”这条思路在CPU环境上的代表；另一条路线是把环境整个用JAX重写、放到GPU上与智能体一起编译，例如[[jaxmarl]]、[[craftax]]和物理引擎[[brax]]，后者在可JAX化的环境上更快，但需要重写环境。",
+  "limits": [
+    {"text": "只能加速已经被封装进C++的环境，新环境要单独移植；环境本身仍在CPU上，与GPU之间有数据搬运。", "solved_by": ["jaxmarl", "craftax"]}
+  ],
+  "relations": [
+    {"to": "openai-gym", "type": "uses", "note": "对外提供与Gym兼容的批量环境接口，现有代码可直接替换。"},
+    {"to": "impala", "type": "extends", "note": "IMPALA等分布式架构提升学习端吞吐；EnvPool把同样的关注放到单机的环境执行上。"},
+    {"to": "apex", "type": "extends", "note": "Ape-X用大量分布式actor加速采样；EnvPool在单机内用C++线程池做到高吞吐采样。"},
+    {"to": "ale", "type": "uses", "note": "Atari环境基于ALE模拟器，在C++层直接驱动。"}
+  ],
+  "prereq": ["throughput-latency", "cpu-gpu", "benchmark", "state-action-observation"],
+  "terms": [
+    {"t": "向量化环境", "d": "同时运行多个环境副本、一次接收一批动作并返回一批观测的封装，用于让神经网络批量推理、提高采样效率。"},
+    {"t": "异步环境执行", "d": "不等所有环境都走完一步，而是谁先完成先处理谁，避免最慢的环境拖住整批。"}
+  ],
+  "learn": "先了解[[openai-gym]]的向量化环境；读原文第3节系统设计和第4节速度测试；用EnvPool替换一个PPO示例中的环境构造函数，比较每秒帧数。",
+  "check": {"source": "https://arxiv.org/abs/2206.10558", "confirmed": "标题、作者列表（共12位）、arXiv v1于2022-06-21；摘要中IMPALA/Apex/Seed RL/Sample Factory提升吞吐、并行环境执行常是最慢环节、DGX-A100上Atari每秒一百万帧与MuJoCo每秒三百万帧、笔记本上为Python子进程的2.8倍、与CleanRL/rl_games/Acme兼容、笔记本上五分钟训练Pong和Ant。C++线程池、同步/异步模式按原文正文与仓库说明的通行描述；NeurIPS 2022 Datasets and Benchmarks、机构按通行引用。"},
+  "aka": ["EnvPool", "并行环境引擎"]
+}

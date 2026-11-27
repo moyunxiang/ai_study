@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>D3PO逐步偏好优化（2023） · AI脉络</title>
+<meta name="description" content="扩散模型的RLHF要先收集大量数据训练奖励模型，再做RL，成本高。语言模型的DPO能省掉奖励模型，但它要算整条输出的似然，扩散模型的多步去噪让这在显存上做不到。 把去噪过程当作多步MDP，把DPO的偏好损失下放到每一个去噪步上：对同一提示的一对“好图/坏图”轨迹，在每一步上提高好轨迹那一步的相对概…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/d3po.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="D3PO逐步偏好优化（2023）">
+<meta property="og:description" content="扩散模型的RLHF要先收集大量数据训练奖励模型，再做RL，成本高。语言模型的DPO能省掉奖励模型，但它要算整条输出的似然，扩散模型的多步去噪让这在显存上做不到。 把去噪过程当作多步MDP，把DPO的偏好损失下放到每一个去噪步上：对同一提示的一对“好图/坏图”轨迹，在每一步上提高好轨迹那一步的相对概…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/d3po.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/d3po">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 可控生成与编辑</div>
+<h1>D3PO逐步偏好优化</h1>
+<div class="full">Using Human Feedback to Fine-tune Diffusion Models without Any Reward Model</div>
+<div class="meta"><span>2023.11</span><span>论文</span><span>延伸</span><span>CVPR 2024</span><span>Kai Yang, Jian Tao, Jiafei Lyu, Chunjiang Ge, Jiaxin Chen, Qimai Li, Weihan Shen, Xiaolong Zhu et al. · 清华大学深圳国际研究生院等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2311.13231" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/yk7333/D3PO" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/d3po">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>扩散模型的RLHF要先收集大量数据训练奖励模型，再做RL，成本高。语言模型的DPO能省掉奖励模型，但它要算整条输出的似然，扩散模型的多步去噪让这在显存上做不到。</p></div><div><h4>方法</h4><p>把去噪过程当作多步MDP，把DPO的偏好损失下放到每一个去噪步上：对同一提示的一对“好图/坏图”轨迹，在每一步上提高好轨迹那一步的相对概率、降低坏轨迹的，从而不需要整条链的似然。</p></div><div><h4>影响</h4><p>和同一周的Diffusion-DPO一起把DPO引入扩散模型；D3PO走在线、逐步的RL式路线，Diffusion-DPO走离线、基于ELBO的路线，后者因可直接用大规模偏好数据集而被采用得更多。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>DPO的核心是：给定偏好对(y_w, y_l)，最小化<code>−log σ(β·[log π(y_w)/π_ref(y_w) − log π(y_l)/π_ref(y_l)])</code>，其中似然比代替了显式奖励。扩散模型生成一张图要T步，整条轨迹的似然是T个高斯转移的乘积，直接对整条轨迹反传需要保存所有步的激活，显存不可承受。</p><p>D3PO把每一步去噪<code>π_θ(x_{t−1}|x_t, z)</code>看成策略的一个动作。作者在一些假设下推导出：把DPO损失分别作用在每一步的状态—动作对上，就可以逐步更新，而每次只需对单步做反传。训练时从同一提示、同一初始噪声出发采样两条轨迹，由人（或用某个指标代替人）挑出更好的那张，然后对两条轨迹的各步施加DPO损失。理论分析表明，这样做等价于用最优的奖励模型来引导学习。</p><p>实验中作者用目标量的相对大小（如可压缩性、美学分）充当人类偏好，取得与使用真实奖励的方法相当的结果；还用真人反馈降低了图像畸变率（如手部畸形）、生成更安全的图。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍需在线采样成对轨迹并获得偏好，无法直接利用现成的大规模离线偏好数据集。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:288" href="../n/diffusion-dpo.html">Diffusion-DPO</a></div></li><li>逐步分解依赖每一步偏好与最终图像偏好一致的假设，这在实际中并不严格成立。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/dpo.html">DPO直接偏好优化</a><span class="yr">2023.05 · LLM</span><div class=nt>把DPO的偏好损失从整条输出下放到扩散模型的每一个去噪步上。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/ddpo.html">扩散模型强化学习DDPO</a><span class="yr">2023.05 · 生成</span><div class=nt>DDPO需要一个奖励函数；D3PO直接用偏好对更新，不训练奖励模型。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/diffusion-dpo.html">Diffusion-DPO</a><span class="yr">2023.11 · 生成</span><div class=nt>同一周提出的扩散DPO：Diffusion-DPO离线用ELBO近似似然，D3PO在线逐步更新；前者可以直接用Pick-a-Pic等现成偏好数据。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/diffusion-dpo.html">Diffusion-DPO</a><span class="yr">2023.11 · 生成</span><div class=nt>仍需在线采样成对轨迹并获得偏好，无法直接利用现成的大规模离线偏好数据集。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/spo.html">SPO逐步偏好优化</a><span class="yr">2024.06 · 生成</span><div class=nt>D3PO同样在步级做偏好优化但沿用两条轨迹；SPO从共享噪声采样候选池。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/rlhf-concept.html">人类反馈强化学习</a> <a class="chip c" href="../c/mdp.html">马尔可夫决策过程</a> <a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a></p>
+<h2>本篇术语</h2><ul><li><b>偏好对</b>　同一条提示下的两张生成图，标注出哪一张更好；DPO类方法只需要这种相对比较，而不需要绝对打分。</li></ul>
+<h2>怎么学</h2><p>先读DPO的损失推导 → 读本文把去噪写成MDP、逐步施加DPO的部分 → 与Diffusion-DPO对照两种近似的取舍。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2311.13231" rel="noopener">https://arxiv.org/abs/2311.13231</a>（标题、作者、v1日期2023-11-22、摘要中训练奖励模型成本高、扩散去噪过程显存需求阻碍直接用DPO、提出D3PO、理论上等价于用最优奖励模型引导、用目标的相对大小代替人类偏好并与用真实奖励的方法相当、降低图像畸变率并生成更安全的图；机构、CVPR 2024、逐步DPO损失的具体写法、同一初始噪声采样两条轨迹来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20D3PO%E9%80%90%E6%AD%A5%E5%81%8F%E5%A5%BD%E4%BC%98%E5%8C%96%EF%BC%88d3po%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ad3po%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/d3po.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="meshgpt.html"><small>本分支上一个 · 2023.11</small><b>MeshGPT自回归网格</b></a><a class="r" href="svd.html"><small>本分支下一个 · 2023.11</small><b>Stable Video Diffusion</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

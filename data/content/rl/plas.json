@@ -1,0 +1,30 @@
+{
+  "id": "plas",
+  "who": "Wenxuan Zhou, Sujay Bajracharya, David Held · CMU",
+  "venue": "CoRL 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2011.07213"},
+    {"label": "项目页", "url": "https://sites.google.com/view/latent-policy"}
+  ],
+  "problem": "离线RL要让策略只选数据支撑集内的动作，BCQ、BEAR等方法用显式约束或扰动来实现，约束强弱不好把握。",
+  "idea": "先用条件VAE学会“数据里的动作长什么样”，再让策略在VAE的潜在空间里输出潜变量，经解码器变成动作；这样输出的动作天然落在数据分布附近。",
+  "impact": "成为“隐式约束/潜在动作空间”一类离线RL的代表，d3rlpy等库内置；后来用扩散、流模型表示行为分布的离线方法都可看作同一思路的延续。",
+  "method": "[[bcq]]用一个生成模型产生“像数据的动作”，再加一个小扰动网络去改进；扰动多大是个超参数。PLAS（Policy in the Latent Action Space）换了一种做法：\n\n1. 先在离线数据上训练一个条件[[vae]]：编码器把 `(s, a)` 压成潜变量z，解码器从 `(s, z)` 还原动作。\n2. 策略不直接输出动作，而是输出潜变量 `z = π(s)`，并把z限制在先验分布概率较高的区域（如截断在一个范围内）。\n3. 执行时 `a = Decoder(s, π(s))`。由于解码器只学过数据里的动作，它在高概率潜变量上解码出来的动作都在数据支撑集内。\n4. 评论家照常用[[td3]]式的双Q学习，策略在潜在空间里做确定性策略梯度最大化Q。\n\n约束不再写在损失里，而是被“动作空间的重新参数化”隐式实现。作者在D4RL连续控制任务和一个真实机器人布料操作任务上评测，摘要称在不同类型的数据集上表现稳定，超过带显式约束的离线方法。",
+  "limits": [
+    {"text": "策略能达到的动作完全取决于VAE的表达能力，VAE对多峰或复杂动作分布拟合不好时，好动作可能根本解码不出来。", "solved_by": ["diffusion-ql"]},
+    {"text": "需要先训VAE再训策略，两阶段的效果受VAE质量和潜变量截断范围影响。"}
+  ],
+  "relations": [
+    {"to": "bcq", "type": "extends", "note": "同样用生成模型把动作限制在数据附近，但去掉扰动网络，改为在潜在空间里直接优化。"},
+    {"to": "vae", "type": "uses", "note": "用条件VAE建模行为策略的动作分布并作为动作解码器。"},
+    {"to": "td3", "type": "uses", "note": "评论家用TD3式双Q学习，策略做确定性策略梯度。"},
+    {"to": "bear", "type": "rivals", "note": "BEAR用MMD显式约束策略在支撑集内；PLAS用潜在空间隐式实现。"}
+  ],
+  "prereq": ["offline-rl", "latent-space", "elbo", "actor-critic"],
+  "terms": [
+    {"t": "潜在动作空间", "d": "生成模型的潜变量空间；策略在这里选点，再由解码器映射成真实动作。"}
+  ],
+  "learn": "先读[[bcq]]和VAE的基本原理；读PLAS原文第4节；在d3rlpy里对比BCQ与PLAS在hopper-medium-replay上的结果。",
+  "check": {"source": "https://arxiv.org/abs/2011.07213", "confirmed": "标题、三位作者、arXiv v1于2020-11-14；摘要中离线设定、外推误差、在潜在动作空间学习策略自然满足支撑约束、连续控制基准与真实机器人可变形物体操作、超过显式约束方法。条件VAE与TD3式评论家等细节按原文正文通行描述；CoRL 2020按通行引用。"},
+  "aka": ["PLAS", "Policy in the Latent Action Space", "潜在动作空间策略", "隐式约束离线RL"]
+}

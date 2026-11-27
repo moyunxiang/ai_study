@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>EPR学习检索示例（2021） · AI脉络</title>
+<meta name="description" content="上下文学习的效果很依赖放进提示的那几个示例，可当时挑示例只能靠BM25或句向量找“表面上像”的训练样本，而表面相似不等于对模型有帮助。 让语言模型自己给候选示例打分：看加上某个示例后，模型生成正确答案的概率有多高；高的当正例、低的当负例，用对比学习训练一个专门挑示例的稠密检索器。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/epr.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="EPR学习检索示例（2021）">
+<meta property="og:description" content="上下文学习的效果很依赖放进提示的那几个示例，可当时挑示例只能靠BM25或句向量找“表面上像”的训练样本，而表面相似不等于对模型有帮助。 让语言模型自己给候选示例打分：看加上某个示例后，模型生成正确答案的概率有多高；高的当正例、低的当负例，用对比学习训练一个专门挑示例的稠密检索器。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/epr.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/epr">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:336"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/agent.html">推理、检索与智能体</a> › 提示、上下文与记忆</div>
+<h1>EPR学习检索示例</h1>
+<div class="full">Learning To Retrieve Prompts for In-Context Learning</div>
+<div class="meta"><span>2021.12</span><span>论文</span><span>延伸</span><span>NAACL 2022</span><span>Ohad Rubin, Jonathan Herzig, Jonathan Berant · 特拉维夫大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2112.08633" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/OhadRubin/EPR" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/epr">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>上下文学习的效果很依赖放进提示的那几个示例，可当时挑示例只能靠BM25或句向量找“表面上像”的训练样本，而表面相似不等于对模型有帮助。</p></div><div><h4>方法</h4><p>让语言模型自己给候选示例打分：看加上某个示例后，模型生成正确答案的概率有多高；高的当正例、低的当负例，用对比学习训练一个专门挑示例的稠密检索器。</p></div><div><h4>影响</h4><p>把“选示例”变成一个可以用LM信号监督训练的检索问题，在三个语义解析任务上明显超过此前的示例选择方法；此后的示例检索与“用LM反馈训练检索器”的工作大多以它为起点或基线。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/gpt-3.html">GPT-3</a>让“在提示里放几个例子、不更新参数”的<a class="lc" href="../c/in-context-learning.html">上下文学习与提示</a>流行起来，但<a class="ln" href="../n/good-icl-examples.html">怎样选好示例</a>等工作发现，换一组示例，准确率可以相差很大。常见做法是用<a class="ln" href="../n/bm25.html">BM25</a>或<a class="ln" href="../n/sentence-bert.html">Sentence-BERT</a>找与测试问题字面或语义最近的训练样本，这只是代理指标。</p><h2>方法</h2><p><b>造训练数据</b>：对训练集中的每一对 <code>(x, y)</code>，先用无监督检索器（BM25或SBERT）从其余训练样本里召回约50个候选 ē。然后把每个候选当作单个示例放在 x 前面，让一个<b>打分LM</b>（实验里主要用GPT-Neo）计算生成正确输出的概率 <code>Prob(y | ē, x)</code>。概率最高的k个标为正例，最低的k个标为负例。因为召回时能用到正确答案 y，候选本身就和目标很接近，负例因此是“看起来像但帮不上忙”的难负例。</p><p><b>训练检索器</b>：仿照<a class="ln" href="../n/dpr.html">稠密检索DPR</a>用两个BERT编码器，一个编码测试输入，一个编码候选示例，用对比损失让正例的内积高于负例和同批其他样本。</p><p><b>推理</b>：测试时只用这个检索器取最相关的若干训练样本拼成提示，交给推理LM（可以与打分LM不同，例如更大的GPT-J、GPT-3或Codex）。</p><p><b>结果</b>：任务是把自然语言映射成结构化表示的Break、MTop、SMCalFlow。打分LM与推理LM都用GPT-Neo时，相比最好的基线，Break从26%到31.9%，MTop从57%到64.2%，SMCalFlow从51.4%到54.3%；用GPT-Neo打分、换更大的模型推理，提升同样存在。</p><h2>后来的发展</h2><p>“用目标模型的似然给检索结果打标签”这个信号，后来也被<a class="ln" href="../n/replug.html">REPLUG黑盒检索增强</a>用来训练文档检索器；示例选择、示例排序和自动构造示例（如<a class="ln" href="../n/auto-cot.html">Auto-CoT自动思维链</a>）此后成为提示工程中的独立研究方向。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每个训练样本都要让打分LM把几十个候选各算一遍，造数据的计算量随训练集大小线性增长。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>每个候选是单独打分的，没有考虑多个示例放在一起时的组合效果和先后顺序。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只在三个语义解析任务上验证，对开放式生成或推理类任务的效果没有检验。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/gpt-3.html">GPT-3</a><span class="yr">2020.05 · LLM</span><div class=nt>上下文学习范式的来源，也是测试时的推理LM之一。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/bm25.html">BM25</a><span class="yr">1994 · NLP</span><div class=nt>召回候选示例，也是主要对照基线。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:336" href="../n/dpr.html">稠密检索DPR</a><span class="yr">2020.04 · 推理·智能体</span><div class=nt>检索器沿用双编码器结构和对比学习目标。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/good-icl-examples.html">怎样选好示例</a><span class="yr">2021.01 · LLM</span><div class=nt>该文用现成句向量找最近邻示例；EPR改用LM打分训练专门的检索器，在三个任务上都更好。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/gpt-neo.html">GPT-Neo</a><span class="yr">2021.03 · LLM</span><div class=nt>主要的打分LM，同时作为推理LM。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/in-context-learning.html">上下文学习与提示</a> <a class="chip c" href="../c/retrieval.html">检索与向量数据库</a> <a class="chip c" href="../c/embedding.html">嵌入向量</a> <a class="chip c" href="../c/contrastive-learning.html">对比学习</a> <a class="chip c" href="../c/language-model.html">语言模型</a></p>
+<h2>本篇术语</h2><ul><li><b>打分LM</b>　专门用来评估“这个示例对生成正确答案有没有帮助”的语言模型，只在造训练数据时使用。</li><li><b>难负例</b>　表面上和正例很像、但其实是错的样本，用它训练能逼模型学会细微区别。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/good-icl-examples.html">怎样选好示例</a>和<a class="ln" href="../n/dpr.html">稠密检索DPR</a> → 读原文第3节打分与训练流程 → 动手：对一个小分类任务，用小模型计算不同示例下正确标签的对数概率，看它和句向量相似度的排名差多少。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2112.08633" rel="noopener">https://arxiv.org/abs/2112.08633</a>（标题、作者、v1提交于2021-12-16；摘要中用LM估计条件概率标正负例、训练稠密检索器、三个语义解析任务；正文（arxiv.org/html/2112.08633）核对BM25/SBERT召回、top-k与bottom-k标签、GPT-Neo打分、迁移到GPT-J/GPT-3/Codex、Break 26%→31.9%、MTop 57%→64.2%、SMCalFlow 51.4%→54.3%。约50个候选、BERT双编码器、venue与单位凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20EPR%E5%AD%A6%E4%B9%A0%E6%A3%80%E7%B4%A2%E7%A4%BA%E4%BE%8B%EF%BC%88epr%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aepr%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/epr.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="colbertv2.html"><small>本分支上一个 · 2021.12</small><b>ColBERTv2残差压缩</b></a><a class="r" href="webgpt.html"><small>本分支下一个 · 2021.12</small><b>WebGPT</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

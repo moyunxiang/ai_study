@@ -1,0 +1,25 @@
+{
+ "id": "deepspeed-chat",
+ "who": "Zhewei Yao, Reza Yazdani Aminabadi, Olatunji Ruwase, Samyam Rajbhandari, Xiaoxia Wu, Ammar Ahmad Awan, Jeff Rasley, Minjia Zhang et al. · 微软",
+ "aka": ["DeepSpeed-Chat", "DeepSpeed-RLHF", "Hybrid Engine", "混合引擎", "RLHF训练框架"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2308.01320"},
+  {"label": "GitHub", "url": "https://github.com/microsoft/DeepSpeedExamples/tree/master/applications/DeepSpeed-Chat"}
+ ],
+ "problem": "ChatGPT之后大家都想复现InstructGPT的三步训练，但RLHF要同时管四个模型（策略、参考、奖励、价值），又要在训练与大量文本生成之间来回切换，当时没有好用又高效的开源端到端流程。",
+ "idea": "把InstructGPT的监督微调、奖励模型、PPO三步做成一条脚本化流程，并用“混合引擎”让同一个模型在生成阶段切换到推理优化的内核与切分方式、在训练阶段切回ZeRO训练模式。",
+ "impact": "是最早被广泛使用的开源RLHF训练系统之一，它的生成—训练切换问题直接催生了OpenRLHF、verl等后续RL训练框架。",
+ "method": "[[instructgpt]]的RLHF分三步：监督微调、训练奖励模型、用[[ppo]]优化策略。第三步每一轮都要先让策略模型生成一批回答（推理，逐词解码，受显存带宽限制），再用奖励模型、参考模型、价值模型打分并更新策略（训练，计算密集）。用训练框架去做生成非常慢，而在训练和推理两套系统之间来回拷贝权重又很麻烦。\n\nDeepSpeed-Chat提供三项东西：一是易用的训练与推理入口；二是复刻InstructGPT三步流程的DeepSpeed-RLHF管线；三是统一的RLHF系统，核心是**混合引擎**：生成阶段把模型切换成[[deepspeed-inference]]的推理内核和张量并行切分，训练阶段切回[[zero]]的分片训练，同一份权重在两种模式之间转换。\n\n摘要称它能以创纪录的时间和远低于以往的成本训练数千亿参数的类ChatGPT模型；具体数字只在官方博客与仓库中给出，此处不引用。",
+ "limits": [
+  {"text": "四个模型挤在同一组GPU上串行执行，生成与训练不能重叠，规模更大或回答更长时效率下降，资源调度也不够灵活。", "solved_by": ["openrlhf", "verl", "areal"]}
+ ],
+ "relations": [
+  {"to": "instructgpt", "type": "uses", "note": "复刻InstructGPT的监督微调、奖励模型与PPO三步训练流程。"},
+  {"to": "ppo", "type": "uses", "note": "第三步用PPO优化策略模型。"},
+  {"to": "zero", "type": "uses", "note": "训练阶段用ZeRO分片训练策略与价值模型。"},
+  {"to": "deepspeed-inference", "type": "uses", "note": "混合引擎在生成阶段切换到DeepSpeed Inference的推理内核与张量并行。"}
+ ],
+ "prereq": ["rlhf-concept", "policy-gradient-concept", "training-vs-inference", "distributed-training"],
+ "terms": [{"t": "混合引擎", "d": "同一份模型权重在“生成用的推理模式”和“更新用的训练模式”之间切换，避免在两套系统间拷贝权重。"}],
+ "check": {"source": "https://arxiv.org/abs/2308.01320", "confirmed": "标题、作者（19位）、v1日期2023-08-02；摘要：缺少易用高效的端到端RLHF训练管线、三项能力（易用的训练与推理体验、复刻InstructGPT的DeepSpeed-RLHF管线、结合训练与推理多种优化的统一DeepSpeed-RLHF系统）。混合引擎的具体机制、仓库路径、2023年4月先以博客发布为一般了解。"}
+}

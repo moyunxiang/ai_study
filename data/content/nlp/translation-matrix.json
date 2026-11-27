@@ -1,0 +1,34 @@
+{
+  "id": "translation-matrix",
+  "who": "Tomas Mikolov, Quoc V. Le, Ilya Sutskever · Google",
+  "venue": "arXiv 2013",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1309.4168"}
+  ],
+  "aka": ["Translation Matrix", "Exploiting Similarities among Languages", "跨语言词向量映射", "线性映射跨语言词向量", "Mikolov et al. 2013c"],
+  "problem": "统计翻译系统依赖人工或从平行语料中整理的词典和短语表，覆盖不全、成本高；而大量单语语料里蕴含的语言结构信息没有被用来补全这些词典。",
+  "idea": "分别在两种语言的大量单语语料上训练word2vec词向量，再用一个小双语词典学一个线性变换矩阵W，使源语言词向量乘以W后接近其译词的向量；翻译新词时，把它的向量映射过去，在目标语言中找余弦最近的词。",
+  "impact": "英语与西班牙语之间的词翻译达到近90%的前5准确率；「两种语言的词向量空间大致只差一个线性变换」这一发现开创了跨语言词向量映射这一方向，后来的正交约束映射、MUSE和VecMap等无监督方法都从这里出发。",
+  "method": "**观察**。作者用PCA把英语数字one到five、动物cat、dog等的词向量和对应的西班牙语uno到cinco、gato、perro等画在二维平面上，发现两组点的几何排列非常相似，仿佛只差一个旋转和缩放。这意味着，只要知道少数词的翻译，就有可能把整个空间对齐。\n\n**方法**。给定n对已知互译的词及其向量`{x_i, z_i}`（`x_i ∈ R^d1`为源语言向量，`z_i ∈ R^d2`为目标语言向量，两者维度可以不同），求变换矩阵`W`使`min_W Σ_i ‖W·x_i − z_i‖²`最小，用随机梯度下降求解。预测时对新词计算`z = W·x`，在目标语言词表中找与`z`余弦相似度最大的词。作者发现这个线性方法比最近邻方法好，与神经网络分类器相当。还可以用`max_i cos(W·x, z_i)`作为置信度，低于阈值就放弃翻译，以覆盖率换精度。\n\n**实验**。用WMT11的单语数据训练英语、西班牙语、捷克语的[[word2vec]]的Skip-gram或CBOW向量，用谷歌翻译为源语言最常见的5000个词生成训练词典，在其后的词上测试。结果明显优于编辑距离和基于共现计数的基线，且对英捷这种拼写不相近的语言对同样有效；源语言向量维度取目标语言的2–4倍时效果最好。换用数十亿词的Google News语料后，英译西的前1准确率在92.5%的覆盖率下为53%，提高置信度阈值、覆盖率降到17%时精度升至78%。",
+  "limits": [
+    {"text": "仍需要几千对已知的翻译作为种子词典；没有双语词典的语言对无法使用。", "solved_by": ["muse", "artetxe-unmt"]},
+    {"text": "对W不加约束的最小二乘映射会扭曲源语言空间，且高维空间中存在「枢纽词」问题，某些目标词会成为大量源词的最近邻。", "solved_by": ["muse"]},
+    {"text": "只翻译单个词和很短的短语，无法处理一词多义和需要上下文的翻译。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "word2vec", "type": "uses", "note": "两种语言的词向量都用word2vec的Skip-gram或CBOW在单语语料上训练。"},
+    {"to": "linguistic-regularities", "type": "extends", "note": "从单一语言里的线性类比规律推广到两种语言之间：整个空间之间也存在线性关系。"},
+    {"to": "phrase-smt", "type": "extends", "note": "目标是自动生成和扩充统计翻译系统所依赖的词典和短语表。"},
+    {"to": "gale-church", "type": "rivals", "note": "传统做法要靠平行语料对齐抽词典；这里只需要单语语料加一个小种子词典。"}
+  ],
+  "prereq": ["embedding", "distributional-hypothesis", "linear-regression", "dot-product", "dimensionality-reduction"],
+  "terms": [
+    {"t": "变换矩阵", "d": "把一种语言的词向量线性地映射到另一种语言词向量空间的矩阵W，用已知的词对拟合得到。"},
+    {"t": "precision@k", "d": "正确译词出现在模型给出的前k个候选中的比例。"}
+  ],
+  "learn": "先读[[word2vec]]和[[linguistic-regularities]]的讲解 → 读原文第3–4节线性关系与变换矩阵 → 动手：下载两种语言的fastText词向量，用1000对词典拟合W，在另外500个词上测precision@1和@5；再试试把W约束为正交矩阵会怎样。",
+  "check": {
+    "source": "https://arxiv.org/abs/1309.4168",
+    "confirmed": "arXiv：标题、作者Mikolov、Le、Sutskever、2013-09-17提交、摘要（自动生成扩充词典和短语表；单语数据学结构、小双语数据学映射；分布式表示加线性映射；英西近90% precision@5；适用于任意语言对）；PDF正文：数字和动物的PCA图、旋转与缩放、目标函数min Σ‖Wx_i−z_i‖²与SGD、余弦最近邻、优于最近邻且与神经网络分类器相当、WMT11英/西/捷、谷歌翻译生成最常见5K词的词典、编辑距离与共现计数基线、源语言维度大2–4倍、置信度max cos、大语料表3（覆盖92.5%时P@1 53%，17%时78%）。Google机构凭一般了解；枢纽词问题与后续正交映射为后续文献的一般了解。"
+  }
+}

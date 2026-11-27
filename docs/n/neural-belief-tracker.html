@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>神经信念追踪NBT（2016） · AI脉络</title>
+<meta name="description" content="任务型对话系统要在每一轮判断用户目前的目标（想要什么菜系、什么价位），但已有的信念追踪器要么依赖需要大量标注的口语理解模块，要么依赖手写的同义词词典来处理用户的各种说法，难以扩展到新领域。 直接在预训练词向量上建模：把用户这一轮的话、系统上一轮的话和每个候选「槽-值」对（如food=chinese…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/neural-belief-tracker.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="神经信念追踪NBT（2016）">
+<meta property="og:description" content="任务型对话系统要在每一轮判断用户目前的目标（想要什么菜系、什么价位），但已有的信念追踪器要么依赖需要大量标注的口语理解模块，要么依赖手写的同义词词典来处理用户的各种说法，难以扩展到新领域。 直接在预训练词向量上建模：把用户这一轮的话、系统上一轮的话和每个候选「槽-值」对（如food=chinese…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/neural-belief-tracker.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/neural-belief-tracker">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 对话与问答</div>
+<h1>神经信念追踪NBT</h1>
+<div class="full">Neural Belief Tracker: Data-Driven Dialogue State Tracking</div>
+<div class="meta"><span>2016.06</span><span>论文</span><span>延伸</span><span>ACL 2017</span><span>Nikola Mrkšić, Diarmuid Ó Séaghdha, Tsung-Hsien Wen, Blaise Thomson, Steve Young · 剑桥大学、Apple</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1606.03777" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/neural-belief-tracker">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>任务型对话系统要在每一轮判断用户目前的目标（想要什么菜系、什么价位），但已有的信念追踪器要么依赖需要大量标注的口语理解模块，要么依赖手写的同义词词典来处理用户的各种说法，难以扩展到新领域。</p></div><div><h4>方法</h4><p>直接在预训练词向量上建模：把用户这一轮的话、系统上一轮的话和每个候选「槽-值」对（如food=chinese）都编码成向量，用一个小网络判断这一轮是否表达了该槽值，从而不需要口语理解标注，也不需要手写词典。</p></div><div><h4>影响</h4><p>NBT是第一批完全基于表示学习的对话状态追踪模型，把DST从依赖词典的工程问题变成了可迁移的学习问题，后续的GLAD、TRADE等模型都以它为基线。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>经典的任务型对话系统是流水线：口语理解（识别意图和槽位）→ <b>对话状态追踪</b>（维护每个槽当前的取值分布）→ 对话策略 → 回复生成。剑桥组的DSTC2餐馆预订数据是当时的标准评测。2014–2015年最强的追踪器（如基于RNN的Henderson等人的模型）直接读用户话语，但需要「去词汇化」：用手写词典把「便宜」「不贵」「实惠」都替换成同一个占位符，否则模型见不到足够的变体。</p><h2>方法</h2><p>对每一轮和每个候选槽值对 <code>(s, v)</code> 分别做二分类：这一轮用户是否表达了 <code>s=v</code>。</p><p><b>表示。</b> 用户话语 <code>r</code> 由预训练词向量经过深度平均网络或卷积网络得到句向量；槽值对的表示是槽名和值的词向量之和 <code>c = c_s + c_v</code>；系统上一轮的行为分两类——系统<b>请求</b>某个槽（「你想要什么价位？」）和系统<b>确认</b>某个槽值（「你是说中餐吗？」），分别编码为 <code>t_q</code> 和 <code>(t_s, t_v)</code>。</p><p><b>交互。</b> 话语与候选的语义相似 <code>d = r ⊙ c</code>（逐元素乘）；上下文门控：若系统刚请求了槽 <code>s</code>，则用户回答的一个短词（「便宜的」）就足以决定槽值，模型用 <code>m = (c_s · t_q) r + (c_s·t_s)(c_v·t_v) r</code> 引入这部分信息。最后 <code>y = softmax(W [d; m])</code> 输出是/否。</p><p><b>状态更新。</b> 每轮的判断与上一轮的信念用简单规则合并成当前对话状态。</p><p>关键在于词向量的质量：作者使用用counter-fitting等方法注入了同义/反义约束的词向量，使「cheap」和「inexpensive」相近、「cheap」与「expensive」远离。</p><h2>结果</h2><p>摘要报告：在两个数据集上，NBT与依赖手写语义词典的最好模型持平，在不提供词典时则超过它们。具体数字未核对。</p><h2>后来的发展</h2><p>此后的DST研究走向不依赖预先枚举槽值的生成式或抽取式方法：<a class="ln" href="../n/trade-dst.html">TRADE对话状态追踪</a>用复制机制直接生成槽值以支持多领域和零样本迁移，BERT类编码器出现后DST在<a class="ln" href="../n/multiwoz.html">MultiWOZ任务型对话</a>上又提升了一大截。NBT展示的「语义专门化的词向量可以替代手写词典」也推动了词向量后处理（counter-fitting、attract-repel）的研究。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要对每个候选槽值对逐个打分，槽值数很多（如餐馆名、时间）时开销大，也无法处理本体里没有的值。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/trade-dst.html">TRADE对话状态追踪</a></div></li><li>只在单一领域的餐馆预订数据上验证，多领域对话的状态追踪没有涉及。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/trade-dst.html">TRADE对话状态追踪</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/word2vec.html">word2vec</a><span class="yr">2013.01 · NLP</span><div class=nt>所有表示都建立在预训练词向量之上，并依赖经过语义约束调整后的词向量。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/retrofitting.html">Retrofitting词向量改装</a><span class="yr">2014.11 · NLP</span><div class=nt>与用词典约束改装词向量的思路一致，NBT利用这类语义专门化的词向量代替手写的去词汇化词典。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/dan.html">DAN深度平均网络</a><span class="yr">2015.07 · NLP</span><div class=nt>用深度平均网络把用户话语编码为句向量（另一变体用卷积网络）。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/wen-e2e-dialog.html">端到端任务型对话系统</a><span class="yr">2016.04 · NLP</span><div class=nt>同一剑桥团队的任务型对话系统研究，NBT专门把其中的信念追踪模块做成不依赖词典的神经模型。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/trade-dst.html">TRADE对话状态追踪</a><span class="yr">2019.05 · NLP</span><div class=nt>需要对每个候选槽值对逐个打分，槽值数很多（如餐馆名、时间）时开销大，也无法处理本体里没有的值。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/embedding.html">嵌入向量</a> <a class="chip c" href="../c/mlp.html">多层感知机</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/supervised-learning.html">监督学习</a></p>
+<h2>本篇术语</h2><ul><li><b>对话状态追踪（DST）</b>　任务型对话中每一轮根据对话历史估计用户目标，即每个槽（菜系、价位、地点）当前取什么值。</li><li><b>任务型对话</b>　帮助用户完成订餐、订票等具体任务的对话系统，通常由理解、状态追踪、策略和生成几个模块组成。</li><li><b>去词汇化（delexicalisation）</b>　用词典把话语中提到的具体槽值替换成占位符，以减少模型需要学习的变体，但需要手工维护同义词表。</li></ul>
+<h2>怎么学</h2><p>先了解任务型对话的流水线结构（<a class="ln" href="../n/wen-e2e-dialog.html">端到端任务型对话系统</a>） → 读原文第3节模型和第5节词向量的影响 → 动手：在WOZ 2.0数据上用GloVe和counter-fitted两种词向量分别训练一个简化版NBT，比较联合目标准确率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1606.03777" rel="noopener">https://arxiv.org/abs/1606.03777</a>（arXiv记录：标题Neural Belief Tracker: Data-Driven Dialogue State Tracking、五位作者、v1 2016-06-12；摘要：信念追踪器每一步估计用户目标、现有方法依赖需要大量标注的口语理解或手写词典、NBT基于表示学习、在预训练词向量上组合出话语与上下文表示、两个数据集上与依赖手写词典的SOTA持平、无词典时更好。ACL 2017出处、作者单位、门控公式的具体形式、DST流水线背景与counter-fitting词向量凭一般了解，未写数字。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E7%A5%9E%E7%BB%8F%E4%BF%A1%E5%BF%B5%E8%BF%BD%E8%B8%AANBT%EF%BC%88neural-belief-tracker%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aneural-belief-tracker%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/neural-belief-tracker.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="complex.html"><small>本分支上一个 · 2016.06</small><b>ComplEx复数嵌入</b></a><a class="r" href="seq-kd.html"><small>本分支下一个 · 2016.06</small><b>序列级知识蒸馏</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

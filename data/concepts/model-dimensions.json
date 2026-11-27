@@ -1,0 +1,9 @@
+{
+  "key": "model-dimensions",
+  "short": "描述一个Transformer“形状”的几个超参数：隐藏维度d_model、层数L、注意力头数h和每头维度、前馈层中间维度d_ff、词表大小V。参数量大致是12·L·d_model²。",
+  "body": "读模型的技术报告或配置文件（config.json）时，最先看到的就是一组尺寸数字。它们决定了参数量、计算量、显存占用，也部分决定了模型的能力。弄懂这几个数，就能大致估算一个模型有多大、跑起来要多少资源（见[[c:params-flops]]）。\n\n**主要的几个**。\n\n- **d_model**（hidden_size，隐藏维度）：每个token在模型内部被表示成多少维的向量，也是[[c:residual-stream]]的宽度。\n- **L**（num_hidden_layers，层数）：堆叠多少个Transformer块（见[[c:transformer-block]]）。\n- **h**（num_attention_heads，头数）和**d_head**（每头维度）：通常`d_head = d_model / h`，常见取64或128。\n- **KV头数**（num_key_value_heads）：使用GQA时比h小，见[[c:mha-mqa-gqa]]。\n- **d_ff**（intermediate_size，前馈中间维度）：前馈层先升维再降回d_model（见[[c:transformer-ffn]]）。经典取`4·d_model`；用SwiGLU时有三个矩阵，常取约`8/3·d_model`，使参数量与前者相当。\n- **V**（vocab_size）：见[[c:vocabulary-size]]。\n- **最大位置数**（max_position_embeddings）：训练时的上下文长度，见[[c:context-window]]。\n\n**估算参数量**。每层注意力有Q、K、V、输出四个d×d矩阵，共`4d²`；前馈层两个d×4d矩阵，共`8d²`。所以每层约`12d²`，总计\n\n`N ≈ 12 · L · d² + V·d`（后一项是嵌入，若输出层不共享再加一份）\n\n归一化层和偏置的参数很少，可以忽略。\n\n**宽与深**。同样的参数预算，可以更宽（d大、L小）或更深（L大、d小）。[[scaling-laws]]的实验发现，在一个相当宽的范围内，损失主要由总参数量决定，对具体形状不太敏感；实践中还要考虑GPU矩阵乘法效率（维度取128的倍数）、并行切分方式和推理延迟（层数越多，逐层串行的延迟越长）。",
+  "example": "[[gpt-3]]最大的版本：L = 96，d_model = 12288，h = 96（每头128维）。\n\n`12 × 96 × 12288² ≈ 12 × 96 × 1.51×10^8 ≈ 1.74×10^11`\n\n约1740亿，与公布的1750亿参数基本吻合；剩下的差额主要是约5万×12288 ≈ 6亿的嵌入矩阵。\n\n小一点的例子：L = 12、d = 768（[[bert]]-base和[[gpt-2]]最小版的尺寸），12×12×768² ≈ 8500万，再加上词嵌入（BERT约2300万，GPT-2约3900万），合计一亿出头。",
+  "pitfalls": "- 混合专家模型（见[[c:mixture-of-experts]]）的总参数和每个token实际用到的“激活参数”差别很大，估算计算量要用后者。\n- 公式里的12d²假设了标准MHA和4倍FFN；用了GQA、SwiGLU、不同的d_ff时要相应调整。",
+  "aka": ["d_model", "hidden size", "hidden_size", "隐藏层维度", "隐藏维度", "模型维度", "num_layers", "层数", "num_heads", "头数", "head dim", "每头维度", "intermediate_size", "d_ff", "FFN维度", "模型尺寸", "model config", "参数量估算", "12Ld²"],
+  "needs": ["transformer-block", "params-flops"]
+}

@@ -1,0 +1,32 @@
+{
+  "id": "simple-baselines-pose",
+  "who": "Bin Xiao, Haiping Wu, Yichen Wei · 微软亚洲研究院",
+  "venue": "ECCV 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1804.06208"},
+    {"label": "代码", "url": "https://github.com/leoxiaobin/pose.pytorch"}
+  ],
+  "aka": ["Simple Baselines", "SimpleBaseline", "SimpleBaselines", "简单基线", "反卷积头姿态估计", "pose tracking baseline"],
+  "problem": "到2018年，人体姿态估计和姿态跟踪的方法越来越复杂：多阶段、多分支、各种特殊模块叠在一起，很难看清到底哪个设计起作用，新方法之间也很难公平比较。",
+  "idea": "给出一个尽量简单的基线：在[[resnet]]骨干最后接三层反卷积把特征图放大，直接输出每个关节的热力图；跟踪则在此基础上用光流把上一帧的人体框传到下一帧，再按姿态相似度做关联。",
+  "impact": "这个“ResNet＋几层反卷积”的结构以极简的设计取得COCO关键点和PoseTrack上的最好结果，成为之后几年姿态估计的标准基线；同组随后的[[hrnet]]和后来的[[vitpose]]都在它的设定上比较。",
+  "method": "**单帧姿态估计**：自上而下的流程——先用检测器框出每个人，把人体框裁出来缩放到固定尺寸（如256×192），送进网络。网络就是ResNet去掉最后的分类层，再接三个带批归一化和ReLU的反卷积层（每层把分辨率放大2倍），最后用1×1卷积输出K个关节的热力图，用均方误差对真值高斯热力图回归。与[[stacked-hourglass]]的多次上下采样、[[conv-pose-machines]]的多阶段不同，这里只有“一路下采样、一路上采样”，也没有跳连。\n\n**姿态跟踪**：视频中每一帧都运行人体检测；此外用光流把上一帧检测到的人体框按估计的运动“推”到当前帧，补上检测器漏检的人。两帧之间的关联不只看框的IoU，而是用光流把上一帧的关节扭到当前帧，与当前帧的姿态计算关键点相似度（OKS），再用贪心匹配分配身份。\n\n摘要称该工作的目的是提供简单有效的基线，帮助启发和评估新想法，并在有挑战性的基准上取得了最好结果（论文报告的是COCO关键点检测和PoseTrack姿态跟踪）。",
+  "legacy": "同一团队在此基础上提出[[hrnet]]，用全程保持高分辨率的结构进一步提高精度；[[vitpose]]把骨干换成朴素ViT、头部仍是简单的反卷积或上采样，延续了“骨干强、头部简单”的思路。",
+  "limits": [
+    {"text": "自上而下流程依赖人体检测器，人数多时耗时线性增长，检测漏框就会漏人。", "solved_by": []},
+    {"text": "反复下采样再上采样会丢失空间细节，小尺寸人体的关节定位不够准。", "solved_by": ["hrnet"]}
+  ],
+  "relations": [
+    {"to": "resnet", "type": "uses", "note": "以ResNet为骨干，只在末端接三层反卷积输出热力图。"},
+    {"to": "stacked-hourglass", "type": "rivals", "note": "堆叠沙漏用多次重复的上下采样和中间监督；Simple Baselines只用一次上采样，结构简单得多却精度更高。"},
+    {"to": "conv-pose-machines", "type": "extends", "note": "沿用CPM确立的关节热力图回归，但去掉多阶段细化。"},
+    {"to": "flownet", "type": "uses", "note": "姿态跟踪中用光流网络把上一帧的人体框和关节传播到当前帧。"}
+  ],
+  "prereq": ["conv-layer", "vision-tasks", "encoder-decoder", "iou-map", "ablation-baseline"],
+  "terms": [
+    {"t": "反卷积", "d": "也叫转置卷积，可学习的上采样层，把特征图的长宽放大。"},
+    {"t": "OKS", "d": "关键点相似度，按关节间距离和人体尺度计算的两个姿态的相似程度，是COCO关键点的评测基础。"}
+  ],
+  "learn": "先了解自上而下的姿态估计流程和热力图解码，再读本文第2节的网络结构图和与沙漏网络的对比；用mmpose跑SimpleBaseline配置，换不同深度的ResNet看精度变化。",
+  "check": {"source": "https://arxiv.org/abs/1804.06208", "confirmed": "arXiv记录：标题、三位作者、v1提交于2018-04-17；摘要中姿态估计与跟踪进展伴随算法复杂度增加、提供简单有效的基线方法、在有挑战性的基准上取得最好结果、代码地址。摘要很短：三层反卷积结构、256×192输入、光流传播框与基于OKS的关联、COCO与PoseTrack、ECCV 2018、机构均凭一般了解写。"}
+}

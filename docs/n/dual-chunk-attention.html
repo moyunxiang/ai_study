@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>双块注意力DCA（2024） · AI脉络</title>
+<meta name="description" content="模型输入一旦超过预训练长度，RoPE遇到训练中没见过的相对距离，效果就急剧变差；用长文本继续训练（位置插值、YaRN等）对70B级模型代价很高。 免训练地把长序列切成不超过预训练长度的块，重新安排位置下标：块内用原始相对位置，跨块时把查询和键的位置重映射，使任意两个token之间的相对距离都落在模…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/dual-chunk-attention.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="双块注意力DCA（2024）">
+<meta property="og:description" content="模型输入一旦超过预训练长度，RoPE遇到训练中没见过的相对距离，效果就急剧变差；用长文本继续训练（位置插值、YaRN等）对70B级模型代价很高。 免训练地把长序列切成不超过预训练长度的块，重新安排位置下标：块内用原始相对位置，跨块时把查询和键的位置重映射，使任意两个token之间的相对距离都落在模…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/dual-chunk-attention.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/dual-chunk-attention">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 长上下文与高效注意力</div>
+<h1>双块注意力DCA</h1>
+<div class="full">Training-Free Long-Context Scaling of Large Language Models</div>
+<div class="meta"><span>2024.02</span><span>论文</span><span>延伸</span><span>ICML 2024</span><span>Chenxin An, Fei Huang, Jun Zhang, Shansan Gong, Xipeng Qiu, Chang Zhou, Lingpeng Kong · 香港大学、阿里巴巴、复旦大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2402.17463" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/HKUNLP/ChunkLlama" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/dual-chunk-attention">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>模型输入一旦超过预训练长度，RoPE遇到训练中没见过的相对距离，效果就急剧变差；用长文本继续训练（位置插值、YaRN等）对70B级模型代价很高。</p></div><div><h4>方法</h4><p>免训练地把长序列切成不超过预训练长度的块，重新安排位置下标：块内用原始相对位置，跨块时把查询和键的位置重映射，使任意两个token之间的相对距离都落在模型训练中见过的范围内。</p></div><div><h4>影响</h4><p>让Llama2 70B不经继续训练就支持10万token以上的上下文；DCA后来被Qwen2和Qwen2.5-1M用于推理时的长度外推，是免训练长上下文扩展的常用方法之一。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/rope.html">旋转位置编码RoPE</a>把位置编码写进q、k的旋转角度，注意力只依赖相对距离 <code>i − j</code>。预训练长度为L时，模型只见过 <code>0 ≤ i − j &lt; L</code> 的距离；推理时若出现更大的距离，注意力分数就落入分布外。<a class="ln" href="../n/position-interpolation.html">位置插值扩上下文</a>和<a class="ln" href="../n/yarn.html">YaRN</a>通过压缩位置并少量续训解决，<a class="ln" href="../n/self-extend.html">SelfExtend免训练扩上下文</a>则在推理时把远距离位置做整除合并。</p><p><b>DCA</b>把注意力拆成三种情况，每种都保证相对距离不超过L：</p><ul><li><b>块内注意力（intra-chunk）</b>：序列切成长度为s（s &lt; L）的块，同一块内的token用块内下标 <code>i mod s</code> 计算相对位置，等同于原模型。</li><li><b>块间注意力（inter-chunk）</b>：查询与之前各块的键相互作用时，把查询的位置固定设为一个较大的常数（接近L−1），键用块内下标，因此距离在 <code>[0, L)</code> 内，同时保持“查询在键之后”的顺序。</li><li><b>相邻块注意力（successive-chunk）</b>：相邻两块之间对查询位置做特殊处理，保留局部的精确相对距离，避免块边界处出现跳变。</li></ul><p>三部分的注意力分数在softmax前拼接，整体仍是一次标准的注意力，因此可以和<a class="ln" href="../n/flashattention.html">FlashAttention</a>结合，实现上只需改变传入的位置下标。</p><p>结果：摘要称DCA让<a class="ln" href="../n/llama-2.html">Llama 2</a> 70B在不继续训练的情况下支持超过10万token的上下文；在实际长上下文任务上与经过微调的模型相当甚至更好；免训练的70B模型达到gpt-3.5-16k表现的94%。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>块间注意力把查询位置固定成常数，远处内容只保留了粗略的先后关系而失去精确距离，需要在长文中精确定位、比较多处内容的任务上不如真正在长文本上训练的模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/long-data-engineering.html">128K长上下文数据配方</a> <a class="chip hue" style="--h:0" href="../n/prolong.html">ProLong长上下文训练</a></div></li><li>只解决位置分布外的问题，没有解决注意力计算随长度平方增长的开销，10万token的推理依然昂贵。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:192" href="../n/minference.html">MInference动态稀疏预填充</a> <a class="chip hue" style="--h:0" href="../n/nsa.html">原生稀疏注意力NSA</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/rope.html">旋转位置编码RoPE</a><span class="yr">2021.04 · LLM</span><div class=nt>RoPE在超出训练长度的相对距离上失效，DCA通过重映射位置下标让所有距离都落在训练范围内。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/flashattention.html">FlashAttention</a><span class="yr">2022.05 · 系统·效率</span><div class=nt>三部分注意力只改变位置下标，可直接用FlashAttention计算。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/position-interpolation.html">位置插值扩上下文</a><span class="yr">2023.06 · LLM</span><div class=nt>位置插值压缩位置并续训，DCA完全免训练。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/llama-2.html">Llama 2</a><span class="yr">2023.07 · LLM</span><div class=nt>主要在Llama2 7B到70B上验证。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/self-extend.html">SelfExtend免训练扩上下文</a><span class="yr">2024.01 · LLM</span><div class=nt>SelfExtend用整除合并远处位置，DCA按块重排下标并单独处理相邻块，同为推理时免训练扩展。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/nsa.html">原生稀疏注意力NSA</a><span class="yr">2025.02 · LLM</span><div class=nt>只解决位置分布外的问题，没有解决注意力计算随长度平方增长的开销，10万token的推理依然昂贵。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/long-data-engineering.html">128K长上下文数据配方</a><span class="yr">2024.02 · LLM</span><div class=nt>块间注意力把查询位置固定成常数，远处内容只保留了粗略的先后关系而失去精确距离，需要在长文中精确定位、比较多处内容的任务上不如真正在长文本上训练的模型。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/minference.html">MInference动态稀疏预填充</a><span class="yr">2024.07 · 系统·效率</span><div class=nt>只解决位置分布外的问题，没有解决注意力计算随长度平方增长的开销，10万token的推理依然昂贵。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/prolong.html">ProLong长上下文训练</a><span class="yr">2024.10 · LLM</span><div class=nt>块间注意力把查询位置固定成常数，远处内容只保留了粗略的先后关系而失去精确距离，需要在长文中精确定位、比较多处内容的任务上不如真正在长文本上训练的模型。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/positional-encoding.html">位置编码</a> <a class="chip c" href="../c/context-window.html">上下文窗口</a> <a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/kv-cache.html">KV缓存</a></p>
+<h2>本篇术语</h2><ul><li><b>长度外推</b>　模型在比训练时更长的输入上仍然正常工作的能力。</li><li><b>免训练（training-free）</b>　只在推理时修改计算方式，不更新任何模型参数。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/rope.html">旋转位置编码RoPE</a>和<a class="ln" href="../n/self-extend.html">SelfExtend免训练扩上下文</a>；读原文第3节三种块注意力的位置下标图；动手：给一个4K上下文的Llama类模型实现DCA位置映射，在16K长度的密码检索任务上比较开启前后的准确率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2402.17463" rel="noopener">https://arxiv.org/abs/2402.17463</a>（标题、7位作者、arXiv v1提交日2024-02-27；摘要中输入超过预训练长度后能力显著减弱、提出DCA使Llama2 70B不经继续训练支持超过10万token、分解为块内与块间模块捕获相对位置信息、与Flash Attention无缝集成、实际长上下文任务上与微调模型相当或更好、免训练70B达到gpt-3.5-16k的94%。相邻块注意力细节、ICML 2024、Qwen2/Qwen2.5-1M采用DCA为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%8F%8C%E5%9D%97%E6%B3%A8%E6%84%8F%E5%8A%9BDCA%EF%BC%88dual-chunk-attention%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adual-chunk-attention%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/dual-chunk-attention.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="long-data-engineering.html"><small>本分支上一个 · 2024.02</small><b>128K长上下文数据配方</b></a><a class="r" href="repeat-after-me.html"><small>本分支下一个 · 2024.02</small><b>SSM复制能力的局限</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "id": "seed-llama",
+  "aka": ["SEED-LLaMA", "SEED-2", "Making LLaMA SEE and Draw", "SEED tokenizer v2"],
+  "who": "Yuying Ge, Sijie Zhao, Ziyun Zeng, Yixiao Ge, Chen Li, Xintao Wang, Ying Shan · 腾讯AI Lab、ARC Lab",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2310.01218"},
+    {"label": "代码", "url": "https://github.com/AILab-CVC/SEED"}
+  ],
+  "problem": "多模态大模型大多只把图像当作输入提示，能看不能画；要在同一个自回归模型里统一理解与生成，关键是图像该被切成什么样的离散token。",
+  "idea": "改进SEED图像分词器：图像token不对应二维图块位置，而是一维因果序列，并且携带与词相当的高层语义，同时兼顾判别和重建；用它在交错图文数据上大规模预训练和指令微调LLaMA。",
+  "impact": "SEED-LLaMA能在多轮对话里按上下文交替理解和生成图像，展示了“把图像变成LLM能读能写的外语”这一路线的可行性，是Emu、Chameleon之外的另一条代表性统一路线。",
+  "method": "让语言模型也会“画图”，一种直接的办法是把图像离散成token，和文字token放进同一个序列，用下一个token预测统一训练。问题是用什么样的分词器：[[vq-vae]]、[[vqgan]]的token对应二维网格上的图块，偏重像素细节、语义很弱，且二维排列与语言模型从左到右的生成顺序不匹配。\n\n作者在此前的[[seed-tokenizer]]基础上总结出两条设计原则：其一，图像token应不依赖二维图块位置，而是按一维因果依赖产生，使其内部依赖关系与LLM从左到右的自回归预测一致；其二，图像token应捕捉与词相当的高层语义，并且在分词器训练阶段同时为判别（理解）和重建（生成）优化。实现上，分词器借助[[blip-2]]式的因果Q-Former把图像压成一串一维语义token再量化，解码时把这些token映射回生成模型的条件嵌入，由扩散模型还原成图像。\n\n有了SEED token，语言模型就能按原有的训练方式——下一个词预测——做多模态自回归。作者在大规模交错图文数据上预训练并指令微调，得到SEED-LLaMA。摘要报告，它在广泛的多模态理解和生成任务上表现出色，并展现出多轮上下文多模态生成等组合式涌现能力。",
+  "limits": [
+    {"text": "一维语义token偏重语义，重建出的图像与原图在细节上差距较大，难以做精确编辑。", "solved_by": ["tokenflow", "unitok"]},
+    {"text": "图像还原依赖外接扩散模型，理解与生成并没有在一个模型内部完全端到端统一。", "solved_by": ["emu3", "transfusion"]}
+  ],
+  "relations": [
+    {"to": "seed-tokenizer", "type": "extends", "note": "升级第一版SEED分词器，使其兼顾判别与重建，并真正用于LLM的大规模多模态自回归训练。"},
+    {"to": "blip-2", "type": "uses", "note": "分词器借助BLIP-2式Q-Former把图像压成一维语义token。"},
+    {"to": "llama-2", "type": "uses", "note": "以LLaMA系列语言模型为底座进行多模态预训练（一般了解）。"},
+    {"to": "emu", "type": "rivals", "note": "Emu用连续视觉嵌入做回归，SEED-LLaMA用离散语义token做分类式预测。"}
+  ],
+  "prereq": ["vector-quantization", "autoregressive", "tokenization", "diffusion-process", "instruction-tuning"],
+  "terms": [
+    {"t": "一维因果视觉token", "d": "图像被表示成一串有先后顺序的token，后面的token只依赖前面的，而不是按二维网格排列的图块，便于语言模型从左到右生成。"}
+  ],
+  "learn": "先读[[seed-tokenizer]]理解第一版设计，再读本文第3节分词器的两条原则与训练目标，与[[emu]]的连续嵌入路线对比。",
+  "check": {"source": "https://arxiv.org/abs/2310.01218", "confirmed": "标题、七位作者、arXiv v1提交2023-10-02；摘要中统一理解与生成需要在自回归Transformer中可互换地表示图文、SEED图像分词器让LLM同时能看和画、两条原则（独立于二维图块位置的一维因果依赖；与词相当的高层语义并为判别与重建优化）、按原训练方式做下一词预测、在交错图文数据上预训练与指令微调、多轮上下文多模态生成等涌现能力。Q-Former与扩散解码的结构、LLaMA底座、机构、ICLR 2024为一般了解，未逐项核对。"}
+}

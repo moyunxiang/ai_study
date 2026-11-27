@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>PackNet自监督深度（2019） · AI脉络</title>
+<meta name="description" content="自监督单目深度（、）只用无标注视频训练，但编码器反复池化和步长卷积会丢掉细节，深度图模糊；而且网络往往依赖ImageNet预训练，加大输入分辨率也不见得变好。 用“打包/解包”块替代下采样和上采样：把相邻像素重排进通道维（space-to-depth），再用3D卷积压缩；解码时反过来解包。这样缩小…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/packnet-sfm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PackNet自监督深度（2019）">
+<meta property="og:description" content="自监督单目深度（、）只用无标注视频训练，但编码器反复池化和步长卷积会丢掉细节，深度图模糊；而且网络往往依赖ImageNet预训练，加大输入分辨率也不见得变好。 用“打包/解包”块替代下采样和上采样：把相邻像素重排进通道维（space-to-depth），再用3D卷积压缩；解码时反过来解包。这样缩小…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/packnet-sfm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/packnet-sfm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:216"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/vision.html">计算机视觉</a> › 单目深度估计</div>
+<h1>PackNet自监督深度</h1>
+<div class="full">3D Packing for Self-Supervised Monocular Depth Estimation</div>
+<div class="meta"><span>2019.05</span><span>论文</span><span>延伸</span><span>CVPR 2020</span><span>Vitor Guizilini, Rares Ambrus, Sudeep Pillai, Allan Raventos, Adrien Gaidon · 丰田研究院（TRI）</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1905.02693" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/TRI-ML/packnet-sfm" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/packnet-sfm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>自监督单目深度（<a class="ln" href="../n/sfmlearner.html">SfMLearner自监督深度</a>、<a class="ln" href="../n/monodepth2.html">Monodepth2</a>）只用无标注视频训练，但编码器反复池化和步长卷积会丢掉细节，深度图模糊；而且网络往往依赖ImageNet预训练，加大输入分辨率也不见得变好。</p></div><div><h4>方法</h4><p>用“打包/解包”块替代下采样和上采样：把相邻像素重排进通道维（space-to-depth），再用3D卷积压缩；解码时反过来解包。这样缩小特征图时不扔掉信息，细节能保留到输出。</p></div><div><h4>影响</h4><p>在KITTI上让纯自监督方法追上甚至超过部分有监督方法；同时发布的DDAD驾驶数据集提供了更远、更密的激光雷达真值，成为自监督深度的常用评测集。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>训练目标和<a class="ln" href="../n/sfmlearner.html">SfMLearner自监督深度</a>一样：给定视频里相邻几帧，深度网络预测当前帧深度，位姿网络预测相机运动，用深度和位姿把邻帧“扭”到当前视角，最小化两者的光度差。不需要任何深度真值。</p><p>PackNet的改动在深度网络结构上：</p><ul><li><b>打包块</b>：把H×W×C的特征按2×2重排成H/2×W/2×4C（不丢任何数值），再加一个维度当成3D张量做3D卷积，学习如何把这些空间信息压缩进特征；</li><li><b>解包块</b>：用卷积扩出通道，再按depth-to-space重排回更高分辨率。</li></ul><p>摘要报告：虽然是自监督，它在KITTI上超过了其他自监督、半监督和全监督方法；3D归纳偏置让它在加大分辨率和参数量时不过拟合，并能更好泛化到NuScenes；不需要ImageNet预训练，可以实时运行。论文还发布了DDAD数据集，用多辆自动驾驶车的高密度激光雷达生成更远距离、更稠密的深度真值。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍然只从单一领域的驾驶视频学习，换到室内或网络图片时泛化有限。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/midas.html">MiDaS混合数据集深度</a> <a class="chip hue" style="--h:216" href="../n/depth-anything.html">Depth Anything</a></div></li><li>光度一致性假设在运动物体、遮挡和弱纹理处失效，单目尺度也只能靠额外信息（如速度）恢复。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:216" href="../n/metric3d.html">Metric3D度量深度</a> <a class="chip hue" style="--h:216" href="../n/unidepth.html">UniDepth通用度量深度</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:216" href="../n/monodepth.html">自监督单目深度</a><span class="yr">2016.09 · 视觉</span><div class=nt>同属不需要深度真值、靠图像重建误差训练深度的路线。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:216" href="../n/sfmlearner.html">SfMLearner自监督深度</a><span class="yr">2017.04 · 视觉</span><div class=nt>沿用“深度网络+位姿网络、用视图合成的光度误差做监督”的自监督框架。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/monodepth2.html">Monodepth2</a><span class="yr">2018.06 · 视觉</span><div class=nt>Monodepth2用普通ResNet编码器，下采样丢细节；PackNet用可逆重排加3D卷积保留细节，KITTI上精度更高。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/midas.html">MiDaS混合数据集深度</a><span class="yr">2019.07 · 视觉</span><div class=nt>仍然只从单一领域的驾驶视频学习，换到室内或网络图片时泛化有限。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/metric3d.html">Metric3D度量深度</a><span class="yr">2023.07 · 视觉</span><div class=nt>光度一致性假设在运动物体、遮挡和弱纹理处失效，单目尺度也只能靠额外信息（如速度）恢复。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/depth-anything.html">Depth Anything</a><span class="yr">2024.01 · 视觉</span><div class=nt>仍然只从单一领域的驾驶视频学习，换到室内或网络图片时泛化有限。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:216" href="../n/unidepth.html">UniDepth通用度量深度</a><span class="yr">2024.03 · 视觉</span><div class=nt>光度一致性假设在运动物体、遮挡和弱纹理处失效，单目尺度也只能靠额外信息（如速度）恢复。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-supervised.html">自监督学习</a> <a class="chip c" href="../c/camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a></p>
+<h2>本篇术语</h2><ul><li><b>space-to-depth</b>　把2×2邻域的像素搬到通道维，分辨率减半、通道变4倍，信息一个不丢，可逆。</li><li><b>光度一致性</b>　同一个三维点在相邻帧里应该颜色相同，所以用预测的深度和位姿重投影后颜色差越小越好。</li></ul>
+<h2>怎么学</h2><p>先读SfMLearner弄懂视图合成损失，再看本文第3节的打包/解包块示意图；在PyTorch里用pixel_unshuffle和pixel_shuffle验证这对操作是可逆的。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1905.02693" rel="noopener">https://arxiv.org/abs/1905.02693</a>（arXiv记录：标题、五位作者、v1提交于2019-05-06；摘要中的只用无标签单目视频、对称的打包与解包块与3D卷积、KITTI上超过其他自/半/全监督方法、扩分辨率和参数不过拟合、泛化到NuScenes、无需ImageNet预训练、实时、发布DDAD数据集。CVPR 2020、space-to-depth的具体实现凭一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20PackNet%E8%87%AA%E7%9B%91%E7%9D%A3%E6%B7%B1%E5%BA%A6%EF%BC%88packnet-sfm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Apacknet-sfm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/packnet-sfm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="retinaface.html"><small>本分支上一个 · 2019.05</small><b>RetinaFace人脸检测</b></a><a class="r" href="efficientnet.html"><small>本分支下一个 · 2019.05</small><b>EfficientNet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

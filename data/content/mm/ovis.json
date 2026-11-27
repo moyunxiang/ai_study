@@ -1,0 +1,28 @@
+{
+  "id": "ovis",
+  "aka": ["Ovis", "Open VISion", "结构化嵌入对齐", "视觉嵌入表", "Ovis2", "Ovis2.5"],
+  "who": "Shiyin Lu, Yang Li, Qing-Guo Chen, Zhao Xu, Weihua Luo, Kaifu Zhang, Han-Jia Ye · 阿里巴巴国际数字商业集团 / 南京大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2405.20797"},
+    {"label": "代码", "url": "https://github.com/AIDC-AI/Ovis"}
+  ],
+  "problem": "主流MLLM用MLP把视觉编码器的连续特征直接塞进LLM，而文字是查嵌入表得到的离散嵌入，两种嵌入方式结构不一致，融合不够顺畅。",
+  "idea": "给视觉端也配一张可学习的“视觉嵌入表”：每个图像块输出一个对视觉词表的概率分布，再按概率加权表中的嵌入，模仿文字查表的方式生成视觉嵌入。",
+  "impact": "同规模下超过当时的开源MLLM并整体超过Qwen-VL-Plus；之后迭代出Ovis1.5、1.6、2、2.5一个持续更新的开源VLM系列。",
+  "method": "[[llava-1.5]]一类模型的标准接法是：视觉编码器给每个图像块一个连续向量，经过MLP投影后当作“词”喂给语言模型。可语言模型里的真正的词，是用离散的token编号去嵌入表里查一行得到的。Ovis认为这两种嵌入的产生方式不对称，是视觉和文字融合不充分的原因之一。\n\nOvis的改法是在视觉端加一张**视觉嵌入表**（大小类似一个视觉词表）。视觉编码器之后接一个小头，对每个图像块输出一个在视觉词表上的[[c:softmax]]概率分布；最终的视觉嵌入是表中各行按这个概率的加权和。概率很尖时就退化为查表取一行，等价于离散的“视觉单词”；概率平滑时则是多个视觉单词的混合，既保留结构化的查表形式，又能端到端训练。\n\n摘要报告，Ovis在多个多模态基准上超过同参数规模的开源MLLM，整体上也超过闭源的Qwen-VL-Plus（[[qwen-vl]]的商用版本）。代码、数据和模型均已开源，后续版本换用更强的SigLIP类编码器和Qwen系列语言模型。",
+  "limits": [
+    {"text": "第一版输入分辨率有限，对高分辨率文档和小物体不如采用切图或原生分辨率的模型。", "solved_by": ["qwen2-vl"]},
+    {"text": "视觉嵌入表带来的收益与更换编码器、数据等其他改动纠缠在一起，结构本身贡献多少缺少大规模独立验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "llava-1.5", "type": "rivals", "note": "LLaVA-1.5用MLP把连续视觉特征直接投影给LLM，Ovis改为概率加权查视觉嵌入表。"},
+    {"to": "qwen-vl", "type": "rivals", "note": "论文以Qwen-VL的商用版Qwen-VL-Plus为主要闭源对比对象，并报告整体超过它。"},
+    {"to": "vq-vae", "type": "extends", "note": "视觉嵌入表与离散视觉码本思路相近，但用软概率组合代替硬量化，保持可微。"}
+  ],
+  "prereq": ["embedding", "softmax", "tokenization", "vector-quantization", "instruction-tuning"],
+  "terms": [
+    {"t": "视觉嵌入表（visual embedding table）", "d": "一张可学习的矩阵，每一行代表一个“视觉单词”；图像块按概率选取并加权这些行，得到喂给语言模型的嵌入。"}
+  ],
+  "learn": "先懂[[llava-1.5]]的MLP连接器和语言模型的词嵌入查表，再读Ovis论文第3节，把“概率加权查表”与[[vq-vae]]的硬量化对比着理解。",
+  "check": {"source": "https://arxiv.org/abs/2405.20797", "confirmed": "标题、七位作者、v1提交2024-05-31；摘要：两种嵌入方式不一致、可学习视觉嵌入表、每个图像块多次索引并概率组合、超过同规模开源MLLM并整体超过Qwen-VL-Plus。GitHub页确认Ovis1.0于2024-06发布及Ovis1.5、1.6、2、2.5的版本序列与Ovis2.5采用SigLIP2+Qwen3。机构为一般了解；“概率由softmax小头产生”的细节为对摘要的转述。"}
+}

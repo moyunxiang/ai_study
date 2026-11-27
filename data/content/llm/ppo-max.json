@@ -1,0 +1,31 @@
+{
+  "id": "ppo-max",
+  "who": "Rui Zheng, Shihan Dou, Songyang Gao, Yuan Hua, Wei Shen, Binghai Wang, Yan Liu, Senjie Jin et al. · 复旦大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2307.04964"},
+    {"label": "代码", "url": "https://github.com/OpenLMLab/MOSS-RLHF"}
+  ],
+  "aka": ["Secrets of RLHF", "PPO-max", "RLHF的秘密", "MOSS-RLHF", "PPO稳定训练"],
+  "problem": "RLHF是让大模型对齐的关键技术，但用PPO稳定地训练大模型一直是个难题；当时也几乎没有开源的RLHF实现，学术界难以复现和研究。",
+  "idea": "拆解RLHF框架，重新检查PPO内部的各个组成部分如何影响策略训练，找出“策略约束”是让PPO有效的关键，据此组合出更稳定的PPO-max，并开源奖励模型和PPO代码。",
+  "impact": "第一份系统剖析PPO在LLM对齐中各个技巧作用的中文团队报告之一，配合开源代码，成为2023年国内外研究者复现RLHF时的常用参考。",
+  "method": "背景：[[instructgpt]]和[[hh-rlhf]]用[[ppo]]做RLHF取得成功，但细节很少公开。实践中PPO训练大模型常常出现**模式坍塌**或奖励突然飙升而回答质量下降（即钻奖励模型的空子），训练过程非常敏感。\n\n**逐项检查PPO组件**：作者在中英文对话数据上训练奖励模型和策略，监控训练中的若干指标——奖励、困惑度、回答长度、与参考模型的KL散度等，发现这些指标能比奖励本身更早地暴露训练失稳。然后逐一检验PPO的各种实现技巧：\n- **分数处理**：奖励的归一化与裁剪；\n- **策略约束**：在奖励中加入对参考（SFT）模型的逐词KL惩罚、熵奖励、限制策略更新幅度等；\n- **优势与价值**：GAE的参数、价值函数的初始化与裁剪；\n- **初始化**：策略和价值网络从什么模型初始化。\n\n**关键发现**：作者把**策略约束**（尤其是与参考模型的KL惩罚）认定为PPO在LLM上能有效工作的关键因素；没有足够约束时，策略很快偏离、出现奖励作弊。\n\n**PPO-max**：把被验证有效的技巧组合起来，包括奖励归一化与裁剪、KL惩罚、价值网络用奖励模型初始化、对策略做预训练语言建模损失的混合等，得到更稳定的PPO-max，能在更长的训练中保持稳定。\n\n**对比**：作者比较了RLHF模型与SFT模型以及ChatGPT，分析RLHF带来的能力变化，并发布了技术报告、奖励模型和PPO代码。",
+  "legacy": "PPO-max的组件清单和训练监控指标被许多开源RLHF框架和后续研究引用；同系列的Part II讨论了奖励建模。",
+  "limits": [
+    {"text": "组件的有效性结论来自特定模型规模和数据，没有严格的理论支撑，换到其他设定时仍需重新调参。", "solved_by": []},
+    {"text": "仍保留PPO的价值网络与复杂流程，显存和实现负担没有减少。", "solved_by": ["remax", "rloo"]}
+  ],
+  "relations": [
+    {"to": "ppo", "type": "extends", "note": "系统检验PPO各实现技巧在LLM对齐中的作用，组合成更稳定的PPO-max。"},
+    {"to": "instructgpt", "type": "extends", "note": "沿用InstructGPT的RLHF三阶段流程，公开了其中PPO阶段的细节和代码。"},
+    {"to": "hh-rlhf", "type": "uses", "note": "英文部分使用HH-RLHF数据训练奖励模型。"},
+    {"to": "gae", "type": "uses", "note": "PPO中的优势估计使用GAE，作者检验了其参数的影响。"}
+  ],
+  "prereq": ["rlhf-concept", "policy-gradient-concept", "actor-critic", "kl-divergence", "reward-design"],
+  "terms": [
+    {"t": "策略约束", "d": "在RL训练中限制新策略偏离参考模型太远的各种手段，例如在奖励里扣除与参考模型的KL散度。"},
+    {"t": "奖励作弊", "d": "策略找到奖励模型的漏洞，奖励分数越来越高，但实际回答质量变差。"}
+  ],
+  "learn": "先读[[ppo]]和[[instructgpt]]的RLHF流程；读本文第4节各组件消融和训练监控指标的曲线；动手：用TRL的PPOTrainer在小模型上分别关掉和打开KL惩罚训练，观察奖励、KL和回答长度的变化。",
+  "check": {"source": "https://arxiv.org/abs/2307.04964", "confirmed": "标题、作者（27位，列前8位）、arXiv首次提交2023-07-11；摘要中RLHF包括奖励模型、PPO和过程监督、稳定训练仍是难题、剖析RLHF框架并重新评估PPO内部机制及各部分对策略训练的影响、策略约束是有效实现PPO的关键因素、提出PPO-max提升稳定性、与SFT模型和ChatGPT比较RLHF能力、发布技术报告、奖励模型和PPO代码。各项技巧清单与监控指标为对正文的一般了解；未写发表处。"}
+}

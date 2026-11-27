@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>RLHF的秘密与PPO-max（2023） · AI脉络</title>
+<meta name="description" content="RLHF是让大模型对齐的关键技术，但用PPO稳定地训练大模型一直是个难题；当时也几乎没有开源的RLHF实现，学术界难以复现和研究。 拆解RLHF框架，重新检查PPO内部的各个组成部分如何影响策略训练，找出“策略约束”是让PPO有效的关键，据此组合出更稳定的PPO-max，并开源奖励模型和PPO代码。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ppo-max.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RLHF的秘密与PPO-max（2023）">
+<meta property="og:description" content="RLHF是让大模型对齐的关键技术，但用PPO稳定地训练大模型一直是个难题；当时也几乎没有开源的RLHF实现，学术界难以复现和研究。 拆解RLHF框架，重新检查PPO内部的各个组成部分如何影响策略训练，找出“策略约束”是让PPO有效的关键，据此组合出更稳定的PPO-max，并开源奖励模型和PPO代码。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ppo-max.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ppo-max">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 指令与偏好对齐</div>
+<h1>RLHF的秘密与PPO-max</h1>
+<div class="full">Secrets of RLHF in Large Language Models Part I: PPO</div>
+<div class="meta"><span>2023.07</span><span>论文</span><span>延伸</span><span>Rui Zheng, Shihan Dou, Songyang Gao, Yuan Hua, Wei Shen, Binghai Wang, Yan Liu, Senjie Jin et al. · 复旦大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2307.04964" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/OpenLMLab/MOSS-RLHF" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/ppo-max">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>RLHF是让大模型对齐的关键技术，但用PPO稳定地训练大模型一直是个难题；当时也几乎没有开源的RLHF实现，学术界难以复现和研究。</p></div><div><h4>方法</h4><p>拆解RLHF框架，重新检查PPO内部的各个组成部分如何影响策略训练，找出“策略约束”是让PPO有效的关键，据此组合出更稳定的PPO-max，并开源奖励模型和PPO代码。</p></div><div><h4>影响</h4><p>第一份系统剖析PPO在LLM对齐中各个技巧作用的中文团队报告之一，配合开源代码，成为2023年国内外研究者复现RLHF时的常用参考。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/instructgpt.html">InstructGPT与RLHF</a>和<a class="ln" href="../n/hh-rlhf.html">Anthropic HH-RLHF</a>用<a class="ln" href="../n/ppo.html">PPO</a>做RLHF取得成功，但细节很少公开。实践中PPO训练大模型常常出现<b>模式坍塌</b>或奖励突然飙升而回答质量下降（即钻奖励模型的空子），训练过程非常敏感。</p><p><b>逐项检查PPO组件</b>：作者在中英文对话数据上训练奖励模型和策略，监控训练中的若干指标——奖励、困惑度、回答长度、与参考模型的KL散度等，发现这些指标能比奖励本身更早地暴露训练失稳。然后逐一检验PPO的各种实现技巧：</p><ul><li><b>分数处理</b>：奖励的归一化与裁剪；</li><li><b>策略约束</b>：在奖励中加入对参考（SFT）模型的逐词KL惩罚、熵奖励、限制策略更新幅度等；</li><li><b>优势与价值</b>：GAE的参数、价值函数的初始化与裁剪；</li><li><b>初始化</b>：策略和价值网络从什么模型初始化。</li></ul><p><b>关键发现</b>：作者把<b>策略约束</b>（尤其是与参考模型的KL惩罚）认定为PPO在LLM上能有效工作的关键因素；没有足够约束时，策略很快偏离、出现奖励作弊。</p><p><b>PPO-max</b>：把被验证有效的技巧组合起来，包括奖励归一化与裁剪、KL惩罚、价值网络用奖励模型初始化、对策略做预训练语言建模损失的混合等，得到更稳定的PPO-max，能在更长的训练中保持稳定。</p><p><b>对比</b>：作者比较了RLHF模型与SFT模型以及ChatGPT，分析RLHF带来的能力变化，并发布了技术报告、奖励模型和PPO代码。</p><h2>后来的发展</h2><p>PPO-max的组件清单和训练监控指标被许多开源RLHF框架和后续研究引用；同系列的Part II讨论了奖励建模。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>组件的有效性结论来自特定模型规模和数据，没有严格的理论支撑，换到其他设定时仍需重新调参。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>仍保留PPO的价值网络与复杂流程，显存和实现负担没有减少。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/remax.html">ReMax贪心基线RLHF</a> <a class="chip hue" style="--h:0" href="../n/rloo.html">RLOO回归REINFORCE</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/ppo.html">PPO</a><span class="yr">2017.07 · RL</span><div class=nt>系统检验PPO各实现技巧在LLM对齐中的作用，组合成更稳定的PPO-max。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/instructgpt.html">InstructGPT与RLHF</a><span class="yr">2022.03 · LLM</span><div class=nt>沿用InstructGPT的RLHF三阶段流程，公开了其中PPO阶段的细节和代码。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/gae.html">广义优势估计GAE</a><span class="yr">2015.06 · RL</span><div class=nt>PPO中的优势估计使用GAE，作者检验了其参数的影响。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/hh-rlhf.html">Anthropic HH-RLHF</a><span class="yr">2022.04 · LLM</span><div class=nt>英文部分使用HH-RLHF数据训练奖励模型。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/remax.html">ReMax贪心基线RLHF</a><span class="yr">2023.10 · LLM</span><div class=nt>仍保留PPO的价值网络与复杂流程，显存和实现负担没有减少。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/rloo.html">RLOO回归REINFORCE</a><span class="yr">2024.02 · LLM</span><div class=nt>仍保留PPO的价值网络与复杂流程，显存和实现负担没有减少。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/rlhf-concept.html">人类反馈强化学习</a> <a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/reward-design.html">奖励设计与奖励投机</a></p>
+<h2>本篇术语</h2><ul><li><b>策略约束</b>　在RL训练中限制新策略偏离参考模型太远的各种手段，例如在奖励里扣除与参考模型的KL散度。</li><li><b>奖励作弊</b>　策略找到奖励模型的漏洞，奖励分数越来越高，但实际回答质量变差。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/ppo.html">PPO</a>和<a class="ln" href="../n/instructgpt.html">InstructGPT与RLHF</a>的RLHF流程；读本文第4节各组件消融和训练监控指标的曲线；动手：用TRL的PPOTrainer在小模型上分别关掉和打开KL惩罚训练，观察奖励、KL和回答长度的变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2307.04964" rel="noopener">https://arxiv.org/abs/2307.04964</a>（标题、作者（27位，列前8位）、arXiv首次提交2023-07-11；摘要中RLHF包括奖励模型、PPO和过程监督、稳定训练仍是难题、剖析RLHF框架并重新评估PPO内部机制及各部分对策略训练的影响、策略约束是有效实现PPO的关键因素、提出PPO-max提升稳定性、与SFT模型和ChatGPT比较RLHF能力、发布技术报告、奖励模型和PPO代码。各项技巧清单与监控指标为对正文的一般了解；未写发表处。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20RLHF%E7%9A%84%E7%A7%98%E5%AF%86%E4%B8%8EPPO-max%EF%BC%88ppo-max%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Appo-max%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ppo-max.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ripple-edits.html"><small>本分支上一个 · 2023.07</small><b>RippleEdits波及效应</b></a><a class="r" href="llama-2.html"><small>本分支下一个 · 2023.07</small><b>Llama 2</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

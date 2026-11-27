@@ -1,0 +1,27 @@
+{
+  "id": "resformer",
+  "who": "Zhanchao Zhou, Tianyi Wu, Zhiyun Jiang, Fares Obeid, Zhenzhong Lan · 西湖大学等",
+  "venue": "arXiv 2024",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2410.17897"}],
+  "aka": ["ResFormer", "Value Residual", "值残差", "value residual learning", "SVFormer", "值残差连接"],
+  "problem": "深层Transformer里，靠隐藏状态残差往后传的信息会被逐层稀释，后面的层很难再拿到第一层那份干净的逐词信息。",
+  "idea": "除了隐藏状态残差，再给注意力的值向量V加一条从第一层直通各层的残差：每层的V都混入第一层的V。",
+  "impact": "官方称用少16%的参数或少20%的数据达到同样的验证损失；它的共享V变体还能把KV缓存砍掉近一半。",
+  "background": "标准Transformer每层的输出通过[[c:residual-connection]]加回隐藏状态，信息理论上可以一直传下去，但实践中越深的层越难保留输入词的原始信息，这也被认为与注意力过度集中到少数词（attention sink）有关。增加参数和数据可以缓解，代价很大。",
+  "method": "ResFormer在每一层的注意力里，把本层算出的值向量 `V_n` 与第一层的值向量 `V_1` 相加后再做加权：\n\n`Attn_n = softmax(Q_n K_nᵀ/√d) · (V_n + V_1)`\n\n（论文也讨论了带权重的混合）。因为 `V_1` 直接来自词嵌入附近，这条“值残差”相当于给每一层留了一条访问原始逐词信息的捷径，而不必依赖隐藏状态的残差流层层转递。\n\n变体SVFormer更进一步：所有层直接共享第一层的V，不再各自计算和缓存，于是推理时的值缓存只需存一份。",
+  "results": "摘要报告：与同等设置的Transformer相比，ResFormer用少16.11%的模型参数、少20.3%的训练数据就能达到相同验证损失，显存和计算基本不变；SVFormer把KV缓存减少近一半，性能只小幅下降，并且可与其他KV压缩方法叠加。",
+  "legacy": "值残差改动只有一行代码、几乎不增加开销，常被开源社区的小模型速训实验拿来试用；它是“改残差路径”这条思路里最简单的一招之一，也能与跨层共享KV的缓存压缩方法组合。",
+  "limits": [
+    {"text": "主要实验在中小规模模型上完成，在百亿参数以上的收益幅度没有公开验证。", "solved_by": []},
+    {"text": "SVFormer的性能损失随序列长度和学习率设置而变化，作者自己也指出需要按场景权衡。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "extends", "note": "在标准注意力的值向量上增加一条跨层残差。"},
+    {"to": "resnet", "type": "extends", "note": "残差连接的思想从隐藏状态推广到注意力内部的值向量。"},
+    {"to": "cross-layer-attention", "type": "rivals", "note": "同样跨层共享KV来省缓存；SVFormer只共享V，并与之互补。"},
+    {"to": "mqa", "type": "rivals", "note": "MQA在头之间共享KV，SVFormer在层之间共享V，两者都为缩小KV缓存。"}
+  ],
+  "prereq": ["self-attention", "residual-connection", "kv-cache", "transformer-block"],
+  "learn": "先理解[[transformer]]里Q、K、V各自的作用；读ResFormer第3节的公式；动手：在小型GPT里给每层V加上第一层的V，对比相同步数的验证损失。",
+  "check": {"source": "https://arxiv.org/abs/2410.17897", "confirmed": "标题Value Residual Learning、arXiv首次提交2024-10-23；摘要中参数少16.11%、数据少20.3%、SVFormer减少近一半KV缓存。"}
+}

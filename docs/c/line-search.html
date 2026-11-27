@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>线搜索与共轭梯度（Line Search and Conjugate Gradient） · AI脉络</title>
+<meta name="description" content="确定了下降方向之后，沿这个方向试几个步长、挑一个让函数值充分下降的，而不是用固定学习率。共轭梯度法则让每一步的方向彼此“不打架”。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/line-search.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="线搜索与共轭梯度（Line Search and Conjugate Gradient）">
+<meta property="og:description" content="确定了下降方向之后，沿这个方向试几个步长、挑一个让函数值充分下降的，而不是用固定学习率。共轭梯度法则让每一步的方向彼此“不打架”。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/line-search.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/line-search">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 优化与训练 · 进阶</div>
+<h1>线搜索与共轭梯度</h1><div class="full">Line Search and Conjugate Gradient</div>
+<p class="muted" style="font-size:13px">也叫：线搜索　line search　回溯线搜索　backtracking line search　Armijo条件　Armijo condition　Wolfe条件　Wolfe conditions　步长选择　step size　共轭梯度　共轭梯度法　conjugate gradient　CG　最速下降　steepest descent</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/line-search">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>确定了下降方向之后，沿这个方向试几个步长、挑一个让函数值充分下降的，而不是用固定学习率。共轭梯度法则让每一步的方向彼此“不打架”。</b></p>
+<p class="tags">先要会：<a class="chip c" href="gradient-descent.html">梯度下降</a> <a class="chip c" href="jacobian-hessian.html">雅可比矩阵与海森矩阵</a></p>
+<p>优化的每一步其实要回答两个问题：往哪走（方向），走多远（步长）。<a class="lc" href="../c/gradient-descent.html">梯度下降</a>用固定的<a class="lc" href="../c/learning-rate.html">学习率与学习率调度</a>回答第二个问题；在确定性的、函数值可以准确算出的问题上，有更聪明的做法。</p><p><b>线搜索</b>。给定当前点x和下降方向d（例如负梯度，或<a class="lc" href="../c/newton-method.html">牛顿法与拟牛顿法</a>给出的方向），问题变成一维的：找步长α使<code>f(x + αd)</code>尽量小。精确求最小值太贵，实际用<b>回溯线搜索</b>：从α = 1开始，如果函数值下降得不够多，就把α乘以一个系数（如0.5）再试，直到满足<b>Armijo条件</b>：</p><p><code>f(x + αd) ≤ f(x) + c·α·∇f(x)ᵀd</code>（c常取1e−4）</p><p>意思是实际下降量至少达到线性预测下降量的一小部分。再加上一个关于斜率的条件就是<b>Wolfe条件</b>，<a class="ln" href="../n/lbfgs.html">L-BFGS</a>通常要求满足它，以保证曲率近似是正定的。</p><p><b>共轭梯度法（conjugate gradient, CG）</b>。最速下降在狭长山谷里会走“之”字形：这一步刚消掉一个方向的误差，下一步又把它弄回来。CG让每个新方向与之前所有方向关于海森矩阵A“共轭”：<code>d_iᵀ A d_j = 0</code>。对n维的二次函数<code>½xᵀAx − bᵀx</code>（等价于解方程<code>Ax = b</code>），它最多n步就精确到达最优，而且每步只需要一次矩阵与向量的乘法，不需要存储或分解A。所以大规模稀疏方程组的标准解法就是CG。</p><p><b>在AI里出现在哪里</b>。<a class="ln" href="../n/hessian-free.html">Hessian-free优化</a>优化用CG近似求解牛顿方程，只需要“海森乘向量”，可以用自动微分高效算出；<a class="ln" href="../n/trpo.html">TRPO</a>用CG计算自然梯度方向，再用回溯线搜索保证KL约束被满足、目标真的改善了。随机小批量训练里梯度有噪声，函数值也有噪声，线搜索的判断会不可靠，所以深度网络训练几乎都用学习率调度代替线搜索。</p>
+<div class="example"><h4>例子</h4><p>f(x) = x²，x = 3，d = −f&#x27;(3) = −6。回溯线搜索（c = 0.5，每次α减半）：</p><ul><li>α = 1：x + αd = −3，f = 9，要求f ≤ 9 + 0.5×1×(−36) = −9，不满足。</li><li>α = 0.5：x = 0，f = 0，要求f ≤ 9 − 9 = 0，满足，接受。一步就到最优点。</li></ul><p>CG：对2维二次函数，无论条件数多大，两步之内精确收敛；最速下降在条件数为100时需要上百步。</p></div>
+<h2>容易误解的地方</h2><ul><li>线搜索每次尝试都要额外计算一次函数值；在每次前向都很贵的大模型上，这个代价很高。</li><li>共轭梯度“n步收敛”只在精确算术和二次函数下成立，浮点误差和非二次函数会破坏共轭性，实际中需要周期性重启。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+ "id": "latent-adversarial-training",
+ "who": "Stephen Casper, Lennart Schulze, Oam Patel, Dylan Hadfield-Menell · MIT、哥伦比亚大学、哈佛大学",
+ "venue": "TMLR",
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2403.05030"}
+ ],
+ "aka": ["LAT", "潜空间对抗训练", "latent adversarial training", "隐层对抗训练"],
+ "problem": "红队和对抗训练只能修补已经找到的攻击，可能诱发有害行为的输入空间大到无法穷举；对抗训练对与训练时攻击不同的失败方式往往无效，[[sleeper-agents]]里的后门甚至能挺过对抗训练。",
+ "idea": "不在输入上找对抗样本，而是直接在网络的隐藏层激活上加最坏情况扰动并训练模型对它保持正确，因为隐层表示更紧凑、更接近模型真正用来做决策的概念。",
+ "impact": "让“在表示层而不是输入层做对抗训练”成为LLM鲁棒性的一条路线，后续有针对越狱和遗忘的定向LAT等工作，也和[[circuit-breakers]]等表示层防御思路相互呼应。",
+ "method": "普通对抗训练（[[pgd-adversarial-training]]）求解 `min_θ E[max_{‖δ‖≤ε} L(f_θ(x+δ), y)]`，扰动δ加在输入x上。LAT把扰动挪到某一隐藏层：把模型写成 `f = g∘h`，h是前几层，g是后几层，训练目标变成 `min_θ E[max_{‖δ‖≤ε} L(g(h(x)+δ), y)]`。\n\n为什么这样可能更好：输入空间里，能触发某种失败的输入可能五花八门、彼此毫不相似（不同措辞的越狱、不同形态的后门触发词）；但到了隐层，它们可能都把激活推向同一片“概念区域”。在隐层上做最坏情况扰动，相当于一次覆盖了许多种输入层面看起来不同的攻击，而且不需要事先知道这些攻击长什么样。\n\n作者用LAT做两件事：移除植入的后门，以及防御训练时未见过的攻击类别。实验覆盖图像分类、文本分类和文本生成三类任务，摘要报告LAT通常比标准对抗训练同时带来更好的新攻击鲁棒性和更好的干净数据表现。\n\n作者把它定位为一种防御“开发者没有明确识别出的失败模式”的工具，这正是红队方法难以覆盖的部分。",
+ "limits": [
+  {"text": "在哪一层加扰动、扰动多大需要调节，扰动太强会损伤正常能力，目前缺乏选择原则。", "solved_by": []},
+  {"text": "无定向的隐层扰动对特定有害能力（如越狱后的危险知识）效果有限，需要定向版本配合。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "pgd-adversarial-training", "type": "extends", "note": "把PGD对抗训练的最小最大目标从输入空间搬到隐藏层激活空间。"},
+  {"to": "sleeper-agents", "type": "solves", "note": "Sleeper Agents显示后门能挺过常规对抗训练，LAT在不知道触发词的情况下尝试移除后门。"},
+  {"to": "red-teaming-lms", "type": "rivals", "note": "红队靠找具体输入暴露问题，LAT不需要能引发失败的输入，直接在表示层防御。"}
+ ],
+ "prereq": ["adversarial-training", "feature-representation", "language-model", "loss-function"],
+ "terms": [
+  {"t": "隐层扰动", "d": "在网络中间层的激活向量上直接加一个小向量，而不是去改输入。"}
+ ],
+ "learn": "先读[[pgd-adversarial-training]] → 读原文的方法与后门移除实验 → 在一个小分类网络上分别做输入层和中间层的PGD对抗训练，比较对未见过攻击的鲁棒性。",
+ "check": {"source": "https://arxiv.org/abs/2403.05030", "confirmed": "arXiv记录：标题、4位作者、2024-03-08 v1；摘要所述攻击面太大无法穷举、红队与对抗训练难以修复与训练攻击不同的失败、LAT利用网络实际使用的潜在表示、移除后门与防御未见攻击类别、图像分类/文本分类/文本生成三类任务、通常同时改进新攻击鲁棒性与干净性能。公式写法、机构与TMLR、后续定向LAT凭一般了解写。"}
+}

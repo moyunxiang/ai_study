@@ -1,0 +1,30 @@
+{
+  "id": "normformer",
+  "who": "Sam Shleifer, Jason Weston, Myle Ott · Facebook AI Research",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2110.09456"},
+    {"label": "fairseq代码", "url": "https://github.com/pytorch/fairseq/tree/main/examples/normformer"}
+  ],
+  "aka": ["NormFormer", "额外归一化", "head-wise scaling", "Pre-LN梯度失配"],
+  "problem": "Pre-LN Transformer虽然好训练，但预训练时各层梯度大小不匹配：靠近输入的浅层梯度远大于深层梯度，深层更新偏慢，学习率也难以调高。",
+  "idea": "在每层多加三个几乎不花算力的操作：自注意力输出后加一个LayerNorm，对每个注意力头的输出乘一个可学习的缩放系数，在FFN第一个全连接层（激活之后）再加一个LayerNorm。",
+  "impact": "参数只增加0.4%，在125M到2.7B的因果和掩码语言模型上都降低了困惑度、加快了收敛，是“Pre-LN之后怎样再稳一点”的代表性改进之一；子层输出再归一化的做法后来在Gemma 2等模型的“三明治归一化”中也能看到。",
+  "method": "背景：[[pre-ln]]把LayerNorm放在每个子层的输入处，使残差通路畅通、训练稳定，成为GPT-3等大模型的标准做法。但作者测量发现，Pre-LN预训练时浅层参数的梯度范数远大于深层，即**梯度大小失配**；深层的更新相对过小，而为了不让浅层发散，学习率又不能调大。\n\n**NormFormer**在Pre-LN的基础上加三处：\n\n- **注意力后LN**：多头自注意力的输出先过一个LayerNorm，再加回残差，即 `x + LN(MHA(LN(x)))`。\n- **头级缩放（head-wise scaling）**：把每个注意力头的输出乘一个可学习的标量γ_i后再拼接，让模型可以调低或调高单个头的贡献。\n- **FFN中间LN**：FFN第一个线性层加激活之后、第二个线性层之前，再加一个LayerNorm。\n\n作者展示这些操作把各层的梯度范数拉得更平均，从而允许使用更大的学习率。\n\n结果：额外参数只占约0.4%，计算开销可以忽略。在最强的1.3B因果语言模型基线上加入NormFormer，达到相同困惑度快24%，或在相同算力下困惑度低0.27；达到GPT-3 Large（1.3B）零样本性能的速度快60%。对掩码语言模型，微调后的GLUE平均提升1.9%。",
+  "limits": [
+    {"text": "实验最大到2.7B参数，作者也报告在更大规模上收益会减小或需要调整；额外的LayerNorm在极深网络上能否根治不稳定没有验证。", "solved_by": ["deepnet"]},
+    {"text": "主要解决梯度大小失配，对注意力logit爆炸等大模型训练中的其他不稳定来源没有直接处理。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "pre-ln", "type": "solves", "note": "Pre-LN浅层梯度远大于深层，NormFormer加三处归一化与缩放使各层梯度更均衡。"},
+    {"to": "admin", "type": "rivals", "note": "Admin用初始化和残差缩放调节各层贡献，NormFormer改为在网络中加归一化和可学习缩放。"},
+    {"to": "qk-norm", "type": "extends", "note": "同样在注意力内部加约束，QK-Norm约束点积，NormFormer约束注意力输出并加头级缩放。"},
+    {"to": "gpt-3", "type": "uses", "note": "以GPT-3论文中1.3B的GPT-3 Large零样本表现为参照衡量收敛速度。"},
+    {"to": "roberta", "type": "uses", "note": "掩码语言模型部分沿用RoBERTa式预训练并在GLUE上微调评测。"}
+  ],
+  "prereq": ["normalization-layer", "residual-connection", "transformer-block", "learning-rate", "perplexity"],
+  "terms": [
+    {"t": "梯度大小失配", "d": "网络不同层的参数梯度范数相差很大，使统一的学习率对一部分层太大、对另一部分层太小。"}
+  ],
+  "learn": "先读[[pre-ln]]理解Pre-LN与Post-LN；读原文图1的梯度范数分布和第3节三处改动；动手：在小GPT里记录各层梯度范数，分别训练Pre-LN与加了三处归一化的版本，比较能承受的最大学习率。",
+  "check": {"source": "https://arxiv.org/abs/2110.09456", "confirmed": "标题、3位作者、arXiv v1提交日2021-10-18；摘要中Pre-LN预训练时浅层梯度远大于深层的梯度失配、三处操作（注意力后LN、注意力输出的头级缩放、第一个全连接层后LN）、参数增加0.4%、125M到2.7B的因果与掩码模型、1.3B基线快24%达到同困惑度或同算力低0.27、快60%达到GPT3-Large零样本、GLUE平均提升1.9%。更大规模收益减小、与Gemma 2三明治归一化的联系为一般了解。"}
+}

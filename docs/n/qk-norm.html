@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>QK归一化（2020） · AI脉络</title>
+<meta name="description" content="注意力分数 q·k/√d 没有上界：训练中查询和键的范数一旦变大，softmax就会饱和成几乎one-hot，梯度变得极小，训练不稳定；除以√d只是一个固定缩放，管不住范数的增长。 在相乘之前先对每个头的查询向量和键向量各做ℓ2归一化，使 q·k 变成夹角余弦、取值在[−1,1]，再乘一个可学习的…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/qk-norm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="QK归一化（2020）">
+<meta property="og:description" content="注意力分数 q·k/√d 没有上界：训练中查询和键的范数一旦变大，softmax就会饱和成几乎one-hot，梯度变得极小，训练不稳定；除以√d只是一个固定缩放，管不住范数的增长。 在相乘之前先对每个头的查询向量和键向量各做ℓ2归一化，使 q·k 变成夹角余弦、取值在[−1,1]，再乘一个可学习的…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/qk-norm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/qk-norm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 架构与组件</div>
+<h1>QK归一化</h1>
+<div class="full">Query-Key Normalization for Transformers</div>
+<div class="meta"><span>2020.10</span><span>论文</span><span>延伸</span><span>Findings of EMNLP 2020</span><span>Alex Henry, Prudhvi Raj Dachapally, Shubham Pawar, Yuxuan Chen · Elastic等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2010.04245" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/qk-norm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>注意力分数 <code>q·k/√d</code> 没有上界：训练中查询和键的范数一旦变大，softmax就会饱和成几乎one-hot，梯度变得极小，训练不稳定；除以√d只是一个固定缩放，管不住范数的增长。</p></div><div><h4>方法</h4><p>在相乘之前先对每个头的查询向量和键向量各做ℓ2归一化，使 q·k 变成夹角余弦、取值在[−1,1]，再乘一个可学习的标量g代替固定的1/√d。</p></div><div><h4>影响</h4><p>原文只在低资源翻译上验证，但这一“给q、k各加一层归一化”的做法后来被大规模训练广泛采用（如ViT-22B、OLMo 2、Gemma 3、Qwen3用RMSNorm版本），成为抑制注意力logit爆炸、稳定大模型训练的常用组件。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>背景：<a class="ln" href="../n/transformer.html">Transformer</a>的注意力权重为 <code>softmax(q·kᵀ/√d)</code>。除以√d是为了让点积的方差在初始化时约为1，但训练过程中q、k的范数会持续变化。如果某些头的范数变得很大，点积的数值范围随之放大，softmax输出接近one-hot（饱和），几乎所有梯度都集中到一个位置，其他位置学不动；范数过小时注意力又过于平均。当时针对低资源翻译，已有工作通过调整归一化位置（如<a class="ln" href="../n/pre-ln.html">Pre-LN Transformer</a>）和缩放来改善训练。</p><p><b>QKNorm</b>的做法：对每个注意力头，先把查询和键分别沿头维度做ℓ2归一化，<code>q̂ = q/‖q‖</code>，<code>k̂ = k/‖k‖</code>，于是 <code>q̂·k̂ = cos θ ∈ [−1, 1]</code>；再乘以可学习的标量g：<code>Attention = softmax(g · q̂ k̂ᵀ) V</code>。这样注意力分布的“锐利程度”完全由g控制，而不会被q、k范数的漂移意外放大，作者称这样能让softmax不再任意饱和，同时不损失表达能力。g在实验中按序列长度相关的公式初始化（细节见原文）。</p><p>结果：在TED Talks语料和IWSLT&#x27;15的5个低资源翻译方向上，相对当时最好的双语基线平均提升0.928 BLEU。</p><p>后续：大模型训练中常见的“注意力logit增长导致损失尖峰”问题让这一思路重新受到重视。后来常见的写法是对q、k各做一次LayerNorm或RMSNorm（不一定是纯ℓ2归一化加单一标量），并保留原来的1/√d缩放。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>原文只在小规模、低资源的翻译任务上实验，对大规模语言模型预训练的稳定性作用没有验证；这一作用是后来的大模型训练报告才系统展示的。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/olmo-2.html">OLMo 2</a> <a class="chip hue" style="--h:0" href="../n/gemma-3.html">Gemma 3</a></div></li><li>把点积压到余弦范围后，注意力的锐度完全依赖可学习标量的初始化和学习，g设得不合适时注意力可能过于平均；与RoPE等位置编码的配合方式原文没有讨论。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>原始缩放点积注意力只除以固定的√d，q、k范数增大时softmax会饱和；QKNorm先归一化再用可学习缩放。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/pre-ln.html">Pre-LN Transformer</a><span class="yr">2020.02 · LLM</span><div class=nt>同属调整归一化位置以稳定Transformer训练的工作，Pre-LN处理残差通路，QKNorm处理注意力内部的点积。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/admin.html">Admin：Post-LN为何难训</a><span class="yr">2020.04 · LLM</span><div class=nt>Admin通过初始化和残差缩放解决训练不稳定，QKNorm直接约束注意力logit的范围。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/normformer.html">NormFormer额外归一化</a><span class="yr">2021.10 · LLM</span><div class=nt>同样在注意力内部加约束，QK-Norm约束点积，NormFormer约束注意力输出并加头级缩放。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/ngpt.html">nGPT超球面归一化</a><span class="yr">2024.10 · LLM</span><div class=nt>QK归一化只归一化查询和键，nGPT把同样的想法推广到所有权重和隐藏状态。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/olmo-2.html">OLMo 2</a><span class="yr">2024.11 · LLM</span><div class=nt>原文只在小规模、低资源的翻译任务上实验，对大规模语言模型预训练的稳定性作用没有验证；这一作用是后来的大模型训练报告才系统展示的。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/gemma-3.html">Gemma 3</a><span class="yr">2025.03 · LLM</span><div class=nt>原文只在小规模、低资源的翻译任务上实验，对大规模语言模型预训练的稳定性作用没有验证；这一作用是后来的大模型训练报告才系统展示的。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/norm.html">范数与距离</a> <a class="chip c" href="../c/dot-product.html">内积与余弦相似度</a></p>
+<h2>本篇术语</h2><ul><li><b>softmax饱和</b>　输入数值差距很大时softmax输出几乎全部集中在最大项上，其余项的梯度接近0。</li><li><b>注意力logit</b>　进入softmax之前的注意力分数，即 q·k 缩放后的值。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/softmax.html">Softmax与logits</a>和<a class="lc" href="../c/self-attention.html">自注意力与多头注意力</a>；读原文第3节QKNorm的定义与g的初始化；动手：在小Transformer里打印训练过程中各头注意力logit的最大值，比较加与不加QK归一化时的曲线。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2010.04245" rel="noopener">https://arxiv.org/abs/2010.04245</a>（标题、4位作者、arXiv v1提交日2020-10-08；摘要中面向低资源翻译、修改注意力使softmax不易任意饱和、在相乘前沿头维度对每个查询和键做ℓ2归一化并用可学习参数放大以代替除以√d、TED Talks与IWSLT&#x27;15的5个低资源方向平均提升0.928 BLEU。venue、机构、g的初始化方式，以及ViT-22B、OLMo 2、Gemma 3、Qwen3等后续采用为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20QK%E5%BD%92%E4%B8%80%E5%8C%96%EF%BC%88qk-norm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aqk-norm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/qk-norm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="scaling-ar-generative.html"><small>本分支上一个 · 2020.10</small><b>跨模态的规模定律</b></a><a class="r" href="cpm.html"><small>本分支下一个 · 2020.12</small><b>清源CPM</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

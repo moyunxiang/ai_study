@@ -1,0 +1,27 @@
+{
+  "id": "repocoder",
+  "who": "Fengji Zhang, Bei Chen, Yue Zhang, Jacky Keung, Jin Liu, Daoguang Zan, Yi Mao, Jian-Guang Lou et al. · 微软 / 香港城市大学",
+  "venue": "EMNLP 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2303.12570"},
+    {"label": "GitHub", "url": "https://github.com/microsoft/CodeT/tree/main/RepoCoder"}
+  ],
+  "aka": ["RepoCoder", "RepoEval", "仓库级代码补全", "repository-level code completion", "迭代检索生成", "代码RAG"],
+  "problem": "代码补全工具通常只看当前文件，但真实项目里要调用的函数、类和约定散落在仓库的其他文件中，模型看不到就会编造不存在的接口。",
+  "idea": "先用当前代码去仓库里检索相似片段并生成一版补全，再拿这版补全当新的查询重新检索，反复几轮，让检索越来越贴近真正需要的代码。",
+  "impact": "把检索增强从问答搬到仓库级代码补全，提出的RepoEval基准和“迭代检索—生成”流程成为后来仓库级代码生成工作的常用对照。",
+  "method": "普通的检索增强代码补全（见[[rag]]）用光标前的几行代码当查询，在仓库的其他文件里找相似片段，拼到提示里再让模型续写。问题是：光标前的代码往往和要写的内容不太像，第一次检索经常找偏。\n\nRepoCoder的做法是**迭代**：\n- 第1轮：用光标前的代码检索，生成一版补全；\n- 第2轮起：把“光标前代码+上一轮生成的补全”合起来当查询再检索——生成的内容虽然可能有错，但它更像目标代码，因此能检索到更相关的定义和用法；\n- 重复几轮后输出最终补全。\n检索器只用简单的词袋相似度，生成器是现成的预训练代码模型（如[[codex]]），整个框架不需要训练。\n\n作者同时构建了**RepoEval**基准，从较新的真实仓库中挖出三种粒度的补全任务：补一行、补一个API调用、补整个函数体（用单元测试判定）。实验显示RepoCoder在所有设置下都比只看本文件的基线高出10%以上，并稳定优于只检索一次的检索增强补全。",
+  "limits": [
+    {"text": "检索单位是固定长度的代码片段，只看文本相似度，不理解导入关系、调用图等仓库结构，跨文件依赖复杂时仍会找错。", "solved_by": ["autocoderover"]},
+    {"text": "只做补全，不会运行代码、读报错再修改；完成整项开发任务需要能执行和迭代的智能体。", "solved_by": ["swe-agent", "claude-code"]}
+  ],
+  "relations": [
+    {"to": "rag", "type": "extends", "note": "把检索增强生成用在仓库级代码补全上，并把单次检索改成检索—生成交替的迭代流程。"},
+    {"to": "codex", "type": "uses", "note": "用现成的预训练代码模型作为生成器，框架本身不需要训练。"},
+    {"to": "copilot", "type": "solves", "note": "Copilot式补全主要依赖当前文件上下文，RepoCoder补上了仓库其他文件中的信息。"},
+    {"to": "ircot", "type": "rivals", "note": "思路相近：IRCoT在问答里让推理步骤引导下一次检索，RepoCoder让生成的代码引导下一次检索。"}
+  ],
+  "prereq": ["retrieval", "language-model", "embedding", "benchmark"],
+  "learn": "先读[[rag]] → 读原文第2节迭代流程图和第4节RepoEval的构造 → 动手：在自己的一个小项目里，用光标前代码与“光标前代码+一版草稿”分别做相似度检索，比较找到的片段是否包含真正需要的函数定义。",
+  "check": {"source": "https://arxiv.org/abs/2303.12570", "confirmed": "标题、作者、v1提交于2023-03-22；摘要中相似度检索器加预训练代码模型的迭代检索—生成流程、RepoEval覆盖行/API调用/函数体三种场景、比本文件基线高10%以上、稳定优于普通检索增强补全。所用检索为词袋相似度、生成器含Codex、EMNLP 2023与香港城市大学署名凭一般了解。"}
+}

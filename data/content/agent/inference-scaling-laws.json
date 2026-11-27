@@ -1,0 +1,27 @@
+{
+  "id": "inference-scaling-laws",
+  "who": "Yangzhen Wu, Zhiqing Sun, Shanda Li, Sean Welleck, Yiming Yang · 清华大学 / 卡内基梅隆大学",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2408.00724"}
+  ],
+  "aka": ["inference scaling laws", "test-time scaling laws", "推理扩展律", "推理时扩展定律", "测试时扩展律", "compute-optimal inference", "REBASE", "Reward Balanced Search"],
+  "problem": "训练阶段的规模定律研究得很多，但推理时该用多大的模型、生成多少条答案、用哪种搜索才最划算，缺少系统的测量。",
+  "idea": "固定推理算力预算，系统比较不同模型大小和多种推理策略（贪心、多数投票、best-of-n、加权投票、树搜索）的性价比，并提出更省算力的奖励平衡树搜索REBASE。",
+  "impact": "给出“推理时多花算力可能比换更大的模型更划算、小模型加好的搜索能落在帕累托前沿上”的实证结论，与同期的测试时计算研究一起奠定了测试时扩展这条路线。",
+  "method": "论文把“推理时用多少算力”当成和训练规模一样可以优化的变量：给定一个以浮点运算量计的预算，可以选择用大模型少生成几条，也可以用小模型多生成几条再挑。作者在数学题上用不同大小的模型，比较贪心解码、多数投票（见[[self-consistency]]）、best-of-n、按奖励模型加权的投票，以及两种树搜索。\n\n他们发现常规的蒙特卡洛树搜索在这里不划算：它会产生大量没写完的解答，能拿来投票的有效答案少。于是提出**REBASE**（奖励平衡搜索）：每一层用过程奖励模型（[[prm]]）给候选步骤打分，按分数的softmax分配下一层的展开名额——分高的多展开，分低的少展开但不完全丢掉，保证最后有足够多完整解答用于加权投票。\n\n结果：在MATH上，Llemma-7B配合REBASE在所有测试的推理策略下都稳定超过Llemma-34B；整体上，小模型配合好的推理算法往往给出最优的“算力—准确率”折中。这与[[llm-monkeys]]的重复采样曲线、[[tts-compute]]的按难度分配算力结论相互印证。",
+  "limits": [
+    {"text": "结论依赖一个可靠的过程奖励模型和答案可自动比对的数学题，换到开放式任务或奖励模型较差时，搜索的收益会打折扣。", "solved_by": []},
+    {"text": "研究的是固定模型上的推理策略；之后的推理模型把“多想”直接训练进单条长思维链，并行搜索与串行长思考孰优并未定论。", "solved_by": ["deepseek-r1", "s1"]}
+  ],
+  "relations": [
+    {"to": "llm-monkeys", "type": "extends", "note": "重复采样的扩展律说明多采样能提高覆盖率，本文进一步把模型大小和多种选答策略放在同一算力预算下比较。"},
+    {"to": "self-consistency", "type": "uses", "note": "多数投票和加权投票是比较的基本策略，REBASE的产出最终也用加权投票汇总。"},
+    {"to": "prm", "type": "uses", "note": "REBASE用过程奖励模型给每一步打分，并据此分配展开名额。"},
+    {"to": "tts-compute", "type": "rivals", "note": "同月发表的测试时计算研究，侧重按题目难度在搜索与修订之间分配算力；本文侧重模型大小与推理策略的整体性价比。"},
+    {"to": "mcts", "type": "rivals", "note": "作者实测蒙特卡洛树搜索在同等预算下不如REBASE，因为它留下太多未完成的解答。"}
+  ],
+  "prereq": ["scaling-law-concept", "params-flops", "tree-search", "decoding-sampling", "reasoning-tokens"],
+  "learn": "先读[[self-consistency]]和[[llm-monkeys]] → 读原文第3节推理策略与REBASE、第4节的算力—准确率曲线 → 动手：在同样的生成词元预算下，比较一个小模型投票16次与一个大模型投票2次在GSM8K上的准确率。",
+  "check": {"source": "https://arxiv.org/abs/2408.00724", "confirmed": "标题、作者、v1提交于2024-08-01；摘要中比较的推理策略、推理算力扩展可能比扩大参数更划算、小模型加高级推理算法位于帕累托前沿、Llemma-7B加新树搜索在MATH上全面超过Llemma-34B；正文（arxiv.org/html/2408.00724）核对REBASE的命名与“MCTS产生大量未完成解答”的分析。REBASE按softmax分配展开名额的细节与机构、ICLR 2025凭一般了解。"}
+}

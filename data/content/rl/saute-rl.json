@@ -1,0 +1,30 @@
+{
+  "id": "saute-rl",
+  "who": "Aivar Sootla, Alexander I. Cowen-Rivers, Taher Jafferjee, Ziyan Wang, David Mguni, Jun Wang, Haitham Bou-Ammar · 华为诺亚方舟实验室 / UCL",
+  "venue": "ICML 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2202.06558"}
+  ],
+  "problem": "CMDP只要求期望代价不超限，平均满足不等于每次都安全；飞机起降这类场景需要约束“几乎必然”（以概率1）满足。",
+  "idea": "把“还剩多少安全预算”加进状态：每走一步预算减去本步代价，预算一旦用完就把奖励换成很大的惩罚；约束从此消失，变成一个普通MDP，任何RL算法都能直接用（Saute MDP）。",
+  "impact": "提供了一个即插即用的安全RL包装方式，PPO、TRPO、SAC、模型RL都可以“Saute化”，OmniSafe把它作为状态增广类方法收录。",
+  "method": "设每条轨迹的累计代价不能超过预算d。Saute（Safety Augmented）MDP做两件事：\n\n- **状态增广**：引入剩余安全预算 `z_t`，初值 `z_0 = 1`（按d归一化），每步更新 `z_(t+1) = (z_t − c_t/d)/γ`，把 `(s_t, z_t)` 作为新的状态；\n- **奖励重塑**：若 `z_t > 0`，奖励保持原样 `r_t`；若预算已经耗尽 `z_t ≤ 0`，奖励换成一个很大的负值 `−n`。\n\n这样原来的约束问题就被改写成一个没有约束的MDP。论文证明这个增广MDP满足贝尔曼方程，因此可以直接套用任何现成的RL算法；当惩罚n足够大时，最优策略对应以概率1满足约束的策略。\n\n由于预算是状态的一部分，同一个策略在训练后还能对不同的预算d泛化：部署时给不同的初始预算，策略就表现出不同的保守程度。摘要称在约束满足非常重要的情形下，Saute化的算法可以超过对应的最先进安全RL算法。",
+  "limits": [
+    {"text": "惩罚值n和预算的归一化方式影响学习难度，惩罚过大会让价值估计数值不稳。"},
+    {"text": "状态维度增加一维，且只适用于“累计代价有预算”这一类约束，表达不了更一般的时序安全规范。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "cmdp", "type": "solves", "note": "CMDP只保证期望约束；Saute把约束改写进状态，追求几乎必然满足。"},
+    {"to": "rcpo", "type": "rivals", "note": "RCPO用拉格朗日乘子；Saute不用乘子，直接把约束变成状态与奖励的改写。"},
+    {"to": "ppo", "type": "uses", "note": "实验中把PPO、TRPO、SAC等现成算法“Saute化”。"},
+    {"to": "uvfa", "type": "extends", "note": "把预算作为额外输入，让同一策略对不同预算泛化，与目标条件价值函数思路相近。"}
+  ],
+  "prereq": ["mdp", "reward-design", "state-action-observation", "bellman-equation"],
+  "terms": [
+    {"t": "几乎必然满足", "d": "以概率1满足约束，即除了概率为零的情况外每条轨迹都不违规。"},
+    {"t": "状态增广", "d": "把额外的信息（这里是剩余安全预算）拼进状态，使原本依赖历史的约束变成马尔可夫的。"}
+  ],
+  "learn": "先读[[cmdp]]；读Saute原文第3节增广与重塑的定义；用OmniSafe的PPOSaute在SafetyPointGoal上训练，部署时改变初始预算观察行为变化。",
+  "check": {"source": "https://arxiv.org/abs/2202.06558", "confirmed": "标题、七位作者、arXiv v1于2022-02-14；摘要中约束几乎必然满足的需求（飞机起降）、Safety Augmented MDP把约束增广进状态并重塑目标、满足贝尔曼方程、即插即用任何RL算法可被Sauteed、状态增广带来跨安全约束的泛化、在约束满足重要时超过最先进的对应算法。预算更新公式与惩罚形式按原文正文通行描述；ICML 2022与单位按通行引用。"},
+  "aka": ["Saute RL", "Sauté RL", "Saute MDP", "安全预算状态增广", "Safety Augmented MDP"]
+}

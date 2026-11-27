@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Rail-only大模型训练网络（2023） · AI脉络</title>
+<meta name="description" content="大规模GPU集群通常用“任意两卡之间都有满带宽”的多层胖树网络，交换机和光模块成本、功耗都很高；但大模型训练的流量是否真的需要这种全互联，没有人认真算过。 分析大模型最优并行策略下的通信模式，发现流量很稀疏：大量通信只发生在同一“轨道”（各服务器上编号相同的GPU）之间。于是去掉传统集群的Spin…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/rail-only.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Rail-only大模型训练网络（2023）">
+<meta property="og:description" content="大规模GPU集群通常用“任意两卡之间都有满带宽”的多层胖树网络，交换机和光模块成本、功耗都很高；但大模型训练的流量是否真的需要这种全互联，没有人认真算过。 分析大模型最优并行策略下的通信模式，发现流量很稀疏：大量通信只发生在同一“轨道”（各服务器上编号相同的GPU）之间。于是去掉传统集群的Spin…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/rail-only.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/rail-only">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:72"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/hw.html">硬件与算力</a> › 互连与超级集群</div>
+<h1>Rail-only大模型训练网络</h1>
+<div class="full">Rail-only: A Low-Cost High-Performance Network for Training LLMs with Trillion Parameters</div>
+<div class="meta"><span>2023.07</span><span>论文</span><span>延伸</span><span>Weiyang Wang, Manya Ghobadi, Kayvon Shakeri, Ying Zhang, Naader Hasani · MIT / Meta</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2307.12169" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/rail-only">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>大规模GPU集群通常用“任意两卡之间都有满带宽”的多层胖树网络，交换机和光模块成本、功耗都很高；但大模型训练的流量是否真的需要这种全互联，没有人认真算过。</p></div><div><h4>方法</h4><p>分析大模型最优并行策略下的通信模式，发现流量很稀疏：大量通信只发生在同一“轨道”（各服务器上编号相同的GPU）之间。于是去掉传统集群的Spine层，只保留轨道内的交换机，跨轨道的少量流量经服务器内部的NVLink转发。</p></div><div><h4>影响</h4><p>把“网络拓扑应按训练的通信模式定制”说得很具体，常被大模型训练网络（多轨道、去Spine的两层设计）和光互连研究引用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>一台8卡服务器里，GPU之间有高带宽的<a class="ln" href="../n/nvlink.html">NVLink与NVSwitch</a>；服务器之间靠网卡和交换机。所谓“轨道”，是把所有服务器上第0号GPU的网卡接到同一组交换机、第1号接另一组，依此类推。传统设计在轨道交换机之上再加一层Spine交换机，让任意两张卡都能以满带宽直接通信（全二分带宽，见<a class="ln" href="../n/fat-tree.html">Fat-tree胖树网络</a>）。</p><p>作者研究了大模型训练的最优并行组合：张量并行放在服务器内部走NVLink，流水线并行和数据并行的通信基本只发生在同一编号的GPU之间。所以网络上的流量是稀疏的，不需要任意对任意的全互联。Rail-only网络就此去掉Spine层；偶尔需要跨轨道时，先在服务器内经NVLink转到对应编号的GPU，再走该轨道。</p><p>摘要报告：训练性能与传统GPU数据中心网络相同，网络成本降低38%到77%，网络功耗降低37%到75%；对需要全对全通信的MoE模型，经转发后全对全流量的完成时间只多8.2%到11.2%。论文还分析了这种网络的故障鲁棒性。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>依赖服务器内部有足够的NVLink带宽来转发跨轨道流量，且假设任务的并行切分方式固定；多租户集群和推理负载的流量模式未必这么规整。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:72" href="../n/nvlink.html">NVLink与NVSwitch</a><span class="yr">2014.03 · 硬件</span><div class=nt>跨轨道的少量流量依赖服务器内NVLink转发。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:72" href="../n/fat-tree.html">Fat-tree胖树网络</a><span class="yr">1985.10 · 硬件</span><div class=nt>胖树追求全二分带宽，Rail-only认为大模型训练用不到，拿掉顶层Spine省成本。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/megatron.html">Megatron-LM模型并行</a><span class="yr">2019.09 · 系统·效率</span><div class=nt>以张量并行、流水线并行与数据并行的组合推导出训练流量的稀疏结构。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/interconnect.html">互连：从芯片到机柜到集群</a> <a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/mixture-of-experts.html">混合专家</a></p>
+<h2>本篇术语</h2><ul><li><b>Spine/Leaf</b>　数据中心网络的两层结构：Leaf交换机直接连服务器，Spine交换机把所有Leaf连起来。</li><li><b>全二分带宽</b>　把网络任意切成两半，两半之间的总带宽等于一半节点的总带宽，即任意通信模式都不会堵在中间。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/fat-tree.html">Fat-tree胖树网络</a>和<a class="lc" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a>；然后画一个4台服务器、每台4卡的集群，标出数据并行和张量并行各自的通信对，看看哪些交换机实际上没有流量经过。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2307.12169" rel="noopener">https://arxiv.org/abs/2307.12169</a>（arXiv记录核对标题、5位作者、v1 2023-07-22（v5 2024-09）与摘要：通信模式稀疏、不需要全二分网络、去掉Spine层、成本降38–77%、功耗降37–75%、MoE全对全经转发多8.2–11.2%、故障鲁棒性分析。正式发表处未核对、MIT与Meta单位、轨道布线细节按一般了解写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Rail-only%E5%A4%A7%E6%A8%A1%E5%9E%8B%E8%AE%AD%E7%BB%83%E7%BD%91%E7%BB%9C%EF%BC%88rail-only%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Arail-only%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/rail-only.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="china-minerals.html"><small>本分支上一个 · 2023.07</small><b>中国镓锗与稀土管制</b></a><a class="r" href="analog-ai.html"><small>本分支下一个 · 2023.08</small><b>模拟存内计算芯片</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

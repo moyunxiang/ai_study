@@ -1,0 +1,32 @@
+{
+  "id": "poolformer",
+  "who": "Weihao Yu, Mi Luo, Pan Zhou, Chenyang Si, Yichen Zhou, Xinchao Wang, Jiashi Feng, Shuicheng Yan · Sea AI Lab / 新加坡国立大学",
+  "venue": "CVPR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2111.11418"},
+    {"label": "代码", "url": "https://github.com/sail-sg/poolformer"}
+  ],
+  "aka": ["PoolFormer", "MetaFormer", "元架构", "token mixer", "token混合器", "池化Transformer"],
+  "problem": "大家普遍认为视觉Transformer强在注意力。但[[mlp-mixer]]等工作把注意力换成空间MLP后效果依然不错，这让人怀疑：真正起作用的会不会是Transformer的整体结构，而不是注意力本身？",
+  "idea": "故意把注意力换成一个极其简单、没有参数的空间平均池化，其余结构（归一化、残差、通道MLP、层级阶段）保持Transformer的样子。如果这样还能工作，就说明关键在于这个通用结构，作者称之为**MetaFormer**。",
+  "impact": "PoolFormer以82.1% ImageNet-1K top-1超过调好的DeiT-B和ResMLP-B24，参数和计算还更少；“MetaFormer”这个说法被广泛接受，此后很多工作把视觉骨干看成“MetaFormer＋某种token混合器”来设计和比较。",
+  "method": "作者把Transformer块抽象成：\n\n`Y = X + TokenMixer(Norm(X))`\n`Z = Y + ChannelMLP(Norm(Y))`\n\n其中TokenMixer负责在不同位置（token）之间交换信息，可以是注意力（ViT）、空间MLP（MLP-Mixer）或别的；ChannelMLP在每个位置内部混合通道。这个抽象框架就是**MetaFormer**。\n\nPoolFormer把TokenMixer换成 `Pooling(X) − X`：对每个位置取3×3邻域的平均值，再减去自身（因为后面还有残差连接，减掉自身让这一项只表示“邻居与我的差”）。池化没有任何参数，计算量随token数线性增长。网络采用与CNN、PVT类似的四阶段层级结构，逐级降低分辨率。\n\n摘要称PoolFormer在多个视觉任务上都有竞争力：ImageNet-1K上82.1% top-1，比DeiT-B和ResMLP-B24分别高0.3%和1.1%，参数少35%和52%，乘加运算少50%和62%。作者据此认为MetaFormer是近期Transformer和类MLP模型取得好结果的关键，呼吁更多研究改进MetaFormer本身，而不是只盯着token混合器；PoolFormer可以作为设计的起点基线。",
+  "legacy": "同一团队后续的MetaFormer Baselines系列（IdentityFormer、RandFormer、ConvFormer、CAFormer）进一步检验了这一观点；同期的[[convnext]]从卷积一侧得出相似结论：现代化的宏观结构和训练方法本身贡献很大。",
+  "limits": [
+    {"text": "池化只做局部、固定的混合，在需要长距离依赖和高精度的检测分割任务上不及注意力类模型。", "solved_by": []},
+    {"text": "结论建立在ImageNet规模的实验上，没有回答在大规模预训练下token混合器是否仍然无关紧要。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mlp-mixer", "type": "extends", "note": "MLP-Mixer说明注意力可以被空间MLP替代；PoolFormer更进一步换成无参数池化，归纳出MetaFormer结构。"},
+    {"to": "deit", "type": "rivals", "note": "与调好的DeiT-B直接比较，以更少参数和计算取得更高精度。"},
+    {"to": "vit", "type": "extends", "note": "保留ViT块的整体结构，只替换其中的注意力，作为对“注意力是关键”的检验。"},
+    {"to": "pvt", "type": "uses", "note": "采用PVT式的四阶段层级结构逐级降低分辨率。"}
+  ],
+  "prereq": ["transformer-block", "self-attention", "residual-connection", "normalization-layer", "ablation-baseline"],
+  "terms": [
+    {"t": "token混合器", "d": "网络中负责在不同空间位置之间交换信息的模块，如注意力、空间MLP或池化。"},
+    {"t": "MetaFormer", "d": "从Transformer抽象出来的通用块结构：归一化＋token混合器＋残差，再接归一化＋通道MLP＋残差。"}
+  ],
+  "learn": "先读ViT和MLP-Mixer的块结构，再读PoolFormer第3节MetaFormer的抽象和第4节的消融（把池化换成恒等映射、改池化大小等）；用官方代码把token混合器换成恒等映射，看精度掉多少。",
+  "check": {"source": "https://arxiv.org/abs/2111.11418", "confirmed": "arXiv记录：标题、八位作者、v1提交于2021-11-22；摘要中注意力可被空间MLP替代的观察、假设通用架构比token混合器更关键、用简单空间池化替换注意力、ImageNet-1K 82.1% top-1、超过DeiT-B/ResMLP-B24 0.3%/1.1%且参数少35%/52%与MACs少50%/62%、提出MetaFormer概念、呼吁改进MetaFormer、PoolFormer作为起点基线。Pooling(X)−X形式、3×3池化、四阶段结构、CVPR 2022、机构、MetaFormer Baselines后续凭一般了解写。"}
+}

@@ -1,0 +1,33 @@
+{
+  "id": "cyclegan-vc",
+  "who": "Takuhiro Kaneko, Hirokazu Kameoka · NTT",
+  "venue": "EUSIPCO 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1711.11293"}
+  ],
+  "problem": "传统语音转换（把A的声音变成B的声音、内容不变）需要两人朗读同一批句子的平行数据，并逐帧对齐后学习映射；统计模型的输出还会被过度平滑，听起来发闷。",
+  "idea": "借用图像领域的CycleGAN：同时学习A→B和B→A两个映射，用对抗损失让转换结果像目标说话人，用循环一致性损失（转过去再转回来要还原）保证内容不变，从而只需两人各自的非平行录音。",
+  "impact": "CycleGAN-VC开启了无平行数据语音转换的GAN路线，后续CycleGAN-VC2/VC3、StarGAN-VC等都在它的基础上改进，是自编码器类方法（如AutoVC）流行之前的主要基线。",
+  "method": "此前主流的语音转换基于高斯混合模型（GMM）：先用[[dtw]]把两个人朗读同一句话的特征逐帧对齐，再学习从A的特征到B的特征的映射。收集平行数据成本高，而且GMM按均值回归，输出的频谱参数被过度平滑。\n\nCycleGAN-VC把图像翻译方法[[cyclegan]]搬到语音特征序列上（输入是梅尔倒谱等声学特征，再由声码器合成）。它训练两个生成器G_A→B、G_B→A和两个判别器（见[[gan]]）。损失有三项：**对抗损失**让G_A→B的输出骗过B的判别器，因而具有B的声音特点，也缓解了过度平滑；**循环一致性损失** `‖G_B→A(G_A→B(x)) − x‖` 保证转换没有丢掉语言内容；**恒等映射损失**要求把B的语音输入G_A→B时尽量不变，帮助保持语言信息。生成器使用门控卷积（与[[gated-cnn-lm]]的门控线性单元相同），能捕捉特征的时间结构。\n\n摘要报告：客观指标上，转换后的特征序列在全局方差和调制谱上接近自然语音；主观评测中，它的质量与一个在更有利条件下（使用平行数据、且数据量为两倍）训练的GMM方法相当。",
+  "limits": [
+    {"text": "每一对说话人都要单独训练一个模型，无法转换到训练时没见过的说话人。", "solved_by": ["autovc", "yourtts"]},
+    {"text": "只转换频谱特征，音高靠简单的线性变换处理，韵律和说话风格的转换能力有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "cyclegan", "type": "uses", "note": "直接把CycleGAN的双向映射和循环一致性损失用到语音特征序列上。"},
+    {"to": "gan", "type": "uses", "note": "用对抗训练让转换结果具有目标说话人的分布特点，缓解统计方法的过度平滑。"},
+    {"to": "gated-cnn-lm", "type": "uses", "note": "生成器采用门控线性单元的一维卷积结构。"},
+    {"to": "dtw", "type": "solves", "note": "传统方法要靠DTW对齐平行语句；CycleGAN-VC不需要平行数据和对齐。"}
+  ],
+  "prereq": ["adversarial-training", "conv-layer", "gating", "waveform-spectrogram", "vocoder-codec"],
+  "terms": [
+    {"t": "语音转换（VC）", "d": "保持说话内容不变，把一个人的声音变成另一个人的声音。"},
+    {"t": "非平行数据", "d": "两个说话人的录音内容各不相同，无法逐句对应。"},
+    {"t": "过度平滑", "d": "统计模型输出接近平均值，频谱细节被抹平，合成声音发闷、不自然。"}
+  ],
+  "aka": ["CycleGAN-VC", "CycleGAN-VC2", "非平行语音转换", "parallel-data-free voice conversion"],
+  "check": {
+    "source": "https://arxiv.org/abs/1711.11293",
+    "confirmed": "arXiv官方记录：标题Parallel-Data-Free Voice Conversion Using Cycle-Consistent Adversarial Networks、作者Kaneko/Kameoka、v1提交2017-11-30；摘要中无平行数据、无额外模块与对齐、避免过度平滑、CycleGAN加门控CNN和恒等映射损失、全局方差与调制谱接近自然、主观质量与使用平行且两倍数据的GMM方法相当。EUSIPCO 2018、NTT、梅尔倒谱输入、后续VC2/VC3/StarGAN-VC为一般了解。"
+  }
+}

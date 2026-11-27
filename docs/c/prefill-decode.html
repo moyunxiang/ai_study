@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>预填充与解码两阶段（Prefill and Decode Phases） · AI脉络</title>
+<meta name="description" content="大模型推理分两个阶段：预填充一次性并行处理整段提示、建立KV缓存，受算力限制；解码阶段每步只生成一个token，要反复读取全部权重和缓存，受显存带宽限制。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/prefill-decode.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="预填充与解码两阶段（Prefill and Decode Phases）">
+<meta property="og:description" content="大模型推理分两个阶段：预填充一次性并行处理整段提示、建立KV缓存，受算力限制；解码阶段每步只生成一个token，要反复读取全部权重和缓存，受显存带宽限制。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/prefill-decode.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/prefill-decode">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>预填充与解码两阶段</h1><div class="full">Prefill and Decode Phases</div>
+<p class="muted" style="font-size:13px">也叫：prefill　预填充　prefill阶段　decode阶段　解码阶段　decode phase　prefill and decode　预填充与解码　compute-bound　memory-bound　算力受限　带宽受限　算术强度　arithmetic intensity　首token延迟　TTFT　TPOT</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/prefill-decode">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>大模型推理分两个阶段：预填充一次性并行处理整段提示、建立KV缓存，受算力限制；解码阶段每步只生成一个token，要反复读取全部权重和缓存，受显存带宽限制。</b></p>
+<p class="tags">先要会：<a class="chip c" href="kv-cache.html">KV缓存</a> <a class="chip c" href="memory-bandwidth.html">显存、内存带宽与“内存墙”</a> <a class="chip c" href="throughput-latency.html">吞吐、延迟与批处理</a></p>
+<p>用户发来一段2000个token的提示，模型要回答500个token。这两部分在计算上完全不同，理解这一点是理解推理优化的起点。</p><p><b>预填充</b>（prefill）。把整段提示一次输入模型，所有位置并行计算（训练时的做法一样，见<a class="lc" href="../c/causal-mask.html">因果掩码</a>），得到每层每个位置的K、V，存进<a class="lc" href="../c/kv-cache.html">KV缓存</a>，并算出第一个输出token。2000个token一起算，矩阵乘法的规模很大，GPU的计算单元能被充分利用——这一阶段<b>受算力限制</b>（compute-bound）。它决定了首token延迟（TTFT，见<a class="lc" href="../c/streaming-output.html">流式输出</a>）。</p><p><b>解码</b>（decode）。之后每一步只输入上一步生成的1个token，读取KV缓存，算出下一个token，再把新的K、V追加进缓存。每一步的计算量很小，但必须把模型的<b>全部权重</b>和越来越长的KV缓存从显存读一遍。读数据的时间远超计算时间——这一阶段<b>受显存带宽限制</b>（memory-bound，见<a class="lc" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a>）。它决定了每token间隔（TPOT）。</p><p><b>用算术强度来看</b>。算术强度 = 计算量 / 读写的字节数。一个d×d的权重矩阵乘以n个token，计算约<code>2·n·d²</code>次，读权重约<code>2·d²</code>字节（FP16），强度约为n。预填充n = 2000，强度很高；解码n = 1，强度约为1，GPU算力大部分闲着。</p><p><b>由此产生的优化</b>。</p><ul><li><b>批处理</b>：把很多用户的解码步拼成一批，权重读一次供多个请求共用，提高解码的算术强度（见<a class="lc" href="../c/throughput-latency.html">吞吐、延迟与批处理</a>）。<a class="ln" href="../n/orca-serving.html">Orca连续批处理</a>的连续批处理让请求随到随加入、完成即离开。</li><li><b>分块预填充</b>：长提示的预填充会让同一批里的解码请求卡顿，<a class="ln" href="../n/sarathi.html">分块预填充Sarathi</a>把预填充切成小块，与解码混合调度。</li><li><b>预填充-解码分离</b>：两阶段需要的硬件特性不同，<a class="ln" href="../n/splitwise.html">Splitwise阶段拆分推理</a>和<a class="ln" href="../n/distserve.html">预填充-解码分离部署</a>把它们放到不同的机器上，中间传输KV缓存（见<a class="lc" href="../c/pd-disaggregation.html">预填充-解码分离</a>）。</li><li><b>缩小KV缓存和权重</b>：<a class="lc" href="../c/mha-mqa-gqa.html">MHA、MQA、GQA与MLA</a>、<a class="lc" href="../c/quantization-concept.html">量化</a>都减少了解码时要读的字节数。</li><li><b>推测解码</b>：用小模型一次猜多个token，大模型一次验证，把多步解码变成一次类似预填充的并行计算（见<a class="lc" href="../c/speculative-decoding-family.html">推测解码家族</a>）。</li></ul>
+<div class="example"><h4>例子</h4><p>某70亿参数模型用FP16存储，权重约14GB；GPU显存带宽约2TB/s，算力约300 TFLOPS（示意值）。</p><ul><li>解码一步：至少要读一遍14GB权重，约7毫秒；计算约2×7×10^9 = 1.4×10^10次运算，只需约0.05毫秒。读数据的时间是计算的上百倍，所以单请求每秒最多约140个token。</li><li>预填充2000个token：计算约2.8×10^13次运算，约0.09秒；权重仍只读一遍。计算成为瓶颈。</li><li>若把64个请求的解码合成一批：权重还是读一次（约7毫秒），却产出64个token，吞吐提高几十倍，每个请求的速度几乎不变。</li></ul></div>
+<h2>容易误解的地方</h2><ul><li>“推理慢”要先分清是首token慢（预填充、排队）还是逐字慢（解码），两者的优化手段不同。</li><li>长上下文下，解码读KV缓存的字节数可能超过读权重的字节数，这时批处理的收益会下降。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "id": "qrnn",
+  "who": "James Bradbury, Stephen Merity, Caiming Xiong, Richard Socher · Salesforce Research",
+  "venue": "ICLR 2017",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/1611.01576"}],
+  "aka": ["QRNN", "准循环神经网络", "Quasi-Recurrent Neural Network", "fo-pooling"],
+  "problem": "RNN每个时间步都要等上一个时间步的输出，无法在时间维上并行，长序列上又慢又难扩展。",
+  "idea": "把重计算全部交给可在时间维并行的卷积层，只保留一个极简的、逐通道的循环池化函数（没有可训练的循环权重矩阵）来混合时间信息。",
+  "impact": "在Transformer普及前是“又快又准的RNN替代品”之一，被用于语言模型与机器翻译加速；它“门由并行算出、循环只做逐元素更新”的设计，与后来的SRU、线性RNN和[[mamba]]一类模型思路相通。",
+  "method": "LSTM的门依赖上一步的隐状态h_{t−1}，所以必须按时间顺序算。QRNN把门的计算改成只依赖输入：对输入序列做一维因果卷积（窗口宽度k，只看当前和过去k−1个位置），一次性并行算出所有时间步的候选值z、遗忘门f和输出门o。\n\n然后做“循环池化”，例如fo-pooling：`c_t = f_t ⊙ c_{t−1} + (1 − f_t) ⊙ z_t`，`h_t = o_t ⊙ c_t`。这一步虽然仍要顺序做，但只是逐元素乘加、各通道相互独立，非常便宜，可以在通道维上并行。没有任何可训练的循环权重矩阵。\n\n摘要报告：堆叠的QRNN在相同隐层大小下比堆叠LSTM预测精度更好，训练和测试速度最多快16倍；在语言建模、情感分类和字符级神经机器翻译上验证了这些优势。",
+  "limits": [
+    {"text": "时间信息只靠窗口很短的卷积和逐元素循环混合，表达力弱于完整LSTM与注意力，长程依赖仍有限。", "solved_by": ["transformer"]},
+    {"text": "循环池化部分仍需顺序扫描，序列极长时仍有瓶颈。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "lstm", "type": "rivals", "note": "保留LSTM式的门控记忆，但门由卷积并行算出，去掉了循环权重。"},
+    {"to": "bytenet", "type": "rivals", "note": "同期用卷积做序列建模的路线，ByteNet完全不用循环。"},
+    {"to": "wavenet", "type": "uses", "note": "借用因果卷积，只看当前与过去的位置。"},
+    {"to": "vanishing-gradient", "type": "solves", "note": "逐元素的遗忘门让梯度沿时间传播更顺畅，同时提高并行度。"}
+  ],
+  "prereq": ["recurrent-layer", "gating", "convolution-op", "language-model"],
+  "learn": "先懂[[lstm]]的门控；读论文第2节的卷积层与三种池化（f/fo/ifo）；动手用PyTorch实现fo-pooling，与LSTM在字符级语言模型上比较速度。",
+  "check": {"source": "https://arxiv.org/abs/1611.01576", "confirmed": "标题、4位作者、arXiv v1 2016-11-05；摘要中时间步依赖限制并行、卷积层跨时间并行与极简循环池化跨通道并行、无可训练循环层、比同尺寸LSTM更准、最多快16倍、语言建模/情感分类/字符级翻译。fo-pooling公式、ICLR 2017、与SRU和线性RNN的关系凭一般了解。"}
+}

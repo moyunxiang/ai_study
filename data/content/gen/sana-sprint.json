@@ -1,0 +1,27 @@
+{
+  "id": "sana-sprint",
+  "who": "Junsong Chen, Shuchen Xue, Yuyang Zhao, Jincheng Yu, Sayak Paul, Junyu Chen, Han Cai, Song Han et al. · NVIDIA、MIT、Hugging Face等",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2503.09641"}
+  ],
+  "aka": ["SANA-Sprint", "混合蒸馏", "Hybrid Distillation", "sCM+LADD", "一步文生图"],
+  "problem": "连续时间一致性模型sCM训练稳定、能做到一两步生成，但要从头按TrigFlow格式训练，现成的流匹配文生图模型用不上；纯一致性蒸馏的一步结果细节也不够锐利。",
+  "idea": "提出一种免训练的变换，把预训练的流匹配模型直接改写成sCM所需的形式来做连续时间一致性蒸馏；再把sCM与潜空间对抗蒸馏LADD混合：前者保证与教师对齐，后者提升一步生成的保真度。",
+  "impact": "得到一个在1–4步间自适应的统一模型，1步时FID 7.59、GenEval 0.74，优于FLUX-schnell的7.94和0.71且快10倍；在H100上生成1024×1024图像仅需0.1秒，接上ControlNet后可做实时交互生成。",
+  "method": "底座是高效的[[sana]]文生图模型，它用流匹配训练，时间和噪声的参数化与[[scm]]要求的TrigFlow（用三角函数插值数据和噪声）不同。作者推导出两者之间只差一个可解析的时间重映射与输出缩放，因此不需要重新训练教师，就能把流匹配模型当作TrigFlow模型，直接进行连续时间一致性蒸馏。\n\n蒸馏损失由两部分组成：sCM损失让学生在任意时刻的一步预测与教师轨迹一致，保证内容和布局正确；[[ladd]]式的对抗损失用教师网络的中间特征作判别器，在隐空间里判断真假，让一步生成的细节更清晰。同一个学生模型对1、2、4步都适用，无需为每个步数单独训练。\n\n结果：1步生成FID 7.59、GenEval 0.74，FLUX-schnell为7.94和0.71，而延迟从1.1秒降到0.1秒（H100）；在RTX 4090上1024×1024出图约0.31秒，ControlNet版本延迟约0.25秒。",
+  "limits": [
+    {"text": "一步生成的多样性和复杂提示的服从度仍弱于多步的大模型，模型规模较小也限制了文字渲染等能力。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "scm", "type": "extends", "note": "把sCM的连续时间一致性蒸馏推广到现成的流匹配模型，免去从头按TrigFlow训练。"},
+    {"to": "ladd", "type": "uses", "note": "混合LADD的潜空间对抗蒸馏，提升一步生成的保真度。"},
+    {"to": "sana", "type": "uses", "note": "以SANA为预训练底座与教师。"},
+    {"to": "controlnet", "type": "uses", "note": "集成ControlNet实现实时交互式可控生成。"}
+  ],
+  "prereq": ["few-step-sampling", "knowledge-distillation", "adversarial-training", "diffusion-process", "throughput-latency"],
+  "terms": [
+    {"t": "TrigFlow", "d": "sCM采用的一种扩散参数化，用cos(t)和sin(t)来插值数据与噪声，使连续时间一致性训练的公式更简洁稳定。"}
+  ],
+  "learn": "先读sCM与LADD → 读本文流匹配到TrigFlow的变换推导和混合蒸馏损失 → 用开源权重测试1、2、4步出图的速度与质量。",
+  "check": {"source": "https://arxiv.org/abs/2503.09641", "confirmed": "标题、作者、v1日期2025-03-12、摘要中基于预训练底座的混合蒸馏把步数从20降到1–4、免训练地把流匹配模型转为sCM蒸馏、sCM保证与教师对齐、LADD增强一步保真度、统一的步数自适应模型、集成ControlNet、1步FID 7.59/GenEval 0.74对比FLUX-schnell 7.94/0.71、快10倍（0.1s对1.1s，H100）、ControlNet 0.25s、RTX 4090 0.31s；机构、TrigFlow的含义、变换为时间重映射与缩放、LADD判别器用教师特征来自一般了解"}
+}

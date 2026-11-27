@@ -1,0 +1,32 @@
+{
+  "id": "edac",
+  "who": "Gaon An, Seungyong Moon, Jang-Hyun Kim, Hyun Oh Song · 首尔大学",
+  "venue": "NeurIPS 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2110.01548"},
+    {"label": "代码", "url": "https://github.com/snu-mllab/EDAC"}
+  ],
+  "problem": "离线RL主流做法要么估计行为策略再加约束，要么专门采样分布外动作来压低Q值，这些步骤本身就不容易做准，而且容易把策略压得离数据太近。",
+  "idea": "发现只要把SAC的Q网络数量加到几十个、目标取它们的最小值（记作SAC-N），就能自动压低不确定性大的分布外动作的Q值；再加一项让各Q网络梯度彼此分散的正则，把所需网络数降到十分之一左右（EDAC）。",
+  "impact": "SAC-N和EDAC成了「基于不确定性」一类离线RL的代表基线，CORL、OfflineRL-Kit等库都收录，后续的RORL、PBRL等常拿它们比较。",
+  "method": "在线RL里常用的“截断双Q”（取两个Q估计的最小值）本来是为了对付高估。论文观察到：如果把Q网络增加到N个、目标取N个里的最小值 `y = r + γ (min_j Q_j(s′, a′) − α log π(a′|s′))`，那么在数据覆盖到的动作上各网络意见一致，最小值和均值差不多；在数据没见过的动作上各网络分歧很大，最小值就会被拉得很低。这样不需要估计行为策略、也不需要专门生成分布外动作，就自动形成了与不确定性成正比的惩罚。这个直接把[[sac]]的评论家数加大的做法叫SAC-N，论文在D4RL上用N从10到500不等。\n\nN太大计算代价高。论文分析发现，若各Q网络对动作的梯度方向很相似，分布外动作上的分歧就不够大，需要更多网络才能起作用。于是EDAC加了一项多样化正则：最小化不同Q网络关于动作的梯度两两之间的余弦相似度，迫使它们在数据外“意见不同”。摘要称这样把所需的网络数降到朴素集成的约十分之一，并在所考察的大多数D4RL任务上取得当时最好成绩。",
+  "limits": [
+    {"text": "需要几十个Q网络并行训练，显存和算力开销远大于单策略约束方法，在大网络或图像输入上不容易扩展。", "solved_by": ["rebrac"]},
+    {"text": "惩罚强度靠网络数N间接控制，不同数据集上最合适的N相差很大，仍要逐个调。"}
+  ],
+  "relations": [
+    {"to": "sac", "type": "extends", "note": "直接在SAC上把评论家数从2个加到N个，目标取最小值，就是SAC-N。"},
+    {"to": "cql", "type": "rivals", "note": "CQL要显式采样分布外动作并压低其Q值；EDAC改用集成分歧隐式惩罚，不需要采样。"},
+    {"to": "bear", "type": "solves", "note": "BEAR需要估计行为策略并做分布约束，EDAC完全不估计数据分布。"},
+    {"to": "redq", "type": "rivals", "note": "REDQ在在线RL里用大集成取子集最小值提高样本效率，EDAC把类似的集成取小用于离线下的保守估计。"},
+    {"to": "d4rl", "type": "uses", "note": "在D4RL的MuJoCo和Adroit数据集上评测。"}
+  ],
+  "prereq": ["offline-rl", "actor-critic", "ensemble", "distribution-shift"],
+  "terms": [
+    {"t": "SAC-N", "d": "把SAC的两个Q网络换成N个、目标取最小值的离线RL基线。"},
+    {"t": "分布外动作（OOD）", "d": "数据集中这个状态下从没出现过的动作，网络在它上面的Q值没有数据约束。"}
+  ],
+  "learn": "先读[[cql]]和[[td3]]的截断双Q；读原文第3–4节看N增大时分布外动作Q值的变化和梯度多样化正则；用CORL里的SAC-N在halfcheetah-medium上试N=2、10、50的差别。",
+  "check": {"source": "https://arxiv.org/abs/2110.01548", "confirmed": "标题、四位作者、arXiv v1于2021-10-04；摘要中现有方法依赖行为策略估计或OOD采样、截断Q学习可惩罚高不确定的OOD点、增加Q网络数即可大幅超越、集成多样化演员-评论家把所需网络降到十分之一并在多数D4RL任务上最好。N的取值范围、梯度余弦正则的形式按原文正文通行描述；NeurIPS 2021按通行引用；作者单位按通行信息。"},
+  "aka": ["EDAC", "SAC-N", "Ensemble-Diversified Actor Critic", "集成多样化演员评论家", "不确定性离线RL", "Q集成离线RL"]
+}

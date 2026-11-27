@@ -1,0 +1,32 @@
+{
+  "id": "htdemucs",
+  "who": "Simon Rouard, Francisco Massa, Alexandre Défossez · Meta AI",
+  "venue": "ICASSP 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2211.08553"},
+    {"label": "GitHub", "url": "https://github.com/facebookresearch/demucs"}
+  ],
+  "problem": "音乐分离（把一首歌拆成人声、鼓、贝斯、其他）的卷积网络只看局部声学特征，不清楚整首歌的长程上下文是否有用。",
+  "idea": "在时域与频域双分支的Hybrid Demucs U-Net最内层，换上一个跨域Transformer：每个域内部做自注意力，两个域之间做交叉注意力。",
+  "impact": "HT Demucs（Demucs v4）在加额外训练数据时刷新了MUSDB的分离纪录，开源后成为音乐人声伴奏分离最常用的工具之一，也是许多音乐数据处理流程（如为歌曲生成准备分轨）的标准环节。",
+  "method": "[[demucs]]直接在波形上用U-Net式（见[[unet]]）卷积编码器-解码器分离音乐，后续的Hybrid Demucs又并联了一条在频谱上工作的分支，两条分支在最深处汇合，被称为双U-Net。卷积的感受野有限，一个问题自然出现：分离时是否需要整首歌范围的上下文，比如副歌重复出现的旋律？\n\nHT Demucs（Hybrid Transformer Demucs）保留两条分支的外层卷积，把最内层替换成**跨域Transformer编码器**：时域分支和频域分支的特征序列各自做自注意力（见[[c:self-attention]]），并在两个域之间做交叉注意力，交换信息后再各自解码，最终把两条分支的输出相加得到每个音源的波形。为了看更长的片段，作者还用稀疏注意力核扩大感受野，并对每个音源单独微调。\n\n摘要报告：只用MUSDB训练时它表现不佳（[[transformer]]需要更多数据）；加入800首额外训练歌曲后，比同样数据训练的Hybrid Demucs提高0.45 dB SDR；配合稀疏注意力和逐音源微调，在MUSDB上达到当时最好的9.20 dB SDR。",
+  "limits": [
+    {"text": "Transformer需要大量额外的分轨训练数据，只用公开的MUSDB时反而不如纯卷积模型，而带分轨的商业音乐数据很难获得。", "solved_by": []},
+    {"text": "只分离固定的四类（或六类）音源，无法按文字描述分离任意乐器或声音。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "demucs", "type": "extends", "note": "Demucs系列的第四版，在时域加频域的Hybrid Demucs双U-Net最内层加入跨域Transformer。"},
+    {"to": "transformer", "type": "uses", "note": "用自注意力和交叉注意力在时域与频域之间整合长程上下文。"},
+    {"to": "unet", "type": "uses", "note": "外层仍是带跳连的U-Net式编码器-解码器。"}
+  ],
+  "prereq": ["self-attention", "attention-concept", "conv-layer", "waveform-spectrogram", "encoder-decoder"],
+  "terms": [
+    {"t": "SDR（信号失真比）", "d": "衡量分离出的音源与真实音源有多接近的指标，单位dB，越高越好。"},
+    {"t": "MUSDB", "d": "音乐分离的标准数据集，150首歌，每首提供人声、鼓、贝斯和其他四个分轨。"}
+  ],
+  "aka": ["HT Demucs", "Hybrid Transformer Demucs", "Demucs v4", "htdemucs", "人声伴奏分离"],
+  "check": {
+    "source": "https://arxiv.org/abs/2211.08553",
+    "confirmed": "arXiv官方记录：标题Hybrid Transformers for Music Source Separation、作者Rouard/Massa/Défossez、v1提交2022-11-15；摘要中基于Hybrid Demucs的时域/频域双U-Net、最内层跨域Transformer（域内自注意力、跨域交叉注意力）、只用MUSDB时表现差、加800首歌后提升0.45 dB SDR、稀疏注意力与逐音源微调后9.20 dB SDR。Demucs v4命名、广泛使用、ICASSP 2023、MUSDB规模为一般了解。"
+  }
+}

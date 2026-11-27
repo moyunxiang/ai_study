@@ -1,0 +1,30 @@
+{
+  "id": "tokenflow",
+  "aka": ["TokenFlow", "双码本分词器", "dual-codebook tokenizer", "统一图像分词器TokenFlow"],
+  "who": "Liao Qu, Huichao Zhang, Yiheng Liu, Xu Wang, Yi Jiang, Yiming Gao, Hu Ye, Daniel K. Du et al. · 字节跳动",
+  "venue": "CVPR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2412.03069"}
+  ],
+  "problem": "用一个以重建为目标的VQ分词器同时服务理解和生成，会牺牲理解性能：理解要高层语义，生成要像素细节，两者需要的信息粒度不同。",
+  "idea": "设计双码本结构：一个码本学语义特征、一个码本学像素特征，两者通过共享的映射用同一个索引对齐；理解任务取语义特征，生成任务取像素特征。",
+  "impact": "首次让离散视觉输入在理解上超过LLaVA-1.5 13B（平均高7.2%），同时在384分辨率重建FID 0.63、256分辨率自回归生成GenEval 0.55，与SDXL相当。",
+  "method": "统一理解与生成的模型（如[[chameleon]]、[[emu3]]）常用一个[[vq-vae]]式分词器把图像变成离散token，该分词器的训练目标是重建像素。这样的token擅长保留纹理细节，但语义较弱，拿去做视觉问答明显不如[[clip]]、[[siglip]]这类语义编码器。[[janus]]的应对是理解和生成各用一个编码器，[[vila-u]]则在一个分词器里同时加重建和对比损失。\n\nTokenFlow的做法是**双码本**：编码器分出语义分支和像素分支，语义分支的特征受预训练语义编码器（如SigLIP）的特征监督，像素分支负责重建细节；量化时两个码本**共享索引**——对每个位置，选择让语义距离和像素距离加权之和最小的那个编号，于是一个token编号同时对应一个语义向量和一个像素向量。下游做理解时，把语义向量送进语言模型；做自回归生成时，模型预测token编号，再查像素码本解码成图像。\n\n摘要报告：基于TokenFlow，离散视觉输入的理解性能首次超过LLaVA-1.5 13B，平均提升7.2%；图像重建在384×384分辨率上FID为0.63；自回归图像生成在256×256分辨率上GenEval得分0.55，与SDXL相当。",
+  "limits": [
+    {"text": "理解与生成虽共享索引，下游仍要分别取用两套特征，真正在一个模型里统一训练两种任务时的相互影响论文分析有限。", "solved_by": []},
+    {"text": "256分辨率的生成效果只与SDXL相当，离当时最强的扩散模型仍有差距。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "vq-vae", "type": "extends", "note": "在向量量化分词器上改为语义与像素两个码本、共享索引。"},
+    {"to": "janus", "type": "rivals", "note": "Janus为理解和生成各用一个视觉编码器，TokenFlow用一个双码本分词器同时服务两者。"},
+    {"to": "vila-u", "type": "solves", "note": "缓解单一码本同时承担语义与重建时理解性能受损的问题。"},
+    {"to": "llamagen", "type": "uses", "note": "自回归生成实验沿用LlamaGen式的下一个token预测框架（一般了解）。"},
+    {"to": "siglip", "type": "uses", "note": "语义分支以预训练语义编码器的特征为监督（一般了解）。"}
+  ],
+  "prereq": ["vector-quantization", "autoregressive", "tokenization", "generation-metrics", "embedding"],
+  "terms": [
+    {"t": "共享索引（shared mapping）", "d": "两个码本里同一个编号的向量成对出现；量化时综合两边的距离选编号，于是一个离散token同时带有语义和像素两种含义。"}
+  ],
+  "learn": "先懂[[vq-vae]]的量化和[[janus]]的双编码器思路，再读TokenFlow第3节双码本的量化公式。",
+  "check": {"source": "https://arxiv.org/abs/2412.03069", "confirmed": "标题、作者（10位）、arXiv v1提交2024-12-04；摘要中单一重建目标VQ编码器统一两任务导致理解受损、理解与生成需要不同粒度、双码本解耦语义与像素特征并以共享映射对齐、离散视觉输入首次超过LLaVA-1.5 13B平均7.2%、384分辨率重建FID 0.63、256分辨率GenEval 0.55与SDXL相当。语义分支受SigLIP监督、加权距离选择索引、基于LlamaGen框架、机构与CVPR 2025为一般了解，未逐项核对。"}
+}

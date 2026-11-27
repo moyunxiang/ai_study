@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MOReL悲观模型离线RL（2020） · AI脉络</title>
+<meta name="description" content="离线RL此前几乎全是无模型方法；基于模型的方法本来很适合用固定数据（先学动力学模型再在模型里规划），但策略会钻模型的空子——在数据没覆盖的地方模型乱预测，策略就去那里“刷分”。 从数据学一个“悲观MDP”：用模型集成的分歧检测哪些状态-动作是模型不了解的，一旦进入这些区域就强制转入一个终止状态并给…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/morel.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MOReL悲观模型离线RL（2020）">
+<meta property="og:description" content="离线RL此前几乎全是无模型方法；基于模型的方法本来很适合用固定数据（先学动力学模型再在模型里规划），但策略会钻模型的空子——在数据没覆盖的地方模型乱预测，策略就去那里“刷分”。 从数据学一个“悲观MDP”：用模型集成的分歧检测哪些状态-动作是模型不了解的，一旦进入这些区域就强制转入一个终止状态并给…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/morel.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/morel">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 离线RL与序列建模</div>
+<h1>MOReL悲观模型离线RL</h1>
+<div class="full">MOReL : Model-Based Offline Reinforcement Learning</div>
+<div class="meta"><span>2020.05</span><span>论文</span><span>延伸</span><span>NeurIPS 2020</span><span>Rahul Kidambi, Aravind Rajeswaran, Praneeth Netrapalli, Thorsten Joachims · 康奈尔大学 / 华盛顿大学 / 微软研究院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2005.05951" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/morel">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>离线RL此前几乎全是无模型方法；基于模型的方法本来很适合用固定数据（先学动力学模型再在模型里规划），但策略会钻模型的空子——在数据没覆盖的地方模型乱预测，策略就去那里“刷分”。</p></div><div><h4>方法</h4><p>从数据学一个“悲观MDP”：用模型集成的分歧检测哪些状态-动作是模型不了解的，一旦进入这些区域就强制转入一个终止状态并给一个大的负奖励；然后在这个悲观MDP里用普通的规划或RL学策略。</p></div><div><h4>影响</h4><p>与<a class="ln" href="../n/mopo.html">MOPO模型离线优化</a>同期把基于模型的方法带进离线RL，给出了“在悲观模型里的回报近似是真实回报下界”的保证和极小极大最优性分析，“检测未知区域并惩罚”成为基于模型的离线RL的标准思路。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>基于模型的RL（<a class="ln" href="../n/pets.html">PETS概率集成模型</a>、<a class="ln" href="../n/mbpo.html">MBPO</a>）在在线设定下样本效率高，但在离线设定下有一个致命问题：策略优化会主动寻找模型预测出高回报的地方，而这些地方恰恰常是数据没覆盖、模型外推出错的区域，这叫“模型利用”（model exploitation）。离线时又不能去真实环境收集数据纠正模型。无模型离线方法（<a class="ln" href="../n/bcq.html">BCQ批量约束Q学习</a>、<a class="ln" href="../n/bear.html">BEAR自举误差约束</a>）通过约束策略靠近数据来规避，但这种约束不能直接用于模型规划。</p><h2>方法</h2><p>MOReL分两步。<b>（a）学悲观MDP</b>：用离线数据训练一组动力学模型（集成），定义“未知状态-动作检测器”（USAD）：当集成中各模型对下一状态的预测分歧 <code>disc(s,a) = max_{i,j} ‖f_i(s,a) − f_j(s,a)‖</code> 超过阈值时，判定 (s,a) 为未知。悲观MDP（P-MDP）在已知区域使用学到的模型；在未知区域，转移到一个吸收的HALT状态，并给奖励 <code>−κ</code>（κ是一个大的正数）。</p><p><b>（b）在P-MDP里学策略</b>：可以用任何规划或RL算法，论文用模型内的自然策略梯度。</p><p>理论上，作者证明对任何策略，它在真实环境中的表现近似以它在P-MDP中的表现为下界，因此在P-MDP里优化相当于在优化真实回报的一个下界；并且MOReL在离线RL中（忽略对数因子）是极小极大最优的。</p><h2>结果</h2><p>摘要称，MOReL在广泛研究的离线RL基准上达到或超过当时的最先进结果，其模块化设计使生成建模、不确定性估计、规划等组件的进步可以直接转化为离线RL的进步。</p><h2>后来的发展</h2><p>MOReL和同月的<a class="ln" href="../n/mopo.html">MOPO模型离线优化</a>代表了基于模型的离线RL的两种悲观方式：MOReL对未知区域做硬截断，MOPO按不确定性软惩罚奖励。后来<a class="ln" href="../n/combo.html">COMBO保守模型离线优化</a>指出两者都依赖神经网络集成的不确定性估计，而这种估计在复杂任务上不可靠，于是改用类似<a class="ln" href="../n/cql.html">离线强化学习CQL</a>的价值正则化。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>依赖集成模型的分歧作为不确定性估计，深度网络的这种估计在高维任务上不可靠，阈值和κ需要按任务调。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/combo.html">COMBO保守模型离线优化</a></div></li><li>硬截断让策略完全不敢进入数据边缘，可能错过数据覆盖稀疏但真正更好的区域。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/bcq.html">BCQ批量约束Q学习</a><span class="yr">2018.12 · RL</span><div class=nt>BCQ等无模型方法约束策略靠近数据；MOReL改为在模型里惩罚进入未知区域。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/pets.html">PETS概率集成模型</a><span class="yr">2018.05 · RL</span><div class=nt>用动力学模型集成表示不确定性，以模型间分歧检测未知区域。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/mbpo.html">MBPO</a><span class="yr">2019.06 · RL</span><div class=nt>沿用学动力学模型、在模型中优化策略的框架，并加入悲观性以适应离线设定。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/mopo.html">MOPO模型离线优化</a><span class="yr">2020.05 · RL</span><div class=nt>同月提出：MOPO按不确定性软惩罚奖励，MOReL对未知区域硬截断并给大负奖励。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/combo.html">COMBO保守模型离线优化</a><span class="yr">2021.02 · RL</span><div class=nt>MOReL同样依赖集成分歧检测未知区域；COMBO避开了这一依赖。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/rambo.html">RAMBO对抗模型离线RL</a><span class="yr">2022.04 · RL</span><div class=nt>MOReL用不确定性划出终止区域；RAMBO把模型训练成对手。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/offline-rl.html">离线强化学习</a> <a class="chip c" href="../c/model-based-rl.html">基于模型的强化学习</a> <a class="chip c" href="../c/ensemble.html">集成学习</a> <a class="chip c" href="../c/mdp.html">马尔可夫决策过程</a> <a class="chip c" href="../c/distribution-shift.html">分布偏移</a></p>
+<h2>本篇术语</h2><ul><li><b>悲观MDP</b>　根据离线数据构造的一个替代环境：数据覆盖得好的地方用学到的模型，覆盖不到的地方直接惩罚，保证策略在其中的回报不高估真实回报。</li><li><b>模型利用</b>　策略优化专门找学到的模型预测错误、虚高回报的地方，导致在模型里表现好、在真实环境里表现差。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/mbpo.html">MBPO</a>和<a class="ln" href="../n/offline-rl-tutorial.html">离线RL综述与问题定义</a>；读原文第4节P-MDP的构造与定理；在一个D4RL任务上训练动力学集成，统计数据集中有多少比例的状态-动作会被判为未知，观察阈值的影响。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2005.05951" rel="noopener">https://arxiv.org/abs/2005.05951</a>（标题、四位作者、arXiv v1于2020-05-12；摘要中此前离线RL几乎全为无模型方法、两步（学悲观MDP、在其中学近最优策略）、任何策略在真实环境的表现近似以其在P-MDP中的表现为下界、克服模型利用、极小极大最优（至多对数因子）、在离线基准上达到或超过最先进、模块化设计。USAD分歧公式、HALT状态与−κ、自然策略梯度按原文正文通行描述；NeurIPS 2020与机构按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MOReL%E6%82%B2%E8%A7%82%E6%A8%A1%E5%9E%8B%E7%A6%BB%E7%BA%BFRL%EF%BC%88morel%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amorel%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/morel.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="plan2explore.html"><small>本分支上一个 · 2020.05</small><b>Plan2Explore规划式探索</b></a><a class="r" href="nle.html"><small>本分支下一个 · 2020.06</small><b>NetHack学习环境</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

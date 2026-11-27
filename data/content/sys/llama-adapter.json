@@ -1,0 +1,25 @@
+{
+ "id": "llama-adapter",
+ "who": "Renrui Zhang, Jiaming Han, Chris Liu, Peng Gao, Aojun Zhou, Xiangfei Hu, Shilin Yan, Pan Lu et al. · 上海人工智能实验室, 香港中文大学等",
+ "venue": "ICLR 2024",
+ "aka": ["LLaMA-Adapter", "零初始化注意力", "zero-init attention", "零门控", "zero gating", "LLaMA-Adapter V2"],
+ "links": [
+  {"label": "arXiv", "url": "https://arxiv.org/abs/2303.16199"},
+  {"label": "GitHub", "url": "https://github.com/OpenGVLab/LLaMA-Adapter"}
+ ],
+ "problem": "Alpaca用5.2万条自指令数据全参数微调LLaMA-7B得到指令跟随模型，但要更新70亿参数；直接在前面加可学习提示又会在训练初期引入随机噪声，扰乱预训练知识。",
+ "idea": "只在较高的若干层前面加一组可学习的“适配提示”，并给它们的注意力加一个从零开始的门控：训练开始时新提示完全不起作用，再逐步把指令信息注入模型。",
+ "impact": "在LLaMA发布后的开源热潮中最早一批证明“百万级参数、一小时即可把LLaMA变成指令模型”的工作之一，零初始化门控的思路后来被多模态适配和其他PEFT方法沿用。",
+ "method": "[[alpaca]]展示了用[[self-instruct]]式数据微调[[llama-1]]的效果，但需要全参数训练。[[prefix-tuning]]类方法在每层前面拼接可学习的向量，参数少，但这些向量随机初始化，训练初期会严重干扰模型原本的注意力分布。\n\nLLaMA-Adapter冻结整个LLaMA-7B，在最上面的若干层（论文设置为较高层）各插入一组长度很短的可学习适配提示，与词元一起参与注意力。关键是**零初始化注意力**：对适配提示那一部分的注意力分数单独做softmax，再乘以一个可学习的门控系数g，g初始化为0。于是训练第一步，模型输出与原模型完全一样；随着g变大，新的指令线索才逐渐加入，而原有词元之间的注意力不受影响，预训练知识得以保留。\n\n摘要报告：只引入120万可训练参数，在8张A100上微调不到一小时，回答质量与全参数微调的Alpaca相当；该方法还能扩展到图像条件的多模态指令，在ScienceQA和COCO Caption上表现良好，零初始化注意力用于微调ViT、RoBERTa等其他预训练模型也有效。",
+ "limits": [
+  {"text": "可训练参数太少、只作用于少数高层，复杂指令和多轮对话能力不及全参数或LoRA微调，后续V2版本扩大了可调参数范围。", "solved_by": []}
+ ],
+ "relations": [
+  {"to": "alpaca", "type": "solves", "note": "Alpaca要全参数微调7B模型，LLaMA-Adapter只训练120万参数、不到一小时达到相当效果。"},
+  {"to": "prefix-tuning", "type": "extends", "note": "同样在注意力里加入可学习提示，但加上零初始化门控，避免训练初期随机提示干扰预训练知识。"},
+  {"to": "llama-1", "type": "uses", "note": "以冻结的LLaMA-7B为基础模型。"},
+  {"to": "lora", "type": "rivals", "note": "LoRA修改权重矩阵的低秩增量，LLaMA-Adapter在注意力输入端加门控提示，二者是同期LLaMA微调的两条主要路线，LoRA后来更普及。"}
+ ],
+ "prereq": ["self-attention", "peft-concept", "instruction-tuning", "softmax"],
+ "check": {"source": "https://arxiv.org/abs/2303.16199", "confirmed": "标题、作者（Zhang等10人）、v1日期2023-03-28；摘要：轻量适配方法把LLaMA微调为指令跟随模型、使用52K自指令数据、在冻结的LLaMA 7B上只引入1.2M可学习参数、8张A100不到一小时、在较高的Transformer层前加入可学习适配提示、零门控的零初始化注意力机制、效果与全参数微调的Alpaca相当、可扩展到多模态指令并在ScienceQA和COCO Caption上表现优异、用于ViT和RoBERTa等模型也有效。门控与单独softmax的细节、ICLR 2024、机构、V2为一般了解。"}
+}

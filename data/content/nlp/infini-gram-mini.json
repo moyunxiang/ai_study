@@ -1,0 +1,36 @@
+{
+  "id": "infini-gram-mini",
+  "who": "Hao Xu, Jiacheng Liu, Yejin Choi, Noah A. Smith, Hannaneh Hajishirzi · 华盛顿大学、艾伦人工智能研究所等",
+  "venue": "EMNLP 2025（最佳论文）",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2506.12229"},
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/2025.emnlp-main.1268"}
+  ],
+  "aka": ["infini-gram mini", "infinigram mini", "FM-index", "FM索引", "精确n-gram检索", "Exact n-gram Search", "评测集污染检测", "Benchmark Contamination"],
+  "problem": "infini-gram的后缀数组索引比语料本身还大好几倍，而现在的网页预训练语料动辄几十TB，没法全部建索引，也就没法回答「这句话在训练数据里出现过吗」。",
+  "idea": "改用**FM-index**：基于BWT变换的压缩全文索引，索引和文本一起压缩存储，仍然支持任意子串的精确计数和定位；再把建索引的实现做到可以在普通多核CPU上并行处理几十TB文本。",
+  "impact": "第一次把互联网规模的文本做成可精确检索的公开索引，并用它系统地量化了常用评测集在网页语料中的污染程度；获EMNLP 2025最佳论文。",
+  "background": "大模型训练数据规模不断增大，研究者想知道模型的输出是不是在背训练数据、评测题是否早就出现在网上（[[c:data-contamination]]）。[[infini-gram]]用后缀数组提供了精确计数，但后缀数组每个位置都要存一个整数指针，索引大约是语料的数倍；Common Crawl这样数十TB的语料用这种方法需要几百TB存储。",
+  "method": "**FM-index的原理。** 先对文本做Burrows-Wheeler变换（BWT）：把文本的所有循环移位排好序，取每一行最后一个字符拼成一个新串 `L`。`L` 中相同字符往往扎堆，非常好压缩。检索时用「后向搜索」：从查询串的最后一个字符开始，每步用 `C[c] + Occ(c, i)`（字符c之前的字符总数加上 `L` 前i位里c的出现次数）收缩匹配区间，处理完整个查询时区间长度就是出现次数。只需要压缩后的 `L`、少量采样的后缀数组位置和计数表，不必存完整后缀数组。\n\n**工程。** 作者重写了建索引的流程，使其能在单机多核上分块并行、外存排序，支持在原文中定位并取回匹配片段。\n\n**用途。** 给定评测集的每道题，检索其文本是否以长片段形式出现在网页语料中，统计「被污染」的比例。",
+  "results": "公开资料报告：索引大小约为语料的44%（约为标准后缀数组的7%）；在单个128核CPU节点上50天、或75个节点上19小时可索引46TB网页文本；建索引比已有最好的FM-index实现快约18倍、内存少约3.2倍。污染分析发现若干核心评测集大量出现在网页抓取中，GSM8K最高达74.2%。",
+  "legacy": "作者公开了网页检索界面、API和持续更新的「污染公告」，供研究者查询评测题是否在主流预训练语料里出现过。它把「训练数据可检索」从研究原型推进到互联网规模，是讨论记忆、版权与评测污染时可以直接引用的工具。",
+  "limits": [
+    {"text": "只支持精确字符串匹配，改写过的评测题或翻译成其他语言的泄漏检测不到。", "solved_by": []},
+    {"text": "FM-index的查询比后缀数组慢，取回长片段的速度依赖后缀数组的采样密度。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "infini-gram", "type": "solves", "note": "infini-gram的后缀数组索引是语料的数倍大，无法覆盖几十TB语料；mini改用压缩的FM-index把索引降到语料的44%左右。"},
+    {"to": "dedup-training-data", "type": "extends", "note": "训练数据去重研究也用后缀数组找重复片段；mini把同类的精确匹配扩展到互联网规模并用于污染分析。"},
+    {"to": "dolma", "type": "uses", "note": "对开放预训练语料和Common Crawl快照建索引。"}
+  ],
+  "prereq": ["n-gram", "data-contamination", "big-o", "tokenization", "benchmark"],
+  "terms": [
+    {"t": "FM-index", "d": "基于Burrows-Wheeler变换的压缩全文索引，体积接近压缩后的文本，仍能快速统计和定位任意子串。"},
+    {"t": "BWT（Burrows-Wheeler变换）", "d": "把字符串的所有循环移位排序后取最后一列的可逆变换，结果里相同字符常连在一起，便于压缩和检索。"}
+  ],
+  "learn": "先读[[infini-gram]]了解后缀数组计数 → 找一份BWT与FM-index的入门讲义，手算一个短字符串的后向搜索 → 动手：在infini-gram-mini的网页界面里搜几道评测题，看它们是否出现在Common Crawl中。",
+  "check": {
+    "source": "https://arxiv.org/abs/2506.12229",
+    "confirmed": "WebSearch结果给出的arXiv 2506.12229与ACL Anthology 2025.emnlp-main.1268：标题、五位作者、EMNLP 2025主会；摘要与论文页：FM-index、索引约为语料44%（约为后缀数组7%）、46TB在单个128核节点50天或75节点19小时、比最好FM-index实现快18倍、内存少3.2倍、GSM8K污染最高74.2%、公开网页、API与污染公告。最佳论文身份来自汇总页（github FeijiangHan/Top-Conference-Best-Papers）。BWT与后向搜索的原理凭一般了解。"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "active-prompt",
+  "who": "Shizhe Diao, Pengcheng Wang, Yong Lin, Rui Pan, Xiang Liu, Tong Zhang · 港科大 / 多伦多大学 / 港大 / UIUC",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2302.12246"},
+    {"label": "GitHub", "url": "https://github.com/shizhediao/active-prompt"}
+  ],
+  "aka": ["Active-Prompt", "Active Prompting", "主动提示", "主动选例", "主动学习选示例", "不确定性选例", "uncertainty-based exemplar selection"],
+  "problem": "少样本思维链用的是一组固定的人工示例（如原论文为GSM8K写的8道），对不同任务不一定是最有用的；可人工写推理过程很贵，不可能把整个训练集都标一遍。",
+  "idea": "借用主动学习：先让模型把一批候选题各答10次，答案越不一致说明模型越拿不准；只挑最拿不准的几道题请人写推理过程，作为这个任务的思维链示例。",
+  "impact": "在八个推理数据集上平均超过人工固定示例的思维链和自洽性采样，说明“给哪几道题写示例”本身值得优化，而且可以用模型的不确定性来决定。",
+  "method": "**估计不确定性**：从训练集随机抽最多1000道题，用现成的少样本思维链提示让模型对每道题采样k=10次。最主要的指标是**分歧度**：10次里出现了几种不同答案，除以10；也试了答案分布的[[c:entropy]]、数值答案的方差，以及让模型自评信心（效果差）。\n\n**挑题并标注**：按不确定性从高到低取前n道，n等于该数据集原本的示例数，GSM8K为8道。人工为这几道题写推理过程和答案。\n\n**推理**：用这组新示例构造提示，按[[self-consistency]]的做法采样40次、取多数答案。\n\n直观上，模型已经稳稳会做的题，写成示例帮助不大；模型摇摆不定的题，恰好暴露了它在这个任务上的薄弱之处，示范一遍最有价值；这是作者借用主动学习时的基本假设，论文也分析了不确定性与准确率之间的关系。这和[[auto-cot]]的思路相反：后者按聚类挑有代表性的题、用模型自己生成推理，免去人工。\n\n结果（八个数据集平均，包括[[gsm8k]]、AQuA、CSQA、StrategyQA等）：code-davinci-002上，思维链72.5%、自洽性79.1%、按分歧度选例80.9%、按熵选例81.6%；text-davinci-002上，思维链61.5%、自洽性67.9%、按分歧度选例74.9%。",
+  "limits": [
+    {"text": "挑出来的题仍需人工写推理过程；估计不确定性要对上千道题各采样10次，前期成本不低。", "solved_by": []},
+    {"text": "“最不确定”的题可能本身有歧义或标注错误，未必是最好的示范；选出的示例针对特定模型，换模型后需重新挑选。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "cot", "type": "solves", "note": "思维链对所有任务沿用同一组人工示例；Active-Prompt按模型的不确定性为每个任务挑选最值得标注的题作示例。"},
+    {"to": "self-consistency", "type": "uses", "note": "既用多次采样的答案分歧来衡量不确定性，推理时也沿用自洽性的多数投票。"},
+    {"to": "auto-cot", "type": "rivals", "note": "Auto-CoT按聚类选代表性问题并让模型自动生成推理；Active-Prompt按不确定性选题，推理过程由人写。"},
+    {"to": "complexity-cot", "type": "rivals", "note": "复杂度提示按推理步数多挑示例；Active-Prompt按模型答案的分歧挑示例，两者都是在优化“选哪些题当示例”。"},
+    {"to": "codex", "type": "uses", "note": "主实验在code-davinci-002上进行，另测了text-davinci-002/003、GPT-3.5-turbo和Llama-2-70b-chat。"}
+  ],
+  "prereq": ["in-context-learning", "zero-few-shot", "entropy", "decoding-sampling", "semi-supervised"],
+  "terms": [
+    {"t": "主动学习", "d": "让模型自己挑出最值得人工标注的样本，用尽量少的标注换取尽量大的提升，常用标准是模型对哪些样本最不确定。"},
+    {"t": "分歧度", "d": "同一道题采样k次，得到的不同答案数除以k；越接近1说明模型越拿不准。"}
+  ],
+  "learn": "先读[[cot]]和[[self-consistency]]，了解[[auto-cot]] → 读原文第2节不确定性指标和表1 → 动手：用一个模型对50道数学题各采样10次，计算分歧度，看看分歧最大的题有什么共同特点。",
+  "check": {"source": "https://arxiv.org/abs/2302.12246", "confirmed": "标题、6位作者、v1提交于2023-02-23；摘要中借鉴不确定性主动学习、八个推理任务；arxiv.org/html/2302.12246v5核对单位、k=10、最多1000道候选、四种不确定性指标、GSM8K取8道、推理采样40次、模型列表、八个数据集、code-davinci-002平均72.5/79.1/80.9/81.6、text-davinci-002平均61.5/67.9/74.9；页面未写正式发表处。"}
+}

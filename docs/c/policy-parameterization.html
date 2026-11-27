@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>策略的参数化：离散动作与连续动作（Policy Parameterization: Discrete and Continuous Actions） · AI脉络</title>
+<meta name="description" content="策略网络怎样输出动作：离散动作空间用softmax给每个动作一个概率；连续动作空间常输出高斯分布的均值和方差，或直接输出一个确定的动作。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/policy-parameterization.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="策略的参数化：离散动作与连续动作（Policy Parameterization: Discrete and Continuous Actions）">
+<meta property="og:description" content="策略网络怎样输出动作：离散动作空间用softmax给每个动作一个概率；连续动作空间常输出高斯分布的均值和方差，或直接输出一个确定的动作。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/policy-parameterization.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/policy-parameterization">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 入门</div>
+<h1>策略的参数化：离散动作与连续动作</h1><div class="full">Policy Parameterization: Discrete and Continuous Actions</div>
+<p class="muted" style="font-size:13px">也叫：动作空间　action space　离散动作空间　discrete action space　连续动作空间　continuous action space　高斯策略　Gaussian policy　squashed Gaussian　tanh squashing　压缩高斯　确定性策略　deterministic policy　随机策略　stochastic policy　策略网络输出　策略参数化</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/policy-parameterization">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>策略网络怎样输出动作：离散动作空间用softmax给每个动作一个概率；连续动作空间常输出高斯分布的均值和方差，或直接输出一个确定的动作。</b></p>
+<p class="tags">先要会：<a class="chip c" href="policy-value.html">策略与价值函数</a> <a class="chip c" href="softmax.html">Softmax与logits</a> <a class="chip c" href="gaussian.html">高斯分布</a></p>
+<p><a class="lc" href="../c/policy-value.html">策略与价值函数</a>里说策略是<code>π(a|s)</code>，落到代码上，必须决定神经网络最后一层输出什么。这取决于<b>动作空间</b>：动作是有限个选项，还是一个连续的实数向量。选错表示方式，算法可能根本跑不起来。</p><p><b>离散动作空间</b>。Atari的18个按键、围棋的361个落点、语言模型的词表。网络对每个动作输出一个logit，经<a class="lc" href="../c/softmax.html">Softmax与logits</a>得到概率，按概率采样（训练）或取最大（评估）。对数概率<code>log π(a|s)</code>直接从log_softmax读出，策略梯度很方便。</p><p><b>连续动作空间</b>。机械臂的关节力矩、车辆的油门和方向盘，是一个d维实向量。</p><ul><li><b>高斯策略</b>：网络输出均值μ(s)和对数标准差log σ(s)（或一个与状态无关的可学参数），动作<code>a = μ + σ·ε</code>，ε ~ N(0, I)。<a class="ln" href="../n/ppo.html">PPO</a>和<a class="ln" href="../n/trpo.html">TRPO</a>在连续控制上用的就是这种。</li><li><b>压缩高斯</b>（squashed Gaussian）：动作通常有上下界，例如[−1, 1]。<a class="ln" href="../n/sac.html">SAC</a>先从高斯采样u，再取<code>a = tanh(u)</code>。由于做了变量替换，对数概率要减去修正项：<code>log π(a|s) = log N(u; μ, σ) − Σ_i log(1 − tanh²(u_i))</code>。</li><li><b>确定性策略</b>：直接输出<code>a = μ_θ(s)</code>，不带随机性，探索靠外加噪声（见<a class="lc" href="../c/action-noise.html">连续动作的探索噪声</a>）。<a class="ln" href="../n/dpg.html">确定性策略梯度DPG</a>、<a class="ln" href="../n/ddpg.html">DDPG</a>、<a class="ln" href="../n/td3.html">TD3</a>属于此类。</li></ul><p><b>随机策略与确定性策略</b>。随机策略本身就能探索，而且在部分可观测或博弈中可能必须随机（见<a class="lc" href="../c/optimal-policy.html">最优策略与最优价值函数</a>）；确定性策略的梯度方差更小，但完全依赖外加噪声探索。</p><p><b>其他形式</b>。把每一维连续动作离散成若干档；多个离散子动作（多离散）各用一个softmax；把动作当作序列逐个生成（语言模型和很多VLA，见<a class="lc" href="../c/action-chunking.html">动作表示：离散token、连续动作与动作块</a>）；用扩散模型表示多峰的动作分布。</p>
+<div class="example"><h4>例子</h4><p>一维动作，网络输出μ=0.3、σ=0.5，采样ε=1.2，得u=0.3+0.5×1.2=0.9。直接截断到[−1, 1]就是0.9；SAC取a=tanh(0.9)≈0.716。高斯部分的对数密度是<code>−½·1.2² − ln 0.5 − ½ln 2π ≈ −0.72 + 0.69 − 0.92 = −0.95</code>；修正项<code>ln(1 − 0.716²) ≈ −0.72</code>，于是log π(a|s) ≈ −0.95 + 0.72 = −0.23。</p></div>
+<h2>容易误解的地方</h2><ul><li>对连续动作直接把采样值裁剪到边界而不做概率修正，会让对数概率和实际执行的动作对不上，PPO里这种做法很常见但严格说是有偏的。</li><li>σ太小会过早失去探索，太大会让动作几乎总在边界上；很多实现给log σ设上下限。</li><li>离散化连续动作时，维度一多组合数会爆炸（每维11档、6维就是11⁶≈177万个动作），所以通常对每维分别离散。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

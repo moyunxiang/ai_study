@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>RandAR随机顺序自回归（2024） · AI脉络</title>
+<meta name="description" content="解码器式自回归图像模型（如LlamaGen）都按固定的光栅顺序逐个生成token。这种顺序是人为设定的归纳偏置：模型只会从左上到右下画，不能随意先画某处，也不能并行出多个token。 在每个要预测的图像token前插入一个“位置指令token”，告诉模型下一个要生成的是哪个位置；训练时把token…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/randar.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RandAR随机顺序自回归（2024）">
+<meta property="og:description" content="解码器式自回归图像模型（如LlamaGen）都按固定的光栅顺序逐个生成token。这种顺序是人为设定的归纳偏置：模型只会从左上到右下画，不能随意先画某处，也不能并行出多个token。 在每个要预测的图像token前插入一个“位置指令token”，告诉模型下一个要生成的是哪个位置；训练时把token…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/randar.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/randar">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:288"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/gen.html">生成模型（图像·视频·3D）</a> › 自回归与视觉分词</div>
+<h1>RandAR随机顺序自回归</h1>
+<div class="full">RandAR: Decoder-only Autoregressive Visual Generation in Random Orders</div>
+<div class="meta"><span>2024.12</span><span>论文</span><span>延伸</span><span>CVPR 2025</span><span>Ziqi Pang, Tianyuan Zhang, Fujun Luan, Yunze Man, Hao Tan, Kai Zhang, William T. Freeman, Yu-Xiong Wang · UIUC、MIT、Adobe</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2412.01827" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://rand-ar.github.io/" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/randar">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>解码器式自回归图像模型（如LlamaGen）都按固定的光栅顺序逐个生成token。这种顺序是人为设定的归纳偏置：模型只会从左上到右下画，不能随意先画某处，也不能并行出多个token。</p></div><div><h4>方法</h4><p>在每个要预测的图像token前插入一个“位置指令token”，告诉模型下一个要生成的是哪个位置；训练时把token序列随机打乱，模型就学会按任意顺序生成。</p></div><div><h4>影响</h4><p>随机顺序训练在质量上与光栅顺序相当，却换来新能力：带KV缓存的并行解码提速2.5倍，并能零样本做修补、外扩和分辨率外推，说明解码器式图像模型不必绑定固定顺序。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>普通的光栅自回归序列是<code>[文本/类别, x₁, x₂, …, x_N]</code>，第i个token的位置隐含在它的序号里。RandAR先对每张训练图随机生成一个排列π，把token按π的顺序排好，并在每个图像token前放一个位置指令token<code>p_{π(i)}</code>（由该位置的二维坐标编码而来），序列变成<code>[c, p_{π(1)}, x_{π(1)}, p_{π(2)}, x_{π(2)}, …]</code>。模型在看到位置指令后预测该位置的token内容，训练目标仍是标准的下一个token交叉熵。</p><p>因为模型已经学会“给定位置就能预测”，推理时可以一次放进多个位置指令、并行预测多个token，同时保留KV缓存，这与掩码生成模型的并行解码不同，后者通常每步都要重算整个序列。作者报告在不损失质量的前提下提速2.5倍。由于任何位置都能作为下一个目标，模型还可以零样本完成修补（先放入已知区域的token，再生成其余位置）、外扩以及生成比训练时更大的图像。</p><p>在ImageNet类条件生成上，随机顺序训练的RandAR达到与同规模光栅顺序模型相当的FID。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>随机顺序训练比固定顺序更难，同等计算下收敛更慢，需要更长训练才能追平。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>仍依赖离散VQ分词器，生成质量上限受量化影响。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/maskgit.html">MaskGIT并行掩码生成</a><span class="yr">2022.02 · 生成</span><div class=nt>MaskGIT靠双向注意力的掩码预测实现并行与任意顺序；RandAR在解码器式因果模型里实现同样能力并能保留KV缓存。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/llamagen.html">LlamaGen</a><span class="yr">2024.06 · 生成</span><div class=nt>LlamaGen只能按光栅顺序逐个生成；RandAR用位置指令去掉顺序偏置，并支持并行解码与零样本编辑。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:288" href="../n/rar.html">RAR随机顺序自回归</a><span class="yr">2024.11 · 生成</span><div class=nt>RAR在训练中随机排列并逐渐退火回光栅顺序，推理仍按光栅顺序；RandAR推理时也保持任意顺序。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/vector-quantization.html">向量量化与离散token</a> <a class="chip c" href="../c/positional-encoding.html">位置编码</a> <a class="chip c" href="../c/masked-modeling.html">掩码建模</a></p>
+<h2>本篇术语</h2><ul><li><b>位置指令token</b>　插在每个图像token前面的一个特殊token，编码“下一个要生成的是第几行第几列”。</li><li><b>光栅顺序</b>　像读书一样从左到右、从上到下依次排列图像的块。</li></ul>
+<h2>怎么学</h2><p>先读LlamaGen的光栅自回归与KV缓存 → 读本文位置指令和并行解码两节 → 在小数据集上训练随机顺序与光栅顺序两个模型对比FID与零样本修补。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2412.01827" rel="noopener">https://arxiv.org/abs/2412.01827</a>（标题、八位作者、v1日期2024-12-02、摘要中任意顺序生成、每个待预测token前插入表示下一位置的位置指令token、在随机排列序列上训练、性能与光栅顺序相当、带KV缓存的并行解码提速2.5倍且不损质量、零样本修补、外扩与分辨率外推；机构、CVPR 2025、序列格式的具体写法、与RAR和MaskGIT的对比、训练收敛更慢来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20RandAR%E9%9A%8F%E6%9C%BA%E9%A1%BA%E5%BA%8F%E8%87%AA%E5%9B%9E%E5%BD%92%EF%BC%88randar%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Arandar%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/randar.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="flowedit.html"><small>本分支上一个 · 2024.12</small><b>FlowEdit免反演编辑</b></a><a class="r" href="r3gan.html"><small>本分支下一个 · 2025.01</small><b>R3GAN现代GAN基线</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

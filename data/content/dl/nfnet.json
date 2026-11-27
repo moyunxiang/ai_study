@@ -1,0 +1,30 @@
+{
+  "id": "nfnet",
+  "who": "Andrew Brock, Soham De, Samuel L. Smith, Karen Simonyan · DeepMind",
+  "venue": "ICML 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2102.06171"},
+    {"label": "代码", "url": "https://github.com/deepmind/deepmind-research/tree/master/nfnets"}
+  ],
+  "aka": ["NFNet", "NF-ResNet", "Normalizer-Free Networks", "无归一化网络", "AGC", "Adaptive Gradient Clipping", "自适应梯度裁剪"],
+  "problem": "[[batchnorm]]依赖批大小、让样本之间相互影响，带来许多麻烦；[[fixup]]等工作已能不用归一化训练深层ResNet，但精度比不上最好的BN网络，而且在大学习率或强数据增强下容易不稳定。",
+  "idea": "提出自适应梯度裁剪（AGC）：按“梯度范数与参数范数之比”逐单元裁剪梯度，压住无归一化网络在大学习率下的不稳定；再配合缩放权重标准化和精心设计的结构，得到一族无归一化的NFNet。",
+  "impact": "首次让无归一化的图像分类网络在ImageNet上达到当时最好精度、且训练快于EfficientNet，有力回应了“没有BN就训不好”的看法；AGC也被后来的一些大模型训练当作稳定化手段借鉴。",
+  "method": "去掉BN后，残差网络的激活尺度会随深度增长。作者沿用同组此前的做法：每个残差分支写成 `h_{i+1} = h_i + α·f_i(h_i/β_i)`，β_i是按理论推算的输入标准差，α是控制残差累加速度的小常数，并对卷积权重做缩放的[[weight-standardization]]，使各层激活在初始化时保持合适的尺度。\n\n仅靠这些，网络在大批量、大学习率和强数据增强下仍会发散。核心改进是**AGC**：对每个输出单元，计算梯度范数与对应权重范数之比 `‖G_i‖/‖W_i‖`，超过阈值λ就把梯度按比例缩小。它的直觉是：一步更新不应该把权重改变超过其自身大小的一定比例。与[[grad-clipping]]按全局梯度范数裁剪不同，AGC是逐单元、相对于参数大小的。\n\n摘要报告：较小的NFNet与EfficientNet-B7在ImageNet上测试精度相当，而训练快最多8.7倍；最大的模型达到86.5%的top-1精度，创当时新高；在3亿张有标注图像上预训练后再在ImageNet上微调时，NFNet明显好于带BN的对应模型，最好达到89.2%。",
+  "limits": [
+    {"text": "需要按网络结构推算缩放常数，并额外调AGC阈值，换一种结构就要重新推导；训练稳定性依赖强正则化和精心的超参数组合。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "batchnorm", "type": "rivals", "note": "完全去掉BN，并在ImageNet精度上反超带BN的同类网络。"},
+    {"to": "fixup", "type": "solves", "note": "此前的无归一化ResNet精度不及最好的BN网络、大学习率下不稳定；NFNet用AGC解决了不稳定并追上精度。"},
+    {"to": "grad-clipping", "type": "extends", "note": "把按全局范数裁剪梯度改为按每个单元的梯度与参数范数之比自适应裁剪。"},
+    {"to": "weight-standardization", "type": "uses", "note": "采用缩放后的权重标准化来控制无归一化网络的激活尺度。"},
+    {"to": "efficientnet", "type": "rivals", "note": "以EfficientNet-B7为主要对手，在同等精度下训练快得多。"}
+  ],
+  "prereq": ["normalization-layer", "residual-connection", "gradient-clipping", "initialization", "norm"],
+  "terms": [
+    {"t": "自适应梯度裁剪", "d": "按每个单元“梯度大小相对于权重大小”的比例来决定是否裁剪，权重越小允许的更新越小。"}
+  ],
+  "learn": "先读[[fixup]]和[[grad-clipping]]；读论文第3节AGC的定义与消融；在一个去掉BN的ResNet上分别用全局梯度裁剪与AGC训练，用较大学习率观察哪个不发散。",
+  "check": {"source": "https://arxiv.org/abs/2102.06171", "confirmed": "标题、4位作者、arXiv v1提交于2021-02-11；摘要中BN的批依赖问题、已有无归一化ResNet精度不及BN网络且在大学习率或强增强下不稳定、提出自适应梯度裁剪、改进的Normalizer-Free ResNets、小模型与EfficientNet-B7精度相当训练快最多8.7倍、最大模型top-1 86.5%、3亿张图预训练后微调最好89.2%。残差缩放公式与AGC的具体形式、ICML 2021来自一般了解。"}
+}

@@ -1,0 +1,28 @@
+{
+  "id": "cosface",
+  "who": "Hao Wang, Yitong Wang, Zheng Zhou, Xing Ji, Dihong Gong, Jingchao Zhou, Zhifeng Li, Wei Liu · 腾讯AI Lab",
+  "venue": "CVPR 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1801.09414"}
+  ],
+  "aka": ["CosFace", "LMCL", "Large Margin Cosine Loss", "大间隔余弦损失", "AM-Softmax", "加性余弦间隔"],
+  "problem": "人脸识别要求同一人的特征挤在一起、不同人的特征分得很开，普通softmax损失做不到；[[sphereface]]在角度上乘一个间隔（A-Softmax）有效，但乘性间隔让损失很难优化，需要各种技巧才能训练收敛。",
+  "idea": "把特征和分类权重都做L2归一化，只保留夹角的余弦；然后在目标类的余弦上直接减去一个固定间隔m，要求“正确类的余弦减去m后仍然最大”，在角度空间里拉开决策边界。",
+  "impact": "加性余弦间隔形式简单、训练稳定，与同期的[[arcface]]（加性角度间隔）一起成为人脸识别的标准损失，后来也被用于说话人识别、行人重识别等度量学习任务。",
+  "method": "softmax分类的logit是 `W_j·x = ‖W_j‖‖x‖cos θ_j`。CosFace先把权重归一化为单位长度、把特征归一化后放大到固定长度s，于是logit只取决于夹角：`s·cos θ_j`。这一步去掉了特征长度带来的变化，让判别完全发生在角度上。\n\n然后对真实类别y减去间隔m：\n\n`L = −log( e^{s(cos θ_y − m)} / ( e^{s(cos θ_y − m)} + Σ_{j≠y} e^{s·cos θ_j} ) )`\n\n含义是：训练时要求正确类的余弦比其他类至少高m，测试时不再减m，于是不同类之间在余弦空间里留出一条宽度为m的“缓冲带”，类内更紧、类间更开。论文从几何上分析了s和m的取值范围（s需要足够大，类别越多需要越大）。\n\n摘要称在MegaFace、YouTube Faces（YTF）和LFW这些最常用的公开人脸识别数据集上取得当时最好结果。",
+  "limits": [
+    {"text": "间隔m对所有样本相同，对噪声标签、低质量人脸和长尾身份不够鲁棒。", "solved_by": []},
+    {"text": "在余弦上加间隔，与角度不是线性关系，几何解释不如在角度上直接加间隔直观。", "solved_by": ["arcface"]}
+  ],
+  "relations": [
+    {"to": "sphereface", "type": "solves", "note": "SphereFace的乘性角度间隔难以优化；CosFace改为在余弦上加性地减去间隔，训练更稳定。"},
+    {"to": "facenet", "type": "rivals", "note": "FaceNet用三元组损失直接学度量，需要难样本挖掘；CosFace用带间隔的分类损失，训练更简单、效果更好。"},
+    {"to": "arcface", "type": "rivals", "note": "同月发布：CosFace在余弦上减间隔，ArcFace在角度上加间隔，两者效果接近，ArcFace后来更常用。"}
+  ],
+  "prereq": ["softmax", "cross-entropy", "norm", "embedding"],
+  "terms": [
+    {"t": "加性余弦间隔", "d": "在正确类别的余弦相似度上减去一个常数m，迫使模型把正确类与其他类拉开至少m。"}
+  ],
+  "learn": "先弄懂softmax分类与特征归一化，再读本文第3节的损失推导与s、m取值分析；在一个小人脸数据集上分别用softmax和CosFace训练，用t-SNE画出特征分布对比。",
+  "check": {"source": "https://arxiv.org/abs/1801.09414", "confirmed": "arXiv记录：标题、八位作者、v1提交于2018-01-29；摘要中的softmax缺乏判别力、center loss/大间隔softmax/角度softmax的共同思想、对特征与权重做L2归一化转化为余弦损失、引入余弦间隔、MegaFace/YTF/LFW上最好。CVPR 2018、机构、损失公式写法、s与m的分析凭一般了解写。"}
+}
