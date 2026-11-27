@@ -1,0 +1,28 @@
+{
+  "id": "minimax-m3",
+  "who": "MiniMax（Xunhao Lai, Weiqi Xu, Yufeng Yang 等，MSA论文） · 稀宇科技",
+  "venue": "arXiv 2026（MSA）",
+  "links": [{"label": "MSA论文", "url": "https://arxiv.org/abs/2606.13392"}, {"label": "Hugging Face模型卡", "url": "https://huggingface.co/MiniMaxAI/MiniMax-M3"}],
+  "aka": ["MiniMax-M3", "MiniMax M3", "MSA", "MiniMax Sparse Attention", "MiniMax稀疏注意力", "MiniMax-M3.1"],
+  "problem": "智能体工作流、仓库级代码推理都需要模型在数十万到上百万token上做注意力，softmax注意力的平方成本让这在部署规模下难以承受。",
+  "idea": "在GQA之上做块稀疏注意力：轻量的索引分支给KV块打分，每个GQA组独立选Top-k块，主分支只在选中的块上做精确注意力，并与GPU内核协同设计。",
+  "impact": "在1M上下文下，MiniMax-M3的预填充和解码分别比M2快9倍和15倍，每token计算降到1/20；MSA在109B模型上与GQA效果相当、注意力计算减少28.4倍。",
+  "background": "[[minimax-01]]用闪电注意力（线性注意力）做到百万上下文，但随后的[[minimax-m2]]回到了全注意力以保证智能体任务的效果。另一方面，[[nsa]]、[[moba]]、[[deepseek-v3.2]]的DSA证明了可训练的稀疏注意力能在保持质量的同时降低长上下文成本。",
+  "method": "MSA（MiniMax Sparse Attention）建立在[[gqa]]之上：\n\n- **索引分支**：轻量地给每个键值块打分，并为每个GQA组独立选出Top-k个块，使不同组可以检索不同的位置，同时保持块级的高效执行；\n- **主分支**：只在被选中的块上做精确的块稀疏注意力；\n- **内核协同设计**：用不需要指数运算的Top-k选择，以及“KV在外层循环”的稀疏注意力实现，提高块粒度访问下的张量核心利用率。\n\nMiniMax-M3是用MSA训练的原生多模态模型：总参数约4280亿、激活约230亿，从第一步就混合文本、图像和视频训练，上下文100万token；支持enabled、adaptive、disabled三种推理模式，其中adaptive由模型自己判断是否需要额外推理。",
+  "results": "MSA论文报告：在109B参数的原生多模态模型上，MSA与GQA效果相当，1M上下文下每token注意力计算减少28.4倍，配合内核在H800上预填充提速14.2倍、解码提速7.6倍。模型卡报告MiniMax-M3在1M上下文下预填充比M2快9倍、解码快15倍，每token计算降为1/20，并在长时程编码与办公协作类智能体基准上达到前沿水平。",
+  "legacy": "MSA的推理内核已开源；它与DeepSeek的DSA/CSA、月之暗面的[[moba]]一起，说明2026年前沿开放模型普遍转向“GQA加可训练块稀疏”的长上下文方案。此后MiniMax又发布了M3.1-Flash。",
+  "limits": [
+    {"text": "块级选择可能漏掉块内少量关键token，对需要精确定位大量分散细节的任务仍有风险。", "solved_by": []},
+    {"text": "加速依赖与特定GPU协同设计的内核，换到其他硬件需要重新优化。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "minimax-m2", "type": "extends", "note": "M2系列的下一代，用MSA把1M上下文下的预填充和解码分别提速9倍和15倍。"},
+    {"to": "gqa", "type": "extends", "note": "MSA在GQA之上为每个组独立选择KV块。"},
+    {"to": "nsa", "type": "rivals", "note": "同为可训练的块稀疏注意力，MSA强调按GQA组选择和内核简洁。"},
+    {"to": "minimax-01", "type": "rivals", "note": "MiniMax-01用线性注意力做长上下文，M3改用精确的块稀疏注意力。"},
+    {"to": "moba", "type": "rivals", "note": "MoBA也用门控选块做注意力，MSA以独立索引分支打分。"}
+  ],
+  "prereq": ["efficient-attention", "kv-cache", "mixture-of-experts", "context-window", "throughput-latency"],
+  "learn": "先读[[nsa]]和[[moba]]；读MSA论文第2节索引分支与主分支；动手：实现一个按块打分、每组取top-k块的玩具注意力，与全注意力比较输出误差。",
+  "check": {"source": "https://arxiv.org/abs/2606.13392", "confirmed": "MSA论文：标题MiniMax Sparse Attention、arXiv首次提交2026-06-11；摘要中基于GQA的块稀疏、索引分支按组选Top-k、exp-free Top-k与KV-outer内核、109B模型上与GQA相当、1M上下文注意力计算减少28.4倍、H800上预填充14.2倍解码7.6倍、模型已发布为MiniMax-M3。模型卡：约428B总/23B激活、原生多模态、1M上下文、比M2预填充快9倍解码快15倍每token计算1/20、三种推理模式。Hugging Face API：M3创建于2026-06-02，M3.1-Flash仓库存在。M2回到全注意力为一般了解。"}
+}

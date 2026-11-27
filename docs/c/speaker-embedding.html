@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>说话人嵌入与说话人验证（Speaker Embeddings and Verification） · AI脉络</title>
+<meta name="description" content="把一段语音压缩成一个固定长度的向量，只保留“是谁在说”的信息而忽略说了什么。两段语音的向量越接近，越可能是同一个人；它是说话人验证、说话人日志和声音克隆的共同基础。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/speaker-embedding.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="说话人嵌入与说话人验证（Speaker Embeddings and Verification）">
+<meta property="og:description" content="把一段语音压缩成一个固定长度的向量，只保留“是谁在说”的信息而忽略说了什么。两段语音的向量越接近，越可能是同一个人；它是说话人验证、说话人日志和声音克隆的共同基础。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/speaker-embedding.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/speaker-embedding">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 语音 · 进阶</div>
+<h1>说话人嵌入与说话人验证</h1><div class="full">Speaker Embeddings and Verification</div>
+<p class="muted" style="font-size:13px">也叫：说话人嵌入　speaker embedding　声纹　voiceprint　说话人验证　speaker verification　说话人确认　说话人识别　speaker recognition　说话人辨认　speaker identification　i-vector　等错误率　EER　equal error rate　声纹识别</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/speaker-embedding">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>把一段语音压缩成一个固定长度的向量，只保留“是谁在说”的信息而忽略说了什么。两段语音的向量越接近，越可能是同一个人；它是说话人验证、说话人日志和声音克隆的共同基础。</b></p>
+<p class="tags">先要会：<a class="chip c" href="embedding.html">嵌入向量</a> <a class="chip c" href="waveform-spectrogram.html">波形、频谱与梅尔谱</a></p>
+<p>手机用声纹解锁、客服系统确认来电者身份、会议转写标出“谁说了哪句”、TTS模仿某个人的声音，都需要一种描述“音色身份”的表示。<b>说话人嵌入</b>就是这样一个向量：同一个人不同句子的嵌入彼此靠近，不同人的嵌入彼此远离（见<a class="lc" href="../c/embedding.html">嵌入向量</a>）。</p><p><b>两类任务</b>。</p><ul><li><b>说话人验证</b>（speaker verification）：给定一段注册语音和一段测试语音，判断是不是同一个人，是一对一的二分类。</li><li><b>说话人辨认</b>（speaker identification）：从已知的一组人里找出是谁，是多分类。</li></ul><p><b>演进</b>。</p><ul><li><a class="ln" href="../n/gmm-ubm.html">GMM-UBM说话人确认</a>：先用大量人的语音训练一个通用背景高斯混合模型，再对每个说话人做自适应，比较似然比。之后的i-vector把每段语音的GMM统计量投影到一个低维“总变化空间”。</li><li><b>神经嵌入</b>：训练网络对大量说话人做分类，取倒数第二层（池化后）的激活作为嵌入。<a class="ln" href="../n/d-vector.html">d-vector说话人嵌入</a>对帧级特征取平均；<a class="ln" href="../n/x-vector.html">x-vector说话人嵌入</a>用时延神经网络加统计池化（均值和标准差）得到段级嵌入，配合数据增强显著优于i-vector。后续工作采用更深的网络和带间隔的分类损失（见<a class="lc" href="../c/metric-learning.html">度量学习</a>）。</li><li><b>数据</b>：<a class="ln" href="../n/voxceleb.html">VoxCeleb说话人库</a>提供了上千名说话人的大规模真实场景语音。</li></ul><p><b>打分与指标</b>。两嵌入之间常用余弦相似度（见<a class="lc" href="../c/dot-product.html">内积与余弦相似度</a>）打分，超过阈值判为同一人。阈值不同，错误接受率（FAR）和错误拒绝率（FRR）此消彼长；两者相等时的错误率叫<b>等错误率</b>（EER），是最常报告的指标。</p><p><b>其他用途</b>。<a class="lc" href="../c/speaker-diarization.html">说话人日志</a>把会议录音切段后对各段的嵌入聚类（见<a class="lc" href="../c/clustering.html">聚类</a>），确定说话人数和分段归属；零样本TTS和语音转换用参考音频的说话人嵌入作为条件，生成同一音色的新语音，见<a class="lc" href="../c/voice-conversion.html">语音转换与变声</a>。</p>
+<div class="example"><h4>例子</h4><p>注册语音的嵌入为a，两段测试语音的嵌入为b和c，余弦相似度cos(a, b)=0.82、cos(a, c)=0.31。阈值设为0.6时，判定b是本人、c不是。若在评测集上把阈值从0.6调到0.5，错误拒绝从4%降到2%，错误接受从1%升到3%；两者在某个阈值处都等于约2.5%时，这个值就是EER（数字为示意）。</p></div>
+<h2>容易误解的地方</h2><ul><li>嵌入并不只编码身份：录音设备、信道、情绪和语言也会影响它，跨设备、跨语种时性能明显下降。</li><li>声纹可以被合成语音或录音回放欺骗，安全场景需要额外的防伪检测。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

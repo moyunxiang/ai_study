@@ -1,0 +1,9 @@
+{
+  "key": "logprobs",
+  "short": "模型给每个token的对数概率log p。很多推理框架和API可以返回生成的每个token及其logprob，以及每一步概率最高的几个候选。它是打分、置信度估计、分类和评测的基础工具。",
+  "body": "语言模型每一步都会输出整个词表上的概率分布（见[[c:softmax]]、[[c:lm-head]]），但通常只把采样出的token交给用户。如果同时把它的概率也拿出来，就能做很多事。由于概率连乘会迅速变得极小，实践中一律使用**对数概率**（logprob）：\n\n`logprob(y_t) = log p(y_t | 前文)`，取值≤0，越接近0越确定。\n\n整段文本的对数概率就是各token对数概率之和（见[[c:autoregressive]]），平均负对数概率取指数就是[[c:perplexity]]。\n\n**能拿来做什么**。\n\n- **给文本打分**：比较几段候选文本在模型下哪个更可能，用于多选题评测（见[[c:likelihood-scoring]]）、重排序和检测训练数据泄漏（见[[c:data-contamination]]）。\n- **分类**：让模型输出“是/否”或类别名，直接比较这几个token的概率，比解析自由文本更稳定，还能得到一个连续的分数。\n- **置信度**：答案token的概率低，往往意味着模型没把握，可以据此提示用户或转人工（见[[c:calibration-concept]]、[[c:refusal-abstention]]）。不过对话模型经过对齐训练后，概率的校准程度通常变差，不能直接当作正确率。\n- **调试生成**：查看每一步的top-k候选（top_logprobs），能看出模型在哪个位置“犹豫”，以及采样参数（见[[c:decoding-sampling]]）实际起了什么作用。[[forking-tokens]]的研究就关注推理链中那些概率分布很分散、决定了后续走向的少数token。\n- **训练**：强化学习和偏好优化都需要策略和参考模型在生成序列上的logprob（见[[c:kl-penalty-reference]]、[[dpo]]）。\n\n**接口上的常见参数**。是否返回生成token的logprob、每一步返回前几个候选（top_logprobs）、是否返回提示部分各token的logprob（有的API为防止模型被“蒸馏”或窃取而不提供）。[[stealing-production-lm]]展示了仅凭API返回的logits或logprob信息就能恢复出模型最后一层的部分参数，这是一些服务限制logprob输出的原因之一。",
+  "example": "模型生成“巴黎”，返回：\n\n- 第1个token“巴”：logprob = −0.05（概率约0.95），候选：“巴” −0.05、“里” −3.2、“马” −4.1。\n- 第2个token“黎”：logprob = −0.01（概率约0.99）。\n\n整段logprob = −0.06，概率约0.94。\n\n分类用法：问“这条评论是正面的吗？回答是或否”，读取下一个token“是”的logprob −0.36（0.70）和“否”的logprob −1.24（0.29），得到正面概率约0.70。",
+  "pitfalls": "- logprob依赖分词：同一个词在不同模型里被切成不同数量的token，直接比较两个模型的logprob没有意义。\n- 采样时用了温度或top-p，返回的logprob可能是调整前或调整后的分布，不同API约定不同，用之前看文档。",
+  "aka": ["logprobs", "logprob", "log probability", "对数概率", "token概率", "token probability", "top_logprobs", "序列对数似然", "sequence log-likelihood", "output scores", "输出分数", "置信度分数"],
+  "needs": ["softmax", "probability-basics"]
+}

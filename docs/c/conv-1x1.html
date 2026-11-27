@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>1×1卷积、瓶颈与深度可分离卷积（1×1 Convolutions, Bottlenecks and Depthwise Separable Convolutions） · AI脉络</title>
+<meta name="description" content="1×1卷积不看邻域，只在每个像素位置上把所有通道做一次线性组合，相当于对每个位置共享同一个全连接层。它用来增减通道数、混合通道信息，是瓶颈结构和深度可分离卷积的关键部件。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/conv-1x1.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="1×1卷积、瓶颈与深度可分离卷积（1×1 Convolutions, Bottlenecks and Depthwise Separable Convolutions）">
+<meta property="og:description" content="1×1卷积不看邻域，只在每个像素位置上把所有通道做一次线性组合，相当于对每个位置共享同一个全连接层。它用来增减通道数、混合通道信息，是瓶颈结构和深度可分离卷积的关键部件。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/conv-1x1.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/conv-1x1">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 视觉 · 入门</div>
+<h1>1×1卷积、瓶颈与深度可分离卷积</h1><div class="full">1×1 Convolutions, Bottlenecks and Depthwise Separable Convolutions</div>
+<p class="muted" style="font-size:13px">也叫：1x1卷积　1×1卷积　1x1 convolution　pointwise convolution　逐点卷积　瓶颈层　bottleneck　bottleneck block　通道降维　深度可分离卷积　depthwise separable convolution　深度卷积　depthwise convolution　Network in Network</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/conv-1x1">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>1×1卷积不看邻域，只在每个像素位置上把所有通道做一次线性组合，相当于对每个位置共享同一个全连接层。它用来增减通道数、混合通道信息，是瓶颈结构和深度可分离卷积的关键部件。</b></p>
+<p class="tags">先要会：<a class="chip c" href="conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="params-flops.html">参数量、计算量与显存</a></p>
+<p>卷积核大小为1×1听起来没有意义：既然不看邻近像素，它能做什么？关键在于输入有很多<b>通道</b>。一个1×1卷积有C_out个核，每个核是长度C_in的权重向量，在每个空间位置上对C_in个通道值做加权求和。所以它是一个作用在通道维上、在所有位置共享参数的线性层（后面通常接激活函数）。</p><p><b>用途一：增减通道（瓶颈）</b>。3×3卷积的参数和计算量与<code>C_in × C_out × 9</code>成正比，通道多时非常贵。先用1×1卷积把256个通道压到64个，做3×3卷积，再用1×1卷积升回256，计算量大幅下降。<a class="ln" href="../n/googlenet.html">GoogLeNet / Inception</a>的Inception模块在昂贵的3×3、5×5卷积前用1×1降维；<a class="ln" href="../n/resnet.html">ResNet</a>更深的版本使用“1×1降维→3×3→1×1升维”的瓶颈块。</p><p><b>用途二：增加非线性与通道混合</b>。<a class="ln" href="../n/nin.html">Network In Network</a>首先提出在卷积层之间插入1×1卷积（相当于在每个位置放一个小的<a class="lc" href="../c/mlp.html">多层感知机</a>），增强每个位置的表达能力，并用全局平均池化代替最后的全连接层。</p><p><b>用途三：深度可分离卷积</b>。普通卷积同时混合空间和通道。深度可分离卷积把它拆成两步：逐通道的深度卷积（每个通道单独做3×3，只混合空间），加上一个1×1的逐点卷积（只混合通道）。<a class="ln" href="../n/xception.html">Xception</a>和<a class="ln" href="../n/mobilenet.html">MobileNet</a>用它在精度损失很小的情况下把计算量降低到原来的几分之一，见<a class="lc" href="../c/efficient-cnn.html">轻量化卷积网络</a>。</p><p><b>在Transformer里</b>。Transformer层里的前馈网络对每个token独立地做两层线性变换，等价于在序列上做1×1卷积，见<a class="lc" href="../c/transformer-block.html">Transformer层的结构</a>。</p>
+<div class="example"><h4>例子</h4><p>输入56×56×256，想得到56×56×256的输出。直接用3×3卷积：参数<code>256×256×9 ≈ 59万</code>。瓶颈结构：1×1降到64（<code>256×64 ≈ 1.6万</code>）→3×3（<code>64×64×9 ≈ 3.7万</code>）→1×1升回256（<code>64×256 ≈ 1.6万</code>），共约6.9万，约为前者的1/8.5。</p></div>
+<h2>容易误解的地方</h2><ul><li>1×1卷积不扩大感受野，网络看多大范围仍由其他卷积和下采样决定。</li><li>瓶颈压得太窄会成为信息瓶颈，损失精度，降维比例需要权衡。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

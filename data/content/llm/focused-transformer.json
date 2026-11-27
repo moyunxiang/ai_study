@@ -1,0 +1,34 @@
+{
+  "id": "focused-transformer",
+  "who": "Szymon Tworkowski, Konrad Staniszewski, Mikołaj Pacek, Yuhuai Wu, Henryk Michalewski, Piotr Miłoś · IDEAS NCBR、华沙大学、Google DeepMind等",
+  "venue": "NeurIPS 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2307.03170"},
+    {"label": "代码", "url": "https://github.com/CStanKonrad/long_llama"}
+  ],
+  "aka": ["FoT", "Focused Transformer", "LongLLaMA", "聚焦Transformer", "跨批次训练", "Crossbatch Training", "分心问题", "Distraction Issue"],
+  "problem": "给注意力层外接一个（键, 值）记忆可以突破上下文长度，但记忆里的文档越多，相关键所占比例越低；不同语义的值对应的键还会彼此重叠，模型被无关的键“分心”，读得越多反而越不准。",
+  "idea": "借鉴对比学习：训练时让记忆注意力层同时看到当前文档的历史和同一批次里其他无关文档的键值，迫使模型把相关与无关的键区分开，从而整理好键空间；推理时再用kNN从大记忆里检索。",
+  "impact": "点名了外接记忆的“分心问题”，并给出一个只改训练方式、不改架构的解法；用它微调OpenLLaMA得到的LongLLaMA是2023年最早一批开源的长上下文模型之一，可在256K长度上完成密钥检索。",
+  "background": "[[memorizing-transformer]]在某一层注意力上外接kNN记忆，把过去的键值存起来按相似度检索，[[landmark-attention]]则按块检索。这类方法的前提是“相关的键与查询相似、无关的键不相似”。但训练时记忆里通常只有同一文档的内容，模型从没见过“满是无关文档”的记忆，一旦推理时记忆变大，无关键大量混入，注意力就分散了。",
+  "method": "**记忆注意力层**：选定少数几层作为记忆层，查询除了照常注意本地上下文，还对外部记忆中的（键, 值）做注意力；推理时外部记忆很大，用kNN只取最相似的若干条。\n\n**跨批次训练**：训练时，对批次中的每个文档，记忆层能看到的不只是这个文档前面若干段的键值（正样本），还有批次中另外d−1个文档的键值（负样本），它们与当前文档无关。模型在这种混合记忆上做下一词预测，要想预测准，就必须学会给相关的键高分、给无关的键低分，相当于在键空间里做[[c:contrastive-learning]]。整个过程是可微的，不需要额外的对比损失，只需在构造批次时把其他文档的键值也放进注意力。\n\n**微调现有模型**：只对选定的记忆层用跨批次训练微调，就能把现有模型的有效上下文拉长。作者用这种方法微调3B和7B的OpenLLaMA检查点，得到LongLLaMA。",
+  "results": "LongLLaMA在需要长上下文的任务上有提升，并能在256K的上下文长度上完成密钥检索（passkey retrieval）；论文还显示，随着训练时负样本文档数量增加，模型在大记忆上的困惑度更低，分心问题得到缓解。",
+  "legacy": "LongLLaMA是开源社区早期可用的长上下文模型之一；此后主流转向位置插值与长文本续训（[[yarn]]、[[long-data-engineering]]），但“训练时加入干扰项来教模型忽略无关上下文”的思路在长上下文检索训练和RAG抗干扰研究中反复出现。",
+  "limits": [
+    {"text": "只有少数记忆层能访问长上下文，且通过kNN近似检索，密钥检索这类简单任务表现好，不代表能在长文本上做复杂推理。", "solved_by": ["ruler"]},
+    {"text": "需要维护外部记忆和kNN索引，推理流程与普通Transformer不同，生态支持差，后来很少被采用。", "solved_by": ["yarn"]}
+  ],
+  "relations": [
+    {"to": "memorizing-transformer", "type": "solves", "note": "Memorizing Transformer的外部记忆在变大时被无关键干扰；跨批次训练让模型学会区分相关与无关的键。"},
+    {"to": "landmark-attention", "type": "rivals", "note": "同期的长上下文外接记忆方案：地标注意力按块检索，FoT用对比式训练改善按词检索。"},
+    {"to": "llama-1", "type": "uses", "note": "LongLLaMA基于LLaMA架构的开源复现OpenLLaMA微调而来。"},
+    {"to": "transformer-xl", "type": "extends", "note": "沿用把前文键值缓存下来供后续注意力使用的思路，并扩展到大规模外部记忆。"}
+  ],
+  "prereq": ["self-attention", "kv-cache", "contrastive-learning", "k-nearest-neighbors", "context-window"],
+  "terms": [
+    {"t": "分心问题", "d": "外接记忆里无关内容越来越多时，模型把注意力分给了与问题无关的键，导致检索和预测变差。"},
+    {"t": "密钥检索", "d": "在很长的无关文本中藏一串数字，要求模型最后把它复述出来，用来测试能否访问长上下文的任意位置。"}
+  ],
+  "learn": "先读[[memorizing-transformer]]；读本文第3节分心问题的分析和跨批次训练；动手：在一个小模型的记忆层里混入其他文档的键值，比较有无跨批次训练时在大记忆上的困惑度。",
+  "check": {"source": "https://arxiv.org/abs/2307.03170", "confirmed": "标题、6位作者、arXiv首次提交2023-07-06；摘要中给注意力层外接（键, 值）外部记忆、文档增多时相关键比例下降、分心问题即不同语义值对应的键重叠、受对比学习启发的训练过程、改善键值空间结构以扩展上下文、微调3B与7B OpenLLaMA得到LongLLaMA、256K密钥检索。跨批次训练细节（d−1个其他文档、可微无需额外损失）、kNN检索、NeurIPS 2023与机构为对正文的一般了解。"}
+}

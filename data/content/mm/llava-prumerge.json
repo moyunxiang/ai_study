@@ -1,0 +1,23 @@
+{
+  "id": "llava-prumerge",
+  "who": "Yuzhang Shang, Mu Cai, Bingxin Xu, Yong Jae Lee, Yan Yan · 伊利诺伊理工学院 / 威斯康星大学麦迪逊分校",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2403.15388"},
+    {"label": "项目页", "url": "https://llava-prumerge.github.io/"}
+  ],
+  "aka": ["PruMerge", "LLaVA PruMerge", "PruMerge+", "自适应视觉token缩减", "剪枝加合并"],
+  "problem": "多模态大模型把CLIP的几百个视觉token全部当前缀，高分辨率和视频输入时token更多，而Transformer的计算随token数平方增长。",
+  "idea": "利用视觉编码器中CLS token对各视觉token注意力分布的稀疏性，用离群值检测自适应地挑出最关键的token保留；再把被剪掉的token按键的相似度聚类，合并进保留的token中补充信息。",
+  "impact": "用在LLaVA-1.5上平均把视觉token压缩14倍，在多种视觉问答和推理任务上性能相当，是视觉token压缩方向常被比较的基线。",
+  "method": "[[llava-1.5]]把CLIP ViT倒数第二层的576个patch token全部输入语言模型。作者观察到，在视觉编码器里，CLS token对各patch的注意力分数分布非常稀疏：只有少数patch得到很高的注意力，它们携带了图像的主要信息。\n\nPruMerge分两步。剪枝：对CLS注意力分数用四分位距（IQR）一类的离群值检测方法，自适应地选出注意力异常高的那些token保留，保留数量随图像内容而变，而不是事先固定。合并：对每个保留下来的token，按键向量的相似度在被剪掉的token中找出与之最近的若干个（k近邻），按注意力加权合并进来，补充和增强保留token的信息。改进版PruMerge+还会额外均匀采样一些空间位置的token，避免遗漏。\n\n摘要报告用于LLaVA-1.5时，视觉token平均可压缩14倍，在多种视觉问答和推理任务上取得相当的性能。",
+  "limits": [
+    {"text": "按CLS注意力挑token与问题无关，问题关注的恰好是注意力低的小区域时会丢信息；压缩后通常仍需微调才能恢复全部精度。", "solved_by": ["visionzip", "sparsevlm"]}
+  ],
+  "relations": [
+    {"to": "llava-1.5", "type": "solves", "note": "缓解LLaVA-1.5视觉token过多、计算量随token数平方增长的问题。"},
+    {"to": "fastv", "type": "rivals", "note": "FastV在LLM内部按注意力剪枝，PruMerge在视觉编码器输出端剪枝并合并。"},
+    {"to": "clip", "type": "uses", "note": "利用CLIP视觉编码器中CLS token对patch的注意力稀疏性选择token。"}
+  ],
+  "prereq": ["image-patch", "self-attention", "clustering", "params-flops"],
+  "check": {"source": "https://arxiv.org/abs/2403.15388", "confirmed": "arXiv记录：标题、作者、v1日期2024-03-22；摘要中固定大量视觉token与平方计算成本、利用CLS与视觉token注意力分数的稀疏性评估重要性、动态选择关键token、按键相似度聚类合并剪掉的token、LLaVA-1.5平均压缩14倍性能相当。IQR离群检测、PruMerge+凭一般了解。"}
+}

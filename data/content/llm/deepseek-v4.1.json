@@ -1,0 +1,28 @@
+{
+  "id": "deepseek-v4.1",
+  "who": "DeepSeek-AI · 深度求索",
+  "links": [{"label": "Hugging Face模型卡", "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash"}],
+  "aka": ["DeepSeek-V4.1", "DeepSeek V4.1", "DeepSeek-V4.1-Flash", "DSV4.1", "CSA2", "Causal Encoder-Decoder", "CED架构", "SWA Bounded Replay", "DSpark"],
+  "problem": "智能体工作负载输入极长、输出相对短，百万token上下文下KV缓存的存储和预填充成本成了主要开销，即使DeepSeek-V4已经大幅压缩过KV。",
+  "idea": "把40层Transformer组织成“20层因果编码器 + 20层解码器”，解码器的全局KV直接由编码器最后的隐藏状态投影得到，再叠加跨层共享的稀疏注意力和FP4的KV缓存。",
+  "impact": "全局KV缓存压到每token约890字节，约为DeepSeek-V4-Flash的1/4、DeepSeek-V1的1/437；预填充时每token只激活80亿参数。",
+  "background": "[[deepseek-v2]]的MLA、[[deepseek-v3.2]]的稀疏注意力DSA、[[deepseek-v4]]的百万上下文，都在压缩KV缓存。智能体任务把大量工具输出、代码文件塞进上下文，预填充的计算和持久化KV的存储成本比解码更突出。[[yoco]]早就提出过“只缓存一次”的解码器-解码器结构，但没有在前沿规模上验证。",
+  "method": "据官方模型卡，DeepSeek-V4.1-Flash是5520亿骨干参数的多模态MoE模型，主要设计有：\n\n- **因果编码器-解码器（CED）**：40层分成20层因果编码器和20层解码器，解码器的全局KV由编码器最后的隐藏状态投影而来，而不是每层各自计算；因此预填充时每token只需激活80亿参数，解码时160亿。\n- **SWA Bounded Replay**：滑动窗口注意力的KV不持久化到SSD，需要时只重放最近的窗口内token来重建，持久化KV约为V4-Flash的1/8。\n- **CSA2压缩稀疏注意力**：每个注意力层固定为Full、Reindex、Reuse三种模式之一，跨层共享主KV和索引器的键、复用Top-K稀疏索引；解码器里的分层稀疏索引器让后面的层只在第一个Full层构造的候选池里挑选，使索引成本与上下文长度无关。主KV以FP4（E2M1，每16通道一个E4M3缩放）缓存。\n- 其他组件：单次前向的[[mhc]]、1960亿参数按token查表的[[engram]]条件记忆、DSpark推测解码；MoE每层1个共享专家和384个路由专家，每token激活6个。\n\n预训练从头在45T token的多模态语料上进行，64K长度训练稀疏注意力，在34T token时把上下文扩到100万；后训练沿用SFT → RL → 在线策略蒸馏，主要改进在大规模自动合成智能体任务与环境；推理强度可在1–100之间连续调节。",
+  "results": "官方模型卡报告：全局KV缓存约890字节/token，约为V4-Flash的1/4、DeepSeek-V1的1/437；基座模型上MMLU-Pro 74.1（V4-Flash-Base 68.3、V4-Pro-Base 73.5），HumanEval 79.4，GSM8K 93.0，MATH 61.1；原生多模态，DocVQA 95.6。模型以MIT许可开放。",
+  "legacy": "它把[[yoco]]式“共享一份全局KV”的思路和DeepSeek自家的稀疏注意力、条件记忆组合到前沿规模，是2026年KV缓存压缩路线最激进的开放模型之一。",
+  "limits": [
+    {"text": "编码器-解码器式的KV共享降低了解码器各层的独立表达，在知识类基准上仍落后于更大的V4-Pro（如SimpleQA-Verified 42.3对55.2）。", "solved_by": []},
+    {"text": "多项新组件（CSA2、Bounded Replay、DSpark）依赖专门的推理实现，第三方框架完整支持需要时间。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "deepseek-v4", "type": "extends", "note": "在V4的百万上下文与稀疏注意力基础上，把KV缓存再压到约1/4。"},
+    {"to": "yoco", "type": "extends", "note": "因果编码器加解码器、解码器共用一份由编码器投影的全局KV，与YOCO的只缓存一次思路一致。"},
+    {"to": "engram", "type": "uses", "note": "集成1960亿参数的按token查表条件记忆。"},
+    {"to": "mhc", "type": "uses", "note": "采用单次前向的流形约束超连接改进残差流混合。"},
+    {"to": "deepseek-v3.2", "type": "extends", "note": "把DSA稀疏注意力发展为跨层共享索引的CSA2。"}
+  ],
+  "prereq": ["kv-cache", "efficient-attention", "mixture-of-experts", "context-window", "floating-point", "encoder-decoder"],
+  "terms": [{"t": "预填充与解码", "d": "预填充是一次性处理整段输入、建立缓存；解码是逐个生成新token。智能体任务输入长输出短，预填充成本占比更高。"}],
+  "learn": "先读[[yoco]]和[[deepseek-v3.2]]；对照V4.1模型卡逐项理解CED、CSA2和FP4缓存；动手：按模型卡数字估算1M上下文下V4-Flash与V4.1-Flash的KV缓存总量。",
+  "check": {"source": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash", "confirmed": "模型卡：552B骨干多模态MoE、1M上下文；CED 20层编码器+20层解码器、预填充8B解码16B激活；SWA Bounded Replay持久KV约1/8；CSA2三种模式与分层稀疏索引器；FP4 E2M1主KV每16通道E4M3缩放；890字节/token约为V4-Flash的1/4、V1的1/437；Single-Pass mHC、Engram 196B、DSpark；1共享+384路由激活6；45T token、64K稀疏注意力、34T时扩到1M；SFT→RL→OPD；推理强度1–100；基座表数字；MIT许可。Hugging Face API：仓库创建于2026-09-10。"}
+}

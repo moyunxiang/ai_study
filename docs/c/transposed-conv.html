@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>上采样与转置卷积（Upsampling and Transposed Convolution） · AI脉络</title>
+<meta name="description" content="让特征图变大的几种办法：插值（最近邻、双线性）后再卷积，可学习的转置卷积（常被误称为反卷积），以及把通道重排成空间的像素重排。分割、生成、超分辨率网络的解码器都靠它们。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/transposed-conv.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="上采样与转置卷积（Upsampling and Transposed Convolution）">
+<meta property="og:description" content="让特征图变大的几种办法：插值（最近邻、双线性）后再卷积，可学习的转置卷积（常被误称为反卷积），以及把通道重排成空间的像素重排。分割、生成、超分辨率网络的解码器都靠它们。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/transposed-conv.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/transposed-conv">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 视觉 · 入门</div>
+<h1>上采样与转置卷积</h1><div class="full">Upsampling and Transposed Convolution</div>
+<p class="muted" style="font-size:13px">也叫：转置卷积　transposed convolution　反卷积　deconvolution　上卷积　up-convolution　上采样　upsampling　双线性插值　bilinear interpolation　最近邻插值　像素重排　pixel shuffle　子像素卷积　sub-pixel convolution　棋盘格伪影　checkerboard artifacts</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/transposed-conv">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>让特征图变大的几种办法：插值（最近邻、双线性）后再卷积，可学习的转置卷积（常被误称为反卷积），以及把通道重排成空间的像素重排。分割、生成、超分辨率网络的解码器都靠它们。</b></p>
+<p class="tags">先要会：<a class="chip c" href="conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="padding-stride.html">步长、填充与特征图尺寸</a> <a class="chip c" href="matrix-multiplication.html">矩阵乘法与线性变换</a></p>
+<p>分类网络一路把分辨率降下去（见<a class="lc" href="../c/padding-stride.html">步长、填充与特征图尺寸</a>），最后只要一个类别。但语义分割要给每个像素一个标签，生成模型和超分辨率要输出完整的图像，自编码器的解码器要把小特征图还原成原尺寸，都需要<b>上采样</b>。</p><p><b>插值</b>。最简单的办法：最近邻（每个像素复制成2×2）或双线性插值，不含参数，然后接一个普通卷积去学习细节。很多现代网络（包括扩散模型常用的<a class="ln" href="../n/unet.html">U-Net</a>实现）都用“插值+卷积”。</p><p><b>转置卷积</b>（transposed convolution）。可学习的上采样。普通卷积可以写成一个矩阵乘法<code>y = C·x</code>（输出比输入小）；转置卷积用这个矩阵的转置<code>Cᵀ</code>作用于输入，形状正好反过来，输出比输入大。直观做法：在输入像素之间插入s−1个0，再做普通卷积。输出尺寸为</p><p><code>out = (in − 1)·s − 2p + k</code>（另加可选的输出填充）</p><p><a class="ln" href="../n/fcn.html">全卷积网络FCN</a>用它把分割网络的粗糙输出放大回原图；<a class="ln" href="../n/dcgan.html">DCGAN</a>的生成器靠一串转置卷积把小特征图逐步放大成64×64的图像；<a class="ln" href="../n/unet.html">U-Net</a>原文中称之为“上卷积”。</p><p><b>名字的混淆</b>。它常被叫作“反卷积”（deconvolution），但它并不是卷积的逆运算（信号处理里的反卷积是另一回事），只是形状上相反。<a class="ln" href="../n/deconvnet.html">DeconvNet反卷积分割</a>等早期文献中两种用法都有，读的时候要分清。</p><p><b>棋盘格伪影</b>。当卷积核大小不能被步长整除时（例如k=3、s=2），输出中有的位置被重叠覆盖的次数多、有的少，生成的图像会出现规则的棋盘格纹理。改用“插值+卷积”或选k为s的倍数可以避免。</p><p><b>像素重排</b>（pixel shuffle）。先用普通卷积把通道数扩大r²倍，再把每r²个通道重排成r×r的空间块，常用于超分辨率，既高效又没有棋盘格问题。</p>
+<div class="example"><h4>例子</h4><p>输入4×4，转置卷积k=4、s=2、p=1：输出边长<code>(4 − 1)×2 − 2 + 4 = 8</code>，正好放大2倍。若用k=3、s=2、p=1，输出为<code>3×2 − 2 + 3 = 7</code>，通常需要再加1的输出填充才能得到8，并且k=3不能被s=2整除，容易出现棋盘格。</p></div>
+<h2>容易误解的地方</h2><ul><li>转置卷积不能恢复下采样时丢掉的信息，只是学一个合理的放大方式；细节通常还要靠跳跃连接从编码器补回来。</li><li>同样的k、s、p，普通卷积和转置卷积的尺寸公式不同，不要套错。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

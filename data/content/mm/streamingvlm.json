@@ -1,0 +1,23 @@
+{
+  "id": "streamingvlm",
+  "who": "Ruyi Xu, Guangxuan Xiao, Yukang Chen, Liuning He, Yao Lu, Song Han · 麻省理工学院 / 英伟达",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2510.09608"},
+    {"label": "代码", "url": "https://github.com/mit-han-lab/streaming-vlm"}
+  ],
+  "aka": ["Streaming VLM", "无限视频流", "Inf-Streams-Eval", "流式视频理解", "实时视频解说"],
+  "problem": "VLM处理近乎无限长的视频流时，全注意力的计算量平方增长；简单的滑动窗口要么破坏连贯性，要么反复重算导致延迟高。",
+  "idea": "训练与流式推理对齐：推理时只保留注意力汇聚token、最近一小段视觉token和较长一段文本token的KV缓存；训练时在短的重叠视频片段上用全注意力做监督微调，模拟推理时的注意力模式。",
+  "impact": "能对平均两小时以上的视频做逐秒稳定的实时理解，在作者新建的Inf-Streams-Eval上对GPT-4o mini的胜率达66.18%，单张H100上可达8 FPS。",
+  "method": "[[streamingllm]]发现保留开头几个“注意力汇聚”token加最近窗口的KV缓存，语言模型就能稳定地无限生成。视频流更难：视觉token数量巨大，模型还要不断把画面和文字对齐，例如实时解说一场球赛。全注意力会让计算和显存随时长平方增长；滑动窗口如果每次重新编码窗口内容，延迟很高，如果直接截断又会丢失上下文连贯。\n\nStreamingVLM在推理时维护一个紧凑的KV缓存：复用注意力汇聚token的状态、最近一小段视觉token的短窗口，以及最近较多文本token的长窗口（文字少而重要，保留更久），并对位置编码做连续化处理，避免位置索引无限增长。这种能力通过一个简单的监督微调注入：在短而相互重叠的视频片段上用全注意力训练，这样的注意力模式与推理时近似，又不必在极长上下文上训练。\n\n评测方面，作者构建了Inf-Streams-Eval，视频平均超过两小时，要求帧与文字逐秒稠密对齐。摘要报告在该基准上，StreamingVLM对GPT-4o mini的胜率为66.18%，并在单张NVIDIA H100上保持最高8 FPS的稳定实时性能。",
+  "limits": [
+    {"text": "只保留最近一小段视觉上下文，需要回忆很久以前画面细节的问题仍难以回答。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "streamingllm", "type": "extends", "note": "把注意力汇聚加滑动窗口的KV缓存思路推广到视频流，并分开设置视觉和文本窗口。"},
+    {"to": "flash-vstream", "type": "rivals", "note": "Flash-VStream用压缩记忆回答异步问题，StreamingVLM侧重逐秒连续理解与解说。"},
+    {"to": "videollm-online", "type": "extends", "note": "延续流式视频对话的目标，解决无限长视频下的延迟和显存问题。"}
+  ],
+  "prereq": ["kv-cache", "context-window", "self-attention", "throughput-latency"],
+  "check": {"source": "https://arxiv.org/abs/2510.09608", "confirmed": "arXiv记录：标题、作者、v1日期2025-10-10；摘要中全注意力平方代价与滑动窗口的缺陷、注意力汇聚+短视觉窗口+长文本窗口的KV缓存、短重叠片段全注意力SFT、Inf-Streams-Eval视频平均超两小时。对GPT-4o mini 66.18%胜率、单张H100最高8 FPS、LongVideoBench +4.30与OVOBench Realtime +5.96。连续位置编码凭一般了解。"}
+}

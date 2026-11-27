@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>GPU执行模型：kernel、线程块、warp与SM（GPU Execution Model: Kernels, Blocks, Warps, SMs） · AI脉络</title>
+<meta name="description" content="GPU程序（kernel）拆成大量线程，按线程块分配到各个SM上运行，每32个线程组成一个warp同步执行。写出快的算子，关键是安排好数据在显存、共享内存和寄存器之间的搬运。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/gpu-execution-model.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="GPU执行模型：kernel、线程块、warp与SM（GPU Execution Model: Kernels, Blocks, Warps, SMs）">
+<meta property="og:description" content="GPU程序（kernel）拆成大量线程，按线程块分配到各个SM上运行，每32个线程组成一个warp同步执行。写出快的算子，关键是安排好数据在显存、共享内存和寄存器之间的搬运。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/gpu-execution-model.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/gpu-execution-model">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 系统与硬件 · 进阶</div>
+<h1>GPU执行模型：kernel、线程块、warp与SM</h1><div class="full">GPU Execution Model: Kernels, Blocks, Warps, SMs</div>
+<p class="muted" style="font-size:13px">也叫：GPU执行模型　GPU execution model　CUDA编程模型　CUDA programming model　kernel　CUDA kernel　GPU kernel　算子　线程块　thread block　网格　grid　warp　线程束　SM　流式多处理器　streaming multiprocessor　SIMT　共享内存　shared memory　分块　tiling　访存合并　memory coalescing　分支发散　warp divergence　占用率　occupancy　核函数</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/gpu-execution-model">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>GPU程序（kernel）拆成大量线程，按线程块分配到各个SM上运行，每32个线程组成一个warp同步执行。写出快的算子，关键是安排好数据在显存、共享内存和寄存器之间的搬运。</b></p>
+<p class="tags">先要会：<a class="chip c" href="cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="memory-bandwidth.html">显存、内存带宽与“内存墙”</a></p>
+<p><a class="lc" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a>说GPU靠成千上万个简单核心并行计算。读高性能算子的论文（如<a class="ln" href="../n/flashattention.html">FlashAttention</a>）时会遇到kernel、SM、warp、共享内存这些词，它们描述的是GPU实际怎样执行一个程序，这套模型随<a class="ln" href="../n/cuda.html">CUDA</a>和<a class="ln" href="../n/g80.html">GeForce 8800/G80</a>一起确立，此后基本没变。</p><p><b>kernel与线程层次</b>。在GPU上运行的一个函数叫<b>kernel</b>。启动时指定一个<b>网格</b>（grid），由许多<b>线程块</b>（block）组成，每个线程块包含几十到上千个<b>线程</b>。每个线程执行同样的代码，用自己的编号决定处理哪部分数据，例如一个线程负责输出矩阵的一个元素。</p><p><b>硬件映射</b>。</p><ul><li><b>SM</b>（流式多处理器）：GPU由几十到一百多个SM组成，每个线程块被整体分配到一个SM上，块内线程可以共享数据、互相同步。</li><li><b>warp</b>：SM以32个线程为一组调度，同一warp内的线程同时执行同一条指令（SIMT）。若遇到分支、不同线程走不同的路，两条路要依次执行，叫<b>分支发散</b>。</li><li><b>Tensor Core</b>：SM内专门做小矩阵乘加的单元，从<a class="ln" href="../n/v100.html">V100与Tensor Core</a>开始引入，提供了大部分深度学习算力。</li></ul><p><b>存储层次</b>（越往上越快、越小）。</p><ul><li><b>寄存器</b>：每个线程私有，最快。</li><li><b>共享内存</b>/L1：每个SM上几百KB以内的片上SRAM，块内线程共享，需要程序员显式管理。</li><li><b>L2缓存</b>：全芯片共享。</li><li><b>全局内存</b>（显存，HBM）：几十GB，带宽每秒数TB，但相对于计算仍是瓶颈，见<a class="lc" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a>。</li></ul><p>高效kernel的核心技巧是<b>分块</b>（tiling）：把一块数据从显存读进共享内存，在片上反复使用多次，再写回。矩阵乘法库（如<a class="ln" href="../n/cutlass.html">CUTLASS</a>）和FlashAttention都靠这个思路减少显存读写。相邻线程访问相邻地址时多次访问可以合并成一次（访存合并），否则带宽会被浪费。</p><p><b>为什么AI研究者需要知道</b>。很多“理论上更少计算”的方法实际并不更快，因为它们访存不规则或无法使用Tensor Core；反之，<a class="lc" href="../c/efficient-attention.html">稀疏注意力与高效注意力</a>中的许多改进主要靠更好地利用这套层次结构。<a class="ln" href="../n/triton-lang.html">Triton GPU编程语言</a>让人用Python按块编写kernel，降低了写高性能算子的门槛；把多个小kernel融合成一个、减少启动开销和中间结果的显存往返，也是编译器（如torch.compile）的主要工作。</p>
+<div class="example"><h4>例子</h4><p>对一个1024×1024的矩阵逐元素加1：启动一个kernel，每个线程块256个线程，共<code>1024×1024/256 = 4096</code>个块，每个线程处理一个元素，即8个warp一块。这个操作每个元素只做1次加法、却要读4字节写4字节（FP32），完全受带宽限制：在每秒3TB的显存上约需<code>8MB/3TB/s ≈ 2.8微秒</code>，而kernel启动本身就可能要几微秒，所以把它和前后的操作融合起来最划算。</p></div>
+<h2>容易误解的地方</h2><ul><li>“GPU核心数”的营销口径各厂商不同，不能直接拿来比较算力；比较时看各精度的峰值FLOPS和显存带宽。</li><li>线程块用的共享内存和寄存器太多，SM上能同时驻留的warp就少（占用率低），隐藏访存延迟的能力随之下降。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

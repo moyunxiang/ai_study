@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>绝对位置编码与相对位置编码（Absolute and Relative Position Encodings） · AI脉络</title>
+<meta name="description" content="位置编码的两大类：绝对位置编码告诉模型“这是第几个token”（正弦编码、可学习位置向量）；相对位置编码让注意力只依赖两个token之间的距离（T5偏置、ALiBi、RoPE）。后者更利于处理比训练时更长的序列。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/relative-position-encoding.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="绝对位置编码与相对位置编码（Absolute and Relative Position Encodings）">
+<meta property="og:description" content="位置编码的两大类：绝对位置编码告诉模型“这是第几个token”（正弦编码、可学习位置向量）；相对位置编码让注意力只依赖两个token之间的距离（T5偏置、ALiBi、RoPE）。后者更利于处理比训练时更长的序列。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/relative-position-encoding.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/relative-position-encoding">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>绝对位置编码与相对位置编码</h1><div class="full">Absolute and Relative Position Encodings</div>
+<p class="muted" style="font-size:13px">也叫：relative position encoding　相对位置编码　relative positional encoding　absolute position encoding　绝对位置编码　absolute positional embedding　sinusoidal positional encoding　正弦位置编码　sinusoidal　learned positional embedding　可学习位置编码　T5 relative bias　T5相对位置偏置　位置偏置　length extrapolation　长度外推</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/relative-position-encoding">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>位置编码的两大类：绝对位置编码告诉模型“这是第几个token”（正弦编码、可学习位置向量）；相对位置编码让注意力只依赖两个token之间的距离（T5偏置、ALiBi、RoPE）。后者更利于处理比训练时更长的序列。</b></p>
+<p class="tags">先要会：<a class="chip c" href="positional-encoding.html">位置编码</a> <a class="chip c" href="self-attention.html">自注意力与多头注意力</a></p>
+<p>注意力本身不区分顺序（见<a class="lc" href="../c/positional-encoding.html">位置编码</a>），必须另外注入位置信息。怎么注入，有两种基本思路。</p><p><b>绝对位置编码</b>。给每个位置p一个向量，加到该位置的词嵌入上（见<a class="lc" href="../c/token-embedding.html">词嵌入层</a>）。</p><ul><li><b>正弦编码</b>：<a class="ln" href="../n/transformer.html">Transformer</a>原文用不同频率的正弦和余弦函数生成位置向量，<code>PE(p, 2i) = sin(p / 10000^(2i/d))</code>，<code>PE(p, 2i+1) = cos(p / 10000^(2i/d))</code>，不需要学习。</li><li><b>可学习位置向量</b>：<a class="ln" href="../n/bert.html">BERT</a>和<a class="ln" href="../n/gpt-2.html">GPT-2</a>为每个位置（如0到511或0到1023）学一个向量。超过训练的最大长度就没有对应的向量，模型无法处理更长的输入。</li></ul><p>问题在于：语言里重要的往往是“两个词相隔多远”，而不是“这个词在第几位”。“猫追老鼠”这句话出现在文章第10个词还是第1000个词，意思不变。</p><p><b>相对位置编码</b>。让注意力分数直接依赖相对距离<code>i − j</code>。</p><ul><li><b>Shaw等人</b>（<a class="ln" href="../n/relative-position.html">相对位置表示</a>，2018）：为每个截断范围内的相对距离学一个向量，加到注意力计算的键（和值）上。</li><li><b>T5偏置</b>：<a class="ln" href="../n/t5.html">T5</a>给每个相对距离（按对数分桶）学一个标量，直接加到注意力分数上，各层共享。</li><li><b>ALiBi</b>：<a class="ln" href="../n/alibi.html">ALiBi线性偏置位置</a>不学参数，给分数加一个与距离成正比的负偏置<code>−m·(i − j)</code>，每个头用不同的斜率m，距离越远惩罚越大。</li><li><b>RoPE</b>：<a class="ln" href="../n/rope.html">旋转位置编码RoPE</a>把Q和K按位置旋转一个角度，使<code>q_i · k_j</code>只依赖<code>i − j</code>。形式上作用在每个位置上（像绝对编码），效果上却是相对编码，这是它的巧妙之处。今天的大多数开源大模型都用RoPE。</li><li><b>DeBERTa</b>的解耦注意力（<a class="ln" href="../n/deberta.html">DeBERTa解耦注意力</a>）分别计算内容-内容、内容-位置、位置-内容三项。</li></ul><p><b>为什么相对编码更受欢迎</b>。它天然具有平移不变性，对“同样的局部模式出现在不同位置”泛化更好，也为<b>长度外推</b>（处理比训练更长的序列）打下基础：ALiBi在比训练更长的输入上退化较慢；RoPE再配合位置插值、<a class="ln" href="../n/yarn.html">YaRN</a>等方法（见<a class="lc" href="../c/rope-context-extension.html">位置编码外推与上下文扩展</a>）可以把上下文扩展很多倍。还有研究发现，仅解码器模型完全不加位置编码（<a class="ln" href="../n/nope-length-gen.html">无位置编码NoPE</a>）也能靠因果掩码隐式地学到位置信息。</p>
+<div class="example"><h4>例子</h4><p>句子“猫 追 老鼠”中，“追”在位置1，“老鼠”在位置2。</p><ul><li>绝对编码：“追”的输入 = 嵌入(追) + PE(1)，“老鼠”的输入 = 嵌入(老鼠) + PE(2)。如果这句话出现在位置100到102，输入就变成加PE(101)和PE(102)，模型需要自己学会这两种情况本质一样。</li><li>ALiBi（斜率m = 0.5）：“老鼠”看“追”时分数加−0.5×1 = −0.5，看“猫”时加−1.0。不管这句话出现在哪里，偏置都相同。</li><li>RoPE：位置1和位置2的旋转角度之差，与位置101和位置102的角度之差相同，所以点积只取决于相距1个位置。</li></ul></div>
+<h2>容易误解的地方</h2><ul><li>“相对位置编码”是一大类方法的统称，各方法的长度外推能力差别很大，不能一概而论。</li><li>外推到训练长度以外时，即使位置编码本身支持，模型也可能因为没见过那么长的上下文而表现下降，通常仍需在长文本上做少量继续训练。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

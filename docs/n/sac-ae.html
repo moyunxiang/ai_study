@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SAC+AE像素自编码（2019） · AI脉络</title>
+<meta name="description" content="直接从图像学控制的无模型RL很难：只靠稀疏的奖励信号去训练一个大容量的图像编码器样本效率极低；加图像重建的辅助损失能帮忙，但放进离策略算法里训练常常发散。 分析发现发散的根源是以往用的VAE；改用确定性的正则化自编码器，让编码器只接收评论家和重建的梯度、不接收演员的梯度，再把它接到SAC上（SAC…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sac-ae.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SAC+AE像素自编码（2019）">
+<meta property="og:description" content="直接从图像学控制的无模型RL很难：只靠稀疏的奖励信号去训练一个大容量的图像编码器样本效率极低；加图像重建的辅助损失能帮忙，但放进离策略算法里训练常常发散。 分析发现发散的根源是以往用的VAE；改用确定性的正则化自编码器，让编码器只接收评论家和重建的梯度、不接收演员的梯度，再把它接到SAC上（SAC…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sac-ae.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sac-ae">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 分层、表示与元学习</div>
+<h1>SAC+AE像素自编码</h1>
+<div class="full">Improving Sample Efficiency in Model-Free Reinforcement Learning from Images</div>
+<div class="meta"><span>2019.10</span><span>论文</span><span>延伸</span><span>AAAI 2021</span><span>Denis Yarats, Amy Zhang, Ilya Kostrikov, Brandon Amos, Joelle Pineau, Rob Fergus · NYU / FAIR / McGill</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1910.01741" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://sites.google.com/view/sac-ae/home" rel="noopener">项目页 ↗</a><a class="btn sm" href="../index.html#/n/sac-ae">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>直接从图像学控制的无模型RL很难：只靠稀疏的奖励信号去训练一个大容量的图像编码器样本效率极低；加图像重建的辅助损失能帮忙，但放进离策略算法里训练常常发散。</p></div><div><h4>方法</h4><p>分析发现发散的根源是以往用的VAE；改用确定性的正则化自编码器，让编码器只接收评论家和重建的梯度、不接收演员的梯度，再把它接到SAC上（SAC+AE）。</p></div><div><h4>影响</h4><p>像素输入连续控制的早期强基线，确立了“编码器由评论家训练、演员复用其特征”的做法，后来的CURL、DrQ、DrQ-v2都沿用这一结构并以它为对比。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>SAC+AE由三部分组成：</p><ul><li><b>编码器-解码器</b>：卷积编码器 <code>z = f_enc(o)</code> 把堆叠的图像帧压成低维特征，确定性的解码器从z重建图像。损失是重建误差加上对z的L2惩罚和解码器权重衰减，相当于一个正则化自编码器（RAE），不像VAE那样采样潜变量；</li><li><b>SAC</b>：评论家和演员都以z为输入，按<a class="ln" href="../n/sac.html">SAC</a>训练；</li><li><b>梯度的去向</b>：重建损失和评论家损失的梯度都传回编码器；演员损失的梯度不传回编码器（演员只是“借用”特征）。作者发现让演员梯度也更新编码器会损害表现。</li></ul><p>论文还专门分析了不稳定的原因：把以往工作里的β-VAE换进离策略学习时，潜变量的随机性和KL项让表示不断漂移，Q学习的目标随之不稳定，导致发散。改成确定性自编码器加上述梯度安排后训练稳定。摘要称这个简单方法在MuJoCo（DeepMind Control）控制任务上达到当时无模型与基于模型（如PlaNet、SLAC）方法的水平，并且对观测噪声更鲁棒。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>像素重建会把能力花在与控制无关的背景细节上，背景复杂或有干扰时表示质量下降。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/curl.html">CURL对比表征RL</a> <a class="chip hue" style="--h:120" href="../n/drq.html">图像增强DrQ</a></div></li><li>仍需额外的解码器和重建损失，计算开销比纯数据增强的方法大。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/drq.html">图像增强DrQ</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:288" href="../n/beta-vae.html">β-VAE与解耦表示</a><span class="yr">2016.11 · 生成</span><div class=nt>指出β-VAE等随机自编码器是离策略训练发散的原因，改用确定性正则化自编码器。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/sac.html">SAC</a><span class="yr">2018.01 · RL</span><div class=nt>以SAC为控制算法，在编码特征上训练演员和评论家。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/dm-control.html">DeepMind Control Suite</a><span class="yr">2018.01 · RL</span><div class=nt>在DeepMind Control像素任务上评测。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/planet.html">PlaNet</a><span class="yr">2018.11 · 具身·世界模型</span><div class=nt>与PlaNet等基于模型的像素控制方法比较，以无模型方式达到相近水平。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/curl.html">CURL对比表征RL</a><span class="yr">2020.04 · RL</span><div class=nt>像素重建会把能力花在与控制无关的背景细节上，背景复杂或有干扰时表示质量下降。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/drq.html">图像增强DrQ</a><span class="yr">2020.04 · RL</span><div class=nt>像素重建会把能力花在与控制无关的背景细节上，背景复杂或有干扰时表示质量下降。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/proto-rl.html">Proto-RL原型表示</a><span class="yr">2021.02 · RL</span><div class=nt>沿用同一作者的像素SAC框架，把重建换成原型对比式表示学习，并加入探索。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autoencoder.html">自编码器</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/feature-representation.html">特征与表示学习</a></p>
+<h2>本篇术语</h2><ul><li><b>正则化自编码器（RAE）</b>　确定性的自编码器，用潜变量的L2惩罚和权重衰减代替VAE的KL项来约束表示。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/sac.html">SAC</a>；读SAC+AE原文第4节关于发散原因的分析和梯度安排；在DMC的cheetah-run像素版上分别让演员梯度传或不传回编码器，比较曲线。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1910.01741" rel="noopener">https://arxiv.org/abs/1910.01741</a>（标题、六位作者、arXiv v1于2019-10-02；摘要中从图像做无模型RL困难、稀疏奖励训练大容量编码器样本效率低、重建等辅助损失有帮助但放进离策略学习常不稳定、找出VAE是发散原因、提出提高稳定性的技术、在MuJoCo控制任务上匹配最好的无模型与基于模型方法、对观测噪声更鲁棒。RAE损失与演员梯度不传回编码器的设计、对比PlaNet与SLAC按原文正文通行描述；AAAI 2021按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SAC%2BAE%E5%83%8F%E7%B4%A0%E8%87%AA%E7%BC%96%E7%A0%81%EF%BC%88sac-ae%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asac-ae%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sac-ae.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="sac-discrete.html"><small>本分支上一个 · 2019.10</small><b>离散动作SAC</b></a><a class="r" href="varibad.html"><small>本分支下一个 · 2019.10</small><b>VariBAD贝叶斯自适应</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>token对数概率（logprobs）（Token Log-Probabilities） · AI脉络</title>
+<meta name="description" content="模型给每个token的对数概率log p。很多推理框架和API可以返回生成的每个token及其logprob，以及每一步概率最高的几个候选。它是打分、置信度估计、分类和评测的基础工具。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/logprobs.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="token对数概率（logprobs）（Token Log-Probabilities）">
+<meta property="og:description" content="模型给每个token的对数概率log p。很多推理框架和API可以返回生成的每个token及其logprob，以及每一步概率最高的几个候选。它是打分、置信度估计、分类和评测的基础工具。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/logprobs.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/logprobs">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 入门</div>
+<h1>token对数概率（logprobs）</h1><div class="full">Token Log-Probabilities</div>
+<p class="muted" style="font-size:13px">也叫：logprobs　logprob　log probability　对数概率　token概率　token probability　top_logprobs　序列对数似然　sequence log-likelihood　output scores　输出分数　置信度分数</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/logprobs">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>模型给每个token的对数概率log p。很多推理框架和API可以返回生成的每个token及其logprob，以及每一步概率最高的几个候选。它是打分、置信度估计、分类和评测的基础工具。</b></p>
+<p class="tags">先要会：<a class="chip c" href="softmax.html">Softmax与logits</a> <a class="chip c" href="probability-basics.html">随机变量与概率分布</a></p>
+<p>语言模型每一步都会输出整个词表上的概率分布（见<a class="lc" href="../c/softmax.html">Softmax与logits</a>、<a class="lc" href="../c/lm-head.html">语言模型头与输出层</a>），但通常只把采样出的token交给用户。如果同时把它的概率也拿出来，就能做很多事。由于概率连乘会迅速变得极小，实践中一律使用<b>对数概率</b>（logprob）：</p><p><code>logprob(y_t) = log p(y_t | 前文)</code>，取值≤0，越接近0越确定。</p><p>整段文本的对数概率就是各token对数概率之和（见<a class="lc" href="../c/autoregressive.html">自回归生成</a>），平均负对数概率取指数就是<a class="lc" href="../c/perplexity.html">困惑度</a>。</p><p><b>能拿来做什么</b>。</p><ul><li><b>给文本打分</b>：比较几段候选文本在模型下哪个更可能，用于多选题评测（见<a class="lc" href="../c/likelihood-scoring.html">多选题评测：似然打分与字母作答</a>）、重排序和检测训练数据泄漏（见<a class="lc" href="../c/data-contamination.html">数据泄漏与基准污染</a>）。</li><li><b>分类</b>：让模型输出“是/否”或类别名，直接比较这几个token的概率，比解析自由文本更稳定，还能得到一个连续的分数。</li><li><b>置信度</b>：答案token的概率低，往往意味着模型没把握，可以据此提示用户或转人工（见<a class="lc" href="../c/calibration-concept.html">模型校准</a>、<a class="lc" href="../c/refusal-abstention.html">拒答与不确定时弃权</a>）。不过对话模型经过对齐训练后，概率的校准程度通常变差，不能直接当作正确率。</li><li><b>调试生成</b>：查看每一步的top-k候选（top_logprobs），能看出模型在哪个位置“犹豫”，以及采样参数（见<a class="lc" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a>）实际起了什么作用。<a class="ln" href="../n/forking-tokens.html">高熵分叉词元</a>的研究就关注推理链中那些概率分布很分散、决定了后续走向的少数token。</li><li><b>训练</b>：强化学习和偏好优化都需要策略和参考模型在生成序列上的logprob（见<a class="lc" href="../c/kl-penalty-reference.html">参考模型与KL惩罚</a>、<a class="ln" href="../n/dpo.html">DPO直接偏好优化</a>）。</li></ul><p><b>接口上的常见参数</b>。是否返回生成token的logprob、每一步返回前几个候选（top_logprobs）、是否返回提示部分各token的logprob（有的API为防止模型被“蒸馏”或窃取而不提供）。<a class="ln" href="../n/stealing-production-lm.html">窃取生产级LLM的参数</a>展示了仅凭API返回的logits或logprob信息就能恢复出模型最后一层的部分参数，这是一些服务限制logprob输出的原因之一。</p>
+<div class="example"><h4>例子</h4><p>模型生成“巴黎”，返回：</p><ul><li>第1个token“巴”：logprob = −0.05（概率约0.95），候选：“巴” −0.05、“里” −3.2、“马” −4.1。</li><li>第2个token“黎”：logprob = −0.01（概率约0.99）。</li></ul><p>整段logprob = −0.06，概率约0.94。</p><p>分类用法：问“这条评论是正面的吗？回答是或否”，读取下一个token“是”的logprob −0.36（0.70）和“否”的logprob −1.24（0.29），得到正面概率约0.70。</p></div>
+<h2>容易误解的地方</h2><ul><li>logprob依赖分词：同一个词在不同模型里被切成不同数量的token，直接比较两个模型的logprob没有意义。</li><li>采样时用了温度或top-p，返回的logprob可能是调整前或调整后的分布，不同API约定不同，用之前看文档。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "id": "deita",
+  "who": "Wei Liu, Weihao Zeng, Keqing He, Yong Jiang, Junxian He · 香港科技大学等",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2312.15685"},
+    {"label": "代码", "url": "https://github.com/hkust-nlp/deita"}
+  ],
+  "aka": ["Deita", "DEITA", "Data-Efficient Instruction Tuning for Alignment", "What Makes Good Data for Alignment", "指令数据自动选择", "复杂度质量多样性", "Evol Complexity", "Evol Quality"],
+  "problem": "大家已经知道少量好数据就能做好指令微调，但“好”到底指什么、怎样从几十万条候选中自动挑出来，没有系统的答案；只按质量打分会挑出一堆简单题。",
+  "idea": "把指令数据的好坏拆成复杂度、质量、多样性三个维度，分别做控制实验并设计新的打分方法：用演化出的样本训练复杂度和质量打分器，两者相乘排序，再按嵌入距离去掉与已选样本太相似的，只选6千条做SFT。",
+  "impact": "给出一套可复现的“三维度”数据选择配方，6千条SFT数据（比基线少10倍以上）就达到当时开源对齐模型的水平，并公开了打分器和选出的数据，成为后续数据选择研究的常用基线。",
+  "background": "[[lima]]说明1000条精选数据就能对齐，[[alpagasus]]用ChatGPT按准确性打分过滤数据，[[wizardlm]]的Evol-Instruct则通过不断改写把指令变得更难。各种方法分别强调了质量或复杂度，但没有人在同一套设置下比较这些维度的作用，也没有说明它们该怎么组合。",
+  "method": "**控制实验**：先固定其他条件，只沿一个维度挑数据，比较训练效果，检验已有的度量（如指令长度、困惑度、ChatGPT直接打分）和新提出的度量。\n\n**复杂度打分（Evol Complexity）**：取少量种子指令，用ChatGPT按Evol-Instruct的方式把每条依次改写得越来越复杂，得到同一指令的若干版本；再让ChatGPT对这一组版本一起排序打分。由于组内样本只差复杂度，比较更准。用这些分数训练一个小打分模型，就能给全部候选打复杂度分c。\n\n**质量打分（Evol Quality）**：同理，让ChatGPT把回答逐步改写得更好，组内排序打分，训练质量打分模型，得到分数q。\n\n**多样性（Repr Filter）**：把样本按综合分 `s = c × q` 从高到低遍历，用模型的句向量表示每个样本；若它与已选样本中最近邻的余弦距离大于阈值才加入。这样高分样本优先，又不会挑出一堆重复的题。\n\n最终从约30万条的候选池（来自WizardLM、UltraChat、ShareGPT等）中选出6千条，在LLaMA和[[mistral-7b]]上做SFT，再可选地用[[dpo]]训练。",
+  "results": "只用6千条SFT样本（比基线少10倍以上），Deita模型达到或超过当时最好的开源对齐模型。Deita-Mistral-7B在6千条SFT加1万条DPO数据训练后，MT-Bench得分7.55，AlpacaEval胜率90.06%。",
+  "legacy": "复杂度×质量+多样性去重成为指令数据筛选的标准思路之一，Deita的打分器和数据集被后续开源后训练直接使用；[[less]]则从另一个角度出发，针对特定能力用梯度相似度选数据。",
+  "limits": [
+    {"text": "打分器的标注来自ChatGPT，复杂度与质量的“好”沿用了强模型的偏好；在MT-Bench、AlpacaEval这类同样由GPT-4评判的榜上收益最明显。", "solved_by": []},
+    {"text": "选的是通用对话数据，没有针对推理、代码等特定能力；多样性只靠句向量距离近似。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "alpagasus", "type": "extends", "note": "AlpaGasus只按准确性打分过滤；Deita把质量与复杂度、多样性一起建模。"},
+    {"to": "wizardlm", "type": "uses", "note": "借用Evol-Instruct的逐步改写来构造只差复杂度（或质量）的样本组，用于训练打分器。"},
+    {"to": "lima", "type": "extends", "note": "把“少量精选数据就够”从人工挑选推进到自动、可解释的选择流程。"},
+    {"to": "mistral-7b", "type": "uses", "note": "主要结果在Mistral-7B上取得。"},
+    {"to": "dpo", "type": "uses", "note": "SFT后再用1万条DPO数据做偏好优化。"}
+  ],
+  "prereq": ["instruction-tuning", "embedding", "sentence-embedding", "rlhf-concept"],
+  "terms": [
+    {"t": "数据复杂度", "d": "一条指令需要多少步骤、约束和知识才能答好；太简单的样本对模型帮助小。"},
+    {"t": "多样性过滤", "d": "选数据时跳过与已选样本过于相似的候选，避免训练集被同一类题目占满。"}
+  ],
+  "learn": "先读[[alpagasus]]和[[wizardlm]]；读本文第2节三个维度的控制实验和第3节选择算法；动手：用开源的Deita打分器给一小批指令打分，按c×q排序后加一个余弦距离阈值，看最后选出的样本长什么样。",
+  "check": {"source": "https://arxiv.org/abs/2312.15685", "confirmed": "标题、5位作者、arXiv首次提交2023-12-25；摘要中数据工程对指令微调关键、从复杂度、质量、多样性三个维度控制研究并提出新的度量技术、基于度量的简单选择策略、deita基于LLaMA与Mistral、只用6K SFT样本（比基线少10倍以上）达到或超过开源SOTA、Mistral-7B加DPO（6K SFT+10K DPO）MT-Bench 7.55与AlpacaEval 90.06%。Evol Complexity/Quality的构造、c×q综合分、Repr Filter余弦阈值、约30万候选池、ICLR 2024与机构为对正文的一般了解。"}
+}

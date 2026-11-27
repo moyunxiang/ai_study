@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>QGPO对比能量引导扩散（2023） · AI脉络</title>
+<meta name="description" content="想从 μ(a|s)·exp(βQ(s, a)) 这样“行为分布乘以能量”的目标分布采样时，扩散模型需要每个噪声步上的中间引导，而这个中间引导由采样分布和能量共同决定，此前的方法只能近似，估不准。 推导出中间引导的精确形式，并提出“对比能量预测”（CEP）目标来学习它；用学到的引导直接在扩散采样中把…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/qgpo.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="QGPO对比能量引导扩散（2023）">
+<meta property="og:description" content="想从 μ(a|s)·exp(βQ(s, a)) 这样“行为分布乘以能量”的目标分布采样时，扩散模型需要每个噪声步上的中间引导，而这个中间引导由采样分布和能量共同决定，此前的方法只能近似，估不准。 推导出中间引导的精确形式，并提出“对比能量预测”（CEP）目标来学习它；用学到的引导直接在扩散采样中把…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/qgpo.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/qgpo">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 离线RL与序列建模</div>
+<h1>QGPO对比能量引导扩散</h1>
+<div class="full">Contrastive Energy Prediction for Exact Energy-Guided Diffusion Sampling in Offline Reinforcement Learning</div>
+<div class="meta"><span>2023.04</span><span>论文</span><span>延伸</span><span>ICML 2023</span><span>Cheng Lu, Huayu Chen, Jianfei Chen, Hang Su, Chongxuan Li, Jun Zhu · 清华大学 / 人民大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2304.12824" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/qgpo">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>想从 <code>μ(a|s)·exp(βQ(s, a))</code> 这样“行为分布乘以能量”的目标分布采样时，扩散模型需要每个噪声步上的中间引导，而这个中间引导由采样分布和能量共同决定，此前的方法只能近似，估不准。</p></div><div><h4>方法</h4><p>推导出中间引导的精确形式，并提出“对比能量预测”（CEP）目标来学习它；用学到的引导直接在扩散采样中把行为模型推向高Q值区域，在离线RL里称为Q引导策略优化（QGPO）。</p></div><div><h4>影响</h4><p>给“能量引导的扩散采样”提供了一个可证明收敛到精确引导的训练方法，是扩散策略离线RL的代表方法之一，常与SfBC、IDQL、Diffusion-QL并列比较。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>离线RL里常见的目标策略是 <code>π(a|s) ∝ μ(a|s)·exp(β·Q(s, a))</code>。若μ由扩散模型学得，要从π采样，按分数模型的理论，在每个噪声水平t上需要的分数是：</p><p class="formula"><code>∇_(a_t) log π_t(a_t|s) = ∇_(a_t) log μ_t(a_t|s) + ∇_(a_t) E_t(s, a_t)</code></p><p>第一项是行为扩散模型给的，第二项是<b>中间能量引导</b>。论文证明这个中间能量的精确形式是 <code>E_t(s, a_t) = log E_(μ_(0|t)(a_0|a_t, s))[exp(β·Q(s, a_0))]</code>，即对“从a_t去噪后可能落到的干净动作”求能量的指数期望。它并不等于直接把Q用在带噪动作上（以往近似做法），所以以往方法得到的引导有偏。</p><p><b>对比能量预测</b>（CEP）：对每个状态从行为分布采K个干净动作，加噪到t，训练一个网络 <code>f_φ(s, a_t, t)</code>，用类似<a class="lc" href="../c/contrastive-learning.html">对比学习</a>的softmax交叉熵目标，让它对各候选的预测与 <code>softmax(β·Q(s, a_0^i))</code> 对齐。作者证明在模型容量和数据无限时，这个目标收敛到精确的中间引导。</p><p>采样时把 <code>∇f_φ</code> 加到行为扩散模型的分数上即可，类似分类器引导。摘要称在D4RL上超过已有最好算法，并给出了把CEP用于图像生成的例子说明其可扩展性。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要先训练行为扩散模型和Q函数，再训练引导网络，三阶段流程繁琐，采样时仍需多步去噪。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/fql.html">FQL流Q学习</a></div></li><li>引导的准确度依赖Q函数本身，Q在数据外估计不准时引导也会出错。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:288" href="../n/ddpm.html">DDPM</a><span class="yr">2020.06 · 生成</span><div class=nt>行为策略由扩散模型表示。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:288" href="../n/adm.html">扩散超越GAN</a><span class="yr">2021.05 · 生成</span><div class=nt>沿用分类器引导的思路，把类别概率换成Q值定义的能量，并给出精确的中间引导。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/diffusion-ql.html">Diffusion-QL扩散策略</a><span class="yr">2022.08 · RL</span><div class=nt>Diffusion-QL对去噪链反传Q梯度；QGPO用学到的能量引导采样。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/sfbc.html">SfBC扩散行为候选选择</a><span class="yr">2022.09 · RL</span><div class=nt>SfBC靠候选重采样近似目标分布；QGPO用精确的中间能量引导直接采样。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/fql.html">FQL流Q学习</a><span class="yr">2025.02 · RL</span><div class=nt>需要先训练行为扩散模型和Q函数，再训练引导网络，三阶段流程繁琐，采样时仍需多步去噪。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/offline-rl.html">离线强化学习</a> <a class="chip c" href="../c/score-function.html">分数函数与分数匹配</a> <a class="chip c" href="../c/guidance.html">条件生成与引导</a> <a class="chip c" href="../c/energy-based.html">能量模型与玻尔兹曼分布</a></p>
+<h2>本篇术语</h2><ul><li><b>能量引导采样</b>　在扩散模型的每个去噪步上加上一个能量函数的梯度，使样本偏向能量高（这里是Q值高）的区域。</li><li><b>对比能量预测（CEP）</b>　用多候选softmax对比目标学习中间能量引导的训练方法。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/sfbc.html">SfBC扩散行为候选选择</a>和分类器引导；读QGPO原文第3节精确引导的推导；在二维多峰玩具分布上比较近似引导与CEP引导的采样结果。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2304.12824" rel="noopener">https://arxiv.org/abs/2304.12824</a>（标题、六位作者、arXiv v1于2023-04-25；摘要中能量函数定义的引导采样、中间引导由采样分布与能量共同决定且难以估计、提出中间引导的精确表述与对比能量预测（CEP）训练目标、在无限容量与数据下保证收敛到精确引导、应用于离线RL、D4RL上超过最好算法、图像生成示例。精确引导的公式与QGPO名称按原文正文通行描述；ICML 2023与单位按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20QGPO%E5%AF%B9%E6%AF%94%E8%83%BD%E9%87%8F%E5%BC%95%E5%AF%BC%E6%89%A9%E6%95%A3%EF%BC%88qgpo%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aqgpo%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/qgpo.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ivr.html"><small>本分支上一个 · 2023.03</small><b>IVR隐式价值正则（SQL/EQL）</b></a><a class="r" href="qrl.html"><small>本分支下一个 · 2023.04</small><b>QRL拟度量强化学习</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

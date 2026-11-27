@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Landmark地标注意力（2023） · AI脉络</title>
+<meta name="description" content="注意力的显存随上下文长度增长，读不了很长的输入。循环记忆（如Transformer-XL）丢掉了“随时回看任意位置”的能力；外挂检索又要另一套与注意力不兼容的检索机制。 把输入切成固定长度的块，每块末尾加一个“地标”词元，训练注意力先通过地标判断哪一块相关、再看块内的词。推理时只需把与查询最相关的…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/landmark-attention.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Landmark地标注意力（2023）">
+<meta property="og:description" content="注意力的显存随上下文长度增长，读不了很长的输入。循环记忆（如Transformer-XL）丢掉了“随时回看任意位置”的能力；外挂检索又要另一套与注意力不兼容的检索机制。 把输入切成固定长度的块，每块末尾加一个“地标”词元，训练注意力先通过地标判断哪一块相关、再看块内的词。推理时只需把与查询最相关的…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/landmark-attention.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/landmark-attention">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 长上下文与高效注意力</div>
+<h1>Landmark地标注意力</h1>
+<div class="full">Landmark Attention: Random-Access Infinite Context Length for Transformers</div>
+<div class="meta"><span>2023.05</span><span>论文</span><span>延伸</span><span>NeurIPS 2023</span><span>Amirkeivan Mohtashami, Martin Jaggi · EPFL</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2305.16300" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/epfml/landmark-attention" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/landmark-attention">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>注意力的显存随上下文长度增长，读不了很长的输入。循环记忆（如Transformer-XL）丢掉了“随时回看任意位置”的能力；外挂检索又要另一套与注意力不兼容的检索机制。</p></div><div><h4>方法</h4><p>把输入切成固定长度的块，每块末尾加一个“地标”词元，训练注意力先通过地标判断哪一块相关、再看块内的词。推理时只需把与查询最相关的少数几个块取进来，检索本身就由注意力完成，完整上下文可以放在任意层级的存储里。</p></div><div><h4>影响</h4><p>把“块级检索”嵌进注意力本身，证明可以在保留随机访问的前提下处理任意长的上下文；把LLaMA 7B微调到32K以上上下文，是2023年长上下文扩展的代表工作之一，也是后来块稀疏注意力（MoBA、NSA）一类思路的先驱。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>2023年上半年，开源模型的上下文只有2K–4K。<a class="ln" href="../n/transformer-xl.html">Transformer-XL</a>和<a class="ln" href="../n/rmt.html">循环记忆Transformer</a>用循环记忆把过去压成固定状态，只能“隐约记得”，无法精确回看某一段；<a class="ln" href="../n/memorizing-transformer.html">外接kNN记忆</a>外接kNN记忆按词检索，检索与注意力是两套机制，检索粒度细、开销大。人们希望既能看完整上下文，又不必每一步都对全部词做注意力。</p><h2>方法</h2><p><b>地标词元</b>：把输入每L个词（论文中如50）划为一块，在块末插入一个特殊的地标词元。它的键向量要学会代表整块的内容。</p><p><b>分组softmax</b>：训练时，普通词对其他块的注意力被改写为两级：先用查询与各块地标键的相似度做一次softmax，得到“选中这一块”的权重g_j；再在块内对各词做softmax。块内词i的最终注意力权重近似为 <code>a_i = g_{block(i)} · softmax_{块内}(q·k_i)</code> 当前块内的词照常直接注意。这样梯度会推动地标键去代表“这一块对当前查询有多重要”。训练用的上下文不必很长，只要包含若干块。</p><p><b>推理时检索</b>：把所有过去块的键值缓存起来（可以放在CPU内存甚至更慢的存储里），每一步用查询与地标键比较，只取得分最高的k个块的完整键值参与注意力，其余不读。检索结果由注意力自身决定，与模型完全兼容，且对不同注意力头可以取不同的块。</p><p><b>微调现有模型</b>：同样的方法可以用于已有的LLaMA 7B，短时间微调后即可在远超原长度的上下文上推理。</p><h2>结果</h2><p>在语言建模上，性能与Transformer-XL相当，而每一步需要取回的词元数明显减少；用该方法微调LLaMA 7B后，模型的上下文容量扩展到32K以上，达到当时GPT-4的上下文长度，并能在长文本中完成密钥检索类测试。</p><h2>后来的发展</h2><p>后来的长上下文研究主要转向位置插值（<a class="ln" href="../n/yarn.html">YaRN</a>）加长文本续训，但“按块选择、只对相关块做注意力”的思想在<a class="ln" href="../n/infini-attention.html">Infini-attention</a>、<a class="ln" href="../n/moba.html">MoBA块注意力</a>、<a class="ln" href="../n/nsa.html">原生稀疏注意力NSA</a>等块级稀疏注意力和KV检索方法中被继承。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>需要改动注意力计算并插入额外词元，现成的高效注意力内核不能直接用；检索按块进行，相关信息若分散在许多块中，取前k块会漏掉。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/moba.html">MoBA块注意力</a> <a class="chip hue" style="--h:0" href="../n/nsa.html">原生稀疏注意力NSA</a></div></li><li>实验主要用困惑度和密钥检索验证，没有在多跳推理等真实长文任务上系统评测，长上下文能力的“有效长度”不明确。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:264" href="../n/ruler.html">RULER长上下文</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/llama-1.html">LLaMA</a><span class="yr">2023.02 · LLM</span><div class=nt>在LLaMA 7B上微调，把上下文扩展到32K以上。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/transformer-xl.html">Transformer-XL</a><span class="yr">2019.01 · LLM</span><div class=nt>Transformer-XL的循环记忆不能随机访问早期内容；地标注意力通过块检索保留了任意位置的访问能力。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/memorizing-transformer.html">外接kNN记忆</a><span class="yr">2022.03 · LLM</span><div class=nt>同为外接长记忆；Memorizing Transformer用独立的kNN按词检索，地标注意力让注意力自己按块检索。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/rmt.html">循环记忆Transformer</a><span class="yr">2022.07 · LLM</span><div class=nt>循环记忆把历史压成固定状态，地标注意力保留完整缓存只按需读取。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/nsa.html">原生稀疏注意力NSA</a><span class="yr">2025.02 · LLM</span><div class=nt>需要改动注意力计算并插入额外词元，现成的高效注意力内核不能直接用；检索按块进行，相关信息若分散在许多块中，取前k块会漏掉。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:264" href="../n/ruler.html">RULER长上下文</a><span class="yr">2024.04 · 数据·评测</span><div class=nt>实验主要用困惑度和密钥检索验证，没有在多跳推理等真实长文任务上系统评测，长上下文能力的“有效长度”不明确。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/moba.html">MoBA块注意力</a><span class="yr">2025.02 · LLM</span><div class=nt>需要改动注意力计算并插入额外词元，现成的高效注意力内核不能直接用；检索按块进行，相关信息若分散在许多块中，取前k块会漏掉。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/context-window.html">上下文窗口</a> <a class="chip c" href="../c/retrieval.html">检索与向量数据库</a></p>
+<h2>本篇术语</h2><ul><li><b>地标词元</b>　每一块文本末尾插入的特殊词元，它的键向量学会概括整块内容，用来判断这一块与当前查询是否相关。</li><li><b>随机访问</b>　模型在生成时可以精确回看上下文中任意位置的内容，而不是只能依赖压缩后的记忆。</li></ul>
+<h2>怎么学</h2><p>先懂<a class="lc" href="../c/kv-cache.html">KV缓存</a>和<a class="ln" href="../n/transformer-xl.html">Transformer-XL</a>的循环记忆；读本文第3节分组softmax的推导和第4节检索流程；动手：在一个小模型上每50词插入地标，比较全注意力和只取前4块的困惑度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2305.16300" rel="noopener">https://arxiv.org/abs/2305.16300</a>（标题、2位作者、arXiv首次提交2023-05-25；摘要中循环记忆或检索增强牺牲随机访问或依赖独立检索机制、用地标词元代表每个输入块并训练注意力用它选块、通过注意力直接检索块、可结合专用数据结构和内存层级处理任意长上下文、与Transformer-XL性能相当且每步取回词元显著减少、微调LLaMA 7B使上下文超过32K达到GPT-4长度。块长50、分组softmax公式、取前k块与CPU缓存、NeurIPS 2023与机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Landmark%E5%9C%B0%E6%A0%87%E6%B3%A8%E6%84%8F%E5%8A%9B%EF%BC%88landmark-attention%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Alandmark-attention%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/landmark-attention.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="plaid.html"><small>本分支上一个 · 2023.05</small><b>Plaid似然扩散LM</b></a><a class="r" href="mpt-7b.html"><small>本分支下一个 · 2023.05</small><b>MPT-7B可商用开源模型</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "id": "sample-factory",
+  "who": "Aleksei Petrenko, Zhehui Huang, Tushar Kumar, Gaurav Sukhatme, Vladlen Koltun · USC / Intel Labs",
+  "venue": "ICML 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2006.11751"},
+    {"label": "GitHub", "url": "https://github.com/alex-petrenko/sample-factory"}
+  ],
+  "problem": "大规模RL实验（电子游戏智能体、机器人仿真到现实）通常依赖昂贵的分布式集群，普通研究者用不起；单机上的RL系统又受采样吞吐量限制。",
+  "idea": "专门为单机优化：把环境模拟、策略推理和学习拆成异步并行的组件，用GPU批量推理、共享内存传数据，并用V-trace等离策略修正抵消异步带来的策略滞后（Sample Factory）。",
+  "impact": "成为单机高吞吐RL训练的代表系统，常用于ViZDoom、DMLab、Isaac Gym等需要海量样本的任务，后续单机/GPU并行RL框架常与它比较吞吐量。",
+  "method": "Sample Factory的架构由三类组件组成，彼此异步运行：\n\n- **Rollout worker**：只负责运行环境，每个worker同时模拟多个环境实例，并把它们分成两组交替执行，一组等待动作时另一组在模拟，避免CPU空等；\n- **Policy worker**：在GPU上把来自所有rollout worker的观测拼成大批量做一次前向推理，返回动作；\n- **Learner**：在GPU上用收集到的轨迹训练策略，采用[[ppo]]式的目标，并用[[impala]]的V-trace等离策略修正，处理“采样时的策略比当前学习的策略旧几步”的滞后问题。\n\n组件之间通过共享内存传递张量，尽量做到零拷贝，减少进程间通信开销。摘要称这一架构在非平凡的三维控制问题上实现了每秒超过10⁵个环境帧的吞吐量，同时不牺牲样本效率。作者还扩展支持了自对弈和基于种群的训练（[[pbt]]），用来在多人第一人称射击游戏（[[vizdoom]]）中训练出很强的智能体。",
+  "limits": [
+    {"text": "为单机设计，规模受一台机器的CPU核数和GPU数限制，超大规模实验仍需分布式系统。"},
+    {"text": "异步带来的策略滞后需要离策略修正，滞后过大时样本效率会下降。"}
+  ],
+  "relations": [
+    {"to": "impala", "type": "uses", "note": "借用IMPALA的演员-学习者分离与V-trace离策略修正。"},
+    {"to": "ppo", "type": "uses", "note": "学习器使用PPO式的截断目标。"},
+    {"to": "vizdoom", "type": "uses", "note": "在ViZDoom的多人射击游戏中训练和评测。"},
+    {"to": "pbt", "type": "uses", "note": "支持基于种群的训练与自对弈。"},
+    {"to": "rllib", "type": "rivals", "note": "RLlib依赖分布式集群扩展，Sample Factory追求单机最大吞吐。"}
+  ],
+  "prereq": ["on-off-policy", "throughput-latency", "cpu-gpu", "actor-critic"],
+  "terms": [
+    {"t": "策略滞后（policy lag）", "d": "采集数据所用的策略比正在更新的策略落后若干次更新造成的偏差。"}
+  ],
+  "learn": "先懂[[impala]]的V-trace；读原文第3节架构图；用Sample Factory在ViZDoom的一个基础场景上训练，记录每秒帧数。",
+  "check": {"source": "https://arxiv.org/abs/2006.11751", "confirmed": "标题、五位作者、arXiv v1于2020-06-21；摘要中大规模RL依赖昂贵分布式系统、优化单机效率与资源利用、高效异步GPU采样器结合离策略修正、在三维控制问题上超过10^5帧/秒且不牺牲样本效率、支持自对弈与基于种群的训练、多人第一人称射击游戏。双组交替模拟、共享内存与V-trace细节按原文正文通行描述；ICML 2020与单位按通行引用。"},
+  "aka": ["Sample Factory", "SampleFactory", "sample-factory", "单机高吞吐RL"]
+}

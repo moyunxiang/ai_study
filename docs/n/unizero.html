@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>UniZero Transformer潜在规划（2024） · AI脉络</title>
+<meta name="description" content="MuZero式方法的潜在模型只看当前一帧编码的状态，靠循环展开做规划，难以处理需要长期记忆的任务，也不容易在多任务、异构场景下扩展。 用Transformer做世界模型：把过去的潜在状态和动作作为序列输入，同时预测下一个潜在状态、奖励、策略和价值，在共享的潜在空间里联合优化长时程世界模型和策略，再…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/unizero.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="UniZero Transformer潜在规划（2024）">
+<meta property="og:description" content="MuZero式方法的潜在模型只看当前一帧编码的状态，靠循环展开做规划，难以处理需要长期记忆的任务，也不容易在多任务、异构场景下扩展。 用Transformer做世界模型：把过去的潜在状态和动作作为序列输入，同时预测下一个潜在状态、奖励、策略和价值，在共享的潜在空间里联合优化长时程世界模型和策略，再…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/unizero.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/unizero">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 模型与规划</div>
+<h1>UniZero Transformer潜在规划</h1>
+<div class="full">UniZero: Generalized and Efficient Planning with Scalable Latent World Models</div>
+<div class="meta"><span>2024.06</span><span>论文</span><span>延伸</span><span>Yuan Pu, Yazhe Niu, Zhenjie Yang, Jiyuan Ren, Hongsheng Li, Yu Liu · 上海人工智能实验室 / 商汤 / 港中文</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2406.10667" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/opendilab/LightZero" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/unizero">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>MuZero式方法的潜在模型只看当前一帧编码的状态，靠循环展开做规划，难以处理需要长期记忆的任务，也不容易在多任务、异构场景下扩展。</p></div><div><h4>方法</h4><p>用Transformer做世界模型：把过去的潜在状态和动作作为序列输入，同时预测下一个潜在状态、奖励、策略和价值，在共享的潜在空间里联合优化长时程世界模型和策略，再在其中做MCTS规划（UniZero）。</p></div><div><h4>影响</h4><p>把MuZero系从“单帧+循环动力学”推进到“Transformer世界模型+序列历史”，是2024年以来该路线扩展到长记忆和多任务的代表工作之一，集成在LightZero库中。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/muzero.html">MuZero</a>的结构是：表示网络把当前观测编码成潜在状态，动力学网络 <code>s_(k+1) = g(s_k, a_k)</code> 一步步展开，预测网络给出策略与价值；规划只依赖当前一帧的编码。作者分析指出，这种设计把历史信息全部压在循环展开里，在需要记住很久以前信息的任务里表现差，而且潜在表示与决策目标之间的耦合方式限制了扩展。</p><p>UniZero的改动：</p><ul><li><b>Transformer潜在世界模型</b>：把历史上的 <code>(z_1, a_1, z_2, a_2, …, z_t)</code> 作为序列输入一个因果<a class="ln" href="../n/transformer.html">Transformer</a>，在每个位置预测下一个潜在状态、即时奖励以及当前的策略和价值。潜在状态的学习目标是与目标编码器对下一帧观测的编码一致（自监督一致性）；</li><li><b>联合优化</b>：世界模型的预测损失与策略、价值损失在同一个潜在空间里一起训练，作者称这使长时程世界模型与策略能够联合优化；</li><li><b>规划</b>：在这个以历史为条件的潜在模型中做MCTS，搜索时用KV缓存复用已有的上下文。</li></ul><p>摘要称UniZero在需要长期记忆的基准上明显超过现有基线；在Atari多任务学习实验中表现出更好的扩展性；在标准单任务的Atari和DMControl上与当前最好方法持平甚至更好。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>Transformer世界模型加MCTS的训练和推理开销都很大，上下文越长代价越高。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>主要在Atari、DMControl和若干记忆任务上验证，在开放世界或真实机器人任务上效果未知。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>用因果Transformer作为潜在世界模型。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/muzero.html">MuZero</a><span class="yr">2019.11 · RL</span><div class=nt>MuZero只用当前帧编码与循环动力学，长期记忆差；UniZero以历史序列为条件做潜在规划。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/efficientzero.html">EfficientZero</a><span class="yr">2021.10 · RL</span><div class=nt>沿用EfficientZero的自监督一致性损失来学潜在状态。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/twm.html">TWM Transformer世界模型</a><span class="yr">2023.03 · 具身·世界模型</span><div class=nt>TWM等Transformer世界模型在想象中训练策略；UniZero把Transformer模型用于MCTS规划。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/lightzero.html">LightZero MCTS基准库</a><span class="yr">2023.10 · RL</span><div class=nt>在LightZero框架中实现和评测。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/model-based-rl.html">基于模型的强化学习</a> <a class="chip c" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/world-model-concept.html">世界模型</a></p>
+<h2>本篇术语</h2><ul><li><b>潜在世界模型</b>　不预测像素，只在学到的低维潜在空间里预测下一状态和奖励的环境模型。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/muzero.html">MuZero</a>和<a class="ln" href="../n/efficientzero.html">EfficientZero</a>；读UniZero原文第3节对MuZero局限的分析与第4节模型结构；在LightZero里对比MuZero与UniZero在一个记忆任务上的表现。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2406.10667" rel="noopener">https://arxiv.org/abs/2406.10667</a>（标题、六位作者、arXiv v1于2024-06-15；摘要中MuZero式方法利用价值等价原则与MCTS、在异构场景下难以扩展、用模块化Transformer世界模型学习共享潜在空间、以潜在历史为条件同时预测潜在动力学与决策量、长时程世界模型与策略联合优化、在需要长期记忆的基准上显著超过基线、Atari多任务扩展性更好、Atari与DMControl单任务上持平或超过最好方法。自监督一致性与KV缓存等细节按原文正文通行描述；发表处未核对。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20UniZero%20Transformer%E6%BD%9C%E5%9C%A8%E8%A7%84%E5%88%92%EF%BC%88unizero%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aunizero%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/unizero.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="big-world.html"><small>本分支上一个 · 2024.06</small><b>大世界假说</b></a><a class="r" href="gymnasium.html"><small>本分支下一个 · 2024.07</small><b>Gymnasium</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

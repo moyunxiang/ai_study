@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Milvus向量数据库（2021） · AI脉络</title>
+<meta name="description" content="FAISS这类向量检索库假设数据全部装进内存、建好索引后不再变化，也不支持“相似且价格低于100元”这种带条件的查询；在关系数据库里加一列向量又跑不快。 专门为向量设计一个数据管理系统：在FAISS之上加入动态插入删除、属性过滤、多向量查询、CPU/GPU协同和多机分布式，并提供SDK和REST接…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/milvus.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Milvus向量数据库（2021）">
+<meta property="og:description" content="FAISS这类向量检索库假设数据全部装进内存、建好索引后不再变化，也不支持“相似且价格低于100元”这种带条件的查询；在关系数据库里加一列向量又跑不快。 专门为向量设计一个数据管理系统：在FAISS之上加入动态插入删除、属性过滤、多向量查询、CPU/GPU协同和多机分布式，并提供SDK和REST接…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/milvus.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/milvus">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:336"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/agent.html">推理、检索与智能体</a> › 检索增强生成</div>
+<h1>Milvus向量数据库</h1>
+<div class="full">Milvus: A Purpose-Built Vector Data Management System</div>
+<div class="meta"><span>2021.06</span><span>论文</span><span>延伸</span><span>SIGMOD 2021</span><span>Jianguo Wang, Xiaomeng Yi, Rentong Guo, Hai Jin, Peng Xu, Shengjun Li, Xiangyu Wang, Xiangzhou Guo et al. · Zilliz / 普渡大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://www.cs.purdue.edu/homes/csjgwang/pubs/SIGMOD21_Milvus.pdf" rel="noopener">论文PDF ↗</a><a class="btn sm" href="https://doi.org/10.1145/3448016.3457550" rel="noopener">ACM DL ↗</a><a class="btn sm" href="https://github.com/milvus-io/milvus" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/milvus">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>FAISS这类向量检索库假设数据全部装进内存、建好索引后不再变化，也不支持“相似且价格低于100元”这种带条件的查询；在关系数据库里加一列向量又跑不快。</p></div><div><h4>方法</h4><p>专门为向量设计一个数据管理系统：在FAISS之上加入动态插入删除、属性过滤、多向量查询、CPU/GPU协同和多机分布式，并提供SDK和REST接口。</p></div><div><h4>影响</h4><p>论文发表时已被数百个组织使用，并进入LF AI &amp; Data基金会孵化；以它为代表的“向量数据库”后来成为RAG系统存放嵌入的常用部件。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/word2vec.html">word2vec</a>之后，图片、文本、商品、分子都被表示成向量，应用要在上亿个向量里找最相似的几个，即近似<a class="ln" href="../n/knn.html">k近邻</a>。<a class="ln" href="../n/faiss.html">FAISS向量检索</a>、微软SPTAG等是算法库：数据须常驻内存、难以增删、不能跨机器；Elasticsearch、阿里AnalyticDB-V等通用数据库加向量列，又无法针对向量做底层优化。</p><p><b>设计</b>。Milvus在FAISS之上构建，支持量化类索引（如IVF）和<a class="ln" href="../n/hnsw.html">HNSW近似近邻</a>等图索引，并留出接口方便加入新索引。数据增删用LSM式结构：新数据先写入内存，再分段落盘、合并，查询时以快照隔离保证结果一致。异构计算方面，CPU侧做缓存感知和SIMD（AVX512等）优化，GPU侧设计了CPU与GPU混合的索引，并支持多块GPU调度。查询方面加入属性过滤（先按条件分区再做向量检索）和多向量查询（一个对象由人脸、姿态等多个向量描述）。系统可部署在多节点上。</p><p><b>结果</b>。论文与Vearch、SPTAG两个开源系统和三个商用系统比较，官方称最多快两个数量级，相对Vearch快6.4到47倍；并在其上搭了以图搜图、化学结构分析、新冠论文检索、问答等10个应用。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>向量检索本身只看语义相似，专有名词、编号等精确匹配需求要另配关键词检索，再做结果融合。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>近似索引在召回率、内存占用和更新速度之间需要人工选型调参，没有一种索引在所有数据规模上都最好。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:336" href="../n/faiss.html">FAISS向量检索</a><span class="yr">2017.02 · 推理·智能体</span><div class=nt>以FAISS为底层向量检索库，补上动态数据、属性过滤、分布式等FAISS缺少的数据管理能力。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/knn.html">k近邻</a><span class="yr">1967 · 基础</span><div class=nt>要解决的核心问题仍是海量高维向量上的最近邻搜索，只是改用近似索引并做成数据库服务。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:336" href="../n/hnsw.html">HNSW近似近邻</a><span class="yr">2016.03 · 推理·智能体</span><div class=nt>把HNSW等图索引作为可选索引类型之一。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/embedding.html">嵌入向量</a> <a class="chip c" href="../c/k-nearest-neighbors.html">k近邻</a> <a class="chip c" href="../c/vector-quantization.html">向量量化与离散token</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a></p>
+<h2>本篇术语</h2><ul><li><b>属性过滤</b>　向量检索时同时满足结构化条件，例如只在价格低于100元的商品向量里找最相似的。</li><li><b>LSM结构</b>　日志结构合并树：写入先进内存，攒够后批量写成不可变的段，后台再合并；写入快，适合频繁插入。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/faiss.html">FAISS向量检索</a>和<a class="ln" href="../n/hnsw.html">HNSW近似近邻</a>，理解近似最近邻索引 → 读论文第2节（系统设计）和第4节（属性过滤、多向量查询） → 动手：用Milvus或FAISS给10万条句向量建IVF和HNSW两种索引，比较召回率和查询延迟。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://www.cs.purdue.edu/homes/csjgwang/pubs/SIGMOD21_Milvus.pdf" rel="noopener">https://www.cs.purdue.edu/homes/csjgwang/pubs/SIGMOD21_Milvus.pdf</a>（标题、作者（Zilliz与普渡大学）、SIGMOD’21（2021年6月20–25日）、DOI；摘要中10个应用、与Vearch和SPTAG及三个商用系统比较、最多快两个数量级、数百个组织使用；正文第1节核对表1对比系统、基于FAISS构建、LSM与快照隔离、SIMD与GPU混合索引、属性过滤与多向量查询、比Vearch快6.4–47倍、2020年1月进入LF AI &amp; Data孵化。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Milvus%E5%90%91%E9%87%8F%E6%95%B0%E6%8D%AE%E5%BA%93%EF%BC%88milvus%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amilvus%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/milvus.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="autoprompt.html"><small>本分支上一个 · 2020.10</small><b>AutoPrompt梯度搜提示</b></a><a class="r" href="copilot.html"><small>本分支下一个 · 2021.06</small><b>GitHub Copilot</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

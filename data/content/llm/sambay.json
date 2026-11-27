@@ -1,0 +1,28 @@
+{
+  "id": "sambay",
+  "who": "Liliang Ren, Congcong Chen, Haoran Xu, Young Jin Kim, Adam Atkinson, Zheng Zhan, Jiankai Sun, Baolin Peng 等 · 微软",
+  "venue": "NeurIPS 2025",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2507.06607"}, {"label": "代码ArchScale", "url": "https://github.com/microsoft/ArchScale"}],
+  "aka": ["SambaY", "Phi-4-mini-flash-reasoning", "Phi4-mini-Flash", "phi-4-mini-flash", "GMU", "Gated Memory Unit", "门控记忆单元", "decoder-hybrid-decoder"],
+  "problem": "推理模型要生成很长的思维链，解码阶段成本高；YOCO、Samba等高效架构还没有利用“SSM层之间共享表示”来进一步省内存和计算。",
+  "idea": "提出门控记忆单元GMU，在YOCO式的交叉解码器里复用自解码器（基于Samba）某层SSM的记忆读出，用逐元素门控代替一部分交叉注意力。",
+  "impact": "SambaY的不可约损失明显低于强YOCO基线；加上差分注意力的Phi-4-mini-flash-reasoning在32K长生成下解码吞吐最高提升10倍，推理成绩还超过Phi-4-mini-reasoning。",
+  "background": "[[yoco]]把模型分成自解码器和交叉解码器，只缓存一份全局KV；[[samba]]把Mamba和滑动窗口注意力混合，预填充是线性复杂度。但推理模型的瓶颈在长输出的解码：即使只有一份KV缓存，交叉解码器每层的交叉注意力仍要读整个缓存。",
+  "method": "门控记忆单元（GMU）：取自解码器中某个SSM层的记忆读出 `m`（相当于它对当前token汇总的上下文信息），在交叉解码器的层里用当前隐藏状态 `x` 产生门控，做逐元素组合：\n\n`y = W_out · ( m ⊙ σ(W_in · x) )`\n\n这样一部分交叉解码器层不再做交叉注意力，而是直接复用SSM的读出状态，计算和内存访问都与上下文长度无关。SambaY的结构是：以Samba（Mamba加滑动窗口注意力）为自解码器，交叉解码器里交替使用交叉注意力层和GMU层。由于SSM本身携带位置信息，模型不再需要显式的位置编码。论文还用大规模的规模化实验比较不可约损失（拟合规模定律后的渐近损失），并在最大模型上加入[[differential-transformer]]的差分注意力得到Phi-4-mini-flash-reasoning。",
+  "results": "摘要报告：SambaY显著提升解码效率，保持线性的预填充复杂度，增强长上下文表现，且无需显式位置编码；规模化实验显示其不可约损失明显低于强YOCO基线；Phi4-mini-Flash-Reasoning在不使用任何强化学习的情况下，在Math500、AIME24/25、GPQA Diamond上明显优于Phi4-mini-Reasoning，在vLLM下对2K提示、32K生成长度的解码吞吐最高提升10倍。",
+  "legacy": "它把“跨层共享缓存”从KV推广到SSM状态，是为长思维链推理专门设计架构的代表工作之一；训练代码库ArchScale以开源数据开放。",
+  "limits": [
+    {"text": "公开模型只有约38亿参数级别的Phi-4-mini规模，更大规模的效果依赖规模定律外推。", "solved_by": []},
+    {"text": "GMU依赖SSM层的读出状态，与纯注意力模型或其他混合架构的兼容性需要重新设计。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "yoco", "type": "extends", "note": "沿用解码器-解码器结构，在交叉解码器中用GMU替换部分交叉注意力。"},
+    {"to": "samba", "type": "uses", "note": "以Samba混合架构作为自解码器。"},
+    {"to": "differential-transformer", "type": "uses", "note": "最大模型加入差分注意力得到Phi-4-mini-flash-reasoning。"},
+    {"to": "phi-4", "type": "extends", "note": "属于Phi-4家族，沿用其高质量合成推理数据。"}
+  ],
+  "prereq": ["state-space-model", "kv-cache", "gating", "scaling-law-concept", "reasoning-tokens"],
+  "terms": [{"t": "不可约损失", "d": "用规模定律 L(C)=E+A/C^α 拟合时的常数项E，表示算力无限增大时损失的下限，越低说明架构的潜力越大。"}],
+  "learn": "先读[[yoco]]和[[samba]]；读SambaY第3节GMU的定义；动手：用vLLM比较Phi-4-mini-flash-reasoning与Phi-4-mini-reasoning生成32K token的速度。",
+  "check": {"source": "https://arxiv.org/abs/2507.06607", "confirmed": "标题、作者、arXiv首次提交2025-07-09；摘要中GMU跨层共享记忆、SambaY以Samba为自解码器、线性预填充、无需显式位置编码、不可约损失低于YOCO基线、差分注意力、Phi4-mini-Flash-Reasoning无RL超过Phi4-mini-Reasoning、2K提示32K生成下解码吞吐最高10倍、ArchScale开源。GMU公式写法、NeurIPS 2025与模型规模为一般了解；模型卡见microsoft/Phi-4-mini-flash-reasoning（创建于2025-06-19）。"}
+}

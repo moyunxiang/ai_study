@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>参考模型与KL惩罚（Reference Model and KL Penalty） · AI脉络</title>
+<meta name="description" content="大模型强化学习和偏好优化里的“缰绳”：保留一份训练前的模型作为参考模型π_ref，在目标中减去当前策略与它之间的KL散度乘以系数β，防止模型为了刷奖励而偏离正常语言太远。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/kl-penalty-reference.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="参考模型与KL惩罚（Reference Model and KL Penalty）">
+<meta property="og:description" content="大模型强化学习和偏好优化里的“缰绳”：保留一份训练前的模型作为参考模型π_ref，在目标中减去当前策略与它之间的KL散度乘以系数β，防止模型为了刷奖励而偏离正常语言太远。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/kl-penalty-reference.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/kl-penalty-reference">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>参考模型与KL惩罚</h1><div class="full">Reference Model and KL Penalty</div>
+<p class="muted" style="font-size:13px">也叫：KL penalty　KL惩罚　KL正则　KL regularization　KL约束　KL constraint　reference model　参考模型　π_ref　ref model　KL系数　beta　β系数　k3估计　k3 estimator　KL估计　adaptive KL</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/kl-penalty-reference">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>大模型强化学习和偏好优化里的“缰绳”：保留一份训练前的模型作为参考模型π_ref，在目标中减去当前策略与它之间的KL散度乘以系数β，防止模型为了刷奖励而偏离正常语言太远。</b></p>
+<p class="tags">先要会：<a class="chip c" href="kl-divergence.html">KL散度</a> <a class="chip c" href="rlhf-concept.html">人类反馈强化学习</a></p>
+<p>用奖励训练语言模型时，模型总能找到让奖励变高的捷径：重复奖励模型喜欢的词、输出极长的回答、甚至生成不像人话的字符串（见<a class="lc" href="../c/reward-hacking.html">奖励作弊</a>）。而且语言模型一旦大幅偏离预训练学到的分布，流畅性和知识也会受损。解决办法是把模型“拴”在一个起点附近。</p><p><b>目标函数</b>。在RLHF中（见<a class="lc" href="../c/rlhf-concept.html">人类反馈强化学习</a>）：</p><p class="formula"><code>max_π E_(x, y∼π)[ r(x, y) ] − β · KL( π(·|x) ‖ π_ref(·|x) )</code></p><ul><li><b>参考模型</b>π_ref：通常是RL之前的监督微调模型，参数冻结、不再更新。训练时它和策略一起前向计算，提供每个token的对数概率。</li><li><b>β</b>：KL系数，越大越保守。<a class="ln" href="../n/instructgpt.html">InstructGPT与RLHF</a>等工作中，它控制着“奖励涨多少”和“偏离多远”之间的权衡；有的实现会动态调整β，使KL保持在目标值附近。</li></ul><p><b>按token实现</b>。整段回答的KL写成每个token对数概率比的和。常见做法是把它并入奖励：每个token的奖励为<code>−β · log(π(y_t)/π_ref(y_t))</code>，最后一个token再加上奖励模型的分数。</p><p><b>KL的估计</b>（见<a class="lc" href="../c/kl-divergence.html">KL散度</a>）。精确KL要对整个词表求和，实践中用采样得到的token估计。设<code>ρ = π_ref(y_t) / π(y_t)</code>：</p><ul><li>k1 = <code>−log ρ</code>：无偏，但单个样本可能为负，方差大。</li><li>k3 = <code>(ρ − 1) − log ρ</code>：无偏且恒为非负，方差较小。</li></ul><p>这几种估计由Schulman在一篇博客中整理，<a class="ln" href="../n/grpo.html">GRPO</a>把k3形式的KL项直接加在损失里，而不是并入奖励。</p><p><b>在别处的形式</b>。<a class="ln" href="../n/dpo.html">DPO直接偏好优化</a>的推导从同一个带KL约束的目标出发，参考模型以<code>log(π/π_ref)</code>的形式出现在损失里；<a class="ln" href="../n/orpo.html">ORPO无参考模型偏好优化</a>、<a class="ln" href="../n/simpo.html">SimPO</a>等方法尝试去掉参考模型以节省显存。推理模型的RL中（见<a class="lc" href="../c/rlvr-concept.html">可验证奖励强化学习（RLVR）</a>），不少工作（如<a class="ln" href="../n/dapo.html">DAPO</a>）发现去掉KL项反而更好，因为希望模型的推理方式能大幅改变；是否保留它仍取决于任务。</p>
+<div class="example"><h4>例子</h4><p>某个token：策略π给它的概率0.6，参考模型π_ref给0.3。ρ = 0.3/0.6 = 0.5。</p><ul><li>k1 = −log 0.5 ≈ 0.693</li><li>k3 = (0.5 − 1) − log 0.5 ≈ −0.5 + 0.693 = 0.193</li></ul><p>设β = 0.05，按k1并入奖励时这个token被扣0.05×0.693 ≈ 0.035分。一段200个token的回答若平均每个token的k1为0.3，总惩罚约0.05×60 = 3分，如果奖励模型对它的打分只比原始回答高2分，这次偏离就是不划算的，模型会被拉回去。</p></div>
+<h2>容易误解的地方</h2><ul><li>参考模型要和策略用同样的输入格式和分词，否则对数概率比没有意义。</li><li>β太大，模型几乎学不动；β太小，很快出现奖励作弊。调β时应同时看奖励和KL两条曲线，而不只看奖励。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

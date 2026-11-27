@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>单应性矩阵（Homography） · AI脉络</title>
+<meta name="description" content="两张图之间的一种3×3射影变换，在齐次坐标下把一张图的点映射到另一张图。当拍摄的是一个平面，或相机只旋转不平移时，两张照片恰好由单应性联系，常用于全景拼接、图像校正和平面增强现实。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/homography.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="单应性矩阵（Homography）">
+<meta property="og:description" content="两张图之间的一种3×3射影变换，在齐次坐标下把一张图的点映射到另一张图。当拍摄的是一个平面，或相机只旋转不平移时，两张照片恰好由单应性联系，常用于全景拼接、图像校正和平面增强现实。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/homography.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/homography">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 视觉 · 进阶</div>
+<h1>单应性矩阵</h1><div class="full">Homography</div>
+<p class="muted" style="font-size:13px">也叫：单应性　单应性矩阵　单应矩阵　homography　homography matrix　射影变换　projective transformation　透视变换　perspective transform　DLT　直接线性变换　全景拼接　image stitching　逆透视变换　IPM　透视校正</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/homography">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>两张图之间的一种3×3射影变换，在齐次坐标下把一张图的点映射到另一张图。当拍摄的是一个平面，或相机只旋转不平移时，两张照片恰好由单应性联系，常用于全景拼接、图像校正和平面增强现实。</b></p>
+<p class="tags">先要会：<a class="chip c" href="camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="matrix-multiplication.html">矩阵乘法与线性变换</a></p>
+<p>把手机转一圈拍几张照片拼成全景图、把斜着拍的文档“拉正”、在桌面上叠一个虚拟物体，背后都是同一个数学工具：<b>单应性</b>（homography）。</p><p><b>定义</b>。用齐次坐标<code>(x, y, 1)</code>表示像素，单应性是一个3×3矩阵H：</p><p class="formula"><code>λ·(x&#x27;, y&#x27;, 1)ᵀ = H · (x, y, 1)ᵀ</code></p><p>即<code>x&#x27; = (h₁₁x + h₁₂y + h₁₃) / (h₃₁x + h₃₂y + h₃₃)</code>，y&#x27;同理。H只在相差一个比例因子的意义下确定，所以有8个自由度。它包含了平移、旋转、缩放、剪切（仿射变换）以及“近大远小”的透视变形，直线映射后仍是直线，但平行线可能不再平行。</p><p><b>什么时候成立</b>。在<a class="lc" href="../c/camera-geometry.html">相机模型与多视图几何</a>的针孔模型下，一般场景中两张图的对应关系依赖每个点的深度，不能用一个矩阵描述。但有两种重要的特殊情况：</p><ul><li>场景是一个<b>平面</b>（墙、桌面、文档、地面），相机可以任意移动；</li><li>相机只<b>旋转</b>、不平移（原地转身拍全景），场景可以任意。</li></ul><p>这时两张图之间严格满足单应性。</p><p><b>怎么估计</b>。每对对应点给出两个方程，所以至少需要4对点（且其中任意3点不共线），用直接线性变换（DLT）通过<a class="lc" href="../c/eigen-svd.html">特征分解与奇异值分解</a>求解。实际匹配中有大量错误配对，所以先用<a class="ln" href="../n/sift.html">SIFT特征</a>或<a class="ln" href="../n/superpoint.html">SuperPoint</a>等特征匹配，再用<a class="ln" href="../n/ransac.html">RANSAC</a>随机抽4对点拟合H、统计符合的内点数，重复多次选内点最多的结果。</p><p><b>它出现在哪里</b>。全景拼接和图像对齐；相机标定时从棋盘格平面估计内参；自动驾驶中把前视图像投影到地面俯视图（逆透视变换）；文档扫描的透视校正；<a class="ln" href="../n/superpoint.html">SuperPoint</a>的训练还用随机单应性变换来合成训练图像对。系统讲解见<a class="ln" href="../n/multiple-view-geometry.html">《多视图几何》</a>。</p>
+<div class="example"><h4>例子</h4><p>一张纸的四个角在照片里位于(100, 120)、(520, 90)、(560, 470)、(80, 430)，想把它校正为400×300的矩形，对应(0, 0)、(400, 0)、(400, 300)、(0, 300)。4对点正好确定8个自由度，解出H后对矩形内每个目标像素用H⁻¹反查原图位置并插值，就得到“拉正”的扫描图。</p></div>
+<h2>容易误解的地方</h2><ul><li>场景有明显的深度变化且相机发生平移时，用一个单应性对齐会产生重影，这在全景拼接中表现为错位的近景物体。</li><li>4个点里有3点近乎共线时，H的估计极不稳定。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

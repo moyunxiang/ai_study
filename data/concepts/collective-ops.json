@@ -1,0 +1,9 @@
+{
+  "key": "collective-ops",
+  "short": "多张GPU之间交换数据的几种标准模式：广播、规约、all-reduce、reduce-scatter、all-gather和all-to-all。数据并行、ZeRO、张量并行、专家并行都由它们拼成。",
+  "body": "[[c:distributed-training]]里的每一种并行方式，落到代码上都是若干次“集合通信”：所有参与的卡同时调用同一个操作，按固定模式交换数据。理解这几个原语，就能估算一种并行方案要通信多少数据、瓶颈在哪里。实现它们的主流库是[[nccl]]。\n\n**几个基本原语**（设N张卡，每张卡上有一个长度为M的向量）。\n\n- **广播**（broadcast）：一张卡的数据复制给所有卡，例如训练开始时同步初始参数。\n- **规约**（reduce）：所有卡的向量逐元素求和（或取最大等），结果放在一张卡上。\n- **all-reduce**：求和结果放到**每一张**卡上。数据并行每一步都要对梯度做一次all-reduce，使所有副本用同样的平均梯度更新。\n- **reduce-scatter**：求和后把结果切成N段，第i张卡只拿第i段。\n- **all-gather**：每张卡各有一段，拼成完整向量后每张卡都拿一份。\n- **all-to-all**：每张卡把自己的数据切成N份，第j份发给第j张卡，相当于一次矩阵转置。\n\n**关键关系**：`all-reduce = reduce-scatter + all-gather`。[[ring-allreduce]]就是这样实现的：把卡连成环，先用N−1步做reduce-scatter，再用N−1步做all-gather，每张卡发送的总数据量约为`2·M·(N−1)/N`，几乎不随卡数增长，见[[horovod]]。\n\n**它们出现在哪里**。\n\n- **数据并行**：梯度all-reduce。\n- **[[zero]] / [[fsdp]]**：参数切分存放，前向前用all-gather临时拼出完整参数，反向后用reduce-scatter把梯度求和并分回各自负责的那一段。\n- **张量并行**（[[megatron]]）：每层内部有all-reduce或all-gather / reduce-scatter，因为通信频繁，通常限制在同一台机器内的高速互连上，见[[c:interconnect]]。\n- **专家并行**：[[c:mixture-of-experts]]把token按路由结果发往不同卡上的专家，再发回来，用的是all-to-all。\n\n通信时间大致等于“延迟 + 数据量/带宽”，所以大消息看带宽、小消息看延迟；把通信和计算重叠起来是分布式训练优化的主要手段之一。",
+  "example": "8张卡做数据并行，模型梯度为1GB（FP32下约2.5亿个参数）。环形all-reduce时每张卡发送约`2 × 1GB × 7/8 = 1.75GB`。若卡间带宽为每张卡单向约100GB/s，理想情况下约需17.5毫秒；换成每卡约12.5GB/s的网络（100Gb/s），则约140毫秒，可能比一步的计算还长。带宽数值为示意。",
+  "pitfalls": "- 集合通信要求所有卡以相同顺序调用相同的操作，某张卡少调一次或顺序不同，程序会卡死而不是报错，这是分布式训练中最常见的“hang”。\n- all-to-all的通信量受负载均衡影响很大，MoE里路由不均时少数卡会成为瓶颈。",
+  "needs": ["distributed-training", "interconnect"],
+  "aka": ["集合通信", "collective communication", "集合通信原语", "collective operations", "collectives", "all-reduce", "allreduce", "AllReduce", "reduce-scatter", "ReduceScatter", "all-gather", "allgather", "AllGather", "all-to-all", "AllToAll", "broadcast", "广播", "规约", "reduce"]
+}

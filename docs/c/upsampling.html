@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>上采样与转置卷积（Upsampling and Transposed Convolution） · AI脉络</title>
+<meta name="description" content="把小特征图放大成大特征图的操作，分割、超分辨率和图像生成的解码器都离不开它。常用插值（最近邻、双线性）、转置卷积（反卷积）和像素重排。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/upsampling.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="上采样与转置卷积（Upsampling and Transposed Convolution）">
+<meta property="og:description" content="把小特征图放大成大特征图的操作，分割、超分辨率和图像生成的解码器都离不开它。常用插值（最近邻、双线性）、转置卷积（反卷积）和像素重排。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/upsampling.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/upsampling">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 神经网络组件 · 入门</div>
+<h1>上采样与转置卷积</h1><div class="full">Upsampling and Transposed Convolution</div>
+<p class="muted" style="font-size:13px">也叫：上采样　upsampling　转置卷积　transposed convolution　反卷积　deconvolution　上卷积　up-convolution　fractionally-strided convolution　ConvTranspose2d　双线性插值　bilinear interpolation　最近邻插值　nearest neighbor upsampling　像素重排　PixelShuffle　pixel shuffle　亚像素卷积　sub-pixel convolution　棋盘格伪影　checkerboard artifacts　解码器上采样</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/upsampling">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>把小特征图放大成大特征图的操作，分割、超分辨率和图像生成的解码器都离不开它。常用插值（最近邻、双线性）、转置卷积（反卷积）和像素重排。</b></p>
+<p class="tags">先要会：<a class="chip c" href="conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="convolution-op.html">卷积运算</a></p>
+<p>分类网络一路下采样，把224×224的图压到7×7（见<a class="lc" href="../c/conv-layer.html">卷积层、池化与感受野</a>）。可语义分割要给每个像素一个标签，超分辨率要输出更大的图，生成模型的解码器要从小的隐变量画出整张图像，这些都需要反方向的操作：<b>上采样</b>。</p><p><b>插值上采样</b>。没有可学习参数：最近邻插值把每个像素复制成2×2块；双线性插值按周围4个像素的距离加权平均，结果更平滑。常见用法是“先插值放大，再接一个普通卷积”去修正细节。</p><p><b>转置卷积</b>（transposed convolution，常被叫作“反卷积”，但它并不是卷积的逆运算）。普通卷积可以写成一个矩阵乘法<code>y = Cx</code>，把高分辨率的x映射成低分辨率的y；转置卷积用<code>Cᵀ</code>，把低分辨率映射回高分辨率的形状，而且卷积核是可学习的。直观上，它把输入的每个像素乘以卷积核，“盖章”到输出的对应位置，重叠处相加。步长为2时输出边长约为输入的2倍。它的反向传播与普通卷积的反向传播完全一样，这也是名字的由来。</p><p><b>棋盘格伪影</b>。转置卷积的核大小不能被步长整除时，输出上有的位置被“盖章”的次数多、有的少，生成的图像会出现规则的格子状纹理。这是<a class="ln" href="../n/dcgan.html">DCGAN</a>类生成器的常见问题，所以很多后来的模型改用“插值 + 卷积”。</p><p><b>像素重排（PixelShuffle / 亚像素卷积）</b>。先用普通卷积在低分辨率上输出<code>C·r²</code>个通道，再把每r²个通道重新排列成一个r×r的空间块，边长放大r倍。计算都在小尺寸上进行，效率高，常用于超分辨率（如<a class="ln" href="../n/srgan.html">SRGAN</a>、<a class="ln" href="../n/esrgan.html">ESRGAN</a>）。</p><p><b>它出现在哪里</b>。</p><ul><li><a class="ln" href="../n/fcn.html">全卷积网络FCN</a>首次用转置卷积把分类网络改造成逐像素预测；<a class="ln" href="../n/unet.html">U-Net</a>的解码器每一级上采样后与编码器同尺寸的特征拼接（跳跃连接），恢复细节；<a class="ln" href="../n/segnet.html">SegNet</a>用池化时记录的最大值位置来上采样。</li><li><a class="ln" href="../n/deconvnet.html">DeconvNet反卷积分割</a>用“反卷积网络”把中间特征映射回像素空间，用于可视化CNN学到了什么。</li><li>扩散模型的U-Net和<a class="ln" href="../n/ldm.html">潜空间扩散LDM</a>的VAE解码器都由多级上采样组成。</li><li>转置卷积的“对偶”是空洞卷积：后者不下采样也能扩大感受野（<a class="ln" href="../n/deeplab.html">DeepLab空洞卷积</a>），从源头上减少了对上采样的需求。</li></ul>
+<div class="example"><h4>例子</h4><p>输入2×2的特征图[[1, 2], [3, 4]]，放大2倍。</p><ul><li>最近邻：[[1, 1, 2, 2], [1, 1, 2, 2], [3, 3, 4, 4], [3, 3, 4, 4]]。</li><li>转置卷积（核2×2全为1，步长2）：每个输入像素盖一个2×2的章，恰好不重叠，结果与最近邻相同；若改用3×3核、步长2，相邻的章有一行一列重叠，重叠处的值相加，便出现了棋盘格的雏形。</li><li>PixelShuffle（r = 2）：输入4通道×2×2，重排成1通道×4×4。</li></ul></div>
+<h2>容易误解的地方</h2><ul><li>“反卷积”是误称：转置卷积只恢复形状，不能恢复被卷积丢失的信息，<code>Cᵀ</code>一般也不是<code>C</code>的逆。</li><li>输出尺寸公式<code>(H − 1)·s − 2p + k</code>（另加output_padding）容易算错，与编码器的特征图拼接前要核对形状。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

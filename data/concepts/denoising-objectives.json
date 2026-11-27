@@ -1,0 +1,9 @@
+{
+  "key": "denoising-objectives",
+  "short": "一类预训练目标：先按某种方式破坏输入文本（遮住一些片段、删词、打乱句子），再让模型还原原文。T5的span corruption、BART的文本填充都属此类，是编码器-解码器模型的主流预训练方式。",
+  "body": "[[c:masked-modeling]]（BERT式）只遮住单个token、在原位置预测它；[[c:autoregressive]]（GPT式）从左到右预测下一个token。**去噪目标**是更一般的框架：定义一种“加噪”方式，把原文x变成损坏的版本x̃，训练模型从x̃恢复x。不同的加噪方式会让模型学到不同的能力。\n\n**几种常见的加噪**。\n\n- **span corruption**（片段破坏）：[[t5]]的默认目标。随机选若干个连续片段（平均长度3个token，总共约占15%），每个片段整体替换成一个哨兵token（`<X>`、`<Y>`……）。编码器读入带哨兵的文本，解码器只需输出被遮住的片段：`<X> 片段1 <Y> 片段2 …`。目标序列比原文短得多，训练效率高。T5论文系统比较了多种去噪目标，选定了这一种。\n- **文本填充**（text infilling）：[[bart]]把若干片段各替换成一个[MASK]，模型要还原完整原文，并且要自己判断每个[MASK]原来有几个词。BART还试验了删除token、打乱句子顺序、文档旋转等加噪方式。\n- **片段遮盖**（span masking）：[[spanbert]]遮住连续的片段而不是零散的token，并用片段边界的表示来预测片段内的每个词，对抽取式问答等片段级任务更有利。\n- **混合去噪**：[[ul2]]把短片段、长片段和前缀补全（见[[c:prefix-lm]]）几种目标按比例混合，并用模式标记告诉模型当前是哪种任务；[[u-palm]]用这种目标对已有的PaLM继续训练，花少量算力就带来了提升。\n- **中间填充**：代码模型常用的[[fim]]把一段中间内容移到末尾，让自回归模型学会“根据前后文补中间”，可以看作去噪思想在仅解码器模型上的应用。[[glm]]的空白填充也属于这一路。\n\n**选择的权衡**。去噪目标让模型双向地利用上下文，适合理解和“输入→输出”式的任务（见[[c:encoder-decoder]]）；纯自回归目标每个token都产生训练信号，生成能力强、与提示式用法一致。大模型时代自回归成为主流，但去噪思想仍以FIM、混合目标等形式保留了下来（见[[c:transformer-architectures]]）。",
+  "example": "原文：“Thank you for inviting me to your party last week.”\n\nT5 span corruption：\n\n- 编码器输入：“Thank you `<X>` me to your party `<Y>` week.”\n- 解码器目标：“`<X>` for inviting `<Y>` last `<Z>`”\n\n（这是T5论文中的示例。）目标只有几个token，而不是整句。\n\nBART文本填充：输入“Thank you [MASK] me to your party [MASK] week.”，目标是完整原句。",
+  "pitfalls": "- “去噪”在这里指文本层面的破坏与还原，与扩散模型里给连续数据加高斯噪声再去除（见[[c:diffusion-process]]）是不同的东西，尽管思想相通。\n- 去噪预训练的模型通常不能直接零样本对话或续写，往往需要按任务格式微调。",
+  "aka": ["denoising objective", "去噪目标", "去噪预训练", "denoising pre-training", "span corruption", "片段破坏", "span masking", "片段遮盖", "text infilling", "文本填充", "sentinel token", "哨兵token", "去噪自编码器（文本）", "mixture of denoisers", "混合去噪", "corrupted span"],
+  "needs": ["masked-modeling", "encoder-decoder"]
+}

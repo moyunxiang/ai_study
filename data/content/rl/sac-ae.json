@@ -1,0 +1,30 @@
+{
+  "id": "sac-ae",
+  "who": "Denis Yarats, Amy Zhang, Ilya Kostrikov, Brandon Amos, Joelle Pineau, Rob Fergus · NYU / FAIR / McGill",
+  "venue": "AAAI 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1910.01741"},
+    {"label": "项目页", "url": "https://sites.google.com/view/sac-ae/home"}
+  ],
+  "problem": "直接从图像学控制的无模型RL很难：只靠稀疏的奖励信号去训练一个大容量的图像编码器样本效率极低；加图像重建的辅助损失能帮忙，但放进离策略算法里训练常常发散。",
+  "idea": "分析发现发散的根源是以往用的VAE；改用确定性的正则化自编码器，让编码器只接收评论家和重建的梯度、不接收演员的梯度，再把它接到SAC上（SAC+AE）。",
+  "impact": "像素输入连续控制的早期强基线，确立了“编码器由评论家训练、演员复用其特征”的做法，后来的CURL、DrQ、DrQ-v2都沿用这一结构并以它为对比。",
+  "method": "SAC+AE由三部分组成：\n\n- **编码器-解码器**：卷积编码器 `z = f_enc(o)` 把堆叠的图像帧压成低维特征，确定性的解码器从z重建图像。损失是重建误差加上对z的L2惩罚和解码器权重衰减，相当于一个正则化自编码器（RAE），不像VAE那样采样潜变量；\n- **SAC**：评论家和演员都以z为输入，按[[sac]]训练；\n- **梯度的去向**：重建损失和评论家损失的梯度都传回编码器；演员损失的梯度不传回编码器（演员只是“借用”特征）。作者发现让演员梯度也更新编码器会损害表现。\n\n论文还专门分析了不稳定的原因：把以往工作里的β-VAE换进离策略学习时，潜变量的随机性和KL项让表示不断漂移，Q学习的目标随之不稳定，导致发散。改成确定性自编码器加上述梯度安排后训练稳定。摘要称这个简单方法在MuJoCo（DeepMind Control）控制任务上达到当时无模型与基于模型（如PlaNet、SLAC）方法的水平，并且对观测噪声更鲁棒。",
+  "limits": [
+    {"text": "像素重建会把能力花在与控制无关的背景细节上，背景复杂或有干扰时表示质量下降。", "solved_by": ["curl", "drq"]},
+    {"text": "仍需额外的解码器和重建损失，计算开销比纯数据增强的方法大。", "solved_by": ["drq"]}
+  ],
+  "relations": [
+    {"to": "sac", "type": "uses", "note": "以SAC为控制算法，在编码特征上训练演员和评论家。"},
+    {"to": "beta-vae", "type": "solves", "note": "指出β-VAE等随机自编码器是离策略训练发散的原因，改用确定性正则化自编码器。"},
+    {"to": "planet", "type": "rivals", "note": "与PlaNet等基于模型的像素控制方法比较，以无模型方式达到相近水平。"},
+    {"to": "dm-control", "type": "uses", "note": "在DeepMind Control像素任务上评测。"}
+  ],
+  "prereq": ["autoencoder", "actor-critic", "conv-layer", "feature-representation"],
+  "terms": [
+    {"t": "正则化自编码器（RAE）", "d": "确定性的自编码器，用潜变量的L2惩罚和权重衰减代替VAE的KL项来约束表示。"}
+  ],
+  "learn": "先读[[sac]]；读SAC+AE原文第4节关于发散原因的分析和梯度安排；在DMC的cheetah-run像素版上分别让演员梯度传或不传回编码器，比较曲线。",
+  "check": {"source": "https://arxiv.org/abs/1910.01741", "confirmed": "标题、六位作者、arXiv v1于2019-10-02；摘要中从图像做无模型RL困难、稀疏奖励训练大容量编码器样本效率低、重建等辅助损失有帮助但放进离策略学习常不稳定、找出VAE是发散原因、提出提高稳定性的技术、在MuJoCo控制任务上匹配最好的无模型与基于模型方法、对观测噪声更鲁棒。RAE损失与演员梯度不传回编码器的设计、对比PlaNet与SLAC按原文正文通行描述；AAAI 2021按通行引用。"},
+  "aka": ["SAC-AE", "SAC+AE", "SAC AE", "自编码器SAC", "像素SAC"]
+}

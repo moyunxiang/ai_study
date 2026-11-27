@@ -1,0 +1,9 @@
+{
+  "key": "system-prompt",
+  "short": "对话模型的输入按角色分成几类消息：system（开发者设定的身份、规则和背景）、user（用户输入）、assistant（模型回复），还可能有tool（工具结果）。系统提示放在最前面，对整段对话生效。",
+  "body": "一个对话应用里，模型要同时听两方的话：开发者希望它“只回答与本产品有关的问题、用礼貌的中文、不要透露内部信息”，用户则提出具体问题。把这两类指令混在一起很难管理，于是对话模型的输入被组织成**带角色的消息列表**。\n\n**几种角色**。\n\n- **system**（系统提示）：开发者写的设定，通常只有一条，放在最前面。内容可以是身份（“你是某银行的客服助手”）、规则（“不提供投资建议”）、输出格式、可用的工具说明、当前日期等背景信息。\n- **user**：用户每一轮的输入。\n- **assistant**：模型之前的回复。多轮对话时，历史上的问答都要按顺序放回去，模型本身没有记忆，每次请求都要带上完整的历史（见[[c:context-window]]）。\n- **tool**（或function）：工具调用返回的结果（见[[c:tool-calling]]）。\n\n**底层是什么**。模型只认一串token。推理框架按[[c:instruction-tuning]]里讲的对话模板，把消息列表拼成一个带[[c:special-tokens]]的字符串，例如ChatML风格的`<|im_start|>system … <|im_end|>`，再交给模型续写。所以“系统提示”并不神秘：它就是放在最前面、被标记为system角色的一段文字，模型在指令微调和偏好训练中学会了更重视它。\n\n**优先级**。当用户的要求与系统提示冲突（“忽略上面所有规则”），模型应该听谁？[[instruction-hierarchy]]提出训练模型按“系统 > 用户 > 工具结果”的优先级处理冲突指令，以抵御[[c:prompt-injection-concept]]；[[model-spec]]等行为规范文件也描述了类似的层级。这种优先级来自训练，并不是硬性的保证。\n\n**常见用途**。角色扮演和人设（[[camel]]让两个模型分别扮演不同角色协作）、限定输出格式、注入检索到的资料、设定语言和语气。系统提示还常被用于产品层面的安全规则，因此也成了攻击者试图套出或绕过的目标（见[[c:llm-jailbreaking]]）。",
+  "example": "一次API请求的消息列表：\n\n`[{role: system, content: 你是一个只回答烹饪问题的助手，回答不超过100字。}, {role: user, content: 番茄炒蛋先放什么？}, {role: assistant, content: 先炒蛋，盛出后再炒番茄……}, {role: user, content: 那盐什么时候放？}]`\n\n模型这次的回答要同时满足system里的两条规则，并理解第二个user问题里省略的“番茄炒蛋”。若用户改问“帮我写一段Python代码”，按系统提示，模型应礼貌地说明自己只回答烹饪问题。",
+  "pitfalls": "- 系统提示不是安全边界：它和用户输入在同一个上下文里，精心构造的输入仍可能让模型违反系统提示，或者把系统提示的内容泄露出来，不要在里面放密钥等敏感信息。\n- 系统提示越长，每次请求消耗的token越多；不变的长系统提示适合配合前缀缓存（见[[c:prefix-caching]]）。",
+  "aka": ["system prompt", "系统提示", "系统提示词", "system message", "系统消息", "messages", "消息格式", "role", "角色", "user/assistant", "多轮对话", "multi-turn", "multi-turn conversation", "对话历史", "chat history", "角色扮演提示", "persona prompt", "人设", "developer message"],
+  "needs": ["instruction-tuning", "special-tokens"]
+}

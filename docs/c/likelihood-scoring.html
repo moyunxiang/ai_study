@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>多选题评测：似然打分与字母作答（Multiple-Choice Evaluation by Likelihood） · AI脉络</title>
+<meta name="description" content="多选题评测的一种做法：不让模型自由作答，而是计算每个候选答案在模型下的（对数）概率，选概率最高的那个。另一种做法是让模型生成选项字母再比对。两种方法得到的分数可能差别很大。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/likelihood-scoring.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="多选题评测：似然打分与字母作答（Multiple-Choice Evaluation by Likelihood）">
+<meta property="og:description" content="多选题评测的一种做法：不让模型自由作答，而是计算每个候选答案在模型下的（对数）概率，选概率最高的那个。另一种做法是让模型生成选项字母再比对。两种方法得到的分数可能差别很大。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/likelihood-scoring.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/likelihood-scoring">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>多选题评测：似然打分与字母作答</h1><div class="full">Multiple-Choice Evaluation by Likelihood</div>
+<p class="muted" style="font-size:13px">也叫：log-likelihood scoring　似然打分　对数似然评测　多选题评测　multiple-choice evaluation　MC评测　cloze formulation　完形式评测　MCF　选项字母打分　acc_norm　长度归一化准确率　选项概率比较　rank classification</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/likelihood-scoring">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>多选题评测的一种做法：不让模型自由作答，而是计算每个候选答案在模型下的（对数）概率，选概率最高的那个。另一种做法是让模型生成选项字母再比对。两种方法得到的分数可能差别很大。</b></p>
+<p class="tags">先要会：<a class="chip c" href="perplexity.html">困惑度</a> <a class="chip c" href="benchmark.html">基准、排行榜与SOTA</a></p>
+<p>MMLU、HellaSwag这类基准都是选择题。让模型做选择题，有两种主要的打分方式，<a class="ln" href="../n/lm-eval-harness.html">lm-eval可复现评测</a>等评测工具都同时支持。</p><p><b>方式一：似然打分</b>。把题目作为前缀，对每个选项分别计算“前缀之后接上这个选项文本”的对数概率（见<a class="lc" href="../c/logprobs.html">token对数概率（logprobs）</a>）：</p><p class="formula"><code>score(选项i) = Σ_t log p(选项i的第t个token | 题目, 选项i的前t−1个token)</code></p><p>选得分最高的选项。不需要模型按格式输出，<a class="ln" href="../n/gpt-3.html">GPT-3</a>论文的少样本评测和<a class="ln" href="../n/hellaswag.html">HellaSwag</a>等补全式任务都这样做，基座模型也能直接用。</p><p><b>长度问题</b>。选项越长，累加的负对数概率越多，长选项天然吃亏。常用的修正：</p><ul><li>按token数归一化：<code>score / token数</code>。</li><li>按字符或字节数归一化（与分词无关，见<a class="lc" href="../c/bits-per-byte.html">每字节比特与每字符比特</a>）。</li><li>除以“无条件概率”：<code>log p(选项 | 题目) − log p(选项 | 无关前缀)</code>，消除某些选项本身就很常见的影响（与<a class="ln" href="../n/calibrate-before-use.html">先校准再用</a>的思路相近）。</li></ul><p><b>方式二：生成选项字母</b>。把选项用A、B、C、D列出来，让模型输出字母，再比较“A”“B”“C”“D”四个token的概率，或者直接解析生成的文本。<a class="ln" href="../n/mmlu.html">MMLU</a>的常见评测方式是这种。它更接近用户实际的用法，但要求模型理解“用字母作答”的格式；小模型或基座模型可能在这上面表现很差，即使它“知道”答案。</p><p><b>两种方式会给出不同结论</b>。同一个模型，用似然打分和用字母作答，准确率可能相差很多；不同论文用不同方式，分数就没法直接比较。字母作答还会受选项顺序和字母位置偏好的影响（见<a class="lc" href="../c/prompt-sensitivity.html">提示敏感性</a>）。</p><p><b>对话模型的评测</b>。推理模型和对话模型通常要先写一段推理再给出答案，似然打分不再适用，于是越来越多地采用“生成完整回答 → 抽取最终答案 → 精确匹配”的方式（见<a class="lc" href="../c/exact-match.html">精确匹配与token级F1</a>），<a class="ln" href="../n/mmlu-pro.html">MMLU-Pro</a>等新基准也增加了选项数并鼓励思维链作答。</p>
+<div class="example"><h4>例子</h4><p>题目：“水在标准大气压下的沸点是多少？”选项：A. 100摄氏度  B. 50摄氏度。</p><ul><li>似然打分：log p(“100摄氏度” | 题目) = −2.1，log p(“50摄氏度” | 题目) = −6.4，选A。</li><li>若选项A改成“100摄氏度，这是在海平面附近测得的”（12个token，总对数概率−9.0），不归一化时得分−9.0低于B的−6.4，会错选B；按token数归一化后A为−0.75、B（5个token）为−1.28，又选回A。</li><li>字母作答：提示末尾“答案：”，比较下一个token为“A”和“B”的概率，0.92对0.05，选A。</li></ul></div>
+<h2>容易误解的地方</h2><ul><li>报告多选题分数时要说明用的是哪种打分方式、是否归一化、几个示例，否则数字不可比。</li><li>似然打分只能衡量“模型更倾向哪个选项”，不能反映模型能否在开放式问题中生成正确答案。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

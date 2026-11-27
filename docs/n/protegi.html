@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>ProTeGi文本梯度提示优化（2023） · AI脉络</title>
+<meta name="description" content="提示靠人反复试错来写；已有的自动方法要么需要模型内部梯度（API用户拿不到），要么像APE那样在提示空间里没有方向地随机改写。 模仿梯度下降：用一小批答错的样本让LLM写出“当前提示错在哪”的批评作为自然语言梯度，再让LLM朝相反方向改写提示，并用束搜索加多臂老虎机挑选最有希望的候选。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/protegi.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ProTeGi文本梯度提示优化（2023）">
+<meta property="og:description" content="提示靠人反复试错来写；已有的自动方法要么需要模型内部梯度（API用户拿不到），要么像APE那样在提示空间里没有方向地随机改写。 模仿梯度下降：用一小批答错的样本让LLM写出“当前提示错在哪”的批评作为自然语言梯度，再让LLM朝相反方向改写提示，并用束搜索加多臂老虎机挑选最有希望的候选。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/protegi.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/protegi">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:336"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/agent.html">推理、检索与智能体</a> › 提示、上下文与记忆</div>
+<h1>ProTeGi文本梯度提示优化</h1>
+<div class="full">Automatic Prompt Optimization with &quot;Gradient Descent&quot; and Beam Search</div>
+<div class="meta"><span>2023.05</span><span>论文</span><span>延伸</span><span>EMNLP 2023</span><span>Reid Pryzant, Dan Iter, Jerry Li, Yin Tat Lee, Chenguang Zhu, Michael Zeng · 微软Azure AI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2305.03495" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/microsoft/LMOps/tree/main/prompt_optimization" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/protegi">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>提示靠人反复试错来写；已有的自动方法要么需要模型内部梯度（API用户拿不到），要么像APE那样在提示空间里没有方向地随机改写。</p></div><div><h4>方法</h4><p>模仿梯度下降：用一小批答错的样本让LLM写出“当前提示错在哪”的批评作为自然语言梯度，再让LLM朝相反方向改写提示，并用束搜索加多臂老虎机挑选最有希望的候选。</p></div><div><h4>影响</h4><p>把“文字批评当梯度”的比喻做成了可用的提示优化算法，在四个任务上把初始提示的效果最多提升31%；后来的TextGrad把类似思路推广到整个LLM系统。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>设定：只有LLM的API和一份带标签的训练数据，要优化的是一条任务说明，例如“判断这段文字是否是越狱攻击”。</p><p>每一步：从训练集取一个小批量，找出当前提示答错的样本；把提示和这些错例交给LLM，要它说明提示有什么问题，例如“没有说明角色扮演请求也算越狱”，这段话就是<b>自然语言梯度</b>；再让LLM根据这段批评改写提示，相当于沿梯度反方向走一步，并生成几个意思相近的改写版本扩大候选。</p><p>候选太多、逐个在全量数据上评测太贵，所以算法保留一个<b>束</b>（beam），把挑选下一轮候选看作<a class="lc" href="../c/exploration-exploitation.html">探索与利用</a>问题，用<a class="ln" href="../n/ucb1.html">UCB1</a>一类的多臂老虎机方法，只花少量评测预算就找出表现最好的几条提示。论文在三个NLP基准任务和一个新的LLM越狱检测任务上实验，官方称比此前的提示编辑方法更好，初始提示的效果最多提升31%，改写后的提示往往把含糊的任务描述变成更精确的标注说明，人也能直接读懂、检查和继续修改。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只优化单条提示、面向分类这类有明确标签的任务；由多个LLM调用组成的流水线该怎么分配批评，这里没有涉及。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:336" href="../n/dspy.html">DSPy</a> <a class="chip hue" style="--h:336" href="../n/gepa.html">GEPA反思式提示进化</a></div></li><li>批评和改写全靠LLM自己，可能对小批量里的几个错例过拟合，写出越来越长、只针对训练样本的提示；每步还要大量API调用。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/ucb1.html">UCB1</a><span class="yr">2002 · RL</span><div class=nt>在束搜索中用多臂老虎机算法分配评测预算，只对最有希望的候选提示多做评测。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:336" href="../n/autoprompt.html">AutoPrompt梯度搜提示</a><span class="yr">2020.10 · 推理·智能体</span><div class=nt>AutoPrompt用模型内部的真实梯度搜索离散token，需要白盒访问；ProTeGi只需API，用文字批评代替数值梯度。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/ape.html">自动提示工程APE</a><span class="yr">2022.11 · 推理·智能体</span><div class=nt>APE靠LLM大量生成候选再筛选，改写没有方向；ProTeGi先用错例写出批评，再按批评定向改写，搜索更有效。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/self-refine.html">Self-Refine自我改进</a><span class="yr">2023.03 · 推理·智能体</span><div class=nt>Self-Refine让LLM批评并改进自己的输出；ProTeGi把“批评—改写”用到提示本身，并用训练数据判断改写好不好。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/dspy.html">DSPy</a><span class="yr">2023.10 · 推理·智能体</span><div class=nt>只优化单条提示、面向分类这类有明确标签的任务；由多个LLM调用组成的流水线该怎么分配批评，这里没有涉及。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/gepa.html">GEPA反思式提示进化</a><span class="yr">2025.07 · 推理·智能体</span><div class=nt>只优化单条提示、面向分类这类有明确标签的任务；由多个LLM调用组成的流水线该怎么分配批评，这里没有涉及。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="../c/exploration-exploitation.html">探索与利用</a> <a class="chip c" href="../c/in-context-learning.html">上下文学习与提示</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a></p>
+<h2>本篇术语</h2><ul><li><b>自然语言梯度</b>　LLM看过错例后写出的一段批评，指出当前提示哪里导致答错，在算法里扮演梯度方向的角色。</li><li><b>束搜索</b>　每一轮只保留得分最高的若干个候选，在它们的基础上继续扩展，而不是保留全部或只留一个。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/ape.html">自动提示工程APE</a>了解黑盒提示优化 → 读原文第2节算法（梯度、编辑、束搜索与老虎机选择）→ 动手：拿一个情感分类小数据集，手动实现一轮“找错例—写批评—改写提示”，比较改写前后的准确率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2305.03495" rel="noopener">https://arxiv.org/abs/2305.03495</a>（标题、6位作者、v1提交于2023-05-04；摘要中三项NLP基准加越狱检测、最多提升31%、束搜索与老虎机选择；arxiv.org/html/2305.03495v2核对作者单位微软Azure AI、v2改名ProTeGi（Prompt Optimization with Textual Gradients）、代码地址。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ProTeGi%E6%96%87%E6%9C%AC%E6%A2%AF%E5%BA%A6%E6%8F%90%E7%A4%BA%E4%BC%98%E5%8C%96%EF%BC%88protegi%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aprotegi%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/protegi.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="cot-expressivity.html"><small>本分支上一个 · 2023.05</small><b>思维链表达能力理论</b></a><a class="r" href="gpt-researcher.html"><small>本分支下一个 · 2023.05</small><b>GPT Researcher研究智能体</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

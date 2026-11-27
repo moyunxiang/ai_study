@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>分位数回归与弹球损失（Quantile Regression and Pinball Loss） · AI脉络</title>
+<meta name="description" content="不预测平均值，而预测某个分位数，如“90%的情况下不超过多少”。用不对称的弹球损失训练，低估与高估罚得不同。它能给出预测区间，也是分布式强化学习的核心工具。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/quantile-regression.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="分位数回归与弹球损失（Quantile Regression and Pinball Loss）">
+<meta property="og:description" content="不预测平均值，而预测某个分位数，如“90%的情况下不超过多少”。用不对称的弹球损失训练，低估与高估罚得不同。它能给出预测区间，也是分布式强化学习的核心工具。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/quantile-regression.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/quantile-regression">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 优化与训练 · 进阶</div>
+<h1>分位数回归与弹球损失</h1><div class="full">Quantile Regression and Pinball Loss</div>
+<p class="muted" style="font-size:13px">也叫：分位数回归　quantile regression　分位数　quantile　弹球损失　pinball loss　分位数损失　quantile loss　check loss　预测区间　prediction interval　条件分位数　conditional quantile　中位数回归　median regression　分位数Huber损失　quantile Huber loss</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/quantile-regression">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>不预测平均值，而预测某个分位数，如“90%的情况下不超过多少”。用不对称的弹球损失训练，低估与高估罚得不同。它能给出预测区间，也是分布式强化学习的核心工具。</b></p>
+<p class="tags">先要会：<a class="chip c" href="regression-losses.html">回归损失：MSE、MAE与Huber</a> <a class="chip c" href="probability-basics.html">随机变量与概率分布</a></p>
+<p>普通回归最小化均方误差，得到的是条件<b>均值</b><code>E[y | x]</code>（见<a class="lc" href="../c/regression-losses.html">回归损失：MSE、MAE与Huber</a>）。但很多决策需要的是分布的其他部分：外卖平台要承诺“90%的订单30分钟内送达”，库存管理要备足“95%的情况下都够用”的货量，风控关心的是最坏的那5%。这些是<b>分位数</b>问题。</p><p><b>分位数</b>。随机变量Y的τ分位数q_τ满足<code>P(Y ≤ q_τ) = τ</code>。τ = 0.5就是中位数。</p><p><b>弹球损失（pinball loss）</b>。设误差<code>u = y − ŷ</code>，</p><p class="formula"><code>L_τ(u) = τ·u（u ≥ 0，低估了）；(τ − 1)·u（u &lt; 0，高估了）</code></p><p>它是一条在0处折弯、两边斜率不同的折线，图形像弹球台的挡板。τ = 0.9时，低估一个单位罚0.9，高估一个单位只罚0.1，于是最优预测会主动偏高，恰好落在条件分布的90%分位数上。τ = 0.5时它就是平均绝对误差的一半，最优解是中位数。</p><p><b>预测区间</b>。同时训练τ = 0.05和τ = 0.95两个输出，就得到一个90%的预测区间。这比只给一个点估计有用得多，是表达预测不确定性的一种简单方法（见<a class="lc" href="../c/uncertainty-quantification.html">不确定性估计</a>）；如果需要有覆盖率保证的区间，可以在其上再做<a class="ln" href="../n/conformal-prediction.html">保形预测</a>校正。</p><p><b>梯度提升与神经网络</b>。弹球损失只是换了一个损失函数，任何回归模型都能用：<a class="ln" href="../n/lightgbm.html">LightGBM</a>、<a class="ln" href="../n/xgboost.html">XGBoost</a>支持分位数目标，神经网络可以同时输出多个分位数。</p><p><b>在强化学习里</b>。分布式强化学习不只估计回报的期望，而是估计回报的整个分布（见<a class="lc" href="../c/distributional-rl.html">分布式价值RL（Distributional RL）</a>）。<a class="ln" href="../n/qr-dqn.html">分位数回归QR-DQN</a>用一组固定的分位数来表示回报分布，用分位数回归的Huber化版本训练；<a class="ln" href="../n/iqn.html">隐式分位数网络IQN</a>把τ作为输入，能对任意分位数查询；<a class="ln" href="../n/tqc.html">TQC截断分位数评论家</a>在连续控制中丢弃最高的若干分位数，缓解Q值高估。</p>
+<div class="example"><h4>例子</h4><p>某线路历史送达时间（分钟）为20、22、25、28、40。τ = 0.9：预测ŷ = 30时，四个比它小的样本各产生高估损失<code>0.1×(30 − y)</code>，合计<code>0.1×(10 + 8 + 5 + 2) = 2.5</code>，40那一单低估10分钟，损失<code>0.9×10 = 9</code>，总计11.5；预测ŷ = 40时总损失为<code>0.1×(20 + 18 + 15 + 12) = 6.5</code>，更小。这批样本的经验0.9分位数正是40，所以最优预测是40。</p></div>
+<h2>容易误解的地方</h2><ul><li>分别训练多个分位数时，预测可能出现“交叉”（0.9分位数小于0.5分位数），需要排序或用联合模型约束单调性。</li><li>弹球损失在0处不可导，梯度方法需用次梯度，或像QR-DQN那样在0附近用平方损失平滑（见<a class="lc" href="../c/subgradient.html">次梯度与不可导点</a>）。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

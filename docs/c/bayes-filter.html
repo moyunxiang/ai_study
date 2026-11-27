@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>状态估计与贝叶斯滤波（State Estimation and Bayes Filters） · AI脉络</title>
+<meta name="description" content="状态估计的通用框架：机器人维护一个关于“自己现在处于什么状态”的概率分布（信念），每来一个控制就按运动模型预测、每来一个观测就按观测模型修正。卡尔曼滤波和粒子滤波是它的两种主要实现。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/bayes-filter.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="状态估计与贝叶斯滤波（State Estimation and Bayes Filters）">
+<meta property="og:description" content="状态估计的通用框架：机器人维护一个关于“自己现在处于什么状态”的概率分布（信念），每来一个控制就按运动模型预测、每来一个观测就按观测模型修正。卡尔曼滤波和粒子滤波是它的两种主要实现。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/bayes-filter.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/bayes-filter">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 具身与控制 · 进阶</div>
+<h1>状态估计与贝叶斯滤波</h1><div class="full">State Estimation and Bayes Filters</div>
+<p class="muted" style="font-size:13px">也叫：贝叶斯滤波　Bayes filter　Bayesian filtering　状态估计　state estimation　递归状态估计　信念　belief　扩展卡尔曼滤波　EKF　extended Kalman filter　粒子滤波　particle filter　蒙特卡洛定位　Monte Carlo localization　MCL　传感器融合　sensor fusion　滤波发散</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/bayes-filter">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>状态估计的通用框架：机器人维护一个关于“自己现在处于什么状态”的概率分布（信念），每来一个控制就按运动模型预测、每来一个观测就按观测模型修正。卡尔曼滤波和粒子滤波是它的两种主要实现。</b></p>
+<p class="tags">先要会：<a class="chip c" href="conditional-bayes.html">条件概率与贝叶斯公式</a> <a class="chip c" href="gaussian.html">高斯分布</a> <a class="chip c" href="markov-chain.html">马尔可夫性与马尔可夫链</a></p>
+<p>机器人的传感器从不直接告诉它真实状态：轮速计会打滑，GPS有几米误差，相机有噪声且会被遮挡。控制和规划却需要知道“我现在在哪、速度多少”。<b>状态估计</b>要从一连串带噪声的控制输入u和观测z中，推断隐藏的状态x。这正是<a class="lc" href="../c/hmm-concept.html">隐马尔可夫模型</a>的思想在连续状态上的推广，也对应<a class="ln" href="../n/pomdp.html">POMDP规划</a>里的信念状态。</p><p><b>贝叶斯滤波的两步循环</b>。信念<code>bel(x_t) = p(x_t | z_{1:t}, u_{1:t})</code>。</p><ul><li><b>预测</b>：根据运动模型和上一时刻的信念，<code>bel⁻(x_t) = ∫ p(x_t | x_{t−1}, u_t)·bel(x_{t−1}) dx_{t−1}</code>。不确定性在这一步变大。</li><li><b>更新</b>：来了观测，用<a class="lc" href="../c/conditional-bayes.html">条件概率与贝叶斯公式</a>修正，<code>bel(x_t) ∝ p(z_t | x_t)·bel⁻(x_t)</code>。不确定性在这一步变小。</li></ul><p>这里假设了马尔可夫性：给定当前状态，过去的观测不再提供额外信息（见<a class="lc" href="../c/markov-chain.html">马尔可夫性与马尔可夫链</a>）。</p><p><b>几种实现</b>。</p><ul><li><b>卡尔曼滤波</b>：运动和观测都是线性的、噪声是<a class="lc" href="../c/gaussian.html">高斯分布</a>时，信念始终是高斯分布，只需更新均值和协方差，有闭式解，见<a class="ln" href="../n/kalman-filter.html">卡尔曼滤波</a>。</li><li><b>扩展卡尔曼滤波（EKF）</b>：非线性模型在当前估计处做一阶<a class="lc" href="../c/taylor-expansion.html">泰勒展开</a>线性化后套用卡尔曼公式，是导航和早期SLAM（<a class="ln" href="../n/stochastic-map.html">随机地图EKF-SLAM</a>）的主力。</li><li><b>无迹卡尔曼滤波（UKF）</b>：用一组精心选择的采样点穿过非线性函数来估计均值和协方差，通常比EKF更准，见<a class="ln" href="../n/ukf.html">无迹卡尔曼滤波UKF</a>。</li><li><b>粒子滤波</b>：用大量带权重的样本（粒子）表示任意形状的分布：预测时按运动模型移动每个粒子，更新时按观测似然重新加权，再按权重重采样。能处理多峰的情形（例如“我可能在两条相似走廊中的任意一条”），代价是计算量随维数急剧增长，见<a class="lc" href="../c/monte-carlo.html">蒙特卡洛采样</a>和<a class="ln" href="../n/fastslam.html">FastSLAM</a>。</li></ul><p>系统讲解见<a class="ln" href="../n/probabilistic-robotics.html">《概率机器人》</a>。在学习型机器人里，循环网络或Transformer的隐状态常被看作一种学到的、隐式的滤波器。</p>
+<div class="example"><h4>例子</h4><p>一维卡尔曼滤波：当前位置估计均值0、方差1。机器人指令前进1米，运动噪声方差0.5：预测为均值1、方差1.5。随后测距传感器读数1.4，观测噪声方差0.5：卡尔曼增益<code>K = 1.5/(1.5 + 0.5) = 0.75</code>，更新后均值<code>1 + 0.75×(1.4 − 1) = 1.3</code>，方差<code>(1 − 0.75)×1.5 = 0.375</code>，比预测和观测单独的方差都小。</p></div>
+<h2>容易误解的地方</h2><ul><li>滤波器“过于自信”（协方差估计过小）时，会忽略后来的观测、越错越远，这叫滤波发散；调大过程噪声常能缓解。</li><li>粒子数不够或重采样过于频繁时，粒子会坍缩到少数几个，失去多样性（粒子贫化）。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{
+  "id": "fast-align",
+  "who": "Chris Dyer, Victor Chahuneau, Noah A. Smith · 卡内基梅隆大学",
+  "venue": "NAACL 2013",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/N13-1073/"},
+    {"label": "代码", "url": "https://github.com/clab/fast_align"}
+  ],
+  "aka": ["fast_align", "fast-align", "fastalign", "IBM Model 2重参数化", "词对齐工具", "Word Alignment", "对角线先验"],
+  "problem": "统计机器翻译的标准词对齐工具GIZA++要依次训练IBM模型1、HMM、模型3和4，在大语料上要跑几天；但IBM模型1又太简单，完全不考虑词的位置，对齐质量差。",
+  "idea": "把IBM模型2的对齐分布重参数化成只有一个参数的「对角线」先验：源词与目标词在句中的相对位置越接近对角线，对齐概率越高，`P(a_i = j) ∝ exp(−λ |i/m − j/n|)`；配合EM训练，速度接近模型1，质量接近甚至超过GIZA++的模型4。",
+  "impact": "fast_align因为又快又准，迅速成为统计和神经机器翻译研究中最常用的词对齐工具，被用于抽取短语表、构建双语词典、评测注意力对齐以及跨语言标注投射。",
+  "background": "[[ibm-models]]定义了从模型1到模型5逐步复杂的对齐模型，[[och-ney-alignment]]的GIZA++把它们与[[hmm-alignment]]串起来训练，是2000年代的事实标准。模型1假设对齐与位置无关，模型2给每个（源位置，目标位置，句长）组合一个参数，参数太多、数据稀疏；更复杂的模型3、4需要近似推断，训练很慢。",
+  "method": "设目标句（如英语）长度为 `m`、源句（如法语）长度为 `n`，第 `i` 个目标词对齐到源位置 `a_i`。模型为\n\n`P(e, a | f) = Π_i P(a_i | i, m, n) · t(e_i | f_{a_i})`\n\n其中 `t` 是词翻译概率。关键是对齐先验的重参数化：\n\n`P(a_i = j | i, m, n) = p₀`（对齐到空词NULL）\n`P(a_i = j | i, m, n) = (1 − p₀) · exp(−λ·h(i, j, m, n)) / Z_λ(i, m, n)`，`h = |i/m − j/n|`\n\n`λ` 控制对齐在多大程度上偏向对角线，`Z_λ` 是归一化项，作者给出了可以在常数时间内算出的闭式。训练用EM：E步计算每个目标词对齐到各源位置的后验，M步更新 `t`，并用梯度更新 `λ`。翻译表 `t` 还可以加上Dirichlet先验做变分贝叶斯估计，减少罕见词「垃圾收集」式的错误对齐。\n\n实际使用时分别从两个方向对齐，再用grow-diag-final等启发式对称化。",
+  "results": "论文报告在法英、中英、阿英翻译任务上，fast_align的训练速度比GIZA++的模型4快约一个数量级，而对齐错误率相近、用于构建短语翻译系统时BLEU相当或更好；具体数字未核对。",
+  "legacy": "在神经机器翻译时代，fast_align仍被用来给训练数据加对齐标签（引导注意力、词汇约束翻译）、评估注意力对齐质量，以及在跨语言迁移中把英语的标注投射到其他语言。后来出现了基于多语言BERT表示的SimAlign、awesome-align等神经对齐工具，在许多语言对上更准。",
+  "limits": [
+    {"text": "对角线先验假设两种语言语序大致相同，对日语-英语这类语序差异很大的语言对效果下降。", "solved_by": []},
+    {"text": "仍是基于词共现的统计对齐，低频词和需要语义知识的对齐容易出错。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "ibm-models", "type": "extends", "note": "把IBM模型2的位置参数重参数化为单参数的对角线先验。"},
+    {"to": "och-ney-alignment", "type": "rivals", "note": "GIZA++依次训练多个复杂模型、速度慢，fast_align以简单模型取得相近质量、快得多。"},
+    {"to": "hmm-alignment", "type": "rivals", "note": "HMM对齐用相对跳跃距离建模位置，fast_align用相对于对角线的偏离建模。"},
+    {"to": "phrase-smt", "type": "uses", "note": "对齐结果用于短语抽取，评测时接入短语翻译系统比较BLEU。"}
+  ],
+  "prereq": ["em-algorithm", "word-alignment", "mle", "latent-variable"],
+  "terms": [
+    {"t": "词对齐", "d": "在平行句对中找出哪个源语言词与哪个目标语言词互为翻译，是统计机器翻译中抽取翻译规则的基础。"},
+    {"t": "对齐对称化", "d": "分别做源→目标和目标→源两个方向的对齐，再按交集、并集或grow-diag-final等规则合并，提高对齐质量。"}
+  ],
+  "learn": "先读[[ibm-models]]的模型1和2 → 读原文第2节重参数化与第3节推断 → 动手：用fast_align对一份小的中英平行语料做双向对齐并对称化，画出几句话的对齐矩阵。",
+  "check": {
+    "source": "https://aclanthology.org/N13-1073/",
+    "confirmed": "ACL Anthology：标题A Simple, Fast, and Effective Reparameterization of IBM Model 2、作者Chris Dyer、Victor Chahuneau、Noah A. Smith、NAACL-HLT 2013。正文未逐段核对：对齐先验公式、λ的梯度更新、Dirichlet先验、实验语言对与「快一个数量级」的说法、后续工具按一般了解写，未写具体数字。"
+  }
+}

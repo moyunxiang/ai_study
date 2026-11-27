@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Retroformer回顾模型（2023） · AI脉络</title>
+<meta name="description" content="Reflexion这类智能体靠模型写“反思”来改进下一次尝试，但写反思的模型是固定的，不会因为环境奖励而变得更会反思；而直接微调智能体本身又往往做不到（比如它是闭源API）。 单独训练一个较小的“回顾模型”：它读失败的轨迹，总结出错的根本原因并提出新计划，写进智能体的提示里；用环境奖励的变化，以策…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/retroformer.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Retroformer回顾模型（2023）">
+<meta property="og:description" content="Reflexion这类智能体靠模型写“反思”来改进下一次尝试，但写反思的模型是固定的，不会因为环境奖励而变得更会反思；而直接微调智能体本身又往往做不到（比如它是闭源API）。 单独训练一个较小的“回顾模型”：它读失败的轨迹，总结出错的根本原因并提出新计划，写进智能体的提示里；用环境奖励的变化，以策…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/retroformer.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/retroformer">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:336"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/agent.html">推理、检索与智能体</a> › 智能体架构与多智能体</div>
+<h1>Retroformer回顾模型</h1>
+<div class="full">Retroformer: Retrospective Large Language Agents with Policy Gradient Optimization</div>
+<div class="meta"><span>2023.08</span><span>论文</span><span>延伸</span><span>ICLR 2024</span><span>Weiran Yao, Shelby Heinecke, Juan Carlos Niebles, Zhiwei Liu, Yihao Feng, Le Xue, Rithesh Murthy, Zeyuan Chen et al. · Salesforce AI Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2308.02151" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/retroformer">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Reflexion这类智能体靠模型写“反思”来改进下一次尝试，但写反思的模型是固定的，不会因为环境奖励而变得更会反思；而直接微调智能体本身又往往做不到（比如它是闭源API）。</p></div><div><h4>方法</h4><p>单独训练一个较小的“回顾模型”：它读失败的轨迹，总结出错的根本原因并提出新计划，写进智能体的提示里；用环境奖励的变化，以策略梯度来微调这个回顾模型。</p></div><div><h4>影响</h4><p>把语言反思和梯度学习接了起来：智能体主体保持冻结，只学习“怎样给它写反思”，是“用强化学习优化提示/反思”这条路线的早期代表。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><a class="ln" href="../n/reflexion.html">Reflexion</a>的流程是：智能体做一次任务，失败后由LLM写一段文字反思（哪里错了、下次怎么做），放进记忆，下一次尝试时作为提示的一部分。问题在于反思的质量全看那个LLM本身，环境给出的奖励并没有被用来改进“反思”这件事。</p><p>Retroformer把系统拆成两部分：</p><ul><li><b>行动者</b>：一个冻结的大模型（可以是GPT这类闭源API），负责实际在环境里行动；</li><li><b>回顾模型</b>：一个可训练的较小语言模型，读入上一次的轨迹和得分，写出总结失败根因、提出行动计划的反思，拼进行动者的提示。</li></ul><p>训练回顾模型的奖励是：用了这段反思之后，下一次尝试的得分比上一次提高了多少。作者把多个环境、多个任务上收集的“反思—奖励提升”数据用于策略梯度微调（实现上参考了<a class="ln" href="../n/instructgpt.html">InstructGPT与RLHF</a>式的奖励模型加<a class="ln" href="../n/ppo.html">PPO</a>流程）。在<a class="ln" href="../n/hotpotqa.html">HotpotQA多跳问答</a>、<a class="ln" href="../n/alfworld.html">ALFWorld文字家务环境</a>、<a class="ln" href="../n/webshop.html">WebShop</a>等任务上，智能体随尝试次数增加持续变好，并明显超过不利用环境梯度的反思基线。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>改进只能通过提示传递给冻结的行动者，行动者本身缺乏的能力无法靠反思补上。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>依赖同一任务可以多次重试，并把得分提升当奖励；对一次性、不能重来的真实任务不适用。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/ppo.html">PPO</a><span class="yr">2017.07 · RL</span><div class=nt>用策略梯度（PPO式流程）微调回顾模型。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:336" href="../n/react.html">ReAct</a><span class="yr">2022.10 · 推理·智能体</span><div class=nt>行动者以ReAct式的推理—行动方式在环境中执行任务。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/hotpotqa.html">HotpotQA多跳问答</a><span class="yr">2018.09 · 数据·评测</span><div class=nt>多跳问答HotpotQA是评测环境之一。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/alfworld.html">ALFWorld文字家务环境</a><span class="yr">2020.10 · 数据·评测</span><div class=nt>文字家务环境ALFWorld是评测环境之一。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/reflexion.html">Reflexion</a><span class="yr">2023.03 · 推理·智能体</span><div class=nt>保留语言反思进记忆的机制，但让写反思的模型能根据环境奖励被训练。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/rlhf-concept.html">人类反馈强化学习</a> <a class="chip c" href="../c/agent-loop.html">智能体循环</a> <a class="chip c" href="../c/in-context-learning.html">上下文学习与提示</a></p>
+
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/reflexion.html">Reflexion</a>和<a class="ln" href="../n/ppo.html">PPO</a> → 读原文第3节两模块结构和奖励定义 → 动手：收集一个任务上几条“反思前后得分”数据，看哪些反思真正带来了提升。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2308.02151" rel="noopener">https://arxiv.org/abs/2308.02151</a>（标题、作者、v1提交于2023-08-04；摘要中现有语言智能体不用环境奖励优化、学习回顾模型通过策略梯度根据环境反馈自动调整提示、总结先前失败根因并提出行动计划、跨多个环境和任务学习、智能体随时间改进并超过不用梯度的基线。行动者冻结、奖励定义为得分提升、PPO式流程、具体评测环境与ICLR 2024凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Retroformer%E5%9B%9E%E9%A1%BE%E6%A8%A1%E5%9E%8B%EF%BC%88retroformer%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aretroformer%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/retroformer.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="metagpt.html"><small>本分支上一个 · 2023.08</small><b>MetaGPT</b></a><a class="r" href="algorithm-of-thoughts.html"><small>本分支下一个 · 2023.08</small><b>思维算法AoT</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

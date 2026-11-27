@@ -1,0 +1,24 @@
+{
+  "id": "sparsevlm",
+  "who": "Yuan Zhang, Chun-Kai Fan, Junpeng Ma, Wenzhao Zheng, Tao Huang, Kurt Keutzer, Shanghang Zhang et al. · 北京大学 / 加州大学伯克利分校 / 松下",
+  "venue": "ICML 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2410.04417"},
+    {"label": "代码", "url": "https://github.com/Gumpest/SparseVLMs"}
+  ],
+  "aka": ["SparseVLMs", "Sparse VLM", "文本引导视觉token稀疏化", "免训练token剪枝", "training-free token pruning", "token recycling"],
+  "problem": "VLM中视觉token信息稀疏却占了大部分计算；已有剪枝方法多要学一个额外的网络、需要训练数据。",
+  "idea": "免训练、文本引导：在语言模型各层用自注意力矩阵，先挑出与图像相关的文本token，再用它们给视觉token打分并剪枝；按矩阵秩自适应决定每层的稀疏比例，并把剪掉的token回收压缩成少量紧凑token。",
+  "impact": "不增加参数、不需微调就能提升多种VLM在图像和视频任务上的效率：LLaVA的FLOPs减少54%、CUDA延迟降低37%，仍保持97%的原始精度。",
+  "method": "[[fastv]]在语言模型的某一层按所有token对视觉token的平均注意力剪掉一部分；但并非所有文本token都与图像有关（如“请”“回答”），用它们来评估视觉token会引入噪声。另一些方法训练一个打分网络，需要额外数据和参数。\n\nSparseVLM不训练。它在语言模型的若干层中：先从文本token里选出与视觉内容相关的“评分者”（依据它们对视觉token的注意力）；再用这些评分者对视觉token的注意力打分，保留高分的视觉token。每层剪多少不固定，而是根据注意力矩阵的秩自适应决定——秩低说明冗余多，可以剪得更狠。被剪掉的token不直接丢弃，而是按相似度聚合回收成少量紧凑的token，保留一部分信息。\n\n摘要报告SparseVLM能提升多种VLM在多种图像和视频理解任务上的效率，例如为LLaVA配上SparseVLM后，FLOPs减少54%，CUDA延迟降低37%，同时保持97%的原始精度。",
+  "limits": [
+    {"text": "剪枝发生在语言模型内部、依赖完整的注意力矩阵，与FlashAttention等不显式算出注意力矩阵的高效实现不易兼容。", "solved_by": ["visionzip"]}
+  ],
+  "relations": [
+    {"to": "fastv", "type": "extends", "note": "同样在LLM内部按注意力剪枝视觉token，改为只用相关文本token打分并自适应每层比例。"},
+    {"to": "llava-prumerge", "type": "rivals", "note": "PruMerge在视觉编码器侧与问题无关地压缩，SparseVLM在语言模型内由文本引导剪枝。"},
+    {"to": "llava-1.5", "type": "uses", "note": "以LLaVA等模型为对象验证加速效果。"}
+  ],
+  "prereq": ["self-attention", "query-key-value", "rank-trace-determinant", "params-flops"],
+  "check": {"source": "https://arxiv.org/abs/2410.04417", "confirmed": "arXiv记录：标题、作者、v1日期2024-10-06；摘要中现有方法需学网络、文本引导免训练、选相关文本token用自注意力矩阵评估视觉token、基于秩的每层自适应稀疏比、token回收、LLaVA上FLOPs -54%、CUDA延迟 -37%、保持97%精度。ICML 2025与机构凭一般了解。"}
+}

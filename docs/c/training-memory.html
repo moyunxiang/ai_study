@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>训练显存的组成：参数、梯度、优化器状态与激活（Where Training Memory Goes） · AI脉络</title>
+<meta name="description" content="训练时显存被四样东西占用：模型参数、梯度、优化器状态和激活值，另外还有临时缓冲与碎片。前三者随参数量增长，激活值随批大小和序列长度增长，“显存不足（OOM）”时要先弄清是哪一项爆了。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/training-memory.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="训练显存的组成：参数、梯度、优化器状态与激活（Where Training Memory Goes）">
+<meta property="og:description" content="训练时显存被四样东西占用：模型参数、梯度、优化器状态和激活值，另外还有临时缓冲与碎片。前三者随参数量增长，激活值随批大小和序列长度增长，“显存不足（OOM）”时要先弄清是哪一项爆了。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/training-memory.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/training-memory">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 系统与硬件 · 入门</div>
+<h1>训练显存的组成：参数、梯度、优化器状态与激活</h1><div class="full">Where Training Memory Goes</div>
+<p class="muted" style="font-size:13px">也叫：训练显存　training memory　显存占用　memory footprint　激活值显存　activation memory　激活显存　优化器状态　optimizer states　优化器状态显存　显存不足　OOM　out of memory　CUDA out of memory　显存碎片　memory fragmentation　显存估算</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/training-memory">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>训练时显存被四样东西占用：模型参数、梯度、优化器状态和激活值，另外还有临时缓冲与碎片。前三者随参数量增长，激活值随批大小和序列长度增长，“显存不足（OOM）”时要先弄清是哪一项爆了。</b></p>
+<p class="tags">先要会：<a class="chip c" href="params-flops.html">参数量、计算量与显存</a> <a class="chip c" href="backpropagation.html">反向传播</a> <a class="chip c" href="memory-bandwidth.html">显存、内存带宽与“内存墙”</a></p>
+<p>推理一个7B模型只需约14GB存权重，训练它却要上百GB。读懂显存都花在哪，才能判断该用哪种省显存技巧，而不是盲目地调小批大小。</p><p><b>与参数量成正比的三项</b>（混合精度+Adam的常见设置，见<a class="lc" href="../c/params-flops.html">参数量、计算量与显存</a>）。</p><ul><li><b>参数</b>：BF16/FP16副本每个2字节，另有一份FP32主权重4字节。</li><li><b>梯度</b>：每个参数2字节（或4字节）。</li><li><b>优化器状态</b>：Adam的一阶和二阶动量各4字节（见<a class="lc" href="../c/adaptive-optimizer.html">自适应学习率优化器</a>）。</li></ul><p>合计约每参数16字节。这三项与批大小无关，<a class="ln" href="../n/zero.html">ZeRO与DeepSpeed</a>和<a class="ln" href="../n/fsdp.html">PyTorch FSDP</a>把它们切分到多卡，见<a class="lc" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a>。</p><p><b>激活值</b>。反向传播需要前向时各层的中间结果（见<a class="lc" href="../c/backpropagation.html">反向传播</a>），它们必须一直保存到反向用完。激活显存大致与<code>层数 × 批大小 × 序列长度 × 隐藏维度</code>成正比，注意力分数还额外与序列长度的平方成正比（使用<a class="ln" href="../n/flashattention.html">FlashAttention</a>后不再需要存这个平方项）。序列一长、批一大，激活往往比参数还大。<a class="ln" href="../n/megatron-sp.html">序列并行与选择性重计算</a>对Transformer每层的激活量做了逐项估算，并用序列并行和选择性重算把它降下来。</p><p><b>省激活的办法</b>：<a class="ln" href="../n/grad-checkpointing.html">梯度检查点</a>只存部分层的输入、反向时重算其余；<a class="lc" href="../c/gradient-accumulation.html">梯度累积</a>用更小的微批；序列并行、上下文并行把长序列切到多卡；把激活卸载到CPU内存，见<a class="ln" href="../n/zero-offload.html">ZeRO-Offload CPU卸载</a>。</p><p><b>其他开销</b>。CUDA上下文和库本身占几百MB到上GB；临时缓冲（如通信缓冲、矩阵乘的工作区）；以及<b>显存碎片</b>：分配器里空闲的总量够，但没有一块连续的足够大，也会OOM。</p><p><b>排查OOM的顺序</b>。先看是在第一步就OOM（多半是参数和优化器状态放不下，需要切分或量化），还是跑了一阵才OOM（多半是某些长序列让激活暴涨，或碎片积累）。PyTorch提供显存快照工具，可以看到每块显存是谁分配的。</p>
+<div class="example"><h4>例子</h4><p>一个1B参数模型，混合精度+Adam：参数、梯度、优化器状态共约16GB。设24层、隐藏维度2048、序列长度2048、微批8条，粗略按每层每token保存约30个隐藏维度大小的BF16张量估算，激活约为<code>24 × 8 × 2048 × 2048 × 30 × 2字节 ≈ 48GB</code>，是参数部分的3倍。开启逐层梯度检查点后，只存每层输入，激活降到约<code>24 × 8 × 2048 × 2048 × 2字节 ≈ 1.6GB</code>（外加反向时单层重算的峰值）。系数30为示意。</p></div>
+<h2>容易误解的地方</h2><ul><li>只把批大小减半不一定能解决OOM：若瓶颈是参数和优化器状态，激活再小也放不下。</li><li>显存监控里显示的“已保留”与“已分配”不同，分配器会缓存释放的显存以便复用，看起来占满不等于真的用满。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

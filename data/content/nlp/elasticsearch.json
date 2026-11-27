@@ -1,0 +1,35 @@
+{
+  "id": "elasticsearch",
+  "who": "Shay Banon · Elastic",
+  "links": [
+    {"label": "官网", "url": "https://www.elastic.co/elasticsearch"},
+    {"label": "Wikipedia", "url": "https://en.wikipedia.org/wiki/Elasticsearch"}
+  ],
+  "aka": ["Elasticsearch", "ES", "ELK", "Elastic Stack", "OpenSearch", "分布式搜索引擎", "全文搜索服务"],
+  "problem": "Lucene只是一个Java库，要用它支撑大规模、多机器、需要高可用的搜索服务，开发者得自己处理分片、副本、集群协调和对外接口。",
+  "idea": "在Lucene之上做一个开箱即用的**分布式搜索服务**：数据以无模式的JSON文档写入，自动分成多个分片分布到集群各节点并保留副本，通过HTTP REST接口建索引和查询，近实时可查。",
+  "impact": "Elasticsearch成为最流行的企业搜索引擎，与Logstash、Kibana组成的ELK栈是日志分析的事实标准；在RAG流行后，它和Lucene一起被广泛用作BM25与向量的混合检索后端。",
+  "background": "[[lucene]]提供了倒排索引、分析链和[[bm25]]等打分，但扩展到多台机器要靠Solr这类上层系统，而当时Solr的分布式能力较弱、配置偏重XML。Shay Banon在2004年写过基于Lucene的Compass框架，在开发第三版时认为需要重写成以JSON和HTTP为接口、天生分布式的系统。",
+  "method": "**文档与索引**：数据是JSON文档，写入某个索引；字段类型可以自动推断（动态映射），也可以显式定义。\n\n**分片与副本**：每个索引被切成若干主分片，每个分片就是一个独立的Lucene索引；每个主分片可以有多个副本放在不同节点上，既提供容错也分担查询负载。写入按文档ID哈希路由到主分片，再同步到副本。\n\n**近实时**：新写入的文档先进入内存缓冲，默认约每秒刷新一次生成新的Lucene段，于是大约一秒后可被搜索到；事务日志保证节点崩溃时不丢数据。\n\n**查询**：用JSON描述的Query DSL组合全文匹配、布尔条件、过滤、聚合（统计、分桶）；查询先发到所有相关分片，各分片返回局部前k个结果，再在协调节点合并排序。默认相关性打分是BM25，新版本也支持稠密向量的近邻检索。",
+  "results": "据维基百科：2004年其前身Compass问世，2010年2月发布Elasticsearch第一个版本，2012年成立Elastic公司；按DB-Engines排名是最流行的企业搜索引擎。",
+  "legacy": "2021年Elastic修改开源许可证后，亚马逊分叉出OpenSearch。Elasticsearch在电商搜索、站内搜索、日志与安全分析中广泛部署；检索增强生成兴起后，它常作为稀疏检索组件，与[[dpr]]式稠密检索结合成混合检索。",
+  "limits": [
+    {"text": "默认的BM25词项匹配不理解语义，需要额外接入稠密向量或重排序模型。", "solved_by": ["dpr", "monobert"]},
+    {"text": "分片数在建索引时就要确定，后期调整要重建索引，集群调优和资源消耗对小团队不低。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "lucene", "type": "uses", "note": "每个分片就是一个Lucene索引，倒排索引、分析链和打分都来自Lucene。"},
+    {"to": "bm25", "type": "uses", "note": "默认相关性打分为BM25。"},
+    {"to": "mapreduce", "type": "extends", "note": "沿用「数据分片到多机、各自计算再汇总」的分布式思路，把它用于在线搜索与聚合。"}
+  ],
+  "prereq": ["retrieval", "distributed-training", "throughput-latency"],
+  "terms": [
+    {"t": "分片（shard）", "d": "把一个大索引切成的若干部分，分布在不同机器上并行处理。"},
+    {"t": "近实时搜索", "d": "新写入的数据经过短暂延迟（约1秒）即可被检索到，而不是写入后立即可见。"}
+  ],
+  "learn": "先了解[[lucene]]的倒排索引 → 读Elasticsearch官方文档中分片、副本和Query DSL的入门章节 → 动手：用Docker启动单节点Elasticsearch，导入一批文档，比较match查询与带过滤条件的bool查询。",
+  "check": {
+    "source": "https://en.wikipedia.org/wiki/Elasticsearch",
+    "confirmed": "lookup.py wiki：基于Apache Lucene、分布式多租户全文搜索、HTTP接口和无模式JSON文档、分片与副本、近实时搜索、ELK栈、Shay Banon于2004年写出前身Compass、2010年2月发布第一版、2012年成立Elastic、DB-Engines最流行的企业搜索引擎。约每秒刷新、路由与合并细节、2021年许可证变更与OpenSearch、向量检索凭一般了解。"
+  }
+}

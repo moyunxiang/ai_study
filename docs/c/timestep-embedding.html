@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>时间步嵌入与条件注入（Timestep Embeddings and Conditioning） · AI脉络</title>
+<meta name="description" content="扩散模型的去噪网络必须知道“现在噪声有多大”和“要画什么”。噪声水平t先编码成向量（时间步嵌入），常通过对特征做缩放和平移（AdaGN、adaLN）注入网络；文本等条件则常通过交叉注意力注入。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/timestep-embedding.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="时间步嵌入与条件注入（Timestep Embeddings and Conditioning）">
+<meta property="og:description" content="扩散模型的去噪网络必须知道“现在噪声有多大”和“要画什么”。噪声水平t先编码成向量（时间步嵌入），常通过对特征做缩放和平移（AdaGN、adaLN）注入网络；文本等条件则常通过交叉注意力注入。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/timestep-embedding.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/timestep-embedding">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 生成模型 · 进阶</div>
+<h1>时间步嵌入与条件注入</h1><div class="full">Timestep Embeddings and Conditioning</div>
+<p class="muted" style="font-size:13px">也叫：时间步嵌入　timestep embedding　time embedding　噪声水平嵌入　noise level embedding　条件注入　conditioning　adaLN　adaLN-Zero　AdaGN　自适应层归一化　adaptive layer norm　交叉注意力条件　cross-attention conditioning　文本条件</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/timestep-embedding">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>扩散模型的去噪网络必须知道“现在噪声有多大”和“要画什么”。噪声水平t先编码成向量（时间步嵌入），常通过对特征做缩放和平移（AdaGN、adaLN）注入网络；文本等条件则常通过交叉注意力注入。</b></p>
+<p class="tags">先要会：<a class="chip c" href="positional-encoding.html">位置编码</a> <a class="chip c" href="diffusion-process.html">扩散：前向加噪与反向去噪</a> <a class="chip c" href="attention-concept.html">注意力机制</a></p>
+<p>同一张模糊的输入，如果噪声水平很高，网络应该大刀阔斧地猜整体结构；噪声水平很低时，只该修补细节。所以去噪网络<code>ε_θ(x_t, t, c)</code>除了图像x_t，还有两个输入：噪声水平t和条件c（类别、文本、图像）。怎样把它们送进一个卷积网络或Transformer，是扩散模型架构的核心细节。</p><p><b>时间步嵌入</b>。t是一个标量（如0到1000的整数，或连续的噪声水平σ）。直接作为一个数输入效果不好，通常像<a class="lc" href="../c/positional-encoding.html">位置编码</a>那样，用一组不同频率的正弦和余弦把它展开成几百维的向量，再经过一个小的<a class="lc" href="../c/mlp.html">多层感知机</a>，得到嵌入向量e_t。</p><p><b>怎么注入</b>。</p><ul><li><b>相加</b>：<a class="ln" href="../n/ddpm.html">DDPM</a>把e_t经线性层投影后加到每个残差块的特征上。</li><li><b>自适应归一化</b>：用e_t（以及类别嵌入）预测每个通道的缩放γ和平移β，对归一化后的特征做<code>γ·h + β</code>。这与<a class="ln" href="../n/film.html">FiLM特征调制</a>的特征调制是同一种思想。<a class="ln" href="../n/adm.html">扩散超越GAN</a>称之为AdaGN，<a class="ln" href="../n/dit.html">Diffusion Transformer</a>在Transformer中用adaLN，并把残差分支的门控系数初始化为0（adaLN-Zero），训练更稳定。</li></ul><p><b>文本等复杂条件</b>。一段文字编码后是一串token向量，一个缩放平移装不下这么多信息。<a class="ln" href="../n/ldm.html">潜空间扩散LDM</a>在U-Net的各层加入<b>交叉注意力</b>：图像特征作为查询，文本token作为键和值（见<a class="lc" href="../c/attention-concept.html">注意力机制</a>），每个空间位置都能“查阅”提示里的相关词。<a class="ln" href="../n/sd3.html">Stable Diffusion 3</a>的MM-DiT则把文本token和图像token拼接在一起做联合自注意力。全局性的信息（例如池化后的文本向量、图像尺寸）仍常和时间步嵌入合并，走adaLN这条路。</p><p><b>为什么重要</b>。条件注入方式决定了模型“听不听话”，也决定了能否在不改主干的情况下增加新的控制信号，例如额外的结构图或参考图像。</p>
+<div class="example"><h4>例子</h4><p>嵌入维度为4时，t=500的正弦编码可以取频率(1, 1/100)：<code>[sin(500), cos(500), sin(5), cos(5)] ≈ [−0.47, −0.88, −0.96, 0.28]</code>。实际模型常用128到320维，经过MLP后映射到每个块所需的γ、β。若某通道得到γ=1.2、β=−0.1，归一化后的特征0.5就变成1.2×0.5 − 0.1 = 0.5，特征−1.0变成−1.3。</p></div>
+<h2>容易误解的地方</h2><ul><li>噪声水平的编码要与训练时一致：用整数步t训练的模型，采样时传入连续的σ就会出错，这是换采样器时常见的错误。</li><li>交叉注意力注入的是逐token的信息，adaLN注入的是全局信息，二者分工不同，不能简单互换。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

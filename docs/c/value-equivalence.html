@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>值等价模型与隐空间动力学（Value Equivalence and Latent Dynamics Models） · AI脉络</title>
+<meta name="description" content="学环境模型不必在像素上逐帧重建世界，只要在一个隐空间里预测规划真正用得到的量（奖励、价值、策略）就够了。按这种标准训练的隐空间动力学模型叫值等价模型，MuZero是代表。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/value-equivalence.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="值等价模型与隐空间动力学（Value Equivalence and Latent Dynamics Models）">
+<meta property="og:description" content="学环境模型不必在像素上逐帧重建世界，只要在一个隐空间里预测规划真正用得到的量（奖励、价值、策略）就够了。按这种标准训练的隐空间动力学模型叫值等价模型，MuZero是代表。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/value-equivalence.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/value-equivalence">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>值等价模型与隐空间动力学</h1><div class="full">Value Equivalence and Latent Dynamics Models</div>
+<p class="muted" style="font-size:13px">也叫：值等价　价值等价　value equivalence　值等价模型　value-equivalent model　隐空间动力学　latent dynamics　latent dynamics model　隐空间模型　latent world model　抽象模型　隐空间规划　latent planning</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/value-equivalence">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>学环境模型不必在像素上逐帧重建世界，只要在一个隐空间里预测规划真正用得到的量（奖励、价值、策略）就够了。按这种标准训练的隐空间动力学模型叫值等价模型，MuZero是代表。</b></p>
+<p class="tags">先要会：<a class="chip c" href="model-based-rl.html">基于模型的强化学习</a> <a class="chip c" href="latent-space.html">潜空间</a> <a class="chip c" href="bellman-equation.html">Bellman方程</a></p>
+<p><a class="lc" href="../c/model-based-rl.html">基于模型的强化学习</a>的模型通常被训练成“预测下一帧观测”。但一帧Atari画面有几万个像素，其中大部分（背景、分数显示的字体）与该怎么行动无关；在真实机器人上，精确预测相机图像更是极难。模型把容量花在这些细节上，真正影响决策的部分反而可能预测不准。</p><p><b>隐空间动力学</b>。先用编码器把观测压成隐状态<code>z = h(o)</code>，在隐空间里学转移<code>z&#x27; = g(z, a)</code>，并从z预测奖励等量。规划和想象都在z上进行，比在像素上便宜得多。按训练信号分两类：</p><ul><li><b>带重建</b>：除了预测奖励，还要求能从z解码回观测（或至少预测观测），例如<a class="ln" href="../n/world-models.html">World Models</a>、<a class="ln" href="../n/planet.html">PlaNet</a>、<a class="ln" href="../n/dreamer.html">Dreamer</a>。重建提供了丰富的学习信号，但也迫使z保留与任务无关的细节。</li><li><b>值等价</b>：不要求重建，只要求从z出发、沿着动作序列展开k步后，模型预测的奖励、价值（有时还有策略）与真实环境中的一致。只要这些量对，模型内部的z可以和真实状态毫无相似之处。</li></ul><p><b>值等价原则</b>。两个模型如果对所有相关的策略和价值函数给出相同的Bellman更新，那么对规划来说它们没有区别；所以没有必要学一个“真实”的模型，只需在决策相关的意义上等价。这一观点为下面这类方法提供了理论说明。</p><p><b>代表方法</b>。<a class="ln" href="../n/predictron.html">Predictron</a>和<a class="ln" href="../n/vpn.html">价值预测网络VPN</a>较早在抽象状态上展开多步来预测价值；<a class="ln" href="../n/muzero.html">MuZero</a>把这一思路与蒙特卡洛树搜索结合，不知道棋规也能在围棋、国际象棋、Atari上达到很强的水平；<a class="ln" href="../n/td-mpc.html">TD-MPC</a>和<a class="ln" href="../n/td-mpc2.html">TD-MPC2</a>在连续控制上学习值等价式的隐空间模型并用于规划。<a class="ln" href="../n/efficientzero.html">EfficientZero</a>又给MuZero加回了一个自监督的隐状态一致性损失，说明纯值等价的信号在数据少时不够用。</p>
+<div class="example"><h4>例子</h4><p>一个打砖块游戏，画面84×84。重建式模型要预测下一帧的7056个像素，其中砖块颜色、背景纹理都要画对；值等价模型只需让z在展开5步后预测出的奖励（打掉砖块得分）和价值与实际一致，球和挡板的位置关系对了就够了，砖块颜色画错也不影响。</p></div>
+<h2>容易误解的地方</h2><ul><li>值等价模型的隐状态不可解释，也不能直接用于预测观测，难以复用到别的任务或用于可视化检查。</li><li>只靠奖励和价值的监督，信号稀疏时隐空间很难学好，实践中常加辅助的自监督损失。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

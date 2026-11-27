@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>注意力汇聚（Attention Sinks） · AI脉络</title>
+<meta name="description" content="大语言模型的很多注意力头会把大量权重分配给序列开头的一两个token（常是BOS），即使它们语义上不重要。这些位置像一个“垃圾桶”，吸收头不需要用到的注意力。去掉它们，模型输出会崩溃。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/attention-sink.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="注意力汇聚（Attention Sinks）">
+<meta property="og:description" content="大语言模型的很多注意力头会把大量权重分配给序列开头的一两个token（常是BOS），即使它们语义上不重要。这些位置像一个“垃圾桶”，吸收头不需要用到的注意力。去掉它们，模型输出会崩溃。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/attention-sink.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/attention-sink">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>注意力汇聚</h1><div class="full">Attention Sinks</div>
+<p class="muted" style="font-size:13px">也叫：attention sink　attention sinks　注意力汇聚　注意力汇点　注意力沉没　注意力黑洞　sink token　汇聚token　BOS注意力　StreamingLLM　massive activations　softmax加一　softmax-off-by-one　registers</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/attention-sink">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>大语言模型的很多注意力头会把大量权重分配给序列开头的一两个token（常是BOS），即使它们语义上不重要。这些位置像一个“垃圾桶”，吸收头不需要用到的注意力。去掉它们，模型输出会崩溃。</b></p>
+<p class="tags">先要会：<a class="chip c" href="self-attention.html">自注意力与多头注意力</a> <a class="chip c" href="softmax.html">Softmax与logits</a></p>
+<p>softmax的输出必须加起来等于1（见<a class="lc" href="../c/softmax.html">Softmax与logits</a>）。如果一个注意力头在当前位置“没什么要看的”，它也不能把所有权重设为0，总得分配到某些位置上。研究者发现，训练好的语言模型找到了一个省事的办法：把多余的权重全部倒给序列最开头的token。这种现象叫<b>注意力汇聚</b>（attention sink），那几个token叫汇聚点。</p><p><b>为什么是开头</b>。在<a class="lc" href="../c/causal-mask.html">因果掩码</a>之下，序列第一个token能被后面所有位置看到，是唯一一个“永远在场”的位置，于是成了天然的公共垃圾桶。它的值向量通常很小，权重倒过去也几乎不改变输出，相当于“不看”。</p><p><b><a class="ln" href="../n/streamingllm.html">StreamingLLM与注意力汇聚</a>的发现</b>（2023）。用<a class="lc" href="../c/sliding-window-attention.html">滑动窗口注意力</a>的方式处理超长的流式输入时，一旦最早的token被挤出窗口，模型的困惑度会突然飙升、输出变成乱码。原因正是汇聚点被丢掉了：那些本来倒向开头的注意力权重只能被强行分配到别的token上，打乱了表示。只要<b>始终保留开头的少数几个token</b>的KV（论文中用4个），再加上最近的滑动窗口，模型就能在远超训练长度的流式文本上保持稳定的困惑度。论文还提出预训练时加入一个专门的可学习“汇聚token”。</p><p><b>与别的现象的联系</b>。</p><ul><li><a class="ln" href="../n/massive-activations.html">巨量激活</a>发现极少数位置和维度上存在比其余大几个数量级的激活值，它们与汇聚点相关，也是量化时的一个难点（见<a class="lc" href="../c/activation-outliers.html">激活离群值与旋转量化</a>）。</li><li>KV缓存压缩方法（见<a class="lc" href="../c/kv-cache-compression.html">KV缓存压缩</a>）普遍会特意保留汇聚点。</li><li><a class="ln" href="../n/gated-attention.html">门控注意力</a>在注意力输出后加一个门控，发现可以显著减少汇聚现象，并改善训练稳定性和长上下文外推。</li><li>还有工作在softmax的分母里加1（或者加一个可学习的偏置），允许注意力“什么都不看”，从根源上消除对汇聚点的需求。</li></ul><p><b>对可解释性的提醒</b>。看注意力热力图时，开头token上的高权重大多是汇聚现象，不代表模型真的在“关注”那个词。</p>
+<div class="example"><h4>例子</h4><p>一个8层模型处理一段1000个token的文本，统计各头的平均注意力分布：第1个token（BOS）平均得到约40%的权重，其余999个token分享另外60%。BOS本身只是一个起始符，没有内容。</p><p>流式推理实验：窗口1024，处理到第5000个token时，只保留最近1024个token，困惑度从约10突然跳到几百；保留“最初4个token + 最近1020个token”，困惑度维持在约10。</p><p>（数字为示意。）</p></div>
+<h2>容易误解的地方</h2><ul><li>汇聚点不一定是BOS：有时是第一个换行符、句号或其他高频token，取决于模型。</li><li>截断上下文或压缩KV缓存时，若不保留汇聚点，效果可能断崖式下跌，而且问题很难从日志里直接看出来。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

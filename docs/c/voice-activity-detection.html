@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>语音活动检测与端点检测（Voice Activity Detection and Endpointing） · AI脉络</title>
+<meta name="description" content="逐帧判断一段音频里“此刻有没有人在说话”。它是语音系统的第一道关卡：决定什么时候开始识别、用户什么时候说完（端点检测），以及把长录音切成可处理的片段。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/voice-activity-detection.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="语音活动检测与端点检测（Voice Activity Detection and Endpointing）">
+<meta property="og:description" content="逐帧判断一段音频里“此刻有没有人在说话”。它是语音系统的第一道关卡：决定什么时候开始识别、用户什么时候说完（端点检测），以及把长录音切成可处理的片段。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/voice-activity-detection.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/voice-activity-detection">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 语音 · 入门</div>
+<h1>语音活动检测与端点检测</h1><div class="full">Voice Activity Detection and Endpointing</div>
+<p class="muted" style="font-size:13px">也叫：语音活动检测　voice activity detection　VAD　语音端点检测　端点检测　endpointing　endpoint detection　静音检测　silence detection　语音检测　speech detection　话轮检测　turn detection　turn-taking　挂起时间　hangover</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/voice-activity-detection">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>逐帧判断一段音频里“此刻有没有人在说话”。它是语音系统的第一道关卡：决定什么时候开始识别、用户什么时候说完（端点检测），以及把长录音切成可处理的片段。</b></p>
+<p class="tags">先要会：<a class="chip c" href="waveform-spectrogram.html">波形、频谱与梅尔谱</a> <a class="chip c" href="classification-metrics.html">准确率、精确率、召回率与F1</a></p>
+<p>语音助手一直开着麦克风，但只有用户说话时才该处理；电话录音有大段静音和噪声；长达几小时的会议录音需要切成一段段送进识别模型。这些都需要先回答一个简单的问题：这一帧是语音还是非语音？这就是<b>语音活动检测</b>（VAD）。</p><p><b>基本做法</b>。把音频切成10到30毫秒的帧（见<a class="lc" href="../c/waveform-spectrogram.html">波形、频谱与梅尔谱</a>），对每帧做二分类，再做平滑。</p><ul><li><b>能量与过零率</b>：语音段能量高，最简单的VAD就是能量超过阈值。噪声大时很容易误判。</li><li><b>统计模型</b>：用高斯混合模型分别建模语音和噪声的频谱特征，按似然比判决，常见的开源实时VAD多属此类。</li><li><b>神经网络</b>：用小型卷积或循环网络在大量带噪数据上训练，对噪声、音乐、多人说话更鲁棒，是现在的主流。</li></ul><p><b>平滑与延迟</b>。逐帧结果会抖动：一个词中间的短暂停顿不应被切开。常用“挂起”策略：检测到语音后，要连续若干帧非语音才判定说话结束。挂起时间越长越不容易误切，但用户说完后系统的反应也越慢。</p><p><b>端点检测与轮流说话</b>。对话系统最关心“用户说完了没有”（endpointing）。只看静音时长会在用户思考停顿时抢话，或在用户早已说完时迟迟不回应。级联式语音智能体（见<a class="lc" href="../c/voice-agent-pipeline.html">语音智能体与级联管线</a>）高度依赖VAD来决定何时把语音交给识别和语言模型；<a class="ln" href="../n/gpt-4o.html">GPT-4o全模态实时模型</a>、<a class="ln" href="../n/moshi.html">Moshi全双工语音对话</a>这类端到端或全双工模型（见<a class="lc" href="../c/full-duplex-speech.html">全双工语音对话</a>）则尝试让模型自己决定何时开口、何时让出话轮。</p><p><b>其他用途</b>。长音频转写先用VAD切段再识别，例如<a class="ln" href="../n/whisperx.html">WhisperX长音频转写</a>；<a class="lc" href="../c/speaker-diarization.html">说话人日志</a>的第一步也是找出有语音的区间，<a class="ln" href="../n/pyannote.html">pyannote.audio</a>工具包中包含这一模块。噪声鲁棒性的评测可见<a class="ln" href="../n/chime.html">CHiME噪声环境语音挑战</a>等挑战。</p>
+<div class="example"><h4>例子</h4><p>帧长20毫秒，挂起时间设为300毫秒（15帧）。用户说“帮我订明天……（停顿200毫秒）……早上的票”，停顿只有10帧，不足15帧，VAD不会切断；说完后再等300毫秒确认结束，于是系统至少有0.3秒的额外延迟。把挂起改为100毫秒，延迟变小，但句中停顿会被误判为说完。</p></div>
+<h2>容易误解的地方</h2><ul><li>VAD只判断有没有人声，不判断是谁在说、说给谁听；电视里的说话声同样会触发它。</li><li>用干净录音调好的阈值在嘈杂环境里常常失效，部署前应在目标场景的噪声下重新评估。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

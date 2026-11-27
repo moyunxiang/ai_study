@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>文本水印（Text Watermarking） · AI脉络</title>
+<meta name="description" content="在模型生成文本时悄悄改变选词的统计规律，人读不出差别，但知道密钥的检测者能用统计检验判断一段文字是不是这个模型写的。代表方法是“绿名单”水印。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/text-watermarking.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="文本水印（Text Watermarking）">
+<meta property="og:description" content="在模型生成文本时悄悄改变选词的统计规律，人读不出差别，但知道密钥的检测者能用统计检验判断一段文字是不是这个模型写的。代表方法是“绿名单”水印。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/text-watermarking.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/text-watermarking">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>文本水印</h1><div class="full">Text Watermarking</div>
+<p class="muted" style="font-size:13px">也叫：watermarking　text watermarking　文本水印　LLM水印　LLM watermark　大模型水印　green list　绿名单　red list　红名单　水印检测　watermark detection　AI文本检测　AI生成文本检测　AI-generated text detection　SynthID</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/text-watermarking">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>在模型生成文本时悄悄改变选词的统计规律，人读不出差别，但知道密钥的检测者能用统计检验判断一段文字是不是这个模型写的。代表方法是“绿名单”水印。</b></p>
+<p class="tags">先要会：<a class="chip c" href="softmax.html">Softmax与logits</a> <a class="chip c" href="decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="statistical-significance.html">方差、种子与统计显著性</a></p>
+<p>大模型写的文字越来越难与人写的区分。事后检测（训练一个分类器判断“像不像AI写的”）准确率有限，而且容易误伤母语不是英语的人写的文本。<b>文本水印</b>换了一个思路：在生成时就埋下可检测的信号。</p><p><b>绿名单水印</b>（<a class="ln" href="../n/llm-watermark.html">LLM文本水印</a>，2023）。</p><p>1. <b>生成时</b>：每一步，用前一个token和一个密钥算出哈希值，以此为随机种子，把词表随机分成“绿名单”（占比γ，如一半）和“红名单”。给绿名单里所有token的logit加上一个常数δ（见<a class="lc" href="../c/softmax.html">Softmax与logits</a>），然后正常采样（见<a class="lc" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a>）。这样生成的文本里，绿名单token会比正常情况多。 2. <b>检测时</b>：不需要模型，只需要密钥。对文本中每个token，用它的前一个token重新算出那一步的绿名单，数一数有多少token落在绿名单里。没有水印的文本，绿token的比例应该约为γ；有水印的文本会明显偏高。用z检验判断：</p><p class="formula"><code>z = (G − γT) / √(T·γ(1 − γ))</code></p><p>T是token总数，G是绿token数。z超过阈值（如4）就判定有水印。</p><p><b>特点</b>。文本越长，检测越可靠；δ越大，水印越强，但对文本质量的影响也越大。在低熵的位置（下一个词几乎是确定的，比如代码或固定搭配），加δ也改变不了选择，所以这些位置几乎不携带水印信号。</p><p><b>部署</b>。<a class="ln" href="../n/synthid-text.html">SynthID文本水印</a>（2024）在生成时用一种“锦标赛采样”嵌入水印，Google称已在其Gemini产品中部署，并公开了实现。</p><p><b>局限</b>。</p><ul><li><b>改写攻击</b>：用另一个模型把文本改写一遍、或者人工逐句修改，水印信号就会大幅减弱。</li><li><b>只对自己有效</b>：只有生成方愿意加水印、并且检测方拿到密钥才行；开源模型的使用者可以直接去掉水印逻辑。</li><li><b>短文本</b>：几十个token的文本统计量不足，难以可靠判断。</li></ul><p>因此水印更适合作为溯源手段之一，而不是“AI文本检测”的完整解决方案。</p>
+<div class="example"><h4>例子</h4><p>γ = 0.5，一段200个token的文本，检测出绿token 140个。</p><ul><li>无水印时期望 0.5 × 200 = 100个，标准差 √(200 × 0.25) ≈ 7.07。</li><li>z = (140 − 100) / 7.07 ≈ 5.66，远超阈值4，判定有水印。</li></ul><p>同一段文字被改写后，绿token降到112个：z = 12/7.07 ≈ 1.70，不足以判定。一段人写的文本，绿token通常在100上下波动，z接近0。</p></div>
+<h2>容易误解的地方</h2><ul><li>检测给出的是统计证据，不是确定的证明；阈值设低了会误判人写的文本。</li><li>水印不改变模型的能力，也不能阻止滥用，只能帮助事后溯源。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

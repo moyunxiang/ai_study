@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>集合通信原语：all-reduce、all-gather与all-to-all（Collective Communication Primitives） · AI脉络</title>
+<meta name="description" content="多张GPU之间交换数据的几种标准模式：广播、规约、all-reduce、reduce-scatter、all-gather和all-to-all。数据并行、ZeRO、张量并行、专家并行都由它们拼成。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/collective-ops.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="集合通信原语：all-reduce、all-gather与all-to-all（Collective Communication Primitives）">
+<meta property="og:description" content="多张GPU之间交换数据的几种标准模式：广播、规约、all-reduce、reduce-scatter、all-gather和all-to-all。数据并行、ZeRO、张量并行、专家并行都由它们拼成。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/collective-ops.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/collective-ops">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 系统与硬件 · 进阶</div>
+<h1>集合通信原语：all-reduce、all-gather与all-to-all</h1><div class="full">Collective Communication Primitives</div>
+<p class="muted" style="font-size:13px">也叫：集合通信　collective communication　集合通信原语　collective operations　collectives　all-reduce　allreduce　AllReduce　reduce-scatter　ReduceScatter　all-gather　allgather　AllGather　all-to-all　AllToAll　broadcast　广播　规约　reduce</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/collective-ops">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>多张GPU之间交换数据的几种标准模式：广播、规约、all-reduce、reduce-scatter、all-gather和all-to-all。数据并行、ZeRO、张量并行、专家并行都由它们拼成。</b></p>
+<p class="tags">先要会：<a class="chip c" href="distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="interconnect.html">互连：从芯片到机柜到集群</a></p>
+<p><a class="lc" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a>里的每一种并行方式，落到代码上都是若干次“集合通信”：所有参与的卡同时调用同一个操作，按固定模式交换数据。理解这几个原语，就能估算一种并行方案要通信多少数据、瓶颈在哪里。实现它们的主流库是<a class="ln" href="../n/nccl.html">NCCL集合通信库</a>。</p><p><b>几个基本原语</b>（设N张卡，每张卡上有一个长度为M的向量）。</p><ul><li><b>广播</b>（broadcast）：一张卡的数据复制给所有卡，例如训练开始时同步初始参数。</li><li><b>规约</b>（reduce）：所有卡的向量逐元素求和（或取最大等），结果放在一张卡上。</li><li><b>all-reduce</b>：求和结果放到<b>每一张</b>卡上。数据并行每一步都要对梯度做一次all-reduce，使所有副本用同样的平均梯度更新。</li><li><b>reduce-scatter</b>：求和后把结果切成N段，第i张卡只拿第i段。</li><li><b>all-gather</b>：每张卡各有一段，拼成完整向量后每张卡都拿一份。</li><li><b>all-to-all</b>：每张卡把自己的数据切成N份，第j份发给第j张卡，相当于一次矩阵转置。</li></ul><p><b>关键关系</b>：<code>all-reduce = reduce-scatter + all-gather</code>。<a class="ln" href="../n/ring-allreduce.html">Ring All-Reduce</a>就是这样实现的：把卡连成环，先用N−1步做reduce-scatter，再用N−1步做all-gather，每张卡发送的总数据量约为<code>2·M·(N−1)/N</code>，几乎不随卡数增长，见<a class="ln" href="../n/horovod.html">Horovod</a>。</p><p><b>它们出现在哪里</b>。</p><ul><li><b>数据并行</b>：梯度all-reduce。</li><li><b><a class="ln" href="../n/zero.html">ZeRO与DeepSpeed</a> / <a class="ln" href="../n/fsdp.html">PyTorch FSDP</a></b>：参数切分存放，前向前用all-gather临时拼出完整参数，反向后用reduce-scatter把梯度求和并分回各自负责的那一段。</li><li><b>张量并行</b>（<a class="ln" href="../n/megatron.html">Megatron-LM模型并行</a>）：每层内部有all-reduce或all-gather / reduce-scatter，因为通信频繁，通常限制在同一台机器内的高速互连上，见<a class="lc" href="../c/interconnect.html">互连：从芯片到机柜到集群</a>。</li><li><b>专家并行</b>：<a class="lc" href="../c/mixture-of-experts.html">混合专家</a>把token按路由结果发往不同卡上的专家，再发回来，用的是all-to-all。</li></ul><p>通信时间大致等于“延迟 + 数据量/带宽”，所以大消息看带宽、小消息看延迟；把通信和计算重叠起来是分布式训练优化的主要手段之一。</p>
+<div class="example"><h4>例子</h4><p>8张卡做数据并行，模型梯度为1GB（FP32下约2.5亿个参数）。环形all-reduce时每张卡发送约<code>2 × 1GB × 7/8 = 1.75GB</code>。若卡间带宽为每张卡单向约100GB/s，理想情况下约需17.5毫秒；换成每卡约12.5GB/s的网络（100Gb/s），则约140毫秒，可能比一步的计算还长。带宽数值为示意。</p></div>
+<h2>容易误解的地方</h2><ul><li>集合通信要求所有卡以相同顺序调用相同的操作，某张卡少调一次或顺序不同，程序会卡死而不是报错，这是分布式训练中最常见的“hang”。</li><li>all-to-all的通信量受负载均衡影响很大，MoE里路由不均时少数卡会成为瓶颈。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

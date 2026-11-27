@@ -1,0 +1,29 @@
+{
+  "id": "uwac",
+  "who": "Yue Wu, Shuangfei Zhai, Nitish Srivastava, Joshua Susskind, Jian Zhang, Ruslan Salakhutdinov, Hanlin Goh · CMU / Apple",
+  "venue": "ICML 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2105.08140"}
+  ],
+  "problem": "离线RL中，Q学习和演员-评论家从分布外的状态或动作上自举时会失败；已有方法主要约束策略，却没有对“哪些样本的目标值不可信”做恰当的不确定性处理。",
+  "idea": "用MC Dropout估计Q值的不确定性，在评论家和演员的损失里按不确定性的倒数给每个样本加权：越可能是分布外的样本，对训练的贡献越小（UWAC）。",
+  "impact": "较早把认知不确定性加权引入离线演员-评论家的方法之一，与后来的EDAC、PBRL同属“基于不确定性的离线RL”，常出现在这类方法的对比表中。",
+  "method": "UWAC（Uncertainty Weighted Actor-Critic）建立在[[bear]]的演员-评论家框架上，加了一个不确定性加权：\n\n- **不确定性估计**：Q网络里带dropout，在计算目标时对同一个 `(s′, a′)` 做多次带dropout的前向（即[[mc-dropout]]），用这些输出的方差 `Var[Q(s′, a′)]` 作为认知不确定性的估计。数据覆盖充分的地方方差小，分布外的地方方差大；\n- **加权的评论家损失**：\n\n`L_Q = E[ (β / Var[Q(s′, a′)]) · (Q(s, a) − (r + γ Q̄(s′, a′)))² ]`\n\n目标值越不可信，这条样本的权重越低，从而减少分布外动作的自举误差对Q的污染；\n- **加权的演员损失**：策略更新时同样按 `β / Var[Q(s, a)]` 对 `Q(s, π(s))` 加权，抑制策略被不确定的高Q值吸引。\n\n作者称dropout式不确定性估计相对原算法只增加很少开销。摘要称UWAC显著提升了训练稳定性，在多个任务上超过已有离线RL方法，并在只有少量人类专家示范的稀疏数据集上相对当时最好的基线有明显提升。",
+  "limits": [
+    {"text": "MC Dropout给出的不确定性往往偏小且校准不佳，在高维连续动作下对分布外区域的识别不够可靠。", "solved_by": ["edac", "pbrl"]},
+    {"text": "加权系数β和dropout概率需要调，权重过度时会让大部分样本几乎不参与训练。"}
+  ],
+  "relations": [
+    {"to": "bear", "type": "extends", "note": "以BEAR的演员-评论家为底座，增加按不确定性的样本加权。"},
+    {"to": "mc-dropout", "type": "uses", "note": "用MC Dropout估计Q值的认知不确定性。"},
+    {"to": "cql", "type": "rivals", "note": "CQL统一压低分布外动作Q值；UWAC降低不确定样本的训练权重。"},
+    {"to": "d4rl", "type": "uses", "note": "在D4RL上评测，包括人类示范的稀疏数据集。"}
+  ],
+  "prereq": ["offline-rl", "dropout-concept", "expectation-variance", "actor-critic"],
+  "terms": [
+    {"t": "认知不确定性", "d": "因为数据不足、模型没见过而产生的不确定性，可以通过更多数据减少。"}
+  ],
+  "learn": "先读[[bear]]和[[mc-dropout]]；读UWAC原文第4节的加权损失；在D4RL的adroit-human数据上比较BEAR与UWAC的训练曲线稳定性。",
+  "check": {"source": "https://arxiv.org/abs/2105.08140", "confirmed": "标题、七位作者、arXiv v1于2021-05-17；摘要中离线RL、从OOD动作或状态自举失败、缺少对不确定性的恰当处理、UWAC检测OOD状态动作对并在训练目标中降权、基于dropout的不确定性估计开销很小、显著提升训练稳定性、多个任务上超过已有离线方法、在人类专家稀疏示范数据集上明显优于最好基线。加权公式与以BEAR为底座按原文正文通行描述；ICML 2021与单位按通行引用。"},
+  "aka": ["UWAC", "Uncertainty Weighted Actor-Critic", "不确定性加权演员评论家"]
+}

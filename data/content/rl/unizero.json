@@ -1,0 +1,30 @@
+{
+  "id": "unizero",
+  "who": "Yuan Pu, Yazhe Niu, Zhenjie Yang, Jiyuan Ren, Hongsheng Li, Yu Liu · 上海人工智能实验室 / 商汤 / 港中文",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2406.10667"},
+    {"label": "代码", "url": "https://github.com/opendilab/LightZero"}
+  ],
+  "problem": "MuZero式方法的潜在模型只看当前一帧编码的状态，靠循环展开做规划，难以处理需要长期记忆的任务，也不容易在多任务、异构场景下扩展。",
+  "idea": "用Transformer做世界模型：把过去的潜在状态和动作作为序列输入，同时预测下一个潜在状态、奖励、策略和价值，在共享的潜在空间里联合优化长时程世界模型和策略，再在其中做MCTS规划（UniZero）。",
+  "impact": "把MuZero系从“单帧+循环动力学”推进到“Transformer世界模型+序列历史”，是2024年以来该路线扩展到长记忆和多任务的代表工作之一，集成在LightZero库中。",
+  "method": "[[muzero]]的结构是：表示网络把当前观测编码成潜在状态，动力学网络 `s_(k+1) = g(s_k, a_k)` 一步步展开，预测网络给出策略与价值；规划只依赖当前一帧的编码。作者分析指出，这种设计把历史信息全部压在循环展开里，在需要记住很久以前信息的任务里表现差，而且潜在表示与决策目标之间的耦合方式限制了扩展。\n\nUniZero的改动：\n\n- **Transformer潜在世界模型**：把历史上的 `(z_1, a_1, z_2, a_2, …, z_t)` 作为序列输入一个因果[[transformer]]，在每个位置预测下一个潜在状态、即时奖励以及当前的策略和价值。潜在状态的学习目标是与目标编码器对下一帧观测的编码一致（自监督一致性）；\n- **联合优化**：世界模型的预测损失与策略、价值损失在同一个潜在空间里一起训练，作者称这使长时程世界模型与策略能够联合优化；\n- **规划**：在这个以历史为条件的潜在模型中做MCTS，搜索时用KV缓存复用已有的上下文。\n\n摘要称UniZero在需要长期记忆的基准上明显超过现有基线；在Atari多任务学习实验中表现出更好的扩展性；在标准单任务的Atari和DMControl上与当前最好方法持平甚至更好。",
+  "limits": [
+    {"text": "Transformer世界模型加MCTS的训练和推理开销都很大，上下文越长代价越高。"},
+    {"text": "主要在Atari、DMControl和若干记忆任务上验证，在开放世界或真实机器人任务上效果未知。"}
+  ],
+  "relations": [
+    {"to": "muzero", "type": "solves", "note": "MuZero只用当前帧编码与循环动力学，长期记忆差；UniZero以历史序列为条件做潜在规划。"},
+    {"to": "efficientzero", "type": "extends", "note": "沿用EfficientZero的自监督一致性损失来学潜在状态。"},
+    {"to": "transformer", "type": "uses", "note": "用因果Transformer作为潜在世界模型。"},
+    {"to": "lightzero", "type": "uses", "note": "在LightZero框架中实现和评测。"},
+    {"to": "twm", "type": "rivals", "note": "TWM等Transformer世界模型在想象中训练策略；UniZero把Transformer模型用于MCTS规划。"}
+  ],
+  "prereq": ["model-based-rl", "tree-search", "transformer-block", "world-model-concept"],
+  "terms": [
+    {"t": "潜在世界模型", "d": "不预测像素，只在学到的低维潜在空间里预测下一状态和奖励的环境模型。"}
+  ],
+  "learn": "先读[[muzero]]和[[efficientzero]]；读UniZero原文第3节对MuZero局限的分析与第4节模型结构；在LightZero里对比MuZero与UniZero在一个记忆任务上的表现。",
+  "check": {"source": "https://arxiv.org/abs/2406.10667", "confirmed": "标题、六位作者、arXiv v1于2024-06-15；摘要中MuZero式方法利用价值等价原则与MCTS、在异构场景下难以扩展、用模块化Transformer世界模型学习共享潜在空间、以潜在历史为条件同时预测潜在动力学与决策量、长时程世界模型与策略联合优化、在需要长期记忆的基准上显著超过基线、Atari多任务扩展性更好、Atari与DMControl单任务上持平或超过最好方法。自监督一致性与KV缓存等细节按原文正文通行描述；发表处未核对。"},
+  "aka": ["UniZero", "Transformer MuZero", "Transformer潜在世界模型规划"]
+}

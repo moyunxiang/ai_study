@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DeepSeek-V4.1 KV压缩（2026） · AI脉络</title>
+<meta name="description" content="智能体工作负载输入极长、输出相对短，百万token上下文下KV缓存的存储和预填充成本成了主要开销，即使DeepSeek-V4已经大幅压缩过KV。 把40层Transformer组织成“20层因果编码器 + 20层解码器”，解码器的全局KV直接由编码器最后的隐藏状态投影得到，再叠加跨层共享的稀疏注意…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/deepseek-v4.1.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DeepSeek-V4.1 KV压缩（2026）">
+<meta property="og:description" content="智能体工作负载输入极长、输出相对短，百万token上下文下KV缓存的存储和预填充成本成了主要开销，即使DeepSeek-V4已经大幅压缩过KV。 把40层Transformer组织成“20层因果编码器 + 20层解码器”，解码器的全局KV直接由编码器最后的隐藏状态投影得到，再叠加跨层共享的稀疏注意…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/deepseek-v4.1.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/deepseek-v4.1">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 开放权重模型</div>
+<h1>DeepSeek-V4.1 KV压缩</h1>
+<div class="full">DeepSeek-V4.1-Flash: Pushing the Limits of KV Cache Compression</div>
+<div class="meta"><span>2026.09</span><span>模型</span><span>延伸</span><span>DeepSeek-AI · 深度求索</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash" rel="noopener">Hugging Face模型卡 ↗</a><a class="btn sm" href="../index.html#/n/deepseek-v4.1">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>智能体工作负载输入极长、输出相对短，百万token上下文下KV缓存的存储和预填充成本成了主要开销，即使DeepSeek-V4已经大幅压缩过KV。</p></div><div><h4>方法</h4><p>把40层Transformer组织成“20层因果编码器 + 20层解码器”，解码器的全局KV直接由编码器最后的隐藏状态投影得到，再叠加跨层共享的稀疏注意力和FP4的KV缓存。</p></div><div><h4>影响</h4><p>全局KV缓存压到每token约890字节，约为DeepSeek-V4-Flash的1/4、DeepSeek-V1的1/437；预填充时每token只激活80亿参数。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/deepseek-v2.html">DeepSeek-V2与MLA</a>的MLA、<a class="ln" href="../n/deepseek-v3.2.html">DeepSeek-V3.2与DSA</a>的稀疏注意力DSA、<a class="ln" href="../n/deepseek-v4.html">DeepSeek-V4百万上下文</a>的百万上下文，都在压缩KV缓存。智能体任务把大量工具输出、代码文件塞进上下文，预填充的计算和持久化KV的存储成本比解码更突出。<a class="ln" href="../n/yoco.html">YOCO只缓存一次</a>早就提出过“只缓存一次”的解码器-解码器结构，但没有在前沿规模上验证。</p><h2>方法</h2><p>据官方模型卡，DeepSeek-V4.1-Flash是5520亿骨干参数的多模态MoE模型，主要设计有：</p><ul><li><b>因果编码器-解码器（CED）</b>：40层分成20层因果编码器和20层解码器，解码器的全局KV由编码器最后的隐藏状态投影而来，而不是每层各自计算；因此预填充时每token只需激活80亿参数，解码时160亿。</li><li><b>SWA Bounded Replay</b>：滑动窗口注意力的KV不持久化到SSD，需要时只重放最近的窗口内token来重建，持久化KV约为V4-Flash的1/8。</li><li><b>CSA2压缩稀疏注意力</b>：每个注意力层固定为Full、Reindex、Reuse三种模式之一，跨层共享主KV和索引器的键、复用Top-K稀疏索引；解码器里的分层稀疏索引器让后面的层只在第一个Full层构造的候选池里挑选，使索引成本与上下文长度无关。主KV以FP4（E2M1，每16通道一个E4M3缩放）缓存。</li><li>其他组件：单次前向的<a class="ln" href="../n/mhc.html">mHC流形约束超连接</a>、1960亿参数按token查表的<a class="ln" href="../n/engram.html">Engram条件记忆</a>条件记忆、DSpark推测解码；MoE每层1个共享专家和384个路由专家，每token激活6个。</li></ul><p>预训练从头在45T token的多模态语料上进行，64K长度训练稀疏注意力，在34T token时把上下文扩到100万；后训练沿用SFT → RL → 在线策略蒸馏，主要改进在大规模自动合成智能体任务与环境；推理强度可在1–100之间连续调节。</p><h2>结果</h2><p>官方模型卡报告：全局KV缓存约890字节/token，约为V4-Flash的1/4、DeepSeek-V1的1/437；基座模型上MMLU-Pro 74.1（V4-Flash-Base 68.3、V4-Pro-Base 73.5），HumanEval 79.4，GSM8K 93.0，MATH 61.1；原生多模态，DocVQA 95.6。模型以MIT许可开放。</p><h2>后来的发展</h2><p>它把<a class="ln" href="../n/yoco.html">YOCO只缓存一次</a>式“共享一份全局KV”的思路和DeepSeek自家的稀疏注意力、条件记忆组合到前沿规模，是2026年KV缓存压缩路线最激进的开放模型之一。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>编码器-解码器式的KV共享降低了解码器各层的独立表达，在知识类基准上仍落后于更大的V4-Pro（如SimpleQA-Verified 42.3对55.2）。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>多项新组件（CSA2、Bounded Replay、DSpark）依赖专门的推理实现，第三方框架完整支持需要时间。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/deepseek-v3.2.html">DeepSeek-V3.2与DSA</a><span class="yr">2025.12 · LLM</span><div class=nt>把DSA稀疏注意力发展为跨层共享索引的CSA2。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/deepseek-v4.html">DeepSeek-V4百万上下文</a><span class="yr">2026.04 · LLM</span><div class=nt>在V4的百万上下文与稀疏注意力基础上，把KV缓存再压到约1/4。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/yoco.html">YOCO只缓存一次</a><span class="yr">2024.05 · LLM</span><div class=nt>因果编码器加解码器、解码器共用一份由编码器投影的全局KV，与YOCO的只缓存一次思路一致。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/mhc.html">mHC流形约束超连接</a><span class="yr">2025.12 · 基础</span><div class=nt>采用单次前向的流形约束超连接改进残差流混合。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/engram.html">Engram条件记忆</a><span class="yr">2026.01 · LLM</span><div class=nt>集成1960亿参数的按token查表条件记忆。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/kv-cache.html">KV缓存</a> <a class="chip c" href="../c/efficient-attention.html">稀疏注意力与高效注意力</a> <a class="chip c" href="../c/mixture-of-experts.html">混合专家</a> <a class="chip c" href="../c/context-window.html">上下文窗口</a> <a class="chip c" href="../c/floating-point.html">浮点精度：FP32、FP16、BF16、INT8</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a></p>
+<h2>本篇术语</h2><ul><li><b>预填充与解码</b>　预填充是一次性处理整段输入、建立缓存；解码是逐个生成新token。智能体任务输入长输出短，预填充成本占比更高。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/yoco.html">YOCO只缓存一次</a>和<a class="ln" href="../n/deepseek-v3.2.html">DeepSeek-V3.2与DSA</a>；对照V4.1模型卡逐项理解CED、CSA2和FP4缓存；动手：按模型卡数字估算1M上下文下V4-Flash与V4.1-Flash的KV缓存总量。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash" rel="noopener">https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash</a>（模型卡：552B骨干多模态MoE、1M上下文；CED 20层编码器+20层解码器、预填充8B解码16B激活；SWA Bounded Replay持久KV约1/8；CSA2三种模式与分层稀疏索引器；FP4 E2M1主KV每16通道E4M3缩放；890字节/token约为V4-Flash的1/4、V1的1/437；Single-Pass mHC、Engram 196B、DSpark；1共享+384路由激活6；45T token、64K稀疏注意力、34T时扩到1M；SFT→RL→OPD；推理强度1–100；基座表数字；MIT许可。Hugging Face API：仓库创建于2026-09-10。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DeepSeek-V4.1%20KV%E5%8E%8B%E7%BC%A9%EF%BC%88deepseek-v4.1%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adeepseek-v4.1%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/deepseek-v4.1.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="gemini-4.html"><small>本分支上一个 · 2026.09</small><b>Gemini 4</b></a><a class="r" href="qwen4.html"><small>本分支下一个 · 2026.11</small><b>Qwen4-Max</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

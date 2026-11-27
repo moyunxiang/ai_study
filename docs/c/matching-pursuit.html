@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>匹配追踪与稀疏表示（Matching Pursuit and Sparse Representation） · AI脉络</title>
+<meta name="description" content="稀疏表示的贪心解法：每步从字典里挑出与当前残差最相关的“原子”，加入已选集合并更新残差，直到残差足够小。正交匹配追踪（OMP）每步对已选原子重做最小二乘。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/matching-pursuit.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="匹配追踪与稀疏表示（Matching Pursuit and Sparse Representation）">
+<meta property="og:description" content="稀疏表示的贪心解法：每步从字典里挑出与当前残差最相关的“原子”，加入已选集合并更新残差，直到残差足够小。正交匹配追踪（OMP）每步对已选原子重做最小二乘。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/matching-pursuit.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/matching-pursuit">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 机器学习基础 · 进阶</div>
+<h1>匹配追踪与稀疏表示</h1><div class="full">Matching Pursuit and Sparse Representation</div>
+<p class="muted" style="font-size:13px">也叫：匹配追踪　matching pursuit　正交匹配追踪　orthogonal matching pursuit　OMP　稀疏表示　sparse representation　过完备字典　overcomplete dictionary　压缩感知　compressed sensing　compressive sensing　基追踪　basis pursuit　K-SVD　L0范数　L0 norm</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/matching-pursuit">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>稀疏表示的贪心解法：每步从字典里挑出与当前残差最相关的“原子”，加入已选集合并更新残差，直到残差足够小。正交匹配追踪（OMP）每步对已选原子重做最小二乘。</b></p>
+<p class="tags">先要会：<a class="chip c" href="dot-product.html">内积与余弦相似度</a> <a class="chip c" href="linear-regression.html">线性回归</a></p>
+<p><b>稀疏表示问题</b>。给定信号x（长度d）和一个字典D（d×K的矩阵，每一列是一个“原子”，通常K &gt; d，字典是过完备的），想用尽量少的原子的线性组合表示x：</p><p class="formula"><code>min ‖α‖₀　满足　‖x − Dα‖ ≤ ε</code></p><p>‖α‖₀是非零系数的个数。这个问题是NP难的，因为要在组合数量级的子集里搜索。有两条近似路线：一是把‖·‖₀放松成‖·‖₁，变成凸问题，即<a class="ln" href="../n/lasso.html">Lasso与L1稀疏</a>（在信号处理里叫基追踪，见<a class="lc" href="../c/subgradient.html">次梯度与不可导点</a>和<a class="lc" href="../c/regularization.html">正则化与权重衰减</a>）；二是贪心算法，即匹配追踪。</p><p><b>匹配追踪（MP）</b>。残差r初始为x，然后重复：</p><p>1. 找与残差内积绝对值最大的原子：<code>j = argmax_k |d_kᵀr|</code>（原子已归一化，见<a class="lc" href="../c/dot-product.html">内积与余弦相似度</a>）； 2. 系数加上<code>d_jᵀr</code>，残差减去这一分量：<code>r ← r − (d_jᵀr)·d_j</code>。</p><p>问题在于同一个原子可能被反复选中，收敛慢。</p><p><b>正交匹配追踪（OMP）</b>。每选进一个新原子，就用所有已选原子对x重新做一次最小二乘（见<a class="lc" href="../c/linear-regression.html">线性回归</a>），残差因此与所有已选原子正交，每个原子最多被选一次。选满k个原子后，得到恰好k稀疏的解。它实现简单、速度快；在压缩感知理论中，若字典的列之间足够“不相关”，OMP能精确恢复真正的稀疏表示。</p><p><b>它出现在哪里</b>。</p><ul><li><b>稀疏编码与字典学习</b>：<a class="ln" href="../n/sparse-coding.html">稀疏编码</a>发现，在自然图像小块上学习稀疏表示的字典，学出的原子很像视觉皮层简单细胞的感受野。K-SVD等字典学习算法交替进行“用OMP求稀疏系数”和“更新字典”（见<a class="lc" href="../c/coordinate-descent.html">坐标下降与交替优化</a>中的交替优化）。</li><li><b>压缩感知</b>：从远少于奈奎斯特采样数的测量中恢复稀疏信号，用于MRI加速成像等。</li><li><b>可解释性</b>：稀疏自编码器把神经网络的激活分解为字典原子的稀疏组合，与这里的稀疏表示是同一个数学问题，只是编码器换成了一个网络（见<a class="lc" href="../c/sparse-autoencoder-interp.html">稀疏自编码器与字典学习</a>）。</li><li>早期语音、音频编码和图像去噪也大量使用稀疏表示。</li></ul>
+<div class="example"><h4>例子</h4><p>字典有三个单位原子：d₁ = (1, 0)、d₂ = (0, 1)、d₃ = (0.707, 0.707)。信号x = (3, 3)。第一步内积为3、3、4.24，选d₃，系数4.24，残差为(3, 3) − 4.24×(0.707, 0.707) ≈ (0, 0)，一步完成：x只需一个原子表示。若x = (3, 1)，内积为3、1、2.83，先选d₁，残差(0, 1)，再选d₂，两步得到精确表示。</p></div>
+<h2>容易误解的地方</h2><ul><li>贪心选择不保证找到最稀疏的表示；原子之间高度相关时，OMP可能一开始就选错并无法回头。</li><li>OMP需要事先给定稀疏度k或残差阈值，选错了要么欠拟合，要么把噪声也拟合进去。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

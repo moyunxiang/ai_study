@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>强化学习中的归一化：观测、奖励与优势（Normalization in RL: Observations, Rewards, Advantages） · AI脉络</title>
+<meta name="description" content="深度RL里把观测、奖励、优势和价值目标都缩放到合适量级的一组技巧：观测按滑动均值方差标准化，奖励除以回报的滑动标准差，优势在每个批次内标准化，价值目标可用PopArt自适应归一化。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/rl-normalization.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="强化学习中的归一化：观测、奖励与优势（Normalization in RL: Observations, Rewards, Advantages）">
+<meta property="og:description" content="深度RL里把观测、奖励、优势和价值目标都缩放到合适量级的一组技巧：观测按滑动均值方差标准化，奖励除以回报的滑动标准差，优势在每个批次内标准化，价值目标可用PopArt自适应归一化。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/rl-normalization.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/rl-normalization">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>强化学习中的归一化：观测、奖励与优势</h1><div class="full">Normalization in RL: Observations, Rewards, Advantages</div>
+<p class="muted" style="font-size:13px">也叫：奖励归一化　reward normalization　奖励缩放　reward scaling　观测归一化　observation normalization　状态归一化　优势归一化　advantage normalization　价值归一化　value normalization　VecNormalize　running mean std　滑动均值方差　PopArt</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/rl-normalization">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>深度RL里把观测、奖励、优势和价值目标都缩放到合适量级的一组技巧：观测按滑动均值方差标准化，奖励除以回报的滑动标准差，优势在每个批次内标准化，价值目标可用PopArt自适应归一化。</b></p>
+<p class="tags">先要会：<a class="chip c" href="actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="expectation-variance.html">期望与方差</a></p>
+<p>监督学习的输入和标签是固定的，训练前算一次均值方差就能标准化。强化学习的数据随策略变化：机器人一开始站着不动，关节速度都接近0，学会跑之后可以到几十；奖励可能从每步0.01到每回合几千。量级忽大忽小，网络的梯度和学习率就很难调。下面几种归一化在<a class="ln" href="../n/ppo.html">PPO</a>等算法的常见实现中几乎是默认开启的，<a class="ln" href="../n/implementation-matters.html">PPO的实现细节之争</a>发现它们对结果的影响有时比算法本身的差别还大。</p><p><b>观测归一化</b>。对每一维观测维护滑动均值μ和方差σ²，输入网络前做<code>(o − μ) / (σ + ε)</code>，再裁剪到例如[−10, 10]。统计量随训练更新，评估和部署时必须使用同一组统计量。</p><p><b>奖励缩放</b>。维护<b>折扣回报</b>的滑动标准差，把每步奖励除以它（通常不减均值，以免改变奖励的符号和“活着就有奖励”这类结构），再裁剪。目标是让价值函数的目标量级保持在1附近。另一种更粗暴的做法是Atari中的奖励裁剪，见<a class="lc" href="../c/frame-stacking.html">帧堆叠、跳帧与像素输入的预处理</a>。</p><p><b>优势归一化</b>。在每个小批量里把优势估计标准化为均值0、标准差1：<code>Â ← (Â − mean) / (std + ε)</code>。它不改变各样本优势的相对大小，却让策略梯度的步长与奖励尺度无关，是一种简单的方差控制，见<a class="lc" href="../c/pg-variance-reduction.html">策略梯度的方差缩减：基线与reward-to-go</a>。在<a class="ln" href="../n/grpo.html">GRPO</a>中，组内奖励标准化起着类似作用。</p><p><b>价值目标归一化</b>。价值函数的目标随策略变好而不断变大，网络输出层要不停追赶。<a class="ln" href="../n/popart.html">PopArt自适应目标归一化</a>在归一化价值目标的同时，反向调整输出层的权重和偏置，使未归一化的预测保持不变，从而能用同一套超参数学习奖励尺度差异很大的多个游戏。另一条路是把价值回归改成分类，见<a class="ln" href="../n/hl-gauss.html">用分类训练价值函数</a>。</p><p>与此不同的是网络内部的层归一化、批归一化（见<a class="lc" href="../c/normalization-layer.html">归一化层</a>），它们近年也被发现能显著稳定深度RL训练，例如<a class="ln" href="../n/crossq.html">CrossQ批归一化RL</a>和<a class="ln" href="../n/simba.html">SimBa</a>。</p>
+<div class="example"><h4>例子</h4><p>某任务每步奖励约为+5，γ=0.99，折扣回报约为5/(1−0.99)=500。不缩放时价值网络要回归几百的目标，均方误差动辄上万，梯度很大。把奖励除以回报的滑动标准差（设为100）后，每步奖励约0.05，回报约5，价值损失回到个位数。优势归一化：一个批次的优势为(3, 1, −1, −3)，均值0、标准差约2.24，归一化后约为(1.34, 0.45, −0.45, −1.34)。</p></div>
+<h2>容易误解的地方</h2><ul><li>保存模型时忘了保存观测归一化的统计量，加载后策略会表现得像完全没训练过，这是最常见的复现问题之一。</li><li>奖励归一化改变了奖励的尺度，报告结果时必须用原始奖励计算回报。</li><li>小批量很小时，优势归一化的均值和标准差噪声很大，可能反而有害。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

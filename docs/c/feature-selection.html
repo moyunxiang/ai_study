@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>特征选择（Feature Selection） · AI脉络</title>
+<meta name="description" content="从众多输入特征中挑出真正有用的一部分。三类做法：过滤式先按统计量打分，包裹式反复训练模型试子集，嵌入式在训练中自动选（如L1正则、树模型的特征重要度）。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/feature-selection.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="特征选择（Feature Selection）">
+<meta property="og:description" content="从众多输入特征中挑出真正有用的一部分。三类做法：过滤式先按统计量打分，包裹式反复训练模型试子集，嵌入式在训练中自动选（如L1正则、树模型的特征重要度）。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/feature-selection.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/feature-selection">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 机器学习基础 · 入门</div>
+<h1>特征选择</h1><div class="full">Feature Selection</div>
+<p class="muted" style="font-size:13px">也叫：特征选择　feature selection　变量选择　variable selection　过滤式　filter method　包裹式　wrapper method　嵌入式特征选择　embedded method　递归特征消除　RFE　recursive feature elimination　前向选择　forward selection　后向消除　backward elimination　特征重要度　feature importance　置换重要度　permutation importance　卡方检验　chi-squared test</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/feature-selection">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>从众多输入特征中挑出真正有用的一部分。三类做法：过滤式先按统计量打分，包裹式反复训练模型试子集，嵌入式在训练中自动选（如L1正则、树模型的特征重要度）。</b></p>
+<p class="tags">先要会：<a class="chip c" href="supervised-learning.html">监督学习</a> <a class="chip c" href="regularization.html">正则化与权重衰减</a></p>
+<p>表格数据常有成百上千列：用户画像、传感器读数、基因表达量。很多列与目标无关，或者彼此高度重复。把它们全部丢给模型，会增加过拟合风险（见<a class="lc" href="../c/curse-of-dimensionality.html">维度灾难</a>）、拖慢训练，还让模型难以解释。<b>特征选择</b>保留原始特征中的一个子集；它与<a class="lc" href="../c/dimensionality-reduction.html">降维与PCA</a>不同，后者（如PCA）构造新的组合特征。</p><p><b>过滤式</b>。不依赖具体模型，先给每个特征单独打分，再按分数取前k个或设阈值：</p><ul><li>方差：几乎不变的特征（比如99.9%都是0）没有信息量；</li><li>与目标的相关系数（见<a class="lc" href="../c/covariance.html">协方差矩阵</a>）、卡方检验；</li><li><a class="lc" href="../c/mutual-information.html">互信息</a>：能捕捉非线性关系，例如决策树里的信息增益（见<a class="lc" href="../c/conditional-entropy.html">联合熵、条件熵与信息增益</a>）。</li></ul><p>速度快，但只看单个特征，会漏掉“单独没用、组合起来有用”的特征，也去不掉彼此冗余的特征。</p><p><b>包裹式</b>。把特征子集的选择当作搜索问题，用模型在验证集上的表现评价每个子集。前向选择从空集开始每次加入最有用的一个；后向消除从全集开始每次删掉最没用的一个；递归特征消除（RFE）反复训练模型、删掉权重最小的特征。效果通常最好，但要训练很多次模型，代价高，且容易在验证集上过拟合（见<a class="lc" href="../c/multiple-comparisons.html">多重比较与统计功效</a>）。</p><p><b>嵌入式</b>。选择发生在训练过程中：</p><ul><li>L1正则（<a class="ln" href="../n/lasso.html">Lasso与L1稀疏</a>）把不重要特征的权重直接压成0（见<a class="lc" href="../c/regularization.html">正则化与权重衰减</a>）；</li><li>树模型（<a class="ln" href="../n/random-forest.html">随机森林</a>、<a class="ln" href="../n/xgboost.html">XGBoost</a>）在训练中自然给出每个特征被用于分裂带来的增益，或用打乱某列后性能下降多少（置换重要度）来衡量。</li></ul><p><b>和可解释性的关系</b>。<a class="ln" href="../n/shap.html">SHAP</a>、<a class="ln" href="../n/lime.html">LIME</a>等方法解释的是“对某个预测，各特征贡献了多少”，常被用来辅助特征选择，但它们回答的是关于模型的问题，不一定反映特征与目标之间的因果关系（见<a class="lc" href="../c/causal-inference.html">因果推断：相关、混杂与干预</a>）。</p><p><b>在深度学习里</b>。端到端的网络自己学习表示（见<a class="lc" href="../c/feature-representation.html">特征与表示学习</a>），通常不做手工特征选择；但在表格数据、医学和金融等需要可解释、特征获取有成本的场景中，它仍是标准步骤。</p>
+<div class="example"><h4>例子</h4><p>预测房价有5个特征：面积、卧室数、房屋编号、面积（平方英尺）、楼层。房屋编号与价格无关，方差过滤留下它、但相关性过滤会去掉；“面积（平方英尺）”与“面积”完全相关，单特征打分时两者都很高，只有包裹式或嵌入式方法（L1会只保留其中一个）能发现它是冗余的。</p></div>
+<h2>容易误解的地方</h2><ul><li>特征选择必须只在训练集上做（包括交叉验证的每一折内部）。先在全部数据上挑出与标签最相关的特征再做交叉验证，是经典的数据泄漏，见<a class="lc" href="../c/data-contamination.html">数据泄漏与基准污染</a>。</li><li>高度相关的一组特征里，L1和树模型会近乎随机地挑一个，重要度数字因此不稳定，不能直接解读为“另一个没用”。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

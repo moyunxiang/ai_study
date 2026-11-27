@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>位姿与齐次变换SE(3)（Poses and Homogeneous Transforms (SE(3))） · AI脉络</title>
+<meta name="description" content="位姿（pose）= 位置 + 朝向，即一个三维平移加一个三维旋转，共6个自由度。用4×4齐次变换矩阵表示时，坐标系之间的换算就变成矩阵连乘，所有这样的变换构成SE(3)。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/rigid-transform.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="位姿与齐次变换SE(3)（Poses and Homogeneous Transforms (SE(3))）">
+<meta property="og:description" content="位姿（pose）= 位置 + 朝向，即一个三维平移加一个三维旋转，共6个自由度。用4×4齐次变换矩阵表示时，坐标系之间的换算就变成矩阵连乘，所有这样的变换构成SE(3)。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/rigid-transform.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/rigid-transform">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 具身与控制 · 入门</div>
+<h1>位姿与齐次变换SE(3)</h1><div class="full">Poses and Homogeneous Transforms (SE(3))</div>
+<p class="muted" style="font-size:13px">也叫：位姿　pose　6D位姿　6-DoF pose　齐次变换　homogeneous transformation　齐次变换矩阵　刚体变换　rigid transformation　rigid-body transform　SE(3)　坐标变换　坐标系变换　coordinate frame　外参　手眼标定　hand-eye calibration　位姿图　pose graph　TF变换</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/rigid-transform">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>位姿（pose）= 位置 + 朝向，即一个三维平移加一个三维旋转，共6个自由度。用4×4齐次变换矩阵表示时，坐标系之间的换算就变成矩阵连乘，所有这样的变换构成SE(3)。</b></p>
+<p class="tags">先要会：<a class="chip c" href="rotation-representation.html">三维旋转的表示：旋转矩阵、欧拉角与四元数</a> <a class="chip c" href="matrix-multiplication.html">矩阵乘法与线性变换</a></p>
+<p>机器人系统里同时存在很多坐标系：世界坐标系、机器人底座、每个关节、末端夹爪、相机、目标物体。相机看到杯子在“相机前方0.5米”，夹爪需要知道它在“底座坐标系下的哪里”。把一个坐标系下的量换到另一个坐标系，是机器人、SLAM和三维视觉里最基本也最容易出错的操作。</p><p><b>位姿</b>。一个坐标系B相对另一个坐标系A的位姿，由旋转R（3×3，见<a class="lc" href="../c/rotation-representation.html">三维旋转的表示：旋转矩阵、欧拉角与四元数</a>）和平移t（3维）组成。点在B中的坐标p_B换到A中：</p><p class="formula"><code>p_A = R·p_B + t</code></p><p><b>齐次变换矩阵</b>。把它写成一个4×4矩阵，点用齐次坐标<code>(x, y, z, 1)</code>：</p><p><code>T_AB = [[R, t], [0 0 0, 1]]</code>，<code>p_A = T_AB · p_B</code></p><p>好处是复合变成矩阵乘法：<code>T_AC = T_AB · T_BC</code>。逆变换有闭式：<code>T_BA = T_AB⁻¹ = [[Rᵀ, −Rᵀ·t], [0, 1]]</code>。所有这样的矩阵构成一个群，记作SE(3)（特殊欧几里得群）。下标的写法<code>T_AB</code>（“B在A中”）能帮助检查乘法顺序：相邻下标要相同才能相乘。</p><p><b>它出现在哪里</b>。</p><ul><li><b>正运动学</b>：机械臂末端位姿就是各关节变换的连乘<code>T_base_ee = T_01·T_12·…</code>，见<a class="lc" href="../c/kinematics-dof.html">自由度、运动学与本体感知</a>和<a class="lc" href="../c/dh-parameters.html">DH参数</a>。</li><li><b>相机外参与手眼标定</b>：<a class="lc" href="../c/camera-geometry.html">相机模型与多视图几何</a>里的[R | t]就是世界到相机的变换；手眼标定求的是相机与夹爪（或底座）之间固定的T。</li><li><b>SLAM与位姿图</b>：每个时刻的相机位姿是图中的一个节点，相邻帧之间测得的相对变换是边，回环检测加入长程约束后整体优化，如<a class="ln" href="../n/orb-slam.html">ORB-SLAM</a>、<a class="ln" href="../n/cartographer.html">Cartographer实时回环激光SLAM</a>，见<a class="lc" href="../c/slam-concept.html">SLAM的基本概念：里程计、后端优化与回环</a>。</li><li><b>机器人动作</b>：很多策略输出末端执行器的目标位姿或位姿增量，见<a class="lc" href="../c/action-chunking.html">动作表示：离散token、连续动作与动作块</a>。</li></ul><p><b>优化时的注意点</b>。SE(3)不是普通的向量空间，不能直接对矩阵元素做梯度下降或取平均；常在李代数（6维向量，3维平移+3维旋转向量）上做小增量更新，再映射回去。</p>
+<div class="example"><h4>例子</h4><p>相机安装在底座上方，<code>T_base_cam</code>的平移为(0, 0, 1.0)米，旋转让相机朝下（绕x轴转180°）。相机看到杯子在相机坐标系下p_cam = (0.1, 0.2, 0.8)。绕x轴转180°把(x, y, z)变成(x, −y, −z)，于是<code>p_base = (0.1, −0.2, −0.8) + (0, 0, 1.0) = (0.1, −0.2, 0.2)</code>：杯子在底座前方0.1米、右侧0.2米、离桌面0.2米高（按所设的坐标轴方向）。</p></div>
+<h2>容易误解的地方</h2><ul><li>最常见的错误是把T_AB和T_BA用反，或者左乘右乘顺序搞错；坚持用带下标的记号并检查相邻下标可以避免。</li><li>不同库对“位姿”的定义方向（世界到相机还是相机到世界）不同，COLMAP、OpenCV、ROS之间转换时尤其要核对。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

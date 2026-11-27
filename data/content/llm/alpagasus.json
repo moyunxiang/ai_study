@@ -1,0 +1,34 @@
+{
+  "id": "alpagasus",
+  "who": "Lichang Chen, Shiyang Li, Jun Yan, Hai Wang, Kalpa Gunaratna, Vikas Yadav, Zheng Tang, Vijay Srinivasan et al. · 马里兰大学、三星美国研究院",
+  "venue": "ICLR 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2307.08701"},
+    {"label": "项目页", "url": "https://lichang-chen.github.io/AlpaGasus/"}
+  ],
+  "aka": ["AlpaGasus", "LLM打分过滤指令数据", "指令数据过滤", "Instruction Data Filtering", "Data-centric IFT", "少而精指令数据"],
+  "problem": "Alpaca的5.2万条指令数据由text-davinci-003自动生成，里面有不少回答错误或答非所问的样本；用这些数据微调会把错误也教给模型，还浪费训练算力。",
+  "idea": "让ChatGPT当评委，给每条（指令, 回答）按准确性打0–5分，只保留高分样本：从5.2万条中筛出约9千条，用它们微调出的AlpaGasus反而比用全部数据的Alpaca更好、训练快5.7倍。",
+  "impact": "把“用强模型给训练数据打分、只留精华”变成一个简单通用的指令数据清洗方法，和LIMA一起推动了“指令数据重质不重量”的共识，此后Deita、LESS等数据选择工作都以它为基线。",
+  "background": "[[alpaca]]用[[self-instruct]]的办法，让text-davinci-003根据175条种子任务生成5.2万条指令和回答，再微调LLaMA，成本极低。但自动生成的数据没人审核，作者发现其中不少回答事实错误、计算错误或与指令无关。同期的[[lima]]用1000条人工精选示例证明少量高质量数据就够，但人工精选难以扩展。",
+  "method": "**打分**：对每一条训练样本，把指令、输入和回答一起交给[[chatgpt]]，用固定提示让它从“准确性”角度给0–5分并说明理由。\n\n**过滤**：设一个阈值（论文的主要设置为4.5分），只保留分数不低于阈值的样本。Alpaca的5.2万条数据经过过滤剩约9千条。\n\n**训练**：用与Alpaca完全相同的设置在LLaMA 7B/13B上微调，只换数据，得到AlpaGasus。\n\n**评测**：在多个测试集上让GPT-4比较AlpaGasus与Alpaca的回答，并做受控的人工评测；还换用其他数据集（如Dolly）、其他基座和其他打分模型（例如Claude）重复实验，检验方法是否通用。\n\n整套方法不需要人工标注，只需要对每条数据调用一次评判模型，成本远低于重新生成数据。",
+  "results": "只用过滤后的约9千条数据，AlpaGasus在GPT-4评判的多个测试集和人工评测上都明显胜过原版Alpaca；13B版本在测试任务上达到其“老师”text-davinci-003的90%以上；7B的训练时间从80分钟降到14分钟，快5.7倍。在不同数据集、基座模型和打分模型上效果一致。",
+  "legacy": "“LLM当评委筛数据”成为后训练数据流水线的标准环节；[[deita]]在质量之外加入复杂度与多样性，[[less]]针对特定能力按梯度影响选数据，都把AlpaGasus当作对比基线。",
+  "limits": [
+    {"text": "只按单一的“准确性”打分，不考虑指令的难度和数据的多样性；简单但正确的样本会被大量保留，难题可能因回答不完美被过滤。", "solved_by": ["deita"]},
+    {"text": "评测和过滤都依赖OpenAI模型，存在评委与被评对象口味一致的风险；选出的数据通用但不针对特定下游能力。", "solved_by": ["less"]}
+  ],
+  "relations": [
+    {"to": "alpaca", "type": "solves", "note": "Alpaca数据中有大量错误或无关回答；AlpaGasus用LLM打分过滤，只用约9千条就训练出更好的模型。"},
+    {"to": "lima", "type": "extends", "note": "LIMA靠人工精选少量数据；AlpaGasus用模型自动筛选，把“少而精”变成可扩展的流程。"},
+    {"to": "chatgpt", "type": "uses", "note": "用ChatGPT给每条指令数据按准确性打分。"},
+    {"to": "self-instruct", "type": "solves", "note": "Self-Instruct式自动生成的数据缺少质量控制，AlpaGasus补上了自动质检这一步。"}
+  ],
+  "prereq": ["instruction-tuning", "pretrain-finetune", "knowledge-distillation", "benchmark"],
+  "terms": [
+    {"t": "LLM评委", "d": "让一个强大的语言模型按给定标准给回答打分或比较优劣，代替人工审核。"},
+    {"t": "以数据为中心的微调", "d": "不改模型和训练方法，只通过挑选、清洗训练数据来提升效果。"}
+  ],
+  "learn": "先读[[alpaca]]和[[lima]]；读本文第3节打分提示和阈值选择；动手：用任一开源大模型给Alpaca数据随机抽的200条打分，看低分样本都错在哪里。",
+  "check": {"source": "https://arxiv.org/abs/2307.08701", "confirmed": "标题、11位作者（列前8位）、arXiv首次提交2023-07-17；摘要中Alpaca 52k数据含大量错误或无关的低质量样本、用强LLM（如ChatGPT）自动识别并过滤、只用从52k过滤出的9k数据、GPT-4在多个测试集与受控人工评测上明显胜过Alpaca、13B变体达到教师text-davinci-003的90%以上、训练快5.7倍（7B从80分钟到14分钟）、在不同数据集、基座和LLM过滤器上有效。0–5分与4.5阈值、按准确性打分、ICLR 2024与机构为对正文的一般了解。"}
+}

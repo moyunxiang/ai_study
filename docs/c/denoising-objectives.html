@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>去噪预训练目标（Denoising Pre-training Objectives） · AI脉络</title>
+<meta name="description" content="一类预训练目标：先按某种方式破坏输入文本（遮住一些片段、删词、打乱句子），再让模型还原原文。T5的span corruption、BART的文本填充都属此类，是编码器-解码器模型的主流预训练方式。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/denoising-objectives.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="去噪预训练目标（Denoising Pre-training Objectives）">
+<meta property="og:description" content="一类预训练目标：先按某种方式破坏输入文本（遮住一些片段、删词、打乱句子），再让模型还原原文。T5的span corruption、BART的文本填充都属此类，是编码器-解码器模型的主流预训练方式。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/denoising-objectives.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/denoising-objectives">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>去噪预训练目标</h1><div class="full">Denoising Pre-training Objectives</div>
+<p class="muted" style="font-size:13px">也叫：denoising objective　去噪目标　去噪预训练　denoising pre-training　span corruption　片段破坏　span masking　片段遮盖　text infilling　文本填充　sentinel token　哨兵token　去噪自编码器（文本）　mixture of denoisers　混合去噪　corrupted span</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/denoising-objectives">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>一类预训练目标：先按某种方式破坏输入文本（遮住一些片段、删词、打乱句子），再让模型还原原文。T5的span corruption、BART的文本填充都属此类，是编码器-解码器模型的主流预训练方式。</b></p>
+<p class="tags">先要会：<a class="chip c" href="masked-modeling.html">掩码建模</a> <a class="chip c" href="encoder-decoder.html">编码器-解码器</a></p>
+<p><a class="lc" href="../c/masked-modeling.html">掩码建模</a>（BERT式）只遮住单个token、在原位置预测它；<a class="lc" href="../c/autoregressive.html">自回归生成</a>（GPT式）从左到右预测下一个token。<b>去噪目标</b>是更一般的框架：定义一种“加噪”方式，把原文x变成损坏的版本x̃，训练模型从x̃恢复x。不同的加噪方式会让模型学到不同的能力。</p><p><b>几种常见的加噪</b>。</p><ul><li><b>span corruption</b>（片段破坏）：<a class="ln" href="../n/t5.html">T5</a>的默认目标。随机选若干个连续片段（平均长度3个token，总共约占15%），每个片段整体替换成一个哨兵token（<code>&lt;X&gt;</code>、<code>&lt;Y&gt;</code>……）。编码器读入带哨兵的文本，解码器只需输出被遮住的片段：<code>&lt;X&gt; 片段1 &lt;Y&gt; 片段2 …</code>。目标序列比原文短得多，训练效率高。T5论文系统比较了多种去噪目标，选定了这一种。</li><li><b>文本填充</b>（text infilling）：<a class="ln" href="../n/bart.html">BART</a>把若干片段各替换成一个[MASK]，模型要还原完整原文，并且要自己判断每个[MASK]原来有几个词。BART还试验了删除token、打乱句子顺序、文档旋转等加噪方式。</li><li><b>片段遮盖</b>（span masking）：<a class="ln" href="../n/spanbert.html">SpanBERT</a>遮住连续的片段而不是零散的token，并用片段边界的表示来预测片段内的每个词，对抽取式问答等片段级任务更有利。</li><li><b>混合去噪</b>：<a class="ln" href="../n/ul2.html">UL2混合去噪</a>把短片段、长片段和前缀补全（见<a class="lc" href="../c/prefix-lm.html">前缀语言模型</a>）几种目标按比例混合，并用模式标记告诉模型当前是哪种任务；<a class="ln" href="../n/u-palm.html">U-PaLM混合去噪续训</a>用这种目标对已有的PaLM继续训练，花少量算力就带来了提升。</li><li><b>中间填充</b>：代码模型常用的<a class="ln" href="../n/fim.html">中间填充FIM</a>把一段中间内容移到末尾，让自回归模型学会“根据前后文补中间”，可以看作去噪思想在仅解码器模型上的应用。<a class="ln" href="../n/glm.html">GLM空白填充</a>的空白填充也属于这一路。</li></ul><p><b>选择的权衡</b>。去噪目标让模型双向地利用上下文，适合理解和“输入→输出”式的任务（见<a class="lc" href="../c/encoder-decoder.html">编码器-解码器</a>）；纯自回归目标每个token都产生训练信号，生成能力强、与提示式用法一致。大模型时代自回归成为主流，但去噪思想仍以FIM、混合目标等形式保留了下来（见<a class="lc" href="../c/transformer-architectures.html">仅编码器、仅解码器与编码器-解码器</a>）。</p>
+<div class="example"><h4>例子</h4><p>原文：“Thank you for inviting me to your party last week.”</p><p>T5 span corruption：</p><ul><li>编码器输入：“Thank you <code>&lt;X&gt;</code> me to your party <code>&lt;Y&gt;</code> week.”</li><li>解码器目标：“<code>&lt;X&gt;</code> for inviting <code>&lt;Y&gt;</code> last <code>&lt;Z&gt;</code>”</li></ul><p>（这是T5论文中的示例。）目标只有几个token，而不是整句。</p><p>BART文本填充：输入“Thank you [MASK] me to your party [MASK] week.”，目标是完整原句。</p></div>
+<h2>容易误解的地方</h2><ul><li>“去噪”在这里指文本层面的破坏与还原，与扩散模型里给连续数据加高斯噪声再去除（见<a class="lc" href="../c/diffusion-process.html">扩散：前向加噪与反向去噪</a>）是不同的东西，尽管思想相通。</li><li>去噪预训练的模型通常不能直接零样本对话或续写，往往需要按任务格式微调。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

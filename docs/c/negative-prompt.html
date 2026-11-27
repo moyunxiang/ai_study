@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>负面提示（Negative Prompts） · AI脉络</title>
+<meta name="description" content="文生图时额外给一段“不想要什么”的文字（如“模糊、多余的手指”）。实现上就是在无分类器引导里，用这段文字的预测替换掉空提示的预测，让采样方向远离它。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/negative-prompt.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="负面提示（Negative Prompts）">
+<meta property="og:description" content="文生图时额外给一段“不想要什么”的文字（如“模糊、多余的手指”）。实现上就是在无分类器引导里，用这段文字的预测替换掉空提示的预测，让采样方向远离它。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/negative-prompt.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/negative-prompt">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 生成模型 · 入门</div>
+<h1>负面提示</h1><div class="full">Negative Prompts</div>
+<p class="muted" style="font-size:13px">也叫：负面提示　负面提示词　反向提示词　负向提示　negative prompt　negative prompting　负提示　引导尺度　CFG scale　cfg scale</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/negative-prompt">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>文生图时额外给一段“不想要什么”的文字（如“模糊、多余的手指”）。实现上就是在无分类器引导里，用这段文字的预测替换掉空提示的预测，让采样方向远离它。</b></p>
+<p class="tags">先要会：<a class="chip c" href="guidance.html">条件生成与引导</a> <a class="chip c" href="diffusion-process.html">扩散：前向加噪与反向去噪</a></p>
+<p>用户常遇到这样的情况：提示词写得再详细，生成的图仍然带水印、画面模糊、手指数目不对。直接在提示里写“不要模糊”往往无效，因为文本编码器对否定词理解很差，“不要模糊”的向量反而和“模糊”很接近。<b>负面提示</b>提供了另一个输入框，专门写不想要的内容。</p><p><b>它是怎么实现的</b>。回顾<a class="lc" href="../c/guidance.html">条件生成与引导</a>里的无分类器引导（<a class="ln" href="../n/cfg.html">无分类器引导CFG</a>）：去噪网络对同一个x_t做两次预测，一次带提示c，一次带空提示∅，再外推：</p><p class="formula"><code>ε̃ = ε(x_t, ∅) + w · (ε(x_t, c) − ε(x_t, ∅))</code></p><p>w是引导尺度（常取5到10）。这相当于从“无条件”的方向出发，朝“有条件”的方向多走w倍。负面提示只是把空提示换成负面文字c⁻：</p><p class="formula"><code>ε̃ = ε(x_t, c⁻) + w · (ε(x_t, c) − ε(x_t, c⁻))</code></p><p>于是采样的推力变成了“从负面描述指向正面描述”，既靠近想要的，又远离不想要的。它不需要任何额外训练，也不增加计算量（本来就要算两次预测）。这一做法随<a class="ln" href="../n/stable-diffusion.html">Stable Diffusion开源</a>的开源社区工具流行起来，后来被各大文生图界面普遍采用。</p><p><b>引导尺度的作用</b>。w越大，图像越贴合提示（和越远离负面提示），但过大会导致颜色过饱和、细节生硬。一些改进方法在采样后期减小w，或对引导结果做重新缩放，见<a class="ln" href="../n/cfg-zero-star.html">CFG-Zero*流匹配引导</a>这类后续工作。</p><p><b>局限</b>。负面提示的效果依赖文本编码器对那些词的理解，对“六根手指”这类精确的计数约束帮助有限；用蒸馏得到的少步模型（见<a class="lc" href="../c/few-step-sampling.html">少步采样与扩散蒸馏</a>）常常不再做CFG，也就没有负面提示的入口，需要另外的设计。</p>
+<div class="example"><h4>例子</h4><p>引导尺度w=7。某个像素位置上，带正面提示的预测为0.30，带负面提示“模糊、低质量”的预测为0.10，空提示的预测为0.20。普通CFG：0.20 + 7×(0.30 − 0.20) = 0.90；使用负面提示：0.10 + 7×(0.30 − 0.10) = 1.50，推力更大，方向是“离开模糊”。</p></div>
+<h2>容易误解的地方</h2><ul><li>负面提示不是逻辑上的“排除”，它只是把采样方向往远离那段描述的地方推，并不保证结果里完全没有那些内容。</li><li>负面提示写得过长或与正面提示冲突时，会显著改变整体风格，带来意外的副作用。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

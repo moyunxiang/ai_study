@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>best-of-N与拒绝采样微调（Best-of-N and Rejection Sampling Fine-Tuning） · AI脉络</title>
+<meta name="description" content="对同一个提示采样N个回答，用奖励模型或验证器打分，只保留得分最高的那个。直接用于推理时叫best-of-N；把挑出来的好回答拿去再微调模型，叫拒绝采样微调。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/best-of-n.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="best-of-N与拒绝采样微调（Best-of-N and Rejection Sampling Fine-Tuning）">
+<meta property="og:description" content="对同一个提示采样N个回答，用奖励模型或验证器打分，只保留得分最高的那个。直接用于推理时叫best-of-N；把挑出来的好回答拿去再微调模型，叫拒绝采样微调。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/best-of-n.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/best-of-n">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>best-of-N与拒绝采样微调</h1><div class="full">Best-of-N and Rejection Sampling Fine-Tuning</div>
+<p class="muted" style="font-size:13px">也叫：best-of-n　best-of-N　BoN　best-of-n sampling　N选一　rejection sampling fine-tuning　拒绝采样微调　RFT　拒绝采样（大模型）　expert iteration　专家迭代　reranking sampling　采样后挑选　生成-验证　generate then verify</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/best-of-n">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>对同一个提示采样N个回答，用奖励模型或验证器打分，只保留得分最高的那个。直接用于推理时叫best-of-N；把挑出来的好回答拿去再微调模型，叫拒绝采样微调。</b></p>
+<p class="tags">先要会：<a class="chip c" href="decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="kl-divergence.html">KL散度</a></p>
+<p>让模型变好有两条路：改模型参数，或者在推理时多试几次再挑。<b>best-of-N</b>（BoN）是后者最简单的形式，不需要任何训练：</p><p>1. 对提示x采样N个回答y_1…y_N（见<a class="lc" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a>）。 2. 用一个打分器给每个回答打分：<a class="lc" href="../c/reward-model.html">奖励模型</a>、答案验证器、单元测试，或者<a class="lc" href="../c/llm-as-a-judge.html">LLM当裁判</a>。 3. 输出得分最高的那个。</p><p><b>作为强基线</b>。BoN常被用来衡量奖励模型或对齐方法：它只用奖励模型挑选、不改策略，却能拿到可观的提升。<a class="ln" href="../n/rm-overoptimization.html">奖励模型过优化</a>用BoN和强化学习两种方式在同一个奖励模型上优化，研究“真实质量”如何随优化程度先升后降。</p><p><b>和KL的关系</b>。可以证明，从N个样本里取最好的，得到的分布与原分布的KL散度不超过<code>log N − (N − 1)/N</code>（见<a class="lc" href="../c/kl-divergence.html">KL散度</a>）。N = 16时上限约1.84奈特。也就是说，BoN是一种“偏离原模型程度可控”的优化，N越大偏离越多。</p><p><b>作为训练数据：拒绝采样微调</b>。把BoN挑出的高分回答收集起来，对模型做监督微调，再用新模型重复这一过程。这种做法有很多名字：拒绝采样微调（rejection sampling fine-tuning，RFT）、专家迭代（expert iteration）、<a class="ln" href="../n/star.html">STaR自举推理</a>的自举推理、<a class="ln" href="../n/rest.html">ReST强化自训练</a>的强化自训练。<a class="ln" href="../n/llama-2.html">Llama 2</a>的后训练和<a class="ln" href="../n/deepseek-r1.html">DeepSeek-R1</a>的流水线中都有拒绝采样生成SFT数据的步骤。这里的“拒绝采样”是借用统计学的说法（只接受满足条件的样本），与统计里严格意义的拒绝采样算法不完全相同。</p><p><b>推理时扩展</b>。BoN是测试时计算（见<a class="lc" href="../c/reasoning-tokens.html">推理token与测试时计算</a>）最基本的形式之一，与多数投票（<a class="ln" href="../n/self-consistency.html">自洽性采样</a>）并列。<a class="ln" href="../n/llm-monkeys.html">重复采样的扩展律</a>显示，在有可靠验证器的任务上，增加采样数N，解出的题目比例持续上升；没有可靠验证器时，挑选本身成为瓶颈。</p><p><b>代价</b>。推理成本约为N倍；打分器有偏差时，N越大越容易挑到“钻打分器空子”的回答。</p>
+<div class="example"><h4>例子</h4><p>对一个问题采样N = 4个回答，奖励模型打分为 [0.2, 1.5, 0.9, 1.1]，best-of-4输出第2个。</p><p>用在代码上：采样10个程序，跑单元测试，第3个和第7个通过，任取一个通过的输出。只要10个中至少1个正确就能答对，正确率接近pass@10（见<a class="lc" href="../c/pass-at-k.html">pass@k</a>），而不是pass@1。</p><p>KL上限：N = 4时为log 4 − 3/4 ≈ 1.386 − 0.75 = 0.64奈特。</p></div>
+<h2>容易误解的地方</h2><ul><li>BoN的提升依赖打分器的质量，打分器越被“优化”越不可靠；N很大时要警惕挑出的是钻空子的回答。</li><li>拒绝采样微调只学“成功的样本”，不直接利用失败样本的信息，难题上能采到的正确样本很少，学习信号也少。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

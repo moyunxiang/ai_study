@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>ART自动多步推理与工具（2023） · AI脉络</title>
+<meta name="description" content="思维链和工具调用都要为每个新任务手写示例，并精心安排模型生成与工具调用怎样交替；换一个任务就要重写一遍。 预先建一个任务库，把若干任务的多步推理写成统一格式的“程序”，每一步标明用什么工具；遇到新任务时自动挑相似任务的程序当示例，冻结的LLM照格式生成新程序，遇到工具调用就暂停、执行、把结果接回再…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/art-reasoning.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ART自动多步推理与工具（2023）">
+<meta property="og:description" content="思维链和工具调用都要为每个新任务手写示例，并精心安排模型生成与工具调用怎样交替；换一个任务就要重写一遍。 预先建一个任务库，把若干任务的多步推理写成统一格式的“程序”，每一步标明用什么工具；遇到新任务时自动挑相似任务的程序当示例，冻结的LLM照格式生成新程序，遇到工具调用就暂停、执行、把结果接回再…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/art-reasoning.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/art-reasoning">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:336"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/agent.html">推理、检索与智能体</a> › 工具调用与开发接口</div>
+<h1>ART自动多步推理与工具</h1>
+<div class="full">ART: Automatic multi-step reasoning and tool-use for large language models</div>
+<div class="meta"><span>2023.03</span><span>论文</span><span>延伸</span><span>Bhargavi Paranjape, Scott Lundberg, Sameer Singh, Hannaneh Hajishirzi, Luke Zettlemoyer, Marco Tulio Ribeiro · 华盛顿大学 / 微软研究院 / UC尔湾 / 艾伦人工智能研究所 / Meta AI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2303.09014" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/art-reasoning">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>思维链和工具调用都要为每个新任务手写示例，并精心安排模型生成与工具调用怎样交替；换一个任务就要重写一遍。</p></div><div><h4>方法</h4><p>预先建一个任务库，把若干任务的多步推理写成统一格式的“程序”，每一步标明用什么工具；遇到新任务时自动挑相似任务的程序当示例，冻结的LLM照格式生成新程序，遇到工具调用就暂停、执行、把结果接回再继续。</p></div><div><h4>影响</h4><p>在未见过的BigBench和MMLU任务上平均比少样本提示高约10.8个点，大多数任务上追平手写思维链，并且人可以通过改程序、加工具来修正特定任务。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p><b>程序格式</b>：每一步写成“Q1: [search] 某某的出生年份是？”接着“#1: 结果”，方括号里是工具名，最后以“Ans:”给出答案。这套格式由一个解析文法固定下来，所以系统能可靠地识别何时该调用工具。</p><p><b>任务库与工具库</b>：任务库含15个BigBench任务的示范程序，按技能分成算术、代码、搜索与问题分解、自由推理、字符串操作五类；工具包括搜索引擎、用Codex生成代码、Python执行环境，自由推理类直接用“一步一步想”的子步骤。</p><p><b>选择示例</b>：新任务带约50个标注样本时，试用每一类的示范程序，选在留出样本上得分最高的那一类；也可以让LLM判断任务是否相似（效果略差）。</p><p><b>执行</b>：冻结的InstructGPT（text-davinci-002）按示例生成程序；每当生成到工具标记，就暂停生成、调用工具、把输出写进“#k”后面，再让模型继续。</p><p>结果：开启工具使测试任务平均提高超过12.3个点；在34个BigBench任务中的32个和全部MMLU任务上不差于<a class="ln" href="../n/auto-cot.html">Auto-CoT自动思维链</a>，平均高出超过22个点；与微调GPT-J的<a class="ln" href="../n/toolformer.html">Toolformer</a>在6个基准上比较，赢了5个。人工反馈（修改程序或新增Prolog引擎等工具）后，12个测试任务比已发表的最好GPT-3结果平均高20多个点。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>工具集合、程序格式和任务库都是人工搭建的，新任务与库里五类技能差别太大时，挑出的示例帮助有限。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>模型并没有学会使用工具，只是模仿示例的格式；一步出错后面就跟着错，没有基于工具结果的反思或纠错。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/cot.html">思维链CoT</a><span class="yr">2022.01 · 推理·智能体</span><div class=nt>把思维链的中间步骤写成带工具标记的程序，让部分步骤交给搜索或代码执行。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/instructgpt.html">InstructGPT与RLHF</a><span class="yr">2022.03 · LLM</span><div class=nt>以冻结的text-davinci-002作为生成程序的模型，代码生成另用Codex。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:336" href="../n/react.html">ReAct</a><span class="yr">2022.10 · 推理·智能体</span><div class=nt>沿用推理与工具调用交替、观察结果接回上下文的模式，但示例从任务库自动选取，而不是为每个任务手写。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/auto-cot.html">Auto-CoT自动思维链</a><span class="yr">2022.10 · 推理·智能体</span><div class=nt>Auto-CoT自动构造思维链示例，但不涉及工具；ART从任务库挑示范程序并接入工具，在绝大多数任务上明显超过Auto-CoT。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:336" href="../n/toolformer.html">Toolformer</a><span class="yr">2023.02 · 推理·智能体</span><div class=nt>Toolformer通过自监督微调让模型学会插入API调用；ART不改权重，靠检索示范程序让冻结模型调用工具，在6个基准中的5个上更好。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/in-context-learning.html">上下文学习与提示</a> <a class="chip c" href="../c/zero-few-shot.html">零样本与少样本</a> <a class="chip c" href="../c/tool-calling.html">工具调用</a> <a class="chip c" href="../c/agent-loop.html">智能体循环</a> <a class="chip c" href="../c/reasoning-tokens.html">推理token与测试时计算</a></p>
+<h2>本篇术语</h2><ul><li><b>任务库</b>　预先写好的若干任务的示范程序集合，遇到新任务时从中挑选相似的作为提示示例。</li><li><b>解析文法</b>　规定程序必须长成什么样的形式规则，用来可靠地从模型输出中识别出每一步和工具调用。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/cot.html">思维链CoT</a>、<a class="ln" href="../n/react.html">ReAct</a>和<a class="ln" href="../n/toolformer.html">Toolformer</a> → 读原文第3节程序格式、任务库与示例选择、表2和表3 → 动手：写两个带[search]和[code]标记的示范程序，实现“遇到标记就暂停并调用工具”的循环，在一个新任务上测试。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2303.09014" rel="noopener">https://arxiv.org/abs/2303.09014</a>（标题、6位作者、v1提交于2023-03-16；摘要中冻结LLM、任务库选示例、暂停调用工具、BigBench与MMLU、追平多数手写CoT；arxiv.org/html/2303.09014v1核对单位、15个任务与五类技能、工具列表、程序文法、两种选例策略、text-davinci-002、少样本+10.8、工具+12.3、32/34任务不差于Auto-CoT且平均高22以上、对Toolformer 5/6、人工反馈后12个任务高20以上；页面未写正式发表处。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ART%E8%87%AA%E5%8A%A8%E5%A4%9A%E6%AD%A5%E6%8E%A8%E7%90%86%E4%B8%8E%E5%B7%A5%E5%85%B7%EF%BC%88art-reasoning%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aart-reasoning%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/art-reasoning.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="repocoder.html"><small>本分支上一个 · 2023.03</small><b>RepoCoder仓库级补全</b></a><a class="r" href="babyagi.html"><small>本分支下一个 · 2023.03</small><b>BabyAGI任务驱动智能体</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "id": "mix-ln",
+  "who": "Pengxiang Li, Lu Yin, Shiwei Liu · 大连理工大学、萨里大学、牛津大学等",
+  "venue": "arXiv 2024",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2412.13795"}, {"label": "代码", "url": "https://github.com/pixeli99/MixLN"}],
+  "aka": ["Mix-LN", "MixLN", "混合层归一化", "Pre-LN与Post-LN混合", "深层无效问题"],
+  "problem": "研究发现大模型的深层常常贡献很小、剪掉也几乎不影响效果；这被当成压缩机会，作者却认为它是Pre-LN导致的训练缺陷。",
+  "idea": "前面的层用Post-LN、后面的层用Pre-LN，让梯度范数在各层之间更均匀，使深层也能被充分训练。",
+  "impact": "在70M到7B的多种规模上一致优于纯Pre-LN和纯Post-LN，并且预训练得到的模型在SFT和RLHF阶段也学得更好。",
+  "background": "[[pre-ln]]把归一化放在子层输入处，训练稳定，被GPT和LLaMA普遍采用；原始[[transformer]]的Post-LN在深层网络中前面几层梯度消失、难以训练（见[[admin]]、[[deepnet]]）。另一方面，一系列剪枝研究发现可以去掉LLaMA等模型的大量深层而性能损失很小，说明深层没有发挥作用。",
+  "method": "作者先分析两种放法的梯度：Pre-LN中残差流不断累加，越深的层其子层输出相对残差流越小，深层的梯度范数随之变小，于是深层学得少、作用弱；Post-LN则相反，深层梯度大，但浅层容易梯度消失。Mix-LN的做法很直接：设总层数为L，比例为α，前 `⌊αL⌋` 层用Post-LN（`h ← Norm(h + F(h))`），其余层用Pre-LN（`h ← h + F(Norm(h))`）。Post-LN段只占前面一小部分层，不至于深到出现严重的梯度消失；后面的Pre-LN段保持训练稳定，同时因为前段输出已经过归一化，深层得到的梯度比纯Pre-LN时更大，各层梯度范数因此更均衡。",
+  "results": "摘要报告：在70M到7B的多种模型规模上，Mix-LN都稳定优于Pre-LN和Post-LN，各层梯度范数更平衡、更健康，预训练质量更高；用Mix-LN预训练的模型在后续SFT和RLHF中也比Pre-LN或Post-LN的模型学得更好；在不增加模型大小的前提下提升了有效容量。",
+  "legacy": "它与[[peri-ln]]等工作一起，把“归一化放在哪里”重新带回大模型架构的讨论，也为“深层冗余”现象给出了训练动力学上的解释。",
+  "limits": [
+    {"text": "Post-LN层的比例是需要调的超参数，最优值可能随模型规模和深度变化。", "solved_by": []},
+    {"text": "最大只验证到7B，前沿规模的模型是否同样受益尚未公开验证。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "pre-ln", "type": "solves", "note": "Pre-LN让深层梯度范数变小、作用减弱，Mix-LN在深层之前插入Post-LN段来平衡梯度。"},
+    {"to": "transformer", "type": "uses", "note": "在原始Post-LN与Pre-LN两种放法之间按层组合。"},
+    {"to": "admin", "type": "rivals", "note": "Admin用初始化让Post-LN可训，Mix-LN只在浅层用Post-LN来绕开深层训练问题。"},
+    {"to": "deepnet", "type": "rivals", "note": "DeepNet用缩放残差稳住深层Post-LN，Mix-LN改为混合两种归一化放法。"}
+  ],
+  "prereq": ["normalization-layer", "residual-connection", "vanishing-exploding", "backpropagation"],
+  "learn": "先对比[[pre-ln]]与Post-LN的公式；读Mix-LN第3节梯度范数分析；动手：在一个12层小GPT里把前3层改成Post-LN，画出各层梯度范数与纯Pre-LN的对比。",
+  "check": {"source": "https://arxiv.org/abs/2412.13795", "confirmed": "标题、作者、arXiv首次提交2024-12-18；摘要中深层贡献小可剪枝、Pre-LN导致深层梯度范数小、Post-LN浅层梯度消失、浅层Post-LN深层Pre-LN、70M到7B一致更优、SFT与RLHF中学得更好。比例α的写法、梯度机制的直观解释与机构为一般了解。"}
+}

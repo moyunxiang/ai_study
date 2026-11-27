@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>受限玻尔兹曼机（Restricted Boltzmann Machine） · AI脉络</title>
+<meta name="description" content="两层的能量模型：可见层与隐藏层之间全连接、层内无连接，于是给定一层时另一层各单元相互独立，可以高效交替采样。用对比散度训练，曾是深度信念网络的积木。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/restricted-boltzmann-machine.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="受限玻尔兹曼机（Restricted Boltzmann Machine）">
+<meta property="og:description" content="两层的能量模型：可见层与隐藏层之间全连接、层内无连接，于是给定一层时另一层各单元相互独立，可以高效交替采样。用对比散度训练，曾是深度信念网络的积木。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/restricted-boltzmann-machine.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/restricted-boltzmann-machine">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 神经网络组件 · 进阶</div>
+<h1>受限玻尔兹曼机</h1><div class="full">Restricted Boltzmann Machine</div>
+<p class="muted" style="font-size:13px">也叫：受限玻尔兹曼机　restricted Boltzmann machine　RBM　RBMs　伯努利RBM　Bernoulli RBM　高斯-伯努利RBM　Gaussian-Bernoulli RBM　CD-k　CD-1　持续对比散度　persistent contrastive divergence　PCD　逐层预训练　layer-wise pretraining　greedy layer-wise pretraining　二部图能量模型　harmonium</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/restricted-boltzmann-machine">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>两层的能量模型：可见层与隐藏层之间全连接、层内无连接，于是给定一层时另一层各单元相互独立，可以高效交替采样。用对比散度训练，曾是深度信念网络的积木。</b></p>
+<p class="tags">先要会：<a class="chip c" href="energy-based.html">能量模型与玻尔兹曼分布</a> <a class="chip c" href="graphical-model.html">概率图模型</a></p>
+<p><b>从玻尔兹曼机说起</b>。<a class="ln" href="../n/boltzmann-machine.html">玻尔兹曼机</a>用一个能量函数给每种二值状态打分，概率<code>p ∝ exp(−E)</code>（见<a class="lc" href="../c/energy-based.html">能量模型与玻尔兹曼分布</a>）。单元之间可以任意相连，表达力强，但推断和学习都极慢：要采样就得长时间运行MCMC（见<a class="lc" href="../c/langevin-mcmc.html">MCMC与朗之万动力学</a>）。</p><p><b>受限玻尔兹曼机（RBM）</b>。只保留可见层v与隐藏层h之间的连接，同层之间不连。能量为</p><p class="formula"><code>E(v, h) = −aᵀv − bᵀh − vᵀWh</code></p><p>这个“二部图”结构带来关键的便利：给定v时，各隐单元条件独立（见<a class="lc" href="../c/iid.html">独立、条件独立与独立同分布</a>），而且</p><p class="formula"><code>p(h_j = 1 | v) = σ(b_j + Σ_i W_ij v_i)</code></p><p>反过来给定h时可见单元也是如此。于是可以整层并行地做<a class="ln" href="../n/gibbs-sampling.html">Gibbs采样与马尔可夫随机场</a>：v → h → v → h……。一个RBM在形式上就像一个用sigmoid的单隐层网络，只是权重同时用于“向上”和“向下”两个方向。</p><p><b>训练：对比散度</b>。对数似然对W的梯度是“数据驱动的相关”减去“模型自己采样出的相关”：<code>⟨v hᵀ⟩_数据 − ⟨v hᵀ⟩_模型</code>。后一项需要模型达到平衡分布，代价太高。<a class="ln" href="../n/contrastive-divergence.html">对比散度</a>（CD-k）从数据出发只做k步（常常k = 1）吉布斯采样就用来近似第二项，有偏但便宜得多，让RBM第一次能在实际规模的数据上训练。</p><p><b>历史地位</b>。<a class="ln" href="../n/dbn.html">深度信念网络</a>（2006）把多个RBM逐层叠起来：先训练第一层RBM，把它的隐层激活当作下一层的输入再训练一个RBM，最后用反向传播微调。这种“无监督逐层预训练”是2006年前后深度学习复兴的起点之一。RBM也被用于协同过滤，是<a class="ln" href="../n/netflix-prize.html">Netflix Prize</a>获胜方案集成中的组成部分（见<a class="lc" href="../c/recommender-systems.html">推荐系统与协同过滤</a>）。</p><p><b>后来</b>。ReLU、更好的初始化和大数据让深层网络可以直接用反向传播从头训练（见<a class="lc" href="../c/initialization.html">参数初始化</a>），逐层预训练不再必要；生成建模也转向了VAE、GAN和扩散模型（见<a class="lc" href="../c/generative-modeling.html">生成建模的目标</a>）。RBM如今主要作为能量模型和概率图模型的教学范例，在量子多体物理中也被用作波函数的表示。</p>
+<div class="example"><h4>例子</h4><p>3个可见单元、2个隐单元，偏置为0，W = [[2, 0], [0, 2], [2, −2]]。输入v = (1, 0, 1)：隐单元1的输入为2 + 2 = 4，<code>p(h₁ = 1) = σ(4) ≈ 0.98</code>；隐单元2的输入为0 − 2 = −2，<code>p(h₂ = 1) = σ(−2) ≈ 0.12</code>。采样得h = (1, 0)后，反向重建可见层：各单元输入为(2, 0, 2)，概率为(0.88, 0.5, 0.88)。</p></div>
+<h2>容易误解的地方</h2><ul><li>RBM的配分函数Z无法精确计算，所以训练过程中通常看不到真实的对数似然，只能看重建误差这类替代指标，而重建误差低并不等于模型好。</li><li>“受限”指的是层内没有连接，而不是参数或容量受限。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

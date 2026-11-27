@@ -1,0 +1,25 @@
+{
+  "key": "sync-batchnorm",
+  "short": "多卡数据并行时，普通BatchNorm只用本卡的几个样本算均值方差；同步BN先在所有卡之间汇总统计量再归一化，相当于在全局批次上做BN，解决单卡批次太小的问题。",
+  "body": "[[batchnorm]]用当前小批次的均值和方差来归一化激活（见[[c:normalization-layer]]）。它有个前提：批次要足够大，统计量才估得准。分类任务每卡放几十张小图没问题；可目标检测、语义分割的输入图像很大，单卡往往只能放下1到2张，这时每卡算出的均值方差噪声极大，BN的效果明显变差甚至有害。\n\n**数据并行下的BN**。在[[pytorch-ddp]]这类数据并行训练中（见[[c:distributed-training]]），每张卡各自处理一部分样本。普通BN在每张卡上独立计算统计量，所以即使全局批大小是64，若分在32张卡上，每张卡的BN也只看到2个样本。\n\n**同步BatchNorm**。前向时，每张卡先算出本地的`Σx`和`Σx²`（以及样本数），用一次all-reduce在所有卡之间求和（见[[ring-allreduce]]），得到全局的均值和方差，再各自归一化；反向时梯度里涉及统计量的部分也同样同步。效果上等价于在整个全局批次上做BN，代价是每个BN层多一次跨卡通信。\n\n**它出现在哪里**。检测和分割模型的训练（输入大、单卡批次小）普遍使用它，MegDet就借助跨卡BN把目标检测的批大小扩大到数百张图；[[simclr]]也在所有设备上汇总BN统计量，因为对比学习对批次统计量特别敏感。PyTorch提供了`nn.SyncBatchNorm.convert_sync_batchnorm`一键替换。\n\n**替代方案**。不依赖批次维度的归一化可以绕开这个问题：[[groupnorm]]在每个样本内部按通道分组归一化，批大小为1也能用；[[layernorm]]在Transformer中成为标准，部分原因就是它与批大小无关（见[[c:gradient-accumulation]]里关于BN与梯度累积的讨论）。推理时BN使用训练中积累的滑动平均统计量（见[[c:exponential-moving-average]]），与是否同步无关。",
+  "example": "全局批大小16、8张卡，每卡2张图。普通BN：每卡用2个样本估计每个通道的均值和方差，相当于从2个数里估方差，误差极大。SyncBN：每卡算出本地的和与平方和，all-reduce后得到16个样本上的统计量。假设某通道8张卡的本地均值分别为0.1到0.8，全局均值约为0.45，而单卡用的是各自偏离很大的本地值。",
+  "pitfalls": "- SyncBN增加了每层一次的同步通信，在卡数很多、网络很深时会明显拖慢训练。\n- 批次中混有不同来源的数据时（如对比学习的正负样本），全局统计量可能泄漏批次内信息，[[moco]]为此专门设计了“打乱BN”，让查询和键的统计量来自不同的样本子集。",
+  "needs": [
+    "normalization-layer",
+    "distributed-training"
+  ],
+  "aka": [
+    "同步BatchNorm",
+    "同步批归一化",
+    "跨卡批归一化",
+    "SyncBN",
+    "SyncBatchNorm",
+    "synchronized batch normalization",
+    "Cross-GPU BatchNorm",
+    "CrossGPU BN",
+    "nn.SyncBatchNorm",
+    "全局批归一化",
+    "小批量BN",
+    "small batch BatchNorm"
+  ]
+}

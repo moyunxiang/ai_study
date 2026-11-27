@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>查询改写与扩展（Query Rewriting and Expansion） · AI脉络</title>
+<meta name="description" content="检索之前先改写用户的问题：补全指代、改成更适合搜索的说法、拆成几个子问题、或者扩展同义词，让检索器更容易找到相关资料。它是检索增强系统里成本很低、效果明显的一步。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/query-rewriting.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="查询改写与扩展（Query Rewriting and Expansion）">
+<meta property="og:description" content="检索之前先改写用户的问题：补全指代、改成更适合搜索的说法、拆成几个子问题、或者扩展同义词，让检索器更容易找到相关资料。它是检索增强系统里成本很低、效果明显的一步。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/query-rewriting.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/query-rewriting">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>查询改写与扩展</h1><div class="full">Query Rewriting and Expansion</div>
+<p class="muted" style="font-size:13px">也叫：query rewriting　查询改写　query rewrite　query expansion　查询扩展　multi-query　多查询检索　query decomposition　问题分解　伪相关反馈　pseudo-relevance feedback　query reformulation　查询重写　对话式查询改写</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/query-rewriting">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>检索之前先改写用户的问题：补全指代、改成更适合搜索的说法、拆成几个子问题、或者扩展同义词，让检索器更容易找到相关资料。它是检索增强系统里成本很低、效果明显的一步。</b></p>
+<p class="tags">先要会：<a class="chip c" href="retrieval.html">检索与向量数据库</a></p>
+<p>用户的原始问题往往不是好的检索查询：</p><ul><li>多轮对话里，“那它的价格呢？”中的“它”指什么，检索器不知道。</li><li>用户的说法和文档的说法不同：问“电脑开不了机怎么办”，文档写的是“主机无法启动的排查步骤”。</li><li>一个问题包含多个子问题：“比较A和B两家公司去年的营收”需要分别查A和B。</li></ul><p>直接拿原句去检索（见<a class="lc" href="../c/retrieval.html">检索与向量数据库</a>），召回效果就会打折扣。<b>查询改写</b>在检索前加一步处理。</p><p><b>常见做法</b>。</p><ul><li><b>上下文补全</b>：结合对话历史，把省略和指代补全，“那它的价格呢？”改成“iPhone 16的价格是多少？”。</li><li><b>查询扩展</b>：加入同义词、相关词或缩写全称。经典信息检索里的伪相关反馈（先检索一次，从排名靠前的文档里提取关键词加回查询）就是一种扩展。</li><li><b>多查询</b>：让语言模型从不同角度生成几个改写版本，分别检索，再把结果合并（可以用<a class="lc" href="../c/hybrid-search.html">混合检索</a>里的RRF融合）。</li><li><b>分解</b>：把复杂问题拆成几个子问题依次检索，这和多跳问答的思路一致（见<a class="lc" href="../c/multi-hop-qa.html">多跳问答</a>）。</li><li><b>抽象化</b>：<a class="ln" href="../n/step-back.html">后退一步提示</a>先让模型提出一个更一般的问题（“这道题涉及哪条物理定律？”），检索背景知识后再回答原问题。</li><li><b>假设文档</b>：<a class="ln" href="../n/hyde.html">HyDE假设文档检索</a>让模型先写一段“假想的答案”，用它的向量去检索。假想答案和真实文档在用词和风格上更接近，往往比问题本身更容易匹配到正确文档，即使假想答案中的事实可能是错的。</li></ul><p><b>在系统中的位置</b>。改写 → 检索 → 重排序（见<a class="lc" href="../c/cross-encoder-reranking.html">交叉编码器与重排序</a>）→ 生成（见<a class="ln" href="../n/rag.html">检索增强生成RAG</a>）。更进一步的智能体式检索（见<a class="lc" href="../c/agentic-search.html">智能体式检索</a>）让模型在多轮中自己决定下一步搜什么，查询改写成为它反复执行的一个动作；<a class="ln" href="../n/flare.html">FLARE主动检索</a>则在生成过程中发现自己不确定时，再主动构造查询去检索。</p>
+<div class="example"><h4>例子</h4><p>对话历史：“用户：特斯拉Model 3的续航是多少？助手：……”。用户接着问：“那充满电要多久？”</p><ul><li>不改写：查询“那充满电要多久？”，检索器可能返回手机、电动自行车的充电文档。</li><li>改写后：“特斯拉Model 3充满电需要多长时间”，检索结果集中在正确的车型上。</li></ul><p>多查询：同一问题再生成“Model 3 快充 时间”“Model 3 家用充电桩 充电时长”两个版本，三路检索结果合并，覆盖了快充和慢充两种情况。</p></div>
+<h2>容易误解的地方</h2><ul><li>改写本身可能出错：模型把指代补错了对象，后面检索得再好也是错的；改写结果最好能被记录和检查。</li><li>每次改写多调用一次模型，增加延迟和成本；简单的单轮查询不一定需要改写。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

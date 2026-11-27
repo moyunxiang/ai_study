@@ -1,0 +1,36 @@
+{
+  "id": "ramshaw-marcus-chunking",
+  "who": "Lance Ramshaw, Mitchell Marcus · 宾夕法尼亚大学、Bowdoin学院",
+  "venue": "Third Workshop on Very Large Corpora 1995",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/W95-0107/"}
+  ],
+  "aka": ["IOB", "BIO", "BIO标注", "IOB标注", "BIO tagging", "IOB tagging", "BIOES", "BILOU", "组块分析", "浅层句法分析", "Text Chunking", "Chunking", "Shallow Parsing", "名词短语识别", "Base NP"],
+  "problem": "完整的句法分析又慢又容易出错，很多应用只需要找出不重叠的短语块（如基本名词短语「the big red dog」）。怎样把「找短语块」变成像词性标注那样可以从数据学习的逐词任务？",
+  "idea": "给每个词打一个三选一的标签：**B**（块的开始）、**I**（块内部）、**O**（不在任何块里），于是找短语块就变成了逐词的序列标注；再用Brill的**基于转换的学习**自动学出一串改写规则来预测这些标签。",
+  "impact": "这篇论文提出的IOB/BIO编码成了把「找片段」转成序列标注的标准做法：CoNLL-2000组块任务、CoNLL-2003命名实体识别、槽填充、分词的BMES标注都沿用这一思路，几乎所有NER模型的输出层都是BIO或其变体。",
+  "background": "[[penn-treebank]]提供了完整的成分句法树，Abney（1991）提出「组块」概念：先找出不嵌套的短语块，再做更深的分析。当时的组块和名词短语识别多靠手写规则。[[brill-tagger]]（1992）展示了「从初始标注出发，自动学习一串转换规则逐步纠错」的方法在词性标注上能接近统计方法的准确率。",
+  "method": "**编码**：对基本名词短语识别，每个词标I（在名词短语内）、O（在外）或B（紧跟另一个名词短语、开启新块的第一个词）。例如：\n\n`[The/I big/I dog/I] chased/O [the/I cat/I]`\n\n在原始的IOB方案里，B只用于区分两个紧挨着的块；后来常用的BIO（IOB2）变体则让每个块的第一个词都标B。\n\n**基于转换的学习**：先给每个词一个初始标签（根据其词性最常见的标签），然后在训练语料上反复寻找一条最能减少错误的规则，形如「若当前词标I、前一个词的词性是X、后一个词是Y，则改为B」，把它加入规则序列并应用，直到改进低于阈值。规则模板考虑前后几个词的词形、词性和标签。\n\n**数据**：从Penn Treebank华尔街日报部分自动转换出名词短语组块和更一般的组块标注，作为训练和测试数据——这份数据后来成为组块任务的标准基准。",
+  "results": "具体数字未核对。论文报告在基本名词短语识别上取得了较高的召回率和精确率，在一般组块任务上也有不错的效果，并发现增加训练数据能持续提升。",
+  "legacy": "Tjong Kim Sang与Veenstra（1999）比较了IOB1、IOB2、IOE等多种编码；CoNLL-2000以这份WSJ数据为基础组织了组块共享任务；[[ratinov-roth]]（2009）比较后推荐BILOU（多出Last和Unit-length两种标签，即BIOES）。[[crf]]、[[bilstm-crf]]、[[lample-ner]]等序列标注模型都在BIO/BIOES标签上训练，中文分词的BMES字标注（[[chinese-segmentation-tagging]]）也是同一思路。",
+  "limits": [
+    {"text": "BIO编码只能表示不重叠、不嵌套的片段，嵌套实体（「北京大学附属医院」里的「北京大学」）无法直接表示。", "solved_by": []},
+    {"text": "基于转换的学习规则要逐条贪心搜索，训练很慢，特征只能来自固定模板。", "solved_by": ["crf"]}
+  ],
+  "relations": [
+    {"to": "brill-tagger", "type": "uses", "note": "直接采用Brill的基于转换的学习来预测块标签。"},
+    {"to": "penn-treebank", "type": "uses", "note": "从宾州树库的句法树自动转换出组块训练与测试数据。"},
+    {"to": "church-tagger", "type": "extends", "note": "把词性标注式的逐词标注推广到识别多词短语，靠BIO编码把片段问题变成标注问题。"}
+  ],
+  "prereq": ["supervised-learning", "classification-metrics", "tokenization"],
+  "terms": [
+    {"t": "BIO / IOB标注", "d": "用B（片段开头）、I（片段内部）、O（片段外）给每个词打标签，把识别短语、实体等连续片段的问题变成逐词分类。"},
+    {"t": "组块分析（chunking）", "d": "也叫浅层句法分析：把句子切成不重叠的短语块（名词短语、动词短语等），不建完整的句法树。"},
+    {"t": "BIOES / BILOU", "d": "BIO的扩展，增加E/L（片段结尾）和S/U（单词独自成片段），让模型更清楚片段边界。"}
+  ],
+  "learn": "先了解[[brill-tagger]]和词性标注 → 读原文第2节标注编码和第3节规则学习 → 动手：把CoNLL-2003的一句话手工转成BIO与BIOES两种标签，再用sklearn-crfsuite训练一个组块标注器。",
+  "check": {
+    "source": "https://aclanthology.org/W95-0107/",
+    "confirmed": "ACL Anthology：标题Text Chunking using Transformation-Based Learning、作者Lance Ramshaw与Mitch Marcus、Third Workshop on Very Large Corpora、1995。正文未逐段核对：原始IOB中B的用法、规则模板、WSJ数据转换、CoNLL-2000与IOB2/BILOU的后续按一般了解写，未写数字；会议月份按1995年6月记。"
+  }
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>碰撞检测（Collision Checking） · AI脉络</title>
+<meta name="description" content="判断机器人在某个构型下（或沿一段运动）是否会与障碍物或自身相撞，并常常还要给出离碰撞有多远。它是运动规划中被调用最频繁的操作，也是仿真器处理接触的第一步。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/collision-checking.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="碰撞检测（Collision Checking）">
+<meta property="og:description" content="判断机器人在某个构型下（或沿一段运动）是否会与障碍物或自身相撞，并常常还要给出离碰撞有多远。它是运动规划中被调用最频繁的操作，也是仿真器处理接触的第一步。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/collision-checking.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/collision-checking">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 具身与控制 · 入门</div>
+<h1>碰撞检测</h1><div class="full">Collision Checking</div>
+<p class="muted" style="font-size:13px">也叫：碰撞检测　collision detection　collision checking　碰撞检查　包围盒　bounding box　AABB　包围体层次　BVH　GJK　有符号距离场　signed distance field　SDF　连续碰撞检测　continuous collision detection　自碰撞　self-collision　穿透深度</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/collision-checking">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>判断机器人在某个构型下（或沿一段运动）是否会与障碍物或自身相撞，并常常还要给出离碰撞有多远。它是运动规划中被调用最频繁的操作，也是仿真器处理接触的第一步。</b></p>
+<p class="tags">先要会：<a class="chip c" href="joint-task-space.html">关节空间、任务空间与构型空间</a> <a class="chip c" href="graph-basics.html">图、树与搜索</a></p>
+<p>运动规划要找一条“不撞”的路径，物理仿真要知道“哪里接触了”，安全监控要判断“下一步会不会撞人”，都依赖<b>碰撞检测</b>。采样式规划器（如<a class="ln" href="../n/rrt.html">RRT快速随机树</a>）找一条路径可能要检查几万到几百万个构型，碰撞检测往往占掉大部分计算时间。</p><p><b>两个阶段</b>。</p><ul><li><b>粗筛</b>（broad phase）：用简单的包围体快速排除明显不可能相撞的物体对。常用轴对齐包围盒（AABB）、包围球，再组织成层次包围体树（BVH），使检查的物体对数远少于全部两两组合。</li><li><b>精检</b>（narrow phase）：对可能相撞的物体对做精确的几何检测。凸体之间常用GJK算法计算距离或判断相交；非凸物体先分解成若干凸块。</li></ul><p><b>不只是“是否相撞”</b>。</p><ul><li><b>距离与有符号距离</b>：分离时给出最近距离（正值），穿透时给出穿透深度（负值）。基于优化的轨迹规划需要这个连续的量及其梯度，把“离障碍物远一点”写进代价函数，例如<a class="ln" href="../n/chomp.html">CHOMP梯度轨迹优化</a>用预计算的有符号距离场，<a class="ln" href="../n/trajopt.html">TrajOpt序列凸轨迹优化</a>用凸体之间的有符号距离做序列凸优化，见<a class="lc" href="../c/planning-mpc.html">规划与模型预测控制</a>。</li><li><b>连续碰撞检测</b>：只检查离散的时间点可能漏掉高速穿过薄障碍的情况（“隧穿”），需要检查整段运动扫过的体积。</li><li><b>自碰撞</b>：机械臂和人形机器人还要检查自身各连杆之间是否相撞，通常排除相邻连杆。</li></ul><p><b>在仿真与学习中</b>。仿真器（如<a class="ln" href="../n/mujoco.html">MuJoCo物理仿真</a>）每一步都先做碰撞检测找出接触点，再计算接触力（见<a class="lc" href="../c/rigid-body-dynamics.html">机器人动力学与运动方程</a>）。用简化的碰撞几何（胶囊体、凸包）代替精细网格可以大幅加速，这也是仿真与真实接触行为存在差异的原因之一。学习型方法也会把“预测是否碰撞”作为辅助任务，或用学到的有符号距离场表示场景。</p>
+<div class="example"><h4>例子</h4><p>一个7轴机械臂用胶囊体近似每个连杆（共7个），场景里有20个障碍物。逐对检查需要7×20=140次胶囊-障碍物检测，外加约15对非相邻连杆的自碰撞检测。若用包围体树粗筛后只剩10对需要精检，精确检测的次数就从约155次降到10次，规划器在同样时间里能检查的构型数随之增加一个数量级左右。</p></div>
+<h2>容易误解的地方</h2><ul><li>碰撞几何过于保守（包得太胖）会让规划器找不到穿过窄缝的路径，过于贴合又会增加计算量和数值不稳定。</li><li>只在路径上的离散点检测而不检查中间段，是规划结果在真机上发生碰撞的常见原因。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

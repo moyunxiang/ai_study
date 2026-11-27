@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>组块分析与BIO标注（1995） · AI脉络</title>
+<meta name="description" content="完整的句法分析又慢又容易出错，很多应用只需要找出不重叠的短语块（如基本名词短语「the big red dog」）。怎样把「找短语块」变成像词性标注那样可以从数据学习的逐词任务？ 给每个词打一个三选一的标签： B （块的开始）、 I （块内部）、 O （不在任何块里），于是找短语块就变成了逐词的序…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/ramshaw-marcus-chunking.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="组块分析与BIO标注（1995）">
+<meta property="og:description" content="完整的句法分析又慢又容易出错，很多应用只需要找出不重叠的短语块（如基本名词短语「the big red dog」）。怎样把「找短语块」变成像词性标注那样可以从数据学习的逐词任务？ 给每个词打一个三选一的标签： B （块的开始）、 I （块内部）、 O （不在任何块里），于是找短语块就变成了逐词的序…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/ramshaw-marcus-chunking.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/ramshaw-marcus-chunking">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 序列标注</div>
+<h1>组块分析与BIO标注</h1>
+<div class="full">Text Chunking using Transformation-Based Learning</div>
+<div class="meta"><span>1995.06</span><span>论文</span><span>延伸</span><span>Third Workshop on Very Large Corpora 1995</span><span>Lance Ramshaw, Mitchell Marcus · 宾夕法尼亚大学、Bowdoin学院</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://aclanthology.org/W95-0107/" rel="noopener">ACL Anthology ↗</a><a class="btn sm" href="../index.html#/n/ramshaw-marcus-chunking">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>完整的句法分析又慢又容易出错，很多应用只需要找出不重叠的短语块（如基本名词短语「the big red dog」）。怎样把「找短语块」变成像词性标注那样可以从数据学习的逐词任务？</p></div><div><h4>方法</h4><p>给每个词打一个三选一的标签：<b>B</b>（块的开始）、<b>I</b>（块内部）、<b>O</b>（不在任何块里），于是找短语块就变成了逐词的序列标注；再用Brill的<b>基于转换的学习</b>自动学出一串改写规则来预测这些标签。</p></div><div><h4>影响</h4><p>这篇论文提出的IOB/BIO编码成了把「找片段」转成序列标注的标准做法：CoNLL-2000组块任务、CoNLL-2003命名实体识别、槽填充、分词的BMES标注都沿用这一思路，几乎所有NER模型的输出层都是BIO或其变体。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/penn-treebank.html">Penn Treebank</a>提供了完整的成分句法树，Abney（1991）提出「组块」概念：先找出不嵌套的短语块，再做更深的分析。当时的组块和名词短语识别多靠手写规则。<a class="ln" href="../n/brill-tagger.html">Brill转换式标注器</a>（1992）展示了「从初始标注出发，自动学习一串转换规则逐步纠错」的方法在词性标注上能接近统计方法的准确率。</p><h2>方法</h2><p><b>编码</b>：对基本名词短语识别，每个词标I（在名词短语内）、O（在外）或B（紧跟另一个名词短语、开启新块的第一个词）。例如：</p><p class="formula"><code>[The/I big/I dog/I] chased/O [the/I cat/I]</code></p><p>在原始的IOB方案里，B只用于区分两个紧挨着的块；后来常用的BIO（IOB2）变体则让每个块的第一个词都标B。</p><p><b>基于转换的学习</b>：先给每个词一个初始标签（根据其词性最常见的标签），然后在训练语料上反复寻找一条最能减少错误的规则，形如「若当前词标I、前一个词的词性是X、后一个词是Y，则改为B」，把它加入规则序列并应用，直到改进低于阈值。规则模板考虑前后几个词的词形、词性和标签。</p><p><b>数据</b>：从Penn Treebank华尔街日报部分自动转换出名词短语组块和更一般的组块标注，作为训练和测试数据——这份数据后来成为组块任务的标准基准。</p><h2>结果</h2><p>具体数字未核对。论文报告在基本名词短语识别上取得了较高的召回率和精确率，在一般组块任务上也有不错的效果，并发现增加训练数据能持续提升。</p><h2>后来的发展</h2><p>Tjong Kim Sang与Veenstra（1999）比较了IOB1、IOB2、IOE等多种编码；CoNLL-2000以这份WSJ数据为基础组织了组块共享任务；<a class="ln" href="../n/ratinov-roth.html">NER设计挑战与BILOU</a>（2009）比较后推荐BILOU（多出Last和Unit-length两种标签，即BIOES）。<a class="ln" href="../n/crf.html">条件随机场</a>、<a class="ln" href="../n/bilstm-crf.html">BiLSTM-CRF序列标注</a>、<a class="ln" href="../n/lample-ner.html">神经命名实体识别</a>等序列标注模型都在BIO/BIOES标签上训练，中文分词的BMES字标注（<a class="ln" href="../n/chinese-segmentation-tagging.html">中文分词即字标注</a>）也是同一思路。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>BIO编码只能表示不重叠、不嵌套的片段，嵌套实体（「北京大学附属医院」里的「北京大学」）无法直接表示。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>基于转换的学习规则要逐条贪心搜索，训练很慢，特征只能来自固定模板。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/crf.html">条件随机场</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/church-tagger.html">HMM词性标注</a><span class="yr">1988 · NLP</span><div class=nt>把词性标注式的逐词标注推广到识别多词短语，靠BIO编码把片段问题变成标注问题。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/penn-treebank.html">Penn Treebank</a><span class="yr">1993 · 数据·评测</span><div class=nt>从宾州树库的句法树自动转换出组块训练与测试数据。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/brill-tagger.html">Brill转换式标注器</a><span class="yr">1992 · NLP</span><div class=nt>直接采用Brill的基于转换的学习来预测块标签。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/crf.html">条件随机场</a><span class="yr">2001 · NLP</span><div class=nt>基于转换的学习规则要逐条贪心搜索，训练很慢，特征只能来自固定模板。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/supervised-learning.html">监督学习</a> <a class="chip c" href="../c/classification-metrics.html">准确率、精确率、召回率与F1</a> <a class="chip c" href="../c/tokenization.html">分词与token</a></p>
+<h2>本篇术语</h2><ul><li><b>BIO / IOB标注</b>　用B（片段开头）、I（片段内部）、O（片段外）给每个词打标签，把识别短语、实体等连续片段的问题变成逐词分类。</li><li><b>组块分析（chunking）</b>　也叫浅层句法分析：把句子切成不重叠的短语块（名词短语、动词短语等），不建完整的句法树。</li><li><b>BIOES / BILOU</b>　BIO的扩展，增加E/L（片段结尾）和S/U（单词独自成片段），让模型更清楚片段边界。</li></ul>
+<h2>怎么学</h2><p>先了解<a class="ln" href="../n/brill-tagger.html">Brill转换式标注器</a>和词性标注 → 读原文第2节标注编码和第3节规则学习 → 动手：把CoNLL-2003的一句话手工转成BIO与BIOES两种标签，再用sklearn-crfsuite训练一个组块标注器。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://aclanthology.org/W95-0107/" rel="noopener">https://aclanthology.org/W95-0107/</a>（ACL Anthology：标题Text Chunking using Transformation-Based Learning、作者Lance Ramshaw与Mitch Marcus、Third Workshop on Very Large Corpora、1995。正文未逐段核对：原始IOB中B的用法、规则模板、WSJ数据转换、CoNLL-2000与IOB2/BILOU的后续按一般了解写，未写数字；会议月份按1995年6月记。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E7%BB%84%E5%9D%97%E5%88%86%E6%9E%90%E4%B8%8EBIO%E6%A0%87%E6%B3%A8%EF%BC%88ramshaw-marcus-chunking%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aramshaw-marcus-chunking%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/ramshaw-marcus-chunking.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="yarowsky-wsd.html"><small>本分支上一个 · 1995.06</small><b>Yarowsky自举词义消歧</b></a><a class="r" href="centering.html"><small>本分支下一个 · 1995.06</small><b>中心理论</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

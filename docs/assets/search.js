@@ -174,7 +174,7 @@ function create(core, sd) {
         for (const [tok, items] of tokens) {
           if (tok[0] !== w[0] && tok[1] !== w[1]) continue;
           const d = editDistance(w, tok, max);
-          if (d > 0 && d <= max) for (const it of items) if (!seen.has(it.k + it.id)) { seen.add(it.k + it.id); fz.push([(it.tk.has(tok) ? 50 : 30) - d * 8 + it.w * 3 + (it.tl === tok ? 30 : 0), it, tok]); }
+          if (d > 0 && d <= max) for (const it of items) if (!seen.has(it.k + it.id)) { seen.add(it.k + it.id); fz.push([(it.tk.has(tok) ? 50 : 30) - d * 25 + it.w * 3 + (it.tl === tok || (it.k !== 't' && it.k !== 'th' && it.id === tok) ? 30 : 0), it, tok]); }      // 差一个字母的排在差两个的前面（“preceptron”先给perceptron，不是perception）
         }
       }
       if (fz.length) return [...fz.sort((a, b) => b[0] - a[0]).slice(0, 12).map(x => wrap(x[1], 30, {fuzzy: x[2]})), ...res];

@@ -1,0 +1,36 @@
+{
+  "id": "maltparser",
+  "who": "Joakim Nivre, Johan Hall, Jens Nilsson · 韦克舍大学、乌普萨拉大学",
+  "venue": "LREC 2006",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/L06-1084/"},
+    {"label": "官网", "url": "https://www.maltparser.org/"}
+  ],
+  "aka": ["MaltParser", "Malt", "转移式依存分析器", "Transition-based Dependency Parser", "Arc-eager", "Arc-standard", "数据驱动依存分析", "Nivre 2006"],
+  "problem": "依存句法分析的数据驱动方法已经在若干语言上验证，但每换一种语言、一套树库，都要重写分析器的特征和代码；研究者缺少一个可以直接拿树库训练出分析器的通用工具。",
+  "idea": "做一个「分析器生成器」：用户提供任意语言的依存树库，选择一种转移系统（如arc-eager）和特征模型，MaltParser就用分类器（SVM或基于记忆的学习）学会在每个分析状态下选哪个动作，输出一个该语言的确定性、线性时间的依存分析器。",
+  "impact": "MaltParser在CoNLL-X（2006）和CoNLL 2007多语言依存分析共享任务中名列前茅，此后十年是最常用的开源依存分析器之一，让「转移式依存分析」成为与图式分析并列的两大范式。",
+  "background": "[[nivre-parser]]（2003）提出了确定性的转移式依存分析：像移进-归约分析一样，用栈和缓冲区逐词处理，每一步做一个动作（移进、左弧、右弧、归约），总步数与句长成线性。[[mstparser]]代表的图式分析则全局搜索最优树。两者在单一语言上都有效，但缺少一个面向多语言、可配置的通用实现。",
+  "method": "**转移系统**：分析状态是 `(栈σ, 缓冲β, 弧集A)`。以arc-eager为例，四个动作：\n\n- `SHIFT`：把缓冲区第一个词压栈；\n- `LEFT-ARC(r)`：加一条从缓冲区首词指向栈顶词的弧（标签r），栈顶出栈；\n- `RIGHT-ARC(r)`：加一条从栈顶指向缓冲区首词的弧，并把该词压栈；\n- `REDUCE`：栈顶词已有中心词时出栈。\n\n从 `([ROOT], 句子, ∅)` 出发直到缓冲区为空，得到一棵依存树。arc-standard是另一种常用变体。\n\n**学习**：训练时用一个「预言」从金标准树推出每一步的正确动作，把（状态特征，动作）当作分类样本。特征模型由用户用配置文件描述，例如栈顶和缓冲区前几个词的词形、词性、已有依存标签。分类器可选LIBSVM或TiMBL（基于记忆的学习）。\n\n**分析**：每一步由分类器选动作，贪心前进，不回溯，时间 `O(n)`。MaltParser还提供伪投射变换，把非投射树编码成投射树训练、分析后再还原。",
+  "results": "据会议论文页：MaltParser是从数据生成依存分析器的工具，免费用于研究与教学，已在瑞典语、英语、捷克语、丹麦语和保加利亚语上做了实证评测。各语言的具体准确率未核对。",
+  "legacy": "2007年的期刊版扩展到更多语言。转移式分析后来走向神经网络：[[chen-manning-parser]]（2014）用前馈网络替换SVM分类器，[[stack-lstm-parser]]用LSTM表示整个栈，[[syntaxnet]]加入全局归一化的束搜索，[[dynamic-oracle]]改进了训练时的预言。spaCy、Stanza等工具中的依存分析器也多属转移式。",
+  "limits": [
+    {"text": "贪心逐步决策，早期的错误无法挽回并会传播到后面的分析。", "solved_by": ["syntaxnet", "dynamic-oracle"]},
+    {"text": "依赖人工设计的特征模板和SVM，换语言时调特征仍费时，特征组合也很稀疏。", "solved_by": ["chen-manning-parser"]}
+  ],
+  "relations": [
+    {"to": "nivre-parser", "type": "extends", "note": "把Nivre的确定性转移式依存分析做成可配置、可多语言训练的通用工具。"},
+    {"to": "mstparser", "type": "rivals", "note": "同期两大依存分析范式：转移式贪心线性时间，图式全局搜索最优树；在CoNLL共享任务中各有胜负。"},
+    {"to": "svm-textcat", "type": "uses", "note": "动作分类器可用支持向量机（LIBSVM）。"}
+  ],
+  "prereq": ["supervised-learning", "feature-representation", "big-o", "graph-basics"],
+  "terms": [
+    {"t": "转移式依存分析", "d": "用栈、缓冲区和一组动作把句子逐词处理成依存树，每步由分类器选择动作，总步数与句长成线性。"},
+    {"t": "预言（oracle）", "d": "训练时根据金标准树告诉分析器每个状态下应做哪个动作的规则。"}
+  ],
+  "learn": "先读[[nivre-parser]]了解arc-eager转移系统 → 读MaltParser论文和用户手册中的特征模型说明 → 动手：用UD英语树库训练一个MaltParser模型，与一个图式分析器比较长句上的LAS。",
+  "check": {
+    "source": "https://aclanthology.org/L06-1084/",
+    "confirmed": "WebSearch结果与ACL Anthology L06-1084：标题MaltParser: A Data-Driven Parser-Generator for Dependency Parsing、作者Nivre、Hall、Nilsson、LREC 2006（热那亚，2006年5月）；是从数据生成依存分析器的工具、免费用于研究和教学、在瑞典语、英语、捷克语、丹麦语、保加利亚语上评测；2007年Natural Language Engineering期刊版。转移动作定义、LIBSVM/TiMBL、伪投射变换、CoNLL共享任务名次、作者单位凭一般了解。"
+  }
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>同步BatchNorm（Synchronized Batch Normalization） · AI脉络</title>
+<meta name="description" content="多卡数据并行时，普通BatchNorm只用本卡的几个样本算均值方差；同步BN先在所有卡之间汇总统计量再归一化，相当于在全局批次上做BN，解决单卡批次太小的问题。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/sync-batchnorm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="同步BatchNorm（Synchronized Batch Normalization）">
+<meta property="og:description" content="多卡数据并行时，普通BatchNorm只用本卡的几个样本算均值方差；同步BN先在所有卡之间汇总统计量再归一化，相当于在全局批次上做BN，解决单卡批次太小的问题。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/sync-batchnorm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/sync-batchnorm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 神经网络组件 · 进阶</div>
+<h1>同步BatchNorm</h1><div class="full">Synchronized Batch Normalization</div>
+<p class="muted" style="font-size:13px">也叫：同步BatchNorm　同步批归一化　跨卡批归一化　SyncBN　SyncBatchNorm　synchronized batch normalization　Cross-GPU BatchNorm　CrossGPU BN　nn.SyncBatchNorm　全局批归一化　小批量BN　small batch BatchNorm</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/sync-batchnorm">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>多卡数据并行时，普通BatchNorm只用本卡的几个样本算均值方差；同步BN先在所有卡之间汇总统计量再归一化，相当于在全局批次上做BN，解决单卡批次太小的问题。</b></p>
+<p class="tags">先要会：<a class="chip c" href="normalization-layer.html">归一化层</a> <a class="chip c" href="distributed-training.html">分布式训练：数据并行与模型并行</a></p>
+<p><a class="ln" href="../n/batchnorm.html">Batch Normalization</a>用当前小批次的均值和方差来归一化激活（见<a class="lc" href="../c/normalization-layer.html">归一化层</a>）。它有个前提：批次要足够大，统计量才估得准。分类任务每卡放几十张小图没问题；可目标检测、语义分割的输入图像很大，单卡往往只能放下1到2张，这时每卡算出的均值方差噪声极大，BN的效果明显变差甚至有害。</p><p><b>数据并行下的BN</b>。在<a class="ln" href="../n/pytorch-ddp.html">PyTorch DDP数据并行</a>这类数据并行训练中（见<a class="lc" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a>），每张卡各自处理一部分样本。普通BN在每张卡上独立计算统计量，所以即使全局批大小是64，若分在32张卡上，每张卡的BN也只看到2个样本。</p><p><b>同步BatchNorm</b>。前向时，每张卡先算出本地的<code>Σx</code>和<code>Σx²</code>（以及样本数），用一次all-reduce在所有卡之间求和（见<a class="ln" href="../n/ring-allreduce.html">Ring All-Reduce</a>），得到全局的均值和方差，再各自归一化；反向时梯度里涉及统计量的部分也同样同步。效果上等价于在整个全局批次上做BN，代价是每个BN层多一次跨卡通信。</p><p><b>它出现在哪里</b>。检测和分割模型的训练（输入大、单卡批次小）普遍使用它，MegDet就借助跨卡BN把目标检测的批大小扩大到数百张图；<a class="ln" href="../n/simclr.html">SimCLR</a>也在所有设备上汇总BN统计量，因为对比学习对批次统计量特别敏感。PyTorch提供了<code>nn.SyncBatchNorm.convert_sync_batchnorm</code>一键替换。</p><p><b>替代方案</b>。不依赖批次维度的归一化可以绕开这个问题：<a class="ln" href="../n/groupnorm.html">Group Normalization</a>在每个样本内部按通道分组归一化，批大小为1也能用；<a class="ln" href="../n/layernorm.html">Layer Normalization</a>在Transformer中成为标准，部分原因就是它与批大小无关（见<a class="lc" href="../c/gradient-accumulation.html">梯度累积</a>里关于BN与梯度累积的讨论）。推理时BN使用训练中积累的滑动平均统计量（见<a class="lc" href="../c/exponential-moving-average.html">指数移动平均</a>），与是否同步无关。</p>
+<div class="example"><h4>例子</h4><p>全局批大小16、8张卡，每卡2张图。普通BN：每卡用2个样本估计每个通道的均值和方差，相当于从2个数里估方差，误差极大。SyncBN：每卡算出本地的和与平方和，all-reduce后得到16个样本上的统计量。假设某通道8张卡的本地均值分别为0.1到0.8，全局均值约为0.45，而单卡用的是各自偏离很大的本地值。</p></div>
+<h2>容易误解的地方</h2><ul><li>SyncBN增加了每层一次的同步通信，在卡数很多、网络很深时会明显拖慢训练。</li><li>批次中混有不同来源的数据时（如对比学习的正负样本），全局统计量可能泄漏批次内信息，<a class="ln" href="../n/moco.html">MoCo</a>为此专门设计了“打乱BN”，让查询和键的统计量来自不同的样本子集。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

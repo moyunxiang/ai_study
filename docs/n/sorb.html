@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SoRB回放池图搜索（2019） · AI脉络</title>
+<meta name="description" content="经典规划算法擅长长视界推理，但需要现成的局部策略和距离度量；RL会学策略和状态价值，却规划不了很长的路。长视界、反馈稀疏、观测高维的目标到达任务对两者都很难。 把目标条件价值函数当作距离：对回放池里的观测两两估计“要走几步”，建成一张图，在图上用最短路算法找出一串中间路标，再让目标条件策略逐段到达…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sorb.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SoRB回放池图搜索（2019）">
+<meta property="og:description" content="经典规划算法擅长长视界推理，但需要现成的局部策略和距离度量；RL会学策略和状态价值，却规划不了很长的路。长视界、反馈稀疏、观测高维的目标到达任务对两者都很难。 把目标条件价值函数当作距离：对回放池里的观测两两估计“要走几步”，建成一张图，在图上用最短路算法找出一串中间路标，再让目标条件策略逐段到达…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sorb.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sorb">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 分层、表示与元学习</div>
+<h1>SoRB回放池图搜索</h1>
+<div class="full">Search on the Replay Buffer: Bridging Planning and Reinforcement Learning</div>
+<div class="meta"><span>2019.06</span><span>论文</span><span>延伸</span><span>NeurIPS 2019</span><span>Benjamin Eysenbach, Ruslan Salakhutdinov, Sergey Levine · CMU / Google Brain / UC Berkeley</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1906.05253" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/sorb">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>经典规划算法擅长长视界推理，但需要现成的局部策略和距离度量；RL会学策略和状态价值，却规划不了很长的路。长视界、反馈稀疏、观测高维的目标到达任务对两者都很难。</p></div><div><h4>方法</h4><p>把目标条件价值函数当作距离：对回放池里的观测两两估计“要走几步”，建成一张图，在图上用最短路算法找出一串中间路标，再让目标条件策略逐段到达（SoRB）。</p></div><div><h4>影响</h4><p>“图搜索+RL”路线的代表工作，展示了把学到的价值当距离用于规划的思路；后来的路标规划、HIQL等分层与离线目标条件方法常引用它。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>SoRB（Search on the Replay Buffer）由三步组成：</p><p>1. <b>学距离</b>：训练一个目标条件Q函数，奖励每步为−1、到达目标时结束，于是 <code>−V(s, g)</code> 就近似从s到g的步数 <code>d(s, g)</code>。为了让远距离估计更可靠，论文用分布式RL（类似<a class="ln" href="../n/c51.html">分布式RL C51</a>）预测步数的分布，并用集成来减少过估计； 2. <b>建图</b>：把回放池里的观测作为节点，若两节点间估计距离小于某个阈值就连一条边，边权就是估计距离——长距离的边不可信，所以只保留短边； 3. <b>搜索与执行</b>：给定起点和目标，把它们加入图，用Dijkstra之类的最短路算法找出一串中间节点（路标），目标条件策略依次以这些路标为短期目标前进。</p><p>这样RL只需在“短距离”上可靠，长视界推理交给图搜索。作者在视觉导航等长视界任务上展示，SoRB比单纯的目标条件RL和此前的规划方法成功率高得多。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>图的规模随回放池大小增长，最短路和两两距离计算代价高；节点只能取已见过的观测。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>图上任何一条错误的短边（距离被低估）都会让规划穿墙，性能对距离估计的准确性很敏感。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/her.html">后见经验回放HER</a><span class="yr">2017.07 · RL</span><div class=nt>目标条件价值用事后重标注在回放数据上训练。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/c51.html">分布式RL C51</a><span class="yr">2017.07 · RL</span><div class=nt>用分布式价值预测步数分布，提高远距离估计的可靠性。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/uvfa.html">通用值函数近似UVFA</a><span class="yr">2015.07 · RL</span><div class=nt>把通用目标条件价值函数解释为状态之间的距离。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/hiro.html">HIRO离策略分层RL</a><span class="yr">2018.05 · RL</span><div class=nt>HIRO学高层策略选子目标；SoRB用显式图搜索选路标。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/graph-basics.html">图、树与搜索</a> <a class="chip c" href="../c/policy-value.html">策略与价值函数</a> <a class="chip c" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a> <a class="chip c" href="../c/planning-mpc.html">规划与模型预测控制</a></p>
+<h2>本篇术语</h2><ul><li><b>路标（waypoint）</b>　从起点到终点路径上的中间目标，策略每次只需到达下一个路标。</li></ul>
+<h2>怎么学</h2><p>先懂目标条件价值与最短路的关系；读SoRB原文第3节建图与搜索；在二维迷宫中可视化图与找到的路标。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1906.05253" rel="noopener">https://arxiv.org/abs/1906.05253</a>（标题、三位作者、arXiv v1于2019-06-12；摘要中规划与RL两类方法的长处与局限、长视界有限反馈高维观测的任务难、只需给目标状态避免奖励塑形、结合规划与RL的通用控制算法、把到达远目标分解为一串更容易的子任务。距离为负价值、分布式RL与集成、阈值建图与最短路按原文正文通行描述；NeurIPS 2019按通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SoRB%E5%9B%9E%E6%94%BE%E6%B1%A0%E5%9B%BE%E6%90%9C%E7%B4%A2%EF%BC%88sorb%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asorb%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sorb.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="mbpo.html"><small>本分支上一个 · 2019.06</small><b>MBPO</b></a><a class="r" href="smm.html"><small>本分支下一个 · 2019.06</small><b>SMM状态边缘分布匹配</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

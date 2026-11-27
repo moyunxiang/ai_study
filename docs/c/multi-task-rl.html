@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>多任务强化学习（Multi-Task RL） · AI脉络</title>
+<meta name="description" content="用一个智能体同时学多个任务：策略和价值网络以任务编号、目标或语言指令为条件，共享大部分参数。希望任务之间互相借力，但也会出现任务互相干扰、奖励尺度不一致的问题。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/multi-task-rl.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="多任务强化学习（Multi-Task RL）">
+<meta property="og:description" content="用一个智能体同时学多个任务：策略和价值网络以任务编号、目标或语言指令为条件，共享大部分参数。希望任务之间互相借力，但也会出现任务互相干扰、奖励尺度不一致的问题。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/multi-task-rl.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/multi-task-rl">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>多任务强化学习</h1><div class="full">Multi-Task RL</div>
+<p class="muted" style="font-size:13px">也叫：多任务强化学习　multi-task RL　multitask RL　multi-task reinforcement learning　多任务策略　任务条件策略　task-conditioned policy　负迁移　negative transfer　梯度冲突　gradient conflict　多任务智能体</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/multi-task-rl">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>用一个智能体同时学多个任务：策略和价值网络以任务编号、目标或语言指令为条件，共享大部分参数。希望任务之间互相借力，但也会出现任务互相干扰、奖励尺度不一致的问题。</b></p>
+<p class="tags">先要会：<a class="chip c" href="policy-value.html">策略与价值函数</a> <a class="chip c" href="transfer-learning.html">迁移学习</a></p>
+<p>单任务RL每学一个新任务都从零开始。很多任务却明显共享知识：开抽屉和开柜门都要抓把手、往外拉；不同Atari游戏都要识别物体和躲避危险。<b>多任务强化学习</b>让一个网络同时在N个任务上训练，期望共享的部分学得更好、更省数据，并为泛化到新任务打下基础。</p><p><b>基本做法</b>。把任务信息作为输入：任务的独热编号、目标状态（见<a class="lc" href="../c/goal-conditioned-rl.html">目标条件强化学习</a>）、或一句语言指令。策略写成<code>π(a|s, z)</code>，z是任务表示，价值函数同理。所有任务的数据放进同一个训练流程，损失按任务求和或加权。</p><p><b>主要困难</b>。</p><ul><li><b>负迁移与梯度冲突</b>：不同任务的梯度方向可能相反，合在一起训练，某些任务反而比单独训练更差。常见对策有对冲突的梯度做投影、按任务分出部分专用参数或专用输出头、用<a class="lc" href="../c/mixture-of-experts.html">混合专家</a>式的路由。</li><li><b>奖励尺度不一致</b>：一个游戏每步得几千分，另一个只有0或1，前者的梯度会压倒后者。奖励裁剪是粗暴的做法，<a class="ln" href="../n/popart.html">PopArt自适应目标归一化</a>用自适应的价值归一化让各任务贡献均衡，见<a class="lc" href="../c/rl-normalization.html">强化学习中的归一化：观测、奖励与优势</a>。</li><li><b>数据与计算分配</b>：难任务需要更多样本，简单任务很快学会，均匀采样效率低。</li></ul><p><b>代表性工作</b>。<a class="ln" href="../n/impala.html">IMPALA与V-trace</a>和<a class="ln" href="../n/popart.html">PopArt自适应目标归一化</a>在DMLab-30、Atari-57上训练单个多任务智能体；<a class="ln" href="../n/mt-opt.html">MT-Opt多任务真机RL</a>在真实机器人上同时学十余种操作技能，并共享各任务的数据；<a class="ln" href="../n/meta-world.html">Meta-World</a>提供了50个机械臂操作任务的多任务和元学习基准；<a class="ln" href="../n/gato.html">Gato</a>把游戏、机器人和语言任务统一成序列建模。</p><p><b>与相邻概念的区别</b>。多任务RL在训练时就见到所有任务，追求“同时都做好”；<a class="lc" href="../c/meta-rl.html">元强化学习</a>追求在新任务上快速适应；持续学习按顺序遇到任务，重点是不遗忘旧任务，见<a class="lc" href="../c/continual-learning.html">持续学习与灾难性遗忘</a>。</p>
+<div class="example"><h4>例子</h4><p>两个任务共享一个策略：任务A每回合奖励约1000，任务B约1。不做任何归一化时，价值损失和策略梯度几乎全来自A，B的表现停在随机水平；把每个任务的价值目标按各自的滑动标准差归一化后，两者的梯度量级相近，B也能学会。数值是说明用的设定。</p></div>
+<h2>容易误解的地方</h2><ul><li>“多任务训练比单任务好”不是必然的，必须和每个任务单独训练的基线比较。</li><li>测试时若任务编号来自训练集，评估的是多任务能力而不是泛化能力。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{
+  "id": "mecab",
+  "who": "Taku Kudo, Kaoru Yamamoto, Yuji Matsumoto · 奈良先端科学技术大学院大学",
+  "venue": "EMNLP 2004",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/W04-3230/"},
+    {"label": "MeCab", "url": "https://taku910.github.io/mecab/"}
+  ],
+  "aka": ["MeCab", "日语分词", "日语形态分析", "Japanese Morphological Analysis", "形态素解析", "ChaSen", "IPADIC", "词格", "Lattice CRF"],
+  "problem": "日语和中文一样不用空格分词，还要同时确定每个词的词性和活用形；当时的日语形态分析器（如ChaSen）用隐马尔可夫模型，难以利用重叠的丰富特征，而最大熵马尔可夫模型又有标签偏置问题，会偏向切成长词或短词。",
+  "idea": "先用词典把句子所有可能的切分与词性组合列成一张**词格**（lattice），再在词格上训练一个**条件随机场**：对整条路径做全局归一化，可以随意使用词形、词性层级、字符类型等重叠特征，又不受标签偏置影响；解码用维特比找最高分路径。",
+  "impact": "论文的方法实现为MeCab，成为日语最常用的形态分析器，被几乎所有日语NLP工具、搜索引擎和日语BERT的预处理使用；「词典+词格+CRF」的方案也影响了中文和韩语分词器的设计。",
+  "background": "[[crf]]（2001）在英语序列标注上证明能解决[[memm]]的标签偏置问题，但英语的词已经切好、每个位置的标签数固定。日语分词中，不同切分方式产生长度不同的词序列，不能直接套用线性链CRF。此前的ChaSen用HMM在词格上解码，参数只能是词性转移和词的发射概率。",
+  "method": "**词格构建**：用系统词典（如IPADIC）在句子的每个字符位置查出所有以它开头的词条，每个词条带词性、活用等信息，这些候选词构成一张从句首到句尾的有向无环图，每条从头到尾的路径就是一种分词+词性标注结果。\n\n**CRF打分**：一条路径 `y = (w_1, t_1), …, (w_n, t_n)` 的得分是所有特征的加权和：\n\n`P(y | x) = exp( Σ_i Σ_k λ_k f_k(y_{i−1}, y_i, x) ) / Z(x)`\n\n其中特征包括词本身、各层级词性（大类、细类）、字符类型（汉字、平假名、片假名）及其两两组合；`Z(x)` 是对词格中所有路径求和，用前向-后向算法在词格上高效计算。\n\n**训练**：最大化训练语料上正确路径的条件对数似然，加L1或L2正则，用L-BFGS优化。作者分析了L1/L2正则的差别，并指出CRF避免了MEMM偏向「切得更少（长词）」的标签偏置。\n\n**解码**：维特比算法在词格上找得分最高的路径。",
+  "results": "论文在京都大学语料和RWCP语料上与HMM、MEMM方法比较，报告CRF的分词与词性标注F值更高；具体数字未核对。",
+  "legacy": "MeCab因为速度快、词典可替换（IPADIC、UniDic、mecab-ipadic-NEologd），成为日语处理的事实标准；Sudachi、Juman++等后来的分析器也采用词格+统计模型的框架。CRF在词格上的用法也影响了中文分词器和Kudo本人后来的CRF++、SentencePiece等工具。",
+  "limits": [
+    {"text": "依赖系统词典生成候选，词典中没有的新词和专有名词只能靠未知词处理规则猜测。", "solved_by": []},
+    {"text": "特征仍是人工设计的离散组合，难以利用更长距离的上下文。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "crf", "type": "extends", "note": "把线性链CRF推广到长度可变的词格上，用于联合分词和词性标注。"},
+    {"to": "memm", "type": "solves", "note": "MEMM在词格上会因标签偏置偏向某种切分长度，CRF的全局归一化避免了这一问题。"},
+    {"to": "church-tagger", "type": "rivals", "note": "HMM式标注只能用转移和发射概率，CRF可以使用大量重叠特征。"},
+    {"to": "viterbi", "type": "uses", "note": "用维特比算法在词格上找最优路径。"}
+  ],
+  "prereq": ["hmm-concept", "dynamic-programming", "logistic-regression", "regularization", "tokenization"],
+  "terms": [
+    {"t": "词格（lattice）", "d": "把一句话所有可能的切分与标注候选画成有向无环图，每条从头到尾的路径对应一种分析结果。"},
+    {"t": "形态素解析", "d": "日语NLP中的术语，指把句子切分成最小的有意义单位（形态素）并标注词性和活用形。"}
+  ],
+  "learn": "先了解[[crf]]和[[viterbi]] → 读原文第3节词格CRF与第4节正则化比较 → 动手：安装MeCab与IPADIC，分析一句日语，输出N-best候选路径，观察词格中的歧义。",
+  "check": {
+    "source": "https://aclanthology.org/W04-3230/",
+    "confirmed": "ACL Anthology：标题Applying Conditional Random Fields to Japanese Morphological Analysis、作者Taku Kudo、Kaoru Yamamoto、Yuji Matsumoto、EMNLP 2004。正文未逐段核对：词格构建、特征组合、L1/L2正则比较、京都大学与RWCP语料、与ChaSen的关系、MeCab词典生态按一般了解写，未写数字；会议月份按2004年7月记。"
+  }
+}
