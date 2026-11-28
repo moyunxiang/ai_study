@@ -1,0 +1,35 @@
+{
+  "id": "probing-cram",
+  "who": "Alexis Conneau, Germán Kruszewski, Guillaume Lample, Loïc Barrault, Marco Baroni · Facebook AI Research、勒芒大学",
+  "venue": "ACL 2018",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/P18-1198/"},
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1805.01070"}
+  ],
+  "aka": ["What you can cram", "句向量探测任务", "Probing Tasks", "SentEval探测任务", "Conneau et al. 2018", "句子表示的语言学探测", "Mooney's quip"],
+  "problem": "句向量通常用情感分类、蕴含判断等下游任务评测，但这些任务需要复杂推理，分数高低说不清句向量里到底编码了什么信息——是句长、词序、句法树深度，还是语义？",
+  "idea": "设计10个只考查单一语言学性质的“探测任务”（句子长度、是否含某词、词序是否被调换、句法树深度、主语单复数等），在固定的句向量上训练简单分类器去预测这些性质，用准确率衡量句向量里有没有这种信息。",
+  "impact": "这套探测任务被并入SentEval，成为分析句子表示的标准工具；论文的发现（如训练目标比编码器结构影响更大、下游表现与探测结果并不简单对应）推动了NLP里以“探针”分析表示的研究风潮。",
+  "background": "[[skip-thought]]、[[infersent]]、[[quick-thoughts]]等通用句向量在下游任务上越来越好，引出一个疑问：Ray Mooney曾说“你没法把整句话的意思塞进一个该死的向量里”，那这些向量究竟塞进了什么？视觉和语音领域已有用线性分类器[[probing-classifiers]]探查中间层的做法；NLP中也有零星的辅助预测任务分析，但缺少一套覆盖表层、句法、语义多个层次、可控又可复现的测试。",
+  "method": "10个探测任务分三类，每个都从书籍语料中自动构造、控制了词汇与长度等干扰因素：\n\n- **表层**：句子长度（SentLen，分6档）、某个词是否在句中（WC，从1000个中频词中预测）；\n- **句法**：相邻两词是否被交换（BShift）、成分句法树深度（TreeDepth）、句子顶层成分序列（TopConst，如“NP VP .”）；\n- **语义**：主句动词时态（Tense）、主语单复数（SubjNum）、宾语单复数（ObjNum）、某个名词或动词是否被随机替换（SOMO）、并列从句顺序是否被颠倒（CoordInv）。\n\n对每种句子编码器，冻结它产生的句向量，在上面训练一个小的分类器（逻辑回归或单隐层MLP），测试准确率。被考察的编码器有三种结构（BiLSTM最大池化、Gated ConvNet、层次卷积）乘以八种训练目标（如Skip-Thought式生成、自编码、多种翻译方向、自然语言推理），并与词向量平均、随机初始化编码器等基线比较。",
+  "results": "论文发现若干有意思的现象（原文摘要所言“揭示编码器与训练方法的有趣性质”）：例如简单的词向量平均在“含某词”任务上很强却几乎不知道词序；随机初始化、未训练的BiLSTM也能编码不少表层与句法信息；用机器翻译训练的编码器在多数探测任务上表现较好；各项探测结果与下游任务成绩之间的相关性并不一致（具体准确率未在此引用）。",
+  "legacy": "探测任务成为理解表示的标准分析方法：[[structural-probe]]（2019）进一步探测BERT中的句法树结构，大量“BERTology”研究沿用了“冻结表示、训练小分类器”的范式。随后的研究也指出探针本身的问题：分类器太强时可能自己学会了任务，于是出现控制任务、信息论探测等更严格的方法。",
+  "limits": [
+    {"text": "探针准确率高只说明信息“可被提取”，不代表模型在下游任务中真的使用了这些信息。", "solved_by": []},
+    {"text": "用MLP等较强分类器时，可能是探针自己学会了任务，难以区分表示与探针各自的贡献。", "solved_by": ["structural-probe"]}
+  ],
+  "relations": [
+    {"to": "probing-classifiers", "type": "extends", "note": "把用线性分类器探查中间表示的做法系统化，设计成覆盖表层、句法、语义的10个NLP探测任务。"},
+    {"to": "infersent", "type": "uses", "note": "被探测的编码器之一，同一第一作者的BiLSTM最大池化结构与自然语言推理训练目标。"},
+    {"to": "skip-thought", "type": "uses", "note": "Skip-Thought式的上下文句生成是被比较的训练目标之一。"},
+    {"to": "fastsent", "type": "extends", "note": "延续Hill等对句表示的系统比较，但从下游任务转向可控的单一性质探测。"}
+  ],
+  "prereq": ["embedding", "logistic-regression", "mlp", "constituency-parsing", "benchmark"],
+  "terms": [
+    {"t": "探测任务", "d": "专门设计的简单分类任务，只检查表示中是否含有某一种信息，如句子长度或主语单复数。"},
+    {"t": "BShift", "d": "随机交换句中相邻两个词，判断句子是否被动过，用来测试表示对词序的敏感程度。"},
+    {"t": "SOMO", "d": "随机把句中一个名词或动词换成同词性的另一个词，判断句子是否被改动（Semantic Odd Man Out）。"}
+  ],
+  "learn": "先读[[probing-classifiers]] → 读本文第2节任务设计与第4节结果分析 → 动手：用SentEval自带的探测数据，比较GloVe平均向量与一个句向量模型在SentLen、BShift、TreeDepth上的准确率。",
+  "check": {"source": "https://aclanthology.org/P18-1198/", "confirmed": "ACL Anthology与原文PDF：标题、作者Conneau、Kruszewski、Lample、Barrault、Baroni，ACL 2018（2018年7月）；摘要：下游任务难以推断表示包含什么信息，引入10个捕捉句子简单语言学特征的探测任务，研究三种编码器以八种方式训练得到的嵌入；引言引用Ray Mooney的名言。arXiv 1805.01070 v1提交于2018-05-03（已核对）。10个任务的名称、三类划分、编码器与训练目标清单、具体发现凭一般了解，未逐项对照结果表。"}
+}

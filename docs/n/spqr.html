@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SpQR稀疏-量化表示（2023） · AI脉络</title>
+<meta name="description" content="把大模型量化到每参数3–4比特后能放进笔记本和手机，但精度损失明显，对最适合端侧部署的1B–10B小模型尤其严重。 找出并单独隔离那些量化误差特别大的离群权重，用高精度稀疏格式保存它们，其余权重用很小分组的3–4比特量化，从而在相近压缩率下做到近无损。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/spqr.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SpQR稀疏-量化表示（2023）">
+<meta property="og:description" content="把大模型量化到每参数3–4比特后能放进笔记本和手机，但精度损失明显，对最适合端侧部署的1B–10B小模型尤其严重。 找出并单独隔离那些量化误差特别大的离群权重，用高精度稀疏格式保存它们，其余权重用很小分组的3–4比特量化，从而在相近压缩率下做到近无损。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/spqr.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/spqr">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 低比特量化</div>
+<h1>SpQR稀疏-量化表示</h1>
+<div class="full">SpQR: A Sparse-Quantized Representation for Near-Lossless LLM Weight Compression</div>
+<div class="meta"><span>2023.06</span><span>论文</span><span>延伸</span><span>ICLR 2024</span><span>Tim Dettmers, Ruslan Svirschevski, Vage Egiazarian, Denis Kuznedelev, Elias Frantar, Saleh Ashkboos, Alexander Borzunov, Torsten Hoefler et al. · 华盛顿大学、Yandex、IST Austria、ETH Zürich</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2306.03078" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/spqr">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>把大模型量化到每参数3–4比特后能放进笔记本和手机，但精度损失明显，对最适合端侧部署的1B–10B小模型尤其严重。</p></div><div><h4>方法</h4><p>找出并单独隔离那些量化误差特别大的离群权重，用高精度稀疏格式保存它们，其余权重用很小分组的3–4比特量化，从而在相近压缩率下做到近无损。</p></div><div><h4>影响</h4><p>把“离群权重单独处理”的思路从激活推进到权重，与<a class="ln" href="../n/squeezellm.html">SqueezeLLM稠密加稀疏量化</a>的稠密加稀疏分解同期，成为极低比特权重量化的常见对照方法。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>SpQR在<a class="ln" href="../n/gptq.html">GPTQ训练后量化</a>的逐列量化与误差补偿框架上做了三点改动。第一，非常小的分组（如每16个权重一组）各自有缩放因子和零点，而这些量化参数本身再用3比特二次量化，以控制额外开销。第二，在量化过程中根据每个权重造成的误差（用二阶信息估计）识别离群权重，把它们从量化矩阵中移出，以16位精度、按CSR一类的稀疏格式单独存储，通常只占权重的约1%。第三，配套一个高效的GPU推理算法，在解码时同时处理稠密低比特部分和稀疏高精度部分。</p><p>摘要称SpQR首次在各种规模的LLM上实现了近无损压缩，同时压缩率与以往方法相近；论文报告，对LLaMA与Falcon模型，相对困惑度损失可低于1%。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>稀疏离群部分需要专门的内核，推理实现比纯稠密低比特格式复杂，主流推理引擎支持有限。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/llm-int8.html">LLM.int8()与离群特征</a><span class="yr">2022.08 · 系统·效率</span><div class=nt>LLM.int8()对激活离群维度用高精度计算，SpQR把类似的离群处理用到权重上。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/gptq.html">GPTQ训练后量化</a><span class="yr">2022.10 · 系统·效率</span><div class=nt>在GPTQ的逐列量化与误差补偿基础上加入小分组与离群权重隔离。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/squeezellm.html">SqueezeLLM稠密加稀疏量化</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>同期的稠密加稀疏量化方案，SqueezeLLM用非均匀量化与敏感度加权。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/awq.html">AWQ激活感知量化</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>AWQ通过缩放保护重要通道，而不是把离群权重单独存储。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/quantization-concept.html">量化</a> <a class="chip c" href="../c/jacobian-hessian.html">雅可比矩阵与海森矩阵</a> <a class="chip c" href="../c/memory-bandwidth.html">显存、内存带宽与“内存墙”</a></p>
+
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/gptq.html">GPTQ训练后量化</a>；读论文第3节离群权重的识别与存储格式；动手用官方代码量化一个7B模型到约3.5比特，与GPTQ同比特下比较困惑度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2306.03078" rel="noopener">https://arxiv.org/abs/2306.03078</a>（标题、作者（9位，列前8位）、arXiv v1 2023-06-05；摘要中3–4比特时1–10B小模型精度损失、SpQR新格式、识别并隔离离群权重、首次跨规模近无损且压缩率相近。LLaMA与Falcon上相对困惑度损失&lt;1%、33B模型可在24GB消费级GPU上运行、GPU推理比16位基线更快且压缩超过4倍。小分组与二次量化、约1%离群比例、ICLR 2024、机构凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SpQR%E7%A8%80%E7%96%8F-%E9%87%8F%E5%8C%96%E8%A1%A8%E7%A4%BA%EF%BC%88spqr%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aspqr%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/spqr.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="lmdeploy.html"><small>本分支上一个 · 2023.06</small><b>LMDeploy与TurboMind</b></a><a class="r" href="oft.html"><small>本分支下一个 · 2023.06</small><b>OFT正交微调</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

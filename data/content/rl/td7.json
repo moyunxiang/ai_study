@@ -1,0 +1,35 @@
+{
+  "id": "td7",
+  "who": "Scott Fujimoto, Wei-Di Chang, Edward J. Smith, Shixiang Shane Gu, Doina Precup, David Meger · McGill University, Mila, Google DeepMind",
+  "venue": "NeurIPS 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2306.02451"},
+    {"label": "GitHub", "url": "https://github.com/sfujim/TD7"}
+  ],
+  "problem": "表示学习在图像任务里早已是标配，但在关节角、速度这类低维状态的物理控制任务上几乎没人用；同时，深度RL训练中策略好坏剧烈波动，最后一刻的策略往往不是最好的。",
+  "idea": "提出SALE：学一个同时编码状态与动作的嵌入，训练目标是在嵌入空间里预测下一状态的嵌入；再把它和改进的优先回放、策略检查点结合进TD3，得到TD7（TD3 + 4个改进）。",
+  "impact": "在低维连续控制上大幅超过TD3和SAC，让“即使状态本身已经很紧凑，学到的状态—动作表示仍然有用”成为共识；它的设计又直接演化为同一作者的通用无模型算法MR.Q。",
+  "background": "[[td3]]和[[sac]]是连续控制的主力算法，网络直接以原始状态为输入。图像任务里，[[spr]]、[[curl]]等辅助表示学习显著提高了样本效率，但人们通常认为低维状态已经是好表示，不需要再学。另一个实践问题是：RL的策略在训练过程中性能波动很大，评测时用最后的参数常常比之前某个时刻差，而监督学习里常用的“保存验证集上最好的检查点”在RL中没有现成的对应。",
+  "method": "**SALE（state-action learned embeddings）**：两个编码器 `z^s = f(s)` 与 `z^{sa} = g(z^s, a)`，训练目标是动力学预测：\n\n`L = ‖ g(f(s), a) − sg(f(s′)) ‖²`\n\n其中sg表示停止梯度。价值网络与策略网络的输入是原始状态（和动作）与这些嵌入的拼接，嵌入用一个延迟更新的副本以保持稳定，并对嵌入做AvgL1归一化。作者系统研究了嵌入的设计空间：预测目标、是否端到端、归一化方式、输入如何拼接等，指出哪些选择最关键。\n\n**另外三项改进**：用LAP（损失调整的优先经验回放，[[per]]的改进版）采样；对价值目标做裁剪，防止外推出过大值；**策略检查点**——每隔若干回合评估当前策略，只有它比已保存的策略更好才替换，评测时使用保存的那个。离线设定下再加一项TD3+BC式的行为克隆项（参考[[td3-bc]]）。",
+  "results": "摘要称：在OpenAI Gym基准任务上，TD7相对于TD3在30万步和500万步时的平均性能提升分别为276.7%和50.7%，在线与离线设定下都适用。原文报告它在D4RL离线基准上也与当时的强方法相当。",
+  "legacy": "TD7把“基于模型的表示目标 + 无模型的价值学习”这一组合引入低维控制，同一作者随后的[[mr-q]]把SALE推广为近似线性化价值函数的表示，用一套超参数覆盖Gym、DMC和Atari。策略检查点也被一些后续工作当作稳定评测的技巧。",
+  "limits": [
+    {"text": "只在低维状态的连续控制上验证，离散动作和图像输入下是否同样有效没有检验。", "solved_by": ["mr-q"]},
+    {"text": "组合了多项改进，每项都带新超参数；策略检查点需要额外的评估回合，在交互昂贵的场景中代价不小。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "td3", "type": "extends", "note": "以TD3为骨架，加入SALE表示、LAP回放、价值裁剪和策略检查点四项改进。"},
+    {"to": "per", "type": "uses", "note": "采用优先经验回放的改进版LAP，按TD误差调整采样概率与损失。"},
+    {"to": "td3-bc", "type": "uses", "note": "离线设定下加入TD3+BC式的行为克隆正则项。"},
+    {"to": "spr", "type": "extends", "note": "沿用“在隐空间预测下一状态表示”的自监督目标，把它从图像任务搬到低维状态任务。"},
+    {"to": "sac", "type": "rivals", "note": "作为另一条主流连续控制算法的强基线，TD7在Gym任务上明显超过它。"}
+  ],
+  "prereq": ["actor-critic", "td-error", "feature-representation", "self-supervised", "on-off-policy"],
+  "terms": [
+    {"t": "状态—动作嵌入", "d": "把状态和动作一起编码成一个向量，让它包含“在这个状态做这个动作会导致什么”的信息。"},
+    {"t": "策略检查点", "d": "训练中定期评估策略，只保留表现最好的一份参数用于部署，避免最后时刻的性能波动。"}
+  ],
+  "learn": "先熟悉[[td3]]；读原文第4节SALE的设计空间研究和第5节策略检查点；在HalfCheetah上分别跑TD3和加了SALE的TD3，观察早期样本效率的差别。",
+  "check": {"source": "https://arxiv.org/abs/2306.02451", "confirmed": "标题、作者（Fujimoto, Chang, Smith, Gu, Precup, Meger）、arXiv v1于2023-06-04；摘要中低维状态环境的表示学习常被忽视、SALE建模状态与动作交互的嵌入、研究嵌入的设计空间、SALE与RL检查点结合进TD3得到TD7、Gym上相对TD3在300k/5M步平均提升276.7%/50.7%、在线与离线都适用。动力学预测损失、AvgL1归一化、LAP、价值裁剪、离线BC项、D4RL结果、NeurIPS 2023与机构按原文正文和通行引用。"},
+  "aka": ["TD7", "SALE", "State-Action Learned Embeddings", "For SALE", "状态动作表示学习", "TD3+SALE"]
+}

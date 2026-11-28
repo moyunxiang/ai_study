@@ -1,0 +1,33 @@
+{
+  "id": "fastsent",
+  "who": "Felix Hill, Kyunghyun Cho, Anna Korhonen · 剑桥大学、纽约大学",
+  "venue": "NAACL 2016",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/N16-1162/"}
+  ],
+  "aka": ["FastSent", "SDAE句向量", "顺序去噪自编码器", "Sequential Denoising Autoencoder", "无监督句向量比较", "Hill et al. 2016", "Learning Distributed Representations of Sentences"],
+  "problem": "无监督词向量已经有成熟做法，但从无标注文本学句子表示的方法五花八门（Skip-Thought、段落向量、自编码器、词向量平均），哪种更好、好在什么场景，没人做过系统比较；Skip-Thought又要训练好几周。",
+  "idea": "在同一套有监督分类与无监督相似度评测上系统比较多种句表示模型，并提出两个新目标：极简的FastSent（用句子词向量之和预测相邻句子中的词）和顺序去噪自编码器SDAE（从打乱、删词的句子重建原句）。",
+  "impact": "得出至今常被引用的结论：最优句表示取决于用途——深而复杂的模型适合作为有监督系统的特征，浅层对数双线性模型（如词向量相加）更适合直接用余弦距离比较相似度；这推动了后来句向量研究把“迁移分类”和“语义相似度”分开评测。",
+  "background": "[[skip-thought]]（2015）用编码器—解码器根据一句话生成前后句，得到通用句向量，但训练要数周；[[doc2vec]]为每段文本学一个向量；也有人直接把[[word2vec]]词向量相加或平均。另一方面，[[infersent]]之前还没有统一的句向量评测框架，各论文在不同任务上报告结果，难以比较。",
+  "method": "论文提出两个新模型：\n\n- **FastSent**：一句话的表示就是其中词向量之和 `s_i = Σ_{w∈S_i} u_w`。训练目标模仿Skip-Thought，但用词袋代替序列解码：让 `s_i` 去预测前一句和后一句里的每个词，`L = −Σ_{w∈S_{i−1}∪S_{i+1}} log softmax(s_i · v_w)`。变体FastSent+AE还要求预测本句自己的词。模型只是一层对数双线性结构，几小时即可训练完。\n- **SDAE（顺序去噪自编码器）**：对输入句子施加噪声——每个词以概率p删除、相邻词以概率q交换——再用LSTM编码器—解码器重建原句。它不需要句子的上下文顺序，可用于任意句子集合。\n\n评测分两组：一组是把句向量作为特征训练分类器（情感、主观性、问题类型、复述识别等）；另一组是无监督的句子相似度（SICK、STS 2014），直接用余弦距离与人工评分比较。参与比较的还有Skip-Thought、段落向量、词向量平均、有监督训练的字典模型等。",
+  "results": "主要发现（原文摘要）：最优方法取决于应用场景——作为有监督系统特征时，更深、更复杂的模型（如Skip-Thought、SDAE）更好；需要用简单空间距离解码时，浅层对数双线性模型（FastSent、词向量和）最好。FastSent在无监督相似度任务上表现突出，训练时间只占Skip-Thought的很小一部分。",
+  "legacy": "这项比较直接影响了后续句向量研究的评测方式：SentEval（Conneau与Kiela，2018）把迁移分类与语义相似度任务统一打包，[[infersent]]、[[quick-thoughts]]、[[sentence-bert]]都按两类任务报告结果。“简单的词向量加权平均是很强的基线”这一观察也被[[sif]]进一步强化。",
+  "limits": [
+    {"text": "FastSent把句子当作词袋，完全丢失词序，无法区分“狗咬人”和“人咬狗”。", "solved_by": ["infersent", "sentence-bert"]},
+    {"text": "没有一个模型能同时在有监督迁移和无监督相似度两类评测上都最好，通用句向量的问题没有解决。", "solved_by": ["sentence-bert", "simcse"]}
+  ],
+  "relations": [
+    {"to": "skip-thought", "type": "solves", "note": "保留“用一句话预测相邻句”的目标，但用词袋代替序列解码，把数周的训练缩短到数小时。"},
+    {"to": "doc2vec", "type": "rivals", "note": "段落向量是被比较的无监督句表示之一。"},
+    {"to": "word2vec", "type": "extends", "note": "FastSent本质上是把CBOW/skip-gram的对数双线性结构从词推广到句子之间。"},
+    {"to": "lstm", "type": "uses", "note": "SDAE用LSTM编码器—解码器从加噪句子重建原句。"}
+  ],
+  "prereq": ["embedding", "autoencoder", "encoder-decoder", "softmax", "self-supervised"],
+  "terms": [
+    {"t": "对数双线性模型", "d": "输出分数是两个向量的点积再经softmax的浅层模型，如word2vec。"},
+    {"t": "去噪自编码器", "d": "故意破坏输入（删词、换序），训练模型恢复原样，从而学到更稳健的表示。"}
+  ],
+  "learn": "先读[[skip-thought]] → 读本文第2节两个新模型与第4节结果表 → 动手：用gensim训练word2vec后，把句中词向量相加作句向量，在STS数据上算余弦与人工评分的Spearman相关，再与Skip-Thought对比。",
+  "check": {"source": "https://aclanthology.org/N16-1162/", "confirmed": "ACL Anthology与原文PDF：标题、作者Hill（剑桥）、Cho（纽约大学）、Korhonen（剑桥）、NAACL 2016（2016年6月）；摘要：系统比较从无标注数据学习短语与句子表示的模型，最优方法取决于应用，更深更复杂的模型适合有监督系统，浅层对数双线性模型适合用简单空间距离解码的表示空间，提出两个在训练时间、领域可移植性与性能间权衡的新无监督目标。FastSent与SDAE的具体公式、噪声参数和评测任务清单凭一般了解。"}
+}

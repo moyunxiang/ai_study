@@ -1,0 +1,33 @@
+{
+  "id": "decision-pretrained-transformer",
+  "who": "Jonathan N. Lee, Annie Xie, Aldo Pacchiano, Yash Chandak, Chelsea Finn, Ofir Nachum, Emma Brunskill · Stanford University, Microsoft Research, Google DeepMind",
+  "venue": "NeurIPS 2023",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2306.14892"}
+  ],
+  "problem": "大Transformer在语言中能上下文学习，决策问题里能否也做到：给模型看一段交互记录，它就能在新任务上探索并改进？算法蒸馏需要完整的RL学习历史作为训练数据，成本高，也说不清模型学到的是什么算法。",
+  "idea": "提出Decision-Pretrained Transformer（DPT）：在大量任务上做监督预训练，输入一个查询状态和一段该任务的交互数据集（上下文），让模型预测该查询状态下的**最优动作**。训练标签只要最优动作，不要学习历史。",
+  "impact": "证明这种简单的监督预训练能让Transformer在上下文中做RL——在线时会探索、离线时会保守，并在理论上等价于贝叶斯后验采样，是上下文强化学习（in-context RL）方向的重要基础工作。",
+  "background": "[[rl2]]用循环网络在多任务上元学习，使网络的隐状态承担学习算法的角色；[[algorithm-distillation]]让Transformer模仿RL算法的完整学习历史，从而在上下文中复现“越学越好”的过程，但需要大量完整的学习曲线作为数据。另一方面，[[psrl]]等后验采样算法有很好的理论保证，却需要显式的贝叶斯推断。作者想要一个只需最优动作标签、又能解释其行为的预训练方法。",
+  "method": "预训练数据来自一个任务分布：对每个任务τ，采样一段交互数据集 `D = {(s_j, a_j, r_j, s′_j)}`（可以来自随机或其他策略），一个查询状态 `s_query`，以及该任务在 `s_query` 下的最优动作 `a*`。训练目标是\n\n`max_θ  E_{τ, D, s_query}[ log M_θ( a* | s_query, D ) ]`\n\nM_θ是因果Transformer，D中的转移作为上下文token。部署时有两种用法：\n\n- **离线**：给定一个固定数据集作为上下文，直接对每个状态取模型输出的动作；\n- **在线**：从空上下文开始，按模型输出的动作分布采样执行，把新得到的转移不断加入上下文。\n\n理论上，作者证明当预训练任务分布与测试一致时，按M_θ的输出分布采样动作，就等价于以D为观测的**后验采样**：模型隐式地推断任务的后验并按“该动作是最优的概率”行动。由此可以把后验采样的遗憾界迁移到DPT上，并证明它可以比生成预训练数据的算法学得更快。",
+  "results": "摘要称：预训练的Transformer能在上下文中解决一系列RL问题（老虎机与MDP），在线时表现出探索、离线时表现出保守，而训练时并未显式要求这些行为；模型能泛化到预训练分布之外的新任务，并能自动适应未知的结构（例如线性老虎机的结构）；理论上DPT可以视为贝叶斯后验采样的高效实现，作者据此给出遗憾保证，并证明它可以比生成预训练数据所用的算法学得更快。",
+  "legacy": "DPT与[[algorithm-distillation]]一起成为上下文RL的两种基本范式；后续研究在其上讨论没有最优动作标签时怎么办、如何扩展到更大的任务与更长的上下文，以及大语言模型是否在上下文中实现了类似的后验采样。",
+  "limits": [
+    {"text": "预训练需要每个任务的最优动作标签，在复杂环境中通常拿不到，只能用近似最优的策略代替。", "solved_by": []},
+    {"text": "实验集中在老虎机和小型MDP；任务分布外的泛化和长时程问题上的效果仍有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "algorithm-distillation", "type": "rivals", "note": "算法蒸馏模仿完整的RL学习历史；DPT只需最优动作标签，并给出后验采样的理论解释。"},
+    {"to": "psrl", "type": "extends", "note": "证明DPT等价于后验采样的一种实现，并借用后验采样的遗憾分析。"},
+    {"to": "rl2", "type": "extends", "note": "同样让网络在上下文中实现学习算法，把循环网络换成Transformer并改为监督预训练。"},
+    {"to": "transformer", "type": "uses", "note": "以因果Transformer读取交互数据集作为上下文。"}
+  ],
+  "prereq": ["in-context-learning", "meta-learning", "exploration-exploitation", "conditional-bayes", "transformer-block"],
+  "terms": [
+    {"t": "上下文强化学习（in-context RL）", "d": "模型参数不变，只通过在输入中放入越来越多的交互记录，就能在新任务上表现得越来越好。"},
+    {"t": "查询状态", "d": "要求模型给出动作的那个状态；上下文中的数据集则提供关于当前任务的信息。"}
+  ],
+  "learn": "先读[[algorithm-distillation]]和[[psrl]]；读原文第3节预训练目标和第5节与后验采样的等价性；在多臂老虎机分布上训练一个小DPT，与Thompson采样比较在线累计遗憾。",
+  "check": {"source": "https://arxiv.org/abs/2306.14892", "confirmed": "标题、作者（Lee, Xie, Pacchiano, Chandak, Finn, Nachum, Brunskill）、arXiv v1于2023-06-26；摘要中研究Transformer在老虎机与MDP中的上下文学习能力、DPT给定查询状态与上下文交互数据集预测最优动作的监督预训练、在线探索与离线保守、泛化到预训练分布外的新任务并自动适应未知结构、理论上可视为贝叶斯后验采样的高效实现、遗憾保证、可比生成预训练数据的算法学得更快。训练目标写法、在线/离线部署方式、NeurIPS 2023与机构按原文正文和通行引用。"},
+  "aka": ["DPT", "Decision-Pretrained Transformer", "决策预训练Transformer", "上下文强化学习", "In-Context RL", "Supervised Pretraining Can Learn In-Context RL"]
+}

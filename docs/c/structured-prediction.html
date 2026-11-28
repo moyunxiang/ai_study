@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>结构化预测（Structured Prediction） · AI脉络</title>
+<meta name="description" content="输出不是单个标签，而是各部分相互约束的结构：标签序列、句法树、对齐、图。可能的输出随长度指数增长，所以把打分拆成局部部件，再用动态规划等算法找整体最优。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/structured-prediction.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="结构化预测（Structured Prediction）">
+<meta property="og:description" content="输出不是单个标签，而是各部分相互约束的结构：标签序列、句法树、对齐、图。可能的输出随长度指数增长，所以把打分拆成局部部件，再用动态规划等算法找整体最优。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/structured-prediction.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/structured-prediction">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 机器学习基础 · 进阶</div>
+<h1>结构化预测</h1><div class="full">Structured Prediction</div>
+<p class="muted" style="font-size:13px">也叫：结构化预测　结构预测　structured prediction　structured output prediction　结构化输出　structured output　联合解码　joint decoding　结构化SVM　structured SVM　SSVM　max-margin Markov networks　M3N　学习搜索　learning to search　标签偏置　label bias</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/structured-prediction">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>输出不是单个标签，而是各部分相互约束的结构：标签序列、句法树、对齐、图。可能的输出随长度指数增长，所以把打分拆成局部部件，再用动态规划等算法找整体最优。</b></p>
+<p class="tags">先要会：<a class="chip c" href="dynamic-programming.html">动态规划</a> <a class="chip c" href="supervised-learning.html">监督学习</a></p>
+<p>给一句话的每个词标上词性（<a class="lc" href="../c/pos-tagging.html">词性标注</a>、<a class="lc" href="../c/sequence-labeling.html">序列标注</a>），是做n次独立的分类吗？不完全是：“形容词后面跟名词”的可能性远高于“限定词后面跟动词”，各位置的标签互相影响。命名实体标注里，“I-人名”不能直接跟在“O”之后。句法分析的输出是一棵树，每条边的选择都受“必须构成合法的树”约束。这类问题叫<b>结构化预测</b>。</p><p><b>为什么难</b>。长度为n的句子，若每个词有K种标签，可能的标签序列有K^n种；一句话的可能句法树数量也随长度指数增长。不能逐个枚举打分，也不能把每种结构当作一个类别去做普通分类。</p><p><b>通用框架</b>。为输入x和候选结构y定义一个得分，并让它<b>分解</b>成局部部件之和：</p><p class="formula"><code>score(x, y) = Σ_部件 f(x, 部件)</code></p><p>序列标注的部件是“相邻两个标签”，依存句法的部件是“一条依存边”。预测就是解<code>y* = argmax_y score(x, y)</code>，借助分解可以用动态规划精确求解：序列上是<a class="ln" href="../n/viterbi.html">Viterbi算法</a>算法（见<a class="lc" href="../c/dynamic-programming.html">动态规划</a>），树上是CKY或Eisner算法，依存树还可以用最大生成树算法（<a class="ln" href="../n/mstparser.html">MSTParser与MIRA</a>）。</p><p><b>怎么学打分函数</b>。</p><ul><li><b>概率模型</b>：<a class="ln" href="../n/crf.html">条件随机场</a>把得分归一化成条件概率，用最大似然训练，需要前向—后向算法计算配分函数（见<a class="lc" href="../c/belief-propagation.html">信念传播与图模型推断</a>）；<a class="ln" href="../n/memm.html">最大熵马尔可夫模型MEMM</a>是更早的局部归一化版本，存在“标签偏置”问题。</li><li><b>基于间隔</b>：<a class="ln" href="../n/structured-perceptron.html">结构化感知机</a>预测错了就把正确结构的特征加上、错误结构的特征减掉；结构化SVM要求正确结构的得分比其他结构至少高出一个与“错得多严重”成比例的间隔（见<a class="lc" href="../c/hinge-loss.html">合页损失与间隔类损失</a>）。</li><li><b>搜索式学习</b>：把结构的构造看成一系列决策，学一个每步做选择的策略，<a class="ln" href="../n/searn.html">SEARN搜索式结构预测</a>和<a class="ln" href="../n/dagger.html">DAgger</a>属于这一路线（与<a class="lc" href="../c/imitation-learning.html">模仿学习与行为克隆</a>相通）。</li></ul><p><b>神经网络时代</b>。BiLSTM或Transformer编码器负责计算局部得分，顶层仍常接一个CRF保证输出合法，例如<a class="ln" href="../n/lample-ner.html">神经命名实体识别</a>的BiLSTM-CRF；另一种方式是把结构线性化成token序列，用<a class="ln" href="../n/seq2seq.html">Seq2Seq</a>直接生成（如把句法树写成括号串），大语言模型做信息抽取时输出JSON也属于这一类，需要<a class="lc" href="../c/structured-generation.html">结构化生成与约束解码</a>保证格式合法。</p>
+<div class="example"><h4>例子</h4><p>三个词的句子，标签集{B, I, O}共27种标签序列。若每个词的局部得分和标签转移得分已知，Viterbi算法每步只保留到达每个标签的最高分路径：计算量约<code>n × K² = 3 × 9 = 27</code>次加法与比较；句长50、标签数9时，穷举要9^50种序列，Viterbi只需约4000次运算。同时转移得分可以把“O后面接I”设为负无穷，保证输出合法。</p></div>
+<h2>容易误解的地方</h2><ul><li>局部得分各自最优的标签拼在一起，往往不是整体最优的结构，甚至不合法；这正是需要联合解码的原因。</li><li>部件选得越大（如考虑三个相邻标签），表达力越强，但动态规划的代价也随之增长，需要权衡。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

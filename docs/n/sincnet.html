@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SincNet原始波形说话人识别（2018） · AI脉络</title>
+<meta name="description" content="直接在原始波形上训练CNN做说话人识别，第一层要学大量滤波器参数，学出来的滤波器杂乱、难解释，小数据下容易过拟合。 把第一层卷积约束为参数化的sinc函数带通滤波器：每个滤波器只学低截止频率和高截止频率两个参数。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/sincnet.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SincNet原始波形说话人识别（2018）">
+<meta property="og:description" content="直接在原始波形上训练CNN做说话人识别，第一层要学大量滤波器参数，学出来的滤波器杂乱、难解释，小数据下容易过拟合。 把第一层卷积约束为参数化的sinc函数带通滤波器：每个滤波器只学低截止频率和高截止频率两个参数。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/sincnet.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/sincnet">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:168"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/speech.html">语音与音频</a> › 说话人与声音分析</div>
+<h1>SincNet原始波形说话人识别</h1>
+<div class="full">Speaker Recognition from Raw Waveform with SincNet</div>
+<div class="meta"><span>2018.07</span><span>论文</span><span>延伸</span><span>SLT 2018</span><span>Mirco Ravanelli, Yoshua Bengio · Mila</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1808.00158" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/sincnet">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>直接在原始波形上训练CNN做说话人识别，第一层要学大量滤波器参数，学出来的滤波器杂乱、难解释，小数据下容易过拟合。</p></div><div><h4>方法</h4><p>把第一层卷积约束为参数化的sinc函数带通滤波器：每个滤波器只学低截止频率和高截止频率两个参数。</p></div><div><h4>影响</h4><p>参数更少、收敛更快、滤波器有物理意义，SincNet前端后来被AASIST等反欺骗系统和多种语音任务采用。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>普通CNN第一层的每个卷积核有几百个自由参数。SincNet利用一个信号处理事实：理想带通滤波器在时域的形状是两个sinc函数之差，<code>g[n] = 2f2·sinc(2πf2·n) − 2f1·sinc(2πf1·n)</code>，只由低截止频率f1和高截止频率f2决定。于是第一层每个滤波器只学这两个数，再乘一个窗函数减少截断带来的波动。网络后续层仍是标准卷积和全连接。</p><p>这样第一层被迫学成一组覆盖不同频段的带通滤波器，更容易抓住音高、共振峰等窄带的说话人特征。作者在TIMIT和LibriSpeech上做说话人识别，SincNet比直接在波形上训练的标准CNN收敛更快、表现更好，也优于i-vector基线。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只约束了第一层，后续仍需大量数据训练；在大规模说话人验证上不如后来基于频谱特征的ECAPA-TDNN等强模型。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/ecapa-tdnn.html">ECAPA-TDNN</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:168" href="../n/i-vector.html">i-vector说话人识别</a><span class="yr">2011.05 · 语音</span><div class=nt>深度学习方法逐步替代i-vector；SincNet直接从原始波形学习，并与i-vector基线对比。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:168" href="../n/d-vector.html">d-vector说话人嵌入</a><span class="yr">2014.05 · 语音</span><div class=nt>同属用神经网络提取说话人表示的路线，把输入从手工特征换成原始波形。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/ecapa-tdnn.html">ECAPA-TDNN</a><span class="yr">2020.05 · 语音</span><div class=nt>只约束了第一层，后续仍需大量数据训练；在大规模说话人验证上不如后来基于频谱特征的ECAPA-TDNN等强模型。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/fourier-transform.html">傅里叶变换与频域</a> <a class="chip c" href="../c/waveform-spectrogram.html">波形、频谱与梅尔谱</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1808.00158" rel="noopener">https://arxiv.org/abs/1808.00158</a>（标题、两位作者、v1日期2018-07-29、SLT 2018、摘要中深度学习替代i-vector、CNN直接用原始波形、捕捉音高与共振峰等窄带特征、SincNet第一层为参数化sinc带通滤波器、只学习低高截止频率；机构、滤波器公式与窗函数、TIMIT与LibriSpeech实验、被AASIST采用来自一般了解）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SincNet%E5%8E%9F%E5%A7%8B%E6%B3%A2%E5%BD%A2%E8%AF%B4%E8%AF%9D%E4%BA%BA%E8%AF%86%E5%88%AB%EF%BC%88sincnet%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asincnet%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/sincnet.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="stargan-vc.html"><small>本分支上一个 · 2018.06</small><b>StarGAN-VC多对多变声</b></a><a class="r" href="conv-tasnet.html"><small>本分支下一个 · 2018.09</small><b>Conv-TasNet</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

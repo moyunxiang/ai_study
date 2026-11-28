@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>知识存储与提取（2023） · AI脉络</title>
+<meta name="description" content="大模型能回答“林肯生日是哪天”，但它是真的从维基百科式的文本里学会了提取知识，还是只是在训练中见过类似的问答？在真实语料上无法区分这两种情况。 构造完全可控的合成人物传记数据，先用传记预训练、再用一半人物的问答微调、在另一半人物上测试提取能力；改变传记的写法多样性，并用（近）线性探针看知识在模型内…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/physics-lm-3.1.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="知识存储与提取（2023）">
+<meta property="og:description" content="大模型能回答“林肯生日是哪天”，但它是真的从维基百科式的文本里学会了提取知识，还是只是在训练中见过类似的问答？在真实语料上无法区分这两种情况。 构造完全可控的合成人物传记数据，先用传记预训练、再用一半人物的问答微调、在另一半人物上测试提取能力；改变传记的写法多样性，并用（近）线性探针看知识在模型内…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/physics-lm-3.1.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/physics-lm-3.1">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 能力的机理</div>
+<h1>知识存储与提取</h1>
+<div class="full">Physics of Language Models: Part 3.1, Knowledge Storage and Extraction</div>
+<div class="meta"><span>2023.09</span><span>论文</span><span>延伸</span><span>ICML 2024</span><span>Zeyuan Allen-Zhu, Yuanzhi Li · Meta FAIR、MBZUAI</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2309.14316" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/physics-lm-3.1">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>大模型能回答“林肯生日是哪天”，但它是真的从维基百科式的文本里学会了提取知识，还是只是在训练中见过类似的问答？在真实语料上无法区分这两种情况。</p></div><div><h4>方法</h4><p>构造完全可控的合成人物传记数据，先用传记预训练、再用一半人物的问答微调、在另一半人物上测试提取能力；改变传记的写法多样性，并用（近）线性探针看知识在模型内部存在哪里。</p></div><div><h4>影响</h4><p>证明知识“被记住”不等于“能被提取”：只有预训练时每条知识以多种写法出现（改写、打乱句序、换说法），模型才会把知识线性地存在人名上并能用问答取出，否则无论怎么指令微调准确率都接近0。这直接支持了在预训练中改写数据、尽早混入指令数据的做法。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/lama-probe.html">语言模型即知识库</a>和<a class="ln" href="../n/knowledge-in-params.html">参数里能装多少知识</a>表明语言模型参数里存了大量事实，<a class="ln" href="../n/rome.html">ROME知识定位与编辑</a>等工作试图在参数中定位这些事实。但真实语料中，同一事实可能以问答、百科、新闻等多种形式出现，测试题也可能在训练中出现过，因此“模型从普通文本里学会提取知识”这一点从未被干净地验证。</p><h2>方法</h2><p><b>合成数据（bioS）</b>：随机生成十万量级的虚构人物，每人有出生日期、出生地、大学、专业、雇主、工作城市等属性，用模板写成传记。另有用LLaMA改写得更自然的版本（bioR）。</p><p><b>实验协议</b>：在全部人物的传记上预训练一个GPT式模型；然后只用一半人物的问答对（如“X在哪里出生？”）做指令微调；最后在另一半人物上提问。这一半人物的问答从没出现过，答对只能说明模型从传记中学会了提取。</p><p><b>变量：知识增强</b>：</p><ul><li>无增强：每人只有一篇固定写法的传记；</li><li>多重性：同一人有多篇不同模板的传记；</li><li>句子打乱：传记中句子的顺序随机；</li><li>全名替换：句子里用全名而不是代词。</li></ul><p><b>探针</b>：在预训练后的模型上，用（近）线性探针从人名词元的隐藏状态预测各属性。若能预测，说明知识被“挂”在人名上；若只能在属性出现前一位置上预测，说明知识分散存放在训练文本的上下文中，只能按原句顺序复述。</p><h2>结果</h2><p>无增强时，模型能完整背诵传记，但对未见过问答的人物提取准确率接近0，指令微调也救不回来；加入多重性、打乱或全名等增强后，提取准确率大幅提升。探针显示，有增强时知识线性编码在人名的隐藏状态中，无增强时则分散在其他词元上。作者还发现，只对部分人物（“名人”）做增强，也能提升其余人物的提取能力。作者据此建议：用小模型改写预训练数据做知识增强，并尽早在预训练阶段混入指令数据。</p><h2>后来的发展</h2><p>同系列的<a class="ln" href="../n/physics-lm-3.2.html">知识操作的局限</a>研究知识的操作，<a class="ln" href="../n/knowledge-capacity-scaling.html">知识容量规模定律</a>（3.3）测量每个参数能存多少比特知识；“预训练时改写数据以提高知识可提取性”与<a class="ln" href="../n/wrap.html">WRAP网页改写预训练</a>等改写预训练路线相互印证。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>结论来自高度规整的合成传记和中小规模模型，真实语料中知识的分布、冲突和噪声要复杂得多。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只研究单跳事实的提取，没有涉及对知识的推理、比较和反向查询。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/physics-lm-3.2.html">知识操作的局限</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/lama-probe.html">语言模型即知识库</a><span class="yr">2019.09 · LLM</span><div class=nt>从“模型里存了知识”推进到“什么条件下存下的知识能被提取”。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/rome.html">ROME知识定位与编辑</a><span class="yr">2022.02 · LLM</span><div class=nt>ROME在真实模型中定位事实所在的层，本文用探针在合成设定下观察知识挂在哪些词元上。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/knowledge-in-params.html">参数里能装多少知识</a><span class="yr">2020.02 · LLM</span><div class=nt>用可控合成数据把闭卷问答能力归因到预训练数据的多样性。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/physics-lm-3.2.html">知识操作的局限</a><span class="yr">2023.09 · LLM</span><div class=nt>在3.1确保知识可提取的设定上，进一步测试分类、比较和反向搜索等操作。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/instruction-tuning.html">指令微调与对话模板</a> <a class="chip c" href="../c/data-augmentation.html">数据增强</a> <a class="chip c" href="../c/feature-representation.html">特征与表示学习</a> <a class="chip c" href="../c/language-model.html">语言模型</a></p>
+<h2>本篇术语</h2><ul><li><b>知识提取</b>　用问答等新形式问出预训练中学到的事实，而不是按原文逐字背诵。</li><li><b>线性探针</b>　在模型的隐藏向量上训练一个线性分类器，看某种信息能否被直接读出，用来判断信息存放在哪里。</li><li><b>知识增强</b>　让同一条知识在训练数据中以多种表述出现，例如换模板、打乱句序、使用全名。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/lama-probe.html">语言模型即知识库</a>；读本文第2–4节数据构造与增强实验，再看第5节探针；动手：生成一千个虚构人物的模板传记，训练一个小GPT，比较有无改写增强时在未见人物问答上的准确率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2309.14316" rel="noopener">https://arxiv.org/abs/2309.14316</a>（标题、2位作者、arXiv首次提交2023-09-25；摘要中用受控传记数据集研究、提取能力与训练数据多样性高度相关、知识必须在预训练期间被充分增强（改写、句子打乱、翻译）才能可靠提取、否则可能被记住但无法提取且无论后续指令微调都是0%准确率、用（近）线性探针显示与知识是否线性编码在实体名隐藏嵌入中相关、建议用小模型改写预训练数据做知识增强并尽早把指令微调数据混入预训练。bioS/bioR细节、一半人物微调一半测试的协议、名人效应、ICML 2024与机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E7%9F%A5%E8%AF%86%E5%AD%98%E5%82%A8%E4%B8%8E%E6%8F%90%E5%8F%96%EF%BC%88physics-lm-3.1%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aphysics-lm-3.1%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/physics-lm-3.1.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="openchat.html"><small>本分支上一个 · 2023.09</small><b>OpenChat混合质量数据</b></a><a class="r" href="physics-lm-3.2.html"><small>本分支下一个 · 2023.09</small><b>知识操作的局限</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

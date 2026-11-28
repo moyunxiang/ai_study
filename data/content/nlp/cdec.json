@@ -1,0 +1,34 @@
+{
+  "id": "cdec",
+  "who": "Chris Dyer, Adam Lopez, Juri Ganitkevitch, Jonathan Weese, Ferhan Türe, Phil Blunsom, Hendra Setiawan, Vladimir Eidelman, Philip Resnik · 马里兰大学、爱丁堡大学、约翰斯·霍普金斯大学、牛津大学",
+  "venue": "ACL 2010（系统演示）",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/P10-4002/"}
+  ],
+  "aka": ["cdec", "cdec decoder", "cdec翻译框架", "超图翻译框架", "Dyer et al. 2010", "翻译森林"],
+  "problem": "Moses、Joshua等开源解码器把翻译模型、语言模型集成和剪枝紧紧绑在一起，想试一种新翻译模型就得连带重写重打分和剪枝；而且它们为少量稠密特征设计，难以训练百万级稀疏特征。",
+  "idea": "把所有翻译模型统一表示成“翻译森林”（超图）：模型相关的代码只负责构造森林，语言模型重打分、剪枝、推断、对齐和训练目标的梯度都作为通用算法作用在这同一种数据结构上。",
+  "impact": "成为研究导向的标准翻译框架之一，有限状态（短语式）与上下文无关（层次式、句法式）模型、词对齐、判别训练都能在同一套代码里对照实验；KenLM也集成进了cdec。",
+  "background": "到2010年，短语式（[[moses]]）和层次式（[[joshua]]）都有了开源解码器，但作者指出它们有两个设计缺陷：其一，翻译模型、语言模型集成（作者称为重打分）和剪枝算法紧耦合，探索新模型要重写大量逻辑；其二，它们围绕传统短语模型设计，通常只有不到10个稠密特征，而[[chiang-mira]]等工作已在尝试成千上万的稀疏特征。",
+  "method": "cdec的核心抽象是**超图**：节点代表“源句某个跨度被译成某一类成分”，超边代表一条规则把若干子节点组合成父节点，边上带特征向量。\n\n- **构造**：短语模型、[[hiero]]式SCFG、有限状态转换器等各自只需写出“如何从源句构造翻译森林”。\n- **通用算法**：在森林上统一实现语言模型重打分（如[[cube-pruning]]）、剪枝、Viterbi与k-best推断、计算期望和边缘概率，以及强制对齐。\n- **训练**：因为期望特征计数、条件似然、期望BLEU等训练目标及其梯度都能在超图上用内向—外向算法算出，任何模型类型都能直接用最大似然、MERT、MIRA等方法训练，并支持从少量稠密特征到上百万稀疏特征的参数化。\n\n这样新算法一实现，所有模型类型都立即受益，不同模型之间的对照实验也更公平。",
+  "results": "这是一篇系统演示论文，重点是设计：论文说明了统一数据结构如何让新模型更易原型化、让多种模型共享重打分与推断算法，并给出与已有解码器的对比说明（具体速度数字未核对，此处不写）。",
+  "legacy": "cdec被大量研究用于层次翻译、判别训练与稀疏特征、形态丰富语言和词对齐（其中的fast_align词对齐工具尤其常用，见[[fast-align]]）；[[kenlm]]集成进了它的语言模型模块。神经翻译出现后，“把结构化预测写成图上的通用推断”这一思路在神经框架中以自动微分加动态规划的形式延续。",
+  "limits": [
+    {"text": "通用的超图表示带来额外开销，在纯短语式翻译上速度不一定比专门优化的解码器快。", "solved_by": []},
+    {"text": "仍属于离散规则加线性特征的统计翻译框架，翻译质量很快被端到端神经翻译超越。", "solved_by": ["bahdanau-attention"]}
+  ],
+  "relations": [
+    {"to": "moses", "type": "solves", "note": "针对Moses把翻译模型、语言模型集成与剪枝耦合在一起的问题，用统一的翻译森林解耦。"},
+    {"to": "joshua", "type": "rivals", "note": "同为支持层次翻译的开源工具；Joshua面向SCFG翻译流水线，cdec强调所有模型共享同一种超图与训练算法。"},
+    {"to": "hiero", "type": "uses", "note": "层次短语SCFG模型是cdec支持的主要模型类型之一。"},
+    {"to": "cube-pruning", "type": "uses", "note": "在翻译森林上用立方剪枝做语言模型重打分。"},
+    {"to": "chiang-mira", "type": "extends", "note": "沿着大规模稀疏特征训练的方向，从框架层面支持百万级特征的判别训练。"}
+  ],
+  "prereq": ["context-free-grammar", "dynamic-programming", "graph-basics", "language-model", "feature-representation"],
+  "terms": [
+    {"t": "超图（翻译森林）", "d": "一条超边把多个子节点连到一个父节点，可以紧凑地表示指数级数量的翻译推导。"},
+    {"t": "内向—外向算法", "d": "在超图上用动态规划计算每条边被用到的期望次数，是计算梯度和边缘概率的基础。"}
+  ],
+  "learn": "先读[[hiero]]和[[cube-pruning]] → 读本文第3–5节超图表示与通用算法 → 动手：为一句三个词的源句手工画出层次规则构成的超图，数出它编码了多少条不同的推导。",
+  "check": {"source": "https://aclanthology.org/P10-4002/", "confirmed": "ACL Anthology与原文PDF：标题cdec: A Decoder, Alignment, and Learning Framework for Finite-State and Context-Free Translation Models、九位作者及其单位、ACL 2010系统演示（2010年7月）；正文：已有开源解码器的两个设计缺陷（翻译、语言模型集成即“重打分”与剪枝紧耦合；只适合少量稠密特征，通常少于10个），cdec中模型代码只需构造翻译森林、通用重打分剪枝推断对齐算法作用于统一结构、支持从少量稠密到数百万稀疏特征、训练目标如条件似然与期望BLEU在统一结构上计算。fast_align出自cdec（Dyer等2013）凭一般了解。"}
+}

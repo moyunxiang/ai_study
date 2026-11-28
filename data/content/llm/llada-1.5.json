@@ -1,0 +1,34 @@
+{
+  "id": "llada-1.5",
+  "who": "Fengqi Zhu, Rongzhen Wang, Shen Nie, Xiaolu Zhang, Chunwei Wu, Jun Hu, Jun Zhou, Jianfei Chen et al. · 中国人民大学高瓴人工智能学院、蚂蚁集团、清华大学",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2505.19223"},
+    {"label": "项目页", "url": "https://ml-gsai.github.io/LLaDA-1.5-Demo/"}
+  ],
+  "aka": ["LLaDA 1.5", "LLaDA-1.5", "VRPO", "Variance-Reduced Preference Optimization", "方差缩减偏好优化", "扩散语言模型DPO", "Diffusion DPO for LLM", "对偶采样"],
+  "problem": "掩码扩散语言模型（如LLaDA）算不出精确的序列对数似然，只能用ELBO的蒙特卡洛估计代替；而DPO一类偏好优化正需要对数似然之差，估计的高方差会让偏好优化的梯度又偏又抖，对齐效果很差。",
+  "idea": "形式化地分析ELBO估计的方差如何传导为偏好优化梯度的偏差和方差，给出上界；据此提出无偏的方差缩减办法：在固定采样预算下最优分配蒙特卡洛样本（多采时间步、每个时间步只采一次掩码），以及让策略模型和参考模型共用同一组随机时间步和掩码的对偶采样。",
+  "impact": "第一次系统解决扩散语言模型的偏好对齐问题，得到的LLaDA 1.5在数学、代码和对齐基准上全面超过只做SFT的LLaDA，说明扩散语言模型也能像自回归模型一样走完整的RLHF后训练流程。",
+  "background": "[[llada]]把掩码扩散做到8B规模，预训练和SFT都已可行。对齐通常用[[dpo]]：损失\n`L = −log σ( β[(log π_θ(y_w) − log π_ref(y_w)) − (log π_θ(y_l) − log π_ref(y_l))] )`\n需要四个对数似然。掩码扩散模型的对数似然没有闭式，只能用ELBO下界\n`B_π(y) = E_{t∼U(0,1)} E_{y_t∼q(y_t|t,y)} ℓ_π(y_t, t, y)`\n近似，其中ℓ是在随机掩码比例t下的加权掩码预测损失。直接把ELBO的少量样本估计代入DPO，等于在sigmoid里面塞进带噪声的量，梯度既有偏又方差大。",
+  "method": "**理论分析**：作者把DPO中的对数似然换成ELBO估计 `B̂`，证明由此产生的损失偏差和梯度方差都被“偏好分数估计的方差”控制，所以只要降低 `B̂_θ(y) − B̂_ref(y)` 的方差，就能同时降低偏差与方差。\n\n**三条方差缩减策略**：\n- 增大采样预算：每个ELBO用n个样本估计，方差约按1/n下降；\n- 最优分配：总预算n=n_t×n_yt（时间步个数×每个时间步的掩码个数）固定时，取n_t=n、n_yt=1最好，即尽量多采不同的掩码比例，每个比例只采一次掩码；\n- 对偶采样（antithetic sampling）：计算策略模型和参考模型的ELBO时，使用完全相同的随机时间步和掩码。两者高度相关，相减后共同的噪声抵消，偏好分数的方差大幅下降，而估计依旧无偏。\n\n这些做法不改变损失的期望，只降低方差，额外开销主要来自增大的采样预算。作者把这套方法称为VRPO，用它在LLaDA上训练偏好数据，得到LLaDA 1.5。",
+  "results": "LLaDA 1.5相对只做SFT的LLaDA在各类基准上稳定且显著提升：数学GSM8K +4.7，代码HumanEval +3.0、MBPP +1.8，对齐IFEval +4.0、Arena-Hard +4.3；数学表现与强的扩散语言模型和自回归模型相比也很有竞争力。",
+  "legacy": "VRPO把“偏好优化的方差来自似然估计”这一问题明确化，此后针对扩散语言模型的强化学习（如[[d1]]的思路延伸、[[llada-moe]]、[[llada-2]]的后训练）普遍在似然估计上采用共享随机性和多时间步采样等技巧。",
+  "limits": [
+    {"text": "方差缩减依赖增大蒙特卡洛预算，每条偏好对要多次前向，偏好优化的计算成本明显高于自回归模型上的DPO。", "solved_by": []},
+    {"text": "只解决了离线DPO式的偏好优化；在线强化学习（如需要大量采样的GRPO）中扩散模型的采样慢、似然估计难的问题仍然突出。", "solved_by": ["llada-2"]}
+  ],
+  "relations": [
+    {"to": "llada", "type": "extends", "note": "在LLaDA 8B SFT模型上做偏好对齐，得到LLaDA 1.5。"},
+    {"to": "dpo", "type": "solves", "note": "DPO需要精确对数似然，扩散模型只有高方差的ELBO估计；VRPO通过方差缩减让DPO在扩散模型上可用。"},
+    {"to": "mdlm", "type": "uses", "note": "使用掩码扩散的ELBO作为对数似然的替代。"},
+    {"to": "d1", "type": "rivals", "note": "d1用在线RL提升扩散模型的推理，LLaDA 1.5用方差缩减的离线偏好优化做通用对齐。"}
+  ],
+  "prereq": ["diffusion-process", "elbo", "monte-carlo", "expectation-variance", "rlhf-concept", "masked-modeling"],
+  "terms": [
+    {"t": "ELBO", "d": "对数似然的一个下界，可以用随机采样估计；扩散模型没法直接算似然时就用它代替。"},
+    {"t": "对偶采样", "d": "两个要相减的随机估计使用同一组随机数，使它们的误差高度相关、相减后抵消，从而降低差值的方差。"},
+    {"t": "方差缩减", "d": "在不改变估计期望值的前提下，用更聪明的采样方式让估计更稳定。"}
+  ],
+  "learn": "先读[[dpo]]和[[llada]]；读本文第3节偏差与方差的上界和第4节三条策略；动手：对同一条回答用不同随机种子估计ELBO，比较独立采样与对偶采样时策略减参考的差值方差。",
+  "check": {"source": "https://arxiv.org/abs/2505.19223", "confirmed": "标题、11位作者（列前8位）、arXiv首次提交2025-05-25；摘要中MDM（如LLaDA）通过RL对齐研究少、偏好优化所需的ELBO似然估计方差高、VRPO形式化分析ELBO估计方差并推导偏好优化梯度的偏差与方差界、无偏方差缩减策略包括最优蒙特卡洛预算分配与对偶采样、LLaDA 1.5相对SFT前身在GSM8K +4.7、HumanEval +3.0、MBPP +1.8、IFEval +4.0、Arena-Hard +4.3、数学表现与强MDM和ARM相比有竞争力。ELBO公式、n_t=n且n_yt=1的分配、机构为对正文的一般了解。"}
+}

@@ -1,0 +1,37 @@
+{
+  "id": "fasttext-classify",
+  "who": "Armand Joulin, Edouard Grave, Piotr Bojanowski, Tomas Mikolov · Facebook AI Research",
+  "venue": "EACL 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1607.01759"},
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/E17-2068/"},
+    {"label": "代码", "url": "https://github.com/facebookresearch/fastText"}
+  ],
+  "aka": ["fastText分类器", "fastText文本分类", "Bag of Tricks", "Bag of Tricks for Efficient Text Classification", "FastText Classifier", "Joulin et al. 2017", "n-gram特征线性分类"],
+  "problem": "2015–2016年文本分类的最好成绩来自卷积网络、循环网络等深度模型，它们训练和预测都要GPU、耗时长；可在海量文本、上万甚至几十万个类别的工业场景里，人们需要几分钟就能训练、毫秒级预测的分类器。",
+  "idea": "回到最简单的结构：把句中词向量和n元组向量取平均，接一个线性分类器；再配上层次softmax处理大量类别、用哈希技巧存储n元组，于是在普通CPU上就能极快地训练。",
+  "impact": "在多个情感和主题分类数据集上，精度与当时的深度分类器相当，训练和预测却快好几个数量级；开源的fastText工具成为工业界文本分类、语种识别和语料清洗最常用的基线之一，后来大模型预训练语料的质量过滤也常用它。",
+  "background": "文本分类的经典做法是词袋或n元组特征加线性模型，如逻辑回归、[[svm-textcat]]、[[nbsvm]]，速度快但需要手工设计特征、无法在词之间共享信息。深度方法——[[kim-cnn]]的卷积网络、[[char-cnn-text]]的字符级卷积、[[han]]等循环/注意力模型——自动学习表示，在大数据集上精度更高，但代价是训练慢、部署重。[[word2vec]]已经证明，极简的“平均向量加线性层”结构加上高效训练技巧，可以在大规模数据上学到好的表示。",
+  "method": "模型结构与word2vec的CBOW几乎一样，只是预测目标从中间词换成了文本的类别标签：\n\n- 每个词（以及可选的二元组、三元组）查一个d维向量（通常d=10），对整段文本求平均，得到文本表示 `h = (1/N) Σ_n x_n`；\n- 线性层加softmax输出类别概率，损失为负对数似然：`L = −(1/N) Σ_n y_n log softmax(B·A·x_n)`，A是词向量矩阵，B是分类权重；\n- 用异步SGD、线性衰减学习率在多核CPU上训练。\n\n两项提速技巧：\n\n- **层次softmax**：类别多（如几十万个标签）时，用按频率构造的Huffman树把输出层计算从O(k·d)降到O(d·log k)，这一技巧来自[[hierarchical-softmax]]；\n- **n元组特征加哈希**：词袋丢掉了词序，加入二元组可以部分找回局部顺序（区分“not good”与“good”）；n元组数量巨大，就用哈希把它们映射到固定数量的桶中，节省内存。",
+  "results": "在情感分析和主题分类的多个公开数据集上，加入二元组的fastText精度与字符级CNN、VDCNN等深度模型大体相当，而训练速度快好几个数量级：在标准多核CPU上不到十分钟训练超过十亿个词，并能在一分钟内把五十万个句子分到31.2万个类别中（标签预测任务，原文摘要）。",
+  "legacy": "这篇论文让“先试一个强而快的线性基线”成为文本分类的常识，也和[[nbsvm]]、[[dan]]一起提醒研究者：很多深度模型的优势并不如想象中大。fastText工具同时支持[[fasttext]]子词词向量与有监督分类，被用于语种识别（lid.176模型）、垃圾内容检测，以及CCNet、[[fineweb]]等网页语料的质量与语言过滤。预训练语言模型出现后，在精度要求高的任务上它已被[[bert]]类模型超越，但在超大规模、低延迟的场景里仍在使用。",
+  "limits": [
+    {"text": "把文本当作词和局部n元组的平均，无法建模长距离的词序与句法结构，复杂语义（反讽、多重否定）容易判错。", "solved_by": ["bert"]},
+    {"text": "从零训练的词向量只依赖标注数据，在小样本任务上不如利用无标注语料预训练的表示。", "solved_by": ["ulmfit", "bert"]}
+  ],
+  "relations": [
+    {"to": "word2vec", "type": "extends", "note": "沿用CBOW式的“向量平均加线性层”结构，把预测目标从上下文词换成文本标签。"},
+    {"to": "hierarchical-softmax", "type": "uses", "note": "用基于Huffman树的层次softmax处理数十万类别的输出层。"},
+    {"to": "char-cnn-text", "type": "rivals", "note": "与字符级CNN等深度分类器在同一批数据集上比较，精度相近而速度快几个数量级。"},
+    {"to": "nbsvm", "type": "extends", "note": "延续“n元组特征加线性模型”是强基线的观点，并用低维嵌入与哈希使其可扩展。"},
+    {"to": "fasttext", "type": "rivals", "note": "同一团队同期的另一篇fastText论文：那篇学习带子词信息的词向量，这篇做有监督文本分类，两者在同一工具中实现。"}
+  ],
+  "prereq": ["embedding", "softmax", "logistic-regression", "sgd-minibatch", "n-gram", "big-o"],
+  "terms": [
+    {"t": "哈希技巧", "d": "不为每个n元组单独建表，而是用哈希函数把它们映射到固定数量的桶，冲突的n元组共享一个向量。"},
+    {"t": "层次softmax", "d": "把类别排成一棵二叉树，预测一个类别只需沿路径做log k次二分类，而不是对全部k类求softmax。"},
+    {"t": "标签预测（tag prediction）", "d": "给每条文本预测用户打的标签，类别数可达几十万，是本文测试大规模输出的任务。"}
+  ],
+  "learn": "先复习[[word2vec]]的CBOW结构 → 读本文第2节模型与两项技巧 → 动手：pip安装fasttext，在AG News上分别用unigram和加bigram训练，记录训练秒数和准确率，再与一个小型BERT微调对比。",
+  "check": {"source": "https://arxiv.org/abs/1607.01759", "confirmed": "arXiv：标题Bag of Tricks for Efficient Text Classification、作者Joulin、Grave、Bojanowski、Mikolov，v1提交于2016-07-06；摘要：探索简单高效的文本分类基线，fastText精度常与深度学习分类器相当而训练和评测快多个数量级，标准多核CPU上不到十分钟训练十亿词以上，一分钟内把五十万句子分到31.2万类。ACL Anthology：EACL 2017短文（E17-2068）。模型公式、d=10、层次softmax与哈希细节凭一般了解；lid.176与语料过滤用途凭一般了解。"}
+}

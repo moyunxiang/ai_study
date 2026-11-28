@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>分词器的跨语言不公平（2023） · AI脉络</title>
+<meta name="description" content="大模型按词元计费、按词元限制上下文长度、按词元计算延迟，但同一段话译成不同语言后，被分词器切出的词元数可能相差很大；这种差异在模型运行之前就已经产生，却很少被量化。 用平行语料（同一内容的多语言译文）测量各种分词器在不同语言上的“分词溢价”——某语言的词元数相对英语的倍数，覆盖子词、字符级和字节级…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/tokenizer-unfairness.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="分词器的跨语言不公平（2023）">
+<meta property="og:description" content="大模型按词元计费、按词元限制上下文长度、按词元计算延迟，但同一段话译成不同语言后，被分词器切出的词元数可能相差很大；这种差异在模型运行之前就已经产生，却很少被量化。 用平行语料（同一内容的多语言译文）测量各种分词器在不同语言上的“分词溢价”——某语言的词元数相对英语的倍数，覆盖子词、字符级和字节级…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/tokenizer-unfairness.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/tokenizer-unfairness">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 子词切分</div>
+<h1>分词器的跨语言不公平</h1>
+<div class="full">Language Model Tokenizers Introduce Unfairness Between Languages</div>
+<div class="meta"><span>2023.05</span><span>论文</span><span>延伸</span><span>NeurIPS 2023</span><span>Aleksandar Petrov, Emanuele La Malfa, Philip H. S. Torr, Adel Bibi · 牛津大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2305.15425" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/tokenizer-unfairness">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>大模型按词元计费、按词元限制上下文长度、按词元计算延迟，但同一段话译成不同语言后，被分词器切出的词元数可能相差很大；这种差异在模型运行之前就已经产生，却很少被量化。</p></div><div><h4>方法</h4><p>用平行语料（同一内容的多语言译文）测量各种分词器在不同语言上的“分词溢价”——某语言的词元数相对英语的倍数，覆盖子词、字符级和字节级分词器，并讨论它对费用、延迟和可用上下文的影响。</p></div><div><h4>影响</h4><p>发现同一文本在不同语言下的分词长度最多相差15倍，专门为多语言训练的分词器也存在明显差异，字符级与字节级模型在某些语言对上也有超过4倍的差距；论文推动了“多语言公平分词”的讨论，后续大模型在扩大词表、平衡多语言语料时常引用这一问题。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/bpe.html">BPE子词切分</a>和<a class="ln" href="../n/sentencepiece.html">SentencePiece</a>按训练语料中的频率合并字符，训练语料以英语为主时，英语常用词被合并成单个词元，而低资源语言的文字只能被切成很多碎片。<a class="ln" href="../n/bbpe.html">字节级BPE（BBPE）</a>在字节上做BPE，避免了未知字符，但UTF-8中非拉丁文字本身就占多个字节。商业大模型（如<a class="ln" href="../n/gpt-4.html">GPT-4</a>）按词元计费，上下文窗口也以词元计。</p><h2>方法</h2><p><b>度量</b>：在FLORES-200这类平行语料上，对每个分词器和每种语言计算整套语料的词元数，定义该语言相对英语的<b>分词溢价</b> <code>premium(L) = |tokens(L)| / |tokens(英语)|</code>。溢价为1表示与英语同样“便宜”，为5表示同样内容要用5倍的词元。</p><p><b>被测分词器</b>：GPT-2、RoBERTa、ChatGPT/GPT-4使用的cl100k_base等英语为主的BPE分词器；mBERT、XLM-R、mT5、BLOOM等多语言模型的分词器；以及字符级（CANINE）和字节级（ByT5）模型。</p><p><b>影响分析</b>：作者把溢价换算为三方面的不平等：按词元计费的API费用、处理时间与延迟（与词元数近似成正比）、以及在固定上下文窗口中能放下的内容量（溢价为4的语言实际只有四分之一的上下文）。最后讨论训练多语言公平的子词分词器的可能做法。</p><h2>结果</h2><p>同一文本译成不同语言后，分词长度最多相差约15倍；即使是为多语言支持而训练的分词器也存在这种差异；字符级和字节级模型在某些语言对之间的编码长度也相差4倍以上（arXiv摘要）。</p><h2>后来的发展</h2><p>这项研究与同期对多语言词元化成本的研究一起，使“分词公平性”成为评估多语言大模型的一个维度；后续模型（如更大词表的多语言分词器）和若干分词改进方法都以平行语料上的词元溢价作为指标。<a class="ln" href="../n/magikarp.html">欠训练词元检测</a>等工作则从另一个角度揭示了分词器与模型训练脱节带来的问题。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只测量了词元长度差异，没有直接量化它对下游任务质量的影响。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>论文主张训练多语言公平的分词器，但没有给出并验证一个具体的公平分词算法。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/gpt-4.html">GPT-4</a><span class="yr">2023.03 · LLM</span><div class=nt>以ChatGPT/GPT-4的分词器与按词元计费为例分析费用和上下文的不平等。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/bpe.html">BPE子词切分</a><span class="yr">2015.08 · NLP</span><div class=nt>分析基于频率合并的BPE类分词器在多语言上的长度差异。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/xlm-r.html">XLM-R</a><span class="yr">2019.11 · LLM</span><div class=nt>XLM-R等多语言模型的分词器是被测对象之一。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/bbpe.html">字节级BPE（BBPE）</a><span class="yr">2019.09 · NLP</span><div class=nt>字节级BPE同样被测，显示UTF-8多字节编码让非拉丁文字天然吃亏。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/fast-wordpiece.html">Fast WordPiece线性分词</a><span class="yr">2020.12 · NLP</span><div class=nt>只加速WordPiece的贪心最长匹配，不改变切分结果本身，切分质量问题（如对罕见词、多语言的切分偏差）仍在。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/byt5.html">ByT5字节级模型</a><span class="yr">2021.05 · LLM</span><div class=nt>说明即便是字节级模型，不同语言之间的编码长度也可相差4倍以上。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/magikarp.html">欠训练词元检测</a><span class="yr">2024.05 · NLP</span><div class=nt>同属“分词器缺陷影响模型”的研究，这里关注词表与训练数据脱节导致的未训练词元。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/tokenization.html">分词与token</a> <a class="chip c" href="../c/context-window.html">上下文窗口</a> <a class="chip c" href="../c/special-tokens.html">特殊token</a> <a class="chip c" href="../c/benchmark.html">基准、排行榜与SOTA</a></p>
+<h2>本篇术语</h2><ul><li><b>分词溢价</b>　同一内容在某种语言下的词元数除以英语下的词元数，衡量该语言“贵”多少。</li><li><b>平行语料</b>　同一批句子的多种语言译文，可用来公平比较不同语言的长度。</li></ul>
+<h2>怎么学</h2><p>先了解<a class="ln" href="../n/bpe.html">BPE子词切分</a>与<a class="ln" href="../n/bbpe.html">字节级BPE（BBPE）</a> → 读本文第3节度量与第4节影响分析 → 动手：用tiktoken与XLM-R分词器，对FLORES-200中同一句话的英语、中文、阿姆哈拉语等版本计数词元，算出各自的溢价。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2305.15425" rel="noopener">https://arxiv.org/abs/2305.15425</a>（arXiv：标题Language Model Tokenizers Introduce Unfairness Between Languages、作者Petrov、La Malfa、Torr、Bibi，v1提交于2023-05-17；摘要：不同语言的处理差异在分词阶段就已产生，同一文本译成不同语言后分词长度可相差多达15倍，有意为多语言训练的分词器也存在差异，字符级与字节级模型在某些语言对上编码长度相差4倍以上，导致商业语言服务费用、处理时间与延迟、可放入上下文的内容量的不公平，主张用多语言公平的子词分词器训练未来模型。NeurIPS 2023出处、FLORES-200与被测分词器清单凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%88%86%E8%AF%8D%E5%99%A8%E7%9A%84%E8%B7%A8%E8%AF%AD%E8%A8%80%E4%B8%8D%E5%85%AC%E5%B9%B3%EF%BC%88tokenizer-unfairness%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Atokenizer-unfairness%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/tokenizer-unfairness.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="conllpp-2023.html"><small>本分支上一个 · 2022.12</small><b>CoNLL-2003模型还管用吗</b></a><a class="r" href="pruning-mbr.html"><small>本分支下一个 · 2023.11</small><b>置信剪枝加速MBR</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

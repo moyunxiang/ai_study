@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>答案选择（Answer Selection） · AI脉络</title>
+<meta name="description" content="给定一个问题和一组候选句子，把能回答问题的句子排到最前面。它是检索式问答流水线的关键一步，介于“检索相关文档”和“抽出精确答案”之间，常用MAP和MRR评测。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/answer-selection.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="答案选择（Answer Selection）">
+<meta property="og:description" content="给定一个问题和一组候选句子，把能回答问题的句子排到最前面。它是检索式问答流水线的关键一步，介于“检索相关文档”和“抽出精确答案”之间，常用MAP和MRR评测。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/answer-selection.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/answer-selection">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 入门</div>
+<h1>答案选择</h1><div class="full">Answer Selection</div>
+<p class="muted" style="font-size:13px">也叫：答案选择　答案句选择　answer selection　answer sentence selection　AS2　答案排序　answer ranking　答案重排　answer reranking　WikiQA　TREC-QA　TrecQA　InsuranceQA　句对匹配　sentence pair matching　文本匹配　text matching　问答匹配　QA matching　最佳答案预测</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/answer-selection">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>给定一个问题和一组候选句子，把能回答问题的句子排到最前面。它是检索式问答流水线的关键一步，介于“检索相关文档”和“抽出精确答案”之间，常用MAP和MRR评测。</b></p>
+<p class="tags">先要会：<a class="chip c" href="ranking-metrics.html">排序指标：NDCG、MRR与Recall@K</a> <a class="chip c" href="pretrain-finetune.html">预训练与微调</a></p>
+<p>早期的开放域问答系统（如TREC问答评测中的系统和<a class="ln" href="../n/ibm-watson.html">IBM Watson赢得Jeopardy!</a>）是一条流水线：先从海量文档中检索相关文档（见<a class="lc" href="../c/retrieval.html">检索与向量数据库</a>），再从中挑出包含答案的句子，最后从句子中抽取答案短语。中间这一步就是<b>答案选择</b>（answer sentence selection）。</p><p><b>任务形式</b>。输入问题q和候选句子集合{s₁, …, s_n}，为每个候选打一个相关分，按分数排序。有时有多个正确候选，有时一个也没有。常用数据集：</p><ul><li><b>TREC-QA</b>：来自<a class="ln" href="../n/trec.html">TREC文本检索评测</a>问答评测的事实类问题；</li><li><b>WikiQA</b>：用必应搜索日志里的真实问题，候选是维基百科摘要段的句子，大约一半的问题在候选中没有正确答案；</li><li><b>InsuranceQA</b>：保险领域的问答对，候选是长答案。</li></ul><p>评测用排序指标MAP和MRR（见<a class="lc" href="../c/ranking-metrics.html">排序指标：NDCG、MRR与Recall@K</a>）。</p><p><b>方法演变</b>。</p><ul><li><b>特征工程</b>：词重合、TF-IDF加权重合、句法树编辑距离、词向量相似度，再用排序模型组合。</li><li><b>神经句对匹配</b>：问题和句子分别编码再比较（双塔，见<a class="lc" href="../c/two-tower-model.html">双塔模型与交叉编码器</a>），或在两者之间做细粒度的交互（注意力对齐、“比较—聚合”结构，见<a class="lc" href="../c/attention-concept.html">注意力机制</a>）。</li><li><b>预训练模型</b>：把问题和候选拼成一个句对送进BERT类模型做二分类，即交叉编码器（见<a class="lc" href="../c/cross-encoder-reranking.html">交叉编码器与重排序</a>），效果大幅领先；<a class="ln" href="../n/monobert.html">BERT重排序</a>在<a class="ln" href="../n/ms-marco.html">MS MARCO</a>段落排序上展示了同样的做法。</li></ul><p><b>与相关任务的关系</b>。</p><ul><li>答案选择输出一整句，<a class="lc" href="../c/machine-reading-comprehension.html">机器阅读理解</a>（如<a class="ln" href="../n/squad.html">SQuAD</a>）输出句子里的精确片段，<a class="lc" href="../c/exact-match.html">精确匹配与token级F1</a>是后者的主要指标。</li><li>今天的检索增强生成（RAG）里，“检索器召回 → 重排器挑出最相关的段落 → 大模型据此生成回答”这一结构中，重排器做的正是答案选择的工作；<a class="ln" href="../n/drqa.html">DrQA开放域问答</a>则是“检索 + 阅读”路线的代表。</li><li>社区问答中的“最佳答案预测”、客服中的“标准回复匹配”也属于同一类问题。</li></ul>
+<div class="example"><h4>例子</h4><p>问题：“珠穆朗玛峰有多高？”候选：</p><p>1. “珠穆朗玛峰位于中国与尼泊尔边境。” 2. “2020年中尼两国公布珠峰最新高程为8848.86米。” 3. “每年有数百名登山者尝试登顶。”</p><p>只看词重合，三句都含“珠穆朗玛峰”或“珠峰”，难分高下；好的模型要认出“有多高”对应的是第2句中的数字高程，把它排第一。若排在第一位，这个问题的倒数排名为1。</p></div>
+<h2>容易误解的地方</h2><ul><li>句子里出现了问题的关键词不等于它回答了问题；很多负例正是“讨论了同一话题但没给答案”的句子。</li><li>WikiQA这类数据集中大量问题没有正确候选，评测时是否排除这些问题会显著改变MAP和MRR的数值，比较时要注意设定。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

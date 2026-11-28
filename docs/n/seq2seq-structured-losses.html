@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>经典结构化损失用于Seq2Seq（2017） · AI脉络</title>
+<meta name="description" content="序列到序列模型按词级交叉熵训练，却按BLEU、ROUGE评测并用束搜索解码；2016年前后出现了MIXER、束搜索优化等用强化学习或改造束搜索来做序列级训练的方法，但NLP里早已有的经典结构化损失放到神经模型上效果如何，没人系统比较过。 把统计NLP里训练线性结构化模型常用的几种序列级目标——序列…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/seq2seq-structured-losses.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="经典结构化损失用于Seq2Seq（2017）">
+<meta property="og:description" content="序列到序列模型按词级交叉熵训练，却按BLEU、ROUGE评测并用束搜索解码；2016年前后出现了MIXER、束搜索优化等用强化学习或改造束搜索来做序列级训练的方法，但NLP里早已有的经典结构化损失放到神经模型上效果如何，没人系统比较过。 把统计NLP里训练线性结构化模型常用的几种序列级目标——序列…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/seq2seq-structured-losses.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/seq2seq-structured-losses">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 神经机器翻译与生成</div>
+<h1>经典结构化损失用于Seq2Seq</h1>
+<div class="full">Classical Structured Prediction Losses for Sequence to Sequence Learning</div>
+<div class="meta"><span>2017.11</span><span>论文</span><span>延伸</span><span>NAACL 2018</span><span>Sergey Edunov, Myle Ott, Michael Auli, David Grangier, Marc&#x27;Aurelio Ranzato · Facebook AI Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1711.04956" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://aclanthology.org/N18-1033/" rel="noopener">ACL Anthology ↗</a><a class="btn sm" href="../index.html#/n/seq2seq-structured-losses">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>序列到序列模型按词级交叉熵训练，却按BLEU、ROUGE评测并用束搜索解码；2016年前后出现了MIXER、束搜索优化等用强化学习或改造束搜索来做序列级训练的方法，但NLP里早已有的经典结构化损失放到神经模型上效果如何，没人系统比较过。</p></div><div><h4>方法</h4><p>把统计NLP里训练线性结构化模型常用的几种序列级目标——序列级似然、间隔损失、期望风险等——原样搬到卷积序列到序列模型上，用束搜索得到的候选集近似计算，并与词级似然组合，做一次全面对照。</p></div><div><h4>影响</h4><p>发现这些经典损失彼此效果相近，都优于同等设置下的束搜索优化，在IWSLT&#x27;14德英翻译和Gigaword摘要上取得当时最好的报告结果；它让“候选集上的期望风险微调”成为序列级训练的常用简单基线。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>神经序列模型的训练与测试存在两处不一致：训练时每步都看真实前缀（<a class="ln" href="../n/scheduled-sampling.html">Scheduled Sampling与暴露偏差</a>称之为暴露偏差），而测试时看自己的输出；训练优化词级似然，评测却用BLEU。<a class="ln" href="../n/mixer.html">MIXER序列级训练</a>用REINFORCE直接优化BLEU，束搜索优化（BSO）让训练时也走束搜索，<a class="ln" href="../n/mrt-nmt.html">最小风险训练MRT</a>把统计翻译的最小风险训练用于RNN翻译。另一方面，统计翻译和句法分析早就用<a class="ln" href="../n/mert.html">最小错误率训练MERT</a>、期望风险、大间隔等目标训练结构化模型。</p><h2>方法</h2><p>对每个源句x，先用当前模型做束搜索得到候选集U(x)，再在U上计算下列序列级损失（u*是候选中与参考最接近的那一个，cost用1−句级BLEU）：</p><ul><li><b>序列级负对数似然</b>：<code>L = −log p(u*|x) + log Σ_{u∈U} p(u|x)</code>，在候选集上把概率集中到最好的候选；</li><li><b>期望风险</b>：<code>L = Σ_{u∈U} cost(t, u) · p(u|x) / Σ_{u&#x27;∈U} p(u&#x27;|x)</code>，最小化候选上BLEU代价的期望；</li><li><b>间隔类损失</b>：要求最好候选的模型分比其他候选高出与它们代价差相当的间隔（含多间隔、softmax间隔等变体）。</li></ul><p>这些损失单独使用容易不稳定，论文把它们与词级交叉熵加权组合 <code>L = α·L_token + (1−α)·L_seq</code>，并先用词级似然预训练，再做序列级微调。模型用的是<a class="ln" href="../n/convs2s.html">卷积Seq2Seq</a>卷积序列到序列结构。</p><h2>结果</h2><p>在IWSLT&#x27;14德英翻译和Gigaword生成式摘要上取得当时最好的报告结果；几种序列级损失效果相近，在可比设置下都优于束搜索优化；在更大的WMT&#x27;14英法上，期望风险最小化同样有效（论文摘要与引言所述）。</p><h2>后来的发展</h2><p>这篇论文的结论——“经典结构化损失对神经模型依然很有竞争力”——让期望风险微调成为翻译与摘要中序列级训练的标准做法之一，fairseq中也实现了相应的损失。之后的研究继续讨论序列级训练收益有限、增益部分来自正则化等问题；在大模型时代，用候选集和奖励做微调的思路又以RLHF、偏好优化等形式出现。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每个训练句都要先做束搜索生成候选，训练开销是普通词级训练的数倍。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>优化的是句级BLEU这类自动指标，BLEU的提升不一定对应人工评价的提升。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/mert.html">最小错误率训练MERT</a><span class="yr">2003.07 · NLP</span><div class=nt>统计翻译中直接优化评测指标的思路（MERT、期望风险）被移植到神经模型的训练上。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/scheduled-sampling.html">Scheduled Sampling与暴露偏差</a><span class="yr">2015.06 · NLP</span><div class=nt>序列级损失在模型自己生成的候选上训练，缓解了只在真实前缀上训练带来的暴露偏差。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/mixer.html">MIXER序列级训练</a><span class="yr">2015.11 · NLP</span><div class=nt>MIXER用强化学习做序列级训练；本文表明在候选集上直接算经典结构化损失同样有效且更简单。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/mrt-nmt.html">最小风险训练MRT</a><span class="yr">2015.12 · NLP</span><div class=nt>最小风险训练是其中的期望风险损失，本文把它与序列似然、间隔损失放在同一框架下系统比较。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/convs2s.html">卷积Seq2Seq</a><span class="yr">2017.05 · NLP</span><div class=nt>所有实验都基于同一团队的卷积序列到序列模型。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/cross-entropy.html">交叉熵</a> <a class="chip c" href="../c/expectation-variance.html">期望与方差</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/encoder-decoder.html">编码器-解码器</a> <a class="chip c" href="../c/text-metrics.html">文本生成的自动指标</a> <a class="chip c" href="../c/teacher-forcing.html">Teacher forcing与曝光偏差</a></p>
+<h2>本篇术语</h2><ul><li><b>序列级训练</b>　不是逐词计算损失，而是对整个输出序列计算损失（如按BLEU打分）来训练模型。</li><li><b>期望风险</b>　在一组候选输出上，按模型概率加权的平均代价（如1−BLEU）。</li><li><b>暴露偏差</b>　训练时模型总看到正确的前文，测试时却要接着自己可能出错的输出往下生成。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/mrt-nmt.html">最小风险训练MRT</a>和<a class="ln" href="../n/mixer.html">MIXER序列级训练</a> → 读本文第2节各损失定义与第3节组合方式 → 动手：在一个小翻译模型上用束宽5生成候选，实现期望风险损失并微调一个周期，观察BLEU与困惑度的变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://aclanthology.org/N18-1033/" rel="noopener">https://aclanthology.org/N18-1033/</a>（ACL Anthology与原文PDF：标题、五位作者（Facebook AI Research）、NAACL 2018；arXiv 1711.04956 v1提交于2017-11-14。引言：回顾NLP结构化预测中常用的目标并应用于卷积序列到序列模型，考察序列级似然、间隔损失和期望风险及其与词级似然的组合，在IWSLT&#x27;14德英和Gigaword摘要上达到当时最好报告结果，各序列级损失表现相近并优于束搜索优化，在WMT&#x27;14英法上验证风险最小化。各损失的公式写法凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E7%BB%8F%E5%85%B8%E7%BB%93%E6%9E%84%E5%8C%96%E6%8D%9F%E5%A4%B1%E7%94%A8%E4%BA%8ESeq2Seq%EF%BC%88seq2seq-structured-losses%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aseq2seq-structured-losses%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/seq2seq-structured-losses.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="artetxe-unmt.html"><small>本分支上一个 · 2017.10</small><b>无监督NMT（Artetxe）</b></a><a class="r" href="mos-softmax.html"><small>本分支下一个 · 2017.11</small><b>混合Softmax（MoS）</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

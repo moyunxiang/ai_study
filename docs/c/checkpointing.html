@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>模型检查点与容错训练（Checkpointing and Fault-Tolerant Training） · AI脉络</title>
+<meta name="description" content="训练过程中定期把模型参数、优化器状态、学习率调度和随机数状态等保存到磁盘，出故障时从最近的检查点恢复。大规模训练里硬件故障几乎每天发生，存档频率、速度和恢复流程直接决定有多少算力被浪费。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/checkpointing.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="模型检查点与容错训练（Checkpointing and Fault-Tolerant Training）">
+<meta property="og:description" content="训练过程中定期把模型参数、优化器状态、学习率调度和随机数状态等保存到磁盘，出故障时从最近的检查点恢复。大规模训练里硬件故障几乎每天发生，存档频率、速度和恢复流程直接决定有多少算力被浪费。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/checkpointing.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/checkpointing">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 系统与硬件 · 入门</div>
+<h1>模型检查点与容错训练</h1><div class="full">Checkpointing and Fault-Tolerant Training</div>
+<p class="muted" style="font-size:13px">也叫：模型检查点　checkpoint　checkpointing　检查点　存档　断点续训　resume training　容错训练　fault tolerance　fault-tolerant training　异步检查点　asynchronous checkpointing　分片检查点　sharded checkpoint　训练中断恢复</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/checkpointing">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>训练过程中定期把模型参数、优化器状态、学习率调度和随机数状态等保存到磁盘，出故障时从最近的检查点恢复。大规模训练里硬件故障几乎每天发生，存档频率、速度和恢复流程直接决定有多少算力被浪费。</b></p>
+<p class="tags">先要会：<a class="chip c" href="training-memory.html">训练显存的组成：参数、梯度、优化器状态与激活</a> <a class="chip c" href="distributed-training.html">分布式训练：数据并行与模型并行</a></p>
+<p>一次大模型训练要在几千上万张GPU上连续跑几周到几个月。卡坏、网络抖动、节点宕机在这种规模下是常态而不是意外，<a class="ln" href="../n/opt.html">OPT-175B</a>公开的训练记录显示，约两个月里因硬件故障至少人工重启了35次、更换了100多台主机。没有检查点，任何一次故障都意味着从头再来。</p><p><b>要保存什么</b>。只存模型权重不够，否则恢复后的训练与中断前不一致：</p><ul><li>模型参数（常保存FP32主权重）；</li><li>优化器状态（如Adam的两个动量，见<a class="lc" href="../c/training-memory.html">训练显存的组成：参数、梯度、优化器状态与激活</a>），大小常是参数的两倍；</li><li>学习率调度器的位置、当前步数；</li><li>数据读取的位置（已经训练过哪些数据）；</li><li>随机数生成器状态（dropout、数据打乱）。</li></ul><p>合计每个参数十几字节，一个70B模型的完整检查点约1TB量级。</p><p><b>存多频繁</b>。存得太少，出故障时丢失的工作多（平均丢失半个存档间隔）；存得太频繁，写盘本身占用时间。一个经典的近似是：最优间隔约为<code>√(2 × 一次保存的耗时 × 平均无故障时间)</code>。例如保存一次要2分钟、平均每8小时出一次故障，最优间隔约为√(2×2×480) ≈ 44分钟。</p><p><b>工程手段</b>。</p><ul><li><b>分片存储</b>：在<a class="lc" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a>中，每张卡只保存自己负责的那一份（与<a class="ln" href="../n/zero.html">ZeRO与DeepSpeed</a>、<a class="ln" href="../n/fsdp.html">PyTorch FSDP</a>的切分一致），并行写入分布式文件系统。</li><li><b>异步存档</b>：先把状态快速复制到CPU内存，训练继续进行，后台再写盘。</li><li><b>快速故障检测与恢复</b>：<a class="ln" href="../n/megascale.html">MegaScale万卡训练与容错</a>等系统专门优化了从发现故障、隔离坏节点到重新加载检查点的全过程，减少浪费的时间。</li></ul><p><b>不要和梯度检查点混淆</b>。<a class="ln" href="../n/grad-checkpointing.html">梯度检查点</a>（激活重计算）是用计算换显存的技巧，与“存档”无关，只是名字相同。另外，“checkpoint”在模型社区里也常指一个可下载的权重文件。保存多个检查点还可以做权重平均，见<a class="lc" href="../c/weight-averaging.html">权重平均</a>。</p>
+<div class="example"><h4>例子</h4><p>一个7B模型用Adam训练，完整检查点约为7×10⁹ × 16字节 ≈ 112GB。若写盘带宽为每秒2GB，同步保存需约56秒；改为先拷到CPU内存（每秒几十GB，约几秒）再异步写盘，训练只暂停几秒。若每小时存一次、平均每天出一次故障，每次故障平均损失约半小时的训练。</p></div>
+<h2>容易误解的地方</h2><ul><li>只存权重、不存优化器状态，恢复后Adam的动量从零开始，损失曲线会出现明显的尖峰。</li><li>恢复时没有跳过已训练过的数据，会让一部分数据被重复训练，影响去重和评测的公正性。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>RoPE缩放：位置插值、NTK与YaRN（RoPE Scaling: Interpolation, NTK and YaRN） · AI脉络</title>
+<meta name="description" content="让用RoPE训练的模型处理比训练时更长的文本：位置插值把位置压回训练范围，NTK感知缩放和动态NTK改基频，YaRN按频率分段处理。有的免训练，有的只需少量长文本微调。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/rope-scaling.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RoPE缩放：位置插值、NTK与YaRN（RoPE Scaling: Interpolation, NTK and YaRN）">
+<meta property="og:description" content="让用RoPE训练的模型处理比训练时更长的文本：位置插值把位置压回训练范围，NTK感知缩放和动态NTK改基频，YaRN按频率分段处理。有的免训练，有的只需少量长文本微调。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/rope-scaling.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/rope-scaling">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>RoPE缩放：位置插值、NTK与YaRN</h1><div class="full">RoPE Scaling: Interpolation, NTK and YaRN</div>
+<p class="muted" style="font-size:13px">也叫：RoPE缩放　RoPE scaling　rope_scaling　NTK感知缩放　NTK-aware scaling　NTK-aware RoPE　动态NTK　Dynamic NTK　dynamic NTK scaling　动态NTK缩放　基频调整　RoPE base　rope theta　ABF　adjusted base frequency　位置插值方法　长上下文扩展</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/rope-scaling">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>让用RoPE训练的模型处理比训练时更长的文本：位置插值把位置压回训练范围，NTK感知缩放和动态NTK改基频，YaRN按频率分段处理。有的免训练，有的只需少量长文本微调。</b></p>
+<p class="tags">先要会：<a class="chip c" href="positional-encoding.html">位置编码</a> <a class="chip c" href="context-window.html">上下文窗口</a></p>
+<p>用4K上下文训练的模型，直接喂给它16K的文本，困惑度通常会在4K之后急剧上升。原因在<a class="lc" href="../c/positional-encoding.html">位置编码</a>：<a class="ln" href="../n/rope.html">旋转位置编码RoPE</a>把位置m编码成旋转角<code>m·θ_i</code>，第i对维度的频率是<code>θ_i = b^(−2i/d)</code>（基频b通常为10000）。超过训练长度后，低频维度转到了训练中从没见过的角度，注意力分数分布随之失常。重新用长文本从头训练代价太高，于是出现了一系列“改一改旋转角”的方法（总述见<a class="lc" href="../c/rope-context-extension.html">位置编码外推与上下文扩展</a>）。</p><p><b>位置插值（PI）</b>。<a class="ln" href="../n/position-interpolation.html">位置插值扩上下文</a>把位置按比例缩小：要从L扩到s·L，就用<code>m/s</code>代替m。所有角度都回到训练见过的范围，只需约1000步的长文本微调就能把LLaMA扩展到32K。缺点是高频维度也被压缩了，相邻token之间的角度差变小，模型分辨近距离位置的能力下降。</p><p><b>NTK感知缩放</b>。不改位置，而是放大基频：<code>b&#x27; = b·s^(d/(d−2))</code>。效果是高频维度几乎不变（保留局部位置分辨率），低频维度被拉伸（相当于插值）。名字来自神经正切核理论中“高频信息难学”的启发（见<a class="lc" href="../c/infinite-width-limit.html">无限宽网络理论</a>）。它最初由社区提出，不微调就能把有效长度扩到原来的几倍。</p><p><b>动态NTK</b>。推理时根据当前序列长度n动态决定缩放比例：n不超过训练长度时不缩放，超过后按<code>s = n/L</code>实时计算新的基频。短文本上完全不损失性能，长文本上逐步插值；它是Hugging Face实现中的一个常用选项（rope_scaling类型为dynamic）。注意它会让同一位置的编码随序列长度变化，与KV缓存配合时需要小心（见<a class="lc" href="../c/kv-cache.html">KV缓存</a>）。</p><p><b>YaRN</b>。<a class="ln" href="../n/yarn.html">YaRN</a>按维度的波长分三段：波长远小于上下文的高频维度不动，波长超过上下文的低频维度做完全插值，中间平滑过渡；再给注意力logits乘一个随s增长的温度系数修正熵的变化。用很少的微调数据就能达到很好的长文本效果，被多种开源模型采用。<a class="ln" href="../n/longrope.html">LongRoPE</a>进一步用搜索为每个维度找最优的缩放因子。</p><p><b>直接调大基频</b>。另一种常见做法是在长文本继续预训练时把b从10000调大到50万甚至上百万，例如<a class="ln" href="../n/code-llama.html">Code Llama</a>把基频设为100万，<a class="ln" href="../n/llama-2-long.html">Llama 2 Long长上下文续训</a>也采用了调大基频的方案（见<a class="lc" href="../c/continual-pretraining.html">继续预训练</a>）。</p><p><b>怎么评价</b>。困惑度在长文本上不再上升只是必要条件；还要看“大海捞针”类检索和真实长文档任务的表现（见<a class="lc" href="../c/long-context-evaluation.html">长上下文评测</a>），很多方法在困惑度上看起来很好，实际却用不上远处的信息。</p>
+<div class="example"><h4>例子</h4><p>LLaMA风格模型：d = 128，训练长度4096，想扩到16384（s = 4）。</p><ul><li>位置插值：位置10000编码为10000/4 = 2500，在训练范围之内。</li><li>NTK感知：新基频<code>b&#x27; = 10000 × 4^(128/126) ≈ 10000 × 4.09 ≈ 40900</code>。最高频维度（i = 0）的θ仍是1，不受影响；最低频维度的波长被拉长约4倍。</li><li>动态NTK：序列长度不超过4096时用原基频；长度到8192时按s = 2计算基频，到16384时按s = 4计算。</li></ul></div>
+<h2>容易误解的地方</h2><ul><li>免训练的方法通常只能把有效长度扩到原来的2到4倍左右；扩更多倍一般仍需要长文本微调。</li><li>上下文窗口能“放下”多少token，与模型能否真正利用远处信息是两回事（见<a class="lc" href="../c/context-window.html">上下文窗口</a>）。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

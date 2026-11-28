@@ -1,0 +1,34 @@
+{
+  "id": "online-lda",
+  "who": "Matthew D. Hoffman, David M. Blei, Francis Bach · 普林斯顿大学、INRIA",
+  "venue": "NeurIPS 2010",
+  "links": [
+    {"label": "NeurIPS论文页", "url": "https://papers.nips.cc/paper_files/paper/2010/hash/71f6278d140af599e06ad9bf1ba03cb0-Abstract.html"}
+  ],
+  "aka": ["在线LDA", "Online LDA", "在线变分贝叶斯", "Online Variational Bayes", "随机自然梯度LDA", "Hoffman et al. 2010", "流式主题模型"],
+  "problem": "批量变分推断和Gibbs采样每次迭代都要扫一遍全部文档，面对几百万篇维基百科文章或持续到达的新闻流，训练一个主题模型要很久，甚至根本装不下。",
+  "idea": "把LDA的变分推断改写成随机优化：每次只读一小批文档，求出它们的局部变分参数，再沿“自然梯度”方向用逐渐减小的步长更新全局的主题参数，可以证明收敛到变分目标的局部最优。",
+  "impact": "单遍扫描就在330万篇维基百科文章上拟合出100个主题，质量与批量变分推断相当甚至更好、耗时只是零头；这一算法成为gensim、scikit-learn中LDA的默认实现，并被推广为通用的随机变分推断（SVI）。",
+  "background": "[[lda]]原论文用批量变分EM：E步为每篇文档优化局部变分参数（主题比例γ与词的主题分配φ），M步用所有文档的统计量更新全局的主题—词参数λ。[[collapsed-gibbs-lda]]实现更简单，但同样需要反复遍历整个语料。到2010年，可用的文本规模（整个维基百科、新闻流）已经远远超出这些批量方法的承受能力。随机梯度下降在大规模机器学习中早已证明有效，但如何把它用于贝叶斯后验推断还不清楚。",
+  "method": "全局变分参数λ（每个主题对词表的狄利克雷参数）的批量更新是：`λ = η + Σ_d (文档d的期望词—主题计数)`。在线算法的第t步：\n\n1. 从语料中取一篇（或一小批）文档d；\n2. 固定λ，像批量算法的E步一样迭代求出该文档的局部参数γ_d与φ_d；\n3. 假装整个语料由D篇与d相同的文档组成，计算中间估计 `λ̃ = η + D · (文档d的期望计数)`；\n4. 用步长 `ρ_t = (τ_0 + t)^{−κ}` 混合：`λ ← (1 − ρ_t) λ + ρ_t λ̃`。\n\n作者证明，`λ̃ − λ` 正是变分目标对λ的自然梯度的一个无偏随机估计，因此这实际上是随机自然梯度上升；当 `κ ∈ (0.5, 1]` 时满足Robbins-Monro条件，算法收敛到变分目标的局部最优。小批量与参数τ_0、κ控制早期更新的权重和遗忘速度。",
+  "results": "作者用单遍扫描在330万篇维基百科文章上拟合了100个主题的模型；在多个语料上，在线LDA找到的主题模型与批量变分推断一样好或更好（以留出困惑度衡量），而用时只是后者的一小部分（NeurIPS论文页摘要）。",
+  "legacy": "Hoffman、Blei等人在2013年把这一思路推广为[[svi]]随机变分推断，适用于一大类条件共轭的概率模型，包括[[hdp]]。在线LDA被gensim的LdaModel与scikit-learn的LatentDirichletAllocation直接实现，是工业界训练大规模主题模型最常见的方式；随机变分推断也成为后来变分自编码器等深度生成模型训练的思想来源之一。",
+  "limits": [
+    {"text": "仍只收敛到局部最优，结果对步长参数τ_0、κ和小批量大小敏感。", "solved_by": []},
+    {"text": "推导依赖条件共轭结构，不能直接用于非共轭的主题模型变体（如动态主题模型）。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "lda", "type": "solves", "note": "解决LDA批量推断无法扩展到海量和流式文档的问题。"},
+    {"to": "variational-inference", "type": "extends", "note": "把批量变分推断改造为随机自然梯度优化。"},
+    {"to": "sgd", "type": "uses", "note": "沿用随机近似的步长条件（Robbins-Monro）保证收敛。"},
+    {"to": "collapsed-gibbs-lda", "type": "rivals", "note": "Gibbs采样每轮要遍历所有词；在线变分推断单遍即可，更适合超大语料。"}
+  ],
+  "prereq": ["beta-dirichlet", "elbo", "sgd-minibatch", "learning-rate", "latent-variable", "fisher-information"],
+  "terms": [
+    {"t": "自然梯度", "d": "按参数空间中概率分布的几何（费舍尔信息）修正过的梯度，对变分参数而言更新更稳定。"},
+    {"t": "全局与局部变分参数", "d": "全局参数是所有文档共享的主题词分布，局部参数是每篇文档自己的主题比例和词的主题分配。"},
+    {"t": "Robbins-Monro条件", "d": "步长之和发散而步长平方和收敛，保证随机近似算法收敛。"}
+  ],
+  "learn": "先学[[lda]]的变分推断 → 读论文第2–3节在线算法与收敛性 → 动手：用gensim的LdaModel在维基百科的一个子集上以不同的chunksize和decay参数训练，比较留出困惑度和耗时。",
+  "check": {"source": "https://papers.nips.cc/paper_files/paper/2010/hash/71f6278d140af599e06ad9bf1ba03cb0-Abstract.html", "confirmed": "NeurIPS论文页：标题Online Learning for Latent Dirichlet Allocation、2010年；摘要：为LDA开发在线变分贝叶斯算法，基于带自然梯度步的在线随机优化，证明收敛到VB目标的局部最优，可处理大规模及流式文档，单遍在330万篇维基百科文章上拟合100主题模型，所得主题模型与批量VB一样好或更好且只用一小部分时间。作者Hoffman、Blei、Bach与单位凭一般了解；更新公式与步长形式凭一般了解（与gensim实现一致）。"}
+}

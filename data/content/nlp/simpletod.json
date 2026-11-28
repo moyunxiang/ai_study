@@ -1,0 +1,34 @@
+{
+  "id": "simpletod",
+  "who": "Ehsan Hosseini-Asl, Bryan McCann, Chien-Sheng Wu, Semih Yavuz, Richard Socher · Salesforce Research",
+  "venue": "NeurIPS 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2005.00796"}
+  ],
+  "aka": ["SimpleTOD", "Simple Task-Oriented Dialogue", "单一语言模型任务型对话", "GPT-2任务型对话", "Hosseini-Asl et al. 2020", "端到端任务型对话语言模型"],
+  "problem": "任务型对话通常拆成理解用户输入（状态追踪）、决定系统动作、生成回复三个子任务，各用一个专门模型串成流水线，结构复杂、误差逐级累积，也难以利用大规模预训练语言模型。",
+  "idea": "把对话历史、对话状态、数据库查询结果、系统动作和回复按顺序拼成一个长文本序列，用一个因果语言模型（GPT-2）统一做“预测下一个词元”，三个子任务都变成续写这段序列的不同部分。",
+  "impact": "在MultiWOZ上以一个模型同时刷新了状态追踪和端到端对话的成绩，证明“任务型对话就是条件语言建模”，此后SOLOIST、UBAR等大批工作沿用这种把对话结构序列化后交给预训练语言模型的做法。",
+  "background": "经典任务型对话系统（从[[pomdp-dialog]]到[[wen-e2e-dialog]]）都有明确的模块：对话状态追踪器从用户话语中提取槽值（如“餐厅区域=市中心”），策略模块根据状态和数据库结果决定动作（如“询问价格”），生成模块把动作变成句子。[[trade-dst]]等方法专门做状态追踪，[[multiwoz]]提供了多领域的标注数据。与此同时，[[gpt-2]]显示大规模预训练的因果语言模型能写出流畅文本，但如何把它用于需要查数据库、做决策的任务型对话，还没有简单的答案。",
+  "method": "训练时把一轮对话写成一条序列：\n\n`[对话历史 C_t] [信念状态 B_t] [数据库结果 D_t] [系统动作 A_t] [回复 S_t]`\n\n各部分用特殊标记分隔，例如信念状态写成文本“餐厅 区域 市中心 , 价格 便宜”，系统动作写成“餐厅 告知 名称 , 询问 时间”。模型就是从GPT-2初始化的因果语言模型，损失是整条序列的下一个词元预测：`L = −Σ_i log p(x_i | x_<i)`。\n\n推理时分步进行：给定历史C_t，让模型续写出信念状态B_t；用B_t去查数据库，把结果D_t拼回序列；再让模型续写出系统动作A_t和回复S_t。回复中的具体值用占位符（如[餐厅名]）表示，最后再用数据库结果填入。",
+  "results": "在MultiWOZ上，SimpleTOD的对话状态追踪联合目标准确率超过此前最好的方法，分析还显示它对噪声标注较为鲁棒；在端到端设置下，衡量动作与回复的主要指标中，告知率（inform）提高8.1点、成功率（success）提高9.7点、综合分提高7.2点。",
+  "legacy": "SimpleTOD与同期工作一起把任务型对话推向“序列化加预训练语言模型”的范式：SOLOIST进一步在大规模对话语料上预训练，UBAR把整段会话级别的状态与动作都放进上下文。大模型时代，任务型对话更多由指令微调的通用LLM配合函数调用完成，但“先生成结构化状态、再查外部数据库、再生成回复”的流程与今天的工具调用一脉相承。",
+  "limits": [
+    {"text": "所有信息都拼在一条序列里，对话轮数一多序列就很长，受限于语言模型的上下文长度。", "solved_by": []},
+    {"text": "依赖MultiWOZ式的完整状态与动作标注，换到新领域仍需要大量人工标注；生成的回复也可能与数据库事实不一致。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "gpt-2", "type": "uses", "note": "以GPT-2为初始化，把任务型对话当作条件语言建模来微调。"},
+    {"to": "multiwoz", "type": "uses", "note": "在MultiWOZ多领域任务型对话数据上训练和评测。"},
+    {"to": "trade-dst", "type": "rivals", "note": "TRADE是专门的状态追踪模型；SimpleTOD用同一个语言模型同时做状态追踪、动作决策和回复生成。"},
+    {"to": "wen-e2e-dialog", "type": "solves", "note": "端到端可训练对话系统仍由多个专门模块组成；SimpleTOD用单一模型取代流水线，减少模块间误差累积。"}
+  ],
+  "prereq": ["autoregressive", "language-model", "pretrain-finetune", "special-tokens", "transformer-block"],
+  "terms": [
+    {"t": "信念状态（对话状态）", "d": "截至当前轮，系统认为用户提出的各项约束，通常写成“领域-槽-值”的集合。"},
+    {"t": "联合目标准确率", "d": "对话状态追踪的指标：某一轮预测的全部槽值都与标注完全一致才算对。"},
+    {"t": "告知率与成功率", "d": "MultiWOZ端到端评测指标：系统是否给出了符合要求的实体，以及是否回答了用户索要的全部信息。"}
+  ],
+  "learn": "先读[[gpt-2]]和[[trade-dst]] → 读本文第3节序列格式与推理流程 → 动手：把MultiWOZ的几段对话按“历史-状态-动作-回复”格式改写成文本，用一个小型GPT-2微调，观察它续写出的状态是否正确。",
+  "check": {"source": "https://arxiv.org/abs/2005.00796", "confirmed": "arXiv：标题A Simple Language Model for Task-Oriented Dialogue、作者Hosseini-Asl、McCann、Wu、Yavuz、Socher，v1提交于2020-05-02；摘要：任务型对话常拆为理解用户输入、决定动作、生成回复三个任务，SimpleTOD用单个因果语言模型把所有子任务重写为一个序列预测问题，可利用GPT-2等预训练模型，在MultiWOZ上状态追踪联合目标准确率超过此前最好，对噪声标注鲁棒，端到端设置下inform提高8.1、success提高9.7、combined提高7.2。NeurIPS 2020出处、Salesforce单位、序列格式细节与占位符回填凭一般了解。"}
+}

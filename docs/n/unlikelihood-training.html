@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>非似然训练抑制重复（2019） · AI脉络</title>
+<meta name="description" content="用最大似然训练的语言模型，配合贪心或束搜索解码，常生成乏味、反复兜圈子的文本。top-k和核采样等解码技巧只是事后补救，没有解决模型给出的词元概率本身就不对的问题。 指出问题出在似然目标本身：它让模型给含重复和高频词的序列分配了过高概率。于是在训练目标里加一项“非似然”损失，显式压低不该出现的候选…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/unlikelihood-training.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="非似然训练抑制重复（2019）">
+<meta property="og:description" content="用最大似然训练的语言模型，配合贪心或束搜索解码，常生成乏味、反复兜圈子的文本。top-k和核采样等解码技巧只是事后补救，没有解决模型给出的词元概率本身就不对的问题。 指出问题出在似然目标本身：它让模型给含重复和高频词的序列分配了过高概率。于是在训练目标里加一项“非似然”损失，显式压低不该出现的候选…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/unlikelihood-training.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/unlikelihood-training">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 预训练目标</div>
+<h1>非似然训练抑制重复</h1>
+<div class="full">Neural Text Generation with Unlikelihood Training</div>
+<div class="meta"><span>2019.08</span><span>论文</span><span>延伸</span><span>ICLR 2020</span><span>Sean Welleck, Ilia Kulikov, Stephen Roller, Emily Dinan, Kyunghyun Cho, Jason Weston · NYU、Facebook AI Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1908.04319" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/unlikelihood-training">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>用最大似然训练的语言模型，配合贪心或束搜索解码，常生成乏味、反复兜圈子的文本。top-k和核采样等解码技巧只是事后补救，没有解决模型给出的词元概率本身就不对的问题。</p></div><div><h4>方法</h4><p>指出问题出在似然目标本身：它让模型给含重复和高频词的序列分配了过高概率。于是在训练目标里加一项“非似然”损失，显式压低不该出现的候选词（例如前文已经出现过的词）的概率，既可以在词元级做，也可以对模型自己生成的序列做。</p></div><div><h4>影响</h4><p>把“文本退化”从解码问题重新定义为训练目标问题，给出简单可用的修正：在保持困惑度的同时显著减少重复，并让普通的束搜索在人工评测中胜过核采样。非似然损失后来被广泛用于对话、对齐和负样本训练。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/gpt-2.html">GPT-2</a>一类语言模型用最大似然 <code>L_MLE = −Σ_t log p(x_t | x_&lt;t)</code> 训练。用贪心或束搜索生成时，常出现同一句话反复出现的“复读”。<a class="ln" href="../n/nucleus-sampling.html">核采样Top-p</a>（核采样）发现这一“神经文本退化”现象，并通过只在累计概率前p的词中采样来缓解，但它改的是解码，模型内部依然给重复内容过高的概率。作者统计发现，模型生成文本中的重复n元组和高频词比例远高于人类文本。</p><h2>方法</h2><p><b>词元级非似然</b>：在每个位置t，除了提高真实下一词x_t的概率，还选一组“负候选”C_t（论文中取前文已出现、且不等于x_t的词），压低它们的概率： <code>L_UL-token = −Σ_t [ log p(x_t | x_&lt;t) + α · Σ_{c∈C_t} log(1 − p(c | x_&lt;t)) ]</code> α控制惩罚强度。<code>log(1 − p)</code> 在p接近1时趋于负无穷，所以模型会被强烈地推离“重复前文的词”。</p><p><b>序列级非似然</b>：词元级只看训练文本，而退化发生在模型自己生成时。作者让模型从一段前缀出发解码出续写，找出续写中重复出现的n元组（如4元组），把属于这些重复片段的词元作为负候选，用同样的 <code>log(1 − p)</code> 项惩罚。这一步通常在似然训练之后做少量微调。</p><p><b>评测</b>：在维基百科语言建模数据上训练，测困惑度、下一词预测准确率、续写中重复4元组的比例、唯一词数等，并做人类评测对比核采样和束搜索屏蔽（beam blocking）。</p><h2>结果</h2><p>词元级和序列级非似然训练都让生成文本明显更少重复、更不乏味，同时困惑度基本保持；用标准贪心或束搜索即可得到更好的生成。人类评测中，非似然训练加标准束搜索优于当时流行的核采样和束搜索屏蔽。</p><h2>后来的发展</h2><p>非似然损失成为“压低不想要输出”的通用工具：对话模型用它抑制矛盾和不安全回复，<a class="ln" href="../n/pretraining-hf.html">带人类偏好的预训练</a>把它作为带偏好预训练的对比目标之一，偏好优化中的负样本项也与它思路相通；“退化是训练目标的问题”这一观点影响了后来对重复与模式坍缩的研究。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>负候选需要人为规定（前文出现过的词、重复n元组），只能针对重复这类容易定义的毛病，对事实错误等更复杂的问题无能为力。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>过强的惩罚会压低本应重复出现的词（人名、术语、代码变量），需要仔细调α。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>实验模型是标准的Transformer语言模型。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a><span class="yr">2019.02 · LLM</span><div class=nt>针对GPT-2式最大似然语言模型贪心解码时的复读问题。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/nucleus-sampling.html">核采样Top-p</a><span class="yr">2019.04 · 系统·效率</span><div class=nt>核采样只在解码时绕开退化；非似然训练直接修正模型给重复内容过高概率的问题。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/pretraining-hf.html">带人类偏好的预训练</a><span class="yr">2023.02 · LLM</span><div class=nt>把非似然训练作为五种对比目标之一，用来压低不良片段的概率。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/mle.html">最大似然估计</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/cross-entropy.html">交叉熵</a> <a class="chip c" href="../c/decoding-sampling.html">解码：贪心、束搜索、温度与top-p</a> <a class="chip c" href="../c/loss-function.html">损失函数</a></p>
+<h2>本篇术语</h2><ul><li><b>文本退化</b>　语言模型生成时变得乏味、反复使用同样的词句，甚至陷入循环的现象。</li><li><b>负候选</b>　训练中被认定为不该生成的词，非似然损失会主动压低它们的概率。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/nucleus-sampling.html">核采样Top-p</a>对文本退化的描述；读本文第4节两种非似然损失的公式；动手：在一个小语言模型上加入词元级非似然项微调，统计贪心续写中重复4元组的比例变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1908.04319" rel="noopener">https://arxiv.org/abs/1908.04319</a>（标题、6位作者、arXiv首次提交2019-08-12；摘要中标准似然训练与解码导致乏味重复输出、top-k与核采样为事后修补、似然目标本身给含重复与高频词的序列过高概率、提出非似然训练迫使不太可能的生成获得更低概率、词元级与序列级非似然都在保持困惑度的同时减少重复与乏味、标准贪心或束搜索生成更好、人工评测中束搜索加本方法优于核采样与束搜索屏蔽。损失公式、负候选选取、4元组、ICLR 2020与机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E9%9D%9E%E4%BC%BC%E7%84%B6%E8%AE%AD%E7%BB%83%E6%8A%91%E5%88%B6%E9%87%8D%E5%A4%8D%EF%BC%88unlikelihood-training%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aunlikelihood-training%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/unlikelihood-training.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="roberta.html"><small>本分支上一个 · 2019.07</small><b>RoBERTa</b></a><a class="r" href="albert.html"><small>本分支下一个 · 2019.09</small><b>ALBERT参数共享</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

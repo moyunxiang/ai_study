@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>近似重复检测：MinHash与SimHash（Near-Duplicate Detection: MinHash and SimHash） · AI脉络</title>
+<meta name="description" content="在海量文档中找出内容几乎相同的文本。核心是把文档压成短指纹再快速比对：MinHash估计Jaccard相似度，SimHash比较汉明距离，局部敏感哈希免去两两比较。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/near-duplicate-detection.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="近似重复检测：MinHash与SimHash（Near-Duplicate Detection: MinHash and SimHash）">
+<meta property="og:description" content="在海量文档中找出内容几乎相同的文本。核心是把文档压成短指纹再快速比对：MinHash估计Jaccard相似度，SimHash比较汉明距离，局部敏感哈希免去两两比较。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/near-duplicate-detection.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/near-duplicate-detection">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 序列与语言模型 · 进阶</div>
+<h1>近似重复检测：MinHash与SimHash</h1><div class="full">Near-Duplicate Detection: MinHash and SimHash</div>
+<p class="muted" style="font-size:13px">也叫：近似重复检测　近似去重　近重复检测　near-duplicate detection　near-dedup　near deduplication　fuzzy deduplication　模糊去重　MinHash　MinHash LSH　SimHash　局部敏感哈希　locality-sensitive hashing　LSH　Jaccard相似度　Jaccard similarity　shingling　shingle　文档指纹　document fingerprinting　汉明距离　Hamming distance　精确去重　exact deduplication</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/near-duplicate-detection">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>在海量文档中找出内容几乎相同的文本。核心是把文档压成短指纹再快速比对：MinHash估计Jaccard相似度，SimHash比较汉明距离，局部敏感哈希免去两两比较。</b></p>
+<p class="tags">先要会：<a class="chip c" href="probability-basics.html">随机变量与概率分布</a> <a class="chip c" href="dot-product.html">内积与余弦相似度</a></p>
+<p>网页上同一篇新闻被成百上千个网站转载，同一份法律模板只改了日期和人名，论坛帖子被复制粘贴到处传播。搜索引擎要避免返回十条一样的结果；大语言模型的预训练语料要去掉重复，否则模型会背下高频重复的文本、浪费算力，测试题被复制进语料还会造成污染。<a class="ln" href="../n/dedup-training-data.html">训练数据去重</a>发现，对训练数据去重后，语言模型逐字复述训练文本的情况大幅减少（另见<a class="ln" href="../n/quantifying-memorization.html">量化语言模型的记忆</a>和<a class="ln" href="../n/repeated-data-scaling.html">重复数据的规模定律</a>）。</p><p><b>精确去重</b>很简单：对每篇文档算一个哈希值（如MD5），相同即重复。难的是<b>近似重复</b>：两篇文档只差几个字、换了标点或广告，哈希值就完全不同。</p><p><b>相似度怎么定义</b>。把文档切成重叠的<b>shingle</b>（连续k个词或k个字的片段），文档就是一个shingle集合，两篇文档的相似度用Jaccard系数衡量：</p><p class="formula"><code>J(A, B) = |A ∩ B| / |A ∪ B|</code></p><p><b>MinHash</b>。对shingle集合施加一个随机哈希函数，取最小的哈希值作为签名。关键性质：两个集合的MinHash相等的概率<b>恰好等于</b>它们的Jaccard相似度。用k个独立哈希函数得到长度为k的签名，签名中相等位置的比例就是J的无偏估计（误差约按<code>1/√k</code>缩小，见<a class="lc" href="../c/monte-carlo.html">蒙特卡洛采样</a>）。</p><p><b>局部敏感哈希（LSH）</b>。即使有了短签名，十亿篇文档两两比较也是10¹⁸对。LSH把签名切成b段、每段r个值，只要某一段完全相同就把两篇文档放进同一个桶里当候选，只在桶内精确比较。选择b和r可以让“相似度高于某个阈值的文档对”以高概率成为候选，而不相似的几乎不会。</p><p><b>SimHash</b>。另一种指纹：把文档的每个特征（词及其权重）哈希成64位，按位加权求和后取符号，得到一个64位指纹。相似文档的指纹只有少数几位不同，用汉明距离（如不超过3位）判断。它对应的是余弦相似度（见<a class="lc" href="../c/dot-product.html">内积与余弦相似度</a>），谷歌曾用它在网页抓取中检测近似重复。</p><p><b>在大模型数据处理中</b>。<a class="ln" href="../n/refinedweb.html">RefinedWeb</a>、<a class="ln" href="../n/fineweb.html">FineWeb / FineWeb-Edu</a>等语料流水线普遍做MinHash去重，有的还做跨数据转储的全局去重或段落级精确子串去重（见<a class="lc" href="../c/pretraining-data.html">预训练语料的清洗、过滤与去重</a>）。语义层面的“近似”（意思相同、措辞不同）则需要用句向量和近似最近邻检索（见<a class="lc" href="../c/retrieval.html">检索与向量数据库</a>和<a class="lc" href="../c/paraphrase.html">复述识别与复述生成</a>）。</p>
+<div class="example"><h4>例子</h4><p>两句话按3个字一组切shingle：A“今天北京下大雨”得{今天北, 天北京, 北京下, 京下大, 下大雨}，B“今天北京下暴雨”得{今天北, 天北京, 北京下, 京下暴, 下暴雨}。交集3个、并集7个，J = 3/7 ≈ 0.43。用128个哈希函数做MinHash，签名大约有55个位置相同（128 × 0.43）。若阈值设为0.8，这两句不算近似重复；改为“今天北京下大雨啊”则J = 5/6 ≈ 0.83，会被判为重复。</p></div>
+<h2>容易误解的地方</h2><ul><li>阈值和shingle长度强烈影响结果：shingle太短，无关文档也会显得相似；太长，改几个字就认不出来。</li><li>去重过度会把有价值的模板化内容（如代码库里的常见函数、法律条款）也删掉，需要按数据类型分别设定。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

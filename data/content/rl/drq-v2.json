@@ -1,0 +1,35 @@
+{
+  "id": "drq-v2",
+  "who": "Denis Yarats, Rob Fergus, Alessandro Lazaric, Lerrel Pinto · New York University, Facebook AI Research",
+  "venue": "ICLR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2107.09645"},
+    {"label": "GitHub", "url": "https://github.com/facebookresearch/drqv2"}
+  ],
+  "problem": "DrQ等数据增强方法让无模型RL能直接从像素学习简单的DMC任务，但最难的人形机器人运动等任务从像素仍学不会；基于模型的DreamerV2能做得更好，计算却昂贵。",
+  "idea": "保留DrQ的随机平移增强，把底层算法从SAC换成DDPG，加上n步回报、按计划衰减的探索噪声、更大的回放池等一系列朴素但关键的改动。",
+  "impact": "第一次用无模型方法从像素解决DMC的人形机器人运动任务，多数任务在单块GPU上约8小时训完，成为视觉连续控制里最常用的高效基线，后来也是许多视觉机器人RL工作的默认底座。",
+  "background": "[[drq]]与同期的[[rad]]表明，只要对图像观测做随机平移、裁剪之类的增强，[[sac]]这样的简单算法就能在像素输入的[[dm-control]]任务上追平带辅助损失的复杂方法（如[[curl]]）。但在“困难”一档任务上，例如人形机器人行走与奔跑，DrQ依然学不会；[[dreamerv2]]这类基于世界模型的方法有进展，但训练成本高、实现复杂。作者想知道，一个简单的无模型方法还能走多远。",
+  "method": "DrQ-v2的改动都很朴素：\n\n- **换算法**：从SAC改为DDPG（带TD3式的截断双Q），去掉熵项；作者发现在像素任务上，熵自动调节会让探索不稳定。\n- **n步回报**：价值目标使用 `y = Σ_{i=0}^{n−1} γ^i r_{t+i} + γ^n min_j Q_j(s_{t+n}, a′)`（n取3），加快奖励信号传播。\n- **探索噪声调度**：动作上加高斯噪声 `a = π(s) + ε, ε ∼ N(0, σ²)`，σ按线性计划从大到小衰减，前期多探索、后期精细控制。\n- **增强**：图像四周填充4像素后随机平移，并用双线性插值使平移更平滑。\n- **工程**：更大的回放池（一百万）、更小的批量调整、更快的数据加载与混合精度。\n\n编码器只由评论家的梯度训练，演员使用停止梯度后的特征。",
+  "results": "摘要称：DrQ-v2在DeepMind Control Suite上取得最先进结果，尤其能直接从像素观测解决复杂的人形机器人运动任务，这是此前无模型RL达不到的；方法概念简单、易于实现，计算开销明显小于以往工作，多数任务在单GPU上只需训练8小时。",
+  "legacy": "DrQ-v2成为视觉RL和视觉机器人学习的默认强基线：后续的表示预训练研究（用ImageNet或人类视频预训练编码器）常在它上面替换编码器做比较；它的代码也被[[urlb]]等基准用作底层实现的参考。",
+  "limits": [
+    {"text": "只在DMC等仿真任务上验证，真实机器人中的视觉干扰与延迟问题没有涉及。", "solved_by": []},
+    {"text": "仍需要数百万帧交互才能学会困难任务，样本效率离基于模型的方法和人类水平还有差距。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "drq", "type": "extends", "note": "沿用DrQ的随机平移数据增强，把底层算法和训练细节全面改进。"},
+    {"to": "ddpg", "type": "uses", "note": "底层算法从SAC换成DDPG，并加入截断双Q与n步回报。"},
+    {"to": "dreamerv2", "type": "rivals", "note": "DreamerV2用世界模型取得像素控制的好成绩；DrQ-v2以更低算力的无模型方法在困难任务上追上或超过它。"},
+    {"to": "rad", "type": "uses", "note": "沿用RAD与DrQ共同验证的随机平移增强，并改为双线性插值的平滑版本。"},
+    {"to": "dm-control", "type": "uses", "note": "在DeepMind Control Suite的像素版本上评测，包括人形机器人任务。"}
+  ],
+  "prereq": ["actor-critic", "data-augmentation", "conv-layer", "td-error", "exploration-exploitation"],
+  "terms": [
+    {"t": "n步回报", "d": "价值目标先累加n步真实奖励，再接上第n步之后的价值估计，比单步目标更快地传播奖励。"},
+    {"t": "随机平移增强", "d": "把图像四周补边后随机裁回原尺寸，相当于把画面平移几个像素，让网络对小位置变化不敏感。"}
+  ],
+  "learn": "先读[[drq]]和[[ddpg]]；读原文第3节逐项改动和消融实验；用开源代码在walker_walk上训练，分别关掉n步回报和噪声调度，看各自影响多大。",
+  "check": {"source": "https://arxiv.org/abs/2107.09645", "confirmed": "标题、作者（Yarats, Fergus, Lazaric, Pinto）、arXiv v1于2021-07-20；摘要中DrQ-v2基于DrQ的数据增强离策略演员—评论家、若干改进带来DMC上的最先进结果、首次以无模型RL直接从像素解决复杂人形机器人运动、概念简单、计算开销小、多数任务单GPU 8小时。改用DDPG、n步回报（n=3）、噪声调度、双线性平移、回放池大小、ICLR 2022与机构按原文正文和通行引用。"},
+  "aka": ["DrQ-v2", "DrQv2", "DrQ v2", "Mastering Visual Continuous Control", "改进的数据增强RL"]
+}

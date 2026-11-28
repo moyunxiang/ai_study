@@ -1,0 +1,32 @@
+{
+  "id": "scaling-nmt",
+  "who": "Myle Ott, Sergey Edunov, David Grangier, Michael Auli · Facebook AI Research",
+  "venue": "WMT 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1806.00187"}
+  ],
+  "aka": ["Scaling NMT", "Scaling Neural Machine Translation", "大批量混合精度翻译训练", "Ott et al. 2018", "Transformer big训练配方", "fairseq Transformer recipe"],
+  "problem": "Transformer等序列到序列模型在单机上要训练好几天才能在WMT大数据集上达到最好成绩，研究迭代很慢；而当时的大批量训练和低精度训练在翻译上还缺少细致的工程配方。",
+  "idea": "把半精度浮点（FP16）训练、超大批量（通过梯度累积和多机同步）、调大学习率配合预热，以及训练流程上的若干实现细节结合起来，在不损失精度的前提下把训练提速近5倍。",
+  "impact": "在WMT'14英德上8块GPU不到5小时追平原版Transformer，128块GPU上85分钟达到29.3 BLEU的新纪录；这套配方随fairseq开源，成为此后几年训练Transformer翻译模型的标准做法。",
+  "background": "[[transformer]]（2017）在WMT'14英德上取得当时最好成绩，但big模型在8块P100上要训练3.5天。[[mixed-precision]]（2017）已说明半精度训练配合损失缩放可以保持精度，视觉领域也证明大批量配合线性放大学习率可以缩短训练；但在翻译这类变长序列任务上，这些技巧怎么组合、批量能放多大、会不会伤精度，还没有系统答案。",
+  "method": "主要做法：\n\n- **半精度训练**：前向和反向用FP16计算，主权重保留FP32副本，并做动态损失缩放防止梯度下溢；在Volta GPU的张量核心上大幅加速。\n- **大批量**：每次更新用到的词元数从约2.5万增大到数十万（如约40万词元），在单机上通过“累积多个小批量的梯度再更新一次”实现，在多机上则让梯度同步与反向计算重叠，降低通信开销。\n- **学习率**：批量增大后相应调大学习率（配合预热），作者发现大批量下可以用比原文大得多的学习率。\n- **其他细节**：按长度把句子分桶减少填充，以及数据和实现上的若干调整。\n\n这些改动不改变模型结构，只改变训练方式。",
+  "results": "在单台8-GPU机器上，精心调参后的半精度与大批量训练可提速近5倍；WMT'14英德上8块GPU不到5小时即达到Vaswani等人的精度，128块GPU上训练85分钟得到29.3 BLEU的新纪录，加入规模大得多的Paracrawl语料后提高到29.8；WMT'14英法上128块GPU训练8.5小时达到43.2 BLEU。",
+  "legacy": "这套配方被纳入[[fairseq]]，同一团队随后在[[back-translation-scale]]中用它在海量回译数据上训练，又在WMT评测中取得领先；“大批量、高学习率、半精度”也成为后来训练大型Transformer语言模型的常规设置。它也让研究者意识到，许多论文之间的差距部分来自训练配方而非模型结构。",
+  "limits": [
+    {"text": "加速依赖大量GPU和新一代张量核心硬件，资源有限的团队难以复现最快的结果。", "solved_by": []},
+    {"text": "只优化训练速度和规模，没有改变模型结构，长句、低资源语言和篇章级翻译的问题仍在。", "solved_by": ["back-translation-scale"]}
+  ],
+  "relations": [
+    {"to": "transformer", "type": "extends", "note": "不改动Transformer结构，只用新的训练配方把它的训练时间从数天缩短到数小时。"},
+    {"to": "mixed-precision", "type": "uses", "note": "采用半精度计算、FP32主权重和损失缩放的混合精度训练。"},
+    {"to": "convs2s", "type": "extends", "note": "同一团队此前的卷积序列到序列模型也在fairseq中训练，本文把加速经验推广到Transformer。"}
+  ],
+  "prereq": ["floating-point", "batch-size-epoch", "learning-rate", "distributed-training", "transformer-block", "text-metrics"],
+  "terms": [
+    {"t": "梯度累积", "d": "先算好几个小批量的梯度并相加，再做一次参数更新，相当于用更大的批量训练。"},
+    {"t": "损失缩放", "d": "半精度训练时先把损失乘一个大数再反传，避免很小的梯度变成0，更新前再除回来。"}
+  ],
+  "learn": "先读[[transformer]]与[[mixed-precision]] → 读本文第3–4节各项加速的消融 → 动手：用fairseq在IWSLT德英上分别跑FP32和FP16、不同梯度累积步数，记录每小时达到的BLEU。",
+  "check": {"source": "https://arxiv.org/abs/1806.00187", "confirmed": "arXiv：标题、作者Ott、Edunov、Grangier、Auli，v1提交于2018-06-01；摘要：降低精度与大批量训练在单台8-GPU机器上提速近5倍，WMT'14英德8块GPU不到5小时追平Vaswani等，128块GPU上85分钟得29.3 BLEU，加Paracrawl后29.8，WMT'14英法128块GPU 8.5小时43.2 BLEU。约40万词元批量、学习率设置、通信与计算重叠、WMT 2018出处与Transformer原文训练3.5天凭一般了解。"}
+}

@@ -1,0 +1,81 @@
+{
+  "id": "fast-wordpiece",
+  "who": "Xinying Song, Alex Salcianu, Yang Song, Dave Dopson, Denny Zhou · Google",
+  "venue": "EMNLP 2021",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2012.15524"
+    }
+  ],
+  "aka": [
+    "Fast WordPiece",
+    "线性时间WordPiece",
+    "LinMaxMatch",
+    "最长匹配优先",
+    "MaxMatch",
+    "Song et al. 2021",
+    "TensorFlow Text分词"
+  ],
+  "problem": "BERT使用的WordPiece在切分单个词时采用“最长匹配优先”（每次从当前位置取词表中最长的前缀），已知最好的算法复杂度是O(n²)或O(nm)（n为输入长度，m为最长词元长度）；分词在线上服务中会成为可观的延迟来源。",
+  "idea": "受Aho-Corasick多模式匹配算法启发，在词表构成的字典树（trie）上额外加入“失败链接”：当字典树匹配无法继续时，不必回到起点重新扫描，而是沿预先算好的链接直接跳到正确状态，从而把单词切分做到严格O(n)；再把预分词（按空格标点切词）与WordPiece合并为一次扫描。",
+  "impact": "在一般文本分词上平均比HuggingFace Tokenizers快8.2倍、比TensorFlow Text快5.1倍；该算法被集成进TensorFlow Text，用于Google的BERT类模型服务，是“分词算法工程优化”的代表性工作。",
+  "background": "[[wordpiece]]最早用于日韩语音搜索，后来被[[bert]]采用：给定词表，对每个词做贪心的最长前缀匹配，匹配到的词元之后的部分用“##”前缀继续匹配。朴素实现每一步都要尝试从最长到最短的候选前缀，最坏情况下对长词是平方复杂度。[[sentencepiece]]等工具解决的是训练与语言无关的问题，而不是这种贪心切分的推理速度。",
+  "method": "**LinMaxMatch**：把词表中的所有词元（含“##”续接词元）插入一棵字典树。对每个节点v，预先计算两样东西：\n\n- **失败弹出（failure pops）** `F(v)`：当在v处无法继续匹配时，应当输出的那一串词元（即最长匹配原则下此时已确定的词元）；\n- **失败链接（failure link）** `f(v)`：输出这些词元之后，应当跳到的字典树节点（对应剩余后缀在“##”子树中的匹配状态）。\n\n切分时从根开始逐字符前进；遇到无法继续的字符，就输出 `F(v)` 并跳到 `f(v)`，然后继续用同一个字符尝试。作者证明每个字符被处理的总次数有常数上界，因此单词切分是严格 `O(n)`。失败链接和弹出可在构建字典树时用广度优先遍历预计算，类似Aho-Corasick的构造。\n\n**端到端分词**：把空白与标点的预分词规则也编码进同一个自动机，一次线性扫描同时完成切词和WordPiece切分，避免两遍处理。",
+  "results": "单词切分达到严格线性时间；在一般文本分词上，平均比HuggingFace Tokenizers快8.2倍、比TensorFlow Text快5.1倍（arXiv摘要）。",
+  "legacy": "该算法被合入TensorFlow Text的FastWordpieceTokenizer。它与[[bbpe]]、[[sentencepiece]]等一起说明，分词虽然只是预处理，但在大规模推理服务中值得专门优化；后续也有针对BPE合并的线性或近线性实现。大模型时代，分词速度问题由tiktoken等高度优化的BPE库处理，同时也出现了直接在字节或字符上建模、绕开分词的方向（如[[byt5]]、[[charformer]]）。",
+  "limits": [
+    {
+      "text": "只加速WordPiece的贪心最长匹配，不改变切分结果本身，切分质量问题（如对罕见词、多语言的切分偏差）仍在。",
+      "solved_by": [
+        "tokenizer-unfairness"
+      ]
+    },
+    {
+      "text": "算法专门针对最长匹配优先，不能直接用于BPE的合并规则或Unigram的概率切分。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "wordpiece",
+      "type": "solves",
+      "note": "把WordPiece最长匹配切分从O(n²)或O(nm)降到严格的O(n)。"
+    },
+    {
+      "to": "bert",
+      "type": "uses",
+      "note": "目标是加速BERT所用的WordPiece分词。"
+    },
+    {
+      "to": "sentencepiece",
+      "type": "rivals",
+      "note": "SentencePiece面向语言无关的子词训练与切分；Fast WordPiece专注于已有WordPiece词表的推理速度。"
+    }
+  ],
+  "prereq": [
+    "tokenization",
+    "big-o",
+    "graph-basics",
+    "dynamic-programming"
+  ],
+  "terms": [
+    {
+      "t": "最长匹配优先",
+      "d": "从当前位置起，在词表中找能匹配的最长前缀作为下一个词元，又称MaxMatch。"
+    },
+    {
+      "t": "字典树（trie）",
+      "d": "把一组字符串按公共前缀合并成的树，每条从根出发的路径对应一个前缀。"
+    },
+    {
+      "t": "失败链接",
+      "d": "Aho-Corasick算法中的指针：当前匹配失败时直接跳到能继续匹配的状态，而不是回退重扫。"
+    }
+  ],
+  "learn": "先了解[[wordpiece]]的贪心切分与Aho-Corasick算法 → 读本文第3节LinMaxMatch的失败链接构造 → 动手：用Python实现朴素MaxMatch和带失败链接的版本，在一个小词表上对长词计时比较。",
+  "check": {
+    "source": "https://arxiv.org/abs/2012.15524",
+    "confirmed": "arXiv：标题Fast WordPiece Tokenization、作者Song、Salcianu、Song、Dopson、Zhou，v1提交于2020-12-31；摘要：BERT所用WordPiece对单词采用最长匹配优先（MaxMatch），已知最好算法为O(n²)或O(nm)，提出受Aho-Corasick启发、在词表字典树上增加链接的严格O(n)算法，并把预分词与线性WordPiece结合为单遍算法，一般文本分词平均比HuggingFace Tokenizers快8.2倍、比TensorFlow Text快5.1倍。EMNLP 2021出处、失败弹出与链接的具体定义、并入TensorFlow Text凭一般了解。"
+  }
+}

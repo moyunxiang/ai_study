@@ -1,0 +1,74 @@
+{
+  "id": "minhash",
+  "who": "Andrei Z. Broder · DEC系统研究中心",
+  "venue": "Compression and Complexity of SEQUENCES 1997",
+  "links": [
+    {
+      "label": "DOI",
+      "url": "https://doi.org/10.1109/SEQUEN.1997.666900"
+    }
+  ],
+  "aka": [
+    "MinHash",
+    "最小哈希",
+    "Min-wise Hashing",
+    "w-shingling",
+    "Shingling",
+    "Jaccard相似度估计",
+    "近似重复检测",
+    "Near-duplicate Detection",
+    "Broder 1997",
+    "相似文档去重"
+  ],
+  "problem": "网页搜索引擎爬到的网页里有大量“几乎相同”的副本（镜像站、只改了日期或广告的页面），逐对比较全文的代价是网页数的平方，根本不可行；需要一种能对每个文档独立计算、再快速估计两文档相似度的方法。",
+  "idea": "把文档表示为它的连续词片段（shingle）集合，用集合的交并比（Jaccard相似度）定义“相似度”；再对集合做随机排列，只保留排列后最小的那个元素——两文档最小元素相同的概率恰好等于它们的Jaccard相似度，于是用固定大小的随机样本（草图）就能估计相似度。",
+  "impact": "MinHash及其“草图”思想被AltaVista用于全网去重，成为近似重复检测、局部敏感哈希（LSH）的经典方法；直到今天，大模型预训练语料（如C4、The Pile、FineWeb等）的模糊去重仍主要靠MinHash加LSH。",
+  "background": "1990年代中期，AltaVista等搜索引擎面对几千万网页，发现其中相当比例是彼此的近似副本，既浪费索引空间也降低结果质量。传统的[[vector-space-model]]可以用余弦相似度比较文档，但需要两两计算。精确的指纹（如对全文做哈希）只能发现完全相同的副本，一个字符的改动就会让指纹完全不同。Rabin（1981）的多项式指纹提供了快速计算子串哈希的方法。",
+  "method": "**表示**：把文档切成长度为w的连续词片段（w-shingle），例如w=4时“a rose is a rose is a rose”得到{a rose is a, rose is a rose, is a rose is}。文档A对应集合S(A)。\n\n**相似度定义**：\n\n- 相似度（resemblance）`r(A,B) = |S(A) ∩ S(B)| / |S(A) ∪ S(B)|`，即Jaccard相似度；\n- 包含度（containment）`c(A,B) = |S(A) ∩ S(B)| / |S(A)|`，衡量A有多少内容出现在B中。\n\n**最小哈希估计**：取一个随机排列π（实际中用随机哈希函数近似），令 `min π(S(A))` 为A的片段在排列下的最小值。关键性质是\n\n`P[ min π(S(A)) = min π(S(B)) ] = r(A, B)`\n\n因为在并集中排第一的元素落在交集里的概率就是交集占并集的比例。用k个独立的哈希函数各取一个最小值，组成长度为k的“草图”，两份草图中相同位置相等的比例就是r(A,B)的无偏估计，误差随k增大而减小。每个文档的草图可以独立计算、固定大小，比较两文档只需比较两个短向量。论文用Rabin指纹高效地实现了片段的哈希。",
+  "results": "论文主要给出相似度与包含度的数学定义、性质证明以及基于Rabin指纹的高效抽样实现（摘要所述）；在AltaVista的实际应用规模等数字未在此引用。",
+  "legacy": "Broder等人同年在WWW会议上（与[[pagerank]]同属1990年代末搜索引擎的基础技术）发表了对整个网络做句法聚类的工作；随后出现的局部敏感哈希把MinHash草图分段做“桶”，只比较落入同一桶的文档，使去重复杂度接近线性；Charikar的SimHash给出了余弦相似度的对应方法。今天的大规模语料清洗（[[dedup-training-data]]、[[fineweb]]等）几乎都使用MinHash加LSH做模糊去重。",
+  "limits": [
+    {
+      "text": "只比较片段集合，不考虑语义：改写、翻译或换个说法的“同一内容”检测不出来。",
+      "solved_by": []
+    },
+    {
+      "text": "单靠草图仍需两两比较文档，规模很大时要再配合局部敏感哈希分桶才能接近线性复杂度。",
+      "solved_by": [
+        "dedup-training-data"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "vector-space-model",
+      "type": "rivals",
+      "note": "向量空间模型用TF-IDF加余弦度量相似度，需要两两比较；MinHash用集合的Jaccard相似度和固定大小草图独立计算。"
+    }
+  ],
+  "prereq": [
+    "probability-basics",
+    "expectation-variance",
+    "big-o",
+    "monte-carlo"
+  ],
+  "terms": [
+    {
+      "t": "Jaccard相似度",
+      "d": "两个集合交集大小除以并集大小，取值0到1，完全相同为1。"
+    },
+    {
+      "t": "shingle（片段）",
+      "d": "文档中连续的w个词组成的片段，文档被看作这些片段的集合。"
+    },
+    {
+      "t": "草图（sketch）",
+      "d": "每个文档用k个哈希函数各取最小值得到的固定长度摘要，可用于估计相似度。"
+    }
+  ],
+  "learn": "先复习集合与概率的基本性质 → 读论文第2–3节相似度定义与最小哈希性质 → 动手：用datasketch库对一批新闻做4-gram片段的MinHash（k=128），找出Jaccard相似度大于0.8的近似重复对，并与精确计算的Jaccard比较。",
+  "check": {
+    "source": "https://doi.org/10.1109/SEQUEN.1997.666900",
+    "confirmed": "Crossref与OpenAlex：标题On the resemblance and containment of documents、作者Andrei Broder、Compression and Complexity of SEQUENCES 1997；摘要：为两文档定义相似度r(A,B)与包含度c(A,B)，分别刻画“大致相同”与“大致包含”，把问题化为可对每个文档独立随机抽样估计的集合交集问题，相似度可用固定大小样本估计，讨论其数学性质并用Rabin（1981）指纹高效实现抽样。会议于1997年6月举行（日期取1997-06）；DEC SRC单位、shingle示例、最小哈希概率性质的写法、AltaVista应用与LSH后续凭一般了解。"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "id": "dependency-word-embeddings",
+  "who": "Omer Levy, Yoav Goldberg · 巴伊兰大学",
+  "venue": "ACL 2014（短文）",
+  "links": [
+    {
+      "label": "ACL Anthology",
+      "url": "https://aclanthology.org/P14-2050/"
+    }
+  ],
+  "aka": [
+    "依存上下文词向量",
+    "Dependency-Based Word Embeddings",
+    "word2vecf",
+    "DEPS词向量",
+    "句法上下文词向量",
+    "Levy & Goldberg 2014",
+    "Syntactic Contexts"
+  ],
+  "problem": "skip-gram等词向量把一个词前后k个词当作它的“上下文”，窗口里混着大量与该词无句法关系的词，也漏掉了窗口外的真正修饰成分；上下文怎么定义会如何改变词向量学到的“相似”，此前没人系统研究过。",
+  "idea": "把skip-gram负采样推广到任意上下文：以依存句法树上与词直接相连的词及其依存关系（如“scientist/nsubj”）作为上下文，训练出的向量更偏向“功能相似”（可以互相替换的词），而非“话题相关”。",
+  "impact": "揭示了上下文的选择决定了词向量编码哪种相似性，配套工具word2vecf支持任意上下文，成为研究句法词向量、上下文类型对比的标准做法。",
+  "background": "[[skip-gram-ns]]让中心词去预测窗口里的每个上下文词，训练快、效果好。但窗口是纯线性的：句子“Australian scientist discovers star with telescope”里，窗口为2时discovers的上下文是Australian、scientist、star、with，而真正的施事scientist和工具telescope中，telescope落在窗口外，with反而在里面。早期的分布式语义（如基于句法的计数向量）已有用依存关系定义上下文的传统，但还没有与神经词向量结合。",
+  "method": "skip-gram负采样的目标是让真实的（词w，上下文c）对得分 `σ(v_w·v_c)` 高、随机配对得分低：\n\n`L = Σ_{(w,c)∈D} [ log σ(v_w·v_c) + k·E_{c'~P} log σ(−v_w·v_{c'}) ]`\n\n论文指出这个目标对“上下文”是什么并不挑剔，于是把D换成依存上下文：先用依存句法分析器处理语料，对每个词w，若它有一个依存于自己、关系为r的修饰词m，就加入上下文 `m/r`；同时把w自己作为m的上下文 `w/r⁻¹`（反向关系）。对介词还做了“折叠”，把 `with` 与 `telescope` 合成 `prep_with`，让discovers直接得到上下文 `telescope/prep_with`。\n\n上下文词表因此变大（词加关系），但训练流程与word2vec相同，作者把它实现为word2vecf。",
+  "results": "定性比较显示：窗口为5的skip-gram下与Hogwarts最相近的是Dumbledore、hallows等同一话题的词，而依存上下文给出的是Sunnydale、Collinwood等其他虚构学校名，即可替换的同类词；在区分“相似”与“相关”的WordSim353相似/相关子集上，依存向量更擅长相似、窗口向量更擅长相关。作者还展示了模型能“看出”哪些上下文最具区分性（具体数字未在此引用）。",
+  "legacy": "这项工作和作者随后的[[levy-goldberg-pmi]]、[[word-embedding-lessons]]一起，帮助学界把神经词向量理解为“对词—上下文共现做矩阵分解”，上下文的定义因此成了可调的设计选择。依存上下文词向量后来被用于句法相关任务和词汇替换；上下文化表示（[[elmo]]、[[bert]]）兴起后，“不同层、不同上下文编码不同性质”的讨论延续了这里的思路。",
+  "limits": [
+    {
+      "text": "依赖依存句法分析器，分析错误会带进上下文，也很难用于缺少高质量分析器的语言。",
+      "solved_by": []
+    },
+    {
+      "text": "仍是一词一向量的静态表示，同一个词在不同句法角色和义项下共用一个向量。",
+      "solved_by": [
+        "elmo"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "skip-gram-ns",
+      "type": "extends",
+      "note": "把skip-gram负采样的上下文从线性窗口推广为任意上下文，这里取依存句法上下文。"
+    },
+    {
+      "to": "word2vec",
+      "type": "extends",
+      "note": "在word2vec代码基础上实现支持任意上下文的word2vecf。"
+    },
+    {
+      "to": "harris-distributional",
+      "type": "extends",
+      "note": "沿用分布假说，但用句法关系而非邻近位置来定义“同样的语境”。"
+    }
+  ],
+  "prereq": [
+    "embedding",
+    "distributional-hypothesis",
+    "logistic-regression",
+    "sgd-minibatch",
+    "dot-product"
+  ],
+  "terms": [
+    {
+      "t": "依存上下文",
+      "d": "依存句法树上与词直接相连的词，连同它们之间的关系标签，例如“scientist/nsubj”。"
+    },
+    {
+      "t": "功能相似与话题相关",
+      "d": "前者指可以互相替换的词（如不同学校名），后者指常在同一话题中出现的词（如学校与校长）。"
+    }
+  ],
+  "learn": "先读[[skip-gram-ns]] → 读本文第2–3节上下文构造 → 动手：用spaCy给一份小语料做依存分析，生成（词，依存上下文）对，用word2vecf或gensim自定义训练，比较与窗口向量的最近邻。",
+  "check": {
+    "source": "https://aclanthology.org/P14-2050/",
+    "confirmed": "ACL Anthology与原文PDF：标题、作者Levy与Goldberg（巴伊兰大学）、ACL 2014短文（2014年6月）；正文：skip-gram负采样在word2vec中实现、以往神经词向量的上下文为前后k个词的线性窗口，本文推广到任意上下文并使用依存上下文。Hogwarts近邻示例、介词折叠、WordSim353相似与相关子集的结论及word2vecf名称凭一般了解（原文表格未逐项核对）。"
+  }
+}

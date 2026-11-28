@@ -1,0 +1,33 @@
+{
+  "id": "matching-the-blanks",
+  "who": "Livio Baldini Soares, Nicholas FitzGerald, Jeffrey Ling, Tom Kwiatkowski · Google Research",
+  "venue": "ACL 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1906.03158"}
+  ],
+  "aka": ["Matching the Blanks", "MTB", "BERT-EM", "实体标记", "Entity Markers", "关系表示预训练", "Baldini Soares et al. 2019", "空白匹配"],
+  "problem": "通用的关系抽取器希望能表示任意关系，但已有做法要么用关系的表面文字表示关系，要么把文字与已有知识图谱的关系联合嵌入，都难以推广到没见过的关系；有监督的关系分类又需要大量标注。",
+  "idea": "把Harris的分布假说推广到关系：如果两句话提到同一对实体，它们很可能表达相同的关系。于是只用实体链接过的网页文本，以“两句话是否包含同一对实体”为信号预训练BERT的关系表示；训练时随机把实体换成[BLANK]，迫使模型看上下文而不是记实体名。",
+  "impact": "得到的任务无关关系表示在少样本关系抽取基准FewRel上，即使不用该任务的训练数据也显著超过以往方法；用它初始化再微调，在SemEval-2010 Task 8、KBP37和TACRED上都超过此前方法。论文对“如何从BERT取关系表示”的比较（实体标记+实体起始位置拼接）成为后续关系抽取的标准做法。",
+  "background": "[[zeng-cnn-re]]、[[pcnn]]等神经关系抽取依赖位置嵌入与标注或远程监督数据；[[distant-supervision]]假设“包含同一实体对的句子都表达知识库中的关系”，噪声很大。[[bert]]（2018）提供了强大的上下文表示，但怎样从中得到“两个实体之间关系”的表示，还没有系统研究。",
+  "method": "**关系表示的结构**：作者比较了多种从BERT中取关系表示的方式，最好的是在输入中用特殊标记把两个实体包起来——`[E1] 实体1 [/E1] … [E2] 实体2 [/E2]`——然后把 `[E1]` 和 `[E2]` 这两个起始标记位置的输出向量拼接，作为关系表示 `r`。\n\n**Matching the Blanks预训练**：从维基百科等实体链接过的文本中取句子，每句标出两个实体。对两句话 r 和 r′，若它们包含同一对实体（链接到同一知识库实体），则为正例，否则为负例；损失为\n\n`L = −Σ [ δ log σ(f(r)ᵀ f(r′)) + (1 − δ) log(1 − σ(f(r)ᵀ f(r′))) ]`\n\n为防止模型只靠记住实体名完成任务，以一定概率（如0.7）把句中的实体替换为特殊的 `[BLANK]` 符号，模型只能依赖实体之间的上下文来判断两句是否描述相同关系。预训练同时保留BERT的掩码语言模型目标。负例主要取“共享一个实体但另一个不同”的难负例。",
+  "results": "在少样本关系抽取基准FewRel上，即使不使用其训练数据，所学关系表示也显著优于以往工作；用它初始化并在SemEval-2010 Task 8、KBP37和TACRED上微调后，明显超过此前方法（arXiv摘要）。",
+  "legacy": "实体标记加起始位置拼接的做法被广泛采用，[[pure-re]]等后续模型在其基础上设计了实体与关系分开编码的流水线；“同一实体对即相似关系”的对比式预训练也启发了ERNIE、对比关系预训练（CP）等工作。大模型出现后，关系抽取越来越多地以生成或指令形式完成，但MTB式的实体标记仍常见于判别式关系抽取模型。",
+  "limits": [
+    {"text": "“同一实体对表达相同关系”的假设并不总成立（同一对人物可能是同事也可能是夫妻），预训练信号带噪声。", "solved_by": []},
+    {"text": "需要大规模实体链接过的文本作为预训练数据，且预训练代价高。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "bert", "type": "extends", "note": "在BERT上加入实体标记并做关系导向的继续预训练。"},
+    {"to": "distant-supervision", "type": "extends", "note": "借用“共享实体对的句子表达相同关系”的思想，但不依赖知识库的关系标签，只比较两句是否共享实体对。"},
+    {"to": "zeng-cnn-re", "type": "solves", "note": "CNN关系分类需要大量标注；MTB预训练的关系表示在少样本甚至零训练数据时就有效。"},
+    {"to": "harris-distributional", "type": "extends", "note": "把分布假说从词推广到关系：出现在相似上下文中的实体对关系相似。"}
+  ],
+  "prereq": ["pretrain-finetune", "contrastive-learning", "special-tokens", "self-supervised", "zero-few-shot"],
+  "terms": [
+    {"t": "实体标记", "d": "在输入句子中用特殊符号把两个目标实体包起来，告诉模型要抽取的是哪两个实体之间的关系。"},
+    {"t": "少样本关系抽取", "d": "每种关系只给少量（如1个或5个）例句，要求模型判断新句子属于哪种关系，FewRel是代表性基准。"}
+  ],
+  "learn": "先读[[bert]]与[[zeng-cnn-re]] → 读本文第3节关系表示结构比较与第4节预训练 → 动手：在TACRED或SemEval数据上用BERT加实体标记微调，比较用[CLS]与用[E1][E2]拼接作为关系表示的效果。",
+  "check": {"source": "https://arxiv.org/abs/1906.03158", "confirmed": "arXiv：标题Matching the Blanks: Distributional Similarity for Relation Learning、作者Baldini Soares、FitzGerald、Ling、Kwiatkowski，v1提交于2019-06-07；摘要：基于把Harris分布假说推广到关系的思想和BERT等文本表示进展，只从实体链接文本构建任务无关的关系表示，在基于示例的关系抽取（FewRel）上即使不用该任务训练数据也显著优于以往，用其初始化并在SemEval 2010 Task 8、KBP37、TACRED上微调显著超过以往方法。ACL 2019出处、实体标记结构、[BLANK]替换概率与损失写法凭一般了解。"}
+}

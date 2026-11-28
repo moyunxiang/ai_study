@@ -1,0 +1,32 @@
+{
+  "id": "skywork-moe",
+  "who": "Tianwen Wei, Bo Zhu, Liang Zhao, Cheng Cheng, Biye Li, Weiwei Lü, Peng Cheng, Jianhao Zhang et al. · 昆仑万维天工",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2406.06563"}
+  ],
+  "aka": ["Skywork-MoE", "天工MoE", "门控logit归一化", "Gating Logit Normalization", "自适应辅助损失", "Adaptive Auxiliary Loss", "Upcycling vs From Scratch"],
+  "problem": "训练MoE大模型时，有两个反复出现的实际问题：已有一个好的稠密模型，是拿它“升级”成MoE还是从头训练；以及路由器输出过于平均、专家分不开，而统一的负载均衡损失系数又难以同时照顾所有层。",
+  "idea": "以天工13B稠密模型为起点训练146B参数、16个专家的Skywork-MoE，系统比较升级与从头训练，并提出两个技巧：在softmax前对门控logit做归一化和放大，让路由更果断；按层根据丢弃率自适应调整辅助损失系数。",
+  "impact": "给出一份公开的大规模MoE训练经验报告：升级与否取决于稠密检查点的质量和MoE训练预算；门控logit归一化和逐层自适应辅助损失两个小改动简单可复用，被后续MoE工程讨论引用。",
+  "background": "[[sparse-upcycling]]提出把训练好的稠密模型复制成多个专家来初始化MoE，比从头训练省；[[mixtral]]的成功让MoE成为开源大模型的热门选择。但升级出来的专家起点完全相同，容易长期相似、分工不明；负载均衡损失（[[switch-transformer]]）的系数若太大会伤害模型质量、太小又会导致大量词元被丢弃，而不同层的需求不同。",
+  "method": "**升级还是从头训**：作者在不同训练预算下比较两种初始化。升级起点高、前期收益大；从头训练起点低但上限可能更高。结论是：若稠密检查点本身很强、而MoE训练预算有限，就升级；预算充足时从头训练可能更好。Skywork-MoE由[[skywork]]的13B稠密检查点升级而来。\n\n**门控logit归一化**：路由器对每个专家输出logit z，常规做法直接 `softmax(z)`。作者先对z做标准化再乘一个放大系数λ：\n`g = softmax( λ · (z − mean(z)) / std(z) )`\n这样路由分布更尖锐，不同专家的选择更明确，有助于专家分化，尤其是对起点相同的升级专家。\n\n**自适应辅助损失系数**：负载均衡辅助损失的系数不再全局固定，而是每层单独设置并在训练中调整：某层的词元丢弃率高，就加大该层的系数，丢弃率低就减小，使各层在负载均衡与模型质量之间各自取得平衡。\n\n最终模型在精简的SkyPile语料子集上训练。",
+  "results": "实验验证了门控logit归一化与自适应辅助损失的有效性；Skywork-MoE在广泛的基准上表现强劲。具体分数见报告，摘要未给出。",
+  "legacy": "门控分布过平的问题和逐层调整负载均衡的思路，与后来[[global-batch-lbl]]、DeepSeek的无辅助损失均衡等工作关注的是同一个矛盾；“升级还是从头”的结论常被引用于MoE初始化的讨论。",
+  "limits": [
+    {"text": "只有16个较大的专家，属于粗粒度MoE；同期已经出现的细粒度专家与共享专家设计（[[deepseekmoe]]）没有纳入比较。", "solved_by": []},
+    {"text": "辅助损失仍然会与语言建模目标冲突，自适应系数只是缓解，没有去掉这种干扰。", "solved_by": ["global-batch-lbl"]}
+  ],
+  "relations": [
+    {"to": "skywork", "type": "extends", "note": "由天工Skywork-13B稠密检查点升级为146B参数的MoE。"},
+    {"to": "sparse-upcycling", "type": "extends", "note": "系统比较升级与从头训练，给出何时该升级的经验结论。"},
+    {"to": "switch-transformer", "type": "solves", "note": "Switch式全局固定的负载均衡损失系数难以兼顾各层；改为按丢弃率逐层自适应。"},
+    {"to": "mixtral", "type": "rivals", "note": "同期的开源MoE大模型。"}
+  ],
+  "prereq": ["mixture-of-experts", "softmax", "normalization-layer", "loss-function", "params-flops"],
+  "terms": [
+    {"t": "升级（upcycling）", "d": "把一个训练好的稠密模型的前馈层复制若干份当作初始专家，再继续训练成MoE。"},
+    {"t": "辅助损失", "d": "在主损失之外额外加的一项，这里用来惩罚专家负载不均，系数决定它的分量。"}
+  ],
+  "learn": "先读[[sparse-upcycling]]和[[switch-transformer]]的负载均衡损失；读报告中升级对比与两个技巧的章节；动手：在一个小MoE上对比有无logit归一化时路由熵和专家负载的变化。",
+  "check": {"source": "https://arxiv.org/abs/2406.06563", "confirmed": "标题、作者（16位，列前8位）、arXiv首次提交2024-06-03；摘要中146B参数、16个专家、由Skywork-13B稠密检查点初始化、比较升级与从头训练、选择取决于稠密检查点表现和MoE训练预算、门控logit归一化改善专家多样化、自适应辅助损失系数允许逐层调整、在精简的SkyPile子集上训练、广泛基准表现强。归一化公式、按丢弃率调整系数的方式为对正文的一般了解。"}
+}

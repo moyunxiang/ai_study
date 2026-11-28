@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>神经CRF成分句法分析（2015） · AI脉络</title>
+<meta name="description" content="CRF成分句法分析能用CKY做精确的动态规划推断，但打分靠大量稀疏的人工特征；神经网络能学到稠密的非线性特征，却往往放弃了精确的结构化推断。两者能不能兼得？ 保持CRF的结构：整棵树的得分仍分解为“锚定规则”（某条文法规则作用在句子某个具体跨度上）的局部得分之和，只是把每个局部得分从稀疏特征的线性…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/neural-crf-parsing.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="神经CRF成分句法分析（2015）">
+<meta property="og:description" content="CRF成分句法分析能用CKY做精确的动态规划推断，但打分靠大量稀疏的人工特征；神经网络能学到稠密的非线性特征，却往往放弃了精确的结构化推断。两者能不能兼得？ 保持CRF的结构：整棵树的得分仍分解为“锚定规则”（某条文法规则作用在句子某个具体跨度上）的局部得分之和，只是把每个局部得分从稀疏特征的线性…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/neural-crf-parsing.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/neural-crf-parsing">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 句法分析</div>
+<h1>神经CRF成分句法分析</h1>
+<div class="full">Neural CRF Parsing</div>
+<div class="meta"><span>2015.07</span><span>论文</span><span>延伸</span><span>ACL 2015</span><span>Greg Durrett, Dan Klein · 加州大学伯克利分校</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1507.03641" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://aclanthology.org/P15-1030/" rel="noopener">ACL Anthology ↗</a><a class="btn sm" href="../index.html#/n/neural-crf-parsing">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>CRF成分句法分析能用CKY做精确的动态规划推断，但打分靠大量稀疏的人工特征；神经网络能学到稠密的非线性特征，却往往放弃了精确的结构化推断。两者能不能兼得？</p></div><div><h4>方法</h4><p>保持CRF的结构：整棵树的得分仍分解为“锚定规则”（某条文法规则作用在句子某个具体跨度上）的局部得分之和，只是把每个局部得分从稀疏特征的线性函数换成前馈神经网络输出的非线性势函数；推断仍用CKY，梯度由期望规则计数反传进网络。</p></div><div><h4>影响</h4><p>只用稠密特征就超过了强的稀疏CRF基线，与稀疏特征结合后在Penn Treebank第23节上达到91.1 F1，并在多种语言上超过此前最好的单个分析器；它示范了“神经打分加精确结构化推断”这一后来在句法分析中广泛采用的组合。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/berkeley-parser.html">Berkeley句法分析器</a>等PCFG类分析器依赖文法细化；Hall、Durrett与Klein（2014）提出“少文法、多特征”的CRF分析器，每条锚定规则的得分由跨度首尾词、边界上下文等稀疏表面特征给出，效果很好，但特征需要人工设计，词与词之间也不共享信息。与此同时，<a class="ln" href="../n/socher-recursive.html">递归神经网络</a>、<a class="ln" href="../n/collobert-weston.html">从零开始的神经NLP</a>等神经方法用稠密向量表示词和短语，但通常采用贪心或重排序，而不是在完整的结构空间上精确求解。</p><h2>方法</h2><p>设句子w、树T。树被分解为锚定规则 <code>r = (规则 A→B C, 起点i, 分割点k, 终点j)</code>，CRF定义</p><p class="formula"><code>P(T | w) ∝ exp( Σ_{r∈T} φ(r, w) )</code></p><p>稀疏CRF中 <code>φ = θᵀ f_s(r, w)</code>。神经CRF则令</p><p class="formula"><code>φ(r, w) = h( W · v(f_o(i,k,j,w)) )ᵀ · W_r · f_r(规则)</code></p><p>其中 <code>f_o</code> 取出锚点附近（跨度首尾、分割点两侧）的若干个词，<code>v</code> 把它们查成预训练词向量并拼接，经一层非线性隐层h得到跨度表示；规则一侧用稀疏指示特征 <code>f_r</code> 表示，二者做双线性组合。由于势函数仍只依赖局部锚点，CKY推断与稀疏情形完全一样。</p><p>训练最大化条件对数似然；梯度对每个势函数等于“金标准中该锚定规则出现的次数减去模型期望次数”，期望由内向—外向算法算出，再沿网络反传。最终模型把稠密的神经势函数和原有稀疏特征相加。</p><h2>结果</h2><p>只用稠密特征的神经CRF已超过强的稀疏CRF基线（Hall等，2014）；与稀疏特征结合后在Penn Treebank第23节上取得91.1 F1，并在多种语言上普遍优于此前最好的单个分析器结果（原文摘要）。</p><h2>后来的发展</h2><p>这项工作与同年的<a class="ln" href="../n/stack-lstm-parser.html">Stack-LSTM依存分析</a>等一起，标志着句法分析进入神经时代。<a class="ln" href="../n/stern-span-parser.html">跨度式神经成分分析</a>（2017）用BiLSTM为跨度打分、仍用CKY式解码，Kitaev与Klein的<a class="ln" href="../n/kitaev-klein-parser.html">自注意力成分句法分析</a>再换成自注意力编码器，都延续了“神经网络打分、动态规划精确推断”的框架；依存分析里的<a class="ln" href="../n/biaffine-parser.html">双仿射依存分析</a>加最大生成树解码也是同一思路。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>神经势函数只看锚点附近的固定窗口词，缺少整句上下文信息。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/stern-span-parser.html">跨度式神经成分分析</a></div></li><li>仍依赖规则和稀疏特征的组合，CKY在大文法上开销较高，需要剪枝。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/stern-span-parser.html">跨度式神经成分分析</a> <a class="chip hue" style="--h:24" href="../n/kitaev-klein-parser.html">自注意力成分句法分析</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/penn-treebank.html">Penn Treebank</a><span class="yr">1993 · 数据·评测</span><div class=nt>在Penn Treebank上训练，第23节评测。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/crf.html">条件随机场</a><span class="yr">2001 · NLP</span><div class=nt>保留CRF的全局归一化和结构化推断，只把线性势函数换成神经网络。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/collobert-weston.html">从零开始的神经NLP</a><span class="yr">2011 · NLP</span><div class=nt>使用预训练的稠密词向量作为神经势函数的输入。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/cky-parsing.html">CKY句法分析算法</a><span class="yr">1967 · NLP</span><div class=nt>推断与训练时的期望计算都用CKY式动态规划，和稀疏模型完全一致。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/berkeley-parser.html">Berkeley句法分析器</a><span class="yr">2006.07 · NLP</span><div class=nt>Berkeley分析器靠潜变量细化文法，神经CRF靠特征与神经势函数，两者在多语言上比较。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/stern-span-parser.html">跨度式神经成分分析</a><span class="yr">2017.05 · NLP</span><div class=nt>神经势函数只看锚点附近的固定窗口词，缺少整句上下文信息。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/kitaev-klein-parser.html">自注意力成分句法分析</a><span class="yr">2018.05 · NLP</span><div class=nt>仍依赖规则和稀疏特征的组合，CKY在大文法上开销较高，需要剪枝。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/dynamic-programming.html">动态规划</a> <a class="chip c" href="../c/constituency-parsing.html">成分句法分析</a> <a class="chip c" href="../c/context-free-grammar.html">上下文无关文法</a> <a class="chip c" href="../c/mlp.html">多层感知机</a> <a class="chip c" href="../c/backpropagation.html">反向传播</a> <a class="chip c" href="../c/embedding.html">嵌入向量</a></p>
+<h2>本篇术语</h2><ul><li><b>锚定规则</b>　一条文法规则加上它在句子中作用的具体位置（起点、分割点、终点），是CRF分析打分的基本单位。</li><li><b>势函数</b>　CRF中给每个局部结构的打分，整体概率正比于所有势函数之和的指数。</li><li><b>内向—外向算法</b>　在句法图表上计算每个跨度、每条规则被用到的期望次数的动态规划。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/crf.html">条件随机场</a>和<a class="ln" href="../n/cky-parsing.html">CKY句法分析算法</a> → 读本文第2–3节模型与梯度 → 动手：用PyTorch在一个只有几十个句子的小树库上实现带神经势函数的CKY与内向算法，检查对数配分函数的梯度是否等于期望计数。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1507.03641" rel="noopener">https://arxiv.org/abs/1507.03641</a>（arXiv：标题Neural CRF Parsing、作者Durrett与Klein，v1提交于2015-07-13；摘要：结合CRF分析的精确动态规划与神经方法的非线性特征，结构上是按锚定规则分解的CRF，势函数由前馈网络计算，结构化推断（CKY）不变，梯度由标准CRF充分统计量（期望规则计数）构成的误差信号反传，只用稠密特征即超过强基线CRF（Hall等2014），结合稀疏特征后在Penn Treebank第23节得91.1 F1，并在多种语言上超过此前最好的单个分析器。ACL 2015出处已在ACL Anthology核对；势函数的双线性形式凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E7%A5%9E%E7%BB%8FCRF%E6%88%90%E5%88%86%E5%8F%A5%E6%B3%95%E5%88%86%E6%9E%90%EF%BC%88neural-crf-parsing%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aneural-crf-parsing%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/neural-crf-parsing.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="dmcnn-event.html"><small>本分支上一个 · 2015.07</small><b>DMCNN事件抽取</b></a><a class="r" href="dan.html"><small>本分支下一个 · 2015.07</small><b>DAN深度平均网络</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

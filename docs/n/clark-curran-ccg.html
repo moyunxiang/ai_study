@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>C&amp;C统计CCG分析器（2007） · AI脉络</title>
+<meta name="description" content="CCG在语言学上优雅，但宽覆盖的统计CCG分析很难：每个词可能有几十个候选范畴，再加上CCG的“伪歧义”（同一分析有许多等价推导），判别式训练需要为每个句子枚举所有错误分析，内存和计算都高得惊人。 先用一个最大熵超级标注器为每个词只保留少数几个可能的范畴，大幅缩小搜索空间；再在打包图表上用动态规划…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/clark-curran-ccg.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="C&amp;C统计CCG分析器（2007）">
+<meta property="og:description" content="CCG在语言学上优雅，但宽覆盖的统计CCG分析很难：每个词可能有几十个候选范畴，再加上CCG的“伪歧义”（同一分析有许多等价推导），判别式训练需要为每个句子枚举所有错误分析，内存和计算都高得惊人。 先用一个最大熵超级标注器为每个词只保留少数几个可能的范畴，大幅缩小搜索空间；再在打包图表上用动态规划…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/clark-curran-ccg.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/clark-curran-ccg">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 句法分析</div>
+<h1>C&amp;C统计CCG分析器</h1>
+<div class="full">Wide-Coverage Efficient Statistical Parsing with CCG and Log-Linear Models</div>
+<div class="meta"><span>2007.12</span><span>论文</span><span>延伸</span><span>Computational Linguistics 2007</span><span>Stephen Clark, James R. Curran · 牛津大学、悉尼大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://aclanthology.org/J07-4004/" rel="noopener">ACL Anthology ↗</a><a class="btn sm" href="../index.html#/n/clark-curran-ccg">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>CCG在语言学上优雅，但宽覆盖的统计CCG分析很难：每个词可能有几十个候选范畴，再加上CCG的“伪歧义”（同一分析有许多等价推导），判别式训练需要为每个句子枚举所有错误分析，内存和计算都高得惊人。</p></div><div><h4>方法</h4><p>先用一个最大熵超级标注器为每个词只保留少数几个可能的范畴，大幅缩小搜索空间；再在打包图表上用动态规划，以对数线性模型为完整分析定义概率并做判别式训练，用并行BFGS在集群上求解。</p></div><div><h4>影响</h4><p>C&amp;C成为最快、最常用的宽覆盖CCG分析器，证明词汇化语法的统计分析可以同时做到准确和高效；“超级标注先行、再组合”的两阶段做法被后来几乎所有CCG分析器沿用，并启发了把句法分析当作序列标注的研究。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/ccg.html">组合范畴语法CCG</a>的绝大部分句法信息在词汇范畴里。Hockenmaier与Steedman把<a class="ln" href="../n/penn-treebank.html">Penn Treebank</a>转换成CCG推导，建成CCGbank，从中可以自动抽取出宽覆盖的CCG语法。此前Hockenmaier的生成式CCG模型把推导拆成独立事件估概率。判别式的对数线性模型（<a class="ln" href="../n/maxent-nlp.html">最大熵模型</a>、<a class="ln" href="../n/crf.html">条件随机场</a>的思路）可以使用任意重叠特征，但训练时要计算所有可能分析上的期望，对CCG而言规模极大。</p><h2>方法</h2><p>系统分两阶段：</p><p><b>超级标注</b>：用最大熵序列标注器根据上下文词和词性为每个词打分所有CCG词汇范畴，只保留概率在最高者β倍以内的若干范畴（β逐步放宽：先用很窄的β分析，失败再放宽）。这一步排除了绝大多数不可能的范畴。</p><p><b>对数线性分析模型</b>：对一个句子S的完整分析ω（推导或依存结构），定义</p><p class="formula"><code>P(ω | S) = exp(Σ_i λ_i f_i(ω)) / Z_S</code></p><p>特征包括词汇范畴、组合规则、谓词—论元依存、距离等。训练是判别式的，需要在该句所有可能分析上计算特征期望；作者把所有分析用<b>打包图表</b>（同一跨度、同一范畴的子分析合并）表示，在图表上用类似内向—外向的动态规划算期望。即便如此，训练所需内存仍高达25GB，于是用并行BFGS在Beowulf集群上优化。</p><p>论文还提出了一个新模型和高效分析算法，利用所有推导（包括非标准推导），以应对CCG的伪歧义；解码用CKY式图表分析。</p><h2>结果</h2><p>在CCGbank上，借助打包图表上的动态规划与并行实现，这一统计句法分析文献中规模最大的估计问题之一在三小时内训练完成；令人意外的是，尽管存在伪歧义，分析速度显著高于文献中可比的分析器（原文摘要）。依存准确率等具体数字未在此引用。</p><h2>后来的发展</h2><p>C&amp;C分析器配套的Boxer系统能从CCG推导生成话语表示结构（<a class="ln" href="../n/drt.html">话语表示理论DRT</a>）语义，被用于问答、文本蕴含和语义解析；后来Lewis与Steedman用LSTM超级标注加A*搜索，Yoshikawa等进一步改进，神经CCG分析延续了“超级标注决定大半”的思路。<a class="ln" href="../n/semantic-parsing-ccg.html">语义解析（CCG）</a>一路的语义解析也常用C&amp;C式的超级标注和图表分析。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>超级标注一旦漏掉正确范畴，后续分析就无法恢复，错误会级联。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>依赖从CCGbank自动抽取的语法和大量人工特征，迁移到其他语言或领域需要相应的CCG树库。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/penn-treebank.html">Penn Treebank</a><span class="yr">1993 · 数据·评测</span><div class=nt>CCGbank由Penn Treebank转换而来，是训练和评测的数据。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/maxent-nlp.html">最大熵模型</a><span class="yr">1996 · NLP</span><div class=nt>超级标注器与分析模型都是最大熵（对数线性）模型。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/ccg.html">组合范畴语法CCG</a><span class="yr">2000.02 · NLP</span><div class=nt>采用CCG作为词汇化语法形式，语法从CCGbank自动抽取。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/crf.html">条件随机场</a><span class="yr">2001 · NLP</span><div class=nt>像CRF一样对完整结构做全局归一化的判别式训练，但结构从序列推广到CCG推导的打包图表。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/charniak-parser.html">Charniak句法分析器</a><span class="yr">2000 · NLP</span><div class=nt>与同期的Charniak等短语结构分析器相比，C&amp;C的分析速度显著更快。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/logistic-regression.html">逻辑回归</a> <a class="chip c" href="../c/dynamic-programming.html">动态规划</a> <a class="chip c" href="../c/constituency-parsing.html">成分句法分析</a> <a class="chip c" href="../c/sequence-labeling.html">序列标注</a> <a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a></p>
+<h2>本篇术语</h2><ul><li><b>超级标注</b>　给每个词预测CCG词汇范畴（比词性细得多的标签），相当于先完成大部分句法分析。</li><li><b>打包图表</b>　把覆盖同一词跨度、得到同一范畴的所有子分析合并成一个节点，用多项式大小表示指数级数量的分析。</li><li><b>伪歧义</b>　CCG中语义相同、只是组合顺序不同的多种推导。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/ccg.html">组合范畴语法CCG</a>理解范畴与组合规则 → 读本文第3节超级标注和第4–5节对数线性模型 → 动手：用开源的CCG分析器（如EasyCCG或depccg）分析几句话，观察每个词被标注的范畴。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://aclanthology.org/J07-4004/" rel="noopener">https://aclanthology.org/J07-4004/</a>（ACL Anthology与原文PDF：标题、作者Clark（牛津）与Curran（悉尼）、Computational Linguistics 2007（第33卷第4期）；摘要：为自动抽取的词汇化语法设计多个对数线性分析模型，概率定义在完整分析上，判别式训练需要错误分析，语法从CCGbank抽取，内存需求达25GB，用Beowulf集群上的并行BFGS满足，打包图表上的动态规划使其在三小时内完成，最大熵超级标注器为词分配CCG范畴使训练可行且分析高效，尽管有伪歧义分析速度仍显著高于可比分析器，并开发了利用所有推导的新模型与算法。β逐步放宽与Boxer凭一般了解；日期按第33卷第4期取2007-12。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20C%26C%E7%BB%9F%E8%AE%A1CCG%E5%88%86%E6%9E%90%E5%99%A8%EF%BC%88clark-curran-ccg%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aclark-curran-ccg%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/clark-curran-ccg.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="wikify.html"><small>本分支上一个 · 2007.11</small><b>Wikify!实体链接</b></a><a class="r" href="pdtb.html"><small>本分支下一个 · 2008.05</small><b>宾州篇章树库PDTB</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

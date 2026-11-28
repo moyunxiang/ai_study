@@ -1,0 +1,33 @@
+{
+  "id": "pgql",
+  "who": "Brendan O'Donoghue, Rémi Munos, Koray Kavukcuoglu, Volodymyr Mnih · DeepMind",
+  "venue": "ICLR 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1611.01626"}
+  ],
+  "problem": "A3C这类在线策略梯度方法只能用当前策略刚采到的数据，每条经验用一次就扔；Q学习能反复利用回放池，却和策略梯度是两套互不相干的算法。",
+  "idea": "证明带熵正则的策略梯度在不动点处，策略的对数概率（动作偏好）与Q值只差一个与状态有关的量：`Q̃(s,a) = α(log π(a|s) + H(π(·|s))) + V(s)`。于是可以从策略里“读出”Q值，再对它做Q学习更新，用回放数据改进同一个策略。",
+  "impact": "揭示了“熵正则策略梯度 ≈ 优势函数学习”的等价关系，是软Q学习、PCL、SAC等最大熵RL把策略与价值统一起来的理论来源之一；PGQL本身在Atari全集上超过A3C和Q学习。",
+  "background": "[[a3c]]用多个并行actor做在线的优势演员—评论家更新，加熵正则防止策略过早变成确定性的；它稳定、通用，但样本只能用一次。[[dqn-nature]]靠经验回放大幅提高了数据利用率，但只学Q值，策略是贪心导出的。很多人尝试把两者结合（例如[[acer]]用重要性采样修正回放数据），但需要处理离策略修正的方差。作者从另一个角度切入：熵正则策略梯度的最优解本身就隐含了一个Q函数。",
+  "method": "带熵正则的策略梯度目标是 `J(π) = E[Σ r] + α Σ_s H(π(·|s))`。作者证明，它的不动点满足\n\n`π(a|s) = exp( (Q^π(s,a) − V(s)) / α )`，\n\n即策略是Q值的Boltzmann分布。反过来，任意策略都可以诱导一个估计\n\n`Q̃(s,a) = α ( log π(a|s) + H(π(·|s)) ) + V(s)`。\n\nPGQL的更新由两部分组成：\n\n- 在线部分：在当前采样数据上做普通的熵正则演员—评论家（A3C式）更新；\n- 离线部分：从回放池采样转移，把上式中的 `Q̃` 当作Q函数，做Q学习的Bellman误差更新 `(r + γ max_a′ Q̃(s′,a′) − Q̃(s,a))²`，梯度通过 `log π` 和V回传到同一套网络。\n\n两部分加权相加。作者还证明了更一般的等价性：动作价值拟合方法与演员—评论家算法可以互相转化，正则化策略梯度可以解释为优势函数学习。",
+  "results": "摘要称，数值例子显示PGQL的数据效率和稳定性都有提升；在完整的Atari游戏集上，PGQL的表现超过了异步优势演员—评论家（A3C）和Q学习。",
+  "legacy": "同一时期的[[soft-q-learning]]与[[pcl]]从最大熵RL出发得到了相近的“策略与软Q值互相决定”的关系；后来的[[sac]]把这条思路用于连续控制并成为主流算法。PGQL中“正则化策略梯度等价于优势学习”的结论也常在策略优化理论中被引用。",
+  "limits": [
+    {"text": "等价关系只在不动点处严格成立，训练中途从策略读出的Q值可能很不准，Q学习更新会把误差传回策略。", "solved_by": []},
+    {"text": "只针对离散动作；连续动作下需要对数概率可计算的策略族，Q学习中的max也不再容易求。", "solved_by": ["sac"]}
+  ],
+  "relations": [
+    {"to": "a3c", "type": "extends", "note": "在A3C的熵正则在线更新之上，增加基于回放数据的Q学习更新。"},
+    {"to": "q-learning", "type": "uses", "note": "对从策略诱导出的Q值做Q学习的Bellman更新。"},
+    {"to": "dqn-nature", "type": "uses", "note": "借用经验回放来提高数据利用率。"},
+    {"to": "acer", "type": "rivals", "note": "同为让演员—评论家使用回放数据：ACER用截断重要性采样，PGQL用策略与Q值的等价关系。"}
+  ],
+  "prereq": ["policy-gradient-concept", "actor-critic", "entropy", "bellman-equation", "softmax"],
+  "terms": [
+    {"t": "熵正则化", "d": "在目标中加上策略熵，鼓励策略保持一定随机性，避免过早收敛到确定性动作。"},
+    {"t": "Boltzmann策略", "d": "按 `exp(Q/α)` 的比例选择动作的随机策略，α越小越接近贪心。"}
+  ],
+  "learn": "先熟悉[[a3c]]和[[c:softmax]]；读原文第3节不动点推导；在一个小型网格世界中验证：训练熵正则策略后，用公式读出的Q值与真实Q值是否接近。",
+  "check": {"source": "https://arxiv.org/abs/1611.01626", "confirmed": "标题、作者（O'Donoghue, Munos, Kavukcuoglu, Mnih）、arXiv v1于2016-11-05；摘要中在线策略梯度不能利用离策略数据、结合离策略Q学习与回放池、由正则化策略梯度不动点与Q值的联系从动作偏好估计Q值、命名PGQL、动作价值拟合与演员—评论家等价、正则化策略梯度可解释为优势函数学习、数据效率与稳定性提升、完整Atari上超过A3C与Q学习。Q̃公式、两部分更新、ICLR 2017按原文正文和通行引用。"},
+  "aka": ["PGQL", "PGQ", "Policy Gradient and Q-learning", "策略梯度与Q学习结合", "Combining Policy Gradient and Q-learning"]
+}

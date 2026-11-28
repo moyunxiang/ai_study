@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>RAKE关键词抽取（2010） · AI脉络</title>
+<meta name="description" content="从单篇文档里自动抽出能概括其内容的关键词和关键短语。TF-IDF需要一个大语料来统计文档频率，TextRank要在词图上迭代计算，监督方法又需要标注；很多场景只有一篇文档，还要求快。 只看这一篇文档：先用停用词和标点把文本切成候选短语（停用词之间的连续实词片段），再按词在候选短语中的共现统计给每个…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/rake.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RAKE关键词抽取（2010）">
+<meta property="og:description" content="从单篇文档里自动抽出能概括其内容的关键词和关键短语。TF-IDF需要一个大语料来统计文档频率，TextRank要在词图上迭代计算，监督方法又需要标注；很多场景只有一篇文档，还要求快。 只看这一篇文档：先用停用词和标点把文本切成候选短语（停用词之间的连续实词片段），再按词在候选短语中的共现统计给每个…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/rake.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/rake">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 检索与文本挖掘</div>
+<h1>RAKE关键词抽取</h1>
+<div class="full">Automatic Keyword Extraction from Individual Documents</div>
+<div class="meta"><span>2010.03</span><span>论文</span><span>延伸</span><span>Text Mining: Applications and Theory（Wiley, 2010）</span><span>Stuart Rose, Dave Engel, Nick Cramer, Wendy Cowley · 太平洋西北国家实验室</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1002/9780470689646.ch1" rel="noopener">DOI ↗</a><a class="btn sm" href="../index.html#/n/rake">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>从单篇文档里自动抽出能概括其内容的关键词和关键短语。TF-IDF需要一个大语料来统计文档频率，TextRank要在词图上迭代计算，监督方法又需要标注；很多场景只有一篇文档，还要求快。</p></div><div><h4>方法</h4><p>只看这一篇文档：先用停用词和标点把文本切成候选短语（停用词之间的连续实词片段），再按词在候选短语中的共现统计给每个词打分 <code>score(w) = deg(w) / freq(w)</code>，短语得分是其中各词得分之和，取得分最高的若干短语。</p></div><div><h4>影响</h4><p>RAKE因为简单、不依赖语料、与语言基本无关，成为最常用的无监督关键词抽取基线之一，有大量开源实现（如rake-nltk），与TF-IDF、TextRank、YAKE、KeyBERT一起常被比较。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>关键词抽取的经典做法有基于统计的<a class="ln" href="../n/tf-idf.html">IDF与TF-IDF</a>（需要语料库统计文档频率）、基于图的<a class="ln" href="../n/textrank.html">TextRank</a>（在词共现图上跑PageRank），以及有监督的KEA等。它们要么依赖外部语料，要么计算较慢。作者在处理情报分析文本时，希望得到一个对单篇文档就能工作、速度快、领域无关的方法。</p><h2>方法</h2><p><b>候选短语</b>：以停用词表和标点作为分隔符切分文本。例如「Compatibility of systems of linear constraints over the set of natural numbers」被切成「Compatibility」「systems」「linear constraints」「set」「natural numbers」等候选，因为of、over、the是停用词。</p><p><b>词得分</b>：在所有候选短语上构建词共现矩阵，对每个词统计：</p><ul><li><code>freq(w)</code>：它在候选短语中出现的次数；</li><li><code>deg(w)</code>：它所在候选短语的长度之和（即与它共现的词数，含自身）。</li></ul><p>作者比较了 <code>freq</code>、<code>deg</code> 和 <code>deg/freq</code> 三种打分，<code>deg/freq</code> 偏向主要出现在较长短语中的词。</p><p><b>短语得分</b>：候选短语的得分是其中各词得分之和；若两个关键词在文中多次以同一个停用词相连（如axis of evil），还会合并成一个包含停用词的关键短语。最后按得分排序，取前约三分之一的候选作为关键词。</p><h2>结果</h2><p>据书目信息：本章发表于Wiley出版的《Text Mining: Applications and Theory》（2010）。作者在Inspec摘要数据集上与TextRank等方法比较，报告精度与F值相当或更好且速度快得多；具体数字未核对。</p><h2>后来的发展</h2><p>后续的无监督方法有基于统计特征的YAKE（2018）、基于句向量相似度的EmbedRank与KeyBERT；有监督方法发展为序列标注与生成式关键短语生成（CopyRNN等）。RAKE至今常作为搜索、标签推荐和文本分析中的快速基线。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>完全依赖停用词表切分，停用词表的质量和语言直接决定候选短语；中文等无空格语言需要先分词。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只看词的共现统计，不理解语义，长而罕见的短语容易得分过高，同义的关键词不会被合并。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/tf-idf.html">IDF与TF-IDF</a><span class="yr">1972.01 · NLP</span><div class=nt>TF-IDF需要大语料的文档频率，RAKE只用单篇文档。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/luhn-abstracts.html">Luhn自动文摘</a><span class="yr">1958.04 · NLP</span><div class=nt>延续Luhn用词频和停用词挑选重要内容的统计思路，用于关键词而非句子。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/textrank.html">TextRank</a><span class="yr">2004.07 · NLP</span><div class=nt>TextRank在词图上迭代计算重要性，RAKE只用一遍共现统计，速度快得多。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/feature-representation.html">特征与表示学习</a> <a class="chip c" href="../c/tokenization.html">分词与token</a></p>
+<h2>本篇术语</h2><ul><li><b>关键词抽取（keyword/keyphrase extraction）</b>　从文档中自动选出能概括其主题的词或短语，用于索引、标签、检索和摘要。</li><li><b>停用词</b>　of、the、的、了这类高频而少有实义的词，RAKE用它们作为候选短语的分隔符。</li></ul>
+<h2>怎么学</h2><p>先了解<a class="ln" href="../n/tf-idf.html">IDF与TF-IDF</a>和<a class="ln" href="../n/textrank.html">TextRank</a> → 读原文对候选生成和deg/freq打分的说明 → 动手：用rake-nltk对一篇论文摘要抽关键词，再与TextRank、KeyBERT的结果比较。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1002/9780470689646.ch1" rel="noopener">https://doi.org/10.1002/9780470689646.ch1</a>（lookup.py title（Crossref）：标题Automatic Keyword Extraction from Individual Documents、作者Stuart Rose、Dave Engel、Nick Cramer、Wendy Cowley、收录于Text Mining（2010-03-04）、DOI 10.1002/9780470689646.ch1。正文未打开：候选切分、deg/freq打分、合并含停用词短语、Inspec评测、作者单位与后续方法按一般了解写，未写数字。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20RAKE%E5%85%B3%E9%94%AE%E8%AF%8D%E6%8A%BD%E5%8F%96%EF%BC%88rake%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Arake%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/rake.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="elasticsearch.html"><small>本分支上一个 · 2010.02</small><b>Elasticsearch</b></a><a class="r" href="gensim-topic.html"><small>本分支下一个 · 2010.05</small><b>gensim主题建模库</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

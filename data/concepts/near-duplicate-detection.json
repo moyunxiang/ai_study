@@ -1,0 +1,37 @@
+{
+  "key": "near-duplicate-detection",
+  "short": "在海量文档中找出内容几乎相同的文本。核心是把文档压成短指纹再快速比对：MinHash估计Jaccard相似度，SimHash比较汉明距离，局部敏感哈希免去两两比较。",
+  "body": "网页上同一篇新闻被成百上千个网站转载，同一份法律模板只改了日期和人名，论坛帖子被复制粘贴到处传播。搜索引擎要避免返回十条一样的结果；大语言模型的预训练语料要去掉重复，否则模型会背下高频重复的文本、浪费算力，测试题被复制进语料还会造成污染。[[dedup-training-data]]发现，对训练数据去重后，语言模型逐字复述训练文本的情况大幅减少（另见[[quantifying-memorization]]和[[repeated-data-scaling]]）。\n\n**精确去重**很简单：对每篇文档算一个哈希值（如MD5），相同即重复。难的是**近似重复**：两篇文档只差几个字、换了标点或广告，哈希值就完全不同。\n\n**相似度怎么定义**。把文档切成重叠的**shingle**（连续k个词或k个字的片段），文档就是一个shingle集合，两篇文档的相似度用Jaccard系数衡量：\n\n`J(A, B) = |A ∩ B| / |A ∪ B|`\n\n**MinHash**。对shingle集合施加一个随机哈希函数，取最小的哈希值作为签名。关键性质：两个集合的MinHash相等的概率**恰好等于**它们的Jaccard相似度。用k个独立哈希函数得到长度为k的签名，签名中相等位置的比例就是J的无偏估计（误差约按`1/√k`缩小，见[[c:monte-carlo]]）。\n\n**局部敏感哈希（LSH）**。即使有了短签名，十亿篇文档两两比较也是10¹⁸对。LSH把签名切成b段、每段r个值，只要某一段完全相同就把两篇文档放进同一个桶里当候选，只在桶内精确比较。选择b和r可以让“相似度高于某个阈值的文档对”以高概率成为候选，而不相似的几乎不会。\n\n**SimHash**。另一种指纹：把文档的每个特征（词及其权重）哈希成64位，按位加权求和后取符号，得到一个64位指纹。相似文档的指纹只有少数几位不同，用汉明距离（如不超过3位）判断。它对应的是余弦相似度（见[[c:dot-product]]），谷歌曾用它在网页抓取中检测近似重复。\n\n**在大模型数据处理中**。[[refinedweb]]、[[fineweb]]等语料流水线普遍做MinHash去重，有的还做跨数据转储的全局去重或段落级精确子串去重（见[[c:pretraining-data]]）。语义层面的“近似”（意思相同、措辞不同）则需要用句向量和近似最近邻检索（见[[c:retrieval]]和[[c:paraphrase]]）。",
+  "example": "两句话按3个字一组切shingle：A“今天北京下大雨”得{今天北, 天北京, 北京下, 京下大, 下大雨}，B“今天北京下暴雨”得{今天北, 天北京, 北京下, 京下暴, 下暴雨}。交集3个、并集7个，J = 3/7 ≈ 0.43。用128个哈希函数做MinHash，签名大约有55个位置相同（128 × 0.43）。若阈值设为0.8，这两句不算近似重复；改为“今天北京下大雨啊”则J = 5/6 ≈ 0.83，会被判为重复。",
+  "pitfalls": "- 阈值和shingle长度强烈影响结果：shingle太短，无关文档也会显得相似；太长，改几个字就认不出来。\n- 去重过度会把有价值的模板化内容（如代码库里的常见函数、法律条款）也删掉，需要按数据类型分别设定。",
+  "needs": [
+    "probability-basics",
+    "dot-product"
+  ],
+  "aka": [
+    "近似重复检测",
+    "近似去重",
+    "近重复检测",
+    "near-duplicate detection",
+    "near-dedup",
+    "near deduplication",
+    "fuzzy deduplication",
+    "模糊去重",
+    "MinHash",
+    "MinHash LSH",
+    "SimHash",
+    "局部敏感哈希",
+    "locality-sensitive hashing",
+    "LSH",
+    "Jaccard相似度",
+    "Jaccard similarity",
+    "shingling",
+    "shingle",
+    "文档指纹",
+    "document fingerprinting",
+    "汉明距离",
+    "Hamming distance",
+    "精确去重",
+    "exact deduplication"
+  ]
+}

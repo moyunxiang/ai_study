@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>动作相关基线的幻象（2018） · AI脉络</title>
+<meta name="description" content="2017年前后有几篇论文提出“同时依赖状态和动作的基线”，声称能在不引入偏差的前提下显著降低策略梯度方差、提高样本效率。这些增益到底从哪里来？ 把策略梯度估计的方差拆成几部分，逐项数值测量；结果发现，在常用基准上，学到的状态—动作基线并没有比只依赖状态的基线降低方差。再审查原论文的开源代码，找出造…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/mirage-baselines.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="动作相关基线的幻象（2018）">
+<meta property="og:description" content="2017年前后有几篇论文提出“同时依赖状态和动作的基线”，声称能在不引入偏差的前提下显著降低策略梯度方差、提高样本效率。这些增益到底从哪里来？ 把策略梯度估计的方差拆成几部分，逐项数值测量；结果发现，在常用基准上，学到的状态—动作基线并没有比只依赖状态的基线降低方差。再审查原论文的开源代码，找出造…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/mirage-baselines.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/mirage-baselines">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 策略梯度与演员评论家</div>
+<h1>动作相关基线的幻象</h1>
+<div class="full">The Mirage of Action-Dependent Baselines in Reinforcement Learning</div>
+<div class="meta"><span>2018.02</span><span>论文</span><span>延伸</span><span>ICML 2018</span><span>George Tucker, Surya Bhupatiraju, Shixiang Gu, Richard E. Turner, Zoubin Ghahramani, Sergey Levine · Google Brain, University of Cambridge</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1802.10031" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/mirage-baselines">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>2017年前后有几篇论文提出“同时依赖状态和动作的基线”，声称能在不引入偏差的前提下显著降低策略梯度方差、提高样本效率。这些增益到底从哪里来？</p></div><div><h4>方法</h4><p>把策略梯度估计的方差拆成几部分，逐项数值测量；结果发现，在常用基准上，学到的状态—动作基线并没有比只依赖状态的基线降低方差。再审查原论文的开源代码，找出造成性能提升的其实是几处与论文描述不一致的实现细节。</p></div><div><h4>影响</h4><p>一篇重要的负结果：它纠正了“动作相关基线大幅降方差”的说法，示范了用方差分解和代码审查来检验RL经验结论的做法，也直接指出了真正有用的改进方向（价值函数的参数化）。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>策略梯度 <code>∇J = E[∇log π(a|s) (Q(s,a) − b(s))]</code> 中减去只依赖状态的基线 <code>b(s)</code> 不改变期望、能降方差，这是<a class="ln" href="../n/reinforce.html">REINFORCE策略梯度</a>以来的标准做法。<a class="ln" href="../n/q-prop.html">Q-Prop控制变量策略梯度</a>、Stein控制变量以及<a class="ln" href="../n/ipg.html">IPG插值策略梯度</a>等工作把基线推广为 <code>b(s,a)</code>（需要解析修正项以保持无偏），并报告在MuJoCo任务上显著提升了样本效率。由于深度RL的结果对实现细节很敏感（<a class="ln" href="../n/deep-rl-matters.html">《Deep RL that Matters》复现性批评</a>），这些提升究竟是否来自更低的方差，值得单独检验。</p><h2>方法</h2><p>作者把一批轨迹上的梯度估计方差分解为三部分：</p><p class="formula"><code>Var = Σ_t E_s[ Var_a( E_τ[ĝ | s, a] ) ] + Σ_t E_{s,a}[ Var_τ(ĝ | s, a) ] + 来自状态分布的项</code></p><p>第一项是动作采样引起的方差，状态—动作基线只能减少这一项；第二项来自轨迹后续的随机性（回报估计的方差），任何基线都动不了它。在Humanoid、HalfCheetah等常用任务上数值估计各项后发现，第二项远大于第一项，因此即使完美的动作相关基线也几乎不能降低总方差，而学到的基线还达不到完美。</p><p>接着，作者审查了几篇原论文的开源代码，发现报告的提升来自与论文描述不同的实现：例如在计算优势时把动作相关项错误地处理成有偏的形式，或改变了价值函数的拟合方式。修正这些后，增益基本消失。最后，方差分解提示应当减少“轨迹方差”，作者展示了一个简单的价值函数参数化改动（让价值函数显式依赖时间步等）就能显著提升性能。</p><h2>结果</h2><p>摘要称：在常用测试基准上，学到的状态—动作基线实际上并没有比状态基线降低方差；审查原论文的开源代码表明，细微的实现决定偏离了论文中描述的方法，并解释了先前观察到的经验增益；方差分解还指出了改进的方向，一个对价值函数参数化的简单改动就能显著提升性能。</p><h2>后来的发展</h2><p>这篇工作与<a class="ln" href="../n/implementation-matters.html">PPO的实现细节之争</a>等研究一起，推动了RL社区对“性能提升是否来自宣称的机制”的审慎态度；此后动作相关基线较少作为降方差的主要手段被采用，研究重心转向价值估计质量与回报方差。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>结论基于几个连续控制基准，在动作维度极高、动作方差占主导的问题上，动作相关基线仍可能有用。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只指出了轨迹方差是主要来源，并没有给出一般性地大幅降低这部分方差的方法。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/reinforce.html">REINFORCE策略梯度</a><span class="yr">1992 · RL</span><div class=nt>沿用REINFORCE以来的基线降方差框架，给出更细的方差分解。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/deep-rl-matters.html">《Deep RL that Matters》复现性批评</a><span class="yr">2017.09 · RL</span><div class=nt>延续对深度RL结果可复现性的追问，把怀疑落实到具体的方差测量与代码审查。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/q-prop.html">Q-Prop控制变量策略梯度</a><span class="yr">2016.11 · RL</span><div class=nt>检验Q-Prop等动作相关基线的降方差主张，发现在常用基准上增益并不来自更低的方差。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/ipg.html">IPG插值策略梯度</a><span class="yr">2017.06 · RL</span><div class=nt>同一批作者对IPG/Q-Prop路线做的事后检验，修正了对动作相关控制变量作用的理解。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/expectation-variance.html">期望与方差</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/bias-variance.html">偏差-方差权衡</a> <a class="chip c" href="../c/ablation-baseline.html">基线与消融实验</a></p>
+<h2>本篇术语</h2><ul><li><b>动作相关基线</b>　同时依赖状态和动作的基线 <code>b(s,a)</code>；为了保持梯度无偏，需要额外加上一个解析计算的修正项。</li><li><b>方差分解</b>　把总方差拆成来自不同随机源（动作采样、后续轨迹、状态分布）的几部分，看各自贡献多大。</li></ul>
+<h2>怎么学</h2><p>先复习策略梯度里的基线与<a class="lc" href="../c/expectation-variance.html">期望与方差</a>；读原文第3节方差分解与第5节代码审查；在一个简单任务上分别估计动作项与轨迹项的方差，自己验证哪一项占主导。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1802.10031" rel="noopener">https://arxiv.org/abs/1802.10031</a>（标题、作者（Tucker, Bhupatiraju, Gu, Turner, Ghahramani, Levine）、arXiv v1于2018-02-27；摘要中状态基线降方差的标准做法、近期论文把基线扩展到状态与动作并声称显著降方差且无偏、分解策略梯度估计的方差并数值表明学到的状态—动作基线在常用基准上未降低方差、审查原论文开源代码发现细微实现决定偏离论文描述并解释了增益、简单的价值函数参数化改动显著提升性能。方差分解的具体形式、代码问题的具体内容、价值函数改动细节、ICML 2018与机构按原文正文和通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%8A%A8%E4%BD%9C%E7%9B%B8%E5%85%B3%E5%9F%BA%E7%BA%BF%E7%9A%84%E5%B9%BB%E8%B1%A1%EF%BC%88mirage-baselines%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Amirage-baselines%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/mirage-baselines.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="diayn.html"><small>本分支上一个 · 2018.02</small><b>DIAYN无奖励技能发现</b></a><a class="r" href="me-trpo.html"><small>本分支下一个 · 2018.02</small><b>ME-TRPO模型集成</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

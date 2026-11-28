@@ -1,0 +1,33 @@
+{
+  "id": "mcts-rpo",
+  "who": "Jean-Bastien Grill, Florent Altché, Yunhao Tang, Thomas Hubert, Michal Valko, Ioannis Antonoglou, Rémi Munos · DeepMind",
+  "venue": "ICML 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2007.12509"}
+  ],
+  "problem": "AlphaZero的树搜索里有不少手工启发式：PUCT选择公式里的常数与平方根形式、用根节点访问次数分布作为策略训练目标等，人们只是部分理解它们为什么有效，尤其在模拟次数很少时，访问次数分布是很粗糙的策略估计。",
+  "idea": "证明AlphaZero的搜索启发式（以及UCT等常见规则）是在近似求解一个“正则化策略优化”问题：最大化 `q·π − λ_N KL(π_θ ‖ π)`。于是可以直接用这个问题的精确解 `π̄` 代替访问次数分布，用来选动作、做搜索和训练策略网络。",
+  "impact": "把MCTS与策略优化的理论联系了起来，给出了一个在少量模拟下明显更好的AlphaZero/MuZero变体；这一视角直接影响了后来的Gumbel MuZero、Muesli等工作。",
+  "background": "[[alphazero]]和[[muzero]]在每个节点用PUCT公式 `argmax_a [ Q(s,a) + c·π_θ(a|s)·√(Σ_b N(s,b)) / (1 + N(s,a)) ]` 选择要模拟的动作，搜索结束后把根节点的访问次数分布 `N(s,·)/ΣN` 当作改进后的策略去训练网络。这些规则来自[[mcts]]与经验调参，效果很好，但当每步只有很少模拟次数时，访问次数只能取几个离散值，无法细致地表达“哪个动作好多少”。另一方面，策略优化文献（[[trpo]]、[[mpo]]）早已研究过“在KL正则下最大化Q值”这类问题的解析解。",
+  "method": "作者考虑正则化策略优化问题\n\n`π̄ = argmax_{π∈Δ}  [ qᵀπ − λ_N · KL(π_θ ‖ π) ]`，  其中 `λ_N = c · √(Σ_b N_b) / (|A| + Σ_b N_b)`\n\n这里q是搜索得到的Q值，π_θ是网络给出的先验策略。证明的核心结论是：AlphaZero的访问次数分布近似地追踪 `π̄`，PUCT的动作选择规则等价于让经验访问分布逼近 `π̄`。\n\n据此提出的变体用 `π̄` 代替启发式：\n\n- **动作选择**（Act）：在环境中按 `π̄` 而不是访问次数采样动作；\n- **搜索**（Search）：在树内按 `π̄` 与当前访问分布的差距选择要扩展的动作；\n- **学习**（Learn）：用 `π̄` 而不是访问次数分布作为策略网络的训练目标。\n\n`π̄` 可以通过一维二分搜索求出（它的形式是 `π̄(a) = λ_N π_θ(a) / (α − q(a))`，α是使其归一化的常数）。",
+  "results": "摘要称：AlphaZero的搜索启发式以及UCT等常见规则，是对一个特定正则化策略优化问题解的近似；基于此提出的AlphaZero变体使用该问题的精确解，实验表明它在多个领域可靠地超过原算法。原文在Atari（基于MuZero）和连续控制上显示，模拟次数越少，提升越明显。",
+  "legacy": "把搜索看作策略改进算子的观点被[[gumbel-muzero]]进一步发展：后者用不放回采样与序列减半保证每次搜索都能改进策略。同一团队的[[muesli]]也采用了正则化策略优化的视角，在不搜索的情况下用类似的目标训练策略。",
+  "limits": [
+    {"text": "仍需要访问根节点的所有动作来估计q，动作空间很大或模拟次数少于动作数时，未访问动作的q只能用默认值填补。", "solved_by": ["gumbel-muzero"]},
+    {"text": "正则化系数λ_N的形式沿用了PUCT的经验公式，理论上并没有说明它为何是最佳选择。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "alphazero", "type": "extends", "note": "解释AlphaZero搜索启发式的含义，并用精确解替换它们得到改进的变体。"},
+    {"to": "muzero", "type": "extends", "note": "在MuZero上同样替换动作选择、搜索与学习目标，在Atari上验证。"},
+    {"to": "mcts", "type": "extends", "note": "把UCT类选择规则也纳入同一个正则化策略优化的解释中。"},
+    {"to": "mpo", "type": "uses", "note": "借用KL正则下最大化Q值的策略优化形式及其解析解。"}
+  ],
+  "prereq": ["tree-search", "kl-divergence", "policy-value", "lagrange-duality", "self-play"],
+  "terms": [
+    {"t": "PUCT", "d": "AlphaZero的树内选择规则：在Q值上加一个与先验概率成正比、随访问次数增加而减小的探索项。"},
+    {"t": "正则化策略优化", "d": "在最大化期望Q值的同时，用KL散度惩罚新策略偏离某个参考策略太远。"}
+  ],
+  "learn": "先读[[alphazero]]的搜索部分和[[c:kl-divergence]]；读原文第3节等价性的推导；在一个小型博弈上实现用 `π̄` 替代访问次数分布作为训练目标，比较每步只模拟8次时的学习速度。",
+  "check": {"source": "https://arxiv.org/abs/2007.12509", "confirmed": "标题、作者（Grill, Altché, Tang, Hubert, Valko, Antonoglou, Munos）、arXiv v1于2020-07-24；摘要中MCTS与深度RL的结合、AlphaZero仍依赖只被部分理解的手工启发式、其搜索启发式与UCT等常见规则是对特定正则化策略优化问题解的近似、提出使用该问题精确解的AlphaZero变体、实验中在多个领域可靠地超过原算法。π̄与λ_N的公式、Act/Search/Learn三处替换、少模拟时提升更大、ICML 2020按原文正文和通行引用。"},
+  "aka": ["MCTS as Regularized Policy Optimization", "MCTS正则化策略优化", "π̄", "AlphaZero搜索启发式解释"]
+}

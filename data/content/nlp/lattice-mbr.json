@@ -1,0 +1,34 @@
+{
+  "id": "lattice-mbr",
+  "who": "Roy Tromble, Shankar Kumar, Franz Josef Och, Wolfgang Macherey · 约翰斯·霍普金斯大学、Google",
+  "venue": "EMNLP 2008",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/D08-1065/"}
+  ],
+  "aka": ["Lattice MBR", "词图MBR", "格上最小贝叶斯风险解码", "Lattice Minimum Bayes-Risk", "线性BLEU近似", "Linear BLEU", "Tromble et al. 2008"],
+  "problem": "最小贝叶斯风险（MBR）解码能比“选概率最高的译文”更贴近BLEU，但它要两两比较候选，实际只能在一千个左右的N-best候选上做，而解码器的词图里其实压缩着数量多出许多个量级的译文假设。",
+  "idea": "给出损失函数满足什么条件就能在词图上高效做MBR，并构造一个满足条件的BLEU线性近似：译文得分写成其中各n元组的加权计数，权重是n元组在整张词图上的后验概率，用加权有限状态自动机一次算完。",
+  "impact": "让MBR从N-best扩展到整张翻译词图，在多个语言对上稳定优于N-best MBR，成为Google翻译等系统的标准后处理；“n元组后验期望”的思路也延续到后来神经翻译的MBR解码研究。",
+  "background": "统计翻译系统通常选模型分最高的译文（MAP决策），等于优化0-1损失；但系统按BLEU评测。[[mbr-smt]]（Kumar与Byrne，2004）改为选使期望损失最小的译文 `ê = argmin_{e'} Σ_e P(e|f) · L(e, e')`，需要对候选两两计算BLEU，复杂度是候选数的平方，于是只能在N-best列表上做。解码器搜索过程中产生的翻译词图（lattice）包含指数级的假设，N-best只是其中极小一部分。",
+  "method": "关键是把损失改写成**对n元组可分解**的形式。论文用一阶泰勒展开得到BLEU的线性近似：\n\n`G(E, E') = θ_0·|E'| + Σ_{w} θ_{|w|} · #_w(E') · δ_w(E)`\n\n其中w遍历长度1到4的n元组，`#_w(E')` 是候选E'中w的出现次数，`δ_w(E)` 表示参考E中是否含w，θ是由语料统计估出的系数。代入期望后，候选的得分变为\n\n`score(E') = θ_0·|E'| + Σ_w θ_{|w|} · #_w(E') · p(w | 词图)`\n\n`p(w|词图)` 是n元组w出现在词图里某条路径上的后验概率，可以用[[wfst]]上的前向—后向式运算对所有n元组一次算出。之后再用加权有限状态自动机在词图中找得分最高的路径，就完成了在整张词图上的MBR解码。",
+  "results": "在阿拉伯语—英语、汉语—英语和英语—汉语翻译任务上，词图MBR相对N-best MBR带来中等但一致的BLEU提升；论文还分析了词图大小、n元组阶数、参数θ等因素对MBR效果的影响（原文摘要所述）。",
+  "legacy": "词图MBR被Google用于其统计翻译系统，后续工作把它推广到超图（层次短语与句法系统的翻译森林），并与[[system-combination]]结合用于多系统融合。神经翻译时代，MBR重新受到关注：从采样得到的候选上用BLEU、COMET等指标做MBR，以及[[pruning-mbr]]等降低平方复杂度的加速方法，延续了这条线。",
+  "limits": [
+    {"text": "线性BLEU近似忽略了长度惩罚与n元组截断的精确形式，参数θ需要按语料调，近似误差会影响结果。", "solved_by": []},
+    {"text": "依赖解码器输出的词图，后验概率只覆盖剪枝后保留下来的假设；神经翻译没有天然的词图结构。", "solved_by": ["pruning-mbr"]}
+  ],
+  "relations": [
+    {"to": "mbr-smt", "type": "solves", "note": "解决MBR只能在N-best上做的问题，把它扩展到包含指数级假设的整张翻译词图。"},
+    {"to": "bleu", "type": "uses", "note": "构造BLEU的一阶线性近似，使损失对n元组可分解。"},
+    {"to": "wfst", "type": "uses", "note": "用加权有限状态自动机计算n元组后验并在词图上搜索最优路径。"},
+    {"to": "confusion-network", "type": "extends", "note": "与语音识别中按词后验做共识解码同属一类思路：用后验期望代替单一最优路径来选输出。"}
+  ],
+  "prereq": ["expectation-variance", "text-metrics", "dynamic-programming", "taylor-expansion", "graph-basics"],
+  "terms": [
+    {"t": "翻译词图（lattice）", "d": "解码器搜索时把大量部分重叠的译文假设合并成的一张有向无环图，每条路径是一个候选译文。"},
+    {"t": "n元组后验", "d": "某个n元组出现在随机抽出的一条词图路径中的概率，按路径的模型概率加权。"},
+    {"t": "MAP决策", "d": "直接选概率最高的那个输出，等价于最小化0-1损失。"}
+  ],
+  "learn": "先读[[mbr-smt]]理解期望风险 → 读本文第3–4节线性BLEU与自动机实现 → 动手：在一个小N-best列表上分别做精确BLEU的MBR和n元组后验加权打分，看两者选出的译文是否一致。",
+  "check": {"source": "https://aclanthology.org/D08-1065/", "confirmed": "ACL Anthology与原文PDF：标题、作者Tromble、Kumar、Och、Macherey（JHU与Google）、EMNLP 2008（2008年10月）；摘要：在紧凑编码大量假设的翻译词图上做MBR、给出损失函数可高效实现的条件、引入满足条件的BLEU近似、用加权有限状态自动机实现、在阿拉伯语—英语、汉语—英语、英语—汉语上相对N-best MBR取得中等而一致的提升，并分析多种参数。线性BLEU公式的具体写法与被Google翻译采用凭一般了解。"}
+}

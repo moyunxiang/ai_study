@@ -1,0 +1,33 @@
+{
+  "id": "quick-thoughts",
+  "who": "Lajanugen Logeswaran, Honglak Lee · 密歇根大学、Google Brain",
+  "venue": "ICLR 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1803.02893"}
+  ],
+  "aka": ["Quick-Thoughts", "Quick Thought Vectors", "QT句向量", "判别式上下文句预测", "Logeswaran & Lee 2018", "对比式句向量"],
+  "problem": "Skip-Thought让编码器生成前后句的每一个词来学习句向量，生成目标要建模大量与语义无关的表层细节，训练极慢（数周）。",
+  "idea": "把“生成上下文句”改成“分辨上下文句”：给定一句话，从一批候选句中挑出真正与它相邻的那一句，只需比较句向量的内积，是一个分类问题。",
+  "impact": "在多项下游任务上超过此前的无监督和有监督句表示方法，同时训练时间缩短一个数量级；这种“正确邻句对比批内其他句子”的目标，是后来对比学习句向量（如SimCSE）的先声。",
+  "background": "[[skip-thought]]（2015）借[[c:distributional-hypothesis]]的思路：意思相近的句子出现在相似的上下文中，于是训练编码器—解码器根据当前句生成前后句。[[fastsent]]（2016）用词袋预测相邻句中的词以加速，但丢失了词序。[[infersent]]（2017）改用有标注的自然语言推理数据训练，效果好但依赖人工标注。另一方面，[[word2vec]]的负采样、[[nce]]等都说明：把预测问题改成区分真伪样本，可以大幅减少计算。",
+  "method": "两个编码器f和g（结构相同、参数分开，均为GRU）分别把句子编码为向量。对一句话s和一个候选集S_cand（其中包含s真正的前后句，其余为同一批次中的其他句子），定义\n\n`p(s_cand | s, S_cand) = exp(f(s)·g(s_cand)) / Σ_{s'∈S_cand} exp(f(s)·g(s'))`\n\n训练目标是最大化真实上下文句的对数概率。打分函数刻意选得极简（内积），迫使语义信息必须进入句向量本身，而不能靠复杂的分类器补偿。训练好后把f(s)与g(s)拼接作为句子表示。\n\n因为不需要逐词解码，每个训练步只做编码和一个批内矩阵乘法，可在大规模无标注书籍语料上快速训练。",
+  "results": "论文报告，在情感、主观性、问题分类、复述识别、语义相关度等多项下游任务上，该方法的句表示优于当时最好的无监督与有监督表示学习方法，且训练时间加速一个数量级（原文摘要）。",
+  "legacy": "Quick-Thoughts的批内对比目标与同年的[[cpc]]思路相近，之后被大量句向量和检索模型沿用：[[sentence-bert]]的多负例训练、[[simcse]]的批内对比学习、稠密检索中的批内负例，都可以看作这一思路的延续。不过在预训练语言模型出现后，基于BERT的句向量很快超越了这些从头训练的RNN编码器。",
+  "limits": [
+    {"text": "依赖文档中句子的先后顺序作为监督信号，相邻句并不总是语义相近，信号有噪声。", "solved_by": ["simcse"]},
+    {"text": "编码器从零训练、规模较小，表达能力不如后来的大规模预训练语言模型。", "solved_by": ["sentence-bert"]}
+  ],
+  "relations": [
+    {"to": "skip-thought", "type": "solves", "note": "把生成相邻句改成在候选中分辨相邻句，避免逐词解码，训练快一个数量级。"},
+    {"to": "fastsent", "type": "rivals", "note": "FastSent用词袋近似加速Skip-Thought但丢失词序；Quick-Thoughts保留RNN编码器，改用判别式目标加速。"},
+    {"to": "infersent", "type": "rivals", "note": "InferSent用人工标注的推理数据有监督训练；Quick-Thoughts只用无标注文本，在多项任务上超过它。"},
+    {"to": "nce", "type": "extends", "note": "沿用“把生成问题变成区分真样本与噪声样本”的思想，以批内其他句子作为负例。"}
+  ],
+  "prereq": ["embedding", "contrastive-learning", "softmax", "recurrent-layer", "self-supervised"],
+  "terms": [
+    {"t": "批内负例", "d": "把同一训练批次里其他样本当作负例，不需要额外采样，计算上只是一次矩阵乘法。"},
+    {"t": "判别式目标", "d": "训练模型区分正确答案与干扰项，而不是逐词生成正确答案。"}
+  ],
+  "learn": "先读[[skip-thought]] → 读本文第3节目标函数 → 动手：用BookCorpus的小子集，以句子与其后一句为正例、批内其余句为负例，训练一个小GRU编码器，再在SST-2上用逻辑回归评测句向量。",
+  "check": {"source": "https://arxiv.org/abs/1803.02893", "confirmed": "arXiv：标题An efficient framework for learning sentence representations、作者Logeswaran与Lee，v1提交于2018-03-07；摘要：受分布假说启发，把预测句子上下文改写为分类问题，给定句子与上下文，分类器根据向量表示区分上下文句与对比句，可高效学习不同类型的编码函数，在多项涉及句义理解的下游任务上超过最好的无监督与有监督表示学习方法，训练时间加速一个数量级。ICLR 2018出处、GRU编码器、f与g拼接等细节凭一般了解。"}
+}

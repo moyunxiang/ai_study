@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Bark文本提示音频生成（2023） · AI脉络</title>
+<meta name="description" content="开源TTS大多只能把文字读出来，做不出笑声、叹气、音乐、背景声这类非语言声音，也很难跨语言自然发音。 做一个GPT式的全生成文本到音频模型：沿用AudioLM、VALL-E的分层token思路，用EnCodec量化的音频表示，直接从文本生成语音乃至其他声音。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/bark.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Bark文本提示音频生成（2023）">
+<meta property="og:description" content="开源TTS大多只能把文字读出来，做不出笑声、叹气、音乐、背景声这类非语言声音，也很难跨语言自然发音。 做一个GPT式的全生成文本到音频模型：沿用AudioLM、VALL-E的分层token思路，用EnCodec量化的音频表示，直接从文本生成语音乃至其他声音。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/bark.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/bark">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:168"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">感知与生成 › <a href="../t/speech.html">语音与音频</a> › 声音克隆与零样本合成</div>
+<h1>Bark文本提示音频生成</h1>
+
+<div class="meta"><span>2023.04</span><span>模型</span><span>延伸</span><span>Suno</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://github.com/suno-ai/bark" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/bark">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>开源TTS大多只能把文字读出来，做不出笑声、叹气、音乐、背景声这类非语言声音，也很难跨语言自然发音。</p></div><div><h4>方法</h4><p>做一个GPT式的全生成文本到音频模型：沿用AudioLM、VALL-E的分层token思路，用EnCodec量化的音频表示，直接从文本生成语音乃至其他声音。</p></div><div><h4>影响</h4><p>开源后很快成为最受欢迎的TTS仓库之一（约3.9万星），能生成多语言语音和笑声、音乐等，2023-05改为MIT许可可商用，并被Coqui TTS集成。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>Bark由Suno开发，README称它是“全生成式”的文本到音频模型而非传统TTS。结构上它参照<a class="ln" href="../n/audiolm.html">AudioLM</a>和<a class="ln" href="../n/vall-e.html">VALL-E</a>：先用一个Transformer从文本生成语义token，再用后续模型依次生成粗粒度和细粒度的声学token，这些声学token来自<a class="ln" href="../n/encodec.html">EnCodec</a>的量化表示，最后由EnCodec解码器还原波形。因为是纯生成模型，它不仅能说多种语言，还能在文本里用提示标记生成笑声、叹息、清嗓、背景噪声，甚至简单的音乐和音效；也可以用预设的语音提示控制音色和语气。2023-05的更新带来GPU上2倍、CPU上10倍的提速，并提供更小的版本。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>作为研究性的全生成模型，输出可能偏离提示，长文本需分段生成；官方不支持任意声音的克隆。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:168" href="../n/xtts.html">XTTS</a> <a class="chip hue" style="--h:168" href="../n/cosyvoice.html">CosyVoice</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:168" href="../n/encodec.html">EnCodec</a><span class="yr">2022.10 · 语音</span><div class=nt>音频表示与解码器来自EnCodec。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:168" href="../n/vall-e.html">VALL-E</a><span class="yr">2023.01 · 语音</span><div class=nt>同样以编解码器token做语言建模生成语音。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:168" href="../n/audiolm.html">AudioLM</a><span class="yr">2022.09 · 语音</span><div class=nt>README写明采用与AudioLM类似的GPT式结构，分层生成语义与声学token。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:168" href="../n/chattts.html">ChatTTS对话语音合成</a><span class="yr">2024.05 · 语音</span><div class=nt>同为可生成笑声等非语言声音的生成式TTS，ChatTTS聚焦中英文对话场景。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/xtts.html">XTTS</a><span class="yr">2024.06 · 语音</span><div class=nt>作为研究性的全生成模型，输出可能偏离提示，长文本需分段生成；官方不支持任意声音的克隆。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:168" href="../n/cosyvoice.html">CosyVoice</a><span class="yr">2024.07 · 语音</span><div class=nt>作为研究性的全生成模型，输出可能偏离提示，长文本需分段生成；官方不支持任意声音的克隆。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:168" href="../n/dia.html">Dia对话语音生成</a><span class="yr">2025.04 · 语音</span><div class=nt>延续Bark一类全生成式模型生成笑声等非语言声音的能力，并扩展到多人对话脚本。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/vocoder-codec.html">声码器与音频编解码</a> <a class="chip c" href="../c/tokenization.html">分词与token</a></p>
+
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://github.com/suno-ai/bark" rel="noopener">https://github.com/suno-ai/bark</a>（仓库创建于2023-04-07、约3.9万星、README中Bark是Suno的基于Transformer的文本到音频模型、可生成多语言语音及音乐、背景噪声、音效与笑声叹气哭泣等非语言声音、GPT式结构类似AudioLM与VALL-E、使用EnCodec量化表示、2023-05-01改为MIT许可并在GPU上提速2倍CPU上10倍、更小版本；语义/粗/细三阶段token细节与Coqui集成（见Coqui README）来自一般了解与README）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Bark%E6%96%87%E6%9C%AC%E6%8F%90%E7%A4%BA%E9%9F%B3%E9%A2%91%E7%94%9F%E6%88%90%EF%BC%88bark%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Abark%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/bark.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="naturalspeech-2.html"><small>本分支上一个 · 2023.04</small><b>NaturalSpeech 2</b></a><a class="r" href="tango.html"><small>本分支下一个 · 2023.04</small><b>TANGO文生音频</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

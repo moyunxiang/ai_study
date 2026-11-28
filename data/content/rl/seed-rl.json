@@ -1,0 +1,34 @@
+{
+  "id": "seed-rl",
+  "who": "Lasse Espeholt, Raphaël Marinier, Piotr Stanczyk, Ke Wang, Marcin Michalski · Google Research, Brain Team",
+  "venue": "ICLR 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1910.06591"},
+    {"label": "GitHub", "url": "https://github.com/google-research/seed_rl"}
+  ],
+  "problem": "IMPALA等分布式架构让每个CPU上的actor各自持有一份模型做推理，再把轨迹发给learner；模型一大，CPU推理又慢又贵，频繁同步参数也占带宽，加速器（GPU/TPU）的算力用不满。",
+  "idea": "把推理也集中到learner所在的加速器上：actor只负责运行环境，每一步把观测发给中心，由加速器批量算出动作再发回。配合优化的通信层（gRPC流式通信），用一套架构跑V-trace和R2D2两种算法。",
+  "impact": "让“环境在CPU、推理与训练都在加速器上”成为大规模RL的标准架构之一，每秒可训练数百万帧，实验成本降低40%–80%，后来的多个大规模RL系统都采用中心化推理。",
+  "background": "[[impala]]把actor（产生经验）与learner（训练）分开，用V-trace纠正二者策略不一致的偏差，是当时扩展深度RL的主流方案；[[r2d2]]在[[apex]]的基础上加入循环网络和分布式优先回放。但在这些架构中，每个actor都要在CPU上运行一份神经网络：网络大了推理慢，actor需要定期从learner拉取最新参数，CPU资源也比加速器贵得多。随着模型变大、环境越来越快，推理成了瓶颈。",
+  "method": "SEED（Scalable, Efficient Deep-RL）的结构是：\n\n- **Actor**：只运行环境，每步把观测发给learner，等待返回的动作，不持有模型；\n- **Learner**：在GPU/TPU上同时做两件事——把大量actor发来的观测凑成批，做一次前向推理返回动作；以及用收集到的轨迹训练模型。循环网络的隐状态也保存在learner端；\n- **通信层**：基于gRPC的双向流式连接，延迟低，可以支持数千个actor。\n\n由于推理和训练用同一份参数、在同一台设备上，不再需要把参数同步给actor。论文在这一架构上实现了两种算法：策略梯度的IMPALA/V-trace与Q学习的R2D2。环境步之间必须等待网络往返，因此作者分析了延迟与吞吐的权衡，并在TPU上把批量推理做得尽量高效。",
+  "results": "摘要称：SEED在Atari-57、DeepMind Lab和Google Research Football上评测；在Football上改进了当时最好水平，在Atari-57上以三倍快的墙钟时间达到最先进水平；在所考察的场景中，运行实验的成本降低了40%到80%。实现与实验均已开源。",
+  "legacy": "中心化推理的设计被之后的大规模RL系统和库广泛借鉴（例如Acme等框架中的分布式变体、以及游戏AI和机器人仿真中的大规模训练系统）；SEED也为在[[google-football]]上训练强智能体提供了标准基线。",
+  "limits": [
+    {"text": "每个环境步都要与learner往返一次，网络延迟直接拖慢环境运行，对需要低延迟控制或跨数据中心部署的场景不友好。", "solved_by": []},
+    {"text": "仍是在线采样的架构，样本效率没有改进，只是把单位成本降了下来。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "impala", "type": "solves", "note": "IMPALA的actor在CPU上各自推理且要同步参数；SEED把推理集中到加速器，消除这两个瓶颈，并沿用V-trace。"},
+    {"to": "r2d2", "type": "uses", "note": "在同一架构中实现R2D2，验证中心化推理也适用于循环网络的Q学习。"},
+    {"to": "apex", "type": "extends", "note": "延续Ape-X式的大规模分布式采样，但把actor简化为只跑环境。"},
+    {"to": "google-football", "type": "uses", "note": "在Google Research Football上评测并刷新了当时最好成绩。"}
+  ],
+  "prereq": ["distributed-training", "cpu-gpu", "throughput-latency", "actor-critic", "on-off-policy"],
+  "terms": [
+    {"t": "中心化推理", "d": "不在每个采样进程里各跑一份模型，而是把所有观测送到一台加速器上批量计算动作。"},
+    {"t": "V-trace", "d": "IMPALA提出的离策略修正方法，用截断的重要性权重纠正actor与learner策略不一致带来的偏差。"}
+  ],
+  "learn": "先读[[impala]]理解actor-learner架构和V-trace；读原文第3节架构与第4节成本分析；对比一下“每个actor一份模型”与“中心推理”在不同模型大小下每秒帧数的理论差异。",
+  "check": {"source": "https://arxiv.org/abs/1910.06591", "confirmed": "标题、作者（Espeholt, Marinier, Stanczyk, Ke Wang, Michalski）、arXiv v1于2019-10-15；摘要中SEED命名、利用现代加速器每秒训练数百万帧并降低成本、中心化推理与优化的通信层、采用IMPALA/V-trace与R2D2、在Atari-57/DeepMind Lab/Google Research Football上评测、Football上改进最好水平、Atari-57上墙钟快三倍达到最先进、成本降低40%到80%、开源。gRPC流式通信、隐状态在learner端、ICLR 2020与机构按原文正文和通行引用。"},
+  "aka": ["SEED RL", "SEED", "Scalable, Efficient Deep-RL", "中心化推理RL", "Accelerated Central Inference"]
+}

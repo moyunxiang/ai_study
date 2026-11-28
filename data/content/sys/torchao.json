@@ -1,0 +1,22 @@
+{
+  "id": "torchao",
+  "who": "Andrew Or, Apurva Jain, Daniel Vega-Myhre, Jesse Cai, Charles David Hernandez, Zhenrui Zheng, Driss Guessous, Vasiliy Kuznetsov et al. · Meta PyTorch团队",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2507.16099"}, {"label": "GitHub", "url": "https://github.com/pytorch/ao"}],
+  "aka": ["torchao", "TorchAO", "pytorch/ao", "PyTorch量化库", "Architecture Optimization"],
+  "problem": "量化、稀疏等模型优化技术分散在各自的库里，训练、微调、部署各用一套工具，格式互不兼容，往往还要改模型代码。",
+  "idea": "做一个PyTorch原生的优化框架：用张量子类表示各种与后端无关的低精度数据类型，在同一套接口下支持FP8训练、量化感知训练、训练后量化和2:4稀疏，并与从预训练到服务的生态库衔接。",
+  "impact": "被transformers、diffusers、torchtitan、vLLM等库接入，支撑了量化版Llama 3.2 1B/3B等模型的发布；2026年起官方表示将把底层原语并入torch本体、上层流程并入各框架，本库减少新功能开发。",
+  "method": "核心抽象是张量子类：一个“量化张量”对外看起来仍是普通的torch.Tensor，内部保存低比特数据和缩放因子，并重载矩阵乘法等运算去调用合适的内核。这样用户只需一行 `quantize_(model, config)` 就能把模型的线性层替换成INT4、INT8、FP8或MX格式（MXFP4/6/8），不用改模型定义，且能与torch.compile配合生成融合内核。\n\n它覆盖的流程包括：FP8量化训练、量化感知训练（QAT）、训练后量化（PTQ，如INT4仅权重、INT8动态量化）以及2:4结构化稀疏。论文强调它与生态的衔接：预训练接TorchTitan，微调接TorchTune与Axolotl，服务接Hugging Face、vLLM、SGLang和ExecuTorch。仓库创建于2023年11月，论文发布于2025年7月。",
+  "limits": [
+    {"text": "README说明MoE模型的量化需要额外决策（分发前还是分发后量化、内核融合边界），统一的端到端流程难以覆盖，库已转向维护为主。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "pytorch-2", "type": "uses", "note": "依赖张量子类与torch.compile生成高效的低精度内核。"},
+    {"to": "integer-quant", "type": "extends", "note": "把量化感知训练与整数推理流程做成PyTorch原生的通用接口。"},
+    {"to": "fp8-lm", "type": "rivals", "note": "同为FP8训练方案，torchao提供与框架集成的通用实现。"},
+    {"to": "8bit-optimizers", "type": "rivals", "note": "bitsandbytes是此前最常用的PyTorch低比特库，torchao提供与PyTorch原生机制（张量子类、torch.compile）集成的替代方案；预训练阶段它还与[[torchtitan]]集成。"}
+  ],
+  "prereq": ["quantization-concept", "floating-point"],
+  "learn": "先理解[[c:quantization-concept]]中仅权重量化与动态量化的区别；读论文第3节张量子类的设计；动手用quantize_把一个小模型的线性层量化为INT4，比较推理速度与精度。",
+  "check": {"source": "https://arxiv.org/abs/2507.16099", "confirmed": "论文标题、作者（13位，列前8位）、arXiv v1 2025-07-21；摘要中PyTorch原生、量化与稀疏、FP8训练/QAT/PTQ/2:4稀疏、张量子类表示INT4/INT8/FP8/MXFP4/6/8、与TorchTitan/TorchTune/Axolotl/HF/vLLM/SGLang/ExecuTorch集成、支撑量化Llama 3.2 1B/3B与LlamaGuard3-8B；GitHub仓库创建于2023-11-03，README中减少新功能开发的说明与MoE原因。quantize_接口名与torch.compile配合凭一般了解。"}
+}

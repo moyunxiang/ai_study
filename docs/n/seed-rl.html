@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SEED RL中心化推理（2019） · AI脉络</title>
+<meta name="description" content="IMPALA等分布式架构让每个CPU上的actor各自持有一份模型做推理，再把轨迹发给learner；模型一大，CPU推理又慢又贵，频繁同步参数也占带宽，加速器（GPU/TPU）的算力用不满。 把推理也集中到learner所在的加速器上：actor只负责运行环境，每一步把观测发给中心，由加速器批量…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/seed-rl.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SEED RL中心化推理（2019）">
+<meta property="og:description" content="IMPALA等分布式架构让每个CPU上的actor各自持有一份模型做推理，再把轨迹发给learner；模型一大，CPU推理又慢又贵，频繁同步参数也占带宽，加速器（GPU/TPU）的算力用不满。 把推理也集中到learner所在的加速器上：actor只负责运行环境，每一步把观测发给中心，由加速器批量…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/seed-rl.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/seed-rl">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 策略梯度与演员评论家</div>
+<h1>SEED RL中心化推理</h1>
+<div class="full">SEED RL: Scalable and Efficient Deep-RL with Accelerated Central Inference</div>
+<div class="meta"><span>2019.10</span><span>系统</span><span>延伸</span><span>ICLR 2020</span><span>Lasse Espeholt, Raphaël Marinier, Piotr Stanczyk, Ke Wang, Marcin Michalski · Google Research, Brain Team</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1910.06591" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/google-research/seed_rl" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/seed-rl">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>IMPALA等分布式架构让每个CPU上的actor各自持有一份模型做推理，再把轨迹发给learner；模型一大，CPU推理又慢又贵，频繁同步参数也占带宽，加速器（GPU/TPU）的算力用不满。</p></div><div><h4>方法</h4><p>把推理也集中到learner所在的加速器上：actor只负责运行环境，每一步把观测发给中心，由加速器批量算出动作再发回。配合优化的通信层（gRPC流式通信），用一套架构跑V-trace和R2D2两种算法。</p></div><div><h4>影响</h4><p>让“环境在CPU、推理与训练都在加速器上”成为大规模RL的标准架构之一，每秒可训练数百万帧，实验成本降低40%–80%，后来的多个大规模RL系统都采用中心化推理。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/impala.html">IMPALA与V-trace</a>把actor（产生经验）与learner（训练）分开，用V-trace纠正二者策略不一致的偏差，是当时扩展深度RL的主流方案；<a class="ln" href="../n/r2d2.html">R2D2</a>在<a class="ln" href="../n/apex.html">Ape-X</a>的基础上加入循环网络和分布式优先回放。但在这些架构中，每个actor都要在CPU上运行一份神经网络：网络大了推理慢，actor需要定期从learner拉取最新参数，CPU资源也比加速器贵得多。随着模型变大、环境越来越快，推理成了瓶颈。</p><h2>方法</h2><p>SEED（Scalable, Efficient Deep-RL）的结构是：</p><ul><li><b>Actor</b>：只运行环境，每步把观测发给learner，等待返回的动作，不持有模型；</li><li><b>Learner</b>：在GPU/TPU上同时做两件事——把大量actor发来的观测凑成批，做一次前向推理返回动作；以及用收集到的轨迹训练模型。循环网络的隐状态也保存在learner端；</li><li><b>通信层</b>：基于gRPC的双向流式连接，延迟低，可以支持数千个actor。</li></ul><p>由于推理和训练用同一份参数、在同一台设备上，不再需要把参数同步给actor。论文在这一架构上实现了两种算法：策略梯度的IMPALA/V-trace与Q学习的R2D2。环境步之间必须等待网络往返，因此作者分析了延迟与吞吐的权衡，并在TPU上把批量推理做得尽量高效。</p><h2>结果</h2><p>摘要称：SEED在Atari-57、DeepMind Lab和Google Research Football上评测；在Football上改进了当时最好水平，在Atari-57上以三倍快的墙钟时间达到最先进水平；在所考察的场景中，运行实验的成本降低了40%到80%。实现与实验均已开源。</p><h2>后来的发展</h2><p>中心化推理的设计被之后的大规模RL系统和库广泛借鉴（例如Acme等框架中的分布式变体、以及游戏AI和机器人仿真中的大规模训练系统）；SEED也为在<a class="ln" href="../n/google-football.html">Google足球环境</a>上训练强智能体提供了标准基线。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每个环境步都要与learner往返一次，网络延迟直接拖慢环境运行，对需要低延迟控制或跨数据中心部署的场景不友好。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>仍是在线采样的架构，样本效率没有改进，只是把单位成本降了下来。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/impala.html">IMPALA与V-trace</a><span class="yr">2018.02 · RL</span><div class=nt>IMPALA的actor在CPU上各自推理且要同步参数；SEED把推理集中到加速器，消除这两个瓶颈，并沿用V-trace。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/apex.html">Ape-X</a><span class="yr">2018.03 · RL</span><div class=nt>延续Ape-X式的大规模分布式采样，但把actor简化为只跑环境。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/r2d2.html">R2D2</a><span class="yr">2018.09 · RL</span><div class=nt>在同一架构中实现R2D2，验证中心化推理也适用于循环网络的Q学习。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/google-football.html">Google足球环境</a><span class="yr">2019.07 · RL</span><div class=nt>在Google Research Football上评测并刷新了当时最好成绩。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/cpu-gpu.html">CPU、GPU与并行计算</a> <a class="chip c" href="../c/throughput-latency.html">吞吐、延迟与批处理</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/on-off-policy.html">on-policy与off-policy</a></p>
+<h2>本篇术语</h2><ul><li><b>中心化推理</b>　不在每个采样进程里各跑一份模型，而是把所有观测送到一台加速器上批量计算动作。</li><li><b>V-trace</b>　IMPALA提出的离策略修正方法，用截断的重要性权重纠正actor与learner策略不一致带来的偏差。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/impala.html">IMPALA与V-trace</a>理解actor-learner架构和V-trace；读原文第3节架构与第4节成本分析；对比一下“每个actor一份模型”与“中心推理”在不同模型大小下每秒帧数的理论差异。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1910.06591" rel="noopener">https://arxiv.org/abs/1910.06591</a>（标题、作者（Espeholt, Marinier, Stanczyk, Ke Wang, Michalski）、arXiv v1于2019-10-15；摘要中SEED命名、利用现代加速器每秒训练数百万帧并降低成本、中心化推理与优化的通信层、采用IMPALA/V-trace与R2D2、在Atari-57/DeepMind Lab/Google Research Football上评测、Football上改进最好水平、Atari-57上墙钟快三倍达到最先进、成本降低40%到80%、开源。gRPC流式通信、隐状态在learner端、ICLR 2020与机构按原文正文和通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SEED%20RL%E4%B8%AD%E5%BF%83%E5%8C%96%E6%8E%A8%E7%90%86%EF%BC%88seed-rl%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aseed-rl%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/seed-rl.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="sac-ae.html"><small>本分支上一个 · 2019.10</small><b>SAC+AE像素自编码</b></a><a class="r" href="varibad.html"><small>本分支下一个 · 2019.10</small><b>VariBAD贝叶斯自适应</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

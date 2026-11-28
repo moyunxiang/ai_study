@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>特征存储与训练—服务一致性（Feature Stores and Training–Serving Consistency） · AI脉络</title>
+<meta name="description" content="集中管理特征的基础设施：同一份特征定义既能批量算出历史值供训练，也能低延迟提供最新值供推理，保证训练和服务用同一套特征，避免训练—服务偏差和时间穿越泄漏。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/feature-store.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="特征存储与训练—服务一致性（Feature Stores and Training–Serving Consistency）">
+<meta property="og:description" content="集中管理特征的基础设施：同一份特征定义既能批量算出历史值供训练，也能低延迟提供最新值供推理，保证训练和服务用同一套特征，避免训练—服务偏差和时间穿越泄漏。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/feature-store.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/feature-store">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 系统与硬件 · 入门</div>
+<h1>特征存储与训练—服务一致性</h1><div class="full">Feature Stores and Training–Serving Consistency</div>
+<p class="muted" style="font-size:13px">也叫：特征存储　特征仓库　特征平台　feature store　feature platform　训练服务偏差　训练-服务偏差　training-serving skew　时间点正确　point-in-time correctness　point-in-time join　时间穿越　在线特征　online features　离线特征　offline features　Feast　Tecton　特征管理</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/feature-store">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>集中管理特征的基础设施：同一份特征定义既能批量算出历史值供训练，也能低延迟提供最新值供推理，保证训练和服务用同一套特征，避免训练—服务偏差和时间穿越泄漏。</b></p>
+<p class="tags">先要会：<a class="chip c" href="feature-representation.html">特征与表示学习</a> <a class="chip c" href="train-val-test.html">训练集、验证集与测试集</a></p>
+<p>推荐、风控、广告这类系统的模型往往依赖成百上千个特征：用户最近7天的点击次数、商品过去一小时的销量、账户注册天数……这些特征散落在不同的数据表和流水线里，由不同团队各自计算。问题随之而来：</p><ul><li><b>训练—服务偏差</b>：离线训练时用SQL批量算出的“最近7天点击数”，与线上服务时用另一段代码实时算出的值，口径稍有不同，模型上线后效果就莫名变差。</li><li><b>时间穿越</b>：构造训练样本时，不小心用了事件发生<b>之后</b>才产生的数据（比如用“今天的累计销量”去预测“今天上午的点击”），离线指标虚高（见<a class="lc" href="../c/data-contamination.html">数据泄漏与基准污染</a>和<a class="lc" href="../c/data-splitting.html">数据划分：分层、分组与按时间划分</a>）。</li><li><b>重复建设</b>：不同模型各自重算同一个特征，浪费算力，结果还不一致。</li></ul><p><b>特征存储</b>把特征当作一等公民来管理：</p><ul><li><b>统一定义</b>：特征的计算逻辑只写一次，登记名称、类型、负责人和更新频率。</li><li><b>离线存储</b>：保存特征的完整历史（通常在数据仓库或数据湖中），用于生成训练集。关键操作是<b>按时间点正确的连接</b>：为每条训练样本只取它发生那一刻之前已经可得的特征值。</li><li><b>在线存储</b>：用低延迟的键值数据库保存每个实体（用户、商品）的最新特征值，推理时毫秒级读取。</li><li><b>物化与同步</b>：批处理或流处理任务定期把特征计算出来，同时写入离线和在线两边，保证一致。</li><li><b>监控与发现</b>：监控特征分布是否漂移（见<a class="lc" href="../c/distribution-shift.html">分布偏移</a>），让其他团队能检索和复用已有特征。</li></ul><p>开源的Feast、商业化的Tecton，以及Uber的Michelangelo等内部平台是常见例子。它是MLOps体系中与模型注册表、实验追踪（<a class="ln" href="../n/mlflow-wandb.html">实验追踪：W&amp;B与MLflow</a>）并列的组件；<a class="ln" href="../n/hidden-tech-debt.html">机器学习系统的技术债</a>所说的机器学习系统技术债，很大一部分正来自特征与数据管道，<a class="ln" href="../n/tfx.html">TFX生产机器学习平台</a>等平台也把特征的一致性作为核心设计目标。</p><p><b>与深度学习、大模型的关系</b>。端到端的深度模型减少了手工特征工程（见<a class="lc" href="../c/feature-representation.html">特征与表示学习</a>），但推荐、风控等工业系统仍大量依赖实时统计特征（见<a class="lc" href="../c/recommender-systems.html">推荐系统与协同过滤</a>）；大模型应用中，检索用的<a class="lc" href="../c/retrieval.html">检索与向量数据库</a>向量索引和用户画像也面临类似的“离线构建、在线服务、保持一致”问题。</p>
+<div class="example"><h4>例子</h4><p>风控模型的特征“用户过去24小时交易次数”。训练样本是2026-03-01 10:00的一笔交易，按时间点正确的连接只统计2026-02-28 10:00到2026-03-01 10:00之间的交易（比如3次），而不是当天全天的统计（比如11次，包含了这笔交易之后发生的8次）。线上推理时，在线存储里实时维护同一个滑动窗口计数，读出的值与训练时的口径完全一致。</p></div>
+<h2>容易误解的地方</h2><ul><li>特征存储解决的是一致性和复用，不会自动保证特征有用；没人维护的特征越积越多，反而成为负担。</li><li>实时特征的更新延迟（流处理落后几秒到几分钟）也要在训练时模拟，否则仍会出现细微的训练—服务偏差。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

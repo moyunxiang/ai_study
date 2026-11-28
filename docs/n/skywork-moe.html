@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Skywork-MoE训练技巧（2024） · AI脉络</title>
+<meta name="description" content="训练MoE大模型时，有两个反复出现的实际问题：已有一个好的稠密模型，是拿它“升级”成MoE还是从头训练；以及路由器输出过于平均、专家分不开，而统一的负载均衡损失系数又难以同时照顾所有层。 以天工13B稠密模型为起点训练146B参数、16个专家的Skywork-MoE，系统比较升级与从头训练，并提出…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/skywork-moe.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Skywork-MoE训练技巧（2024）">
+<meta property="og:description" content="训练MoE大模型时，有两个反复出现的实际问题：已有一个好的稠密模型，是拿它“升级”成MoE还是从头训练；以及路由器输出过于平均、专家分不开，而统一的负载均衡损失系数又难以同时照顾所有层。 以天工13B稠密模型为起点训练146B参数、16个专家的Skywork-MoE，系统比较升级与从头训练，并提出…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/skywork-moe.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/skywork-moe">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 混合专家</div>
+<h1>Skywork-MoE训练技巧</h1>
+<div class="full">Skywork-MoE: A Deep Dive into Training Techniques for Mixture-of-Experts Language Models</div>
+<div class="meta"><span>2024.06</span><span>论文</span><span>延伸</span><span>Tianwen Wei, Bo Zhu, Liang Zhao, Cheng Cheng, Biye Li, Weiwei Lü, Peng Cheng, Jianhao Zhang et al. · 昆仑万维天工</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2406.06563" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/skywork-moe">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>训练MoE大模型时，有两个反复出现的实际问题：已有一个好的稠密模型，是拿它“升级”成MoE还是从头训练；以及路由器输出过于平均、专家分不开，而统一的负载均衡损失系数又难以同时照顾所有层。</p></div><div><h4>方法</h4><p>以天工13B稠密模型为起点训练146B参数、16个专家的Skywork-MoE，系统比较升级与从头训练，并提出两个技巧：在softmax前对门控logit做归一化和放大，让路由更果断；按层根据丢弃率自适应调整辅助损失系数。</p></div><div><h4>影响</h4><p>给出一份公开的大规模MoE训练经验报告：升级与否取决于稠密检查点的质量和MoE训练预算；门控logit归一化和逐层自适应辅助损失两个小改动简单可复用，被后续MoE工程讨论引用。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/sparse-upcycling.html">稀疏升级Upcycling</a>提出把训练好的稠密模型复制成多个专家来初始化MoE，比从头训练省；<a class="ln" href="../n/mixtral.html">Mixtral 8x7B</a>的成功让MoE成为开源大模型的热门选择。但升级出来的专家起点完全相同，容易长期相似、分工不明；负载均衡损失（<a class="ln" href="../n/switch-transformer.html">稀疏MoE大模型</a>）的系数若太大会伤害模型质量、太小又会导致大量词元被丢弃，而不同层的需求不同。</p><h2>方法</h2><p><b>升级还是从头训</b>：作者在不同训练预算下比较两种初始化。升级起点高、前期收益大；从头训练起点低但上限可能更高。结论是：若稠密检查点本身很强、而MoE训练预算有限，就升级；预算充足时从头训练可能更好。Skywork-MoE由<a class="ln" href="../n/skywork.html">天工Skywork-13B</a>的13B稠密检查点升级而来。</p><p><b>门控logit归一化</b>：路由器对每个专家输出logit z，常规做法直接 <code>softmax(z)</code>。作者先对z做标准化再乘一个放大系数λ： <code>g = softmax( λ · (z − mean(z)) / std(z) )</code> 这样路由分布更尖锐，不同专家的选择更明确，有助于专家分化，尤其是对起点相同的升级专家。</p><p><b>自适应辅助损失系数</b>：负载均衡辅助损失的系数不再全局固定，而是每层单独设置并在训练中调整：某层的词元丢弃率高，就加大该层的系数，丢弃率低就减小，使各层在负载均衡与模型质量之间各自取得平衡。</p><p>最终模型在精简的SkyPile语料子集上训练。</p><h2>结果</h2><p>实验验证了门控logit归一化与自适应辅助损失的有效性；Skywork-MoE在广泛的基准上表现强劲。具体分数见报告，摘要未给出。</p><h2>后来的发展</h2><p>门控分布过平的问题和逐层调整负载均衡的思路，与后来<a class="ln" href="../n/global-batch-lbl.html">全局批负载均衡损失</a>、DeepSeek的无辅助损失均衡等工作关注的是同一个矛盾；“升级还是从头”的结论常被引用于MoE初始化的讨论。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只有16个较大的专家，属于粗粒度MoE；同期已经出现的细粒度专家与共享专家设计（<a class="ln" href="../n/deepseekmoe.html">DeepSeekMoE细粒度专家</a>）没有纳入比较。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>辅助损失仍然会与语言建模目标冲突，自适应系数只是缓解，没有去掉这种干扰。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/global-batch-lbl.html">全局批负载均衡损失</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/mixtral.html">Mixtral 8x7B</a><span class="yr">2024.01 · LLM</span><div class=nt>同期的开源MoE大模型。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/switch-transformer.html">稀疏MoE大模型</a><span class="yr">2021.01 · LLM</span><div class=nt>Switch式全局固定的负载均衡损失系数难以兼顾各层；改为按丢弃率逐层自适应。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/sparse-upcycling.html">稀疏升级Upcycling</a><span class="yr">2022.12 · LLM</span><div class=nt>系统比较升级与从头训练，给出何时该升级的经验结论。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/skywork.html">天工Skywork-13B</a><span class="yr">2023.10 · LLM</span><div class=nt>由天工Skywork-13B稠密检查点升级为146B参数的MoE。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/global-batch-lbl.html">全局批负载均衡损失</a><span class="yr">2025.01 · LLM</span><div class=nt>辅助损失仍然会与语言建模目标冲突，自适应系数只是缓解，没有去掉这种干扰。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/mixture-of-experts.html">混合专家</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a></p>
+<h2>本篇术语</h2><ul><li><b>升级（upcycling）</b>　把一个训练好的稠密模型的前馈层复制若干份当作初始专家，再继续训练成MoE。</li><li><b>辅助损失</b>　在主损失之外额外加的一项，这里用来惩罚专家负载不均，系数决定它的分量。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/sparse-upcycling.html">稀疏升级Upcycling</a>和<a class="ln" href="../n/switch-transformer.html">稀疏MoE大模型</a>的负载均衡损失；读报告中升级对比与两个技巧的章节；动手：在一个小MoE上对比有无logit归一化时路由熵和专家负载的变化。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2406.06563" rel="noopener">https://arxiv.org/abs/2406.06563</a>（标题、作者（16位，列前8位）、arXiv首次提交2024-06-03；摘要中146B参数、16个专家、由Skywork-13B稠密检查点初始化、比较升级与从头训练、选择取决于稠密检查点表现和MoE训练预算、门控logit归一化改善专家多样化、自适应辅助损失系数允许逐层调整、在精简的SkyPile子集上训练、广泛基准表现强。归一化公式、按丢弃率调整系数的方式为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Skywork-MoE%E8%AE%AD%E7%BB%83%E6%8A%80%E5%B7%A7%EF%BC%88skywork-moe%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Askywork-moe%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/skywork-moe.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="armorm.html"><small>本分支上一个 · 2024.06</small><b>ArmoRM多目标奖励模型</b></a><a class="r" href="md4.html"><small>本分支下一个 · 2024.06</small><b>MD4简化掩码扩散</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

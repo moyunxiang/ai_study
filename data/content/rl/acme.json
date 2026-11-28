@@ -1,0 +1,34 @@
+{
+  "id": "acme",
+  "who": "Matthew W. Hoffman, Bobak Shahriari, John Aslanides, Gabriel Barth-Maron, Nikola Momchev, Danila Sinopalnikov, Piotr Stańczyk, Sabela Ramos et al. · DeepMind",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2006.00979"},
+    {"label": "GitHub", "url": "https://github.com/google-deepmind/acme"}
+  ],
+  "problem": "深度RL的进展伴随着越来越大的网络和越来越复杂的算法，研究者很难快速试验新想法，也很难复现已发表的算法；分布式大规模版本更是各写各的，代码难以阅读。",
+  "idea": "提供一个用简单、模块化组件搭建RL智能体的研究框架：把智能体拆成actor（与环境交互）、learner（更新参数）、replay/dataset（存取经验）等部件，同一套代码既能单进程运行，也能扩展为大规模分布式运行。附带一批重要算法的参考实现。",
+  "impact": "成为DeepMind对外发布的主要RL研究框架之一，包含DQN、R2D2、D4PG、MPO、IMPALA、SAC、PPO、BC、CQL等大量参考实现，被学术界用作复现与新算法开发的基础。",
+  "background": "早期的RL代码库如[[openai-baselines]]、[[dopamine]]主要面向单机、少数算法；[[rllib]]侧重工程化的分布式训练。DeepMind内部的大规模智能体（如[[impala]]、[[r2d2]]、[[d4pg]]）依赖各自的分布式基础设施，外部研究者难以复用。作者希望有一个框架，让“写一个新算法”与“把它扩展到成百上千个actor”使用相同的、可读的代码。",
+  "method": "Acme的核心抽象：\n\n- **Actor**：持有策略，执行 `select_action(observation)`，并把转移交给适配器写入经验存储；\n- **Learner**：从数据集中取批量数据，执行梯度更新，并对外提供最新参数；\n- **Dataset/Replay**：基于Reverb（DeepMind开源的经验回放服务）实现，可以配置为均匀回放、优先回放、FIFO队列（用于在线策略算法）或离线数据集；\n- **Variable client**：actor通过它从learner拉取最新参数。\n\n单进程模式下这些组件在同一个循环里运行；分布式模式下用Launchpad把它们部署为独立进程，actor数可以扩展到很多。论文还描述了参考实现所覆盖的算法族：值方法（DQN、R2D2）、连续控制（D4PG、MPO、SAC、TD3）、在线策略（IMPALA、PPO）、离线与模仿学习（BC、BCQ/CQL类、GAIL、SQIL、PWIL等，具体以仓库为准）、以及基于模型的MCTS等，并在DMC、Atari等环境上给出基线结果。",
+  "results": "摘要称：作者描述了Acme的主要设计决策，并说明其组件如何用于实现各种算法；实验为若干常见和最先进的算法提供了基线，并展示了这些算法如何扩展到更大、更复杂的环境；这突出了Acme的主要优势——它可以实现在海量规模上运行的大型分布式RL算法，同时保持实现本身的可读性。",
+  "legacy": "Acme之后，JAX生态的RL库（如RLax、Dopamine的JAX版本、CleanRL的JAX实现）蓬勃发展；Acme的actor/learner/replay分解也被许多研究代码采用，作为把单机原型扩展为分布式实验的模板。",
+  "limits": [
+    {"text": "基于TensorFlow/JAX与Reverb、Launchpad等DeepMind工具链，安装和定制门槛较高，对小规模实验显得偏重。", "solved_by": []},
+    {"text": "框架本身不提供新的算法改进，参考实现的超参数和结果随版本更新变化，跨版本比较需要谨慎。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "impala", "type": "uses", "note": "把IMPALA式actor-learner分布式架构作为框架设计的出发点之一，并提供参考实现。"},
+    {"to": "r2d2", "type": "uses", "note": "提供R2D2等分布式值方法的参考实现。"},
+    {"to": "d4pg", "type": "uses", "note": "提供D4PG、MPO等连续控制算法的参考实现与基线。"},
+    {"to": "dopamine", "type": "rivals", "note": "Dopamine面向单机、少量值方法的快速原型；Acme覆盖更多算法族并能扩展到分布式。"},
+    {"to": "rllib", "type": "rivals", "note": "RLlib偏工程化的分布式训练平台；Acme更强调研究代码的可读性与模块化。"}
+  ],
+  "prereq": ["distributed-training", "actor-critic", "on-off-policy", "throughput-latency", "rl-taxonomy"],
+  "terms": [
+    {"t": "Actor/Learner分离", "d": "把与环境交互产生数据的部分和用数据更新网络的部分拆开，二者可以在不同机器上并行运行。"},
+    {"t": "Reverb", "d": "DeepMind开源的经验存储与采样服务，支持多种回放策略，供分布式RL中的actor写入、learner读取。"}
+  ],
+  "learn": "先了解[[impala]]的actor-learner架构；读原文第2–3节组件设计；用Acme在一个DMC任务上运行单进程的D4PG示例，再切换到分布式配置观察吞吐变化。",
+  "check": {"source": "https://arxiv.org/abs/2006.00979", "confirmed": "标题、作者（Hoffman, Shahriari, Aslanides, Barth-Maron, Momchev, Sinopalnikov, Stańczyk, Ramos等39人）、arXiv v1于2020-06-01；摘要中深度RL规模与复杂度增加使快速原型与复现变难、Acme是用简单模块化组件构建新算法且可在多种规模上执行的框架、次要目标是提供重要算法的简单参考实现以利复现、描述主要设计决策、为常见与最先进算法提供基线并展示其扩展到更大环境、可实现大规模分布式算法同时保持可读性。组件名称、Reverb与Launchpad、参考算法清单按原文正文和GitHub仓库的通行描述；发表处未在abs页确认，故不写venue。"},
+  "aka": ["Acme", "DeepMind Acme", "分布式RL研究框架", "Acme RL框架"]
+}

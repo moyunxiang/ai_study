@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>RNNLM扩展与类分解（2011） · AI脉络</title>
+<meta name="description" content="2010年的RNN语言模型困惑度明显低于n-gram，但输出层要对整个词表（几万到几十万词）算softmax，训练和测试都很慢，只能在小语料上训练，难以进入实际的语音识别系统。 把输出层分解成两步：先预测下一个词属于哪个词类，再只在这个类内部预测具体的词；同时用按时间截断的反向传播训练，并组合多个…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/rnnlm-ext.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RNNLM扩展与类分解（2011）">
+<meta property="og:description" content="2010年的RNN语言模型困惑度明显低于n-gram，但输出层要对整个词表（几万到几十万词）算softmax，训练和测试都很慢，只能在小语料上训练，难以进入实际的语音识别系统。 把输出层分解成两步：先预测下一个词属于哪个词类，再只在这个类内部预测具体的词；同时用按时间截断的反向传播训练，并组合多个…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/rnnlm-ext.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/rnnlm-ext">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 语言模型</div>
+<h1>RNNLM扩展与类分解</h1>
+<div class="full">Extensions of recurrent neural network language model</div>
+<div class="meta"><span>2011.05</span><span>论文</span><span>延伸</span><span>ICASSP 2011</span><span>Tomas Mikolov, Stefan Kombrink, Lukáš Burget, Jan Černocký, Sanjeev Khudanpur · 布尔诺理工大学、约翰斯·霍普金斯大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1109/ICASSP.2011.5947611" rel="noopener">DOI ↗</a><a class="btn sm" href="../index.html#/n/rnnlm-ext">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>2010年的RNN语言模型困惑度明显低于n-gram，但输出层要对整个词表（几万到几十万词）算softmax，训练和测试都很慢，只能在小语料上训练，难以进入实际的语音识别系统。</p></div><div><h4>方法</h4><p>把输出层分解成两步：先预测下一个词属于哪个词类，再只在这个类内部预测具体的词；同时用按时间截断的反向传播训练，并组合多个RNN模型。</p></div><div><h4>影响</h4><p>让RNN语言模型的训练速度提高一个数量级以上，配套发布的RNNLM工具包成为2011–2014年神经语言模型实验和语音识别重打分的常用工具，类分解思路也被后来的层次softmax类方法沿用。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/rnnlm.html">RNN语言模型</a>（2010）用一个循环隐层把全部历史压成向量，再在输出层预测下一个词的分布。困难在于输出层：隐层维度H、词表V时，每预测一个词要做 <code>H×V</code> 次乘加，V在几万以上时，这一项远大于隐层本身的计算。<a class="ln" href="../n/nplm.html">神经概率语言模型</a>同样被这个瓶颈卡住；<a class="ln" href="../n/hierarchical-softmax.html">层次softmax语言模型</a>用二叉树把复杂度降到 <code>log V</code>，但树的构造较复杂、效果对树结构敏感。</p><h2>方法</h2><p>核心改动是<b>按词类分解输出概率</b>：先把词按频率分到C个类（按累计词频把词表切成大致等概率的几段，高频词各占小类，低频词合进大类），然后</p><p class="formula"><code>p(w_t | h_t) = p(c(w_t) | h_t) · p(w_t | c(w_t), h_t)</code></p><p>第一项是对C个类的softmax，第二项只对该类内的词做softmax。每步计算量从 <code>H×V</code> 降到约 <code>H×(C + V/C)</code>，C取 <code>√V</code> 量级时最省。</p><p>训练上，论文比较了只回传一步的简单反向传播与<a class="ln" href="../n/bptt.html">随时间反向传播BPTT</a>（随时间反向传播，回传若干步后截断），说明后者能学到更长的依赖、困惑度更低；还讨论了把多个不同初始化的RNN模型线性插值，以及和n-gram模型插值，以进一步降低困惑度和识别词错率。</p><h2>结果</h2><p>论文在Penn Treebank语料上报告困惑度，在语音识别任务上报告重打分后的词错率；主要结论是类分解带来大幅加速而困惑度只略有上升，BPTT与模型组合都能降低困惑度（具体数字未能核对原文，此处不写）。</p><h2>后来的发展</h2><p>这篇论文和随后公开的RNNLM工具包让循环网络语言模型从实验室走向大规模实验：Mikolov随后在语音识别和机器翻译重打分中用它取得收益，<a class="ln" href="../n/word2vec.html">word2vec</a>的工程实现也沿用了他在这里积累的高效训练经验。词类分解输出层后来被<a class="ln" href="../n/lstm-lm.html">LSTM语言模型</a>等工作直接采用，并演化出<a class="ln" href="../n/adaptive-softmax.html">自适应softmax</a>这类按词频分簇、适配GPU的输出层。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>普通RNN用截断BPTT训练仍会遇到梯度消失，实际能利用的历史只有十几个词。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/lstm-lm.html">LSTM语言模型</a></div></li><li>按词频切分的词类与语义无关，类内softmax对低频大类仍然很慢，在GPU上并行效率也不理想。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/adaptive-softmax.html">自适应softmax</a> <a class="chip hue" style="--h:24" href="../n/nce-lm.html">NCE训练语言模型</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/brown-clustering.html">Brown聚类</a><span class="yr">1992 · NLP</span><div class=nt>沿用“先预测词类再预测词”的类语言模型思想，但词类按词频简单切分，而非Brown式的互信息聚类。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/rnnlm.html">RNN语言模型</a><span class="yr">2010.09 · NLP</span><div class=nt>解决RNN语言模型输出层对整个词表做softmax太慢的问题，使它能在更大语料上训练。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/bptt.html">随时间反向传播BPTT</a><span class="yr">1990 · 基础</span><div class=nt>用截断的随时间反向传播训练循环隐层，并与一步反向传播比较。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/hierarchical-softmax.html">层次softmax语言模型</a><span class="yr">2005 · NLP</span><div class=nt>同样把输出层分解来省计算：层次softmax用二叉树做log V次判别，这里只用一层词类、实现简单。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/nce-lm.html">NCE训练语言模型</a><span class="yr">2012.06 · NLP</span><div class=nt>按词频切分的词类与语义无关，类内softmax对低频大类仍然很慢，在GPU上并行效率也不理想。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/lstm-lm.html">LSTM语言模型</a><span class="yr">2012.09 · NLP</span><div class=nt>普通RNN用截断BPTT训练仍会遇到梯度消失，实际能利用的历史只有十几个词。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/adaptive-softmax.html">自适应softmax</a><span class="yr">2016.09 · NLP</span><div class=nt>按词频切分的词类与语义无关，类内softmax对低频大类仍然很慢，在GPU上并行效率也不理想。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/recurrent-layer.html">循环网络与隐状态</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a> <a class="chip c" href="../c/backpropagation.html">反向传播</a> <a class="chip c" href="../c/perplexity.html">困惑度</a> <a class="chip c" href="../c/big-o.html">时间与空间复杂度</a></p>
+<h2>本篇术语</h2><ul><li><b>类分解softmax</b>　先在少数几个词类上做softmax，再在选中的类内部做softmax，两者相乘得到词的概率。</li><li><b>截断BPTT</b>　反向传播只沿时间往回传固定步数，用来控制计算量和梯度爆炸。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/rnnlm.html">RNN语言模型</a>了解基本结构 → 读本文的类分解与BPTT两节 → 动手：在PyTorch里实现一个带两级softmax的小RNN语言模型，比较V=5万时与完整softmax的每步耗时。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1109/ICASSP.2011.5947611" rel="noopener">https://doi.org/10.1109/ICASSP.2011.5947611</a>（Crossref与Semantic Scholar：标题Extensions of recurrent neural network language model、五位作者、ICASSP 2011（2011年5月）。IEEE全文未能打开；类分解公式、按词频切分词类、BPTT比较、多模型组合、在PTB与语音识别上实验均凭一般了解（作者博士论文与后续文献的通行讲法），未写具体数字。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20RNNLM%E6%89%A9%E5%B1%95%E4%B8%8E%E7%B1%BB%E5%88%86%E8%A7%A3%EF%BC%88rnnlm-ext%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Arnnlm-ext%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/rnnlm-ext.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="ibm-watson.html"><small>本分支上一个 · 2011.02</small><b>IBM Watson赢得Jeopardy!</b></a><a class="r" href="socher-recursive.html"><small>本分支下一个 · 2011.06</small><b>递归神经网络</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

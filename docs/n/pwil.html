@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>PWIL最优传输模仿（2020） · AI脉络</title>
+<meta name="description" content="对抗式模仿学习（GAIL、AIRL）要在与环境交互的同时训练判别器来学奖励，训练不稳定、超参数敏感；而且通常只用任务回报来评价模仿效果，并不直接衡量“像不像专家”。 直接用专家与智能体状态—动作分布之间Wasserstein距离的原始形式（最优传输）来定义奖励：每走一步，就把当前的状态—动作“运”…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/pwil.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PWIL最优传输模仿（2020）">
+<meta property="og:description" content="对抗式模仿学习（GAIL、AIRL）要在与环境交互的同时训练判别器来学奖励，训练不稳定、超参数敏感；而且通常只用任务回报来评价模仿效果，并不直接衡量“像不像专家”。 直接用专家与智能体状态—动作分布之间Wasserstein距离的原始形式（最优传输）来定义奖励：每走一步，就把当前的状态—动作“运”…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/pwil.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/pwil">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 奖励与模仿</div>
+<h1>PWIL最优传输模仿</h1>
+<div class="full">Primal Wasserstein Imitation Learning</div>
+<div class="meta"><span>2020.06</span><span>论文</span><span>延伸</span><span>ICLR 2021</span><span>Robert Dadashi, Léonard Hussenot, Matthieu Geist, Olivier Pietquin · Google Research, Brain Team</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2006.04678" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/pwil">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>对抗式模仿学习（GAIL、AIRL）要在与环境交互的同时训练判别器来学奖励，训练不稳定、超参数敏感；而且通常只用任务回报来评价模仿效果，并不直接衡量“像不像专家”。</p></div><div><h4>方法</h4><p>直接用专家与智能体状态—动作分布之间Wasserstein距离的原始形式（最优传输）来定义奖励：每走一步，就把当前的状态—动作“运”到最近的、尚未被用完的专家样本上，运得越近奖励越高。奖励离线可算，不需要判别器。</p></div><div><h4>影响</h4><p>给出了一个非对抗、几乎不需调参的模仿学习方法，在MuJoCo上用很少的示范和交互就能恢复专家行为，并主张用Wasserstein距离而不是任务回报来评估模仿质量。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/gail.html">GAIL</a>及其推广（如<a class="ln" href="../n/f-max.html">f-MAX散度最小化模仿</a>）把模仿写成最小化某种分布散度，但都依赖对抗训练的判别器作为奖励，判别器与策略的博弈容易不稳定。<a class="ln" href="../n/valuedice.html">ValueDICE离策略模仿</a>把分布匹配改写成离策略的形式提高了样本效率，<a class="ln" href="../n/sqil.html">SQIL软Q模仿</a>则用“专家样本奖励为1、其他为0”的极简规则代替判别器。另一方面，Wasserstein距离有清晰的几何含义，但它的对偶形式需要训练一个Lipschitz函数，同样是一种对抗。</p><h2>方法</h2><p>PWIL采用Wasserstein距离的<b>原始形式</b>：把智能体轨迹中的每个状态—动作看作质量为 <code>1/T</code> 的点，把专家示范中的每个点看作质量为 <code>1/(T_E·D)</code> 的点，求把前者运到后者的最小代价。精确求解需要整条轨迹，作者用贪心的在线近似：</p><ul><li>每一步t，把当前 <code>(s_t, a_t)</code> 的质量依次分配给距离最近、仍有剩余质量的专家点，记这一步的传输代价 <code>c_t</code>；</li><li>奖励设为 <code>r_t = α · exp( −β · T · c_t / √|S×A| )</code>，代价越小奖励越大。</li></ul><p>这样每个专家点最多被“用掉”一次，智能体不能反复停留在同一个专家状态上刷奖励，从而被迫覆盖整条专家轨迹。距离用标准化后的欧氏距离。奖励在每个回合开始时重置专家点的剩余质量，整个奖励函数不需要学习。策略用<a class="ln" href="../n/sac.html">SAC</a>或D4PG等离策略算法在此奖励上训练。</p><h2>结果</h2><p>摘要称：作者给出了一个离线推导的奖励函数，与通过环境交互学习奖励的对抗式模仿方法不同，它几乎不需要调参；在MuJoCo的多种连续控制任务上，就智能体与环境的交互数和专家与环境的交互数（示范量）而言，PWIL都能以样本高效的方式恢复专家行为；并且训练出的智能体行为在Wasserstein距离意义下与专家匹配，而不只是用性能这一常用代理指标衡量。</p><h2>后来的发展</h2><p>PWIL推动了基于最优传输的模仿学习（如用Sinkhorn距离、跨身体结构的最优传输对齐）以及“用分布距离而非回报评价模仿”的做法；它也常作为非对抗模仿学习的基线出现。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>贪心的在线传输只是Wasserstein距离的近似，且依赖欧氏距离，在图像等高维观测上需要先学好的表示。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>奖励只看状态—动作与专家样本的几何接近程度，专家示范有多种模式或时间顺序很重要时可能给出误导性奖励。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/gail.html">GAIL</a><span class="yr">2016.06 · RL</span><div class=nt>GAIL需要对抗训练的判别器、不稳定；PWIL用最优传输的原始形式离线给出奖励，无需判别器。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/sac.html">SAC</a><span class="yr">2018.01 · RL</span><div class=nt>在PWIL奖励上用离策略演员—评论家训练策略。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/sqil.html">SQIL软Q模仿</a><span class="yr">2019.05 · RL</span><div class=nt>SQIL用二值奖励代替判别器；PWIL用基于传输距离的连续奖励，并防止反复利用同一专家点。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/f-max.html">f-MAX散度最小化模仿</a><span class="yr">2019.11 · RL</span><div class=nt>f-MAX在f-散度族中最小化分布差异；PWIL改用Wasserstein距离的原始形式。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/valuedice.html">ValueDICE离策略模仿</a><span class="yr">2019.12 · RL</span><div class=nt>两者都追求样本高效的分布匹配：ValueDICE改写为离策略目标，PWIL靠离线可算的奖励。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a> <a class="chip c" href="../c/optimal-transport.html">最优传输与Wasserstein距离</a> <a class="chip c" href="../c/reward-design.html">奖励设计与奖励投机</a> <a class="chip c" href="../c/distribution-shift.html">分布偏移</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a></p>
+<h2>本篇术语</h2><ul><li><b>Wasserstein距离的原始形式</b>　直接求把一个分布的质量搬到另一个分布上所需的最小总距离，而不是通过对偶的函数去估计。</li><li><b>贪心传输</b>　每来一个新点就立刻把它分配给最近的、还有剩余容量的目标点，不回头修改，是最优传输的廉价近似。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/optimal-transport.html">最优传输与Wasserstein距离</a>与<a class="ln" href="../n/gail.html">GAIL</a>；读原文第3节奖励构造与伪代码；在Hopper上只给1条专家轨迹，比较PWIL与GAIL的回报以及与专家的Wasserstein距离。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2006.04678" rel="noopener">https://arxiv.org/abs/2006.04678</a>（标题、作者（Dadashi, Hussenot, Geist, Pietquin）、arXiv v1于2020-06-08；摘要中模仿学习匹配专家行为、基于专家与智能体状态—动作分布间Wasserstein距离原始形式的PWIL、离线推导的奖励（区别于在交互中学奖励的对抗式方法）且几乎无需调参、在MuJoCo多种连续控制任务上就智能体与专家交互量而言样本高效地恢复专家行为、行为在Wasserstein距离意义下与专家匹配。贪心传输与奖励公式、SAC/D4PG、ICLR 2021与机构按原文正文和通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20PWIL%E6%9C%80%E4%BC%98%E4%BC%A0%E8%BE%93%E6%A8%A1%E4%BB%BF%EF%BC%88pwil%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Apwil%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/pwil.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="what-matters-onpolicy.html"><small>本分支上一个 · 2020.06</small><b>在线策略RL什么最重要</b></a><a class="r" href="rl-unplugged.html"><small>本分支下一个 · 2020.06</small><b>RL Unplugged离线基准</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

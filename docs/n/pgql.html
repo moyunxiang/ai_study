@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>PGQL策略梯度+Q学习（2016） · AI脉络</title>
+<meta name="description" content="A3C这类在线策略梯度方法只能用当前策略刚采到的数据，每条经验用一次就扔；Q学习能反复利用回放池，却和策略梯度是两套互不相干的算法。 证明带熵正则的策略梯度在不动点处，策略的对数概率（动作偏好）与Q值只差一个与状态有关的量： Q̃(s,a) = α(log π(a|s) + H(π(·|s))) …">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/pgql.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PGQL策略梯度+Q学习（2016）">
+<meta property="og:description" content="A3C这类在线策略梯度方法只能用当前策略刚采到的数据，每条经验用一次就扔；Q学习能反复利用回放池，却和策略梯度是两套互不相干的算法。 证明带熵正则的策略梯度在不动点处，策略的对数概率（动作偏好）与Q值只差一个与状态有关的量： Q̃(s,a) = α(log π(a|s) + H(π(·|s))) …">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/pgql.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/pgql">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 策略梯度与演员评论家</div>
+<h1>PGQL策略梯度+Q学习</h1>
+<div class="full">Combining policy gradient and Q-learning</div>
+<div class="meta"><span>2016.11</span><span>论文</span><span>延伸</span><span>ICLR 2017</span><span>Brendan O&#x27;Donoghue, Rémi Munos, Koray Kavukcuoglu, Volodymyr Mnih · DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1611.01626" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/pgql">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>A3C这类在线策略梯度方法只能用当前策略刚采到的数据，每条经验用一次就扔；Q学习能反复利用回放池，却和策略梯度是两套互不相干的算法。</p></div><div><h4>方法</h4><p>证明带熵正则的策略梯度在不动点处，策略的对数概率（动作偏好）与Q值只差一个与状态有关的量：<code>Q̃(s,a) = α(log π(a|s) + H(π(·|s))) + V(s)</code>。于是可以从策略里“读出”Q值，再对它做Q学习更新，用回放数据改进同一个策略。</p></div><div><h4>影响</h4><p>揭示了“熵正则策略梯度 ≈ 优势函数学习”的等价关系，是软Q学习、PCL、SAC等最大熵RL把策略与价值统一起来的理论来源之一；PGQL本身在Atari全集上超过A3C和Q学习。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/a3c.html">A3C</a>用多个并行actor做在线的优势演员—评论家更新，加熵正则防止策略过早变成确定性的；它稳定、通用，但样本只能用一次。<a class="ln" href="../n/dqn-nature.html">DQN（Nature版）</a>靠经验回放大幅提高了数据利用率，但只学Q值，策略是贪心导出的。很多人尝试把两者结合（例如<a class="ln" href="../n/acer.html">ACER</a>用重要性采样修正回放数据），但需要处理离策略修正的方差。作者从另一个角度切入：熵正则策略梯度的最优解本身就隐含了一个Q函数。</p><h2>方法</h2><p>带熵正则的策略梯度目标是 <code>J(π) = E[Σ r] + α Σ_s H(π(·|s))</code>。作者证明，它的不动点满足</p><p><code>π(a|s) = exp( (Q^π(s,a) − V(s)) / α )</code>，</p><p>即策略是Q值的Boltzmann分布。反过来，任意策略都可以诱导一个估计</p><p><code>Q̃(s,a) = α ( log π(a|s) + H(π(·|s)) ) + V(s)</code>。</p><p>PGQL的更新由两部分组成：</p><ul><li>在线部分：在当前采样数据上做普通的熵正则演员—评论家（A3C式）更新；</li><li>离线部分：从回放池采样转移，把上式中的 <code>Q̃</code> 当作Q函数，做Q学习的Bellman误差更新 <code>(r + γ max_a′ Q̃(s′,a′) − Q̃(s,a))²</code>，梯度通过 <code>log π</code> 和V回传到同一套网络。</li></ul><p>两部分加权相加。作者还证明了更一般的等价性：动作价值拟合方法与演员—评论家算法可以互相转化，正则化策略梯度可以解释为优势函数学习。</p><h2>结果</h2><p>摘要称，数值例子显示PGQL的数据效率和稳定性都有提升；在完整的Atari游戏集上，PGQL的表现超过了异步优势演员—评论家（A3C）和Q学习。</p><h2>后来的发展</h2><p>同一时期的<a class="ln" href="../n/soft-q-learning.html">软Q学习（能量策略）</a>与<a class="ln" href="../n/pcl.html">PCL路径一致性学习</a>从最大熵RL出发得到了相近的“策略与软Q值互相决定”的关系；后来的<a class="ln" href="../n/sac.html">SAC</a>把这条思路用于连续控制并成为主流算法。PGQL中“正则化策略梯度等价于优势学习”的结论也常在策略优化理论中被引用。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>等价关系只在不动点处严格成立，训练中途从策略读出的Q值可能很不准，Q学习更新会把误差传回策略。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只针对离散动作；连续动作下需要对数概率可计算的策略族，Q学习中的max也不再容易求。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:120" href="../n/sac.html">SAC</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/q-learning.html">Q-learning</a><span class="yr">1992 · RL</span><div class=nt>对从策略诱导出的Q值做Q学习的Bellman更新。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/dqn-nature.html">DQN（Nature版）</a><span class="yr">2015.02 · RL</span><div class=nt>借用经验回放来提高数据利用率。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/a3c.html">A3C</a><span class="yr">2016.02 · RL</span><div class=nt>在A3C的熵正则在线更新之上，增加基于回放数据的Q学习更新。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/acer.html">ACER</a><span class="yr">2016.11 · RL</span><div class=nt>同为让演员—评论家使用回放数据：ACER用截断重要性采样，PGQL用策略与Q值的等价关系。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/sac.html">SAC</a><span class="yr">2018.01 · RL</span><div class=nt>只针对离散动作；连续动作下需要对数概率可计算的策略族，Q学习中的max也不再容易求。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/entropy.html">信息量与熵</a> <a class="chip c" href="../c/bellman-equation.html">Bellman方程</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a></p>
+<h2>本篇术语</h2><ul><li><b>熵正则化</b>　在目标中加上策略熵，鼓励策略保持一定随机性，避免过早收敛到确定性动作。</li><li><b>Boltzmann策略</b>　按 <code>exp(Q/α)</code> 的比例选择动作的随机策略，α越小越接近贪心。</li></ul>
+<h2>怎么学</h2><p>先熟悉<a class="ln" href="../n/a3c.html">A3C</a>和<a class="lc" href="../c/softmax.html">Softmax与logits</a>；读原文第3节不动点推导；在一个小型网格世界中验证：训练熵正则策略后，用公式读出的Q值与真实Q值是否接近。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1611.01626" rel="noopener">https://arxiv.org/abs/1611.01626</a>（标题、作者（O&#x27;Donoghue, Munos, Kavukcuoglu, Mnih）、arXiv v1于2016-11-05；摘要中在线策略梯度不能利用离策略数据、结合离策略Q学习与回放池、由正则化策略梯度不动点与Q值的联系从动作偏好估计Q值、命名PGQL、动作价值拟合与演员—评论家等价、正则化策略梯度可解释为优势函数学习、数据效率与稳定性提升、完整Atari上超过A3C与Q学习。Q̃公式、两部分更新、ICLR 2017按原文正文和通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20PGQL%E7%AD%96%E7%95%A5%E6%A2%AF%E5%BA%A6%2BQ%E5%AD%A6%E4%B9%A0%EF%BC%88pgql%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Apgql%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/pgql.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="vic.html"><small>本分支上一个 · 2016.11</small><b>VIC变分内在控制</b></a><a class="r" href="q-prop.html"><small>本分支下一个 · 2016.11</small><b>Q-Prop控制变量策略梯度</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "id": "peer",
+  "who": "Xu Owen He · Google DeepMind",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2407.04153"}
+  ],
+  "aka": ["PEER", "Parameter Efficient Expert Retrieval", "Mixture of A Million Experts", "百万专家", "百万专家混合", "乘积键检索", "Product Key Retrieval", "单神经元专家"],
+  "problem": "细粒度MoE规模定律表明专家切得越细、越多越好，但现有MoE只有几十到几百个专家：路由器要对每个专家打分，专家一多，路由计算和训练稳定性都撑不住。",
+  "idea": "把每个专家缩成只有一个隐藏神经元的小MLP，专家数做到一百万以上；用乘积键（product key）技术做稀疏检索，只需比较约两千个子键就能从百万专家里选出最相关的若干个，再由多个检索头各取一组专家加权求和。",
+  "impact": "把MoE推到“百万个极小专家”这一极端，证明在同等计算下这种层比稠密前馈层和粗粒度MoE有更好的性能—计算权衡，是“专家越细越好”方向上的代表性探索，常与记忆层、查表式专家一起讨论。",
+  "background": "Transformer前馈层（FFW）的计算和激活显存随隐藏宽度线性增长。[[sparse-moe]]、[[switch-transformer]]把FFW拆成多个专家、每个词只用少数几个，使参数与计算脱钩。[[moe-granularity-scaling]]发现，在总参数和激活参数固定时，把专家切得更小、数量更多（更高的“粒度”）效果更好；[[deepseekmoe]]也采用了细粒度专家。但专家数一旦上万，对所有专家算路由分数本身就成了瓶颈。",
+  "method": "**极小专家**：第i个专家只有一个隐藏神经元：\n`e_i(x) = σ(u_iᵀ x) · v_i`\n其中u_i、v_i是与模型宽度相同的向量，σ是激活函数。专家总数N取1024²，约一百万个。\n\n**乘积键检索**：给每个专家一个键，但不直接存N个键，而是把键拆成两半，各有√N=1024个子键，第i个专家的键是两个子键的拼接。查询q也拆成两半，分别与两组子键算相似度、各取top-k，组合出k²个候选，再从中取top-k。这样只需计算2√N个相似度就能近似找到与q最相似的k个专家，避免对一百万个键逐一打分。\n\n**多头检索与输出**：像多头注意力一样，用h个独立的查询网络各检索k个专家（例如h=8、k=16），每个头的输出为\n`f(x) = Σ_{i∈topk} softmax(q·k_i) · e_i(x)`\n各头输出相加，替换原来的FFW层。每个词实际激活的参数只有h·k个小专家，计算量很小，而可用的总参数极大。\n\n**实验**：在语言建模任务上，固定计算预算（isoFLOP）比较PEER、稠密FFW、粗粒度MoE和乘积键记忆层。",
+  "results": "在语言建模上，PEER层在性能—计算权衡上优于稠密FFW和粗粒度MoE；摘要称，通过高效利用海量专家，PEER在保持计算效率的同时为进一步扩展Transformer打开了空间。具体困惑度见原文。",
+  "legacy": "PEER与此前的乘积键记忆层一起，代表了“把FFW当作可检索的大规模键值记忆”的思路；后续的查表式专家（如[[mole-lookup]]）、记忆层扩展工作都与它比较。",
+  "limits": [
+    {"text": "百万个专家的参数总量很大，检索出的专家散落在显存各处，访存不连续，实际墙钟速度和分布式实现远不如理论计算量那样乐观。", "solved_by": ["mole-lookup"]},
+    {"text": "实验只在中等规模的语言模型上做，没有验证在百亿参数以上的大模型和下游任务上是否保持优势。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "moe-granularity-scaling", "type": "extends", "note": "沿着“专家越细越好”的规模定律推到极端：百万个单神经元专家。"},
+    {"to": "sparse-moe", "type": "extends", "note": "保留稀疏门控只激活少数专家的思想，用乘积键检索代替对所有专家打分的路由器。"},
+    {"to": "switch-transformer", "type": "rivals", "note": "Switch式粗粒度MoE只有少量大专家；PEER在同等计算下取得更好的权衡。"},
+    {"to": "deepseekmoe", "type": "extends", "note": "DeepSeekMoE已采用细粒度专家，PEER把粒度推到单个神经元。"}
+  ],
+  "prereq": ["mixture-of-experts", "mlp", "query-key-value", "k-nearest-neighbors", "params-flops"],
+  "terms": [
+    {"t": "乘积键", "d": "把一个大键表拆成两个小子键表的笛卡尔积，查询时分别在两个小表里找最近的，再组合，从而用很少的计算在海量键中检索。"},
+    {"t": "专家粒度", "d": "专家切得多细；粒度越高，专家越小、越多，每个词激活的专家也越多。"}
+  ],
+  "learn": "先读[[switch-transformer]]和[[moe-granularity-scaling]]；读本文第2节PEER层的定义和乘积键检索；动手：实现一个N=64²的乘积键检索，验证它与暴力检索top-k的重合率。",
+  "check": {"source": "https://arxiv.org/abs/2407.04153", "confirmed": "标题、作者（单作者）、arXiv首次提交2024-07-04；摘要中FFW计算与激活显存随宽度线性增长、稀疏MoE解耦模型规模与计算、细粒度MoE规模定律显示更高粒度更好、现有MoE受限于少量专家、PEER利用乘积键技术从超过一百万个小专家中稀疏检索、语言建模上优于稠密FFW和粗粒度MoE的性能—计算权衡。单神经元专家公式、N=1024²、多头检索参数、Google DeepMind机构为对正文的一般了解。"}
+}

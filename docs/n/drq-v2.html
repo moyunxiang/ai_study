@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DrQ-v2（2021） · AI脉络</title>
+<meta name="description" content="DrQ等数据增强方法让无模型RL能直接从像素学习简单的DMC任务，但最难的人形机器人运动等任务从像素仍学不会；基于模型的DreamerV2能做得更好，计算却昂贵。 保留DrQ的随机平移增强，把底层算法从SAC换成DDPG，加上n步回报、按计划衰减的探索噪声、更大的回放池等一系列朴素但关键的改动。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/drq-v2.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DrQ-v2（2021）">
+<meta property="og:description" content="DrQ等数据增强方法让无模型RL能直接从像素学习简单的DMC任务，但最难的人形机器人运动等任务从像素仍学不会；基于模型的DreamerV2能做得更好，计算却昂贵。 保留DrQ的随机平移增强，把底层算法从SAC换成DDPG，加上n步回报、按计划衰减的探索噪声、更大的回放池等一系列朴素但关键的改动。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/drq-v2.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/drq-v2">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 分层、表示与元学习</div>
+<h1>DrQ-v2</h1>
+<div class="full">Mastering Visual Continuous Control: Improved Data-Augmented Reinforcement Learning</div>
+<div class="meta"><span>2021.07</span><span>论文</span><span>延伸</span><span>ICLR 2022</span><span>Denis Yarats, Rob Fergus, Alessandro Lazaric, Lerrel Pinto · New York University, Facebook AI Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2107.09645" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/facebookresearch/drqv2" rel="noopener">GitHub ↗</a><a class="btn sm" href="../index.html#/n/drq-v2">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>DrQ等数据增强方法让无模型RL能直接从像素学习简单的DMC任务，但最难的人形机器人运动等任务从像素仍学不会；基于模型的DreamerV2能做得更好，计算却昂贵。</p></div><div><h4>方法</h4><p>保留DrQ的随机平移增强，把底层算法从SAC换成DDPG，加上n步回报、按计划衰减的探索噪声、更大的回放池等一系列朴素但关键的改动。</p></div><div><h4>影响</h4><p>第一次用无模型方法从像素解决DMC的人形机器人运动任务，多数任务在单块GPU上约8小时训完，成为视觉连续控制里最常用的高效基线，后来也是许多视觉机器人RL工作的默认底座。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/drq.html">图像增强DrQ</a>与同期的<a class="ln" href="../n/rad.html">RAD数据增强RL</a>表明，只要对图像观测做随机平移、裁剪之类的增强，<a class="ln" href="../n/sac.html">SAC</a>这样的简单算法就能在像素输入的<a class="ln" href="../n/dm-control.html">DeepMind Control Suite</a>任务上追平带辅助损失的复杂方法（如<a class="ln" href="../n/curl.html">CURL对比表征RL</a>）。但在“困难”一档任务上，例如人形机器人行走与奔跑，DrQ依然学不会；<a class="ln" href="../n/dreamerv2.html">DreamerV2</a>这类基于世界模型的方法有进展，但训练成本高、实现复杂。作者想知道，一个简单的无模型方法还能走多远。</p><h2>方法</h2><p>DrQ-v2的改动都很朴素：</p><ul><li><b>换算法</b>：从SAC改为DDPG（带TD3式的截断双Q），去掉熵项；作者发现在像素任务上，熵自动调节会让探索不稳定。</li><li><b>n步回报</b>：价值目标使用 <code>y = Σ_{i=0}^{n−1} γ^i r_{t+i} + γ^n min_j Q_j(s_{t+n}, a′)</code>（n取3），加快奖励信号传播。</li><li><b>探索噪声调度</b>：动作上加高斯噪声 <code>a = π(s) + ε, ε ∼ N(0, σ²)</code>，σ按线性计划从大到小衰减，前期多探索、后期精细控制。</li><li><b>增强</b>：图像四周填充4像素后随机平移，并用双线性插值使平移更平滑。</li><li><b>工程</b>：更大的回放池（一百万）、更小的批量调整、更快的数据加载与混合精度。</li></ul><p>编码器只由评论家的梯度训练，演员使用停止梯度后的特征。</p><h2>结果</h2><p>摘要称：DrQ-v2在DeepMind Control Suite上取得最先进结果，尤其能直接从像素观测解决复杂的人形机器人运动任务，这是此前无模型RL达不到的；方法概念简单、易于实现，计算开销明显小于以往工作，多数任务在单GPU上只需训练8小时。</p><h2>后来的发展</h2><p>DrQ-v2成为视觉RL和视觉机器人学习的默认强基线：后续的表示预训练研究（用ImageNet或人类视频预训练编码器）常在它上面替换编码器做比较；它的代码也被<a class="ln" href="../n/urlb.html">URLB无监督RL基准</a>等基准用作底层实现的参考。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只在DMC等仿真任务上验证，真实机器人中的视觉干扰与延迟问题没有涉及。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>仍需要数百万帧交互才能学会困难任务，样本效率离基于模型的方法和人类水平还有差距。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/ddpg.html">DDPG</a><span class="yr">2015.09 · RL</span><div class=nt>底层算法从SAC换成DDPG，并加入截断双Q与n步回报。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/dm-control.html">DeepMind Control Suite</a><span class="yr">2018.01 · RL</span><div class=nt>在DeepMind Control Suite的像素版本上评测，包括人形机器人任务。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/drq.html">图像增强DrQ</a><span class="yr">2020.04 · RL</span><div class=nt>沿用DrQ的随机平移数据增强，把底层算法和训练细节全面改进。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/rad.html">RAD数据增强RL</a><span class="yr">2020.04 · RL</span><div class=nt>沿用RAD与DrQ共同验证的随机平移增强，并改为双线性插值的平滑版本。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/dreamerv2.html">DreamerV2</a><span class="yr">2020.10 · 具身·世界模型</span><div class=nt>DreamerV2用世界模型取得像素控制的好成绩；DrQ-v2以更低算力的无模型方法在困难任务上追上或超过它。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/actor-critic.html">Actor-Critic与优势函数</a> <a class="chip c" href="../c/data-augmentation.html">数据增强</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/td-error.html">时序差分与自举</a> <a class="chip c" href="../c/exploration-exploitation.html">探索与利用</a></p>
+<h2>本篇术语</h2><ul><li><b>n步回报</b>　价值目标先累加n步真实奖励，再接上第n步之后的价值估计，比单步目标更快地传播奖励。</li><li><b>随机平移增强</b>　把图像四周补边后随机裁回原尺寸，相当于把画面平移几个像素，让网络对小位置变化不敏感。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/drq.html">图像增强DrQ</a>和<a class="ln" href="../n/ddpg.html">DDPG</a>；读原文第3节逐项改动和消融实验；用开源代码在walker_walk上训练，分别关掉n步回报和噪声调度，看各自影响多大。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2107.09645" rel="noopener">https://arxiv.org/abs/2107.09645</a>（标题、作者（Yarats, Fergus, Lazaric, Pinto）、arXiv v1于2021-07-20；摘要中DrQ-v2基于DrQ的数据增强离策略演员—评论家、若干改进带来DMC上的最先进结果、首次以无模型RL直接从像素解决复杂人形机器人运动、概念简单、计算开销小、多数任务单GPU 8小时。改用DDPG、n步回报（n=3）、噪声调度、双线性平移、回放池大小、ICLR 2022与机构按原文正文和通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DrQ-v2%EF%BC%88drq-v2%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adrq-v2%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/drq-v2.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="tianshou.html"><small>本分支上一个 · 2021.07</small><b>Tianshou天授RL库</b></a><a class="r" href="melting-pot.html"><small>本分支下一个 · 2021.07</small><b>Melting Pot社会泛化评测</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

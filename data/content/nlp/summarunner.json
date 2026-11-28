@@ -1,0 +1,34 @@
+{
+  "id": "summarunner",
+  "who": "Ramesh Nallapati, Feifei Zhai, Bowen Zhou · IBM Watson",
+  "venue": "AAAI 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1611.04230"}
+  ],
+  "aka": ["SummaRuNNer", "神经抽取式摘要", "RNN抽取式摘要", "Extractive Summarization with RNN", "Nallapati et al. 2017", "句子二分类摘要"],
+  "problem": "抽取式摘要过去靠LexRank这类图排序或手工特征打分，难以端到端地学习“哪句话该进摘要”；而训练神经模型又需要每个句子“选/不选”的标签，CNN/DailyMail这类数据只给了人写的摘要。",
+  "idea": "用两层GRU把文档编码成句子表示，按顺序对每句做“选或不选”的二分类，打分显式拆成信息量、显著度、新颖度和位置几项；没有句子标签时，用贪心匹配人写摘要的ROUGE自动造标签，或直接用人写摘要训练。",
+  "impact": "成为神经抽取式摘要的代表性基线，“句子级序列二分类加贪心ROUGE造标签”的做法被BertSum等后续抽取式模型直接沿用。",
+  "background": "自动摘要分两类：抽取式从原文挑句子拼成摘要，生成式重新写一段话。[[lexrank]]、[[textrank]]等无监督方法按句子之间的相似度做图排序，[[rush-summarization]]（2015）和后来的指针网络开启了神经生成式摘要，但生成式模型当时常出现事实错误和重复。[[attentive-reader]]整理出的CNN/DailyMail新闻—要点数据为监督学习提供了规模足够的语料，却没有句子级的抽取标签。",
+  "method": "模型是一个层次RNN：底层双向GRU读词，平均池化得到每个句子的向量；上层双向GRU读句子序列，得到句子在文档中的表示 `h_j`，再平均得到文档表示d。对第j句按顺序计算被选概率\n\n`P(y_j=1) = σ( W_c·h_j + h_jᵀ W_s d − h_jᵀ W_r tanh(s_j) + W_ap·p_j^a + W_rp·p_j^r + b )`\n\n五项分别对应：句子本身的信息量（content）、与全文的相关度（salience）、与已选内容的重复度（novelty，`s_j` 是前面各句按被选概率加权求和的“摘要表示”，减号表示越重复越不选）、绝对位置和相对位置。因为每项都是单独的分数，可以把一句话为什么被选拆开来看，作者称之为可解释性。\n\n标签：用贪心法逐句加入能使与人写摘要的ROUGE最大化的句子，得到0/1标签做交叉熵训练。论文另提出“生成式训练”：在句子表示上接一个解码器去生成人写摘要，从而不需要句子标签也能训练抽取模型。",
+  "results": "论文报告其效果优于或与当时最先进的方法相当（摘要所述），并展示了按信息量、显著度、新颖度拆分的预测可视化；具体ROUGE数字未在此引用。",
+  "legacy": "SummaRuNNer确立了神经抽取式摘要的标准形式：把摘要当作句子级序列标注、用贪心ROUGE构造“预言”标签。[[bertsum]]（2019）把底层编码器换成BERT、在句子上做同样的二分类，效果大幅提升；[[pointer-generator]]等生成式模型则在同一数据上与它对比。[[cnn-dm-examination]]等分析工作指出新闻摘要强烈依赖导语位置，这也解释了位置特征的作用。",
+  "limits": [
+    {"text": "逐句独立打分，只靠新颖度项粗略避免重复，句子之间如何组合成连贯摘要没有建模。", "solved_by": []},
+    {"text": "只能整句照抄原文，摘要冗长、无法压缩或改写；贪心造出的标签本身也不是最优抽取。", "solved_by": ["pointer-generator", "bertsum"]}
+  ],
+  "relations": [
+    {"to": "lexrank", "type": "rivals", "note": "LexRank用无监督图排序选句；SummaRuNNer用有监督的神经网络按内容、显著度、新颖度给句子打分。"},
+    {"to": "cho-encdec", "type": "uses", "note": "用GRU作为词级和句子级编码器。"},
+    {"to": "attentive-reader", "type": "uses", "note": "在其整理的CNN/DailyMail新闻—摘要语料上训练和评测。"},
+    {"to": "rush-summarization", "type": "rivals", "note": "神经生成式摘要重写句子；SummaRuNNer只抽取原句，换来事实上更可靠、更易解释。"}
+  ],
+  "prereq": ["recurrent-layer", "gating", "logistic-regression", "cross-entropy", "text-metrics"],
+  "terms": [
+    {"t": "抽取式摘要", "d": "从原文中挑出若干句子直接组成摘要，不改写。"},
+    {"t": "ROUGE", "d": "摘要评测指标，计算系统摘要与人写摘要之间n元组或最长公共子序列的重合程度。"},
+    {"t": "预言标签", "d": "用贪心搜索找出能让ROUGE最高的句子组合，把这些句子标为1作训练标签。"}
+  ],
+  "learn": "先读[[lexrank]]了解抽取式摘要 → 读本文第2–3节模型与造标签 → 动手：在CNN/DailyMail几十篇文章上实现贪心ROUGE造标签，看被选中的句子有多少落在前三句。",
+  "check": {"source": "https://arxiv.org/abs/1611.04230", "confirmed": "arXiv：标题、作者Nallapati、Zhai、Zhou，v1提交于2016-11-14；摘要：基于RNN的抽取式摘要序列模型，效果优于或可比最先进方法，可按信息量、显著度、新颖度等抽象特征可视化预测，另提出只用人写摘要训练抽取模型的生成式训练。AAAI 2017出处、IBM Watson单位、打分公式各项具体形式与贪心ROUGE造标签凭一般了解。"}
+}

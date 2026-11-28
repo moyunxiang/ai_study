@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>LDA折叠Gibbs采样（2004） · AI脉络</title>
+<meta name="description" content="LDA主题模型的后验推断不可精确计算，原论文用的变分EM推导繁琐、实现复杂，而且只给出近似的局部最优；研究者需要一种简单、易实现又准确的推断方法。 把每篇文档的主题分布θ和每个主题的词分布φ用狄利克雷—多项共轭关系积分掉，只对每个词的主题标签z做Gibbs采样：一个词属于主题k的概率，正比于“该词…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/collapsed-gibbs-lda.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LDA折叠Gibbs采样（2004）">
+<meta property="og:description" content="LDA主题模型的后验推断不可精确计算，原论文用的变分EM推导繁琐、实现复杂，而且只给出近似的局部最优；研究者需要一种简单、易实现又准确的推断方法。 把每篇文档的主题分布θ和每个主题的词分布φ用狄利克雷—多项共轭关系积分掉，只对每个词的主题标签z做Gibbs采样：一个词属于主题k的概率，正比于“该词…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/collapsed-gibbs-lda.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/collapsed-gibbs-lda">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 检索与文本挖掘</div>
+<h1>LDA折叠Gibbs采样</h1>
+<div class="full">Finding scientific topics</div>
+<div class="meta"><span>2004.04</span><span>论文</span><span>延伸</span><span>PNAS 2004</span><span>Thomas L. Griffiths, Mark Steyvers · 斯坦福大学、加州大学尔湾分校</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1073/pnas.0307752101" rel="noopener">DOI ↗</a><a class="btn sm" href="https://europepmc.org/article/PMC/PMC387300" rel="noopener">PMC全文 ↗</a><a class="btn sm" href="../index.html#/n/collapsed-gibbs-lda">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>LDA主题模型的后验推断不可精确计算，原论文用的变分EM推导繁琐、实现复杂，而且只给出近似的局部最优；研究者需要一种简单、易实现又准确的推断方法。</p></div><div><h4>方法</h4><p>把每篇文档的主题分布θ和每个主题的词分布φ用狄利克雷—多项共轭关系积分掉，只对每个词的主题标签z做Gibbs采样：一个词属于主题k的概率，正比于“该词在主题k中出现的次数”乘以“该文档中主题k出现的次数”（都加上平滑先验）。</p></div><div><h4>影响</h4><p>这套几行公式就能实现的采样器成为训练LDA最常用的方法（MALLET等工具的默认算法），也成为后来HDP、作者主题模型等大量贝叶斯文本模型的标准推断手段；论文用它分析了28000篇PNAS摘要，展示了主题模型在科学文献分析上的用途。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/lda.html">LDA主题模型</a>（Blei、Ng与Jordan，2003）把每篇文档看作多个主题的混合、每个主题是词表上的一个分布，用变分推断近似后验。<a class="ln" href="../n/plsa.html">概率潜在语义分析pLSA</a>没有文档层面的先验，参数随文档数增长。<a class="ln" href="../n/gibbs-sampling.html">Gibbs采样与马尔可夫随机场</a>和<a class="ln" href="../n/mcmc.html">Metropolis采样与MCMC</a>是统计学中通用的后验采样方法，但对LDA而言，直接对θ、φ、z一起采样收敛慢。</p><h2>方法</h2><p>LDA的生成过程：主题k的词分布 <code>φ_k ~ Dir(β)</code>；文档d的主题分布 <code>θ_d ~ Dir(α)</code>；文档中每个词先抽主题 <code>z_i ~ Mult(θ_d)</code>，再抽词 <code>w_i ~ Mult(φ_{z_i})</code>。</p><p>利用狄利克雷与多项分布的共轭性，θ和φ可以被解析地积分掉（“折叠”），只剩离散变量z。对第i个词（属于文档d，词为w），在固定其他所有标签的条件下：</p><p class="formula"><code>P(z_i = k | z_{−i}, w) ∝ (n_{k,w}^{−i} + β) / (n_{k,·}^{−i} + Vβ) · (n_{d,k}^{−i} + α)</code></p><p>其中 <code>n_{k,w}</code> 是词w被分配给主题k的次数，<code>n_{k,·}</code> 是主题k的总词数，<code>n_{d,k}</code> 是文档d中分配给主题k的词数，上标−i表示不计当前词，V是词表大小。采样器只需维护这几张计数表，每次重新抽一个词的主题再更新计数。收敛后可由计数估计 <code>φ̂_{k,w} = (n_{k,w}+β)/(n_{k,·}+Vβ)</code>。</p><p>论文还用调和平均估计边缘似然 <code>P(w | K)</code>，据此在不同主题数K之间做贝叶斯模型选择。</p><h2>结果</h2><p>作者把模型用于PNAS 1991–2001年约28000篇论文摘要，用模型选择得到约300个主题，展示了主题与学科分类的对应、“热门”与“冷门”主题随时间的变化，以及按主题标注文档中每个词的可视化（主要内容来自论文正文；样本数凭一般了解）。</p><h2>后来的发展</h2><p>折叠Gibbs采样成为LDA事实上的标准推断方法，被MALLET、GibbsLDA++等工具实现，后来又有稀疏加速的SparseLDA、分布式的AD-LDA和LightLDA等，用于数百万文档与上千主题。它的计数式更新公式也是<a class="ln" href="../n/hdp.html">HDP层次狄利克雷过程</a>等非参数模型变体推断的出发点（而<a class="ln" href="../n/dtm.html">动态主题模型DTM</a>因非共轭只能用变分推断）。随着语料继续增大，基于随机优化的<a class="ln" href="../n/online-lda.html">在线LDA随机变分推断</a>与<a class="ln" href="../n/svi.html">随机变分推断SVI</a>给出了另一条更可扩展的路线。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>每轮要扫描语料中的每一个词，语料达到百万文档时速度很慢，难以处理流式到达的数据。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/online-lda.html">在线LDA随机变分推断</a> <a class="chip hue" style="--h:48" href="../n/svi.html">随机变分推断SVI</a></div></li><li>主题数K要预先指定，只能靠多次训练比较似然来选择。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/hdp.html">HDP层次狄利克雷过程</a></div></li><li>调和平均估计边缘似然的方差很大，用于模型选择并不可靠。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/gibbs-sampling.html">Gibbs采样与马尔可夫随机场</a><span class="yr">1984.11 · 基础</span><div class=nt>在积分掉连续参数后，对每个词的主题标签做Gibbs采样。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/mcmc.html">Metropolis采样与MCMC</a><span class="yr">1953 · 基础</span><div class=nt>采样器属于马尔可夫链蒙特卡洛方法，收敛后的样本用来估计主题与文档分布。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/plsa.html">概率潜在语义分析pLSA</a><span class="yr">1999.07 · NLP</span><div class=nt>沿着pLSA→LDA的概率主题模型路线，在完整的贝叶斯模型上做推断与模型选择。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/lda.html">LDA主题模型</a><span class="yr">2003 · NLP</span><div class=nt>给LDA提供一种比变分EM简单得多、易于实现的后验推断方法。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/dtm.html">动态主题模型DTM</a><span class="yr">2006.06 · NLP</span><div class=nt>折叠Gibbs依赖狄利克雷—多项共轭，DTM为表达时间演化改用逻辑正态分布，只能用变分推断。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/hdp.html">HDP层次狄利克雷过程</a><span class="yr">2006.12 · NLP</span><div class=nt>主题数K要预先指定，只能靠多次训练比较似然来选择。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/online-lda.html">在线LDA随机变分推断</a><span class="yr">2010.12 · NLP</span><div class=nt>Gibbs采样每轮要遍历所有词；在线变分推断单遍即可，更适合超大语料。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:48" href="../n/svi.html">随机变分推断SVI</a><span class="yr">2012.06 · 基础</span><div class=nt>每轮要扫描语料中的每一个词，语料达到百万文档时速度很慢，难以处理流式到达的数据。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/beta-dirichlet.html">Beta分布、狄利克雷分布与共轭先验</a> <a class="chip c" href="../c/discrete-distributions.html">伯努利、二项、类别与多项分布</a> <a class="chip c" href="../c/conditional-bayes.html">条件概率与贝叶斯公式</a> <a class="chip c" href="../c/monte-carlo.html">蒙特卡洛采样</a> <a class="chip c" href="../c/markov-chain.html">马尔可夫性与马尔可夫链</a> <a class="chip c" href="../c/latent-variable.html">隐变量模型</a></p>
+<h2>本篇术语</h2><ul><li><b>折叠（collapsed）</b>　用共轭性把一部分参数解析地积分掉，只对剩下的变量采样，通常收敛更快。</li><li><b>共轭先验</b>　先验与似然配对后，后验与先验属于同一分布族，如狄利克雷先验配多项分布。</li><li><b>调和平均估计</b>　用后验样本的似然倒数平均来估计边缘似然，实现简单但方差很大。</li></ul>
+<h2>怎么学</h2><p>先学<a class="ln" href="../n/lda.html">LDA主题模型</a>的生成过程和狄利克雷分布 → 读本文“Statistical Inference”一节的采样公式 → 动手：用不到100行Python实现折叠Gibbs采样，在20 Newsgroups的一个子集上跑20个主题，打印每个主题概率最高的10个词。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1073/pnas.0307752101" rel="noopener">https://doi.org/10.1073/pnas.0307752101</a>（Crossref与Semantic Scholar：标题Finding scientific topics、作者Griffiths与Steyvers、PNAS 2004（S2记2004-04-06，有PMC开放全文）。采样公式、调和平均模型选择、PNAS摘要分析（约28000篇、约300个主题）按教材与后续文献的通行讲法写，未逐页对照原文；出版社摘要被S2隐去。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20LDA%E6%8A%98%E5%8F%A0Gibbs%E9%87%87%E6%A0%B7%EF%BC%88collapsed-gibbs-lda%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acollapsed-gibbs-lda%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/collapsed-gibbs-lda.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="klein-manning-parser.html"><small>本分支上一个 · 2003.07</small><b>非词汇化句法分析</b></a><a class="r" href="lexicalized-reordering.html"><small>本分支下一个 · 2004.05</small><b>词汇化调序模型</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

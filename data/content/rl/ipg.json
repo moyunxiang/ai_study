@@ -1,0 +1,33 @@
+{
+  "id": "ipg",
+  "who": "Shixiang Gu, Timothy Lillicrap, Zoubin Ghahramani, Richard E. Turner, Bernhard Schölkopf, Sergey Levine · University of Cambridge, MPI Tübingen, DeepMind, UC Berkeley",
+  "venue": "NeurIPS 2017",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1706.00387"}
+  ],
+  "problem": "在线策略梯度（TRPO、PPO）稳定但费样本；离策略的DDPG省样本但不稳定。Q-Prop、ACER等方法各自尝试混合两者，却缺少统一的理论来说明“混合到什么程度、偏差有多大”。",
+  "idea": "把在线策略梯度与基于评论家的离策略梯度按比例ν插值：`∇J ≈ (1−ν)·∇J_on-policy + ν·∇J_off-policy`，并用控制变量（以评论家为基线）降低方差。证明这一族梯度在插值后仍满足策略改进的性能下界，Q-Prop、DDPG、普通策略梯度都是它的特例。",
+  "impact": "给出了混合在线与离策略梯度的统一框架和偏差界，使“在线/离线程度”成为一个可调的连续参数；它的分析也引出了后来对动作相关基线究竟能减多少方差的检验。",
+  "background": "[[trpo]]与[[ppo]]这样的在线方法每次更新只用当前策略的数据，回报估计无偏但样本效率低；[[ddpg]]用回放池中的数据和评论家Q函数的梯度更新策略，样本效率高但有偏、易发散。同年的[[q-prop]]用评论家的一阶泰勒展开作为控制变量，把DDPG式的梯度“嫁接”到在线策略梯度里，[[acer]]则用截断重要性采样利用回放数据。这些方法各有构造，彼此关系和偏差大小不清楚。",
+  "method": "IPG的梯度估计是\n\n`∇J ≈ (1−ν) E_{π}[ ∇log π(a|s) (Â(s,a) − A_w(s,a)) ] + ν E_{s∼β}[ ∇_θ Ā_w(s) ]`\n\n第一项是在线采样得到的似然比梯度，减去评论家 `A_w` 作为控制变量（当控制变量的期望可解析计算时无偏）；第二项是在回放分布β下、对评论家给出的期望优势求梯度，即DDPG式的离策略梯度。ν在0到1之间：ν=0且不用控制变量就是普通策略梯度；ν=0加控制变量就是Q-Prop；ν=1就近似DDPG。\n\n理论上，作者推导了ν>0时由离策略项和评论家误差引入的偏差上界，并证明在满足信赖域约束时，插值后的更新仍满足类似[[trpo]]的单调改进下界。实践中把它嵌入TRPO式的信赖域更新，在一组固定的其他细节下系统比较不同ν与控制变量的组合。",
+  "results": "摘要称：最终算法统一并推广了已有的深度策略梯度技术，对离策略更新引入的偏差有理论保证，并在若干OpenAI Gym连续控制基准上超过了当时最好的无模型深度RL方法；作者还比较了不同的离策略梯度与在线样本混合方式对性能的贡献。",
+  "legacy": "IPG与Q-Prop的“动作相关控制变量”路线随后受到[[mirage-baselines]]的检验：Tucker等人（含同一作者）发现，在常见基准上，学到的动作相关基线并没有比状态基线显著减少方差。混合在线与离策略更新的思想则在后来的P3O、离线到在线RL等工作中继续出现。",
+  "limits": [
+    {"text": "ν需要按任务调节，偏差界较松，实际使用时离策略比例过大仍会引起不稳定。", "solved_by": []},
+    {"text": "论文报告的方差改进部分来自动作相关控制变量，后来的分析发现这类基线在常见基准上减少的方差有限。", "solved_by": ["mirage-baselines"]}
+  ],
+  "relations": [
+    {"to": "q-prop", "type": "extends", "note": "Q-Prop是IPG在ν=0时的特例，IPG把它推广为在线与离策略梯度的连续插值。"},
+    {"to": "ddpg", "type": "uses", "note": "离策略项就是DDPG式的确定性评论家梯度，ν=1时近似退化为DDPG。"},
+    {"to": "trpo", "type": "uses", "note": "在TRPO式信赖域更新中使用插值梯度，并给出类似的单调改进下界。"},
+    {"to": "acer", "type": "rivals", "note": "ACER用截断重要性采样利用回放数据；IPG直接插值评论家梯度，不用重要性权重。"}
+  ],
+  "prereq": ["policy-gradient-concept", "actor-critic", "on-off-policy", "expectation-variance", "bias-variance"],
+  "terms": [
+    {"t": "控制变量（control variate）", "d": "从随机估计中减去一个期望已知、与之相关的量，期望不变而方差变小；策略梯度里的基线就是一种控制变量。"},
+    {"t": "插值系数ν", "d": "决定梯度中离策略部分所占比例的超参数，0表示纯在线，1表示近似纯离策略。"}
+  ],
+  "learn": "先读[[q-prop]]理解评论家控制变量；读原文第3节IPG梯度与第4节偏差界；在HalfCheetah上用ν=0、0.2、1三种设置训练，比较样本效率与稳定性。",
+  "check": {"source": "https://arxiv.org/abs/1706.00387", "confirmed": "标题、作者（Gu, Lillicrap, Ghahramani, Turner, Schölkopf, Levine）、arXiv v1于2017-06-01；摘要中离策略方法样本效率高而在线方法更稳定、从理论与实验两方面研究合并两者、带价值估计的离策略更新可与在线策略梯度插值并满足性能界、用控制变量方法得到一族策略梯度算法且若干近期算法为特例、固定其余细节下的比较、对离策略偏差有理论保证、在若干Gym连续控制基准上超过最先进无模型方法。梯度公式、ν的特例对应关系、NeurIPS 2017与机构按原文正文和通行引用。"},
+  "aka": ["IPG", "Interpolated Policy Gradient", "插值策略梯度", "在线与离策略梯度插值"]
+}

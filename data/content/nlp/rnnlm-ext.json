@@ -1,0 +1,33 @@
+{
+  "id": "rnnlm-ext",
+  "who": "Tomas Mikolov, Stefan Kombrink, Lukáš Burget, Jan Černocký, Sanjeev Khudanpur · 布尔诺理工大学、约翰斯·霍普金斯大学",
+  "venue": "ICASSP 2011",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1109/ICASSP.2011.5947611"}
+  ],
+  "aka": ["Extensions of RNNLM", "RNNLM扩展", "类分解输出层", "Class-based Softmax", "Mikolov 2011", "RNNLM toolkit", "基于词类的softmax分解"],
+  "problem": "2010年的RNN语言模型困惑度明显低于n-gram，但输出层要对整个词表（几万到几十万词）算softmax，训练和测试都很慢，只能在小语料上训练，难以进入实际的语音识别系统。",
+  "idea": "把输出层分解成两步：先预测下一个词属于哪个词类，再只在这个类内部预测具体的词；同时用按时间截断的反向传播训练，并组合多个RNN模型。",
+  "impact": "让RNN语言模型的训练速度提高一个数量级以上，配套发布的RNNLM工具包成为2011–2014年神经语言模型实验和语音识别重打分的常用工具，类分解思路也被后来的层次softmax类方法沿用。",
+  "background": "[[rnnlm]]（2010）用一个循环隐层把全部历史压成向量，再在输出层预测下一个词的分布。困难在于输出层：隐层维度H、词表V时，每预测一个词要做 `H×V` 次乘加，V在几万以上时，这一项远大于隐层本身的计算。[[nplm]]同样被这个瓶颈卡住；[[hierarchical-softmax]]用二叉树把复杂度降到 `log V`，但树的构造较复杂、效果对树结构敏感。",
+  "method": "核心改动是**按词类分解输出概率**：先把词按频率分到C个类（按累计词频把词表切成大致等概率的几段，高频词各占小类，低频词合进大类），然后\n\n`p(w_t | h_t) = p(c(w_t) | h_t) · p(w_t | c(w_t), h_t)`\n\n第一项是对C个类的softmax，第二项只对该类内的词做softmax。每步计算量从 `H×V` 降到约 `H×(C + V/C)`，C取 `√V` 量级时最省。\n\n训练上，论文比较了只回传一步的简单反向传播与[[bptt]]（随时间反向传播，回传若干步后截断），说明后者能学到更长的依赖、困惑度更低；还讨论了把多个不同初始化的RNN模型线性插值，以及和n-gram模型插值，以进一步降低困惑度和识别词错率。",
+  "results": "论文在Penn Treebank语料上报告困惑度，在语音识别任务上报告重打分后的词错率；主要结论是类分解带来大幅加速而困惑度只略有上升，BPTT与模型组合都能降低困惑度（具体数字未能核对原文，此处不写）。",
+  "legacy": "这篇论文和随后公开的RNNLM工具包让循环网络语言模型从实验室走向大规模实验：Mikolov随后在语音识别和机器翻译重打分中用它取得收益，[[word2vec]]的工程实现也沿用了他在这里积累的高效训练经验。词类分解输出层后来被[[lstm-lm]]等工作直接采用，并演化出[[adaptive-softmax]]这类按词频分簇、适配GPU的输出层。",
+  "limits": [
+    {"text": "普通RNN用截断BPTT训练仍会遇到梯度消失，实际能利用的历史只有十几个词。", "solved_by": ["lstm-lm"]},
+    {"text": "按词频切分的词类与语义无关，类内softmax对低频大类仍然很慢，在GPU上并行效率也不理想。", "solved_by": ["adaptive-softmax", "nce-lm"]}
+  ],
+  "relations": [
+    {"to": "rnnlm", "type": "solves", "note": "解决RNN语言模型输出层对整个词表做softmax太慢的问题，使它能在更大语料上训练。"},
+    {"to": "hierarchical-softmax", "type": "rivals", "note": "同样把输出层分解来省计算：层次softmax用二叉树做log V次判别，这里只用一层词类、实现简单。"},
+    {"to": "bptt", "type": "uses", "note": "用截断的随时间反向传播训练循环隐层，并与一步反向传播比较。"},
+    {"to": "brown-clustering", "type": "extends", "note": "沿用“先预测词类再预测词”的类语言模型思想，但词类按词频简单切分，而非Brown式的互信息聚类。"}
+  ],
+  "prereq": ["language-model", "recurrent-layer", "softmax", "backpropagation", "perplexity", "big-o"],
+  "terms": [
+    {"t": "类分解softmax", "d": "先在少数几个词类上做softmax，再在选中的类内部做softmax，两者相乘得到词的概率。"},
+    {"t": "截断BPTT", "d": "反向传播只沿时间往回传固定步数，用来控制计算量和梯度爆炸。"}
+  ],
+  "learn": "先读[[rnnlm]]了解基本结构 → 读本文的类分解与BPTT两节 → 动手：在PyTorch里实现一个带两级softmax的小RNN语言模型，比较V=5万时与完整softmax的每步耗时。",
+  "check": {"source": "https://doi.org/10.1109/ICASSP.2011.5947611", "confirmed": "Crossref与Semantic Scholar：标题Extensions of recurrent neural network language model、五位作者、ICASSP 2011（2011年5月）。IEEE全文未能打开；类分解公式、按词频切分词类、BPTT比较、多模型组合、在PTB与语音识别上实验均凭一般了解（作者博士论文与后续文献的通行讲法），未写具体数字。"}
+}

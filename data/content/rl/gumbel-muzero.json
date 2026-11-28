@@ -1,0 +1,34 @@
+{
+  "id": "gumbel-muzero",
+  "who": "Ivo Danihelka, Arthur Guez, Julian Schrittwieser, David Silver · DeepMind",
+  "venue": "ICLR 2022",
+  "links": [
+    {"label": "OpenReview", "url": "https://openreview.net/forum?id=bERaNdoegnO"},
+    {"label": "mctx（官方JAX实现）", "url": "https://github.com/google-deepmind/mctx"}
+  ],
+  "problem": "AlphaZero依靠根节点的搜索结果改进策略网络，但如果模拟次数少、没能访问根节点的所有动作，搜索得到的访问次数分布可能比原策略还差，策略网络就学不到改进。",
+  "idea": "在根节点用Gumbel-Top-k技巧做不放回采样，选出k个候选动作，再用“序列减半”把模拟次数分配给它们，最后选出的动作保证在期望意义下改进策略；训练目标改为用Q值补全后的改进策略，而不是访问次数分布。",
+  "impact": "得到Gumbel AlphaZero和Gumbel MuZero：在围棋、国际象棋和Atari上与原算法持平，在每步只有很少模拟次数（如2次、16次）时显著更好；它是DeepMind开源MCTS库mctx中的标准算法之一。",
+  "background": "[[alphazero]]与[[muzero]]的训练目标是根节点的访问次数分布，动作选择用PUCT公式加Dirichlet噪声。当模拟次数大于动作数时这很有效；但当模拟预算很小（例如棋类有几百个合法着法、Atari要求实时），访问次数分布几乎只反映先验和噪声，不能保证比先验策略更好。[[mcts-rpo]]已经把搜索解释为正则化策略优化，但仍假设能估计所有根动作的Q值。作者要求一种在**任意**模拟次数下都能保证策略改进的方法。",
+  "method": "**根节点：Gumbel-Top-k不放回采样**。对每个动作a加独立的Gumbel噪声 `g(a)`，取 `g(a) + logits(a)` 最大的k个动作作为候选；这等价于按策略π不放回地采样k个动作。\n\n**序列减半（Sequential Halving）**：把模拟预算分成若干轮，每轮在剩余候选上平均分配模拟，然后按 `g(a) + logits(a) + σ(q̂(a))` 保留前一半，直到剩一个动作。其中σ是随访问次数单调增长的变换。作者证明，在Q值估计正确时，这样选出的动作满足 `E[q(A)] ≥ E_{a∼π}[q(a)]`，即一定不比原策略差。\n\n**训练目标**：用 `π′ = softmax(logits + σ(completed Q))` 作为策略网络的目标，其中未访问动作的Q值用价值估计补全（completed Q）。\n\n**非根节点**：同样用由策略改进推出的确定性规则选择动作，以取代PUCT的启发式。去掉模型学习就是Gumbel AlphaZero，带学到的模型就是Gumbel MuZero。",
+  "results": "摘要称：Gumbel AlphaZero与Gumbel MuZero（分别不带和带模型学习）在围棋、国际象棋和Atari上达到当时最先进的水平，并且在只用少量模拟进行规划时显著改进了以往的性能。原文报告，在9×9围棋中每步只用2次模拟时，原版AlphaZero几乎学不到东西，而Gumbel版本仍能稳定提升。",
+  "legacy": "Gumbel MuZero被纳入官方开源库mctx，成为后续研究中低算力搜索的默认选择；它的“保证策略改进的搜索”思想也被用到连续控制规划、组合优化以及大模型推理中的树搜索。",
+  "limits": [
+    {"text": "策略改进保证依赖Q值估计准确；学到的模型或价值函数有偏时，保证不再严格成立。", "solved_by": []},
+    {"text": "主要针对离散动作；在连续动作空间里需要先采样候选动作，如何把搜索结果蒸馏回连续策略仍是开放问题。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "alphazero", "type": "solves", "note": "AlphaZero在模拟次数少于根动作数时可能无法改进策略；Gumbel不放回采样加序列减半保证改进。"},
+    {"to": "muzero", "type": "extends", "note": "在MuZero的学到模型上使用同样的Gumbel搜索与训练目标，得到Gumbel MuZero。"},
+    {"to": "mcts-rpo", "type": "extends", "note": "延续“把搜索看作策略改进”的视角，并去掉需要估计所有根动作Q值的前提。"},
+    {"to": "sampled-muzero", "type": "rivals", "note": "Sampled MuZero也在根节点采样部分动作来处理大动作空间；Gumbel MuZero用不放回采样并给出改进保证。"}
+  ],
+  "prereq": ["tree-search", "gumbel-softmax", "policy-value", "self-play", "softmax"],
+  "terms": [
+    {"t": "Gumbel-Top-k技巧", "d": "给每个动作的对数概率加独立的Gumbel随机噪声后取最大的k个，等价于按该分布不放回地抽k个动作。"},
+    {"t": "序列减半（Sequential Halving）", "d": "一种老虎机算法：每轮把预算平均分给剩余候选，淘汰表现较差的一半，直到只剩一个。"}
+  ],
+  "learn": "先了解[[alphazero]]的PUCT搜索与[[c:gumbel-softmax]]；读原文第3–4节根节点算法与策略改进证明；用mctx库在一个小棋类上比较muzero_policy与gumbel_muzero_policy在模拟次数为4时的训练曲线。",
+  "check": {"source": "https://openreview.net/forum?id=bERaNdoegnO（经OpenAlex记录）；https://github.com/google-deepmind/mctx", "confirmed": "标题、作者（Danihelka, Guez, Schrittwieser, Silver）、ICLR 2022（OpenAlex记录日期2022-04-25）；摘要中AlphaZero在未访问根节点所有动作时可能无法改进策略、基于不放回采样的策略改进算法、用策略改进思想替换根与非根节点的启发式、Gumbel AlphaZero/MuZero分别不带和带模型学习、在围棋/国际象棋/Atari上达到最先进并在少量模拟时显著改进。mctx的README确认库内实现了Gumbel MuZero。序列减半与σ变换、completed Q、9×9围棋2次模拟的实验按原文正文和通行了解（OpenReview页面本身未能直接打开）。"},
+  "aka": ["Gumbel MuZero", "Gumbel AlphaZero", "Policy improvement by planning with Gumbel", "Gumbel搜索", "Sequential Halving MCTS", "mctx"]
+}

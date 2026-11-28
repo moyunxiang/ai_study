@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>在线策略RL什么最重要（2020） · AI脉络</title>
+<meta name="description" content="PPO这类在线策略算法概念上很简单，但真正好用的实现里藏着几十个高低层设计选择（归一化、网络初始化、优势估计、截断方式……），论文里很少讨论，导致论文描述与实现脱节，很难判断进步来自哪里。 在一个统一的在线策略RL框架里实现50多个这样的“选择”，在5个复杂度不同的连续控制环境上训练超过25万个智…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/what-matters-onpolicy.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="在线策略RL什么最重要（2020）">
+<meta property="og:description" content="PPO这类在线策略算法概念上很简单，但真正好用的实现里藏着几十个高低层设计选择（归一化、网络初始化、优势估计、截断方式……），论文里很少讨论，导致论文描述与实现脱节，很难判断进步来自哪里。 在一个统一的在线策略RL框架里实现50多个这样的“选择”，在5个复杂度不同的连续控制环境上训练超过25万个智…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/what-matters-onpolicy.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/what-matters-onpolicy">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 环境与评测</div>
+<h1>在线策略RL什么最重要</h1>
+<div class="full">What Matters In On-Policy Reinforcement Learning? A Large-Scale Empirical Study</div>
+<div class="meta"><span>2020.06</span><span>论文</span><span>延伸</span><span>ICLR 2021</span><span>Marcin Andrychowicz, Anton Raichuk, Piotr Stańczyk, Manu Orsini, Sertan Girgin, Raphaël Marinier, Léonard Hussenot, Matthieu Geist et al. · Google Research, Brain Team</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2006.05990" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/what-matters-onpolicy">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>PPO这类在线策略算法概念上很简单，但真正好用的实现里藏着几十个高低层设计选择（归一化、网络初始化、优势估计、截断方式……），论文里很少讨论，导致论文描述与实现脱节，很难判断进步来自哪里。</p></div><div><h4>方法</h4><p>在一个统一的在线策略RL框架里实现50多个这样的“选择”，在5个复杂度不同的连续控制环境上训练超过25万个智能体，逐个测量每个选择的影响，给出可操作的训练建议。</p></div><div><h4>影响</h4><p>成为调PPO类算法最常被引用的实证指南之一，许多“默认配置”（如观测归一化、策略输出层的小初始化、GAE的λ取值、Adam学习率等）都能在这里找到依据。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/ppo.html">PPO</a>是连续控制和许多大型项目中最常用的在线策略算法，但它的表现高度依赖实现。<a class="ln" href="../n/implementation-matters.html">PPO的实现细节之争</a>（Engstrom等，2020）发现PPO相对TRPO的优势很大程度来自代码中的“小技巧”而非截断目标本身；<a class="ln" href="../n/deep-rl-matters.html">《Deep RL that Matters》复现性批评</a>更早指出结果对超参数和种子极为敏感。这些工作说明了问题，但没有系统地回答：在众多选择中，哪些真正重要，推荐值是多少？</p><h2>方法</h2><p>作者把在线策略算法拆成若干主题：策略损失（PPO截断、V-trace、AWR式等）、网络结构（宽度、深度、激活函数、策略与价值是否共享）、初始化（尤其是策略输出层的缩放）、归一化与裁剪（观测、价值、梯度）、优势估计（<a class="ln" href="../n/gae.html">广义优势估计GAE</a>的λ、n步回报、V-trace）、训练设置（每批环境步数、迭代轮数、小批量大小）、时间步处理（回合截断的处理、折扣因子）以及优化器（Adam学习率、动量）。</p><p>每个主题内，在其他选择取合理默认值的前提下随机采样配置，在Hopper、Walker2d、HalfCheetah、Ant、Humanoid五个环境上训练，以多次随机种子统计性能，再分析各选择的边际影响，形成推荐。总计训练了超过25万个智能体。</p><h2>结果</h2><p>摘要称：作者在统一框架中实现了50多个选择，在五个不同复杂度的连续控制环境中训练了超过25万个智能体，提供了在线策略训练的见解与实用建议。原文的主要建议包括：使用PPO的截断损失、把策略最后一层初始化为很小的权重、对观测做归一化、用GAE（λ约0.9）、策略与价值使用不共享的网络、Adam学习率在3×10⁻⁴左右等。</p><h2>后来的发展</h2><p>该研究被大量实现与教程引用，影响了CleanRL、Stable-Baselines3等库中PPO的默认配置；同类的大规模实证研究随后也被用于离策略算法、离线RL等方向。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只在五个MuJoCo连续控制环境上做研究，结论在离散动作、图像输入或多智能体场景中未必成立。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>按主题分组、在默认配置附近采样，难以发现跨主题的强交互作用，推荐值可能只是局部最优。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/ppo.html">PPO</a><span class="yr">2017.07 · RL</span><div class=nt>以PPO为主要对象，系统地检验其实现中各项设计选择的作用。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/gae.html">广义优势估计GAE</a><span class="yr">2015.06 · RL</span><div class=nt>比较GAE、n步回报与V-trace等优势估计方式，推荐GAE及其λ取值。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/deep-rl-matters.html">《Deep RL that Matters》复现性批评</a><span class="yr">2017.09 · RL</span><div class=nt>针对深度RL结果难以归因的问题，用超过25万次训练的统计给出可操作结论。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/implementation-matters.html">PPO的实现细节之争</a><span class="yr">2020.05 · RL</span><div class=nt>在Engstrom等指出“代码细节决定PPO表现”的基础上，把考察扩展到50多个选择并给出推荐值。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/policy-gradient-concept.html">策略梯度</a> <a class="chip c" href="../c/hyperparameter.html">超参数与调参</a> <a class="chip c" href="../c/ablation-baseline.html">基线与消融实验</a> <a class="chip c" href="../c/normalization-layer.html">归一化层</a> <a class="chip c" href="../c/statistical-significance.html">方差、种子与统计显著性</a></p>
+<h2>本篇术语</h2><ul><li><b>设计选择</b>　算法描述之外、但实现时必须做出的决定，如是否归一化观测、网络如何初始化、优势如何估计。</li><li><b>大规模实证研究</b>　通过大量随机配置和多次重复训练，用统计方法衡量每个因素对性能的影响，而不是只比较少数精心调过的配置。</li></ul>
+<h2>怎么学</h2><p>先熟悉<a class="ln" href="../n/ppo.html">PPO</a>和<a class="ln" href="../n/gae.html">广义优势估计GAE</a>；读原文每个主题的“推荐”段落；在CleanRL的PPO实现上逐项关闭观测归一化、改变策略输出层初始化，看各自对Hopper回报的影响。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2006.05990" rel="noopener">https://arxiv.org/abs/2006.05990</a>（标题、作者（Andrychowicz, Raichuk, Stańczyk, Orsini, Girgin, Marinier, Hussenot, Geist, Pietquin, Michalski, Gelly, Bachem）、arXiv v1于2020-06-10；摘要中在线策略RL的大量高低层设计选择强烈影响性能且很少被讨论、论文描述与实现脱节、在统一框架中实现50多个选择、在五个不同复杂度的连续控制环境中训练超过25万个智能体、给出实用建议。主题分组、五个环境名、具体推荐值、ICLR 2021、对开源库的影响按原文正文和通行了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%9C%A8%E7%BA%BF%E7%AD%96%E7%95%A5RL%E4%BB%80%E4%B9%88%E6%9C%80%E9%87%8D%E8%A6%81%EF%BC%88what-matters-onpolicy%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Awhat-matters-onpolicy%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/what-matters-onpolicy.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="dbc.html"><small>本分支上一个 · 2020.06</small><b>DBC互模拟表示</b></a><a class="r" href="pwil.html"><small>本分支下一个 · 2020.06</small><b>PWIL最优传输模仿</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

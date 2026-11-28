@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>过度训练与下游的规模定律（2024） · AI脉络</title>
+<meta name="description" content="规模定律大多在Chinchilla最优（计算最优）的配比下研究，而实际模型为了降低推理成本普遍“过度训练”（小模型喂远超最优的数据）；规模定律通常只预测下一词损失，而大家真正比较的是下游任务成绩。 训练104个模型（0.011B–6.9B参数，三种数据分布，不同词元数），拟合同时外推过度训练程度和…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/overtraining-scaling.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="过度训练与下游的规模定律（2024）">
+<meta property="og:description" content="规模定律大多在Chinchilla最优（计算最优）的配比下研究，而实际模型为了降低推理成本普遍“过度训练”（小模型喂远超最优的数据）；规模定律通常只预测下一词损失，而大家真正比较的是下游任务成绩。 训练104个模型（0.011B–6.9B参数，三种数据分布，不同词元数），拟合同时外推过度训练程度和…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/overtraining-scaling.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/overtraining-scaling">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 规模定律与数据</div>
+<h1>过度训练与下游的规模定律</h1>
+<div class="full">Language models scale reliably with over-training and on downstream tasks</div>
+<div class="meta"><span>2024.03</span><span>论文</span><span>延伸</span><span>Samir Yitzhak Gadre, Georgios Smyrnis, Vaishaal Shankar, Suchin Gururangan, Mitchell Wortsman, Rulin Shao, Jean Mercat, Alex Fang et al. · 哥伦比亚大学、UT Austin、华盛顿大学、丰田研究院等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2403.08540" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/mlfoundations/scaling" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/overtraining-scaling">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>规模定律大多在Chinchilla最优（计算最优）的配比下研究，而实际模型为了降低推理成本普遍“过度训练”（小模型喂远超最优的数据）；规模定律通常只预测下一词损失，而大家真正比较的是下游任务成绩。</p></div><div><h4>方法</h4><p>训练104个模型（0.011B–6.9B参数，三种数据分布，不同词元数），拟合同时外推过度训练程度和参数规模的损失规模定律；再提出一个幂律，把模型的困惑度与下游任务平均错误率联系起来，从而用小实验预测大模型的下游表现。</p></div><div><h4>影响</h4><p>把规模定律从“计算最优”推广到实际常用的过度训练区间，并给出损失到下游错误率的可预测关系；用约1/300的计算准确预测了32倍过度训练的1.4B模型的损失，为DCLM等后续数据与训练配方研究提供了预测工具。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/scaling-laws.html">语言模型的规模定律</a>和<a class="ln" href="../n/chinchilla.html">Chinchilla</a>给出损失随参数量N和训练词元数D变化的规律，并据此算出计算最优配比（约每参数20个词元）。但<a class="ln" href="../n/llama-2.html">Llama 2</a>、<a class="ln" href="../n/mistral-7b.html">Mistral 7B</a>等模型为了推理便宜，用的词元数远超这个比例。另一方面，<a class="ln" href="../n/emergent-abilities.html">涌现能力</a>和<a class="ln" href="../n/emergence-mirage.html">涌现是幻象吗</a>的争论显示，下游任务的成绩并不总能从损失平滑地预测。实际做决策时，需要知道“过度训练到什么程度”以及“下游会怎样”。</p><h2>方法</h2><p><b>测试平台</b>：在C4、RedPajama、RefinedWeb三种数据上训练104个模型，参数从0.011B到6.9B，每个规模用不同的词元数，覆盖从计算最优到大幅过度训练。用词元倍数 <code>M = D/N</code> 表示过度训练程度（Chinchilla最优约为M=20）。</p><p><b>过度训练的损失定律</b>：作者观察到，固定M时，损失随计算量C仍按幂律下降，且不同M的曲线大致平行，只是常数不同。于是拟合 <code>L(C, M) = E + (a·M^η + b·M^(−η)) · C^(−η)</code> 其中E是不可约损失。这样只用较小计算的实验就能外推到更大规模、更大M的模型。</p><p><b>损失到下游的定律</b>：对一组下游任务取平均top-1错误率Err，发现它与验证集困惑度之间满足指数型关系 <code>Err(L) = ε − k · exp(−γ·L)</code> 先用小模型拟合两步关系，再串起来预测大模型的下游错误率。</p><h2>结果</h2><p>用比目标运行少约300倍的计算，准确预测了1.4B参数、900B词元（32倍过度训练）的运行和6.9B参数、138B词元（计算最优）的运行的验证损失；用少约20倍的计算，预测了这两个模型在下游任务上的平均top-1错误率。</p><h2>后来的发展</h2><p>这套过度训练与下游预测的方法被同一批作者用于<a class="ln" href="../n/dclm.html">DCLM</a>的数据配方评估；“小模型先拟合、再外推下游表现”成为预训练前评估方案的常用流程，与<a class="ln" href="../n/observational-scaling.html">观测式规模定律</a>一起构成下游可预测性的主要参考。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>下游预测针对多个任务的平均错误率，对单个任务（尤其是表现出“涌现”的困难任务）的预测并不可靠。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>实验最大到6.9B参数，过度训练倍数在更极端的范围（例如每参数上千个词元）以及其他架构上是否仍满足同样的形式，没有验证。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/scaling-laws.html">语言模型的规模定律</a><span class="yr">2020.01 · LLM</span><div class=nt>沿用损失随计算的幂律形式，并加入词元倍数M作为第二个变量。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/chinchilla.html">Chinchilla</a><span class="yr">2022.03 · LLM</span><div class=nt>把只在计算最优配比下研究的规模定律推广到实际常用的过度训练区间。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/emergence-mirage.html">涌现是幻象吗</a><span class="yr">2023.04 · LLM</span><div class=nt>在“下游表现能否从损失预测”的争论中，给出多任务平均错误率可以从困惑度预测的证据。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/llama-2.html">Llama 2</a><span class="yr">2023.07 · LLM</span><div class=nt>以LLaMA式大幅过度训练的现实做法作为研究动机。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/scaling-law-concept.html">幂律与规模定律</a> <a class="chip c" href="../c/perplexity.html">困惑度</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a> <a class="chip c" href="../c/classification-metrics.html">准确率、精确率、召回率与F1</a> <a class="chip c" href="../c/loss-function.html">损失函数</a></p>
+<h2>本篇术语</h2><ul><li><b>过度训练</b>　训练词元数远多于计算最优配比，模型更小、推理更便宜，但训练时每单位计算换来的损失下降变少。</li><li><b>词元倍数</b>　训练词元数除以参数量；Chinchilla最优约为20，LLaMA类模型常达到几百甚至更多。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/scaling-laws.html">语言模型的规模定律</a>和<a class="ln" href="../n/chinchilla.html">Chinchilla</a>；读本文第3节过度训练定律的推导和第4节损失到下游错误率的拟合；动手：用论文公开的小模型数据，自己拟合L(C, M)，再外推到较大的M看误差。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2403.08540" rel="noopener">https://arxiv.org/abs/2403.08540</a>（标题、作者（25位，列前8位）、arXiv首次提交2024-03-13；摘要中规模研究多在计算最优区间而模型常被过度训练以降低推理成本、规模定律多预测下一词损失而模型按下游任务比较、104个模型（0.011B至6.9B、三种数据分布）、同时外推过度训练量与参数量的规模定律、预测1.4B参数900B词元（32倍过度训练）与6.9B参数138B词元运行的验证损失且实验计算少300倍、困惑度与下游任务表现的幂律、用少20倍的计算预测两个模型的平均top-1错误率。L(C, M)与Err(L)的具体函数形式、三个数据集名称、机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E8%BF%87%E5%BA%A6%E8%AE%AD%E7%BB%83%E4%B8%8E%E4%B8%8B%E6%B8%B8%E7%9A%84%E8%A7%84%E6%A8%A1%E5%AE%9A%E5%BE%8B%EF%BC%88overtraining-scaling%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aovertraining-scaling%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/overtraining-scaling.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="command-r.html"><small>本分支上一个 · 2024.03</small><b>Cohere Command R/R+</b></a><a class="r" href="orpo.html"><small>本分支下一个 · 2024.03</small><b>ORPO无参考模型偏好优化</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>视觉伺服（Visual Servoing） · AI脉络</title>
+<meta name="description" content="用相机图像直接闭环控制机器人运动：持续比较当前画面中的特征与目标位置之间的误差，按误差计算速度指令，直到误差消失。分为基于图像特征的IBVS和基于估计位姿的PBVS两类，是“看着做”的经典控制方法。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/visual-servoing.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="视觉伺服（Visual Servoing）">
+<meta property="og:description" content="用相机图像直接闭环控制机器人运动：持续比较当前画面中的特征与目标位置之间的误差，按误差计算速度指令，直到误差消失。分为基于图像特征的IBVS和基于估计位姿的PBVS两类，是“看着做”的经典控制方法。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/visual-servoing.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/visual-servoing">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 具身与控制 · 进阶</div>
+<h1>视觉伺服</h1><div class="full">Visual Servoing</div>
+<p class="muted" style="font-size:13px">也叫：视觉伺服　visual servoing　visual servo control　IBVS　基于图像的视觉伺服　image-based visual servoing　PBVS　基于位置的视觉伺服　position-based visual servoing　交互矩阵　interaction matrix　图像雅可比　image Jacobian　眼在手上　eye-in-hand　眼在手外　eye-to-hand</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/visual-servoing">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>用相机图像直接闭环控制机器人运动：持续比较当前画面中的特征与目标位置之间的误差，按误差计算速度指令，直到误差消失。分为基于图像特征的IBVS和基于估计位姿的PBVS两类，是“看着做”的经典控制方法。</b></p>
+<p class="tags">先要会：<a class="chip c" href="control-loop.html">控制回路与控制频率</a> <a class="chip c" href="camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="jacobian-hessian.html">雅可比矩阵与海森矩阵</a></p>
+<p>先用相机估计物体的三维位置、再规划一条路径闭着眼执行，任何标定误差或物体移动都会导致失败。人伸手拿杯子时则是边看边调整。<b>视觉伺服</b>把相机放进控制回路（见<a class="lc" href="../c/control-loop.html">控制回路与控制频率</a>），在每个控制周期根据视觉误差修正运动。</p><p><b>两种基本形式</b>。</p><ul><li><b>基于图像的视觉伺服（IBVS）</b>：误差直接定义在图像上，例如目标上4个特征点的当前像素坐标与期望像素坐标之差e。关键是<b>交互矩阵</b>L（也叫图像雅可比），它描述相机运动速度v如何引起特征点在图像上移动：<code>ė = L·v</code>。经典控制律为</li></ul><p class="formula"><code>v = −λ · L⁺ · e</code></p><p>L⁺是伪逆，λ是增益，误差按指数衰减。L依赖特征点的深度，通常用估计值或期望位置处的值近似。IBVS对相机标定误差不敏感，但相机在三维空间中的轨迹可能绕远，甚至让特征离开视野。</p><ul><li><b>基于位置的视觉伺服（PBVS）</b>：先从图像估计目标相对相机的位姿（见<a class="lc" href="../c/rigid-transform.html">位姿与齐次变换SE(3)</a>、<a class="lc" href="../c/pose-estimation.html">姿态估计</a>），误差定义在三维位姿上，相机轨迹更直观，但对标定和位姿估计误差更敏感。</li></ul><p><b>相机安装方式</b>。相机装在机械臂末端（眼在手上，eye-in-hand）或固定在外部看着机械臂和目标（眼在手外，eye-to-hand），二者的交互矩阵和标定方式不同，后者需要手眼标定（见<a class="lc" href="../c/camera-geometry.html">相机模型与多视图几何</a>）。</p><p><b>与学习方法的关系</b>。学习型的闭环视觉策略可以看作“学出来的视觉伺服”：<a class="ln" href="../n/levine-grasping.html">机械臂农场抓取</a>训练网络预测某个运动指令能否带来成功抓取，并在执行中持续重新选择指令，作者明确把它称为一种连续的伺服；<a class="ln" href="../n/e2e-visuomotor.html">端到端视觉运动策略</a>从图像直接输出电机力矩。它们不再需要手工设计特征和交互矩阵，但需要大量数据。经典视觉伺服仍常用于工业装配和对精度要求高的最后几厘米。</p>
+<div class="example"><h4>例子</h4><p>IBVS对准一个二维码：期望它的4个角点在图像中位于以画面中心为中心、边长200像素的正方形上。当前角点整体偏右40像素、偏小（边长160像素）。按控制律，相机会同时向右平移（消除水平误差）并向前靠近（放大二维码）。设λ=0.5、控制周期0.1秒，误差每一步大约缩小5%，约4到5秒后误差降到初值的10%以下。数字为示意。</p></div>
+<h2>容易误解的地方</h2><ul><li>交互矩阵在某些特征配置下奇异或病态，例如4个特征点几乎共线时，控制会变得不稳定。</li><li>视觉处理延迟会降低可用的增益，延迟大时强行提高λ容易振荡。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

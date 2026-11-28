@@ -1,0 +1,33 @@
+{
+  "id": "dbc",
+  "who": "Amy Zhang, Rowan McAllister, Roberto Calandra, Yarin Gal, Sergey Levine · McGill University, Facebook AI Research, UC Berkeley, University of Oxford",
+  "venue": "ICLR 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2006.10742"}
+  ],
+  "problem": "从图像学控制时，像素重构式的表示会把背景视频、云彩、光照这些与任务无关的细节也编码进去；画面背景一换，学到的策略就失效。",
+  "idea": "用互模拟度量定义“两个状态在行为上有多像”：奖励相近且后续转移分布相近的状态就该被视为相似。训练编码器使隐空间里的距离等于互模拟距离，从而只保留与任务相关的信息，不需要重构像素。",
+  "impact": "把互模拟这一经典的MDP状态抽象理论变成可扩展的深度表示学习目标，DBC成为“对任务无关干扰鲁棒的表示”方向的标准对照，后续一批基于互模拟或行为相似度的表示方法都从它出发。",
+  "background": "表示学习能加速像素RL，但常见做法有两类缺陷：像素重构（自编码器、世界模型）要求编码画面里的一切，包括与控制无关的背景；数据增强（[[rad]]、[[drq]]）只带来对小扰动的不变性。理论上，MDP里有一个明确的“该保留什么”的答案：互模拟。两个状态如果当前奖励相同，并且转移到各个等价类的概率也相同，就可以合并为一个状态，最优价值不变。[[deepmdp]]已经用奖励和隐转移预测损失与互模拟建立了联系，但没有直接学互模拟距离。",
+  "method": "连续MDP中的互模拟度量满足不动点方程\n\n`d(s_i, s_j) = |r(s_i) − r(s_j)| + γ · W₂( P(·|s_i), P(·|s_j) )`\n\nW₂是两个转移分布之间的2-Wasserstein距离。DBC让编码器 φ 的隐空间L1距离逼近这个度量：从批次中随机配对两个样本 i、j，最小化\n\n`L(φ) = ( ‖z_i − z_j‖₁ − |r_i − r_j| − γ W₂( P̂(·|z̄_i, a_i), P̂(·|z̄_j, a_j) ) )²`\n\n其中 P̂ 是在隐空间里学的高斯动力学模型，高斯之间的W₂有闭式解；z̄ 表示停止梯度。动力学模型同时用最大似然训练。策略与价值函数用[[sac]]在 φ 的输出上训练，编码器不接收任何像素重构损失。直观地说，背景视频不影响奖励和动力学，因此在互模拟意义下无关，编码器会学着忽略它。",
+  "results": "摘要称：在背景换成运动干扰物和自然视频的修改版视觉MuJoCo任务上，方法有效地忽略了任务无关信息，同时达到最先进性能；在第一人称高速公路驾驶任务上，学到了对云、天气和一天中时间的不变性；作者还根据互模拟度量的性质给出了泛化结果，并讨论了与因果推断的联系。",
+  "legacy": "DBC之后，基于互模拟的表示学习出现了大量改进：用策略相关的互模拟（只针对当前策略）降低计算、用更稳定的距离替代W₂、与对比学习结合等；Distracting Control Suite这类加干扰的基准也常把DBC作为对照。",
+  "limits": [
+    {"text": "互模拟目标依赖学到的奖励与动力学模型，模型不准或奖励稀疏时，表示可能塌缩或混淆不同状态。", "solved_by": []},
+    {"text": "要求编码器距离严格等于互模拟距离，对不同策略都成立，过于严格，实际训练不稳定、对超参数敏感。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "deepmdp", "type": "extends", "note": "DeepMDP用奖励与隐转移预测损失间接联系互模拟；DBC直接让隐空间距离等于互模拟距离。"},
+    {"to": "sac", "type": "uses", "note": "策略与价值函数用SAC在学到的表示上训练。"},
+    {"to": "rad", "type": "solves", "note": "数据增强只能处理小扰动；DBC通过只保留与奖励和动力学相关的信息，对换背景等大干扰保持鲁棒。"},
+    {"to": "curl", "type": "rivals", "note": "CURL靠对比学习学视觉表示，没有区分任务相关与无关信息；DBC用行为相似度定义表示。"}
+  ],
+  "prereq": ["mdp", "feature-representation", "optimal-transport", "actor-critic", "model-based-rl"],
+  "terms": [
+    {"t": "互模拟（bisimulation）", "d": "两个状态在行为上不可区分：当前奖励相同，并且接下来转移到各类状态的概率也相同；它们可以被合并而不影响最优决策。"},
+    {"t": "Wasserstein距离", "d": "把一个概率分布“搬运”成另一个所需的最小代价，可以比较两个分布有多不同。"}
+  ],
+  "learn": "先补[[c:optimal-transport]]里的Wasserstein距离和[[deepmdp]]；读原文第3节互模拟度量的定义与第4节损失；在加了自然视频背景的cheetah_run上比较DBC与像素重构的SAC-AE。",
+  "check": {"source": "https://arxiv.org/abs/2006.10742", "confirmed": "标题、作者（Amy Zhang, McAllister, Calandra, Gal, Levine）、arXiv v1于2020-06-18；摘要中不依赖领域知识或像素重构、互模拟度量量化连续MDP中状态的行为相似度、训练编码器使隐空间距离等于互模拟距离、运动干扰物与自然视频背景的视觉MuJoCo实验、第一人称高速驾驶对云/天气/时间的不变性、基于互模拟性质的泛化结果与因果推断联系。损失公式、高斯动力学与W₂闭式、SAC、ICLR 2021与机构按原文正文和通行引用。"},
+  "aka": ["DBC", "Deep Bisimulation for Control", "互模拟表示学习", "Bisimulation Metric", "互模拟度量", "Learning Invariant Representations without Reconstruction"]
+}

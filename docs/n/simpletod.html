@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>SimpleTOD单模型任务型对话（2020） · AI脉络</title>
+<meta name="description" content="任务型对话通常拆成理解用户输入（状态追踪）、决定系统动作、生成回复三个子任务，各用一个专门模型串成流水线，结构复杂、误差逐级累积，也难以利用大规模预训练语言模型。 把对话历史、对话状态、数据库查询结果、系统动作和回复按顺序拼成一个长文本序列，用一个因果语言模型（GPT-2）统一做“预测下一个词元”…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/simpletod.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SimpleTOD单模型任务型对话（2020）">
+<meta property="og:description" content="任务型对话通常拆成理解用户输入（状态追踪）、决定系统动作、生成回复三个子任务，各用一个专门模型串成流水线，结构复杂、误差逐级累积，也难以利用大规模预训练语言模型。 把对话历史、对话状态、数据库查询结果、系统动作和回复按顺序拼成一个长文本序列，用一个因果语言模型（GPT-2）统一做“预测下一个词元”…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/simpletod.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/simpletod">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 对话与问答</div>
+<h1>SimpleTOD单模型任务型对话</h1>
+<div class="full">A Simple Language Model for Task-Oriented Dialogue</div>
+<div class="meta"><span>2020.05</span><span>论文</span><span>延伸</span><span>NeurIPS 2020</span><span>Ehsan Hosseini-Asl, Bryan McCann, Chien-Sheng Wu, Semih Yavuz, Richard Socher · Salesforce Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2005.00796" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/simpletod">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>任务型对话通常拆成理解用户输入（状态追踪）、决定系统动作、生成回复三个子任务，各用一个专门模型串成流水线，结构复杂、误差逐级累积，也难以利用大规模预训练语言模型。</p></div><div><h4>方法</h4><p>把对话历史、对话状态、数据库查询结果、系统动作和回复按顺序拼成一个长文本序列，用一个因果语言模型（GPT-2）统一做“预测下一个词元”，三个子任务都变成续写这段序列的不同部分。</p></div><div><h4>影响</h4><p>在MultiWOZ上以一个模型同时刷新了状态追踪和端到端对话的成绩，证明“任务型对话就是条件语言建模”，此后SOLOIST、UBAR等大批工作沿用这种把对话结构序列化后交给预训练语言模型的做法。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>经典任务型对话系统（从<a class="ln" href="../n/pomdp-dialog.html">POMDP对话管理</a>到<a class="ln" href="../n/wen-e2e-dialog.html">端到端任务型对话系统</a>）都有明确的模块：对话状态追踪器从用户话语中提取槽值（如“餐厅区域=市中心”），策略模块根据状态和数据库结果决定动作（如“询问价格”），生成模块把动作变成句子。<a class="ln" href="../n/trade-dst.html">TRADE对话状态追踪</a>等方法专门做状态追踪，<a class="ln" href="../n/multiwoz.html">MultiWOZ任务型对话</a>提供了多领域的标注数据。与此同时，<a class="ln" href="../n/gpt-2.html">GPT-2</a>显示大规模预训练的因果语言模型能写出流畅文本，但如何把它用于需要查数据库、做决策的任务型对话，还没有简单的答案。</p><h2>方法</h2><p>训练时把一轮对话写成一条序列：</p><p class="formula"><code>[对话历史 C_t] [信念状态 B_t] [数据库结果 D_t] [系统动作 A_t] [回复 S_t]</code></p><p>各部分用特殊标记分隔，例如信念状态写成文本“餐厅 区域 市中心 , 价格 便宜”，系统动作写成“餐厅 告知 名称 , 询问 时间”。模型就是从GPT-2初始化的因果语言模型，损失是整条序列的下一个词元预测：<code>L = −Σ_i log p(x_i | x_&lt;i)</code>。</p><p>推理时分步进行：给定历史C_t，让模型续写出信念状态B_t；用B_t去查数据库，把结果D_t拼回序列；再让模型续写出系统动作A_t和回复S_t。回复中的具体值用占位符（如[餐厅名]）表示，最后再用数据库结果填入。</p><h2>结果</h2><p>在MultiWOZ上，SimpleTOD的对话状态追踪联合目标准确率超过此前最好的方法，分析还显示它对噪声标注较为鲁棒；在端到端设置下，衡量动作与回复的主要指标中，告知率（inform）提高8.1点、成功率（success）提高9.7点、综合分提高7.2点。</p><h2>后来的发展</h2><p>SimpleTOD与同期工作一起把任务型对话推向“序列化加预训练语言模型”的范式：SOLOIST进一步在大规模对话语料上预训练，UBAR把整段会话级别的状态与动作都放进上下文。大模型时代，任务型对话更多由指令微调的通用LLM配合函数调用完成，但“先生成结构化状态、再查外部数据库、再生成回复”的流程与今天的工具调用一脉相承。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>所有信息都拼在一条序列里，对话轮数一多序列就很长，受限于语言模型的上下文长度。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>依赖MultiWOZ式的完整状态与动作标注，换到新领域仍需要大量人工标注；生成的回复也可能与数据库事实不一致。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/gpt-2.html">GPT-2</a><span class="yr">2019.02 · LLM</span><div class=nt>以GPT-2为初始化，把任务型对话当作条件语言建模来微调。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/wen-e2e-dialog.html">端到端任务型对话系统</a><span class="yr">2016.04 · NLP</span><div class=nt>端到端可训练对话系统仍由多个专门模块组成；SimpleTOD用单一模型取代流水线，减少模块间误差累积。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/multiwoz.html">MultiWOZ任务型对话</a><span class="yr">2018.09 · 数据·评测</span><div class=nt>在MultiWOZ多领域任务型对话数据上训练和评测。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/trade-dst.html">TRADE对话状态追踪</a><span class="yr">2019.05 · NLP</span><div class=nt>TRADE是专门的状态追踪模型；SimpleTOD用同一个语言模型同时做状态追踪、动作决策和回复生成。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/special-tokens.html">特殊token</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a></p>
+<h2>本篇术语</h2><ul><li><b>信念状态（对话状态）</b>　截至当前轮，系统认为用户提出的各项约束，通常写成“领域-槽-值”的集合。</li><li><b>联合目标准确率</b>　对话状态追踪的指标：某一轮预测的全部槽值都与标注完全一致才算对。</li><li><b>告知率与成功率</b>　MultiWOZ端到端评测指标：系统是否给出了符合要求的实体，以及是否回答了用户索要的全部信息。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/gpt-2.html">GPT-2</a>和<a class="ln" href="../n/trade-dst.html">TRADE对话状态追踪</a> → 读本文第3节序列格式与推理流程 → 动手：把MultiWOZ的几段对话按“历史-状态-动作-回复”格式改写成文本，用一个小型GPT-2微调，观察它续写出的状态是否正确。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2005.00796" rel="noopener">https://arxiv.org/abs/2005.00796</a>（arXiv：标题A Simple Language Model for Task-Oriented Dialogue、作者Hosseini-Asl、McCann、Wu、Yavuz、Socher，v1提交于2020-05-02；摘要：任务型对话常拆为理解用户输入、决定动作、生成回复三个任务，SimpleTOD用单个因果语言模型把所有子任务重写为一个序列预测问题，可利用GPT-2等预训练模型，在MultiWOZ上状态追踪联合目标准确率超过此前最好，对噪声标注鲁棒，端到端设置下inform提高8.1、success提高9.7、combined提高7.2。NeurIPS 2020出处、Salesforce单位、序列格式细节与占位符回填凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20SimpleTOD%E5%8D%95%E6%A8%A1%E5%9E%8B%E4%BB%BB%E5%8A%A1%E5%9E%8B%E5%AF%B9%E8%AF%9D%EF%BC%88simpletod%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asimpletod%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/simpletod.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="gector.html"><small>本分支上一个 · 2020.05</small><b>GECToR标注式语法纠错</b></a><a class="r" href="labse.html"><small>本分支下一个 · 2020.07</small><b>LaBSE</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

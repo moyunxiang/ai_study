@@ -1,0 +1,35 @@
+{
+  "id": "based",
+  "who": "Simran Arora, Sabri Eyuboglu, Michael Zhang, Aman Timalsina, Silas Alberti, Dylan Zinsley, James Zou, Atri Rudra et al. · 斯坦福大学、布法罗大学",
+  "venue": "ICML 2024",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2402.18668"},
+    {"label": "代码", "url": "https://github.com/HazyResearch/based"}
+  ],
+  "aka": ["Based", "BASED", "线性注意力加滑窗", "Taylor线性注意力", "回忆—吞吐权衡", "Recall-Throughput Tradeoff", "Recall-Memory Tradeoff"],
+  "problem": "注意力擅长“回忆”上下文里出现过的内容，但推理时KV缓存随长度线性增长，吃显存、拖吞吐；Mamba、RWKV等替代品状态大小固定、生成快，却在回忆类任务上明显变差。",
+  "idea": "从理论和实验上说明：模型的循环状态越小，回忆能力越差，二者是一条权衡曲线。BASED把泰勒展开近似的线性注意力（负责全局、状态固定）和很小窗口的滑窗注意力（负责局部精确）组合起来，调两者的大小就能沿这条曲线移动；再写专门的IO感知内核，让它真的跑得快。",
+  "impact": "把“状态大小决定回忆能力”的权衡说清楚并给出可调的简单架构，在1.3B规模上困惑度与Mamba持平、回忆类任务高6.22个点，生成吞吐是FlashAttention-2的24倍，是2024年线性注意力与混合架构复兴的代表工作之一。",
+  "background": "[[zoology]]用多查询联想回忆（MQAR）任务发现，门控卷积和状态空间模型的困惑度差距主要来自回忆能力。[[mamba]]、[[rwkv]]、[[gla]]等模型把历史压进固定大小的循环状态，生成时每步开销恒定，但能记住的东西有限。纯[[linear-attention]]的状态同样固定，且以往实现常比优化过的标准注意力还慢。",
+  "method": "**权衡**：作者在大量架构上测量“循环状态大小（推理时需保留的内存）”与回忆准确率，发现几乎所有模型落在同一条帕累托曲线上：要多回忆，就得多存。注意力在曲线一端（状态随长度增长，回忆最好），固定状态模型在另一端。\n\n**泰勒线性注意力**：线性注意力用特征映射φ近似 `exp(q·k)`，这样 `Σ_j φ(q)·φ(k_j) v_j = φ(q)·(Σ_j φ(k_j) v_jᵀ)` 可以用一个累计状态递推。BASED选用exp的二阶泰勒展开\n`exp(q·k) ≈ 1 + q·k + (q·k)²/2`\n对应的φ把维度为d′的投影映射成约 `1 + d′ + d′²/2` 维，状态大小由d′控制（如d′=16）。\n\n**小窗口滑窗注意力**：线性注意力对邻近词的精确区分较差，于是再叠加窗口很小（如64）的标准softmax滑窗注意力，状态只多出窗口大小的KV缓存。把线性注意力的特征维度和滑窗大小当作两个旋钮，就能在整条权衡曲线上取点：一端接近完整注意力的质量，一端接近固定状态模型的小内存。\n\n**IO感知内核**：作者为线性注意力的前向与生成写了专门的GPU内核，把状态保持在快速片上存储中，减少显存读写。",
+  "results": "训练到1.3B参数，BASED在困惑度上与最强的次二次模型（如Mamba）持平，在真实的回忆密集型任务上高出6.22个准确率点；在1.3B模型生成1024个词元时，吞吐比FlashAttention-2高24倍。",
+  "legacy": "“线性注意力或SSM负责全局、少量滑窗或全注意力负责精确回忆”的混合设计随后成为主流，见[[samba]]、[[hymba]]、[[nemotron-h]]等；状态大小与回忆的权衡也成为评价高效架构的常用视角。",
+  "limits": [
+    {"text": "状态固定的部分仍然受权衡曲线约束：在要求精确回忆很长距离内容的任务上，小状态的BASED仍不如完整注意力。", "solved_by": []},
+    {"text": "实验最大只到1.3B参数，规模放大后与混合了全注意力层的架构谁更好，论文没有回答。", "solved_by": ["samba", "nemotron-h"]}
+  ],
+  "relations": [
+    {"to": "zoology", "type": "extends", "note": "沿用Zoology的联想回忆分析，把回忆差距归结为循环状态大小，并据此设计架构。"},
+    {"to": "linear-attention", "type": "extends", "note": "用exp的二阶泰勒展开作为线性注意力的特征映射，并配上高效内核。"},
+    {"to": "longformer", "type": "uses", "note": "借用滑窗注意力补足局部的精确匹配。"},
+    {"to": "mamba", "type": "rivals", "note": "同为次二次复杂度模型；困惑度持平，BASED在回忆密集任务上更好。"},
+    {"to": "flashattention-2", "type": "rivals", "note": "以FlashAttention-2为吞吐基准，BASED在长生成上快24倍。"}
+  ],
+  "prereq": ["self-attention", "efficient-attention", "kv-cache", "taylor-expansion", "recurrent-layer", "throughput-latency"],
+  "terms": [
+    {"t": "回忆能力", "d": "模型根据上下文里先前出现过的内容生成正确词的能力，例如前文出现“张三的电话是123”，后面被问到时能答出123。"},
+    {"t": "循环状态", "d": "按顺序处理文本时保留下来的固定大小内存；状态越小，生成越省，但能记住的信息越少。"}
+  ],
+  "learn": "先读[[linear-attention]]和[[zoology]]；读本文第3节权衡曲线和第4节泰勒特征映射；动手：在MQAR合成任务上比较不同d′和窗口大小的BASED，画出状态大小与准确率的曲线。",
+  "check": {"source": "https://arxiv.org/abs/2402.18668", "confirmed": "标题、9位作者（列前8位）、arXiv首次提交2024-02-28；摘要中注意力擅长回忆但KV缓存占内存、状态大小与回忆能力的关键权衡、H3/Mamba/RWKV状态固定且回忆差、BASED结合线性注意力与滑窗注意力、调窗口与特征维度遍历帕累托前沿、训练到1.3B、困惑度匹配Mamba且回忆密集任务高6.22个点、IO感知算法生成1024词元时吞吐比FlashAttention-2高24倍。二阶泰勒展开特征映射、d′=16与窗口64、ICML 2024与机构为对正文的一般了解。"}
+}

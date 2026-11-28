@@ -1,0 +1,23 @@
+{
+  "id": "spqr",
+  "who": "Tim Dettmers, Ruslan Svirschevski, Vage Egiazarian, Denis Kuznedelev, Elias Frantar, Saleh Ashkboos, Alexander Borzunov, Torsten Hoefler et al. · 华盛顿大学、Yandex、IST Austria、ETH Zürich",
+  "venue": "ICLR 2024",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2306.03078"}],
+  "aka": ["SpQR", "稀疏-量化表示", "Sparse-Quantized Representation", "近无损量化"],
+  "problem": "把大模型量化到每参数3–4比特后能放进笔记本和手机，但精度损失明显，对最适合端侧部署的1B–10B小模型尤其严重。",
+  "idea": "找出并单独隔离那些量化误差特别大的离群权重，用高精度稀疏格式保存它们，其余权重用很小分组的3–4比特量化，从而在相近压缩率下做到近无损。",
+  "impact": "把“离群权重单独处理”的思路从激活推进到权重，与[[squeezellm]]的稠密加稀疏分解同期，成为极低比特权重量化的常见对照方法。",
+  "method": "SpQR在[[gptq]]的逐列量化与误差补偿框架上做了三点改动。第一，非常小的分组（如每16个权重一组）各自有缩放因子和零点，而这些量化参数本身再用3比特二次量化，以控制额外开销。第二，在量化过程中根据每个权重造成的误差（用二阶信息估计）识别离群权重，把它们从量化矩阵中移出，以16位精度、按CSR一类的稀疏格式单独存储，通常只占权重的约1%。第三，配套一个高效的GPU推理算法，在解码时同时处理稠密低比特部分和稀疏高精度部分。\n\n摘要称SpQR首次在各种规模的LLM上实现了近无损压缩，同时压缩率与以往方法相近；论文报告，对LLaMA与Falcon模型，相对困惑度损失可低于1%。",
+  "limits": [
+    {"text": "稀疏离群部分需要专门的内核，推理实现比纯稠密低比特格式复杂，主流推理引擎支持有限。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "gptq", "type": "extends", "note": "在GPTQ的逐列量化与误差补偿基础上加入小分组与离群权重隔离。"},
+    {"to": "llm-int8", "type": "extends", "note": "LLM.int8()对激活离群维度用高精度计算，SpQR把类似的离群处理用到权重上。"},
+    {"to": "squeezellm", "type": "rivals", "note": "同期的稠密加稀疏量化方案，SqueezeLLM用非均匀量化与敏感度加权。"},
+    {"to": "awq", "type": "rivals", "note": "AWQ通过缩放保护重要通道，而不是把离群权重单独存储。"}
+  ],
+  "prereq": ["quantization-concept", "jacobian-hessian", "memory-bandwidth"],
+  "learn": "先读[[gptq]]；读论文第3节离群权重的识别与存储格式；动手用官方代码量化一个7B模型到约3.5比特，与GPTQ同比特下比较困惑度。",
+  "check": {"source": "https://arxiv.org/abs/2306.03078", "confirmed": "标题、作者（9位，列前8位）、arXiv v1 2023-06-05；摘要中3–4比特时1–10B小模型精度损失、SpQR新格式、识别并隔离离群权重、首次跨规模近无损且压缩率相近。LLaMA与Falcon上相对困惑度损失<1%、33B模型可在24GB消费级GPU上运行、GPU推理比16位基线更快且压缩超过4倍。小分组与二次量化、约1%离群比例、ICLR 2024、机构凭一般了解。"}
+}

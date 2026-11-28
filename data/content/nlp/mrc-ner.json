@@ -1,0 +1,90 @@
+{
+  "id": "mrc-ner",
+  "who": "Xiaoya Li, Jingrong Feng, Yuxian Meng, Qinghong Han, Fei Wu, Jiwei Li（李纪为）et al. · 香侬科技、浙江大学",
+  "venue": "ACL 2020",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/1910.11476"
+    },
+    {
+      "label": "ACL Anthology",
+      "url": "https://aclanthology.org/2020.acl-main.519/"
+    }
+  ],
+  "aka": [
+    "MRC-NER",
+    "阅读理解式NER",
+    "BERT-MRC",
+    "Unified MRC Framework for NER",
+    "嵌套NER",
+    "Nested NER",
+    "Li et al. 2020",
+    "问答式实体识别"
+  ],
+  "problem": "命名实体识别通常当作序列标注：每个字或词只能贴一个标签，因此无法表示嵌套实体（如“北京大学”是机构，其中“北京”又是地名），平面NER和嵌套NER只能各用一套模型。",
+  "idea": "把NER改写成机器阅读理解：对每种实体类型写一个自然语言问题（如“文中提到了哪些人？”），让模型像回答阅读理解题那样在原文中抽出答案片段；不同类型分别提问，重叠的实体自然能被分别抽出。",
+  "impact": "一个框架同时处理平面与嵌套NER，在ACE04、ACE05、GENIA、KBP17四个嵌套数据集上大幅刷新纪录，在CoNLL 2003、OntoNotes和两个中文数据集上也取得最好成绩；“把信息抽取任务表述为问答”的思路被广泛用于关系抽取、事件抽取等任务。",
+  "background": "[[bilstm-crf]]等序列标注模型在平面NER上效果很好，但对嵌套实体只能借助分层标注、超图等专门结构。[[squad]]式的抽取式阅读理解模型（如[[bidaf]]、基于[[bert]]的模型）擅长根据问题在文本中定位答案片段。Levy等（2017）已把关系抽取改写为阅读理解问答。",
+  "method": "对每个实体类型y构造一个查询q_y，例如人物类型的查询可以是“找出文中的人物，包括虚构人物”，查询可以来自标注指南中的类型说明。输入BERT的是 `[CLS] q_y [SEP] 原文 [SEP]`。\n\n输出由三部分组成：\n\n- **起点预测**：对原文每个位置做二分类，判断它是否是某个实体的起点（不同于SQuAD只取一个起点，这里允许多个）；\n- **终点预测**：同理判断每个位置是否是实体终点；\n- **起终点匹配**：对每对候选起点i和终点j（i≤j），用两者表示拼接后的分类器判断 `[i, j]` 是否构成一个实体。\n\n训练损失是三部分交叉熵之和。因为每种类型单独提问，一个片段可以在“地名”问题下被抽出、同时其外层片段在“机构”问题下被抽出，嵌套实体就被自然处理。查询还为模型提供了关于实体类型的先验知识。",
+  "results": "在嵌套NER数据集ACE04、ACE05、GENIA、KBP17上，相对此前最好模型分别提升1.28、2.55、5.44、6.37个F1点；在平面NER数据集英文CoNLL 2003、英文OntoNotes 5.0、中文MSRA、中文OntoNotes 4.0上分别提升0.24、1.95、0.21、1.49个F1点（arXiv摘要）。",
+  "legacy": "MRC式NER成为嵌套NER的代表方法之一，其“类型描述作为查询”的设计也被用于少样本与零样本实体识别。后续的[[w2ner]]（2022）用词对关系网格统一处理平面、嵌套和非连续三类实体；[[uie]]（2022）和基于大模型的生成式抽取则把各种抽取任务统一为文本到结构的生成。",
+  "limits": [
+    {
+      "text": "每种实体类型都要单独过一遍BERT，类型多时推理代价成倍增加。",
+      "solved_by": [
+        "w2ner"
+      ]
+    },
+    {
+      "text": "只抽取连续片段，无法表示由不相邻片段组成的非连续实体。",
+      "solved_by": [
+        "w2ner"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "to": "bert",
+      "type": "uses",
+      "note": "以BERT作为阅读理解模型的编码器。"
+    },
+    {
+      "to": "squad",
+      "type": "extends",
+      "note": "借用SQuAD式抽取式阅读理解的问题—片段形式，并改为可抽取多个答案片段。"
+    },
+    {
+      "to": "bilstm-crf",
+      "type": "solves",
+      "note": "序列标注每个词只能有一个标签、无法处理嵌套实体；分类型提问的阅读理解形式自然支持嵌套。"
+    },
+    {
+      "to": "lattice-lstm",
+      "type": "rivals",
+      "note": "Lattice LSTM通过词典信息改进中文平面NER；MRC-NER通过改变任务形式统一平面与嵌套NER，也在中文数据上取得更好成绩。"
+    }
+  ],
+  "prereq": [
+    "sequence-labeling",
+    "bio-tagging",
+    "pretrain-finetune",
+    "cross-entropy",
+    "special-tokens"
+  ],
+  "terms": [
+    {
+      "t": "抽取式阅读理解",
+      "d": "给定问题和一段文本，模型从文本中直接划出一段作为答案。"
+    },
+    {
+      "t": "起终点匹配",
+      "d": "在预测出的多个起点和终点中，判断哪个起点和哪个终点配成一个实体。"
+    }
+  ],
+  "learn": "先读[[squad]]和[[bert]]了解抽取式问答 → 读本文第3节查询构造与三部分输出 → 动手：用开源的BERT-MRC代码在ACE05子集上训练，人工检查嵌套实体被各类型问题分别抽出的样例。",
+  "check": {
+    "source": "https://arxiv.org/abs/1910.11476",
+    "confirmed": "arXiv：标题A Unified MRC Framework for Named Entity Recognition、作者Li、Feng、Meng、Han、Wang、Wu、Li，v1提交于2019-10-25；摘要：序列标注只能为每个词元分配一个标签，不适合嵌套NER，本文把NER表述为机器阅读理解，例如抽取PER即回答“文中提到了哪个人？”，自然处理实体重叠，查询编码先验知识，在嵌套数据集ACE04、ACE05、GENIA、KBP17上提升+1.28、+2.55、+5.44、+6.37，在平面数据集英文CoNLL 2003、英文OntoNotes 5.0、中文MSRA、中文OntoNotes 4.0上提升+0.24、+1.95、+0.21、+1.49。ACL 2020出处已在ACL Anthology核对；起终点匹配结构与查询来源凭一般了解。"
+  }
+}

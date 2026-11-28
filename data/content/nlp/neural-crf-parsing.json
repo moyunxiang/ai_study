@@ -1,0 +1,36 @@
+{
+  "id": "neural-crf-parsing",
+  "who": "Greg Durrett, Dan Klein · 加州大学伯克利分校",
+  "venue": "ACL 2015",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1507.03641"},
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/P15-1030/"}
+  ],
+  "aka": ["神经CRF句法分析", "Neural CRF Parsing", "Durrett & Klein 2015", "神经势函数CRF", "锚定规则CRF", "Anchored Rule CRF"],
+  "problem": "CRF成分句法分析能用CKY做精确的动态规划推断，但打分靠大量稀疏的人工特征；神经网络能学到稠密的非线性特征，却往往放弃了精确的结构化推断。两者能不能兼得？",
+  "idea": "保持CRF的结构：整棵树的得分仍分解为“锚定规则”（某条文法规则作用在句子某个具体跨度上）的局部得分之和，只是把每个局部得分从稀疏特征的线性函数换成前馈神经网络输出的非线性势函数；推断仍用CKY，梯度由期望规则计数反传进网络。",
+  "impact": "只用稠密特征就超过了强的稀疏CRF基线，与稀疏特征结合后在Penn Treebank第23节上达到91.1 F1，并在多种语言上超过此前最好的单个分析器；它示范了“神经打分加精确结构化推断”这一后来在句法分析中广泛采用的组合。",
+  "background": "[[berkeley-parser]]等PCFG类分析器依赖文法细化；Hall、Durrett与Klein（2014）提出“少文法、多特征”的CRF分析器，每条锚定规则的得分由跨度首尾词、边界上下文等稀疏表面特征给出，效果很好，但特征需要人工设计，词与词之间也不共享信息。与此同时，[[socher-recursive]]、[[collobert-weston]]等神经方法用稠密向量表示词和短语，但通常采用贪心或重排序，而不是在完整的结构空间上精确求解。",
+  "method": "设句子w、树T。树被分解为锚定规则 `r = (规则 A→B C, 起点i, 分割点k, 终点j)`，CRF定义\n\n`P(T | w) ∝ exp( Σ_{r∈T} φ(r, w) )`\n\n稀疏CRF中 `φ = θᵀ f_s(r, w)`。神经CRF则令\n\n`φ(r, w) = h( W · v(f_o(i,k,j,w)) )ᵀ · W_r · f_r(规则)`\n\n其中 `f_o` 取出锚点附近（跨度首尾、分割点两侧）的若干个词，`v` 把它们查成预训练词向量并拼接，经一层非线性隐层h得到跨度表示；规则一侧用稀疏指示特征 `f_r` 表示，二者做双线性组合。由于势函数仍只依赖局部锚点，CKY推断与稀疏情形完全一样。\n\n训练最大化条件对数似然；梯度对每个势函数等于“金标准中该锚定规则出现的次数减去模型期望次数”，期望由内向—外向算法算出，再沿网络反传。最终模型把稠密的神经势函数和原有稀疏特征相加。",
+  "results": "只用稠密特征的神经CRF已超过强的稀疏CRF基线（Hall等，2014）；与稀疏特征结合后在Penn Treebank第23节上取得91.1 F1，并在多种语言上普遍优于此前最好的单个分析器结果（原文摘要）。",
+  "legacy": "这项工作与同年的[[stack-lstm-parser]]等一起，标志着句法分析进入神经时代。[[stern-span-parser]]（2017）用BiLSTM为跨度打分、仍用CKY式解码，Kitaev与Klein的[[kitaev-klein-parser]]再换成自注意力编码器，都延续了“神经网络打分、动态规划精确推断”的框架；依存分析里的[[biaffine-parser]]加最大生成树解码也是同一思路。",
+  "limits": [
+    {"text": "神经势函数只看锚点附近的固定窗口词，缺少整句上下文信息。", "solved_by": ["stern-span-parser"]},
+    {"text": "仍依赖规则和稀疏特征的组合，CKY在大文法上开销较高，需要剪枝。", "solved_by": ["stern-span-parser", "kitaev-klein-parser"]}
+  ],
+  "relations": [
+    {"to": "crf", "type": "extends", "note": "保留CRF的全局归一化和结构化推断，只把线性势函数换成神经网络。"},
+    {"to": "cky-parsing", "type": "uses", "note": "推断与训练时的期望计算都用CKY式动态规划，和稀疏模型完全一致。"},
+    {"to": "berkeley-parser", "type": "rivals", "note": "Berkeley分析器靠潜变量细化文法，神经CRF靠特征与神经势函数，两者在多语言上比较。"},
+    {"to": "collobert-weston", "type": "uses", "note": "使用预训练的稠密词向量作为神经势函数的输入。"},
+    {"to": "penn-treebank", "type": "uses", "note": "在Penn Treebank上训练，第23节评测。"}
+  ],
+  "prereq": ["dynamic-programming", "constituency-parsing", "context-free-grammar", "mlp", "backpropagation", "embedding"],
+  "terms": [
+    {"t": "锚定规则", "d": "一条文法规则加上它在句子中作用的具体位置（起点、分割点、终点），是CRF分析打分的基本单位。"},
+    {"t": "势函数", "d": "CRF中给每个局部结构的打分，整体概率正比于所有势函数之和的指数。"},
+    {"t": "内向—外向算法", "d": "在句法图表上计算每个跨度、每条规则被用到的期望次数的动态规划。"}
+  ],
+  "learn": "先读[[crf]]和[[cky-parsing]] → 读本文第2–3节模型与梯度 → 动手：用PyTorch在一个只有几十个句子的小树库上实现带神经势函数的CKY与内向算法，检查对数配分函数的梯度是否等于期望计数。",
+  "check": {"source": "https://arxiv.org/abs/1507.03641", "confirmed": "arXiv：标题Neural CRF Parsing、作者Durrett与Klein，v1提交于2015-07-13；摘要：结合CRF分析的精确动态规划与神经方法的非线性特征，结构上是按锚定规则分解的CRF，势函数由前馈网络计算，结构化推断（CKY）不变，梯度由标准CRF充分统计量（期望规则计数）构成的误差信号反传，只用稠密特征即超过强基线CRF（Hall等2014），结合稀疏特征后在Penn Treebank第23节得91.1 F1，并在多种语言上超过此前最好的单个分析器。ACL 2015出处已在ACL Anthology核对；势函数的双线性形式凭一般了解。"}
+}

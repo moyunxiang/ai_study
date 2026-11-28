@@ -1,0 +1,33 @@
+{
+  "id": "counter-fitting",
+  "who": "Nikola Mrkšić, Diarmuid Ó Séaghdha, Blaise Thomson, Milica Gašić, Lina Rojas-Barahona, Pei-Hao Su, David Vandyke, Tsung-Hsien Wen et al. · 剑桥大学、Apple",
+  "venue": "NAACL 2016",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/N16-1018/"}
+  ],
+  "aka": ["Counter-fitting", "反义拟合", "反拟合词向量", "Counter-fitted Vectors", "Mrkšić et al. 2016", "同义反义约束", "词向量后处理"],
+  "problem": "按“出现语境相似”学出的词向量分不清“相似”和“相关”：east和west、cheap和expensive常出现在相同语境里，于是在向量空间里挨得很近，这对需要区分反义词的任务（如对话里理解“便宜的餐厅”）是致命的。",
+  "idea": "不重新训练，直接对已有词向量做后处理：把反义词对推远、把同义词对拉近，同时约束每个词与原始空间里邻居的相对距离尽量不变，保留分布式语义里的其他信息。",
+  "impact": "在SimLex-999语义相似度评测上取得新的最好成绩，并直接改善了对话状态追踪；它和Retrofitting一起开创了“用词汇资源专门化词向量”的路线，后续的Attract-Repel等方法沿此发展。",
+  "background": "[[word2vec]]、[[glove]]等方法依据[[c:distributional-hypothesis]]学习词向量，捕捉的是“相关性”而非严格的“相似性”。SimLex-999等新评测专门区分两者，暴露了这一问题。[[retrofitting]]（2014）用WordNet、PPDB里的同义关系把词向量往同义词方向拉，但只用了同义约束，没有处理反义词。",
+  "method": "给定原始词向量 `V`，求新的向量 `V'`，最小化三项之和：\n\n- **反义排斥（AR）**：对反义词对 (u, w)，若余弦距离小于阈值δ就受罚，`AR = Σ_{(u,w)∈A} τ(δ − d(v'_u, v'_w))`，其中 `τ(x)=max(0,x)`，`d` 为余弦距离；\n- **同义吸引（SA）**：对同义词对，若距离大于阈值γ就受罚，`SA = Σ_{(u,w)∈S} τ(d(v'_u, v'_w) − γ)`；\n- **向量空间保持（VSP）**：对每个词在原空间中距离较近的邻居对 (i, j)，惩罚新距离与原距离的差异，`VSP = Σ τ(d(v'_i, v'_j) − d(v_i, v_j))`，防止空间被扭得面目全非。\n\n总目标是三者的加权和，用随机梯度下降优化。同义和反义约束来自PPDB与WordNet等词汇资源。作者还把它用于对话：按对话领域的槽值（如价格“便宜/昂贵”）提供约束，让词向量更适合对话状态追踪中的语义匹配。",
+  "results": "把counter-fitting应用于公开的预训练词向量（如GloVe、PARAGRAM-SL999），在SimLex-999上取得新的最好成绩；论文表1展示了GloVe中east的近邻在处理后不再包含west，expensive的近邻不再包含cheaper。在多个对话领域的状态追踪上也带来稳定提升（原文摘要所述）。",
+  "legacy": "同一团队随后提出Attract-Repel（2017），把方法推广到多语言并改用批内负例；神经信念追踪器[[neural-belief-tracker]]直接使用这类专门化的词向量。上下文化的预训练模型出现后，静态词向量的后处理退居次要，但“用词汇资源约束表示空间”的思想延续到了对比学习式的句向量与知识注入研究中。",
+  "limits": [
+    {"text": "只能调整词汇资源里出现过的词，资源没覆盖的词只会通过保持项间接受影响。", "solved_by": []},
+    {"text": "每个词仍只有一个静态向量，多义词的不同义项无法分别处理。", "solved_by": ["elmo", "bert"]}
+  ],
+  "relations": [
+    {"to": "retrofitting", "type": "extends", "note": "Retrofitting只用同义关系把向量拉近；counter-fitting加入反义排斥和空间保持两项。"},
+    {"to": "glove", "type": "uses", "note": "以公开的GloVe等预训练词向量为输入做后处理。"},
+    {"to": "paragram-phrase", "type": "uses", "note": "PARAGRAM词向量也是被处理的输入之一，它们本身已用PPDB改写对训练过。"},
+    {"to": "wordnet", "type": "uses", "note": "同义、反义约束的来源之一。"}
+  ],
+  "prereq": ["embedding", "distributional-hypothesis", "dot-product", "loss-function", "sgd-minibatch"],
+  "terms": [
+    {"t": "SimLex-999", "d": "999对英语词的人工相似度评分，专门区分“相似”（同义）和“相关”（常一起出现），反义词被打低分。"},
+    {"t": "词向量专门化", "d": "用外部知识调整通用词向量，让它更适合某种语义关系或某个下游任务。"}
+  ],
+  "learn": "先读[[retrofitting]] → 读本文第2节三项目标 → 动手：取GloVe向量，用一小份反义词表实现AR+VSP两项，训练几轮后比较east、cheap等词的最近邻变化。",
+  "check": {"source": "https://aclanthology.org/N16-1018/", "confirmed": "ACL Anthology与原文PDF：标题、作者（剑桥大学与Apple，含Mrkšić、Ó Séaghdha、Thomson、Gašić、Rojas-Barahona、Su、Vandyke、Wen、Young）、NAACL 2016（2016年6月）；摘要：向向量空间注入反义与同义约束以提高判断语义相似度的能力，在公开预训练词向量上得到SimLex-999新的最好成绩，并用于对话状态追踪带来稳健提升；表1：GloVe中east、expensive、British的近邻在处理前后的变化。三项损失的具体公式与约束来源（PPDB、WordNet）凭一般了解。"}
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>PnP：由二维–三维对应求相机位姿（Perspective-n-Point） · AI脉络</title>
+<meta name="description" content="已知若干三维点的坐标、它们在图像中的投影位置和相机内参，求相机的旋转和平移。最少需3个点（P3P），实践中常用EPnP加RANSAC，再做非线性优化。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/pnp.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PnP：由二维–三维对应求相机位姿（Perspective-n-Point）">
+<meta property="og:description" content="已知若干三维点的坐标、它们在图像中的投影位置和相机内参，求相机的旋转和平移。最少需3个点（P3P），实践中常用EPnP加RANSAC，再做非线性优化。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/pnp.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/pnp">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 视觉 · 进阶</div>
+<h1>PnP：由二维–三维对应求相机位姿</h1><div class="full">Perspective-n-Point</div>
+<p class="muted" style="font-size:13px">也叫：PnP　PnP问题　Perspective-n-Point　perspective-n-point problem　P3P　EPnP　相机位姿估计　camera pose estimation　绝对位姿估计　absolute pose estimation　重投影误差　reprojection error　solvePnP　solvePnPRansac　二维三维对应　2D-3D correspondence　视觉定位　visual localization　外参估计　extrinsic estimation</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/pnp">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>已知若干三维点的坐标、它们在图像中的投影位置和相机内参，求相机的旋转和平移。最少需3个点（P3P），实践中常用EPnP加RANSAC，再做非线性优化。</b></p>
+<p class="tags">先要会：<a class="chip c" href="camera-geometry.html">相机模型与多视图几何</a> <a class="chip c" href="rigid-transform.html">位姿与齐次变换SE(3)</a></p>
+<p>增强现实要知道手机相机此刻在房间里的什么位置，才能把虚拟物体“放”在桌面上；机器人看到一个已知形状的零件，要算出零件相对相机的位姿才能去抓；视觉定位要在一张已有的三维地图中找到当前照片是从哪里拍的。这些问题都归结为<b>PnP</b>。</p><p><b>问题描述</b>。输入：n个三维点P_i（世界坐标系或物体坐标系），它们在图像中的像素位置p_i，以及相机内参K（见<a class="lc" href="../c/camera-geometry.html">相机模型与多视图几何</a>）。求旋转R和平移t，使投影尽量吻合：</p><p class="formula"><code>p_i ≈ π(K·(R·P_i + t))</code></p><p>π表示除以深度的透视投影。位姿有6个自由度（见<a class="lc" href="../c/rigid-transform.html">位姿与齐次变换SE(3)</a>），每个点提供2个约束，所以理论上至少需要3个点。</p><p><b>主要解法</b>。</p><ul><li><b>P3P</b>：3个点的闭式解，最多有4组解，需要第4个点来消除歧义；适合放进RANSAC做最小样本求解。</li><li><b>DLT（直接线性变换）</b>：把投影矩阵的12个元素当作未知数，用至少6个点解线性方程组，再从中提取R和t，简单但不保证R是严格的旋转矩阵（见<a class="lc" href="../c/orthogonal-psd.html">正交矩阵与正定矩阵</a>）。</li><li><b>EPnP</b>：把所有三维点表示成4个虚拟控制点的加权组合，只求这4个控制点在相机坐标系下的坐标，复杂度与点数成线性，是OpenCV等库中的常用选项。</li><li><b>非线性精化</b>：以上解作为初值，最小化重投影误差<code>Σ‖p_i − π(K(RP_i + t))‖²</code>，用Gauss–Newton或Levenberg–Marquardt迭代（见<a class="lc" href="../c/newton-method.html">牛顿法与拟牛顿法</a>），这一步本质上是只优化相机位姿的<a class="ln" href="../n/bundle-adjustment.html">光束平差综述</a>。</li><li><b>鲁棒性</b>：二维–三维匹配中常有大量错误匹配，PnP几乎总是套在<a class="ln" href="../n/ransac.html">RANSAC</a>中使用。</li></ul><p><b>它出现在哪里</b>。</p><ul><li><b>视觉SLAM与视觉里程计</b>：<a class="ln" href="../n/orb-slam.html">ORB-SLAM</a>等系统在跟踪阶段，用已有地图点与当前帧特征点的匹配求PnP，得到当前相机位姿（见<a class="lc" href="../c/slam-concept.html">SLAM的基本概念：里程计、后端优化与回环</a>）。</li><li><b>视觉定位</b>：先用全局描述子（如<a class="ln" href="../n/netvlad.html">NetVLAD地点识别</a>）检索相似图像，再用局部特征建立二维–三维匹配，最后求PnP。</li><li><b>相机标定与标志物</b>：<a class="ln" href="../n/zhang-calibration.html">张正友标定法</a>用平面棋盘格求内外参；AR里的二维码标志物（ArUco、AprilTag）检测出四个角点后直接求PnP。</li><li><b>物体6D位姿估计</b>：许多方法先用神经网络预测物体关键点或稠密的二维–三维对应，再用PnP解出位姿（见<a class="lc" href="../c/pose-estimation.html">姿态估计</a>）。</li></ul>
+<div class="example"><h4>例子</h4><p>一张A4纸（210mm×297mm）平放在桌上，四个角在纸面坐标系中的坐标已知：(0, 0, 0)、(210, 0, 0)、(210, 297, 0)、(0, 297, 0)。在照片中检测到四个角的像素坐标，已知手机相机内参，PnP就能算出相机相对纸面的旋转和距离，例如“相机在纸面正上方约40厘米、倾斜30°”。这就是AR应用把虚拟物体稳稳放在纸上的方法。（数字为示意）</p></div>
+<h2>容易误解的地方</h2><ul><li>点几乎共线、或只覆盖图像一小块区域时，解对噪声极其敏感，深度方向的误差尤其大。</li><li>内参不准（尤其是焦距和畸变）会直接转化为位姿误差，必须先标定好相机。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

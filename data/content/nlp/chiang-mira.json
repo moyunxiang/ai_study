@@ -1,0 +1,35 @@
+{
+  "id": "chiang-mira",
+  "who": "David Chiang, Yuval Marton, Philip Resnik · 南加州大学信息科学研究所、马里兰大学",
+  "venue": "EMNLP 2008",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/D08-1024/"}
+  ],
+  "aka": ["MIRA调参", "MIRA for SMT", "MIRA翻译特征训练", "Chiang et al. 2008", "大间隔在线训练", "Online Large-Margin Training", "软句法约束"],
+  "problem": "统计翻译系统的特征权重靠MERT调，而MERT只能可靠地优化十几到几十个权重；研究者想加入成百上千个句法、调序特征，却没有办法把它们的权重调好。",
+  "idea": "改用在线大间隔算法MIRA：每次取一句话，从解码器的候选中找出BLEU高的“好译文”和模型分高但BLEU低的“坏译文”，以最小改动把权重推向让好译文以足够间隔胜出，并做并行化。",
+  "impact": "第一次在大规模翻译系统上演示了可与MERT持平或更好的大特征量调参，使“加入上千个稀疏特征”成为可行的研究方向；它也是之后PRO、批量MIRA等调参方法的直接比较对象。",
+  "background": "[[log-linear-smt]]把翻译打分写成特征的加权和，权重由[[mert]]直接对BLEU做逐维线搜索来调。MERT在特征少时很好用，但特征一多就不稳定，经验上的上限在15到30个特征。Marton和Resnik曾给[[hiero]]加了一批“软句法约束”特征（按候选推导与源端句法树是否一致来奖惩），就因为MERT调不动这么多权重而难以发挥作用。Watanabe等人2007年已尝试用MIRA调翻译特征。",
+  "method": "MIRA（Margin Infused Relaxed Algorithm）是在线的大间隔学习：对每个训练句子，从解码得到的候选集中选出若干“预言”译文（BLEU高的）和“对手”译文（模型分高而BLEU低的），求解\n\n`min_w ½‖w − w_old‖² + C·Σ ξ`  使得  `w·(h(e⁺) − h(e⁻)) ≥ ΔBLEU(e⁺, e⁻) − ξ`\n\n即权重改动尽量小，但让好译文比坏译文的模型分高出与它们BLEU差距相当的间隔。h是特征向量，C控制容忍度。\n\n论文的工程改进有两点：用多个处理器并行跑解码与更新，再把各自的权重平均；更多地利用解码器的翻译森林来选候选，而不只是N-best列表。在此基础上，作者同时训练大量软句法约束特征，并提出一个新的结构调序（distortion）特征集，用来弥补Hiero不懂句法、不擅长调序的缺陷。",
+  "results": "在NIST 2006阿拉伯语—英语评测数据的子集上，MIRA在翻译质量和计算代价上都能追平或超过MERT；同时优化软句法约束与新调序特征共56个权重时，BLEU提高2.6点。",
+  "legacy": "这项工作让大间隔在线学习成为翻译调参的一条主线：Chiang等人2009年用它训练了上万个稀疏特征；cdec等工具包内置了MIRA调参。由于实现复杂、与MERT架构差别大，2011年的[[pro-tuning]]提出用现成二分类器实现排序式调参，成为更易用的替代；之后又出现批量MIRA等简化版本。神经翻译端到端训练后，这类特征权重调参就不再需要了。",
+  "limits": [
+    {"text": "实现复杂：需要改动解码器以输出森林或候选、并行同步权重，与MERT架构差别大，很少团队真正采用。", "solved_by": ["pro-tuning"]},
+    {"text": "BLEU是语料级指标，按句子计算的近似BLEU作为间隔和挑选标准并不稳定，结果对预言译文的选择方式敏感。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "mert", "type": "solves", "note": "解决MERT只能调十几到几十个权重的问题，使上千个特征的权重也能训练。"},
+    {"to": "hiero", "type": "extends", "note": "在Hiero层次短语系统上实验，并为其加入软句法约束和新的结构调序特征。"},
+    {"to": "mstparser", "type": "uses", "note": "MIRA大间隔在线更新此前已在McDonald的依存分析器中证明有效，这里把它移植到翻译调参。"},
+    {"to": "structured-perceptron", "type": "extends", "note": "与结构化感知机同属在线判别训练，但更新幅度由间隔约束决定，而非固定步长。"},
+    {"to": "bleu", "type": "uses", "note": "用（近似的）BLEU差值定义好坏译文之间应有的间隔。"}
+  ],
+  "prereq": ["loss-function", "gradient-descent", "lagrange-duality", "text-metrics", "feature-representation"],
+  "terms": [
+    {"t": "MIRA", "d": "一种在线大间隔算法：每次用最小的权重改动，使正确答案比错误答案的得分高出要求的间隔。"},
+    {"t": "软句法约束", "d": "不强制翻译推导服从源端句法树，而是按是否与句法成分一致给出奖励或惩罚的特征。"},
+    {"t": "预言译文", "d": "在候选中按BLEU挑出的“最好”译文，用作训练时的正例。"}
+  ],
+  "learn": "先读[[mert]]理解对数线性模型调参 → 读本文第2–3节MIRA与并行化 → 动手：在一个只有两三个特征的玩具候选集上，分别用MERT式网格搜索和MIRA更新调权重，比较结果。",
+  "check": {"source": "https://aclanthology.org/D08-1024/", "confirmed": "ACL Anthology与原文PDF：标题、作者Chiang、Marton、Resnik（ISI与马里兰大学）、EMNLP 2008（2008年10月）；摘要与引言：MERT能可靠优化的权重有限（民间估计15到30个），基于Watanabe等用MIRA替代MERT，并行与利用更多解析森林后与MERT持平或更好，训练软句法约束并提出新的结构调序模型，共56个权重时在NIST 2006阿拉伯语—英语子集上提高2.6 BLEU。MIRA目标函数的具体形式凭一般了解。"}
+}

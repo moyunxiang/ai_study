@@ -1,0 +1,34 @@
+{
+  "id": "mr-q",
+  "who": "Scott Fujimoto, Pierluca D'Oro, Amy Zhang, Yuandong Tian, Michael Rabbat · Meta FAIR",
+  "venue": "ICLR 2025",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2501.16142"},
+    {"label": "GitHub", "url": "https://github.com/facebookresearch/MRQ"}
+  ],
+  "problem": "多数RL算法是为某个基准量身定做的，换一个领域就要重新调超参数和设计；DreamerV3、TD-MPC2这类基于模型的方法虽然通用，但要学世界模型并在其中规划或想象轨迹，复杂且慢。",
+  "idea": "无模型地学价值和策略，但用基于模型的目标学表示：让状态—动作嵌入能线性地预测奖励、下一状态嵌入和终止，从而使价值函数在这个嵌入上近似线性。只学表示，不做规划、不生成想象轨迹。",
+  "impact": "用一套固定超参数在Gym、DeepMind Control（状态与像素）和Atari上都取得有竞争力的结果，速度明显快于基于模型的通用方法，是“通用无模型深度RL”方向的代表性尝试。",
+  "background": "[[dreamerv3]]和[[td-mpc2]]表明一套超参数可以跨很多领域工作，但它们的通用性来自学习世界模型、在模型中想象或规划，计算量和实现复杂度都高。另一方面，[[td7]]显示即使不规划，只用“预测下一状态嵌入”来学状态—动作表示，也能显著提升无模型算法。理论上，如果一个特征表示能线性地预测奖励和下一特征，那么在线性MDP中价值函数就是这些特征的线性函数——这给“用模型目标学表示”提供了依据。",
+  "method": "编码器把状态映射为 `z_s`，再与动作组合为 `z_sa`。表示的训练目标是在 `z_sa` 上用线性头预测：\n\n- 奖励（用两热（two-hot）编码的分类损失，以适应不同奖励尺度）；\n- 下一状态的嵌入 `z_{s′}`（目标来自延迟更新的编码器）；\n- 回合是否终止。\n\n预测沿着回放数据展开若干步，损失在展开的多步上累加。价值网络 `Q(z_sa)` 和确定性策略 `π(z_s)` 都建立在这些嵌入之上，用TD3式的方法训练：多步回报目标、目标网络、LAP优先回放，奖励按经验尺度归一化。连续与离散动作用同一架构，离散动作用Gumbel-softmax式的输出处理。所有领域共用一套超参数，只有网络输入层随观测类型（向量或图像）改变。",
+  "results": "摘要称，在多种常见RL基准上用单一超参数集评估MR.Q，与领域专用和通用基线相比都有竞争力。原文显示，它在DMC和Gym上接近或超过TD-MPC2、DreamerV3等方法，训练与推理速度快得多，在Atari上则仍落后于最强的领域专用方法。",
+  "legacy": "MR.Q与同期的[[simbav2]]、[[bro]]一起代表了2024–2025年“让无模型方法也能跨领域通用、可扩展”的路线；它说明基于模型的方法的一部分优势来自更稠密的表示学习目标，而不一定来自规划本身。",
+  "limits": [
+    {"text": "在Atari等离散动作领域仍落后于为该领域专门设计的方法，“一套超参数通吃”是以部分领域的峰值性能为代价的。", "solved_by": []},
+    {"text": "不做规划，在需要长程推理或稀疏奖励的任务里，无法像MuZero类方法那样通过搜索弥补价值估计的不足。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "td7", "type": "extends", "note": "把TD7的SALE嵌入推广为同时预测奖励、下一嵌入与终止的表示，并扩展到离散动作与图像输入。"},
+    {"to": "dreamerv3", "type": "rivals", "note": "DreamerV3靠世界模型与想象训练实现跨领域通用；MR.Q只用模型目标学表示，不做想象，速度更快。"},
+    {"to": "td-mpc2", "type": "rivals", "note": "TD-MPC2在隐空间中规划；MR.Q去掉规划，保留类似的隐空间预测目标。"},
+    {"to": "td3", "type": "uses", "note": "价值与策略的更新沿用TD3的确定性演员—评论家框架。"}
+  ],
+  "prereq": ["actor-critic", "feature-representation", "model-based-rl", "td-error", "hyperparameter"],
+  "terms": [
+    {"t": "线性化价值函数", "d": "如果特征能线性预测奖励和下一时刻特征，价值函数就可以写成这些特征的线性组合；MR.Q用这个性质设计表示目标。"},
+    {"t": "两热编码（two-hot）", "d": "把一个实数表示成相邻两个离散区间上的概率，用分类损失回归数值，对数值尺度不敏感。"}
+  ],
+  "learn": "先读[[td7]]了解SALE；读原文第3节线性MDP的动机和第4节表示损失；用开源代码在一个DMC任务和一个Atari游戏上运行同一配置，体会“单一超参数”的含义。",
+  "check": {"source": "https://arxiv.org/abs/2501.16142", "confirmed": "标题、作者（Fujimoto, D'Oro, Zhang, Tian, Rabbat）、arXiv v1于2025-01-27；摘要中RL算法常为特定基准定制、基于模型的方法通用但复杂且慢、寻找统一的无模型算法、利用近似线性化价值函数的基于模型表示、避免规划与模拟轨迹、单一超参数集在多种基准上有竞争力。表示损失的具体组成、两热编码、LAP、与TD-MPC2/DreamerV3的比较结论、ICLR 2025与机构按原文正文和通行引用。"},
+  "aka": ["MR.Q", "MRQ", "Model-based Representations for Q-learning", "通用无模型RL", "Towards General-Purpose Model-Free RL"]
+}

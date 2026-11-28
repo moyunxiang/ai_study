@@ -1,0 +1,32 @@
+{
+  "id": "pangu-coder",
+  "who": "Fenia Christopoulou, Gerasimos Lampouras, Milan Gritta, Guchun Zhang, Yinpeng Guo, Zhongqi Li, Qi Zhang, Meng Xiao et al. · 华为诺亚方舟实验室",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2207.11280"}
+  ],
+  "aka": ["PanGu-Coder", "盘古Coder", "盘古代码模型", "PanGu-Coder-FT", "函数级语言建模", "Function-Level Language Modeling"],
+  "problem": "Codex展示了用大规模代码预训练做“自然语言描述→代码”生成的能力，但模型和训练数据不公开；如何用更少的数据、更短的上下文训练出同样能写对函数的模型，需要一套可复现的训练策略。",
+  "idea": "沿用盘古α的解码器架构，分两阶段训练：先在原始代码上做因果语言建模，再在“自然语言函数说明—函数代码”配对上结合因果语言建模与掩码语言建模，专门针对文本到代码生成；最后用竞赛题与带持续集成测试的代码微调出PanGu-Coder-FT。",
+  "impact": "华为在代码大模型上的第一份公开技术报告，表明聚焦函数级的两阶段训练能让模型在更短上下文、更少数据下达到与同规模Codex相当或更好的函数正确率，是后续PanGu-Coder2的起点。",
+  "background": "[[codex]]在GitHub代码上微调GPT-3，并用[[humaneval]]按单元测试是否通过来衡量功能正确性。[[codegen]]、[[incoder]]等开源模型随后出现，但大多直接在全部代码上做语言建模，没有专门利用代码中自然语言注释与函数实现的配对关系。[[pangu-alpha]]是华为的中文自回归大模型，提供了现成的架构。",
+  "method": "**架构**：采用盘古α的仅解码器Transformer（在顶层多一个查询层），训练了数亿到数十亿参数的版本，上下文窗口比Codex短。\n\n**第一阶段**：在大量原始Python代码上做标准的因果语言建模（下一词预测），让模型熟悉代码语法与常见写法。\n\n**第二阶段**：从代码中抽取“函数定义与文档字符串（自然语言说明）—函数体”配对，数据经过较宽松的筛选。训练目标把两种损失结合起来：对函数体部分做因果语言建模（给定说明逐词生成代码），对说明部分做掩码语言建模，让模型更好地理解自然语言描述。这样训练直接对准下游的“文本→代码”任务，而不是泛泛地续写代码。\n\n**PanGu-Coder-FT**：在第二阶段模型的基础上，用编程竞赛题目（含测试用例）和从开源项目中收集的带持续集成测试的代码进一步微调，提升生成功能正确程序的能力。\n\n**评测**：以生成的程序能否通过单元测试为准，在HumanEval和MBPP上按pass@k报告。",
+  "results": "摘要称，PanGu-Coder在功能正确性上与同等规模的Codex等模型相当或更好，同时使用了更小的上下文窗口和更少的训练数据；具体pass@k数字见原文。",
+  "legacy": "PanGu-Coder是华为代码模型系列的开端，后续的PanGu-Coder2用排序反馈继续提升；“先通用代码、再函数级配对”的两阶段训练与后来代码模型中的继续预训练、指令数据构造思路一致。",
+  "limits": [
+    {"text": "主要面向Python单函数生成，跨文件、仓库级的代码理解和多语言支持有限。", "solved_by": []},
+    {"text": "上下文窗口较短，虽然节省计算，但无法利用长的项目上下文；与同期更大的开源代码模型相比规模较小。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "codex", "type": "rivals", "note": "以同规模Codex为主要比较对象，在更少数据和更短上下文下取得相当或更好的结果。"},
+    {"to": "pangu-alpha", "type": "uses", "note": "沿用盘古α的解码器架构。"},
+    {"to": "humaneval", "type": "uses", "note": "用HumanEval的单元测试衡量生成程序的功能正确性。"},
+    {"to": "apps", "type": "uses", "note": "竞赛类编程题用于微调PanGu-Coder-FT。"}
+  ],
+  "prereq": ["language-model", "masked-modeling", "autoregressive", "pretrain-finetune", "benchmark"],
+  "terms": [
+    {"t": "文档字符串", "d": "写在函数开头、用自然语言说明函数用途和参数的注释；与函数体组成天然的“说明—代码”配对。"},
+    {"t": "pass@k", "d": "对每道题采样k个程序，只要有一个通过全部单元测试就算解出；衡量代码生成的功能正确率。"}
+  ],
+  "learn": "先读[[codex]]和[[humaneval]]；读报告第3节两阶段训练目标；动手：从一个Python仓库抽取文档字符串—函数体配对，统计有多少函数有可用的说明。",
+  "check": {"source": "https://arxiv.org/abs/2207.11280", "confirmed": "标题、作者（22位，列前8位）、arXiv首次提交2022-07-22；摘要中预训练仅解码器模型、采用PanGu-Alpha架构、文本到代码生成、两阶段训练（第一阶段在原始代码上做因果语言建模，第二阶段结合因果与掩码语言建模、在宽松筛选的自然语言程序定义与代码函数配对上训练）、PanGu-Coder-FT在竞赛编程题与带持续集成测试的代码上微调、与同等规模的Codex等模型相当或更好且上下文窗口更小、训练数据更少。查询层、参数规模、Python为主、PanGu-Coder2为一般了解。"}
+}

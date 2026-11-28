@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>残差强化学习（Residual Reinforcement Learning） · AI脉络</title>
+<meta name="description" content="不从零学策略，而是在已有控制器或预训练策略上只学一个修正量：动作 = 基础动作 + 残差。基础策略给出合理起点，残差弥补接触、摩擦和模型误差，样本效率高得多。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/residual-rl.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="残差强化学习（Residual Reinforcement Learning）">
+<meta property="og:description" content="不从零学策略，而是在已有控制器或预训练策略上只学一个修正量：动作 = 基础动作 + 残差。基础策略给出合理起点，残差弥补接触、摩擦和模型误差，样本效率高得多。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/residual-rl.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/residual-rl">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 具身与控制 · 进阶</div>
+<h1>残差强化学习</h1><div class="full">Residual Reinforcement Learning</div>
+<p class="muted" style="font-size:13px">也叫：残差强化学习　残差RL　residual RL　residual reinforcement learning　残差策略　residual policy　residual policy learning　动作修正　action correction　策略修正　基础策略加残差　base policy plus residual　残差控制　residual control</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/residual-rl">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>不从零学策略，而是在已有控制器或预训练策略上只学一个修正量：动作 = 基础动作 + 残差。基础策略给出合理起点，残差弥补接触、摩擦和模型误差，样本效率高得多。</b></p>
+<p class="tags">先要会：<a class="chip c" href="policy-value.html">策略与价值函数</a> <a class="chip c" href="imitation-learning.html">模仿学习与行为克隆</a></p>
+<p>机器人里经常已经有一个“差不多能用”的控制器：手工调好的PD控制器、基于模型的轨迹规划器、通过模仿学习得到的策略（见<a class="lc" href="../c/imitation-learning.html">模仿学习与行为克隆</a>）。它们在大多数情况下工作，但在精细接触、物体位置有误差、仿真与现实存在偏差时会失败。从零开始用强化学习又要大量试错，在真实机器人上代价很高。<b>残差强化学习</b>取两者之长。</p><p><b>做法</b>。设基础策略为π_base(s)，学一个残差策略π_res(s)，执行的动作是</p><p class="formula"><code>a = π_base(s) + π_res(s)</code></p><p>只训练π_res。残差网络通常初始化为输出接近0，所以训练开始时机器人的表现就等于基础策略，探索是在一个已经合理的动作附近进行（见<a class="lc" href="../c/exploration-exploitation.html">探索与利用</a>）。有时残差的输入还包括基础动作本身，或者把残差的幅度限制在一个小范围内，保证安全。</p><p><b>为什么有效</b>。</p><ul><li>基础策略解决了任务的大部分结构（往哪里走、按什么顺序），强化学习只需处理剩下的小问题，奖励更容易获得（见<a class="lc" href="../c/credit-assignment.html">信用分配</a>）。</li><li>残差可以补偿基础控制器所依据的模型与真实世界之间的差异，是缩小<a class="lc" href="../c/sim2real.html">仿真到现实的差距</a>差距的一种方式（与<a class="lc" href="../c/system-identification.html">系统辨识</a>互补）。</li><li>不需要改动或重训基础策略，可以在不同机器人上复用同一个基础控制器。</li></ul><p><b>常见场景</b>。插孔、装配这类接触丰富的任务；在模仿学习得到的视觉运动策略或<a class="lc" href="../c/vla-concept.html">VLA与WAM的基本结构</a>模型之上做少量真机强化学习微调（见<a class="lc" href="../c/vla-rl.html">VLA强化学习后训练</a>）；足式机器人在模型预测控制器的输出上加学到的修正（见<a class="lc" href="../c/planning-mpc.html">规划与模型预测控制</a>）。</p><p><b>与相关方法的关系</b>。它与神经网络中的<a class="lc" href="../c/residual-connection.html">残差连接</a>思想一致：学习“与已有结果的差”通常比学习完整映射更容易；与<a class="lc" href="../c/pretrain-finetune.html">预训练与微调</a>相比，残差方法不改动基础参数，而是在输出端叠加修正。</p>
+<div class="example"><h4>例子</h4><p>机械臂把销钉插进公差0.5毫米的孔。手工的位置控制器按标称孔位插入，因为孔位有±2毫米的感知误差，成功率约30%。在它上面训练一个残差策略，输入力传感器读数，输出每步±1毫米以内的位置修正，真机训练约2小时后成功率达到90%；从零训练同样的强化学习策略，同样时间内几乎学不会。（数字为示意）</p></div>
+<h2>容易误解的地方</h2><ul><li>基础策略太差时，残差需要修正的幅度太大，等于从零学习，优势消失。</li><li>残差和基础策略“各管一部分”，出现故障时难以判断是哪一部分的问题；残差幅度的限制设得太小又会束缚改进空间。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

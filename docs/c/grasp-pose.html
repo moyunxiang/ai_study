@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>6自由度抓取与6D物体位姿估计（6-DoF Grasping and 6D Object Pose Estimation） · AI脉络</title>
+<meta name="description" content="机器人抓取的两个基本问题：6自由度抓取要算出夹爪的三维位置和朝向，使物体能被稳定拿起；6D物体位姿估计要算出物体相对相机的旋转和平移，以便按已知模型规划抓取。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/grasp-pose.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="6自由度抓取与6D物体位姿估计（6-DoF Grasping and 6D Object Pose Estimation）">
+<meta property="og:description" content="机器人抓取的两个基本问题：6自由度抓取要算出夹爪的三维位置和朝向，使物体能被稳定拿起；6D物体位姿估计要算出物体相对相机的旋转和平移，以便按已知模型规划抓取。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/grasp-pose.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/grasp-pose">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 具身与控制 · 进阶</div>
+<h1>6自由度抓取与6D物体位姿估计</h1><div class="full">6-DoF Grasping and 6D Object Pose Estimation</div>
+<p class="muted" style="font-size:13px">也叫：6自由度抓取　六自由度抓取　6-DoF grasp　6-DoF grasping　6DoF grasp　抓取检测　grasp detection　抓取位姿　grasp pose　抓取规划　grasp planning　平面抓取　planar grasp　力封闭　force closure　6D位姿估计　6D pose estimation　物体位姿估计　object pose estimation　6DoF位姿　ADD指标　BOP基准　ICP　iterative closest point　迭代最近点</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/grasp-pose">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>机器人抓取的两个基本问题：6自由度抓取要算出夹爪的三维位置和朝向，使物体能被稳定拿起；6D物体位姿估计要算出物体相对相机的旋转和平移，以便按已知模型规划抓取。</b></p>
+<p class="tags">先要会：<a class="chip c" href="rigid-transform.html">位姿与齐次变换SE(3)</a> <a class="chip c" href="camera-geometry.html">相机模型与多视图几何</a></p>
+<p><b>抓取的表示</b>。最简单的是<b>平面抓取</b>：相机从正上方往下看，只预测图像上的抓取点、夹爪张开方向和宽度（4个左右的自由度），适合桌面上的散乱物体。真实场景里常需要从侧面、斜着抓，这就要<b>6自由度抓取</b>：夹爪的完整位姿是一个SE(3)变换（见<a class="lc" href="../c/rigid-transform.html">位姿与齐次变换SE(3)</a>和<a class="lc" href="../c/rotation-representation.html">三维旋转的表示：旋转矩阵、欧拉角与四元数</a>），再加上张开宽度。</p><p><b>怎么判断一个抓取好不好</b>。经典方法基于物体模型和接触力学：计算接触点上的摩擦锥能否抵抗任意方向的外力（力封闭）。数据驱动的方法则直接学习“这个抓取成功的概率”：</p><ul><li><a class="ln" href="../n/dex-net.html">Dex-Net 2.0</a>在大量仿真物体上用解析方法标注抓取质量，训练一个网络在深度图上评估候选抓取；</li><li><a class="ln" href="../n/pinto-gupta.html">5万次抓取自监督</a>、<a class="ln" href="../n/levine-grasping.html">机械臂农场抓取</a>、<a class="ln" href="../n/qt-opt.html">QT-Opt</a>用真实机械臂反复试抓、以是否成功作为标签，属于自监督或强化学习路线；</li><li><a class="ln" href="../n/contact-graspnet.html">Contact-GraspNet六自由度抓取</a>、<a class="ln" href="../n/anygrasp.html">AnyGrasp抓取感知</a>直接从点云中预测大量6自由度抓取位姿及其质量，能处理堆叠杂乱的场景。</li></ul><p><b>6D物体位姿估计</b>。如果物体的三维模型已知（工业零件、超市商品），可以先估计它相对相机的6D位姿，再把在模型上预先规划好的抓取变换过来。方法包括：模板匹配与特征点匹配后用<a class="lc" href="../c/pnp.html">PnP：由二维–三维对应求相机位姿</a>求解；用网络预测物体关键点或逐像素的物体坐标再解PnP；直接回归旋转和平移再用迭代最近点（ICP）细化；对没见过的新物体，基于参考图像或CAD模型做零样本位姿估计。评测常用ADD指标（模型点变换后的平均距离）和BOP基准。与之相关但不同的是人体姿态估计（见<a class="lc" href="../c/pose-estimation.html">姿态估计</a>）。</p><p><b>在端到端策略中</b>。<a class="lc" href="../c/vla-concept.html">VLA与WAM的基本结构</a>和模仿学习策略往往不显式输出抓取位姿，而是直接输出动作序列（见<a class="lc" href="../c/action-chunking.html">动作表示：离散token、连续动作与动作块</a>）；但在工业分拣、仓储等需要高可靠性的场景，显式的抓取检测加运动规划仍是主流（见<a class="lc" href="../c/tamp.html">任务与运动规划（TAMP）</a>）。抓住之后的精细操作见<a class="lc" href="../c/dexterous-manipulation.html">灵巧手与灵巧操作</a>。</p>
+<div class="example"><h4>例子</h4><p>桌上一个马克杯。平面抓取只能从上方捏住杯口边缘；6自由度抓取可以选择“从侧面水平伸入、夹住杯把”，位姿为位置(0.42, −0.10, 0.08)米、绕竖直轴转30°、夹爪宽度4厘米。若已知杯子模型，6D位姿估计给出杯子的位置和朝向（杯把朝哪边），预先在模型上标注好的“抓杯把”姿势就能直接换算到当前场景。（数字为示意）</p></div>
+<h2>容易误解的地方</h2><ul><li>抓取检测网络预测的“成功率”通常只考虑能否拿起，不考虑后续任务：能拿起不等于拿起后方便倒水或放进柜子。</li><li>对称物体（如瓶子绕轴旋转看起来一样）的6D位姿本身就有歧义，评测和训练损失都需要专门处理对称性。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

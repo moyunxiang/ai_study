@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>ICP迭代最近点配准（1992） · AI脉络</title>
+<meta name="description" content="两次扫描得到的三维点云之间相差一个未知的旋转和平移，点与点之间又不知道谁对应谁，没法直接求出两者的相对位姿。 交替做两步：先给每个点找另一组里最近的点当作对应，再用这些对应闭式求出最优刚体变换；重复迭代直到误差不再下降。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/icp.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ICP迭代最近点配准（1992）">
+<meta property="og:description" content="两次扫描得到的三维点云之间相差一个未知的旋转和平移，点与点之间又不知道谁对应谁，没法直接求出两者的相对位姿。 交替做两步：先给每个点找另一组里最近的点当作对应，再用这些对应闭式求出最优刚体变换；重复迭代直到误差不再下降。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/icp.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/icp">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:96"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/robot.html">具身智能与世界模型</a> › 经典控制与规划</div>
+<h1>ICP迭代最近点配准</h1>
+<div class="full">A Method for Registration of 3-D Shapes</div>
+<div class="meta"><span>1992.02</span><span>论文</span><span>延伸</span><span>IEEE TPAMI 1992</span><span>Paul J. Besl, Neil D. McKay · 通用汽车研究实验室</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://doi.org/10.1109/34.121791" rel="noopener">DOI ↗</a><a class="btn sm" href="../index.html#/n/icp">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>两次扫描得到的三维点云之间相差一个未知的旋转和平移，点与点之间又不知道谁对应谁，没法直接求出两者的相对位姿。</p></div><div><h4>方法</h4><p>交替做两步：先给每个点找另一组里最近的点当作对应，再用这些对应闭式求出最优刚体变换；重复迭代直到误差不再下降。</p></div><div><h4>影响</h4><p>成为点云配准的标准算法，激光SLAM的扫描匹配、三维重建、物体位姿估计都以它或它的变体为基础。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>设要把点集P对齐到点集Q，求旋转R和平移t使 <code>Σ‖R·p_i + t − q_i‖²</code> 最小。难点是不知道p_i该配哪个q_i。ICP的做法很朴素：</p><ul><li>对P中每个点，在Q里找当前位置下最近的点，暂时当作对应点；</li><li>有了对应关系，最优的R、t可以闭式求出（论文用四元数方法，也可用SVD）；</li><li>用求得的变换移动P，再重新找最近点，循环往复。</li></ul><p>论文证明这个过程的均方误差单调下降，一定收敛到一个局部最小。它对点、线段、曲线、三角面片、参数曲面等多种几何表示都适用。代价是只收敛到局部最优：初始位姿差得太远就会对错。后来的点到平面ICP、广义ICP都在此基础上改进；<a class="ln" href="../n/loam.html">LOAM激光里程计与建图</a>等激光里程计里的扫描匹配、<a class="ln" href="../n/kinectfusion.html">KinectFusion</a>的实时三维重建也都以它为核心。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只保证收敛到局部最优，需要较好的初始位姿；离群点和部分重叠会让最近点对应大量出错。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:96" href="../n/occupancy-grid.html">占据栅格地图</a><span class="yr">1985.03 · 具身·世界模型</span><div class=nt>早期激光定位常把扫描对齐到栅格地图，ICP直接在点与点之间配准。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:96" href="../n/slam-probabilistic.html">SLAM的概率框架</a><span class="yr">1986 · 具身·世界模型</span><div class=nt>在SLAM中，ICP给出的相对位姿作为里程计或回环约束进入概率估计。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/vector-matrix.html">向量、矩阵与张量</a> <a class="chip c" href="../c/eigen-svd.html">特征分解与奇异值分解</a> <a class="chip c" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a> <a class="chip c" href="../c/loss-function.html">损失函数</a></p>
+<h2>本篇术语</h2><ul><li><b>刚体变换</b>　只包含旋转和平移、不改变形状大小的变换，三维中有6个自由度。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://doi.org/10.1109/34.121791" rel="noopener">https://doi.org/10.1109/34.121791</a>（用lookup.py title（OpenAlex）与Crossref核对标题A Method for Registration of 3-D Shapes、作者Besl与McKay、IEEE TPAMI 1992-02。四元数闭式解、单调收敛到局部最小、适用多种几何表示凭一般了解（经典结论），未打开原文逐项对照。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20ICP%E8%BF%AD%E4%BB%A3%E6%9C%80%E8%BF%91%E7%82%B9%E9%85%8D%E5%87%86%EF%BC%88icp%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aicp%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/icp.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="brooks-behavior.html"><small>本分支上一个 · 1991</small><b>行为主义机器人学</b></a><a class="r" href="ferrari-canny.html"><small>本分支下一个 · 1992.05</small><b>力封闭与抓取质量</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

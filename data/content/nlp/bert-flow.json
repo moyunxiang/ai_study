@@ -1,0 +1,35 @@
+{
+  "id": "bert-flow",
+  "who": "Bohan Li, Hao Zhou, Junxian He, Mingxuan Wang, Yiming Yang, Lei Li · 字节跳动AI Lab、卡内基梅隆大学",
+  "venue": "EMNLP 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2011.05864"},
+    {"label": "代码", "url": "https://github.com/bohanli/BERT-flow"}
+  ],
+  "aka": ["BERT-flow", "BERT flow", "流模型校正句向量", "各向异性", "Anisotropy", "Li et al. 2020", "On the Sentence Embeddings from Pre-trained Language Models"],
+  "problem": "不经微调直接用BERT的输出（如各词向量平均）作句向量，在语义相似度任务上甚至不如GloVe平均；原因不清楚，好用的Sentence-BERT又需要有标注的推理数据来微调。",
+  "idea": "分析指出BERT的句向量分布是“各向异性”的：挤在一个狭窄的锥形区域里，且受词频影响分布不均；于是用一个无监督训练的标准化流，把句向量分布可逆地变换成各向同性的标准高斯，再用余弦相似度。",
+  "impact": "在多个语义文本相似度（STS）任务上无监督地大幅提升了BERT句向量，“预训练表示的各向异性”从此成为句向量研究的核心问题，直接引出BERT-whitening、SimCSE等后续方法。",
+  "background": "[[bert]]在微调后表现很好，但人们发现直接拿它的表示做句子相似度效果很差，这也是[[sentence-bert]]（2019）要用自然语言推理数据做孪生网络微调的原因。Ethayarajh（2019）等分析已经观察到上下文表示占据的空间很“窄”，任意两个句子的余弦相似度都很高。[[realnvp]]、[[glow]]等标准化流模型能学到一个可逆变换，把复杂分布映射为简单的高斯分布。",
+  "method": "**分析**：作者先从理论上把掩码语言模型的训练目标与句子间的语义相似度联系起来，说明BERT表示中确实含有语义信息；再从经验上发现两个问题——(1) 表示空间各向异性，向量集中在一个窄锥里；(2) 高频词的向量靠近原点、分布稠密，低频词则稀疏散落、远离原点，使得基于距离的相似度被词频而非语义主导。\n\n**BERT-flow**：保持BERT参数不变，在句向量u之上训练一个可逆的流模型 `u = f_φ(z)`，其中隐变量 `z ~ N(0, I)` 是标准高斯。训练目标是在无标注句子上最大化u的似然：\n\n`max_φ  E_u [ log p_Z(f_φ⁻¹(u)) + log |det ∂f_φ⁻¹(u)/∂u| ]`\n\n第二项是变换的雅可比行列式，由流模型结构（类似Glow的可逆层）保证可高效计算。推理时用 `z = f_φ⁻¹(u)` 作为新的句向量，此时空间各向同性、各方向尺度一致，余弦相似度更能反映语义。",
+  "results": "在STS-B、SICK-R以及STS 2012–2016等多个语义文本相似度任务上，BERT-flow相对直接使用BERT句向量取得显著提升，超过当时最好的无监督句向量方法（原文摘要）；具体Spearman相关系数未在此引用。",
+  "legacy": "几个月后，[[bert-whitening]]发现只需一个线性的白化变换就能取得相近效果，说明关键在“去相关、去尺度差”，而不一定需要复杂的流模型；[[simcse]]（2021）则用对比学习直接训练出各向同性更好的句向量，成为新的标准做法。“表示各向异性”的分析也被用于研究语言模型表示的退化问题。",
+  "limits": [
+    {"text": "需要额外训练一个流模型，且变换只针对目标领域的句子分布，换领域要重新训练。", "solved_by": ["bert-whitening"]},
+    {"text": "只是对冻结的BERT表示做事后变换，并未让编码器本身学到更好的句子级语义。", "solved_by": ["simcse"]}
+  ],
+  "relations": [
+    {"to": "bert", "type": "solves", "note": "解释并缓解BERT句向量在语义相似度上表现差的问题：根源是表示空间各向异性。"},
+    {"to": "sentence-bert", "type": "rivals", "note": "Sentence-BERT用有标注的推理数据微调；BERT-flow不改BERT参数、只用无标注句子学习变换。"},
+    {"to": "glow", "type": "uses", "note": "采用Glow式的可逆标准化流把句向量分布映射为标准高斯。"},
+    {"to": "realnvp", "type": "uses", "note": "可逆变换与雅可比行列式的计算沿用RealNVP一类流模型的耦合层设计。"}
+  ],
+  "prereq": ["normalizing-flow", "gaussian", "mle", "embedding", "masked-modeling", "covariance"],
+  "terms": [
+    {"t": "各向异性", "d": "向量在空间中并非均匀分布在各个方向，而是挤在少数方向上，导致任意两向量的余弦相似度都很高。"},
+    {"t": "标准化流", "d": "一串可逆且雅可比行列式易算的变换，能把简单分布（如高斯）变成复杂分布，也能反过来变换。"},
+    {"t": "STS任务", "d": "语义文本相似度：给两句话打0–5分的相似度，看模型分数与人工评分的相关程度。"}
+  ],
+  "learn": "先读[[sentence-bert]]与[[glow]] → 读本文第2节各向异性分析和第3节方法 → 动手：取BERT对1万个句子的平均池化向量，计算两两余弦相似度的均值，再做白化或流变换后重新计算，观察均值的变化。",
+  "check": {"source": "https://arxiv.org/abs/2011.05864", "confirmed": "arXiv：标题On the Sentence Embeddings from Pre-trained Language Models、作者Li、Zhou、He、Wang、Yang、Li，v1提交于2020-11-02；摘要：未微调的预训练模型句向量难以捕捉语义，作者从理论上揭示掩码语言模型目标与语义相似度任务的联系并做经验分析，发现BERT诱导出非平滑的各向异性句子语义空间，提出用无监督目标学习的标准化流把它变换为平滑各向同性的高斯分布，在多种STS任务上显著超过最好的句向量。EMNLP 2020出处、单位、词频与原点距离的观察、具体流结构凭一般了解。"}
+}

@@ -1,0 +1,35 @@
+{
+  "id": "lattice-lstm",
+  "who": "Yue Zhang（张岳）, Jie Yang（杨杰）· 新加坡科技设计大学",
+  "venue": "ACL 2018",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1805.02023"},
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/P18-1144/"}
+  ],
+  "aka": ["Lattice LSTM", "格子LSTM", "词格LSTM", "中文NER", "Chinese NER", "Zhang & Yang 2018", "词典增强NER", "Lexicon-enhanced NER"],
+  "problem": "中文命名实体识别若先分词再按词标注，分词错误（“南京市长江大桥”切错）会直接导致实体边界错误；若按字标注，又丢掉了词典里“南京市”“长江大桥”这类现成的词信息。",
+  "idea": "在字级LSTM上，把句子中所有能与词典匹配的词作为“格子”（lattice）路径加进来：每个匹配词有自己的词单元，其信息通过门控流入词尾那个字的记忆单元，模型自己决定该信任哪些词。",
+  "impact": "在OntoNotes、MSRA、微博、简历等中文NER数据集上同时超过字级和词级的LSTM基线，开创了“词典增强的字级中文NER”这一方向；FLAT、LEBERT、SoftLexicon等后续工作都以它为比较对象。",
+  "background": "[[bilstm-crf]]（2015）已成为英文序列标注的标准结构。中文NER有两条路：先分词再做词级标注，受分词错误连累；或直接做字级标注，避免分词错误，但损失词信息。中文分词研究（如[[peng-crf-seg]]）早已显示词典特征的价值，但在神经模型中，怎样在不先分词的前提下利用所有可能的词，还没有好办法。",
+  "method": "输入是字序列 `c_1…c_m`，并用一个大词典找出句中所有匹配的词 `w_{b,e}`（从第b个字到第e个字）。\n\n- **字路径**：与普通LSTM相同，每个字有输入门、遗忘门、输出门和记忆单元 `c^c_j`。\n- **词路径**：对每个匹配词，用它的词向量和词首字的隐状态计算一个词单元 `c^w_{b,e}`（没有输出门）。\n- **融合**：在词尾字e处，记忆单元由所有以e结尾的词单元与当前字的候选记忆加权组合：\n\n`c^c_e = Σ_{b} α_{b,e} ⊙ c^w_{b,e} + α_e ⊙ c̃^c_e`\n\n权重α由额外的门计算并归一化，模型据此在“相信哪个词”之间做软选择。例如在“长”字上，词“市长”和“长江”的信息分别流入不同位置，由门决定取舍。\n\n最后在字级隐状态上接CRF输出BIO标签。",
+  "results": "在多个中文NER数据集上，Lattice LSTM优于基于词和基于字的LSTM基线，取得最好结果（原文摘要）；分析表明它不受分词错误影响，同时能利用词典中的词信息。",
+  "legacy": "Lattice LSTM的缺点是格子结构不规则、难以批处理，推理慢；后续的LR-CNN、LGN、SoftLexicon（把词信息编码为字的特征）和FLAT（把格子展平进Transformer位置编码）都在提速与效果上改进它，LEBERT则把词典信息注入BERT层内。这一系列工作构成了中文NER的“词汇增强”研究线；[[mrc-ner]]、[[w2ner]]则从任务形式上统一了嵌套与非连续实体。",
+  "limits": [
+    {"text": "每个字匹配的词数不同，格子结构难以并行，训练和推理速度远低于普通LSTM。", "solved_by": []},
+    {"text": "只能识别平面实体，不能处理一个实体嵌套在另一个实体内部的情况。", "solved_by": ["mrc-ner", "w2ner"]}
+  ],
+  "relations": [
+    {"to": "bilstm-crf", "type": "extends", "note": "在字级BiLSTM-CRF结构中加入词格路径，引入词典信息。"},
+    {"to": "lstm", "type": "extends", "note": "扩展LSTM的记忆单元，使其能融合多个以当前字结尾的词单元。"},
+    {"to": "peng-crf-seg", "type": "extends", "note": "延续中文处理中利用词典信息的思路，但不做显式分词，而由模型软选择。"},
+    {"to": "ontonotes", "type": "uses", "note": "在OntoNotes中文等数据集上评测。"}
+  ],
+  "prereq": ["recurrent-layer", "gating", "sequence-labeling", "bio-tagging", "embedding"],
+  "terms": [
+    {"t": "词格（lattice）", "d": "把句子中所有与词典匹配的词都画成从首字到尾字的边，形成一张有向无环图。"},
+    {"t": "命名实体识别", "d": "找出文本中的人名、地名、机构名等实体及其类型。"},
+    {"t": "嵌套实体", "d": "一个实体内部包含另一个实体，如“北京大学”中的“北京”。"}
+  ],
+  "learn": "先读[[bilstm-crf]] → 读本文第3节格子结构与门控公式 → 动手：运行作者开源的LatticeLSTM代码，在微博NER数据上比较字级BiLSTM-CRF与Lattice LSTM，并统计两者在分词歧义样例上的差异。",
+  "check": {"source": "https://arxiv.org/abs/1805.02023", "confirmed": "arXiv：标题Chinese NER Using Lattice LSTM、作者Zhang与Yang，v1提交于2018-05-05；摘要：用格子结构的LSTM编码字序列与所有匹配词典的潜在词，相比基于字的方法显式利用词与词序列信息，相比基于词的方法不受分词错误影响，门控单元选择最相关的字和词，在多个数据集上优于基于词和基于字的LSTM基线。ACL 2018（P18-1144）已核对；数据集名称、融合公式写法与后续工作凭一般了解。"}
+}

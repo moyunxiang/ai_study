@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>DistiLLM偏斜KL蒸馏（2024） · AI脉络</title>
+<meta name="description" content="对大语言模型这类自回归模型做知识蒸馏，缺少公认的标准目标函数；为缓解训练与推理不一致而改用学生自己生成的序列，又让计算成本大幅上升。 两个组件：一是新的偏斜KL散度损失（把教师与学生分布按比例混合后再算KL），并利用其理论性质；二是自适应的离策略做法，更高效地复用学生生成的输出。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/distillm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DistiLLM偏斜KL蒸馏（2024）">
+<meta property="og:description" content="对大语言模型这类自回归模型做知识蒸馏，缺少公认的标准目标函数；为缓解训练与推理不一致而改用学生自己生成的序列，又让计算成本大幅上升。 两个组件：一是新的偏斜KL散度损失（把教师与学生分布按比例混合后再算KL），并利用其理论性质；二是自适应的离策略做法，更高效地复用学生生成的输出。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/distillm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/distillm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:192"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">土壤 · 数据、系统与算力 › <a href="../t/sys.html">系统、框架与效率</a> › 模型压缩与蒸馏</div>
+<h1>DistiLLM偏斜KL蒸馏</h1>
+<div class="full">DistiLLM: Towards Streamlined Distillation for Large Language Models</div>
+<div class="meta"><span>2024.02</span><span>论文</span><span>延伸</span><span>ICML 2024</span><span>Jongwoo Ko, Sungnyun Kim, Tianyi Chen, Se-Young Yun · 韩国科学技术院（KAIST）、微软</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2402.03898" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/distillm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>对大语言模型这类自回归模型做知识蒸馏，缺少公认的标准目标函数；为缓解训练与推理不一致而改用学生自己生成的序列，又让计算成本大幅上升。</p></div><div><h4>方法</h4><p>两个组件：一是新的偏斜KL散度损失（把教师与学生分布按比例混合后再算KL），并利用其理论性质；二是自适应的离策略做法，更高效地复用学生生成的输出。</p></div><div><h4>影响</h4><p>成为LLM蒸馏常用的对照方法之一；后续的DistiLLM-2进一步引入对比式目标，在ICML 2025发表。</p></div></div>
+<div class="prose">
+<h2>方法</h2><p>常见的LLM蒸馏目标是前向KL（让学生覆盖教师分布）或反向KL（<a class="ln" href="../n/minillm.html">MiniLLM反向KL蒸馏</a>，让学生集中在教师的高概率区域），两者各有梯度不稳定、模式覆盖不足等问题。DistiLLM提出偏斜KL：<code>KL(p ‖ αp + (1−α)q)</code>，即把教师p与学生q混合后作为比较对象；它的优点是在q与p差别很大时梯度仍然有界、优化更稳定，作者给出了相关理论分析，并有对应的偏斜反向KL版本。</p><p>为解决训练只看教师数据、推理却要接着自己生成导致的分布偏移，<a class="ln" href="../n/gkd.html">在策略蒸馏GKD</a>等方法让学生在线生成训练序列，但代价很高。DistiLLM用自适应离策略方案：根据验证损失决定何时、以多大比例使用学生生成的序列，并把生成结果放进回放缓冲区反复使用，而不是每步都重新生成。摘要报告：在包括指令遵循在内的大量实验中，它训练出的学生模型效果更好，速度最多比近期KD方法快4.3倍。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>混合比例α等超参数需要调；仍需要能访问教师模型的完整输出分布（logits），不适用于只有文本输出的闭源教师。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:192" href="../n/distillation.html">知识蒸馏</a><span class="yr">2015.03 · 系统·效率</span><div class=nt>把知识蒸馏的目标函数改进到自回归语言模型上。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:192" href="../n/minillm.html">MiniLLM反向KL蒸馏</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>MiniLLM用反向KL加策略梯度，DistiLLM用偏斜KL并降低学生生成数据的成本。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:192" href="../n/gkd.html">在策略蒸馏GKD</a><span class="yr">2023.06 · 系统·效率</span><div class=nt>GKD在线使用学生生成序列代价高，DistiLLM用自适应离策略与回放复用降低开销。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/knowledge-distillation.html">知识蒸馏</a> <a class="chip c" href="../c/kl-divergence.html">KL散度</a> <a class="chip c" href="../c/language-model.html">语言模型</a></p>
+
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/distillation.html">知识蒸馏</a>与<a class="ln" href="../n/minillm.html">MiniLLM反向KL蒸馏</a>；读论文第3节偏斜KL的定义与性质；动手用一个小教师模型蒸馏更小的学生，比较前向KL、反向KL与偏斜KL。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2402.03898" rel="noopener">https://arxiv.org/abs/2402.03898</a>（标题、4位作者、arXiv v1 2024-02-06；摘要中自回归模型KD缺乏标准目标、学生生成输出成本高、偏斜KL损失及其理论性质、自适应离策略、最多4.3倍加速。偏斜KL公式、回放缓冲细节、ICML 2024、DistiLLM-2与ICML 2025、机构凭一般了解（DistiLLM-2的ICML 2025 oral来自别的分支报告）。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20DistiLLM%E5%81%8F%E6%96%9CKL%E8%92%B8%E9%A6%8F%EF%BC%88distillm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Adistillm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/distillm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="lora-plus.html"><small>本分支上一个 · 2024.02</small><b>LoRA+双学习率</b></a><a class="r" href="kivi.html"><small>本分支下一个 · 2024.02</small><b>KIVI两比特KV缓存</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

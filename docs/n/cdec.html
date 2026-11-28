@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>cdec翻译森林框架（2010） · AI脉络</title>
+<meta name="description" content="Moses、Joshua等开源解码器把翻译模型、语言模型集成和剪枝紧紧绑在一起，想试一种新翻译模型就得连带重写重打分和剪枝；而且它们为少量稠密特征设计，难以训练百万级稀疏特征。 把所有翻译模型统一表示成“翻译森林”（超图）：模型相关的代码只负责构造森林，语言模型重打分、剪枝、推断、对齐和训练目标的…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/cdec.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="cdec翻译森林框架（2010）">
+<meta property="og:description" content="Moses、Joshua等开源解码器把翻译模型、语言模型集成和剪枝紧紧绑在一起，想试一种新翻译模型就得连带重写重打分和剪枝；而且它们为少量稠密特征设计，难以训练百万级稀疏特征。 把所有翻译模型统一表示成“翻译森林”（超图）：模型相关的代码只负责构造森林，语言模型重打分、剪枝、推断、对齐和训练目标的…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/cdec.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/cdec">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 规则与统计翻译</div>
+<h1>cdec翻译森林框架</h1>
+<div class="full">cdec: A Decoder, Alignment, and Learning Framework for Finite-State and Context-Free Translation Models</div>
+<div class="meta"><span>2010.07</span><span>系统</span><span>延伸</span><span>ACL 2010（系统演示）</span><span>Chris Dyer, Adam Lopez, Juri Ganitkevitch, Jonathan Weese, Ferhan Türe, Phil Blunsom, Hendra Setiawan, Vladimir Eidelman, Philip Resnik · 马里兰大学、爱丁堡大学、约翰斯·霍普金斯大学、牛津大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://aclanthology.org/P10-4002/" rel="noopener">ACL Anthology ↗</a><a class="btn sm" href="../index.html#/n/cdec">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Moses、Joshua等开源解码器把翻译模型、语言模型集成和剪枝紧紧绑在一起，想试一种新翻译模型就得连带重写重打分和剪枝；而且它们为少量稠密特征设计，难以训练百万级稀疏特征。</p></div><div><h4>方法</h4><p>把所有翻译模型统一表示成“翻译森林”（超图）：模型相关的代码只负责构造森林，语言模型重打分、剪枝、推断、对齐和训练目标的梯度都作为通用算法作用在这同一种数据结构上。</p></div><div><h4>影响</h4><p>成为研究导向的标准翻译框架之一，有限状态（短语式）与上下文无关（层次式、句法式）模型、词对齐、判别训练都能在同一套代码里对照实验；KenLM也集成进了cdec。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>到2010年，短语式（<a class="ln" href="../n/moses.html">Moses</a>）和层次式（<a class="ln" href="../n/joshua.html">Joshua层次翻译工具包</a>）都有了开源解码器，但作者指出它们有两个设计缺陷：其一，翻译模型、语言模型集成（作者称为重打分）和剪枝算法紧耦合，探索新模型要重写大量逻辑；其二，它们围绕传统短语模型设计，通常只有不到10个稠密特征，而<a class="ln" href="../n/chiang-mira.html">MIRA翻译特征调参</a>等工作已在尝试成千上万的稀疏特征。</p><h2>方法</h2><p>cdec的核心抽象是<b>超图</b>：节点代表“源句某个跨度被译成某一类成分”，超边代表一条规则把若干子节点组合成父节点，边上带特征向量。</p><ul><li><b>构造</b>：短语模型、<a class="ln" href="../n/hiero.html">层次短语翻译Hiero</a>式SCFG、有限状态转换器等各自只需写出“如何从源句构造翻译森林”。</li><li><b>通用算法</b>：在森林上统一实现语言模型重打分（如<a class="ln" href="../n/cube-pruning.html">立方剪枝与森林重打分</a>）、剪枝、Viterbi与k-best推断、计算期望和边缘概率，以及强制对齐。</li><li><b>训练</b>：因为期望特征计数、条件似然、期望BLEU等训练目标及其梯度都能在超图上用内向—外向算法算出，任何模型类型都能直接用最大似然、MERT、MIRA等方法训练，并支持从少量稠密特征到上百万稀疏特征的参数化。</li></ul><p>这样新算法一实现，所有模型类型都立即受益，不同模型之间的对照实验也更公平。</p><h2>结果</h2><p>这是一篇系统演示论文，重点是设计：论文说明了统一数据结构如何让新模型更易原型化、让多种模型共享重打分与推断算法，并给出与已有解码器的对比说明（具体速度数字未核对，此处不写）。</p><h2>后来的发展</h2><p>cdec被大量研究用于层次翻译、判别训练与稀疏特征、形态丰富语言和词对齐（其中的fast_align词对齐工具尤其常用，见<a class="ln" href="../n/fast-align.html">fast_align词对齐</a>）；<a class="ln" href="../n/kenlm.html">KenLM语言模型查询库</a>集成进了它的语言模型模块。神经翻译出现后，“把结构化预测写成图上的通用推断”这一思路在神经框架中以自动微分加动态规划的形式延续。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>通用的超图表示带来额外开销，在纯短语式翻译上速度不一定比专门优化的解码器快。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>仍属于离散规则加线性特征的统计翻译框架，翻译质量很快被端到端神经翻译超越。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/bahdanau-attention.html">注意力机制</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/hiero.html">层次短语翻译Hiero</a><span class="yr">2005.06 · NLP</span><div class=nt>层次短语SCFG模型是cdec支持的主要模型类型之一。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/moses.html">Moses</a><span class="yr">2007.06 · NLP</span><div class=nt>针对Moses把翻译模型、语言模型集成与剪枝耦合在一起的问题，用统一的翻译森林解耦。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/cube-pruning.html">立方剪枝与森林重打分</a><span class="yr">2007.06 · NLP</span><div class=nt>在翻译森林上用立方剪枝做语言模型重打分。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/chiang-mira.html">MIRA翻译特征调参</a><span class="yr">2008.10 · NLP</span><div class=nt>沿着大规模稀疏特征训练的方向，从框架层面支持百万级特征的判别训练。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/joshua.html">Joshua层次翻译工具包</a><span class="yr">2009.03 · NLP</span><div class=nt>同为支持层次翻译的开源工具；Joshua面向SCFG翻译流水线，cdec强调所有模型共享同一种超图与训练算法。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/bahdanau-attention.html">注意力机制</a><span class="yr">2014.09 · NLP</span><div class=nt>仍属于离散规则加线性特征的统计翻译框架，翻译质量很快被端到端神经翻译超越。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/context-free-grammar.html">上下文无关文法</a> <a class="chip c" href="../c/dynamic-programming.html">动态规划</a> <a class="chip c" href="../c/graph-basics.html">图、树与搜索</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/feature-representation.html">特征与表示学习</a></p>
+<h2>本篇术语</h2><ul><li><b>超图（翻译森林）</b>　一条超边把多个子节点连到一个父节点，可以紧凑地表示指数级数量的翻译推导。</li><li><b>内向—外向算法</b>　在超图上用动态规划计算每条边被用到的期望次数，是计算梯度和边缘概率的基础。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/hiero.html">层次短语翻译Hiero</a>和<a class="ln" href="../n/cube-pruning.html">立方剪枝与森林重打分</a> → 读本文第3–5节超图表示与通用算法 → 动手：为一句三个词的源句手工画出层次规则构成的超图，数出它编码了多少条不同的推导。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://aclanthology.org/P10-4002/" rel="noopener">https://aclanthology.org/P10-4002/</a>（ACL Anthology与原文PDF：标题cdec: A Decoder, Alignment, and Learning Framework for Finite-State and Context-Free Translation Models、九位作者及其单位、ACL 2010系统演示（2010年7月）；正文：已有开源解码器的两个设计缺陷（翻译、语言模型集成即“重打分”与剪枝紧耦合；只适合少量稠密特征，通常少于10个），cdec中模型代码只需构造翻译森林、通用重打分剪枝推断对齐算法作用于统一结构、支持从少量稠密到数百万稀疏特征、训练目标如条件似然与期望BLEU在统一结构上计算。fast_align出自cdec（Dyer等2013）凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20cdec%E7%BF%BB%E8%AF%91%E6%A3%AE%E6%9E%97%E6%A1%86%E6%9E%B6%EF%BC%88cdec%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Acdec%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/cdec.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="heideltime.html"><small>本分支上一个 · 2010.07</small><b>HeidelTime时间表达式</b></a><a class="r" href="koo-collins.html"><small>本分支下一个 · 2010.07</small><b>三阶依存分析</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Soft MoE扩展深度RL（2024） · AI脉络</title>
+<meta name="description" content="监督学习与自监督学习的进步很大程度可以用扩展定律预测：模型越大越好。RL里却常常相反，把价值网络加大往往让最终性能变差，参数扩展的规律迟迟找不到。 在基于价值的深度RL网络（DQN、Rainbow等）的倒数第二层换上混合专家（MoE）模块，尤其是Soft MoE：输入token被软性地分配给多个专…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/softmoe-rl.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Soft MoE扩展深度RL（2024）">
+<meta property="og:description" content="监督学习与自监督学习的进步很大程度可以用扩展定律预测：模型越大越好。RL里却常常相反，把价值网络加大往往让最终性能变差，参数扩展的规律迟迟找不到。 在基于价值的深度RL网络（DQN、Rainbow等）的倒数第二层换上混合专家（MoE）模块，尤其是Soft MoE：输入token被软性地分配给多个专…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/softmoe-rl.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/softmoe-rl">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 深度值函数</div>
+<h1>Soft MoE扩展深度RL</h1>
+<div class="full">Mixtures of Experts Unlock Parameter Scaling for Deep RL</div>
+<div class="meta"><span>2024.02</span><span>论文</span><span>延伸</span><span>ICML 2024</span><span>Johan Obando-Ceron, Ghada Sokar, Timon Willi, Clare Lyle, Jesse Farebrother, Jakob Foerster, Gintare Karolina Dziugaite, Doina Precup et al. · Google DeepMind, Mila, University of Oxford, McGill University</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2402.08609" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/softmoe-rl">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>监督学习与自监督学习的进步很大程度可以用扩展定律预测：模型越大越好。RL里却常常相反，把价值网络加大往往让最终性能变差，参数扩展的规律迟迟找不到。</p></div><div><h4>方法</h4><p>在基于价值的深度RL网络（DQN、Rainbow等）的倒数第二层换上混合专家（MoE）模块，尤其是Soft MoE：输入token被软性地分配给多个专家，每个专家处理加权后的“槽”，再软性地合并回来。</p></div><div><h4>影响</h4><p>实验表明加入Soft MoE后，价值网络随专家数和参数量增加性能持续提升，在多种训练设定与模型规模下都有明显收益，为“RL也能有参数扩展规律”提供了有力的实证证据。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/dqn-nature.html">DQN（Nature版）</a>、<a class="ln" href="../n/rainbow.html">Rainbow</a>等值方法通常使用固定的小型卷积网络；简单地加宽或加深网络常导致训练不稳定、可塑性下降，最终回报反而变差（参见<a class="ln" href="../n/primacy-bias.html">首因偏差与网络重置</a>、<a class="ln" href="../n/redo.html">休眠神经元与ReDo</a>等对可塑性丧失的研究）。在语言模型中，混合专家（<a class="ln" href="../n/sparse-moe.html">稀疏门控MoE层</a>、<a class="ln" href="../n/switch-transformer.html">稀疏MoE大模型</a>）可以在不显著增加每步计算的情况下扩大参数量；Soft MoE（Puigcerver等，2023）用可微的软分配取代离散路由，避免了专家负载不均、token被丢弃等问题。</p><h2>方法</h2><p>作者把卷积编码器输出的特征图展开成一组token（例如按空间位置或按通道切分），送入一个MoE层，替换原网络中卷积之后的全连接层，再接Q值头。</p><p><b>Soft MoE</b>：设有n个token <code>X ∈ R^{n×d}</code>，e个专家、每个专家p个槽。先用可学习参数Φ计算分配权重 <code>D = softmax_列(XΦ)</code>，得到每个槽的输入 <code>X̃ = DᵀX</code>（每个槽是所有token的加权和）；每个专家处理自己的p个槽；再用 <code>C = softmax_行(XΦ)</code> 把槽的输出合并回各token。整个过程可微，每个token都参与，没有离散路由。</p><p>作者也比较了传统的Top-k稀疏路由MoE。实验覆盖在线Atari（DQN、Rainbow，基于Dopamine）、数据高效的Atari 100k设定、离线RL（如CQL）等，并改变专家数量（1到8及以上）、网络宽度与每步更新次数，观察性能随参数量的变化。</p><h2>结果</h2><p>摘要称：在基于价值的网络中加入MoE模块，尤其是Soft MoE，能得到参数上更可扩展的模型，在多种训练设定和模型规模下都带来了显著的性能提升；这为发展RL的扩展定律提供了有力的实证证据。原文显示，专家数增加时Soft MoE的性能持续上升，而直接加宽基线网络则会变差。</p><h2>后来的发展</h2><p>这项工作与<a class="ln" href="../n/bbf.html">BBF</a>、<a class="ln" href="../n/simba.html">SimBa</a>、<a class="ln" href="../n/value-rl-scaling.html">价值型RL的可预测扩展</a>等一起，构成了2023–2025年研究深度RL“可扩展网络结构”的一条主线；后续工作进一步分析MoE在RL中起作用的原因（如缓解可塑性丧失、改变特征的token化方式）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>收益的来源并不完全清楚：后续分析显示，token化方式和网络结构的其他变化本身就贡献了很大一部分提升。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>主要在Atari等离散动作的值方法上验证，连续控制、策略梯度方法和更大规模（如十亿参数）上的扩展性没有系统检验。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/dqn-nature.html">DQN（Nature版）</a><span class="yr">2015.02 · RL</span><div class=nt>在DQN的价值网络中插入Soft MoE层，研究参数扩展。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/sparse-moe.html">稀疏门控MoE层</a><span class="yr">2017.01 · LLM</span><div class=nt>借用语言模型中的混合专家思想，并比较传统Top-k稀疏路由。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/rainbow.html">Rainbow</a><span class="yr">2017.10 · RL</span><div class=nt>同样在Rainbow上验证Soft MoE带来的可扩展性。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/primacy-bias.html">首因偏差与网络重置</a><span class="yr">2022.05 · RL</span><div class=nt>大网络在RL中性能下降与可塑性丧失有关；Soft MoE使加大参数后性能不降反升。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/mixture-of-experts.html">混合专家</a> <a class="chip c" href="../c/td-error.html">时序差分与自举</a> <a class="chip c" href="../c/scaling-law-concept.html">幂律与规模定律</a> <a class="chip c" href="../c/conv-layer.html">卷积层、池化与感受野</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a></p>
+<h2>本篇术语</h2><ul><li><b>Soft MoE</b>　一种可微的混合专家：每个专家的输入是所有token的加权平均，输出再加权分配回各token，不需要离散地挑选专家。</li><li><b>参数扩展性</b>　增加模型参数后性能能否持续提高；RL网络历来缺乏这一性质。</li></ul>
+<h2>怎么学</h2><p>先补<a class="lc" href="../c/mixture-of-experts.html">混合专家</a>和<a class="ln" href="../n/dqn-nature.html">DQN（Nature版）</a>；读原文第3节MoE插入位置与token化方式、第4节扩展实验；在一个Atari游戏上比较基线DQN、加宽DQN和Soft MoE DQN的曲线。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2402.08609" rel="noopener">https://arxiv.org/abs/2402.08609</a>（标题、作者（Obando-Ceron, Sokar, Willi, Lyle, Farebrother, Foerster, Dziugaite, Precup, Castro）、arXiv v1于2024-02-13；摘要中监督/自监督模型的进步由经验扩展定律预测、RL中增加参数常损害最终性能、在基于价值的网络中加入MoE模块尤其是Soft MoE（Puigcerver等2023）得到参数上更可扩展的模型、多种训练设定与模型规模下性能显著提升、为RL扩展定律提供有力实证。插入位置、token化、Soft MoE公式、实验设定、ICML 2024与机构按原文正文和通行引用；后续分析的结论凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Soft%20MoE%E6%89%A9%E5%B1%95%E6%B7%B1%E5%BA%A6RL%EF%BC%88softmoe-rl%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Asoftmoe-rl%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/softmoe-rl.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="hilp.html"><small>本分支上一个 · 2024.02</small><b>HILP希尔伯特基础策略</b></a><a class="r" href="chess-without-search.html"><small>本分支下一个 · 2024.02</small><b>无搜索的大师级象棋</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

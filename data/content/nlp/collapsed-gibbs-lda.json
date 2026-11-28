@@ -1,0 +1,36 @@
+{
+  "id": "collapsed-gibbs-lda",
+  "who": "Thomas L. Griffiths, Mark Steyvers · 斯坦福大学、加州大学尔湾分校",
+  "venue": "PNAS 2004",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1073/pnas.0307752101"},
+    {"label": "PMC全文", "url": "https://europepmc.org/article/PMC/PMC387300"}
+  ],
+  "aka": ["折叠Gibbs采样", "Collapsed Gibbs Sampling", "LDA的Gibbs采样", "Finding scientific topics", "Griffiths & Steyvers 2004", "塌缩吉布斯采样", "主题数选择"],
+  "problem": "LDA主题模型的后验推断不可精确计算，原论文用的变分EM推导繁琐、实现复杂，而且只给出近似的局部最优；研究者需要一种简单、易实现又准确的推断方法。",
+  "idea": "把每篇文档的主题分布θ和每个主题的词分布φ用狄利克雷—多项共轭关系积分掉，只对每个词的主题标签z做Gibbs采样：一个词属于主题k的概率，正比于“该词在主题k中出现的次数”乘以“该文档中主题k出现的次数”（都加上平滑先验）。",
+  "impact": "这套几行公式就能实现的采样器成为训练LDA最常用的方法（MALLET等工具的默认算法），也成为后来HDP、作者主题模型等大量贝叶斯文本模型的标准推断手段；论文用它分析了28000篇PNAS摘要，展示了主题模型在科学文献分析上的用途。",
+  "background": "[[lda]]（Blei、Ng与Jordan，2003）把每篇文档看作多个主题的混合、每个主题是词表上的一个分布，用变分推断近似后验。[[plsa]]没有文档层面的先验，参数随文档数增长。[[gibbs-sampling]]和[[mcmc]]是统计学中通用的后验采样方法，但对LDA而言，直接对θ、φ、z一起采样收敛慢。",
+  "method": "LDA的生成过程：主题k的词分布 `φ_k ~ Dir(β)`；文档d的主题分布 `θ_d ~ Dir(α)`；文档中每个词先抽主题 `z_i ~ Mult(θ_d)`，再抽词 `w_i ~ Mult(φ_{z_i})`。\n\n利用狄利克雷与多项分布的共轭性，θ和φ可以被解析地积分掉（“折叠”），只剩离散变量z。对第i个词（属于文档d，词为w），在固定其他所有标签的条件下：\n\n`P(z_i = k | z_{−i}, w) ∝ (n_{k,w}^{−i} + β) / (n_{k,·}^{−i} + Vβ) · (n_{d,k}^{−i} + α)`\n\n其中 `n_{k,w}` 是词w被分配给主题k的次数，`n_{k,·}` 是主题k的总词数，`n_{d,k}` 是文档d中分配给主题k的词数，上标−i表示不计当前词，V是词表大小。采样器只需维护这几张计数表，每次重新抽一个词的主题再更新计数。收敛后可由计数估计 `φ̂_{k,w} = (n_{k,w}+β)/(n_{k,·}+Vβ)`。\n\n论文还用调和平均估计边缘似然 `P(w | K)`，据此在不同主题数K之间做贝叶斯模型选择。",
+  "results": "作者把模型用于PNAS 1991–2001年约28000篇论文摘要，用模型选择得到约300个主题，展示了主题与学科分类的对应、“热门”与“冷门”主题随时间的变化，以及按主题标注文档中每个词的可视化（主要内容来自论文正文；样本数凭一般了解）。",
+  "legacy": "折叠Gibbs采样成为LDA事实上的标准推断方法，被MALLET、GibbsLDA++等工具实现，后来又有稀疏加速的SparseLDA、分布式的AD-LDA和LightLDA等，用于数百万文档与上千主题。它的计数式更新公式也是[[hdp]]等非参数模型变体推断的出发点（而[[dtm]]因非共轭只能用变分推断）。随着语料继续增大，基于随机优化的[[online-lda]]与[[svi]]给出了另一条更可扩展的路线。",
+  "limits": [
+    {"text": "每轮要扫描语料中的每一个词，语料达到百万文档时速度很慢，难以处理流式到达的数据。", "solved_by": ["online-lda", "svi"]},
+    {"text": "主题数K要预先指定，只能靠多次训练比较似然来选择。", "solved_by": ["hdp"]},
+    {"text": "调和平均估计边缘似然的方差很大，用于模型选择并不可靠。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "lda", "type": "solves", "note": "给LDA提供一种比变分EM简单得多、易于实现的后验推断方法。"},
+    {"to": "gibbs-sampling", "type": "uses", "note": "在积分掉连续参数后，对每个词的主题标签做Gibbs采样。"},
+    {"to": "mcmc", "type": "uses", "note": "采样器属于马尔可夫链蒙特卡洛方法，收敛后的样本用来估计主题与文档分布。"},
+    {"to": "plsa", "type": "extends", "note": "沿着pLSA→LDA的概率主题模型路线，在完整的贝叶斯模型上做推断与模型选择。"}
+  ],
+  "prereq": ["beta-dirichlet", "discrete-distributions", "conditional-bayes", "monte-carlo", "markov-chain", "latent-variable"],
+  "terms": [
+    {"t": "折叠（collapsed）", "d": "用共轭性把一部分参数解析地积分掉，只对剩下的变量采样，通常收敛更快。"},
+    {"t": "共轭先验", "d": "先验与似然配对后，后验与先验属于同一分布族，如狄利克雷先验配多项分布。"},
+    {"t": "调和平均估计", "d": "用后验样本的似然倒数平均来估计边缘似然，实现简单但方差很大。"}
+  ],
+  "learn": "先学[[lda]]的生成过程和狄利克雷分布 → 读本文“Statistical Inference”一节的采样公式 → 动手：用不到100行Python实现折叠Gibbs采样，在20 Newsgroups的一个子集上跑20个主题，打印每个主题概率最高的10个词。",
+  "check": {"source": "https://doi.org/10.1073/pnas.0307752101", "confirmed": "Crossref与Semantic Scholar：标题Finding scientific topics、作者Griffiths与Steyvers、PNAS 2004（S2记2004-04-06，有PMC开放全文）。采样公式、调和平均模型选择、PNAS摘要分析（约28000篇、约300个主题）按教材与后续文献的通行讲法写，未逐页对照原文；出版社摘要被S2隐去。"}
+}

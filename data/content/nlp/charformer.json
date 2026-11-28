@@ -1,0 +1,86 @@
+{
+  "id": "charformer",
+  "who": "Yi Tay, Vinh Q. Tran, Sebastian Ruder, Jai Gupta, Hyung Won Chung, Dara Bahri, Zhen Qin, Simon Baumgartner et al. · Google Research、DeepMind",
+  "venue": "ICLR 2022",
+  "links": [
+    {
+      "label": "arXiv",
+      "url": "https://arxiv.org/abs/2106.12672"
+    }
+  ],
+  "aka": [
+    "Charformer",
+    "GBST",
+    "Gradient-Based Subword Tokenization",
+    "可学习子词切分",
+    "无分词器模型",
+    "Tokenization-free",
+    "Tay et al. 2021",
+    "字节级Transformer"
+  ],
+  "problem": "主流模型依赖事先训练好、固定不变的子词分词器（BPE、SentencePiece），它对拼写错误、新词和跨语言文本泛化差；直接在字节上建模（如ByT5）又让序列变长好几倍，计算代价高。",
+  "idea": "让模型自己学习“子词”：在字节序列上枚举长度为1到M的候选块，用一个打分网络在每个位置为各种块长打分，按分数软性地混合不同粒度的块表示（梯度可回传），再做下采样缩短序列，送入深层Transformer。这个模块称为GBST（基于梯度的子词切分）。",
+  "impact": "在英文GLUE、多语言和含噪声文本任务上，Charformer优于一系列字节级基线，并与子词模型持平甚至更好；同时比原始字节级和子词级Transformer快28%–100%，是“去分词器”方向的代表性尝试之一。",
+  "background": "[[bpe]]与[[sentencepiece]]的分词在训练前就固定了，模型无法根据任务调整；它们在噪声文本和形态丰富语言上表现欠佳。[[canine]]（2021）用字符哈希嵌入和下采样做无分词编码器，[[byt5]]（2021）直接把UTF-8字节喂给T5，鲁棒但序列长、计算量大。如何在字节级的灵活性与子词级的效率之间折中，是这篇工作的出发点。",
+  "method": "**GBST模块**：输入字节序列的嵌入 `X ∈ ℝ^{L×d}`。\n\n1. **候选块**：对每种块长 b∈{1,…,M}，把序列按长度b切成不重叠的块，块内做平均池化得到块表示，并把它“铺回”到块中每个位置，于是每个位置i都有M个候选表示 `X_{b,i}`；\n2. **块打分**：用一个线性打分网络为每个位置、每种块长打分 `p_{b,i} = softmax_b( wᵀ X_{b,i} )`；为让相邻位置的选择更一致，还对分数做一次位置间的点积校准；\n3. **软选择**：位置i的潜在子词表示为加权和 `X̂_i = Σ_b p_{b,i} · X_{b,i}`；\n4. **下采样**：对 `X̂` 按步长d_s做平均池化，把序列长度缩短为原来的 `1/d_s`，再送入后续的Transformer编码器。\n\n整个过程处处可导，“切分方式”随下游任务一起端到端学习。作者还配合使用较深而窄的Transformer结构，并在C4上以字节级的片段掩码任务预训练。",
+  "results": "在英文GLUE、多语言任务和含噪声文本数据集上，Charformer优于一系列有竞争力的字节级基线，总体与子词模型持平、有时更好；速度上比原始字节级与子词级Transformer快28%–100%，同时保持有竞争力的质量（arXiv摘要）。",
+  "legacy": "Charformer与[[canine]]、[[byt5]]一起构成2021年“无分词”模型的代表；后来的MEGABYTE、分块字节模型以及2024年后的动态分块字节级模型（如Byte Latent Transformer）延续了“在模型内部学习切分或分块”的思路。不过主流大模型仍使用固定的BPE词表，[[tokenizer-unfairness]]等研究持续揭示固定分词带来的问题。",
+  "limits": [
+    {
+      "text": "块是固定长度、按位置不重叠地切分，学到的“子词”不一定对应真实的语素或词边界。",
+      "solved_by": []
+    },
+    {
+      "text": "主要在编码器上验证，在大规模自回归生成模型中的效果与效率没有得到充分证明。",
+      "solved_by": []
+    }
+  ],
+  "relations": [
+    {
+      "to": "byt5",
+      "type": "solves",
+      "note": "ByT5直接在字节上建模、序列很长；Charformer通过可学习的软子词与下采样大幅缩短序列，速度更快。"
+    },
+    {
+      "to": "canine",
+      "type": "rivals",
+      "note": "CANINE用字符哈希嵌入与卷积下采样做无分词编码；Charformer用对多种块长的软选择来学习子词。"
+    },
+    {
+      "to": "sentencepiece",
+      "type": "rivals",
+      "note": "SentencePiece在训练前固定切分；Charformer把切分作为模型的一部分端到端学习。"
+    },
+    {
+      "to": "t5",
+      "type": "uses",
+      "note": "沿用T5式的预训练目标与Transformer架构，在C4上预训练。"
+    }
+  ],
+  "prereq": [
+    "tokenization",
+    "transformer-block",
+    "softmax",
+    "pretrain-finetune",
+    "inductive-bias"
+  ],
+  "terms": [
+    {
+      "t": "无分词器模型",
+      "d": "不依赖事先训练的子词词表，直接处理字符或字节的模型。"
+    },
+    {
+      "t": "下采样",
+      "d": "把相邻若干位置的表示合并成一个，缩短序列长度以减少后续计算。"
+    },
+    {
+      "t": "软选择",
+      "d": "不是硬性选一种切分，而是按概率对多种切分的表示加权求和，使梯度可以回传。"
+    }
+  ],
+  "learn": "先读[[byt5]]与[[canine]] → 读本文第2节GBST的四个步骤 → 动手：用PyTorch实现块长1–4的GBST模块，在一个小的字节级文本分类任务上比较加不加GBST时的速度与准确率。",
+  "check": {
+    "source": "https://arxiv.org/abs/2106.12672",
+    "confirmed": "arXiv：标题Charformer: Fast Character Transformers via Gradient-based Subword Tokenization、作者Tay、Tran、Ruder、Gupta、Chung、Bahri、Qin、Baumgartner、Yu、Metzler，v1提交于2021-06-23；摘要：主流模型依赖独立而僵化的子词分词算法，提出端到端学习子词切分的GBST模块，从字符数据驱动地学习潜在子词表示，枚举候选子词块并用块打分网络按位置打分，Charformer是集成GBST、在字节级工作的深层Transformer，在英文GLUE、多语言与噪声文本上优于字节级基线并与子词模型持平或更好，比原始字节级与子词级Transformer快28%–100%。ICLR 2022出处、校准步骤与下采样细节凭一般了解。"
+  }
+}

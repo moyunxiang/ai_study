@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Fast WordPiece线性分词（2020） · AI脉络</title>
+<meta name="description" content="BERT使用的WordPiece在切分单个词时采用“最长匹配优先”（每次从当前位置取词表中最长的前缀），已知最好的算法复杂度是O(n²)或O(nm)（n为输入长度，m为最长词元长度）；分词在线上服务中会成为可观的延迟来源。 受Aho-Corasick多模式匹配算法启发，在词表构成的字典树（trie…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/fast-wordpiece.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Fast WordPiece线性分词（2020）">
+<meta property="og:description" content="BERT使用的WordPiece在切分单个词时采用“最长匹配优先”（每次从当前位置取词表中最长的前缀），已知最好的算法复杂度是O(n²)或O(nm)（n为输入长度，m为最长词元长度）；分词在线上服务中会成为可观的延迟来源。 受Aho-Corasick多模式匹配算法启发，在词表构成的字典树（trie…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/fast-wordpiece.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/fast-wordpiece">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 子词切分</div>
+<h1>Fast WordPiece线性分词</h1>
+<div class="full">Fast WordPiece Tokenization</div>
+<div class="meta"><span>2020.12</span><span>论文</span><span>延伸</span><span>EMNLP 2021</span><span>Xinying Song, Alex Salcianu, Yang Song, Dave Dopson, Denny Zhou · Google</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2012.15524" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/fast-wordpiece">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>BERT使用的WordPiece在切分单个词时采用“最长匹配优先”（每次从当前位置取词表中最长的前缀），已知最好的算法复杂度是O(n²)或O(nm)（n为输入长度，m为最长词元长度）；分词在线上服务中会成为可观的延迟来源。</p></div><div><h4>方法</h4><p>受Aho-Corasick多模式匹配算法启发，在词表构成的字典树（trie）上额外加入“失败链接”：当字典树匹配无法继续时，不必回到起点重新扫描，而是沿预先算好的链接直接跳到正确状态，从而把单词切分做到严格O(n)；再把预分词（按空格标点切词）与WordPiece合并为一次扫描。</p></div><div><h4>影响</h4><p>在一般文本分词上平均比HuggingFace Tokenizers快8.2倍、比TensorFlow Text快5.1倍；该算法被集成进TensorFlow Text，用于Google的BERT类模型服务，是“分词算法工程优化”的代表性工作。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/wordpiece.html">WordPiece</a>最早用于日韩语音搜索，后来被<a class="ln" href="../n/bert.html">BERT</a>采用：给定词表，对每个词做贪心的最长前缀匹配，匹配到的词元之后的部分用“##”前缀继续匹配。朴素实现每一步都要尝试从最长到最短的候选前缀，最坏情况下对长词是平方复杂度。<a class="ln" href="../n/sentencepiece.html">SentencePiece</a>等工具解决的是训练与语言无关的问题，而不是这种贪心切分的推理速度。</p><h2>方法</h2><p><b>LinMaxMatch</b>：把词表中的所有词元（含“##”续接词元）插入一棵字典树。对每个节点v，预先计算两样东西：</p><ul><li><b>失败弹出（failure pops）</b> <code>F(v)</code>：当在v处无法继续匹配时，应当输出的那一串词元（即最长匹配原则下此时已确定的词元）；</li><li><b>失败链接（failure link）</b> <code>f(v)</code>：输出这些词元之后，应当跳到的字典树节点（对应剩余后缀在“##”子树中的匹配状态）。</li></ul><p>切分时从根开始逐字符前进；遇到无法继续的字符，就输出 <code>F(v)</code> 并跳到 <code>f(v)</code>，然后继续用同一个字符尝试。作者证明每个字符被处理的总次数有常数上界，因此单词切分是严格 <code>O(n)</code>。失败链接和弹出可在构建字典树时用广度优先遍历预计算，类似Aho-Corasick的构造。</p><p><b>端到端分词</b>：把空白与标点的预分词规则也编码进同一个自动机，一次线性扫描同时完成切词和WordPiece切分，避免两遍处理。</p><h2>结果</h2><p>单词切分达到严格线性时间；在一般文本分词上，平均比HuggingFace Tokenizers快8.2倍、比TensorFlow Text快5.1倍（arXiv摘要）。</p><h2>后来的发展</h2><p>该算法被合入TensorFlow Text的FastWordpieceTokenizer。它与<a class="ln" href="../n/bbpe.html">字节级BPE（BBPE）</a>、<a class="ln" href="../n/sentencepiece.html">SentencePiece</a>等一起说明，分词虽然只是预处理，但在大规模推理服务中值得专门优化；后续也有针对BPE合并的线性或近线性实现。大模型时代，分词速度问题由tiktoken等高度优化的BPE库处理，同时也出现了直接在字节或字符上建模、绕开分词的方向（如<a class="ln" href="../n/byt5.html">ByT5字节级模型</a>、<a class="ln" href="../n/charformer.html">Charformer可学习子词</a>）。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>只加速WordPiece的贪心最长匹配，不改变切分结果本身，切分质量问题（如对罕见词、多语言的切分偏差）仍在。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/tokenizer-unfairness.html">分词器的跨语言不公平</a></div></li><li>算法专门针对最长匹配优先，不能直接用于BPE的合并规则或Unigram的概率切分。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/bert.html">BERT</a><span class="yr">2018.10 · LLM</span><div class=nt>目标是加速BERT所用的WordPiece分词。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/wordpiece.html">WordPiece</a><span class="yr">2012.03 · NLP</span><div class=nt>把WordPiece最长匹配切分从O(n²)或O(nm)降到严格的O(n)。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/sentencepiece.html">SentencePiece</a><span class="yr">2018.08 · NLP</span><div class=nt>SentencePiece面向语言无关的子词训练与切分；Fast WordPiece专注于已有WordPiece词表的推理速度。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/tokenizer-unfairness.html">分词器的跨语言不公平</a><span class="yr">2023.05 · NLP</span><div class=nt>只加速WordPiece的贪心最长匹配，不改变切分结果本身，切分质量问题（如对罕见词、多语言的切分偏差）仍在。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/tokenization.html">分词与token</a> <a class="chip c" href="../c/big-o.html">时间与空间复杂度</a> <a class="chip c" href="../c/graph-basics.html">图、树与搜索</a> <a class="chip c" href="../c/dynamic-programming.html">动态规划</a></p>
+<h2>本篇术语</h2><ul><li><b>最长匹配优先</b>　从当前位置起，在词表中找能匹配的最长前缀作为下一个词元，又称MaxMatch。</li><li><b>字典树（trie）</b>　把一组字符串按公共前缀合并成的树，每条从根出发的路径对应一个前缀。</li><li><b>失败链接</b>　Aho-Corasick算法中的指针：当前匹配失败时直接跳到能继续匹配的状态，而不是回退重扫。</li></ul>
+<h2>怎么学</h2><p>先了解<a class="ln" href="../n/wordpiece.html">WordPiece</a>的贪心切分与Aho-Corasick算法 → 读本文第3节LinMaxMatch的失败链接构造 → 动手：用Python实现朴素MaxMatch和带失败链接的版本，在一个小词表上对长词计时比较。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2012.15524" rel="noopener">https://arxiv.org/abs/2012.15524</a>（arXiv：标题Fast WordPiece Tokenization、作者Song、Salcianu、Song、Dopson、Zhou，v1提交于2020-12-31；摘要：BERT所用WordPiece对单词采用最长匹配优先（MaxMatch），已知最好算法为O(n²)或O(nm)，提出受Aho-Corasick启发、在词表字典树上增加链接的严格O(n)算法，并把预分词与线性WordPiece结合为单遍算法，一般文本分词平均比HuggingFace Tokenizers快8.2倍、比TensorFlow Text快5.1倍。EMNLP 2021出处、失败弹出与链接的具体定义、并入TensorFlow Text凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Fast%20WordPiece%E7%BA%BF%E6%80%A7%E5%88%86%E8%AF%8D%EF%BC%88fast-wordpiece%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Afast-wordpiece%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/fast-wordpiece.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="bert-flow.html"><small>本分支上一个 · 2020.11</small><b>BERT-flow句向量校正</b></a><a class="r" href="pyserini.html"><small>本分支下一个 · 2021.02</small><b>Pyserini检索工具包</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

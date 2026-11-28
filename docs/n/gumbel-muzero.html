@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Gumbel MuZero（2022） · AI脉络</title>
+<meta name="description" content="AlphaZero依靠根节点的搜索结果改进策略网络，但如果模拟次数少、没能访问根节点的所有动作，搜索得到的访问次数分布可能比原策略还差，策略网络就学不到改进。 在根节点用Gumbel-Top-k技巧做不放回采样，选出k个候选动作，再用“序列减半”把模拟次数分配给它们，最后选出的动作保证在期望意义下…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/gumbel-muzero.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Gumbel MuZero（2022）">
+<meta property="og:description" content="AlphaZero依靠根节点的搜索结果改进策略网络，但如果模拟次数少、没能访问根节点的所有动作，搜索得到的访问次数分布可能比原策略还差，策略网络就学不到改进。 在根节点用Gumbel-Top-k技巧做不放回采样，选出k个候选动作，再用“序列减半”把模拟次数分配给它们，最后选出的动作保证在期望意义下…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/gumbel-muzero.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/gumbel-muzero">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 模型与规划</div>
+<h1>Gumbel MuZero</h1>
+<div class="full">Policy improvement by planning with Gumbel</div>
+<div class="meta"><span>2022.04</span><span>论文</span><span>延伸</span><span>ICLR 2022</span><span>Ivo Danihelka, Arthur Guez, Julian Schrittwieser, David Silver · DeepMind</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://openreview.net/forum?id=bERaNdoegnO" rel="noopener">OpenReview ↗</a><a class="btn sm" href="https://github.com/google-deepmind/mctx" rel="noopener">mctx（官方JAX实现） ↗</a><a class="btn sm" href="../index.html#/n/gumbel-muzero">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>AlphaZero依靠根节点的搜索结果改进策略网络，但如果模拟次数少、没能访问根节点的所有动作，搜索得到的访问次数分布可能比原策略还差，策略网络就学不到改进。</p></div><div><h4>方法</h4><p>在根节点用Gumbel-Top-k技巧做不放回采样，选出k个候选动作，再用“序列减半”把模拟次数分配给它们，最后选出的动作保证在期望意义下改进策略；训练目标改为用Q值补全后的改进策略，而不是访问次数分布。</p></div><div><h4>影响</h4><p>得到Gumbel AlphaZero和Gumbel MuZero：在围棋、国际象棋和Atari上与原算法持平，在每步只有很少模拟次数（如2次、16次）时显著更好；它是DeepMind开源MCTS库mctx中的标准算法之一。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/alphazero.html">AlphaZero</a>与<a class="ln" href="../n/muzero.html">MuZero</a>的训练目标是根节点的访问次数分布，动作选择用PUCT公式加Dirichlet噪声。当模拟次数大于动作数时这很有效；但当模拟预算很小（例如棋类有几百个合法着法、Atari要求实时），访问次数分布几乎只反映先验和噪声，不能保证比先验策略更好。<a class="ln" href="../n/mcts-rpo.html">MCTS即正则化策略优化</a>已经把搜索解释为正则化策略优化，但仍假设能估计所有根动作的Q值。作者要求一种在<b>任意</b>模拟次数下都能保证策略改进的方法。</p><h2>方法</h2><p><b>根节点：Gumbel-Top-k不放回采样</b>。对每个动作a加独立的Gumbel噪声 <code>g(a)</code>，取 <code>g(a) + logits(a)</code> 最大的k个动作作为候选；这等价于按策略π不放回地采样k个动作。</p><p><b>序列减半（Sequential Halving）</b>：把模拟预算分成若干轮，每轮在剩余候选上平均分配模拟，然后按 <code>g(a) + logits(a) + σ(q̂(a))</code> 保留前一半，直到剩一个动作。其中σ是随访问次数单调增长的变换。作者证明，在Q值估计正确时，这样选出的动作满足 <code>E[q(A)] ≥ E_{a∼π}[q(a)]</code>，即一定不比原策略差。</p><p><b>训练目标</b>：用 <code>π′ = softmax(logits + σ(completed Q))</code> 作为策略网络的目标，其中未访问动作的Q值用价值估计补全（completed Q）。</p><p><b>非根节点</b>：同样用由策略改进推出的确定性规则选择动作，以取代PUCT的启发式。去掉模型学习就是Gumbel AlphaZero，带学到的模型就是Gumbel MuZero。</p><h2>结果</h2><p>摘要称：Gumbel AlphaZero与Gumbel MuZero（分别不带和带模型学习）在围棋、国际象棋和Atari上达到当时最先进的水平，并且在只用少量模拟进行规划时显著改进了以往的性能。原文报告，在9×9围棋中每步只用2次模拟时，原版AlphaZero几乎学不到东西，而Gumbel版本仍能稳定提升。</p><h2>后来的发展</h2><p>Gumbel MuZero被纳入官方开源库mctx，成为后续研究中低算力搜索的默认选择；它的“保证策略改进的搜索”思想也被用到连续控制规划、组合优化以及大模型推理中的树搜索。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>策略改进保证依赖Q值估计准确；学到的模型或价值函数有偏时，保证不再严格成立。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>主要针对离散动作；在连续动作空间里需要先采样候选动作，如何把搜索结果蒸馏回连续策略仍是开放问题。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:120" href="../n/alphazero.html">AlphaZero</a><span class="yr">2017.12 · RL</span><div class=nt>AlphaZero在模拟次数少于根动作数时可能无法改进策略；Gumbel不放回采样加序列减半保证改进。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/muzero.html">MuZero</a><span class="yr">2019.11 · RL</span><div class=nt>在MuZero的学到模型上使用同样的Gumbel搜索与训练目标，得到Gumbel MuZero。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/mcts-rpo.html">MCTS即正则化策略优化</a><span class="yr">2020.07 · RL</span><div class=nt>延续“把搜索看作策略改进”的视角，并去掉需要估计所有根动作Q值的前提。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:120" href="../n/sampled-muzero.html">Sampled MuZero</a><span class="yr">2021.04 · RL</span><div class=nt>Sampled MuZero也在根节点采样部分动作来处理大动作空间；Gumbel MuZero用不放回采样并给出改进保证。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/tree-search.html">博弈树搜索：minimax与MCTS</a> <a class="chip c" href="../c/gumbel-softmax.html">离散变量的梯度：直通估计与Gumbel-Softmax</a> <a class="chip c" href="../c/policy-value.html">策略与价值函数</a> <a class="chip c" href="../c/self-play.html">自我对弈</a> <a class="chip c" href="../c/softmax.html">Softmax与logits</a></p>
+<h2>本篇术语</h2><ul><li><b>Gumbel-Top-k技巧</b>　给每个动作的对数概率加独立的Gumbel随机噪声后取最大的k个，等价于按该分布不放回地抽k个动作。</li><li><b>序列减半（Sequential Halving）</b>　一种老虎机算法：每轮把预算平均分给剩余候选，淘汰表现较差的一半，直到只剩一个。</li></ul>
+<h2>怎么学</h2><p>先了解<a class="ln" href="../n/alphazero.html">AlphaZero</a>的PUCT搜索与<a class="lc" href="../c/gumbel-softmax.html">离散变量的梯度：直通估计与Gumbel-Softmax</a>；读原文第3–4节根节点算法与策略改进证明；用mctx库在一个小棋类上比较muzero_policy与gumbel_muzero_policy在模拟次数为4时的训练曲线。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://openreview.net/forum?id=bERaNdoegnO（经OpenAlex记录）" rel="noopener">https://openreview.net/forum?id=bERaNdoegnO（经OpenAlex记录）</a>、<a href="https://github.com/google-deepmind/mctx" rel="noopener">https://github.com/google-deepmind/mctx</a>（标题、作者（Danihelka, Guez, Schrittwieser, Silver）、ICLR 2022（OpenAlex记录日期2022-04-25）；摘要中AlphaZero在未访问根节点所有动作时可能无法改进策略、基于不放回采样的策略改进算法、用策略改进思想替换根与非根节点的启发式、Gumbel AlphaZero/MuZero分别不带和带模型学习、在围棋/国际象棋/Atari上达到最先进并在少量模拟时显著改进。mctx的README确认库内实现了Gumbel MuZero。序列减半与σ变换、completed Q、9×9围棋2次模拟的实验按原文正文和通行了解（OpenReview页面本身未能直接打开）。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Gumbel%20MuZero%EF%BC%88gumbel-muzero%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Agumbel-muzero%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/gumbel-muzero.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="rambo.html"><small>本分支上一个 · 2022.04</small><b>RAMBO对抗模型离线RL</b></a><a class="r" href="diffuser.html"><small>本分支下一个 · 2022.05</small><b>Diffuser扩散规划</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

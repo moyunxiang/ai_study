@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>Jelinek-Mercer插值平滑（1980） · AI脉络</title>
+<meta name="description" content="三元语法语言模型在语音识别中效果最好，但训练语料中绝大多数三元组只出现过一两次或从未出现，直接用相对频率估计会把大量合理的词序列概率估成0；二元、一元模型估计更稳定却丢掉了上下文。 把三元、二元、一元的频率估计线性混合： p(w|u,v) = λ₃ f(w|u,v) + λ₂ f(w|v) + λ…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/jelinek-mercer.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Jelinek-Mercer插值平滑（1980）">
+<meta property="og:description" content="三元语法语言模型在语音识别中效果最好，但训练语料中绝大多数三元组只出现过一两次或从未出现，直接用相对频率估计会把大量合理的词序列概率估成0；二元、一元模型估计更稳定却丢掉了上下文。 把三元、二元、一元的频率估计线性混合： p(w|u,v) = λ₃ f(w|u,v) + λ₂ f(w|v) + λ…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/jelinek-mercer.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/jelinek-mercer">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 语言模型</div>
+<h1>Jelinek-Mercer插值平滑</h1>
+<div class="full">Interpolated estimation of Markov source parameters from sparse data</div>
+<div class="meta"><span>1980</span><span>论文</span><span>延伸</span><span>Pattern Recognition in Practice（研讨会文集）1980</span><span>Frederick Jelinek, Robert L. Mercer · IBM T.J. Watson研究中心</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://ci.nii.ac.jp/naid/80001014717" rel="noopener">CiNii记录 ↗</a><a class="btn sm" href="../index.html#/n/jelinek-mercer">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>三元语法语言模型在语音识别中效果最好，但训练语料中绝大多数三元组只出现过一两次或从未出现，直接用相对频率估计会把大量合理的词序列概率估成0；二元、一元模型估计更稳定却丢掉了上下文。</p></div><div><h4>方法</h4><p>把三元、二元、一元的频率估计线性混合：<code>p(w|u,v) = λ₃ f(w|u,v) + λ₂ f(w|v) + λ₁ f(w)</code>，混合权重λ不手工设定，而是在留出的数据上用EM算法估计（“删除插值”），并允许按历史出现次数分组使用不同的λ。</p></div><div><h4>影响</h4><p>插值平滑成为n-gram语言模型最基本的平滑方法之一，IBM语音识别系统长期使用；它和Katz回退并列为两大平滑范式，此后的Kneser-Ney等方法常以插值形式实现，检索中的语言模型方法也直接沿用了“Jelinek-Mercer平滑”这一名称。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>IBM的统计语音识别组在1970年代把语音识别看作噪声信道问题，<a class="ln" href="../n/hmm-asr.html">HMM统计语音识别</a>负责声学部分，语言部分用三元语法。<a class="ln" href="../n/shannon-ngram.html">香农：语言的统计模型</a>早已提出用n元频率近似语言，<a class="ln" href="../n/good-turing.html">Good-Turing估计</a>给出了估计未见事件总概率的方法，但如何在不同阶的估计之间取舍还没有好的方案。</p><h2>方法</h2><p><b>插值形式</b>：对历史(u, v)和下一个词w，</p><p><code>p̂(w | u, v) = λ₃(u,v) · f(w | u, v) + λ₂(u,v) · f(w | v) + λ₁(u,v) · f(w)</code>，其中 <code>λ₁ + λ₂ + λ₃ = 1</code></p><p>f是在训练语料上的相对频率。直观上，历史(u, v)出现得越多，三元估计越可信，λ₃应越大；出现得少就更多依赖低阶估计。</p><p><b>权重估计（删除插值）</b>：λ不能在同一份训练数据上估，否则三元频率总是“最准”、λ₃会趋于1。做法是留出一部分数据（或轮流删除一部分数据做交叉估计），把插值看成一个隐变量混合模型——每个词“由哪一阶模型生成”是隐变量——用<a class="ln" href="../n/em.html">EM算法</a>迭代：E步计算每个留出词由各阶模型生成的后验，M步把后验平均作为新的λ。</p><p><b>参数分组</b>：为每个历史单独估λ太稀疏，于是按历史的出现次数把历史分到若干“桶”中，同一个桶共享一组λ。</p><h2>结果</h2><p>论文以IBM语音识别任务说明了插值估计相对单一阶估计的优势（原始文集难以获取，具体数字未核对，此处不写）。</p><h2>后来的发展</h2><p>Jelinek-Mercer插值与<a class="ln" href="../n/katz-backoff.html">Katz回退语言模型</a>回退一起构成n-gram平滑的两大基本形式；<a class="ln" href="../n/ngram-smoothing.html">n-gram平滑</a>（Chen与Goodman）的系统比较把它作为基线之一，并说明插值版的<a class="ln" href="../n/kneser-ney.html">Kneser-Ney平滑</a>效果最好。在信息检索中，<a class="ln" href="../n/query-likelihood.html">语言模型检索（查询似然）</a>与<a class="ln" href="../n/lm-smoothing-ir.html">检索语言模型的平滑</a>把文档模型与语料背景模型的线性混合直接称为Jelinek-Mercer平滑。混合权重用EM在留出数据上估计的做法也被广泛用于模型插值与集成。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>低阶分布直接用普通的相对频率，没有考虑一个词能接在多少种不同上下文后面，这会高估某些只在固定搭配中出现的词。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/kneser-ney.html">Kneser-Ney平滑</a></div></li><li>插值权重按历史计数分组估计，粒度粗，需要额外的留出数据。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/ngram-smoothing.html">n-gram平滑</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/shannon-ngram.html">香农：语言的统计模型</a><span class="yr">1948 · NLP</span><div class=nt>在n元频率模型基础上，把不同阶的估计线性混合以缓解数据稀疏。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:168" href="../n/hmm-asr.html">HMM统计语音识别</a><span class="yr">1976 · 语音</span><div class=nt>插值三元语言模型用于IBM基于HMM的统计语音识别系统。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/em.html">EM算法</a><span class="yr">1977 · 基础</span><div class=nt>把插值看成隐变量混合，用EM在留出数据上估计混合权重。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/good-turing.html">Good-Turing估计</a><span class="yr">1953.12 · NLP</span><div class=nt>Good-Turing通过折扣计数为未见事件留出概率；Jelinek-Mercer通过与低阶分布插值实现平滑。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/kneser-ney.html">Kneser-Ney平滑</a><span class="yr">1995.05 · NLP</span><div class=nt>低阶分布直接用普通的相对频率，没有考虑一个词能接在多少种不同上下文后面，这会高估某些只在固定搭配中出现的词。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/ngram-smoothing.html">n-gram平滑</a><span class="yr">1996 · NLP</span><div class=nt>插值权重按历史计数分组估计，粒度粗，需要额外的留出数据。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/n-gram.html">n-gram与平滑</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/em-algorithm.html">EM算法</a> <a class="chip c" href="../c/mle.html">最大似然估计</a> <a class="chip c" href="../c/probability-basics.html">随机变量与概率分布</a></p>
+<h2>本篇术语</h2><ul><li><b>插值</b>　把几个不同的概率估计按权重相加，权重之和为1。</li><li><b>删除插值</b>　轮流删除一部分训练数据作为留出集来估计插值权重，再把结果合并，避免在同一份数据上过拟合。</li></ul>
+<h2>怎么学</h2><p>先学n-gram的极大似然估计 → 读Jurafsky与Martin教材n-gram平滑一节的插值部分 → 动手：在一份小语料上实现三元插值模型，用EM在留出集上估计λ，比较与只用三元、只用二元模型的困惑度。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://ci.nii.ac.jp/naid/80001014717" rel="noopener">https://ci.nii.ac.jp/naid/80001014717</a>（OpenAlex：标题Interpolated estimation of Markov source parameters from sparse data、作者F. Jelinek、1980（OpenAlex仅列Jelinek一人，链接到CiNii记录）；该文收于Gelsema与Kanal编的Pattern Recognition in Practice（North-Holland，1980）。原文未能打开；插值公式、删除插值与EM估计、按计数分组共享λ、合作者Mercer均按教材（Jurafsky与Martin、Chen与Goodman 1996）的通行讲法写。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20Jelinek-Mercer%E6%8F%92%E5%80%BC%E5%B9%B3%E6%BB%91%EF%BC%88jelinek-mercer%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ajelinek-mercer%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/jelinek-mercer.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="porter-stemmer.html"><small>本分支上一个 · 1980</small><b>Porter词干提取</b></a><a class="r" href="drt.html"><small>本分支下一个 · 1981</small><b>话语表示理论DRT</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

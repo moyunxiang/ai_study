@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>K-NRM核池化神经排序（2017） · AI脉络</title>
+<meta name="description" content="神经检索模型DRMM用词向量相似度的直方图来做软匹配，但直方图分桶不可导，词向量无法根据排序目标端到端调整；而直接用通用词向量的相似度，“相关”和“相似”又不是一回事。 先算查询词与文档词两两的词向量余弦相似度矩阵（翻译矩阵），再用一组中心不同的高斯核对每一行做“软计数”，得到多个相似度层次上的匹…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/knrm.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="K-NRM核池化神经排序（2017）">
+<meta property="og:description" content="神经检索模型DRMM用词向量相似度的直方图来做软匹配，但直方图分桶不可导，词向量无法根据排序目标端到端调整；而直接用通用词向量的相似度，“相关”和“相似”又不是一回事。 先算查询词与文档词两两的词向量余弦相似度矩阵（翻译矩阵），再用一组中心不同的高斯核对每一行做“软计数”，得到多个相似度层次上的匹…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/knrm.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/knrm">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 检索与文本挖掘</div>
+<h1>K-NRM核池化神经排序</h1>
+<div class="full">End-to-End Neural Ad-hoc Ranking with Kernel Pooling</div>
+<div class="meta"><span>2017.06</span><span>论文</span><span>延伸</span><span>SIGIR 2017</span><span>Chenyan Xiong, Zhuyun Dai, Jamie Callan, Zhiyuan Liu（刘知远）, Russell Power · 卡内基梅隆大学、清华大学、Allen人工智能研究所</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1706.06613" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/knrm">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>神经检索模型DRMM用词向量相似度的直方图来做软匹配，但直方图分桶不可导，词向量无法根据排序目标端到端调整；而直接用通用词向量的相似度，“相关”和“相似”又不是一回事。</p></div><div><h4>方法</h4><p>先算查询词与文档词两两的词向量余弦相似度矩阵（翻译矩阵），再用一组中心不同的高斯核对每一行做“软计数”，得到多个相似度层次上的匹配特征，接一个排序层；高斯核处处可导，整个模型连同词向量一起用成对排序损失端到端训练。</p></div><div><h4>影响</h4><p>在商业搜索引擎（搜狗）的查询日志上显著超过此前的特征式和神经排序方法，并说明了优势来源：学到的词向量编码了专门为查询—文档匹配定制的相似度。核池化成为交互式神经排序模型的常用组件，后续Conv-KNRM等工作直接沿用。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/dssm.html">DSSM深度语义匹配</a>等“表示式”模型分别把查询和文档压成向量再比较，丢失了逐词匹配的信号；<a class="ln" href="../n/drmm.html">DRMM深度相关性匹配</a>（2016）转而先计算查询词与每个文档词的相似度，再按相似度区间统计直方图作为匹配特征，效果更好，但直方图计数不可微，只能使用固定的预训练词向量。<a class="ln" href="../n/bm25.html">BM25</a>等传统模型只做精确匹配，无法处理同义改写。</p><h2>方法</h2><p>设查询有n个词、文档有m个词，词向量经同一嵌入层得到，先构造翻译矩阵 <code>M_{ij} = cos(v_{q_i}, v_{d_j})</code>。</p><p><b>核池化</b>：取K个高斯核，第k个核中心为μ_k、宽度为σ_k，对查询词i计算</p><p class="formula"><code>K_k(M_i) = Σ_j exp( −(M_{ij} − μ_k)² / (2σ_k²) )</code></p><p>它统计文档中与查询词i相似度接近μ_k的词有多少（软计数）。μ取−0.9到1.0的多个值，其中μ=1.0、σ很小的核专门捕捉精确匹配。再对查询词求和取对数：<code>φ_k = Σ_i log K_k(M_i)</code>，得到K维软匹配特征。</p><p><b>排序层</b>：<code>f(q, d) = tanh(wᵀ φ + b)</code>。训练用成对的合页损失：<code>L = Σ max(0, 1 − f(q, d⁺) + f(q, d⁻))</code>，正负文档对来自点击日志。梯度经核函数传回翻译矩阵，再传回词向量，于是词向量被调整为“让相关文档里的词落到高相似度核中”。</p><h2>结果</h2><p>在商业搜索引擎的查询日志上，K-NRM相对此前基于特征的和神经的最好方法都有提升；分析表明，其优势来自核引导的词向量，它编码了专门为查询词与文档词匹配定制的相似度度量，并提供有效的多层次软匹配（原文摘要）。具体NDCG提升未在此引用。</p><h2>后来的发展</h2><p>K-NRM与DRMM一起代表了“交互式”神经检索模型：先建词级交互矩阵，再提取匹配信号。Conv-KNRM（2018）加入n元组卷积；BERT出现后，基于交叉编码器的重排序（monoBERT等）全面超过了这类模型，但核池化思想仍被用于在BERT表示上提取匹配信号（如CEDR）。<a class="ln" href="../n/colbert.html">ColBERT后期交互</a>的“延迟交互”也继承了逐词相似度矩阵的思路。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>词向量从查询日志中学到，依赖大量点击数据，在没有日志的场景（如学术检索）效果有限。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只看词级相似度，不建模词序与上下文，同一个词在不同语境下的含义无法区分。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:336" href="../n/colbert.html">ColBERT后期交互</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/word2vec.html">word2vec</a><span class="yr">2013.01 · NLP</span><div class=nt>翻译矩阵基于词向量的余弦相似度，词向量在训练中被继续调整。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/ranksvm.html">Ranking SVM点击学排序</a><span class="yr">2002.07 · NLP</span><div class=nt>沿用基于点击数据的成对排序训练思想，用合页损失比较正负文档。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/dssm.html">DSSM深度语义匹配</a><span class="yr">2013.10 · NLP</span><div class=nt>DSSM先把查询和文档各自压成向量；K-NRM先做逐词交互，再从相似度矩阵提取匹配信号。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/drmm.html">DRMM深度相关性匹配</a><span class="yr">2016.10 · NLP</span><div class=nt>用可导的高斯核软计数替代DRMM不可导的直方图分桶，使词向量能按排序目标端到端训练。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:336" href="../n/colbert.html">ColBERT后期交互</a><span class="yr">2020.04 · 推理·智能体</span><div class=nt>只看词级相似度，不建模词序与上下文，同一个词在不同语境下的含义无法区分。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/embedding.html">嵌入向量</a> <a class="chip c" href="../c/dot-product.html">内积与余弦相似度</a> <a class="chip c" href="../c/gaussian.html">高斯分布</a> <a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/retrieval.html">检索与向量数据库</a> <a class="chip c" href="../c/end-to-end.html">端到端学习</a></p>
+<h2>本篇术语</h2><ul><li><b>翻译矩阵</b>　查询中每个词与文档中每个词两两之间的词向量相似度组成的矩阵。</li><li><b>核池化</b>　用以某个相似度值为中心的高斯核对一行相似度求和，相当于“统计相似度接近这个值的词有多少”的可导版本。</li><li><b>软匹配</b>　不要求查询词与文档词完全相同，只要语义相近也算部分匹配。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/drmm.html">DRMM深度相关性匹配</a>理解交互式匹配 → 读本文第3节核池化 → 动手：用PyTorch实现K-NRM，在MS MARCO段落排序的小子集上训练，比较只用精确匹配核与使用全部核的效果。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1706.06613" rel="noopener">https://arxiv.org/abs/1706.06613</a>（arXiv：标题End-to-End Neural Ad-hoc Ranking with Kernel Pooling、作者Xiong、Dai、Callan、Liu、Power，v1提交于2017-06-20；摘要：K-NRM用翻译矩阵通过词向量建模词级相似度，新的核池化技术用核提取多层次软匹配特征，排序层组合这些特征，整体端到端训练，排序层从成对排序损失学习，核把特征模式转移为各相似度层次的软匹配目标，在商业搜索引擎查询日志上超过此前特征式与神经最好方法，优势来自核引导的嵌入。SIGIR 2017出处、搜狗日志、核中心取值与公式细节凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20K-NRM%E6%A0%B8%E6%B1%A0%E5%8C%96%E7%A5%9E%E7%BB%8F%E6%8E%92%E5%BA%8F%EF%BC%88knrm%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aknrm%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/knrm.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="convs2s.html"><small>本分支上一个 · 2017.05</small><b>卷积Seq2Seq</b></a><a class="r" href="six-challenges-nmt.html"><small>本分支下一个 · 2017.06</small><b>NMT的六大挑战</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>PanGu-Coder函数级代码模型（2022） · AI脉络</title>
+<meta name="description" content="Codex展示了用大规模代码预训练做“自然语言描述→代码”生成的能力，但模型和训练数据不公开；如何用更少的数据、更短的上下文训练出同样能写对函数的模型，需要一套可复现的训练策略。 沿用盘古α的解码器架构，分两阶段训练：先在原始代码上做因果语言建模，再在“自然语言函数说明—函数代码”配对上结合因果语…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/pangu-coder.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PanGu-Coder函数级代码模型（2022）">
+<meta property="og:description" content="Codex展示了用大规模代码预训练做“自然语言描述→代码”生成的能力，但模型和训练数据不公开；如何用更少的数据、更短的上下文训练出同样能写对函数的模型，需要一套可复现的训练策略。 沿用盘古α的解码器架构，分两阶段训练：先在原始代码上做因果语言建模，再在“自然语言函数说明—函数代码”配对上结合因果语…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/pangu-coder.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/pangu-coder">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 代码大模型</div>
+<h1>PanGu-Coder函数级代码模型</h1>
+<div class="full">PanGu-Coder: Program Synthesis with Function-Level Language Modeling</div>
+<div class="meta"><span>2022.07</span><span>论文</span><span>延伸</span><span>Fenia Christopoulou, Gerasimos Lampouras, Milan Gritta, Guchun Zhang, Yinpeng Guo, Zhongqi Li, Qi Zhang, Meng Xiao et al. · 华为诺亚方舟实验室</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2207.11280" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/pangu-coder">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Codex展示了用大规模代码预训练做“自然语言描述→代码”生成的能力，但模型和训练数据不公开；如何用更少的数据、更短的上下文训练出同样能写对函数的模型，需要一套可复现的训练策略。</p></div><div><h4>方法</h4><p>沿用盘古α的解码器架构，分两阶段训练：先在原始代码上做因果语言建模，再在“自然语言函数说明—函数代码”配对上结合因果语言建模与掩码语言建模，专门针对文本到代码生成；最后用竞赛题与带持续集成测试的代码微调出PanGu-Coder-FT。</p></div><div><h4>影响</h4><p>华为在代码大模型上的第一份公开技术报告，表明聚焦函数级的两阶段训练能让模型在更短上下文、更少数据下达到与同规模Codex相当或更好的函数正确率，是后续PanGu-Coder2的起点。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/codex.html">Codex</a>在GitHub代码上微调GPT-3，并用<a class="ln" href="../n/humaneval.html">HumanEval</a>按单元测试是否通过来衡量功能正确性。<a class="ln" href="../n/codegen.html">CodeGen</a>、<a class="ln" href="../n/incoder.html">InCoder代码补全</a>等开源模型随后出现，但大多直接在全部代码上做语言建模，没有专门利用代码中自然语言注释与函数实现的配对关系。<a class="ln" href="../n/pangu-alpha.html">盘古α</a>是华为的中文自回归大模型，提供了现成的架构。</p><h2>方法</h2><p><b>架构</b>：采用盘古α的仅解码器Transformer（在顶层多一个查询层），训练了数亿到数十亿参数的版本，上下文窗口比Codex短。</p><p><b>第一阶段</b>：在大量原始Python代码上做标准的因果语言建模（下一词预测），让模型熟悉代码语法与常见写法。</p><p><b>第二阶段</b>：从代码中抽取“函数定义与文档字符串（自然语言说明）—函数体”配对，数据经过较宽松的筛选。训练目标把两种损失结合起来：对函数体部分做因果语言建模（给定说明逐词生成代码），对说明部分做掩码语言建模，让模型更好地理解自然语言描述。这样训练直接对准下游的“文本→代码”任务，而不是泛泛地续写代码。</p><p><b>PanGu-Coder-FT</b>：在第二阶段模型的基础上，用编程竞赛题目（含测试用例）和从开源项目中收集的带持续集成测试的代码进一步微调，提升生成功能正确程序的能力。</p><p><b>评测</b>：以生成的程序能否通过单元测试为准，在HumanEval和MBPP上按pass@k报告。</p><h2>结果</h2><p>摘要称，PanGu-Coder在功能正确性上与同等规模的Codex等模型相当或更好，同时使用了更小的上下文窗口和更少的训练数据；具体pass@k数字见原文。</p><h2>后来的发展</h2><p>PanGu-Coder是华为代码模型系列的开端，后续的PanGu-Coder2用排序反馈继续提升；“先通用代码、再函数级配对”的两阶段训练与后来代码模型中的继续预训练、指令数据构造思路一致。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>主要面向Python单函数生成，跨文件、仓库级的代码理解和多语言支持有限。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>上下文窗口较短，虽然节省计算，但无法利用长的项目上下文；与同期更大的开源代码模型相比规模较小。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/codex.html">Codex</a><span class="yr">2021.07 · LLM</span><div class=nt>以同规模Codex为主要比较对象，在更少数据和更短上下文下取得相当或更好的结果。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/pangu-alpha.html">盘古α</a><span class="yr">2021.04 · LLM</span><div class=nt>沿用盘古α的解码器架构。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/apps.html">APPS</a><span class="yr">2021.05 · 数据·评测</span><div class=nt>竞赛类编程题用于微调PanGu-Coder-FT。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/humaneval.html">HumanEval</a><span class="yr">2021.07 · 数据·评测</span><div class=nt>用HumanEval的单元测试衡量生成程序的功能正确性。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/masked-modeling.html">掩码建模</a> <a class="chip c" href="../c/autoregressive.html">自回归生成</a> <a class="chip c" href="../c/pretrain-finetune.html">预训练与微调</a> <a class="chip c" href="../c/benchmark.html">基准、排行榜与SOTA</a></p>
+<h2>本篇术语</h2><ul><li><b>文档字符串</b>　写在函数开头、用自然语言说明函数用途和参数的注释；与函数体组成天然的“说明—代码”配对。</li><li><b>pass@k</b>　对每道题采样k个程序，只要有一个通过全部单元测试就算解出；衡量代码生成的功能正确率。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/codex.html">Codex</a>和<a class="ln" href="../n/humaneval.html">HumanEval</a>；读报告第3节两阶段训练目标；动手：从一个Python仓库抽取文档字符串—函数体配对，统计有多少函数有可用的说明。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2207.11280" rel="noopener">https://arxiv.org/abs/2207.11280</a>（标题、作者（22位，列前8位）、arXiv首次提交2022-07-22；摘要中预训练仅解码器模型、采用PanGu-Alpha架构、文本到代码生成、两阶段训练（第一阶段在原始代码上做因果语言建模，第二阶段结合因果与掩码语言建模、在宽松筛选的自然语言程序定义与代码函数配对上训练）、PanGu-Coder-FT在竞赛编程题与带持续集成测试的代码上微调、与同等规模的Codex等模型相当或更好且上下文窗口更小、训练数据更少。查询层、参数规模、Python为主、PanGu-Coder2为一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20PanGu-Coder%E5%87%BD%E6%95%B0%E7%BA%A7%E4%BB%A3%E7%A0%81%E6%A8%A1%E5%9E%8B%EF%BC%88pangu-coder%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Apangu-coder%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/pangu-coder.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="bloom.html"><small>本分支上一个 · 2022.07</small><b>BLOOM</b></a><a class="r" href="coderl.html"><small>本分支下一个 · 2022.07</small><b>CodeRL单元测试强化学习</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

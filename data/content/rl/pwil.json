@@ -1,0 +1,34 @@
+{
+  "id": "pwil",
+  "who": "Robert Dadashi, Léonard Hussenot, Matthieu Geist, Olivier Pietquin · Google Research, Brain Team",
+  "venue": "ICLR 2021",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2006.04678"}
+  ],
+  "problem": "对抗式模仿学习（GAIL、AIRL）要在与环境交互的同时训练判别器来学奖励，训练不稳定、超参数敏感；而且通常只用任务回报来评价模仿效果，并不直接衡量“像不像专家”。",
+  "idea": "直接用专家与智能体状态—动作分布之间Wasserstein距离的原始形式（最优传输）来定义奖励：每走一步，就把当前的状态—动作“运”到最近的、尚未被用完的专家样本上，运得越近奖励越高。奖励离线可算，不需要判别器。",
+  "impact": "给出了一个非对抗、几乎不需调参的模仿学习方法，在MuJoCo上用很少的示范和交互就能恢复专家行为，并主张用Wasserstein距离而不是任务回报来评估模仿质量。",
+  "background": "[[gail]]及其推广（如[[f-max]]）把模仿写成最小化某种分布散度，但都依赖对抗训练的判别器作为奖励，判别器与策略的博弈容易不稳定。[[valuedice]]把分布匹配改写成离策略的形式提高了样本效率，[[sqil]]则用“专家样本奖励为1、其他为0”的极简规则代替判别器。另一方面，Wasserstein距离有清晰的几何含义，但它的对偶形式需要训练一个Lipschitz函数，同样是一种对抗。",
+  "method": "PWIL采用Wasserstein距离的**原始形式**：把智能体轨迹中的每个状态—动作看作质量为 `1/T` 的点，把专家示范中的每个点看作质量为 `1/(T_E·D)` 的点，求把前者运到后者的最小代价。精确求解需要整条轨迹，作者用贪心的在线近似：\n\n- 每一步t，把当前 `(s_t, a_t)` 的质量依次分配给距离最近、仍有剩余质量的专家点，记这一步的传输代价 `c_t`；\n- 奖励设为 `r_t = α · exp( −β · T · c_t / √|S×A| )`，代价越小奖励越大。\n\n这样每个专家点最多被“用掉”一次，智能体不能反复停留在同一个专家状态上刷奖励，从而被迫覆盖整条专家轨迹。距离用标准化后的欧氏距离。奖励在每个回合开始时重置专家点的剩余质量，整个奖励函数不需要学习。策略用[[sac]]或D4PG等离策略算法在此奖励上训练。",
+  "results": "摘要称：作者给出了一个离线推导的奖励函数，与通过环境交互学习奖励的对抗式模仿方法不同，它几乎不需要调参；在MuJoCo的多种连续控制任务上，就智能体与环境的交互数和专家与环境的交互数（示范量）而言，PWIL都能以样本高效的方式恢复专家行为；并且训练出的智能体行为在Wasserstein距离意义下与专家匹配，而不只是用性能这一常用代理指标衡量。",
+  "legacy": "PWIL推动了基于最优传输的模仿学习（如用Sinkhorn距离、跨身体结构的最优传输对齐）以及“用分布距离而非回报评价模仿”的做法；它也常作为非对抗模仿学习的基线出现。",
+  "limits": [
+    {"text": "贪心的在线传输只是Wasserstein距离的近似，且依赖欧氏距离，在图像等高维观测上需要先学好的表示。", "solved_by": []},
+    {"text": "奖励只看状态—动作与专家样本的几何接近程度，专家示范有多种模式或时间顺序很重要时可能给出误导性奖励。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "gail", "type": "solves", "note": "GAIL需要对抗训练的判别器、不稳定；PWIL用最优传输的原始形式离线给出奖励，无需判别器。"},
+    {"to": "f-max", "type": "rivals", "note": "f-MAX在f-散度族中最小化分布差异；PWIL改用Wasserstein距离的原始形式。"},
+    {"to": "valuedice", "type": "rivals", "note": "两者都追求样本高效的分布匹配：ValueDICE改写为离策略目标，PWIL靠离线可算的奖励。"},
+    {"to": "sqil", "type": "rivals", "note": "SQIL用二值奖励代替判别器；PWIL用基于传输距离的连续奖励，并防止反复利用同一专家点。"},
+    {"to": "sac", "type": "uses", "note": "在PWIL奖励上用离策略演员—评论家训练策略。"}
+  ],
+  "prereq": ["imitation-learning", "optimal-transport", "reward-design", "distribution-shift", "actor-critic"],
+  "terms": [
+    {"t": "Wasserstein距离的原始形式", "d": "直接求把一个分布的质量搬到另一个分布上所需的最小总距离，而不是通过对偶的函数去估计。"},
+    {"t": "贪心传输", "d": "每来一个新点就立刻把它分配给最近的、还有剩余容量的目标点，不回头修改，是最优传输的廉价近似。"}
+  ],
+  "learn": "先补[[c:optimal-transport]]与[[gail]]；读原文第3节奖励构造与伪代码；在Hopper上只给1条专家轨迹，比较PWIL与GAIL的回报以及与专家的Wasserstein距离。",
+  "check": {"source": "https://arxiv.org/abs/2006.04678", "confirmed": "标题、作者（Dadashi, Hussenot, Geist, Pietquin）、arXiv v1于2020-06-08；摘要中模仿学习匹配专家行为、基于专家与智能体状态—动作分布间Wasserstein距离原始形式的PWIL、离线推导的奖励（区别于在交互中学奖励的对抗式方法）且几乎无需调参、在MuJoCo多种连续控制任务上就智能体与专家交互量而言样本高效地恢复专家行为、行为在Wasserstein距离意义下与专家匹配。贪心传输与奖励公式、SAC/D4PG、ICLR 2021与机构按原文正文和通行引用。"},
+  "aka": ["PWIL", "Primal Wasserstein Imitation Learning", "原始Wasserstein模仿学习", "最优传输模仿学习", "非对抗模仿学习"]
+}

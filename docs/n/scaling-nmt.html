@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>大批量半精度翻译训练（2018） · AI脉络</title>
+<meta name="description" content="Transformer等序列到序列模型在单机上要训练好几天才能在WMT大数据集上达到最好成绩，研究迭代很慢；而当时的大批量训练和低精度训练在翻译上还缺少细致的工程配方。 把半精度浮点（FP16）训练、超大批量（通过梯度累积和多机同步）、调大学习率配合预热，以及训练流程上的若干实现细节结合起来，在不…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/scaling-nmt.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="大批量半精度翻译训练（2018）">
+<meta property="og:description" content="Transformer等序列到序列模型在单机上要训练好几天才能在WMT大数据集上达到最好成绩，研究迭代很慢；而当时的大批量训练和低精度训练在翻译上还缺少细致的工程配方。 把半精度浮点（FP16）训练、超大批量（通过梯度累积和多机同步）、调大学习率配合预热，以及训练流程上的若干实现细节结合起来，在不…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/scaling-nmt.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/scaling-nmt">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 神经机器翻译与生成</div>
+<h1>大批量半精度翻译训练</h1>
+<div class="full">Scaling Neural Machine Translation</div>
+<div class="meta"><span>2018.06</span><span>论文</span><span>延伸</span><span>WMT 2018</span><span>Myle Ott, Sergey Edunov, David Grangier, Michael Auli · Facebook AI Research</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/1806.00187" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/scaling-nmt">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>Transformer等序列到序列模型在单机上要训练好几天才能在WMT大数据集上达到最好成绩，研究迭代很慢；而当时的大批量训练和低精度训练在翻译上还缺少细致的工程配方。</p></div><div><h4>方法</h4><p>把半精度浮点（FP16）训练、超大批量（通过梯度累积和多机同步）、调大学习率配合预热，以及训练流程上的若干实现细节结合起来，在不损失精度的前提下把训练提速近5倍。</p></div><div><h4>影响</h4><p>在WMT&#x27;14英德上8块GPU不到5小时追平原版Transformer，128块GPU上85分钟达到29.3 BLEU的新纪录；这套配方随fairseq开源，成为此后几年训练Transformer翻译模型的标准做法。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/transformer.html">Transformer</a>（2017）在WMT&#x27;14英德上取得当时最好成绩，但big模型在8块P100上要训练3.5天。<a class="ln" href="../n/mixed-precision.html">混合精度训练</a>（2017）已说明半精度训练配合损失缩放可以保持精度，视觉领域也证明大批量配合线性放大学习率可以缩短训练；但在翻译这类变长序列任务上，这些技巧怎么组合、批量能放多大、会不会伤精度，还没有系统答案。</p><h2>方法</h2><p>主要做法：</p><ul><li><b>半精度训练</b>：前向和反向用FP16计算，主权重保留FP32副本，并做动态损失缩放防止梯度下溢；在Volta GPU的张量核心上大幅加速。</li><li><b>大批量</b>：每次更新用到的词元数从约2.5万增大到数十万（如约40万词元），在单机上通过“累积多个小批量的梯度再更新一次”实现，在多机上则让梯度同步与反向计算重叠，降低通信开销。</li><li><b>学习率</b>：批量增大后相应调大学习率（配合预热），作者发现大批量下可以用比原文大得多的学习率。</li><li><b>其他细节</b>：按长度把句子分桶减少填充，以及数据和实现上的若干调整。</li></ul><p>这些改动不改变模型结构，只改变训练方式。</p><h2>结果</h2><p>在单台8-GPU机器上，精心调参后的半精度与大批量训练可提速近5倍；WMT&#x27;14英德上8块GPU不到5小时即达到Vaswani等人的精度，128块GPU上训练85分钟得到29.3 BLEU的新纪录，加入规模大得多的Paracrawl语料后提高到29.8；WMT&#x27;14英法上128块GPU训练8.5小时达到43.2 BLEU。</p><h2>后来的发展</h2><p>这套配方被纳入<a class="ln" href="../n/fairseq.html">fairseq序列建模库</a>，同一团队随后在<a class="ln" href="../n/back-translation-scale.html">大规模回译</a>中用它在海量回译数据上训练，又在WMT评测中取得领先；“大批量、高学习率、半精度”也成为后来训练大型Transformer语言模型的常规设置。它也让研究者意识到，许多论文之间的差距部分来自训练配方而非模型结构。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>加速依赖大量GPU和新一代张量核心硬件，资源有限的团队难以复现最快的结果。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>只优化训练速度和规模，没有改变模型结构，长句、低资源语言和篇章级翻译的问题仍在。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/back-translation-scale.html">大规模回译</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/transformer.html">Transformer</a><span class="yr">2017.06 · LLM</span><div class=nt>不改动Transformer结构，只用新的训练配方把它的训练时间从数天缩短到数小时。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/convs2s.html">卷积Seq2Seq</a><span class="yr">2017.05 · NLP</span><div class=nt>同一团队此前的卷积序列到序列模型也在fairseq中训练，本文把加速经验推广到Transformer。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:192" href="../n/mixed-precision.html">混合精度训练</a><span class="yr">2017.10 · 系统·效率</span><div class=nt>采用半精度计算、FP32主权重和损失缩放的混合精度训练。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/back-translation-scale.html">大规模回译</a><span class="yr">2018.08 · NLP</span><div class=nt>只优化训练速度和规模，没有改变模型结构，长句、低资源语言和篇章级翻译的问题仍在。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/floating-point.html">浮点精度：FP32、FP16、BF16、INT8</a> <a class="chip c" href="../c/batch-size-epoch.html">批大小、步数与轮数</a> <a class="chip c" href="../c/learning-rate.html">学习率与学习率调度</a> <a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/transformer-block.html">Transformer层的结构</a> <a class="chip c" href="../c/text-metrics.html">文本生成的自动指标</a></p>
+<h2>本篇术语</h2><ul><li><b>梯度累积</b>　先算好几个小批量的梯度并相加，再做一次参数更新，相当于用更大的批量训练。</li><li><b>损失缩放</b>　半精度训练时先把损失乘一个大数再反传，避免很小的梯度变成0，更新前再除回来。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/transformer.html">Transformer</a>与<a class="ln" href="../n/mixed-precision.html">混合精度训练</a> → 读本文第3–4节各项加速的消融 → 动手：用fairseq在IWSLT德英上分别跑FP32和FP16、不同梯度累积步数，记录每小时达到的BLEU。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/1806.00187" rel="noopener">https://arxiv.org/abs/1806.00187</a>（arXiv：标题、作者Ott、Edunov、Grangier、Auli，v1提交于2018-06-01；摘要：降低精度与大批量训练在单台8-GPU机器上提速近5倍，WMT&#x27;14英德8块GPU不到5小时追平Vaswani等，128块GPU上85分钟得29.3 BLEU，加Paracrawl后29.8，WMT&#x27;14英法128块GPU 8.5小时43.2 BLEU。约40万词元批量、学习率设置、通信与计算重叠、WMT 2018出处与Transformer原文训练3.5天凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%A4%A7%E6%89%B9%E9%87%8F%E5%8D%8A%E7%B2%BE%E5%BA%A6%E7%BF%BB%E8%AF%91%E8%AE%AD%E7%BB%83%EF%BC%88scaling-nmt%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ascaling-nmt%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/scaling-nmt.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="span-srl.html"><small>本分支上一个 · 2018.05</small><b>跨度式端到端SRL</b></a><a class="r" href="vecmap.html"><small>本分支下一个 · 2018.07</small><b>VecMap无监督跨语言映射</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "id": "compound-pcfg",
+  "who": "Yoon Kim, Chris Dyer, Alexander M. Rush · 哈佛大学、DeepMind",
+  "venue": "ACL 2019",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/1906.10225"},
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/P19-1228/"}
+  ],
+  "aka": ["Compound PCFG", "复合PCFG", "复合概率上下文无关文法", "神经PCFG", "Neural PCFG", "无监督成分句法归纳", "Grammar Induction", "Kim et al. 2019"],
+  "problem": "从没有句法标注的原始句子里自动学出短语结构（文法归纳）几十年来效果很差：直接用EM训练PCFG会陷入差的局部最优，还受“上下文无关”这一强独立性假设的限制。",
+  "idea": "先用神经网络参数化PCFG的规则概率（规则与符号都用嵌入表示，共享参数），再为每个句子引入一个连续隐变量z，让这句话的规则概率随z变化——即“复合”PCFG；用摊销变分推断估计z，用动态规划精确地对隐含的句法树求和。",
+  "impact": "在英文Penn Treebank和中文树库的无监督成分句法分析上明显超过此前的PRPN、ON-LSTM等方法，使“神经参数化的经典文法”成为无监督句法归纳的主流路线，后续大量工作沿此扩展。",
+  "background": "[[pcfg]]用规则概率生成句子，用[[em]]（内向—外向算法）可以从原始文本中估计，但Carroll与Charniak等早期实验发现这样学到的文法与语言学结构相去甚远；[[dmv]]在依存结构上取得进展，成分结构上则一直困难。2018–2019年出现了[[on-lstm]]、PRPN、[[rnng]]的无监督变体等神经方法，通过语言模型间接诱导树结构。Kim等人发现，只要用神经网络参数化PCFG（规则概率由符号嵌入经MLP计算，而不是每条规则一个独立参数），直接最大化似然就已经比传统PCFG好得多。",
+  "method": "**神经PCFG**：对非终结符A、B、C，规则概率 `π_{A→BC} ∝ exp(u_{BC}ᵀ f(w_A))`，终结符发射概率同理，`w_A` 是符号嵌入，f是多层感知机。参数共享让数据稀疏的规则也能得到合理概率。\n\n**复合PCFG**：为每句话采样 `z ~ N(0, I)`，规则概率改为 `π_{z, A→BC} ∝ exp(u_{BC}ᵀ f([w_A; z]))`，于是不同句子对应略有不同的文法。边缘化z后，句子之间、句内成分之间就有了超越上下文无关假设的依赖（例如同一话题的词倾向于一起出现）。\n\n**推断**：用一个推断网络 `q(z | x)`（读整句的BiLSTM）近似后验，最大化证据下界\n\n`ELBO = E_{q(z|x)}[ log p_θ(x | z) ] − KL(q(z|x) ‖ p(z))`\n\n其中 `log p_θ(x | z)` 用内向算法对所有句法树精确求和得到，可以直接求梯度；这种“对树精确边缘化、对z做摊销变分”的组合即论文所说的collapsed variational inference。分析时，取给定 `z = E[q(z|x)]` 下的Viterbi最优树。",
+  "results": "在英文和中文的无监督成分句法分析评测上，复合PCFG优于近期的最好方法（原文摘要）；作为对照，不加z的神经PCFG也已显著超过传统的、每条规则独立参数的PCFG（具体F1未在此引用）。",
+  "legacy": "复合PCFG之后，无监督句法归纳出现了大批“神经参数化的经典模型”：词汇化的神经PCFG、张量分解后可使用上千个符号的大规模PCFG、视觉信号辅助的文法归纳等；它也被用作检验语言模型是否隐含句法的工具。与[[structural-probe]]从预训练模型里“读出”句法不同，它从零开始用生成模型“学出”句法。",
+  "limits": [
+    {"text": "内向算法的复杂度是句长的三次方、符号数的三次方，只能用几十个非终结符，难以扩展到细粒度文法。", "solved_by": []},
+    {"text": "学到的结构在右分支等方面仍与人工树库有系统差异，评测依赖与树库对比的F1，对“好结构”的定义有争议。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "pcfg", "type": "extends", "note": "保留PCFG的生成结构与动态规划，只把规则概率改为神经参数化，并加入句子级隐变量。"},
+    {"to": "on-lstm", "type": "solves", "note": "ON-LSTM通过语言模型间接诱导树，结构没有显式概率模型；复合PCFG直接以文法为生成模型，在无监督句法分析上效果更好。"},
+    {"to": "dmv", "type": "extends", "note": "DMV用EM学无监督依存结构；本文在成分结构上沿用“直接优化文法似然”的路线，并用神经参数化克服局部最优。"},
+    {"to": "rnng", "type": "rivals", "note": "RNNG是有监督的神经生成式文法，其无监督变体同期出现；复合PCFG保持上下文无关结构以便精确动态规划。"}
+  ],
+  "prereq": ["context-free-grammar", "latent-variable", "elbo", "reparameterization", "dynamic-programming", "em-algorithm"],
+  "terms": [
+    {"t": "文法归纳", "d": "只看没有标注的句子，自动学出一套能描述其句法结构的文法。"},
+    {"t": "复合概率模型", "d": "模型参数本身由一个随机变量控制，每个样本先抽取这个变量，再按对应参数生成。"},
+    {"t": "内向算法", "d": "在CKY图表上自底向上累加所有子树概率，得到一句话在PCFG下的总概率。"}
+  ],
+  "learn": "先学[[pcfg]]与内向算法、VAE的证据下界 → 读本文第2–3节神经PCFG与复合PCFG → 动手：运行作者开源代码，在PTB的短句子集上训练，比较神经PCFG与复合PCFG归纳出的树和金标准树的F1。",
+  "check": {"source": "https://arxiv.org/abs/1906.10225", "confirmed": "arXiv：标题Compound Probabilistic Context-Free Grammars for Grammar Induction、作者Kim、Dyer、Rush，v1提交于2019-06-24；摘要：用复合PCFG形式化文法归纳，规则概率受每句一个连续隐变量调制，从而引入超越上下文无关假设的边缘依赖，用折叠变分推断（对连续变量做摊销变分后验、用动态规划边缘化隐树）推断，在英文和中文的无监督句法分析上优于近期最好方法。ACL 2019出处已在ACL Anthology核对；规则概率的参数化公式与神经PCFG对照的结论凭一般了解。"}
+}

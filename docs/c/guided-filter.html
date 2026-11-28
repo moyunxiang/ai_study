@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>引导滤波与保边平滑（Guided Filter and Edge-Preserving Smoothing） · AI脉络</title>
+<meta name="description" content="保边平滑滤波器：借助一张引导图，假设输出在每个小窗口内是引导图的线性函数，平滑时就跟着引导图的边缘走。速度与窗口大小无关，常用于去雾、抠图边缘细化和细节增强。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/guided-filter.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="引导滤波与保边平滑（Guided Filter and Edge-Preserving Smoothing）">
+<meta property="og:description" content="保边平滑滤波器：借助一张引导图，假设输出在每个小窗口内是引导图的线性函数，平滑时就跟着引导图的边缘走。速度与窗口大小无关，常用于去雾、抠图边缘细化和细节增强。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/guided-filter.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/guided-filter">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 视觉 · 进阶</div>
+<h1>引导滤波与保边平滑</h1><div class="full">Guided Filter and Edge-Preserving Smoothing</div>
+<p class="muted" style="font-size:13px">也叫：引导滤波　导向滤波　guided filter　guided image filtering　保边滤波　保边平滑　edge-preserving filter　edge-preserving smoothing　双边滤波　bilateral filter　盒式滤波　box filter　fast guided filter　可导引导滤波　透射率细化</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/guided-filter">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>保边平滑滤波器：借助一张引导图，假设输出在每个小窗口内是引导图的线性函数，平滑时就跟着引导图的边缘走。速度与窗口大小无关，常用于去雾、抠图边缘细化和细节增强。</b></p>
+<p class="tags">先要会：<a class="chip c" href="linear-regression.html">线性回归</a> <a class="chip c" href="convolution-op.html">卷积运算</a></p>
+<p>普通的高斯模糊会把边缘一起抹掉。<b>保边滤波</b>希望在平坦区域平滑、在边缘处保持锐利。双边滤波按空间距离和颜色差共同加权，是早期的代表，但计算慢，还会在边缘附近产生梯度反转伪影。何恺明等人2010年提出的<b>引导滤波</b>给出了一个又快又稳的方案。</p><p><b>模型</b>。输入图像p（要滤波的），引导图I（可以就是p本身，也可以是另一张图，比如原彩色图）。假设在以像素k为中心的每个小窗口ω_k里，输出q是引导图的线性变换：</p><p class="formula"><code>q_i = a_k · I_i + b_k，i ∈ ω_k</code></p><p>因为<code>∇q = a·∇I</code>，引导图有边缘的地方输出也有边缘，平坦的地方输出也平坦。系数通过让q尽量接近p、并对a加一点<a class="lc" href="../c/regularization.html">正则化与权重衰减</a>来求，是一个窗口内的<a class="lc" href="../c/linear-regression.html">线性回归</a>（岭回归）：</p><p class="formula"><code>a_k = cov_k(I, p) / (var_k(I) + ε)，b_k = mean_k(p) − a_k·mean_k(I)</code></p><p>每个像素属于多个窗口，最后把这些窗口给出的a、b取平均再计算q。</p><p><b>ε的作用</b>。窗口内引导图方差远大于ε（有边缘），a ≈ 1，输出跟随引导图，边缘保留；方差远小于ε（平坦区域），a ≈ 0，输出约等于窗口均值，即被平滑。ε就是“多大的起伏算边缘”的阈值。</p><p><b>为什么快</b>。所有量（均值、方差、协方差）都可以用盒式滤波计算，借助积分图，每个像素的代价是O(1)，与窗口半径无关，百万像素的图像在CPU上也能很快处理。</p><p><b>它出现在哪里</b>。</p><ul><li><b>去雾</b>：<a class="ln" href="../n/dark-channel.html">暗通道先验去雾</a>暗通道先验去雾先得到粗糙的透射率图，原方法用耗时的软抠图来细化；引导滤波以原图为引导，快速把透射率图的边缘对齐到物体边缘，大幅提速。</li><li><b>抠图与分割细化</b>：用原图引导，把粗糙的掩码或深度图边缘修整得贴合物体轮廓；深度学习中也有把可导的引导滤波层接在网络末端、对低分辨率输出做上采样细化的做法（见<a class="lc" href="../c/upsampling.html">上采样与转置卷积</a>）。</li><li><b>细节增强与HDR色调映射</b>：把图像分解为平滑的“基础层”和“细节层”，放大细节层再合成。</li><li>也用于低光增强中估计平滑的光照图（见<a class="lc" href="../c/retinex.html">Retinex理论与低光照增强</a>）。</li></ul>
+<div class="example"><h4>例子</h4><p>引导图I就是待滤波图p，窗口半径r = 2，ε = 0.01（像素值在0到1之间）。</p><ul><li>平坦但有噪声的区域：窗口内方差约0.001，远小于ε，a ≈ 0.001/0.011 ≈ 0.09，输出几乎就是窗口均值，噪声被抹平。</li><li>跨越明暗边界的窗口：方差约0.2，a ≈ 0.2/0.21 ≈ 0.95，输出几乎等于原值，边缘保留。</li></ul></div>
+<h2>容易误解的地方</h2><ul><li>引导图里有而输入里没有的结构（例如引导图的纹理）可能被“转移”到输出上，选择引导图时要注意。</li><li>ε太大时，较弱的真实边缘也会被平滑掉；在非常细的结构附近仍可能出现轻微光晕。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

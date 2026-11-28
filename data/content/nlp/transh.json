@@ -1,0 +1,34 @@
+{
+  "id": "transh",
+  "who": "Zhen Wang, Jianwen Zhang, Jianlin Feng, Zheng Chen · 中山大学、微软亚洲研究院",
+  "venue": "AAAI 2014",
+  "links": [
+    {"label": "DOI", "url": "https://doi.org/10.1609/aaai.v28i1.8870"}
+  ],
+  "aka": ["TransH", "超平面平移嵌入", "Translating on Hyperplanes", "Wang et al. 2014", "一对多关系建模", "bern负采样", "伯努利负采样"],
+  "problem": "TransE把关系看作头实体向量到尾实体向量的平移 h + r ≈ t，简单高效，但处理不了一对多、多对一、多对多和自反关系：如果“导演—执导—电影”中一个导演有多部电影，TransE会把这些电影的向量挤成同一个点。",
+  "idea": "让每个关系拥有一个超平面：先把头尾实体投影到该关系的超平面上，再在超平面内做平移。同一个实体在不同关系下的投影不同，于是多部电影只需在“执导”超平面上的投影重合，本身仍可不同。",
+  "impact": "以几乎与TransE相同的参数量和计算代价，在WordNet和Freebase上的链接预测、三元组分类和事实抽取任务中显著优于TransE；它与同期的TransR、TransD等组成了“Trans系列”平移式知识图谱嵌入，其伯努利负采样技巧也被广泛沿用。",
+  "background": "[[transe]]（2013）用 `‖h + r − t‖` 衡量三元组 (h, r, t) 是否成立，参数少、易扩展，是知识图谱补全的强基线。但当 (h, r, t₁) 和 (h, r, t₂) 同时成立时，最优解要求 t₁ ≈ t₂；自反关系则要求 r ≈ 0。更复杂的模型（如[[rescal]]的双线性矩阵、神经张量网络）能表达这些映射属性，但参数多、效率低。",
+  "method": "每个关系r有两个向量：超平面的法向量 `w_r`（单位长度）和超平面上的平移向量 `d_r`。实体投影为\n\n`h⊥ = h − w_rᵀh · w_r`，`t⊥ = t − w_rᵀt · w_r`\n\n打分函数为 `f_r(h, t) = ‖h⊥ + d_r − t⊥‖²₂`，越小越可能成立。训练用基于间隔的排序损失：`L = Σ max(0, f_r(h,t) + γ − f_r(h′,t′))`，(h′, r, t′) 是负例，并约束实体向量范数不超过1、`d_r` 位于超平面内。\n\n**负采样技巧**：随机替换头或尾实体造负例时，可能恰好造出一个真实但未被收录的三元组（假负例）。对一对多关系，替换头实体更不容易造出假负例。作者统计每个关系平均每个头对应多少尾（tph）和每个尾对应多少头（hpt），以概率 `tph/(tph+hpt)` 替换头实体、否则替换尾实体，称为“bern”采样。",
+  "results": "在WordNet与Freebase的标准数据上，TransH在链接预测、三元组分类和事实抽取三项任务中相对TransE有显著提升，同时保持了相近的可扩展性；bern负采样对TransE和TransH都有帮助（原文摘要）。",
+  "legacy": "TransH之后，[[transr]]（2015）把实体投影到关系专属的空间，TransD、TranSparse等进一步细化投影方式；双线性的[[distmult]]、[[complex]]和旋转式的[[rotate]]则从另一角度解决复杂关系建模。bern负采样成为平移式嵌入的标准训练配置。",
+  "limits": [
+    {"text": "实体与关系仍处在同一个向量空间，投影只是去掉一个方向，表达不同关系关注实体不同属性的能力有限。", "solved_by": ["transr"]},
+    {"text": "平移式打分难以建模对称、反对称、逆与组合等关系模式。", "solved_by": ["complex", "rotate"]}
+  ],
+  "relations": [
+    {"to": "transe", "type": "solves", "note": "通过关系专属超平面上的投影，解决TransE无法处理一对多、多对一、多对多与自反关系的问题。"},
+    {"to": "rescal", "type": "rivals", "note": "RESCAL用关系矩阵能表达复杂映射但参数多；TransH以接近TransE的参数量取得折中。"},
+    {"to": "freebase", "type": "uses", "note": "在Freebase子集上做链接预测与事实抽取实验。"},
+    {"to": "wordnet", "type": "uses", "note": "在WordNet数据上做链接预测与三元组分类。"}
+  ],
+  "prereq": ["embedding", "vector-matrix", "norm", "loss-function", "sgd-minibatch"],
+  "terms": [
+    {"t": "链接预测", "d": "给定三元组中的两项（如头实体和关系），预测缺失的另一项。"},
+    {"t": "一对多关系", "d": "一个头实体对应多个尾实体的关系，如一位导演执导多部电影。"},
+    {"t": "假负例", "d": "随机替换得到、被当作错误的三元组，其实在现实中成立，只是知识图谱里没收录。"}
+  ],
+  "learn": "先读[[transe]] → 读本文第3节投影与负采样 → 动手：用PyKEEN在FB15k-237上分别训练TransE和TransH，比较两者在一对多关系上的Hits@10。",
+  "check": {"source": "https://doi.org/10.1609/aaai.v28i1.8870", "confirmed": "Crossref与OpenAlex：标题Knowledge Graph Embedding by Translating on Hyperplanes、作者Wang、Zhang、Feng、Chen、AAAI 2014；摘要：TransE高效但处理不好自反、一对多、多对一、多对多映射属性，复杂模型能保留这些属性却牺牲效率，提出把关系建模为超平面加其上的平移的TransH，模型复杂度几乎与TransE相同，利用一对多/多对一属性提出减少假负例的简单技巧，在WordNet与Freebase上的链接预测、三元组分类与事实抽取中显著优于TransE且可扩展性相当。会议于2014年7月举行（日期取2014-07）；投影与损失公式、tph/hpt采样概率凭一般了解。"}
+}

@@ -1,0 +1,22 @@
+{
+  "id": "mingru",
+  "who": "Leo Feng, Frederick Tung, Mohamed Osama Ahmed, Yoshua Bengio, Hossein Hajimirsadeghi · Mila、Borealis AI",
+  "links": [{"label": "arXiv", "url": "https://arxiv.org/abs/2410.01201"}],
+  "aka": ["minGRU", "minLSTM", "Were RNNs All We Needed", "最小GRU", "最小LSTM", "可并行RNN"],
+  "problem": "Transformer在序列长度上的扩展性受限，人们转向可并行训练的新型循环模型（Mamba等）；但这些模型结构越来越复杂，经典的LSTM和GRU是否只差一点就能达到同样效果？",
+  "idea": "把LSTM和GRU简化：让门只依赖当前输入、不依赖上一步隐状态，并去掉输出范围约束，得到minLSTM与minGRU；它们参数更少，并能用并行前缀扫描训练。",
+  "impact": "以极简的形式说明“可并行的线性门控循环”就是近年许多新序列模型的共同核心，引发了关于新架构到底新在哪里的讨论。",
+  "method": "GRU的更新门 `z_t = σ(W_z[x_t, h_{t−1}])` 和候选状态都依赖上一步隐状态h_{t−1}，所以只能逐步计算。minGRU去掉这种依赖：\n\n`z_t = σ(Linear(x_t))`，`h̃_t = Linear(x_t)`，`h_t = (1 − z_t) ⊙ h_{t−1} + z_t ⊙ h̃_t`\n\n此时h_t是h_{t−1}的线性函数，系数只由输入决定，因此整个序列的隐状态可以用并行前缀扫描（与[[mamba]]、[[s5]]训练时相同的算法）在O(log T)的并行步数内算出。minLSTM同理，去掉遗忘门、输入门对h_{t−1}的依赖，并把两者归一化使其和为1，去掉tanh等输出约束。\n\n摘要称：这两个最小版本比原版参数更少、训练时完全可并行，并在一系列任务上取得出人意料的有竞争力表现，可与包括Transformer在内的近期模型相比。",
+  "limits": [
+    {"text": "门不再依赖隐状态，表达力弱于原版LSTM/GRU；实验规模较小，尚未在大规模语言建模上与主流模型充分比较。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "lstm", "type": "extends", "note": "简化LSTM得到minLSTM。"},
+    {"to": "cho-encdec", "type": "extends", "note": "简化GRU得到minGRU。"},
+    {"to": "mamba", "type": "rivals", "note": "说明Mamba等选择性状态空间模型的核心——输入相关的线性门控递推——用极简RNN也能得到。"},
+    {"to": "qrnn", "type": "extends", "note": "与QRNN一样让门只依赖输入以获得并行性，并进一步用前缀扫描在时间维上并行。"}
+  ],
+  "prereq": ["recurrent-layer", "gating", "state-space-model"],
+  "learn": "先懂GRU的门控公式和并行前缀扫描；读论文第3节两个最小版本的推导；动手用PyTorch实现minGRU的并行扫描版本，与逐步计算的结果对照。",
+  "check": {"source": "https://arxiv.org/abs/2410.01201", "confirmed": "标题、5位作者、arXiv v1 2024-10-02；摘要中Transformer的序列长度扩展性限制、回顾LSTM与GRU、简化得到minLSTM与minGRU、参数更少、训练完全可并行、在多项任务上可与Transformer等近期模型竞争。简化公式、前缀扫描、机构凭一般了解；发表处未核对。"}
+}

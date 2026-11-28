@@ -1,0 +1,34 @@
+{
+  "id": "gensim-topic",
+  "who": "Radim Řehůřek, Petr Sojka · 马萨里克大学",
+  "venue": "LREC 2010 NLP框架研讨会",
+  "links": [
+    {"label": "HAL", "url": "https://hal.science/hal-05382247"},
+    {"label": "项目主页", "url": "https://radimrehurek.com/gensim/"}
+  ],
+  "aka": ["gensim", "Gensim", "Software Framework for Topic Modelling with Large Corpora", "Řehůřek & Sojka 2010", "流式主题建模", "Python主题模型库", "gensim word2vec"],
+  "problem": "LSA、LDA等主题模型的常见实现都要求把整个文档—词矩阵读进内存，语料一大就装不下；而且接口各异、难以组合，实际应用者很难把它们用在大语料上。",
+  "idea": "围绕“文档流”设计一个Python框架：语料是一个可以逐篇迭代的对象，每种变换（TF-IDF、LSA、LDA、随机投影）都以流的方式读取文档、增量更新，内存占用与语料规模无关；接口统一，变换可以像管道一样串接。",
+  "impact": "gensim成为最流行的开源主题建模与文本相似度库之一，后来又加入了word2vec、doc2vec、fastText等词向量的高效实现，长期是Python生态中训练静态词向量和LDA的默认工具；论文本身被引数千次（OpenAlex约4500次）。",
+  "background": "[[lsa]]需要对大型稀疏矩阵做奇异值分解，[[lda]]的变分推断或Gibbs采样需要多次遍历语料。2010年前后常用的实现（如MATLAB工具箱、某些C++程序）大多是“批量、内存内”的，处理捷克数字数学图书馆（DML-CZ）这类实际项目的全部文献时就遇到了内存瓶颈。[[vector-space-model]]的思想虽然简单，但工程上缺少能处理大语料、易于扩展的通用框架。",
+  "method": "gensim的核心抽象：\n\n- **语料（corpus）**：任何可迭代、每次产生一篇文档的稀疏向量（词id与权重对的列表）的对象。语料可以来自磁盘文件、数据库或网络流，不必一次装入内存。\n- **变换（transformation）**：在一个语料上训练后，可以把任意文档从一种向量空间映射到另一种，例如词袋→[[tf-idf]]→LSA主题空间。变换本身也以流的方式处理输入，可以串接：`lsi[tfidf[bow]]`。\n- **相似度查询**：在变换后的空间里对整个语料建索引，计算某篇文档与所有文档的余弦相似度。\n\n算法上，论文实现了增量式、可分布式的LSA（基于随机化与分块的SVD，可以单遍处理语料）和LDA（基于在线/流式的变分推断），使它们“完全独立于训练语料的大小”。整个框架用Python和NumPy/SciPy编写，强调简单直观的接口，便于使用者修改和扩展。",
+  "results": "论文以DML-CZ数字图书馆中计算文档相似度的实际场景演示了框架的可用性：在有限内存下对全部文献训练主题模型并给出相似文章推荐（论文摘要所述；具体规模与耗时未在此引用）。",
+  "legacy": "gensim随后实现了[[online-lda]]（Hoffman等，2010）的在线LDA、[[word2vec]]（2013）的优化版本、[[doc2vec]]、[[fasttext]]与[[dtm]]动态主题模型，成为研究和工业中训练这些模型最方便的工具之一，也常被用于加载与评测预训练词向量。神经网络与预训练模型时代，Hugging Face等库成为主流，但在主题建模与静态词向量上gensim仍被广泛使用。",
+  "limits": [
+    {"text": "以Python实现、主要面向CPU，处理极大规模语料时速度不如专门的分布式系统。", "solved_by": []},
+    {"text": "提供的是词袋与浅层模型，不涉及上下文化的神经表示。", "solved_by": ["bert"]}
+  ],
+  "relations": [
+    {"to": "lsa", "type": "uses", "note": "实现了增量式、单遍的LSA，用于大语料上的主题空间与相似度计算。"},
+    {"to": "lda", "type": "uses", "note": "实现了流式变分推断的LDA，使其内存占用与语料规模无关。"},
+    {"to": "vector-space-model", "type": "extends", "note": "把向量空间模型中的各种表示与相似度计算做成可串接的流式变换。"},
+    {"to": "tf-idf", "type": "uses", "note": "TF-IDF是框架中最基本的一种变换。"}
+  ],
+  "prereq": ["vector-matrix", "eigen-svd", "embedding", "dot-product"],
+  "terms": [
+    {"t": "文档流", "d": "一次只读入并处理一篇文档，处理完就丢弃，因此内存不随语料大小增长。"},
+    {"t": "变换（transformation）", "d": "gensim中把文档从一种向量表示映射到另一种的对象，如TF-IDF、LSI、LDA模型。"}
+  ],
+  "learn": "先了解[[lsa]]与[[lda]] → 读论文第2–3节框架设计 → 动手：用gensim把一份维基百科子集做成流式语料，依次训练TF-IDF与LSI，再查询与某篇文章最相似的十篇。",
+  "check": {"source": "https://hal.science/hal-05382247", "confirmed": "OpenAlex/HAL：标题Software Framework for Topic Modelling with Large Corpora、作者Řehůřek与Sojka、2010、被引约4568次；摘要：大语料下内存成为向量空间模型应用的瓶颈，现有实现缺乏可扩展性与易用性，提出基于文档流的NLP框架，逐篇处理、内存无关，实现了LSA与LDA等主题推断算法并使其完全独立于训练语料大小，强调直观的框架设计，用DML-CZ数字图书馆的文档相似度场景演示。Wikipedia：gensim为开源无监督主题建模与文本相似度库。LREC 2010研讨会（2010年5月）出处、接口示例与后续实现的模型清单凭一般了解。"}
+}

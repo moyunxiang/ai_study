@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>HIQL离线分层目标RL（2023） · AI脉络</title>
+<meta name="description" content="从无奖励的离线数据里学“到达任意目标”的策略时，远处目标的价值函数估计噪声很大：离目标很远时，一步动作带来的价值差异微乎其微，被估计误差淹没，策略不知道该往哪走。 只学一个与动作无关的目标条件价值函数 V(s,g) ，却从中抽取两层策略：高层策略把“状态”当动作，预测一个约k步之后的子目标（的隐表…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/hiql.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="HIQL离线分层目标RL（2023）">
+<meta property="og:description" content="从无奖励的离线数据里学“到达任意目标”的策略时，远处目标的价值函数估计噪声很大：离目标很远时，一步动作带来的价值差异微乎其微，被估计误差淹没，策略不知道该往哪走。 只学一个与动作无关的目标条件价值函数 V(s,g) ，却从中抽取两层策略：高层策略把“状态”当动作，预测一个约k步之后的子目标（的隐表…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/hiql.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/hiql">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:120"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">决策与真实世界 › <a href="../t/rl.html">强化学习与博弈</a> › 分层、表示与元学习</div>
+<h1>HIQL离线分层目标RL</h1>
+<div class="full">HIQL: Offline Goal-Conditioned RL with Latent States as Actions</div>
+<div class="meta"><span>2023.07</span><span>论文</span><span>延伸</span><span>NeurIPS 2023</span><span>Seohong Park, Dibya Ghosh, Benjamin Eysenbach, Sergey Levine · UC Berkeley, Princeton University</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2307.11949" rel="noopener">arXiv ↗</a><a class="btn sm" href="../index.html#/n/hiql">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>从无奖励的离线数据里学“到达任意目标”的策略时，远处目标的价值函数估计噪声很大：离目标很远时，一步动作带来的价值差异微乎其微，被估计误差淹没，策略不知道该往哪走。</p></div><div><h4>方法</h4><p>只学一个与动作无关的目标条件价值函数 <code>V(s,g)</code>，却从中抽取两层策略：高层策略把“状态”当动作，预测一个约k步之后的子目标（的隐表示）；低层策略学怎样到达这个近处的子目标。近处目标的价值差异大，信号清晰。</p></div><div><h4>影响</h4><p>在离线目标条件RL基准上（包括长程迷宫和像素观测任务）大幅超过以往方法，成为该方向的标准强基线，也是OGBench中的参考算法之一。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p>目标条件RL（<a class="ln" href="../n/uvfa.html">通用值函数近似UVFA</a>、<a class="ln" href="../n/her.html">后见经验回放HER</a>）可以看成RL里的自监督学习：任何轨迹中后来到达的状态都可以当作目标，不需要奖励标注。离线设定下，<a class="ln" href="../n/iql.html">隐式Q学习IQL</a>式的期望分位数回归能稳定地学价值函数，但在长程任务中，<code>V(s,g)</code> 对于远处目标的值几乎是平的：向任何方向走一步，价值都只变化一点点，而估计误差可能比这还大，从价值中提取的策略就会乱走。分层RL（如<a class="ln" href="../n/hiro.html">HIRO离策略分层RL</a>）早有“先定子目标再执行”的思路，但通常需要在线交互和复杂的两层训练。</p><h2>方法</h2><p><b>价值学习</b>：用IQL风格的期望分位数损失学一个动作无关的价值函数 <code>V(s, g)</code>，奖励为“未到达目标时每步−1”，目标从同一条轨迹中后来的状态采样。</p><p><b>两层策略提取</b>，都用优势加权回归（参考<a class="ln" href="../n/awr.html">AWR优势加权回归</a>）：</p><ul><li>高层策略 <code>π^h(s_{t+k} | s_t, g)</code>：把k步之后的状态当作“动作”，优势为 <code>A^h = V(s_{t+k}, g) − V(s_t, g)</code>，即选一个能让到目标的价值提高最多的子目标；</li><li>低层策略 <code>π^ℓ(a_t | s_t, s_{t+k})</code>：以子目标为目标，优势为 <code>A^ℓ = V(s_{t+1}, s_{t+k}) − V(s_t, s_{t+k})</code>。</li></ul><p>因为子目标只在k步之外，低层看到的价值差异比直接面对远处目标时大得多，信噪比更高。为了处理图像等高维观测，子目标不直接预测原始状态，而是预测价值网络内部学到的隐表示 <code>φ(s_{t+k})</code>，这个表示与价值函数一起训练，不需要额外的重构损失。</p><h2>结果</h2><p>摘要称，作者通过分析和教学性例子说明这种分层分解让方法对价值函数中的噪声更鲁棒；在离线目标到达基准上，HIQL能解决以往方法难以处理的长程任务，能扩展到高维图像观测，并且可以方便地利用无动作标签的数据。</p><h2>后来的发展</h2><p>HIQL成为离线目标条件RL的常用对照，同一作者的<a class="ln" href="../n/ogbench.html">OGBench离线目标RL基准</a>把它列为参考实现之一；“状态作为高层动作”的设计也影响了后续用离线数据学长程技能和子目标规划的工作。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>子目标间隔k是固定超参数，对不同任务的时间尺度需要重新调整。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>仍依赖单一价值函数的质量；在随机性强的环境里，按状态到达定义的目标价值可能有偏。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/her.html">后见经验回放HER</a><span class="yr">2017.07 · RL</span><div class=nt>目标从同一轨迹中后来到达的状态采样，即事后重标注的思想。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/iql.html">隐式Q学习IQL</a><span class="yr">2021.10 · RL</span><div class=nt>用IQL的期望分位数回归学动作无关的目标条件价值函数。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/uvfa.html">通用值函数近似UVFA</a><span class="yr">2015.07 · RL</span><div class=nt>在目标条件价值函数的基础上，增加子目标层来缓解远处目标的价值噪声。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:120" href="../n/hiro.html">HIRO离策略分层RL</a><span class="yr">2018.05 · RL</span><div class=nt>延续“高层出子目标、低层去到达”的分层结构，但完全离线、由同一个价值函数驱动两层。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/awr.html">AWR优势加权回归</a><span class="yr">2019.10 · RL</span><div class=nt>高层与低层策略都用优势加权回归从价值函数中提取。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:120" href="../n/ogbench.html">OGBench离线目标RL基准</a><span class="yr">2024.10 · RL</span><div class=nt>把HIQL作为参考实现之一。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/offline-rl.html">离线强化学习</a> <a class="chip c" href="../c/policy-value.html">策略与价值函数</a> <a class="chip c" href="../c/td-error.html">时序差分与自举</a> <a class="chip c" href="../c/feature-representation.html">特征与表示学习</a> <a class="chip c" href="../c/imitation-learning.html">模仿学习与行为克隆</a></p>
+<h2>本篇术语</h2><ul><li><b>目标条件RL</b>　策略和价值函数额外以“想到达的目标状态”为输入，一个模型可以完成到达任意目标的任务。</li><li><b>状态作为动作</b>　高层策略输出的不是底层控制动作，而是一个希望在若干步后到达的状态，供低层去实现。</li></ul>
+<h2>怎么学</h2><p>先熟悉<a class="ln" href="../n/iql.html">隐式Q学习IQL</a>和<a class="ln" href="../n/her.html">后见经验回放HER</a>；读原文第4节关于远处目标价值噪声的分析以及第5节两层策略的公式；在antmaze-large数据上对比单层的GCIQL与HIQL的成功率。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2307.11949" rel="noopener">https://arxiv.org/abs/2307.11949</a>（标题、作者（Park, Ghosh, Eysenbach, Levine）、arXiv v1于2023-07-22；摘要中目标条件RL作为利用无奖励数据的自监督方法、远处目标价值难以准确估计、到达远处目标需先经过近处子目标、一个无动作价值函数学两层策略、高层把状态当动作预测子目标的隐表示、对价值噪声鲁棒、离线目标到达基准上的效果。优势公式、IQL损失、子目标间隔k、NeurIPS 2023与机构按原文正文和通行引用。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20HIQL%E7%A6%BB%E7%BA%BF%E5%88%86%E5%B1%82%E7%9B%AE%E6%A0%87RL%EF%BC%88hiql%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Ahiql%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/hiql.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="decision-pretrained-transformer.html"><small>本分支上一个 · 2023.06</small><b>DPT决策预训练Transformer</b></a><a class="r" href="q-transformer.html"><small>本分支下一个 · 2023.09</small><b>Q-Transformer自回归Q函数</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "id": "clark-manning-coref",
+  "who": "Kevin Clark, Christopher D. Manning · 斯坦福大学",
+  "venue": "ACL 2016",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/P16-1061/"},
+    {"label": "同年EMNLP：强化学习提及排序", "url": "https://aclanthology.org/D16-1245/"}
+  ],
+  "aka": ["实体级分布式表示共指", "Entity-Level Distributed Representations", "簇排序", "Cluster Ranking", "Easy-first共指", "Clark & Manning 2016", "neuralcoref", "Stanford神经共指"],
+  "problem": "提及对和提及排序模型只看两个提及，容易出现实体层面的矛盾（“Bill Clinton—Clinton—she”被连成一串）；以往加入实体信息的做法只是少量手工的硬约束（如簇之间性别、数要一致）。",
+  "idea": "训练深度网络为“一对共指簇”构建分布式表示：先用神经网络得到每个提及对的表示，再在两簇的所有提及对上做池化得到簇对表示；测试时从每个提及自成一簇开始，用一个“容易的先合并”的簇排序过程逐步合并簇，并用学习到搜索（learning to search）的方式训练合并策略。",
+  "impact": "在CoNLL 2012英文与中文共指任务上取得当时最好成绩；同年作者在EMNLP用强化学习直接优化共指评测指标训练提及排序模型，两者组成的斯坦福神经共指系统被纳入Stanford CoreNLP，并在端到端神经共指出现前是最强的系统之一。",
+  "background": "[[durrett-klein-coref]]表明浅层词汇特征加提及排序已经很强，但每个提及的先行语独立选择，缺少实体层面的一致性。[[sieve-coref]]的多遍筛通过“先确定容易的、再处理难的”并共享簇属性取得了实体一致性，但依赖手写规则。Wiseman等（2015）开始用神经网络学习提及排序的特征组合。",
+  "method": "**提及对编码器**：对候选提及对(m, a)，把两个提及的词向量（中心词、首末词、周围词的平均等）、提及类型、距离、说话人等特征拼接，经多层前馈网络得到提及对表示 `r_m(a, m)`。它先作为提及排序模型预训练。\n\n**簇对编码器**：对两个簇 c_i、c_j，取它们之间所有提及对的表示，做最大池化和平均池化后拼接，得到簇对表示 `r_c(c_i, c_j)`；它刻画的是“这两个实体整体上是否匹配”，可以利用簇里所有提及的信息。\n\n**簇排序与easy-first**：测试时每个提及先各自成簇，按提及排序模型的分数从高到低依次考虑提及；对当前提及，簇排序模型决定把它所在的簇与某个前文簇合并，还是不合并。这样“容易的”决定先做，难的决定可以利用已合并簇的信息。\n\n**训练**：簇合并是一系列依赖前面决定的动作，作者用类似DAgger的学习到搜索方法：按当前策略跑出合并轨迹，在每一步用评测指标（如B³）的变化给出每个动作的代价，训练模型选择代价最小的动作。",
+  "results": "在CoNLL 2012共享任务的英文和中文数据上，该系统取得当时最好的成绩，相对此前最好系统都有提升（结论按一般了解写，具体CoNLL F1未在此引用）。",
+  "legacy": "斯坦福神经共指系统被集成进Stanford CoreNLP；同年的强化学习提及排序（D16-1245）展示了直接优化评测指标的方法。2017年[[e2e-coref]]去掉了外部提及检测和簇级推断，仅靠端到端的跨度表示和提及排序就超过了这些系统，此后的SpanBERT、高阶推断等工作又把“实体级信息”以迭代精化跨度表示的方式加了回来。",
+  "limits": [
+    {"text": "依赖外部的提及检测器给出候选提及，提及检测错误无法在共指模型中纠正。", "solved_by": ["e2e-coref"]},
+    {"text": "簇合并是贪心的逐步过程，训练依赖学习到搜索，计算和实现都较复杂。", "solved_by": ["e2e-coref"]}
+  ],
+  "relations": [
+    {"to": "durrett-klein-coref", "type": "solves", "note": "提及排序逐提及独立选择先行语；簇对表示与簇排序加入了实体层面的一致性。"},
+    {"to": "sieve-coref", "type": "extends", "note": "沿用多遍筛“容易的先做”和共享簇信息的思想，但用学习到的簇对表示代替手写规则。"},
+    {"to": "dagger", "type": "uses", "note": "用学习到搜索（DAgger类）的方法训练簇合并策略。"},
+    {"to": "ontonotes", "type": "uses", "note": "在基于OntoNotes的CoNLL 2012英文与中文数据上训练和评测。"}
+  ],
+  "prereq": ["mlp", "embedding", "imitation-learning", "clustering", "classification-metrics"],
+  "terms": [
+    {"t": "簇排序", "d": "不是给单个提及找先行语，而是判断两个已形成的共指簇是否应当合并。"},
+    {"t": "easy-first", "d": "先做模型最有把握的决定，再处理难的，让难的决定能利用已做决定的信息。"},
+    {"t": "学习到搜索", "d": "把结构预测看作一系列决策，按模型自己的决策轨迹收集训练数据并学习每一步的动作。"}
+  ],
+  "learn": "先读[[durrett-klein-coref]]与[[sieve-coref]] → 读本文第3–4节簇对编码与训练 → 动手：用Hugging Face的neuralcoref（或AllenNLP共指模型）分析几段新闻，统计实体链中的性别、数矛盾。",
+  "check": {"source": "https://aclanthology.org/P16-1061/", "confirmed": "ACL Anthology与原文PDF：标题Improving Coreference Resolution by Learning Entity-Level Distributed Representations、作者Clark与Manning（斯坦福）、ACL 2016（2016年8月）；正文：以往通过性别、数一致等硬约束特征引入实体信息，本文训练深度网络构建共指簇对的分布式表示，用大量学习到的连续特征捕捉实体信息，测试时从每个提及自成一簇开始逐步合并，并采用新的easy-first簇排序过程。同年EMNLP的Deep Reinforcement Learning for Mention-Ranking Coreference Models（D16-1245）元数据已核对。池化方式、学习到搜索训练、CoNLL 2012结果与CoreNLP集成凭一般了解。"}
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>在线LDA随机变分推断（2010） · AI脉络</title>
+<meta name="description" content="批量变分推断和Gibbs采样每次迭代都要扫一遍全部文档，面对几百万篇维基百科文章或持续到达的新闻流，训练一个主题模型要很久，甚至根本装不下。 把LDA的变分推断改写成随机优化：每次只读一小批文档，求出它们的局部变分参数，再沿“自然梯度”方向用逐渐减小的步长更新全局的主题参数，可以证明收敛到变分目标…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/online-lda.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="在线LDA随机变分推断（2010）">
+<meta property="og:description" content="批量变分推断和Gibbs采样每次迭代都要扫一遍全部文档，面对几百万篇维基百科文章或持续到达的新闻流，训练一个主题模型要很久，甚至根本装不下。 把LDA的变分推断改写成随机优化：每次只读一小批文档，求出它们的局部变分参数，再沿“自然梯度”方向用逐渐减小的步长更新全局的主题参数，可以证明收敛到变分目标…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/online-lda.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/online-lda">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 检索与文本挖掘</div>
+<h1>在线LDA随机变分推断</h1>
+<div class="full">Online Learning for Latent Dirichlet Allocation</div>
+<div class="meta"><span>2010.12</span><span>论文</span><span>延伸</span><span>NeurIPS 2010</span><span>Matthew D. Hoffman, David M. Blei, Francis Bach · 普林斯顿大学、INRIA</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://papers.nips.cc/paper_files/paper/2010/hash/71f6278d140af599e06ad9bf1ba03cb0-Abstract.html" rel="noopener">NeurIPS论文页 ↗</a><a class="btn sm" href="../index.html#/n/online-lda">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>批量变分推断和Gibbs采样每次迭代都要扫一遍全部文档，面对几百万篇维基百科文章或持续到达的新闻流，训练一个主题模型要很久，甚至根本装不下。</p></div><div><h4>方法</h4><p>把LDA的变分推断改写成随机优化：每次只读一小批文档，求出它们的局部变分参数，再沿“自然梯度”方向用逐渐减小的步长更新全局的主题参数，可以证明收敛到变分目标的局部最优。</p></div><div><h4>影响</h4><p>单遍扫描就在330万篇维基百科文章上拟合出100个主题，质量与批量变分推断相当甚至更好、耗时只是零头；这一算法成为gensim、scikit-learn中LDA的默认实现，并被推广为通用的随机变分推断（SVI）。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/lda.html">LDA主题模型</a>原论文用批量变分EM：E步为每篇文档优化局部变分参数（主题比例γ与词的主题分配φ），M步用所有文档的统计量更新全局的主题—词参数λ。<a class="ln" href="../n/collapsed-gibbs-lda.html">LDA折叠Gibbs采样</a>实现更简单，但同样需要反复遍历整个语料。到2010年，可用的文本规模（整个维基百科、新闻流）已经远远超出这些批量方法的承受能力。随机梯度下降在大规模机器学习中早已证明有效，但如何把它用于贝叶斯后验推断还不清楚。</p><h2>方法</h2><p>全局变分参数λ（每个主题对词表的狄利克雷参数）的批量更新是：<code>λ = η + Σ_d (文档d的期望词—主题计数)</code>。在线算法的第t步：</p><p>1. 从语料中取一篇（或一小批）文档d； 2. 固定λ，像批量算法的E步一样迭代求出该文档的局部参数γ_d与φ_d； 3. 假装整个语料由D篇与d相同的文档组成，计算中间估计 <code>λ̃ = η + D · (文档d的期望计数)</code>； 4. 用步长 <code>ρ_t = (τ_0 + t)^{−κ}</code> 混合：<code>λ ← (1 − ρ_t) λ + ρ_t λ̃</code>。</p><p>作者证明，<code>λ̃ − λ</code> 正是变分目标对λ的自然梯度的一个无偏随机估计，因此这实际上是随机自然梯度上升；当 <code>κ ∈ (0.5, 1]</code> 时满足Robbins-Monro条件，算法收敛到变分目标的局部最优。小批量与参数τ_0、κ控制早期更新的权重和遗忘速度。</p><h2>结果</h2><p>作者用单遍扫描在330万篇维基百科文章上拟合了100个主题的模型；在多个语料上，在线LDA找到的主题模型与批量变分推断一样好或更好（以留出困惑度衡量），而用时只是后者的一小部分（NeurIPS论文页摘要）。</p><h2>后来的发展</h2><p>Hoffman、Blei等人在2013年把这一思路推广为<a class="ln" href="../n/svi.html">随机变分推断SVI</a>随机变分推断，适用于一大类条件共轭的概率模型，包括<a class="ln" href="../n/hdp.html">HDP层次狄利克雷过程</a>。在线LDA被gensim的LdaModel与scikit-learn的LatentDirichletAllocation直接实现，是工业界训练大规模主题模型最常见的方式；随机变分推断也成为后来变分自编码器等深度生成模型训练的思想来源之一。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>仍只收敛到局部最优，结果对步长参数τ_0、κ和小批量大小敏感。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li><li>推导依赖条件共轭结构，不能直接用于非共轭的主题模型变体（如动态主题模型）。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:48" href="../n/sgd.html">随机梯度下降</a><span class="yr">1951 · 基础</span><div class=nt>沿用随机近似的步长条件（Robbins-Monro）保证收敛。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:48" href="../n/variational-inference.html">变分推断</a><span class="yr">1999 · 基础</span><div class=nt>把批量变分推断改造为随机自然梯度优化。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/lda.html">LDA主题模型</a><span class="yr">2003 · NLP</span><div class=nt>解决LDA批量推断无法扩展到海量和流式文档的问题。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/collapsed-gibbs-lda.html">LDA折叠Gibbs采样</a><span class="yr">2004.04 · NLP</span><div class=nt>Gibbs采样每轮要遍历所有词；在线变分推断单遍即可，更适合超大语料。</div></div></li></ul>
+
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/beta-dirichlet.html">Beta分布、狄利克雷分布与共轭先验</a> <a class="chip c" href="../c/elbo.html">变分推断与ELBO</a> <a class="chip c" href="../c/sgd-minibatch.html">随机梯度下降与小批量</a> <a class="chip c" href="../c/learning-rate.html">学习率与学习率调度</a> <a class="chip c" href="../c/latent-variable.html">隐变量模型</a> <a class="chip c" href="../c/fisher-information.html">费舍尔信息与Cramér–Rao下界</a></p>
+<h2>本篇术语</h2><ul><li><b>自然梯度</b>　按参数空间中概率分布的几何（费舍尔信息）修正过的梯度，对变分参数而言更新更稳定。</li><li><b>全局与局部变分参数</b>　全局参数是所有文档共享的主题词分布，局部参数是每篇文档自己的主题比例和词的主题分配。</li><li><b>Robbins-Monro条件</b>　步长之和发散而步长平方和收敛，保证随机近似算法收敛。</li></ul>
+<h2>怎么学</h2><p>先学<a class="ln" href="../n/lda.html">LDA主题模型</a>的变分推断 → 读论文第2–3节在线算法与收敛性 → 动手：用gensim的LdaModel在维基百科的一个子集上以不同的chunksize和decay参数训练，比较留出困惑度和耗时。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://papers.nips.cc/paper_files/paper/2010/hash/71f6278d140af599e06ad9bf1ba03cb0-Abstract.html" rel="noopener">https://papers.nips.cc/paper_files/paper/2010/hash/71f6278d140af599e06ad9bf1ba03cb0-Abstract.html</a>（NeurIPS论文页：标题Online Learning for Latent Dirichlet Allocation、2010年；摘要：为LDA开发在线变分贝叶斯算法，基于带自然梯度步的在线随机优化，证明收敛到VB目标的局部最优，可处理大规模及流式文档，单遍在330万篇维基百科文章上拟合100主题模型，所得主题模型与批量VB一样好或更好且只用一小部分时间。作者Hoffman、Blei、Bach与单位凭一般了解；更新公式与步长形式凭一般了解（与gensim实现一致）。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20%E5%9C%A8%E7%BA%BFLDA%E9%9A%8F%E6%9C%BA%E5%8F%98%E5%88%86%E6%8E%A8%E6%96%AD%EF%BC%88online-lda%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aonline-lda%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/online-lda.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="pdtb-parser.html"><small>本分支上一个 · 2010.11</small><b>PDTB式端到端篇章分析</b></a><a class="r" href="collobert-weston.html"><small>本分支下一个 · 2011</small><b>从零开始的神经NLP</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>MIRA翻译特征调参（2008） · AI脉络</title>
+<meta name="description" content="统计翻译系统的特征权重靠MERT调，而MERT只能可靠地优化十几到几十个权重；研究者想加入成百上千个句法、调序特征，却没有办法把它们的权重调好。 改用在线大间隔算法MIRA：每次取一句话，从解码器的候选中找出BLEU高的“好译文”和模型分高但BLEU低的“坏译文”，以最小改动把权重推向让好译文以足…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/chiang-mira.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MIRA翻译特征调参（2008）">
+<meta property="og:description" content="统计翻译系统的特征权重靠MERT调，而MERT只能可靠地优化十几到几十个权重；研究者想加入成百上千个句法、调序特征，却没有办法把它们的权重调好。 改用在线大间隔算法MIRA：每次取一句话，从解码器的候选中找出BLEU高的“好译文”和模型分高但BLEU低的“坏译文”，以最小改动把权重推向让好译文以足…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/chiang-mira.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/chiang-mira">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:24"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/nlp.html">语言与NLP（前Transformer）</a> › 规则与统计翻译</div>
+<h1>MIRA翻译特征调参</h1>
+<div class="full">Online Large-Margin Training of Syntactic and Structural Translation Features</div>
+<div class="meta"><span>2008.10</span><span>论文</span><span>延伸</span><span>EMNLP 2008</span><span>David Chiang, Yuval Marton, Philip Resnik · 南加州大学信息科学研究所、马里兰大学</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://aclanthology.org/D08-1024/" rel="noopener">ACL Anthology ↗</a><a class="btn sm" href="../index.html#/n/chiang-mira">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>统计翻译系统的特征权重靠MERT调，而MERT只能可靠地优化十几到几十个权重；研究者想加入成百上千个句法、调序特征，却没有办法把它们的权重调好。</p></div><div><h4>方法</h4><p>改用在线大间隔算法MIRA：每次取一句话，从解码器的候选中找出BLEU高的“好译文”和模型分高但BLEU低的“坏译文”，以最小改动把权重推向让好译文以足够间隔胜出，并做并行化。</p></div><div><h4>影响</h4><p>第一次在大规模翻译系统上演示了可与MERT持平或更好的大特征量调参，使“加入上千个稀疏特征”成为可行的研究方向；它也是之后PRO、批量MIRA等调参方法的直接比较对象。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/log-linear-smt.html">对数线性翻译模型</a>把翻译打分写成特征的加权和，权重由<a class="ln" href="../n/mert.html">最小错误率训练MERT</a>直接对BLEU做逐维线搜索来调。MERT在特征少时很好用，但特征一多就不稳定，经验上的上限在15到30个特征。Marton和Resnik曾给<a class="ln" href="../n/hiero.html">层次短语翻译Hiero</a>加了一批“软句法约束”特征（按候选推导与源端句法树是否一致来奖惩），就因为MERT调不动这么多权重而难以发挥作用。Watanabe等人2007年已尝试用MIRA调翻译特征。</p><h2>方法</h2><p>MIRA（Margin Infused Relaxed Algorithm）是在线的大间隔学习：对每个训练句子，从解码得到的候选集中选出若干“预言”译文（BLEU高的）和“对手”译文（模型分高而BLEU低的），求解</p><p><code>min_w ½‖w − w_old‖² + C·Σ ξ</code>  使得  <code>w·(h(e⁺) − h(e⁻)) ≥ ΔBLEU(e⁺, e⁻) − ξ</code></p><p>即权重改动尽量小，但让好译文比坏译文的模型分高出与它们BLEU差距相当的间隔。h是特征向量，C控制容忍度。</p><p>论文的工程改进有两点：用多个处理器并行跑解码与更新，再把各自的权重平均；更多地利用解码器的翻译森林来选候选，而不只是N-best列表。在此基础上，作者同时训练大量软句法约束特征，并提出一个新的结构调序（distortion）特征集，用来弥补Hiero不懂句法、不擅长调序的缺陷。</p><h2>结果</h2><p>在NIST 2006阿拉伯语—英语评测数据的子集上，MIRA在翻译质量和计算代价上都能追平或超过MERT；同时优化软句法约束与新调序特征共56个权重时，BLEU提高2.6点。</p><h2>后来的发展</h2><p>这项工作让大间隔在线学习成为翻译调参的一条主线：Chiang等人2009年用它训练了上万个稀疏特征；cdec等工具包内置了MIRA调参。由于实现复杂、与MERT架构差别大，2011年的<a class="ln" href="../n/pro-tuning.html">PRO排序式调参</a>提出用现成二分类器实现排序式调参，成为更易用的替代；之后又出现批量MIRA等简化版本。神经翻译端到端训练后，这类特征权重调参就不再需要了。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>实现复杂：需要改动解码器以输出森林或候选、并行同步权重，与MERT架构差别大，很少团队真正采用。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:24" href="../n/pro-tuning.html">PRO排序式调参</a></div></li><li>BLEU是语料级指标，按句子计算的近似BLEU作为间隔和挑选标准并不稳定，结果对预言译文的选择方式敏感。<div class="by">本站还没有记录针对它的后续工作（不代表没有人解决）</div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/structured-perceptron.html">结构化感知机</a><span class="yr">2002.07 · NLP</span><div class=nt>与结构化感知机同属在线判别训练，但更新幅度由间隔约束决定，而非固定步长。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:264" href="../n/bleu.html">BLEU</a><span class="yr">2002.07 · 数据·评测</span><div class=nt>用（近似的）BLEU差值定义好坏译文之间应有的间隔。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:24" href="../n/mert.html">最小错误率训练MERT</a><span class="yr">2003.07 · NLP</span><div class=nt>解决MERT只能调十几到几十个权重的问题，使上千个特征的权重也能训练。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/hiero.html">层次短语翻译Hiero</a><span class="yr">2005.06 · NLP</span><div class=nt>在Hiero层次短语系统上实验，并为其加入软句法约束和新的结构调序特征。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:24" href="../n/mstparser.html">MSTParser与MIRA</a><span class="yr">2005.06 · NLP</span><div class=nt>MIRA大间隔在线更新此前已在McDonald的依存分析器中证明有效，这里把它移植到翻译调参。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:24" href="../n/cdec.html">cdec翻译森林框架</a><span class="yr">2010.07 · NLP</span><div class=nt>沿着大规模稀疏特征训练的方向，从框架层面支持百万级特征的判别训练。</div></div></li><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:24" href="../n/pro-tuning.html">PRO排序式调参</a><span class="yr">2011.07 · NLP</span><div class=nt>两者都面向大特征量调参：MIRA是在线大间隔、实现复杂；PRO批量训练二分类器、几小时即可实现，实验中两者质量相当。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/loss-function.html">损失函数</a> <a class="chip c" href="../c/gradient-descent.html">梯度下降</a> <a class="chip c" href="../c/lagrange-duality.html">拉格朗日乘子、约束优化与对偶</a> <a class="chip c" href="../c/text-metrics.html">文本生成的自动指标</a> <a class="chip c" href="../c/feature-representation.html">特征与表示学习</a></p>
+<h2>本篇术语</h2><ul><li><b>MIRA</b>　一种在线大间隔算法：每次用最小的权重改动，使正确答案比错误答案的得分高出要求的间隔。</li><li><b>软句法约束</b>　不强制翻译推导服从源端句法树，而是按是否与句法成分一致给出奖励或惩罚的特征。</li><li><b>预言译文</b>　在候选中按BLEU挑出的“最好”译文，用作训练时的正例。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/mert.html">最小错误率训练MERT</a>理解对数线性模型调参 → 读本文第2–3节MIRA与并行化 → 动手：在一个只有两三个特征的玩具候选集上，分别用MERT式网格搜索和MIRA更新调权重，比较结果。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://aclanthology.org/D08-1024/" rel="noopener">https://aclanthology.org/D08-1024/</a>（ACL Anthology与原文PDF：标题、作者Chiang、Marton、Resnik（ISI与马里兰大学）、EMNLP 2008（2008年10月）；摘要与引言：MERT能可靠优化的权重有限（民间估计15到30个），基于Watanabe等用MIRA替代MERT，并行与利用更多解析森林后与MERT持平或更好，训练软句法约束并提出新的结构调序模型，共56个权重时在NIST 2006阿拉伯语—英语子集上提高2.6 BLEU。MIRA目标函数的具体形式凭一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20MIRA%E7%BF%BB%E8%AF%91%E7%89%B9%E5%BE%81%E8%B0%83%E5%8F%82%EF%BC%88chiang-mira%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Achiang-mira%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/chiang-mira.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="opinion-mining-survey.html"><small>本分支上一个 · 2008.07</small><b>观点挖掘与情感分析综述</b></a><a class="r" href="lattice-mbr.html"><small>本分支下一个 · 2008.10</small><b>词图MBR解码</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

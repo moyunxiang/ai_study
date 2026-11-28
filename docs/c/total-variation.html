@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>全变分与ROF去噪（Total Variation and ROF Denoising） · AI脉络</title>
+<meta name="description" content="图像的全变分是所有像素梯度大小之和，衡量图像有多“起伏”。把它作为正则项加进目标函数，会压平噪声造成的细碎起伏、却保留真实的边缘，是图像去噪、复原和重建中的经典先验。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/total-variation.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="全变分与ROF去噪（Total Variation and ROF Denoising）">
+<meta property="og:description" content="图像的全变分是所有像素梯度大小之和，衡量图像有多“起伏”。把它作为正则项加进目标函数，会压平噪声造成的细碎起伏、却保留真实的边缘，是图像去噪、复原和重建中的经典先验。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/total-variation.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/total-variation">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 视觉 · 进阶</div>
+<h1>全变分与ROF去噪</h1><div class="full">Total Variation and ROF Denoising</div>
+<p class="muted" style="font-size:13px">也叫：全变分　总变分　total variation　TV正则　TV regularization　TV损失　TV loss　total variation loss　全变分去噪　TV denoising　ROF模型　Rudin-Osher-Fatemi　各向异性全变分　anisotropic TV　阶梯效应　staircasing</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/total-variation">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>图像的全变分是所有像素梯度大小之和，衡量图像有多“起伏”。把它作为正则项加进目标函数，会压平噪声造成的细碎起伏、却保留真实的边缘，是图像去噪、复原和重建中的经典先验。</b></p>
+<p class="tags">先要会：<a class="chip c" href="norm.html">范数与距离</a> <a class="chip c" href="regularization.html">正则化与权重衰减</a></p>
+<p>去噪、去模糊、超分辨率、CT重建都是“病态”的逆问题：同一张观测图像可以由无数种原图产生，需要一个先验来挑出“像自然图像”的那个。最朴素的先验是“图像应该平滑”，但用梯度的<b>平方</b>做惩罚（L2，相当于高斯平滑）会把边缘也一起抹糊。<b>全变分（TV）</b>换成梯度的<b>绝对值</b>。</p><p><b>定义</b>。对二维图像u，</p><p class="formula"><code>TV(u) = Σ_{i,j} √((u_{i+1,j} − u_{i,j})² + (u_{i,j+1} − u_{i,j})²)</code></p><p>（各向同性TV）。把根号换成两个方向差值的绝对值之和，就是各向异性TV。它是梯度场的L1范数（见<a class="lc" href="../c/norm.html">范数与距离</a>）。</p><p><b>为什么能保边</b>。从一个暗区到一个亮区，不管是在一个像素内突变、还是在十个像素上缓慢过渡，总变分都一样（都等于亮度差）；而L2惩罚对突变的惩罚远大于缓变。所以TV不反对清晰的边缘，只反对大量细碎的上下起伏（噪声）。这与<a class="lc" href="../c/regularization.html">正则化与权重衰减</a>里L1正则偏好稀疏解是同一个原理：TV偏好<b>梯度稀疏</b>，即分段常数的图像。</p><p><b>ROF去噪模型</b>。Rudin、Osher和Fatemi在1992年提出：</p><p class="formula"><code>min_u ½‖u − f‖² + λ·TV(u)</code></p><p>f是带噪声的观测，λ控制平滑强度。它是一个凸问题（见<a class="lc" href="../c/convexity.html">凸函数与凸优化</a>），但TV项不可导，常用原始–对偶算法、分裂Bregman或近端方法求解（见<a class="lc" href="../c/subgradient.html">次梯度与不可导点</a>和<a class="lc" href="../c/lagrange-duality.html">拉格朗日乘子、约束优化与对偶</a>）。</p><p><b>它出现在哪里</b>。</p><ul><li>经典图像处理：去噪（与<a class="ln" href="../n/nlm.html">非局部均值去噪</a>、<a class="ln" href="../n/bm3d.html">BM3D去噪</a>并列的代表方法）、去模糊、图像修补、压缩感知MRI与低剂量CT重建。</li><li>深度学习中作为辅助损失：<a class="ln" href="../n/neural-style.html">神经风格迁移</a>等风格迁移方法加一项TV损失，抑制生成图像中的高频噪点；单目深度估计、光流和NeRF类方法用TV或类似的平滑项约束深度图、光流场或三维网格的平滑度，例如<a class="ln" href="../n/plenoxels.html">Plenoxels无网络辐射场</a>在体素网格上加TV正则（见<a class="lc" href="../c/3d-representation.html">三维表示：体素、点云、网格、隐式场</a>）。</li><li>与<a class="ln" href="../n/deep-image-prior.html">深度图像先验</a>对比：后者发现网络结构本身就是一种图像先验，可以不用手工设计的TV。</li></ul><p><b>缺点</b>。TV偏好分段常数，会把平滑渐变的区域变成一块块平台，叫“阶梯效应”；纹理细节也会被当作噪声抹掉。改进有高阶TV、总广义变分等。</p>
+<div class="example"><h4>例子</h4><p>一行像素(10, 10, 10, 50, 50, 50)，相邻差为(0, 0, 40, 0, 0)，TV = 40；改成缓慢过渡(10, 20, 30, 40, 50, 50)，TV同样是40。加了噪声的(10, 13, 9, 52, 48, 51)，差的绝对值为(3, 4, 43, 4, 3)，TV = 57。最小化TV会先消除那17的“额外起伏”，而保留40的那个台阶。用L2惩罚时，台阶的代价为40² = 1600，缓坡为4 × 10² = 400，于是L2会把台阶抹成缓坡。</p></div>
+<h2>容易误解的地方</h2><ul><li>λ选大了，图像变成卡通般的色块；选小了，噪声去不干净，通常需要按噪声水平调节。</li><li>作为深度学习的辅助损失时，TV损失的权重通常很小，否则会让输出过度平滑。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

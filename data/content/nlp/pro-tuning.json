@@ -1,0 +1,33 @@
+{
+  "id": "pro-tuning",
+  "who": "Mark Hopkins, Jonathan May · SDL Language Weaver",
+  "venue": "EMNLP 2011",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/D11-1125/"}
+  ],
+  "aka": ["PRO", "Pairwise Ranking Optimization", "成对排序优化", "Tuning as Ranking", "排序式调参", "Hopkins & May 2011"],
+  "problem": "MERT调不动几十个以上的特征，MIRA虽能处理上千个特征却实现复杂、与MERT架构差别很大，ACL 2010的翻译系统论文里有15篇用MERT、只有1篇用MIRA。",
+  "idea": "把调参看成排序问题：从每句的候选译文里随机抽样成对，按句级BLEU谁高谁低给每一对打标签，用两者特征向量之差训练一个现成的线性二分类器，分类器的权重就是翻译模型的权重。",
+  "impact": "PRO几个小时就能在已有的MERT框架上搭好，又能处理上千个特征，很快被Moses、cdec等工具包内置，与MERT、MIRA并列成为统计翻译的三种标准调参方法。",
+  "background": "对数线性翻译模型 `score(e) = w·h(e)` 的权重w决定了解码器偏好哪种译文。[[mert]]沿每个方向做精确线搜索直接优化BLEU，特征一多就不稳定、容易陷入差的局部最优；[[chiang-mira]]用在线大间隔学习能扩展到上千特征，但要改造解码器、做并行同步，复杂度很高，实际很少有人用。",
+  "method": "PRO借用排序学习里的“成对方法”（如[[ranksvm]]）：\n\n1. 用当前权重对开发集每个句子解码，得到N-best候选，并与之前各轮的候选合并；\n2. 对每个句子随机抽取Γ对候选 `(e_i, e_j)`，计算两者的句级BLEU差，只保留差值足够大的若干对（论文取差距最大的Ξ对，例如从5000对中留50对）；\n3. 对每一对生成训练样本：特征差 `h(e_i) − h(e_j)`，标签为“e_i 的BLEU更高”则为+1，否则为−1（同时加入反向样本）；\n4. 用任意线性二分类器（论文用最大熵/逻辑回归）训练，得到的权重向量即新的w，回到第1步迭代。\n\n直观上，分类器学的是“特征上的哪些差异预示着BLEU更高”，这正是我们要的翻译权重。因为只需要N-best列表和一个现成分类器，它可以直接挂在已有的MERT流程上。",
+  "results": "在短语式和句法式两类系统、多个语言对、大规模数据设定下，PRO与MERT、MIRA的翻译质量持平；在特征数增加到上千时，PRO仍能稳定训练，而MERT已经失效（论文摘要所述结论）。",
+  "legacy": "PRO成为统计翻译后期最常用的大特征调参方法之一，[[moses]]等系统都内置了它；后续研究发现它在特征极多时会出现BLEU偏短等偏差，并提出了批量MIRA等改进。这种“把结构化输出的调参改写成成对分类”的思路，与[[ranknet]]等排序学习方法一脉相承；后来神经翻译用端到端训练和[[mrt-nmt]]这类句级风险训练取代了单独的调参步骤。",
+  "limits": [
+    {"text": "抽样和筛选成对样本的超参数影响结果，句级BLEU噪声大，在特征很多时会出现译文偏短等系统性偏差。", "solved_by": []},
+    {"text": "仍然只调线性模型的权重，翻译模型、语言模型这些特征本身是固定的，无法端到端地学习表示。", "solved_by": ["mrt-nmt"]}
+  ],
+  "relations": [
+    {"to": "mert", "type": "solves", "note": "解决MERT无法扩展到几十个以上特征的问题，同时保留在MERT框架上即插即用的便利。"},
+    {"to": "chiang-mira", "type": "rivals", "note": "两者都面向大特征量调参：MIRA是在线大间隔、实现复杂；PRO批量训练二分类器、几小时即可实现，实验中两者质量相当。"},
+    {"to": "ranksvm", "type": "uses", "note": "沿用排序学习的成对方法：把“谁排在前面”转成特征差上的二分类。"},
+    {"to": "log-linear-smt", "type": "extends", "note": "仍在对数线性翻译模型的框架内，只改变权重的学习方式。"}
+  ],
+  "prereq": ["logistic-regression", "classification-metrics", "text-metrics", "feature-representation", "loss-function"],
+  "terms": [
+    {"t": "成对排序", "d": "不直接预测每个候选的得分，而是学习判断两个候选中哪个更好。"},
+    {"t": "句级BLEU", "d": "对单个句子算的平滑BLEU，用来比较同一句话的两个候选译文。"}
+  ],
+  "learn": "先读[[mert]]和[[ranksvm]] → 读本文第3节抽样与分类流程 → 动手：给一个开发集的N-best列表抽样成对，用scikit-learn的LogisticRegression训练特征差，再用学到的权重重新排序候选，看BLEU变化。",
+  "check": {"source": "https://aclanthology.org/D11-1125/", "confirmed": "ACL Anthology与原文PDF：标题Tuning as Ranking、作者Hopkins与May（SDL Language Weaver）、EMNLP 2011（2011年7月）；摘要与引言：基于成对排序方法、不受MERT只能处理少量参数的限制、可处理上千特征、比基于MIRA的方法容易实现、用现成线性二分类器、几小时内可搭在MERT框架上、与MERT和MIRA对比在短语式与句法式系统上质量持平；ACL 2010论文中15篇用MERT、1篇用MIRA。抽样参数Γ=5000、Ξ=50与最大熵分类器凭一般了解，未逐页核对。"}
+}

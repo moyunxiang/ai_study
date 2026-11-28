@@ -1,0 +1,35 @@
+{
+  "id": "linkbert",
+  "who": "Michihiro Yasunaga, Jure Leskovec, Percy Liang · 斯坦福大学",
+  "venue": "ACL 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2203.15827"},
+    {"label": "代码", "url": "https://github.com/michiyasunaga/LinkBERT"}
+  ],
+  "aka": ["LinkBERT", "BioLinkBERT", "文档链接预训练", "Document Relation Prediction", "DRP", "超链接预训练", "跨文档预训练"],
+  "problem": "BERT一类预训练每次只看单篇文档里的连续文本，学不到跨文档的知识；可很多问题（多跳问答）需要把分散在不同文档里的事实连起来，而网页的超链接、论文的引用恰恰标出了这种跨文档关系。",
+  "idea": "把语料看成以超链接或引用为边的文档图，构造输入时把有链接关系的两段文本放进同一个上下文窗口；除掩码语言模型外，再加一个新任务“文档关系预测”：判断第二段是同一文档的下一段、随机文档，还是被链接的文档。",
+  "impact": "简单地改变“哪些文本放在一起训练”，就让模型在多跳推理和少样本问答上明显变强（HotpotQA、TriviaQA约+5个点），生物医学版BioLinkBERT在BioASQ和USMLE上约+7个点，刷新了多项BioNLP纪录。",
+  "background": "[[bert]]的预训练输入是同一文档的连续片段，下一句预测（NSP）也只在单文档内判断。[[realm]]等检索增强模型在推理时检索其他文档，但预训练本身仍不建模文档间关系。生物医学领域的[[pubmedbert]]在PubMed摘要上从头预训练，同样一次只看一篇。而维基百科有大量超链接，PubMed论文有引用链接，这些链接往往连接了相互补充的知识，例如一篇讲“潮汐”，被链接的一篇讲“月球引力”。",
+  "method": "**文档图**：把语料中每篇文档当作节点，超链接（维基百科）或引用（PubMed）当作边。\n\n**构造输入**：每个训练样本由两段文本A、B组成，放在同一个上下文里。B有三种来源，各占约三分之一：\n- 连续：B是A在同一文档里的下一段；\n- 随机：B来自一篇随机文档；\n- 链接：B来自与A所在文档有链接关系的文档。\n\n**两个目标**：\n- 掩码语言模型：在A、B中随机遮词并预测，由于两段同在上下文中，模型可以借助被链接文档的信息来填空，从而学会跨文档的知识关联；\n- 文档关系预测（DRP）：用[CLS]表示对B属于“连续/随机/链接”三类做分类，迫使模型理解两段文本之间的关系。\n\n**两个领域**：在带超链接的维基百科上预训练通用版LinkBERT，在带引用链接的PubMed上预训练BioLinkBERT，规模与BERT、PubMedBERT对应，便于直接对比。",
+  "results": "通用领域：LinkBERT在多种下游任务上超过BERT，在多跳推理和少样本问答上尤其明显，HotpotQA和TriviaQA绝对提升约5个点。生物医学领域：BioLinkBERT在多项BioNLP任务上刷新纪录，BioASQ和USMLE绝对提升约7个点。",
+  "legacy": "同组随后的DRAGON把文本与知识图谱联合预训练，延续了“把结构化关系放进预训练”的思路；“把相关文档拼进同一上下文”的数据组织方式也在后来的大模型预训练中出现（例如按相关性而不是随机拼接文档以训练长上下文）。",
+  "limits": [
+    {"text": "依赖语料自带的超链接或引用；大部分网页文本没有可靠的链接结构，难以直接推广到通用预训练语料。", "solved_by": []},
+    {"text": "只验证了BERT规模的编码器；在大规模自回归模型上，跨文档拼接带来的收益是否仍然显著，论文未涉及。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "bert", "type": "extends", "note": "保留掩码语言模型，把单文档输入扩展为链接文档对，并用文档关系预测替换下一句预测。"},
+    {"to": "pubmedbert", "type": "extends", "note": "BioLinkBERT在同样的PubMed语料上加入引用链接，超过PubMedBERT等生物医学模型。"},
+    {"to": "realm", "type": "rivals", "note": "REALM在推理时检索文档来补充知识，LinkBERT在预训练时就把链接文档放进上下文。"},
+    {"to": "hotpotqa", "type": "uses", "note": "多跳问答HotpotQA是主要评测之一，提升约5个点。"},
+    {"to": "medqa", "type": "uses", "note": "生物医学版在USMLE题目（MedQA）上提升约7个点。"}
+  ],
+  "prereq": ["masked-modeling", "pretrain-finetune", "graph-basics", "special-tokens", "classification-metrics"],
+  "terms": [
+    {"t": "多跳推理", "d": "回答一个问题需要依次用到两条或更多事实，而这些事实分布在不同的文档里。"},
+    {"t": "文档关系预测", "d": "LinkBERT新增的预训练任务：判断两段文本是同一文档的上下文、随机配对，还是有超链接或引用关系。"}
+  ],
+  "learn": "先读[[bert]]的预训练输入与下一句预测；读本文第3节输入构造和文档关系预测；动手：从维基百科抽取若干带超链接的段落对，构造三类样本，看一个现成BERT在文档关系分类上能做到多少。",
+  "check": {"source": "https://arxiv.org/abs/2203.15827", "confirmed": "标题、3位作者、arXiv首次提交2022-03-29；摘要中BERT只建模单篇文档、利用文档之间的链接（如超链接）、把语料看成文档图并把链接文档放在同一上下文、两个联合自监督目标（掩码语言模型与新的文档关系预测）、通用领域（带超链接的维基百科）与生物医学领域（带引用链接的PubMed）都超过BERT、多跳推理与少样本问答（HotpotQA与TriviaQA绝对+5%）、BioLinkBERT在BioASQ和USMLE上+7%、开源LinkBERT与BioLinkBERT。三类样本各约三分之一、ACL 2022、后续DRAGON为对正文的一般了解。"}
+}

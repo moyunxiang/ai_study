@@ -1,0 +1,34 @@
+{
+  "id": "lexicalized-reordering",
+  "who": "Christoph Tillmann · IBM T.J. Watson研究中心",
+  "venue": "HLT-NAACL 2004（短文）",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/N04-4026/"},
+    {"label": "Koehn等2005（msd双向扩展）", "url": "https://aclanthology.org/2005.iwslt-1.8/"}
+  ],
+  "aka": ["词汇化调序模型", "Lexicalized Reordering Model", "Orientation Model", "方向模型", "MSD调序", "Monotone-Swap-Discontinuous", "Tillmann 2004", "msd-bidirectional-fe"],
+  "problem": "短语翻译系统里，短语之间的顺序只靠一个“跳得越远罚得越重”的距离惩罚和语言模型来决定，完全不看是哪个短语——可法语形容词、阿拉伯语动词该不该换位置，恰恰取决于具体的词。",
+  "idea": "为每个短语对单独统计它相对前一个短语的“方向”：顺接、与前一块互换，或跳开；训练时从词对齐语料里数出这些方向的频率，解码时把方向概率当作一个特征。",
+  "impact": "这种按短语对统计方向的调序模型被Koehn等人扩展成单调/互换/不连续三类、前后双向的版本，随后成为Moses的默认调序特征，几乎所有短语翻译系统都在用。",
+  "background": "[[phrase-smt]]把句子切成若干短语，各自翻译后再排列。排列的好坏当时主要靠两样东西：距离惩罚 `d = |起点_i − 终点_{i−1} − 1|`，以及目标语言模型。距离惩罚只鼓励“别乱动”，对“英语形容词要提前、阿拉伯语动词要后移”这类有规律的调序毫无帮助；语言模型只能看到目标端几个词，常常无法判断两块是否应该互换。",
+  "method": "Tillmann把翻译单元称为**块（block）**，即一个源短语与一个目标短语组成的对。对每个块b，统计它出现时与前一个块的相对位置o：\n\n- 右（R）：b 紧接在前一块之后，顺序不变；\n- 左（L）：b 与前一块互换了位置。\n\n训练时从词对齐的双语语料中抽取块，并数出 `count(b, o)`，得到方向概率 `p(o | b)`，对出现次数少的块做平滑。解码时句子从左到右切分成块，除了单调顺接外只允许相邻两块互换，每个决定的打分里加入 `log p(o | b)` 。\n\nKoehn等人在2005年IWSLT系统中把它推广为三种方向——**单调（monotone）、互换（swap）、不连续（discontinuous）**，并同时对“相对前一短语”和“相对后一短语”两个方向建模，这就是后来Moses里的“msd-bidirectional-fe”配置。",
+  "results": "在标准的阿拉伯语—英语翻译任务上，加入方向模型的系统优于两个对照：完全不调序的系统，以及只靠语言模型决定是否互换块的系统（原文摘要的结论；具体BLEU值未在此引用）。",
+  "legacy": "词汇化调序是短语翻译从“只会单调翻译”走向“能做局部调序”的关键特征，[[moses]]把它作为标准配置；它在MERT调参的对数线性框架里只是一个或几个特征，容易与其他特征组合。它解决不了长距离、结构性的调序（如德语动词放句末、中文定语从句前置），这推动了[[hiero]]层次短语模型和基于句法的翻译模型。",
+  "limits": [
+    {"text": "只描述相邻短语之间的相对方向，对跨越多个短语的长距离调序无能为力。", "solved_by": ["hiero"]},
+    {"text": "方向概率按具体短语对统计，低频短语的估计很稀疏，只能回退到整体平均。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "phrase-smt", "type": "solves", "note": "替换或补充短语翻译里只看距离的调序惩罚，让调序决定取决于具体的短语对。"},
+    {"to": "och-ney-alignment", "type": "uses", "note": "方向统计来自GIZA++一类工具产生的词对齐，从对齐中抽出块并判断相邻块的相对位置。"},
+    {"to": "itg", "type": "rivals", "note": "ITG用文法规则统一描述“顺接或倒置”两种组合；方向模型不引入文法，只在相邻块上做局部的方向判断，更易嵌入短语解码器。"},
+    {"to": "log-linear-smt", "type": "uses", "note": "方向概率作为对数线性模型里的一个特征，与翻译概率、语言模型一起加权。"}
+  ],
+  "prereq": ["word-alignment", "probability-basics", "mle", "language-model"],
+  "terms": [
+    {"t": "块（block）", "d": "Tillmann的叫法，一个源语言短语和它对应的目标语言短语组成的翻译单元。"},
+    {"t": "方向（orientation）", "d": "一个短语对相对于前一个短语对的位置关系：顺接、互换或跳开。"}
+  ],
+  "learn": "先读[[phrase-smt]]理解短语切分与距离惩罚 → 读本文第2–3节方向统计 → 动手：在一份小的词对齐语料上抽短语对，数出每个短语对的单调/互换/不连续次数。",
+  "check": {"source": "https://aclanthology.org/N04-4026/", "confirmed": "ACL Anthology与原文PDF：标题A Unigram Orientation Model for Statistical Machine Translation、作者Christoph Tillmann（IBM T.J. Watson）、HLT-NAACL 2004短文；摘要：翻译单元为块（无内部结构的短语对）、新的方向组件处理相邻块的互换、训练时统计块出现在前一块左侧或右侧的次数、在阿拉伯语—英语任务上优于不调序和只靠语言模型控制互换的两个对照。Koehn等2005 IWSLT系统描述（2005.iwslt-1.8）元数据已核对；三类方向与双向建模、Moses的msd-bidirectional-fe配置凭一般了解。"}
+}

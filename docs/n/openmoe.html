@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>OpenMoE与路由分析（2024） · AI脉络</title>
+<meta name="description" content="2023年MoE大模型（Switch、GLaM、Mixtral）要么闭源、要么只放权重，社区不知道训练细节，也不清楚路由器到底按什么把词分给专家。 从头训练并完全公开一系列解码器MoE模型（650M到34B参数，训练到超过1T词元），把数据、代码、中间检查点都开源，并深入分析路由行为，总结出三个现…">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/n/openmoe.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OpenMoE与路由分析（2024）">
+<meta property="og:description" content="2023年MoE大模型（Switch、GLaM、Mixtral）要么闭源、要么只放权重，社区不知道训练细节，也不清楚路由器到底按什么把词分给专家。 从头训练并完全公开一系列解码器MoE模型（650M到34B参数，训练到超过1T词元），把数据、代码、中间检查点都开源，并深入分析路由行为，总结出三个现…">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/n/openmoe.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/n/openmoe">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article class="hue" style="--h:0"><div class="narrow" style="margin:0 auto">
+<div class="article-head">
+<div class="eyebrow">语言与推理 › <a href="../t/llm.html">Transformer与大语言模型</a> › 混合专家</div>
+<h1>OpenMoE与路由分析</h1>
+<div class="full">OpenMoE: An Early Effort on Open Mixture-of-Experts Language Models</div>
+<div class="meta"><span>2024.01</span><span>论文</span><span>延伸</span><span>ICML 2024</span><span>Fuzhao Xue, Zian Zheng, Yao Fu, Jinjie Ni, Zangwei Zheng, Wangchunshu Zhou, Yang You · 新加坡国立大学、爱丁堡大学等</span><span class="rvb r0">待核对</span></div>
+<div class="acts"><a class="btn sm" href="https://arxiv.org/abs/2402.01739" rel="noopener">arXiv ↗</a><a class="btn sm" href="https://github.com/XueFuzhao/OpenMoE" rel="noopener">代码 ↗</a><a class="btn sm" href="../index.html#/n/openmoe">在交互版中打开（演化树、学习进度）</a></div>
+</div>
+<div class="gist"><div><h4>问题</h4><p>2023年MoE大模型（Switch、GLaM、Mixtral）要么闭源、要么只放权重，社区不知道训练细节，也不清楚路由器到底按什么把词分给专家。</p></div><div><h4>方法</h4><p>从头训练并完全公开一系列解码器MoE模型（650M到34B参数，训练到超过1T词元），把数据、代码、中间检查点都开源，并深入分析路由行为，总结出三个现象：专家分工与上下文无关、路由很早就定型、序列越靠后的词越容易被丢弃。</p></div><div><h4>影响</h4><p>给出第一批完全可复现的开源MoE语言模型，更重要的是揭示了“路由主要看词元ID而非上下文”和“容量限制导致靠后词元被丢弃”这两个缺陷，影响了后续MoE在路由设计和无丢弃训练上的选择。</p></div></div>
+<div class="prose">
+<h2>背景</h2><p><a class="ln" href="../n/sparse-moe.html">稀疏门控MoE层</a>和<a class="ln" href="../n/switch-transformer.html">稀疏MoE大模型</a>让每个词只激活少数专家，参数量与计算量脱钩。为了让各专家负载均衡、便于并行，常给每个专家设一个容量上限（容量因子），超出的词被直接丢弃、走残差跳过该层。<a class="ln" href="../n/st-moe.html">ST-MoE稳定训练</a>总结了稳定训练的技巧。但这些模型的路由器学到了什么、丢弃对下游任务影响多大，缺乏公开的系统研究。</p><h2>方法</h2><p><b>模型</b>：基于ST-MoE式的解码器架构，每隔若干层放一个MoE层，top-2路由；规模从OpenMoE-Base（650M）到8B、34B。训练早期混用<a class="ln" href="../n/ul2.html">UL2混合去噪</a>的去噪目标，后来改回标准语言建模；数据中代码比例较高。全部训练代码、数据配方与检查点开源。</p><p><b>路由分析的三个发现</b>：</p><ul><li>上下文无关的专家分工：同一个词元ID几乎总是被送往同样的专家，不管它处在什么上下文，路由更像一张按词查表的映射，而不是按语义分工；</li><li>早期路由学习：词元到专家的分配在预训练很早的阶段就确定下来，之后基本不变，后续训练难以纠正不理想的分工；</li><li>越靠后越容易丢：由于专家有容量上限，而语义相近的词会集中挤向同一专家，一个序列中位置越靠后的词越可能因为“满员”被丢弃。在多轮对话这种答案出现在序列后部的任务上，性能因此下降。</li></ul><p><b>建议</b>：作者据此讨论了改进方向，例如在指令数据上更早混入以免路由定型于预训练分布、减少或取消词元丢弃等。</p><h2>结果</h2><p>研究确认MoE语言模型在成本—效果上比稠密模型更有利；三个路由现象在不同规模的OpenMoE上都可观察到，丢弃问题导致多轮对话等序列后部任务的性能下降。</p><h2>后来的发展</h2><p>“路由主要按词元而非上下文”被后续可解释性与MoE分析工作反复验证；<a class="ln" href="../n/olmoe.html">OLMoE开放MoE</a>等后来的开放MoE普遍采用无丢弃（dropless）训练，<a class="ln" href="../n/deepseekmoe.html">DeepSeekMoE细粒度专家</a>等用细粒度与共享专家改进专家分工。</p>
+<h2 id="limits">局限与后续</h2><ul class="limits"><li>OpenMoE本身的效果不及同期的Mixtral等模型，部分原因在于训练数据偏重代码、训练目标中途切换等设计选择。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/olmoe.html">OLMoE开放MoE</a></div></li><li>论文提出了缓解路由缺陷的方向，但没有在大规模上验证修正后的设计。<div class="by">后来针对它的工作　<a class="chip hue" style="--h:0" href="../n/olmoe.html">OLMoE开放MoE</a> <a class="chip hue" style="--h:0" href="../n/deepseekmoe.html">DeepSeekMoE细粒度专家</a></div></li></ul>
+<h2 id="before">它建立在什么之上</h2><ul class="rels"><li><span class="ty rivals">竞争</span><div><a class="chip hue" style="--h:0" href="../n/mixtral.html">Mixtral 8x7B</a><span class="yr">2024.01 · LLM</span><div class=nt>同期的MoE语言模型；Mixtral只开放权重，OpenMoE开放全流程但效果较弱。</div></div></li><li><span class="ty extends">延续</span><div><a class="chip hue" style="--h:0" href="../n/switch-transformer.html">稀疏MoE大模型</a><span class="yr">2021.01 · LLM</span><div class=nt>沿用稀疏MoE与容量因子设计，在完全开源的解码器模型上分析其路由行为。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/st-moe.html">ST-MoE稳定训练</a><span class="yr">2022.02 · LLM</span><div class=nt>采用ST-MoE式的架构与稳定训练技巧。</div></div></li><li><span class="ty uses">使用</span><div><a class="chip hue" style="--h:0" href="../n/ul2.html">UL2混合去噪</a><span class="yr">2022.05 · LLM</span><div class=nt>训练早期混用UL2的去噪目标。</div></div></li></ul>
+<h2 id="after">后来的相关工作</h2><ul class="rels"><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/deepseekmoe.html">DeepSeekMoE细粒度专家</a><span class="yr">2024.01 · LLM</span><div class=nt>论文提出了缓解路由缺陷的方向，但没有在大规模上验证修正后的设计。</div></div></li><li><span class="ty solves">改进</span><div><a class="chip hue" style="--h:0" href="../n/olmoe.html">OLMoE开放MoE</a><span class="yr">2024.09 · LLM</span><div class=nt>OpenMoE本身的效果不及同期的Mixtral等模型，部分原因在于训练数据偏重代码、训练目标中途切换等设计选择。</div></div></li></ul>
+<p class="muted" style="font-size:13.5px">这些关系由AI模型整理。“改进”指后来的工作针对它的某个问题做了改进，不代表问题已经解决；“竞争”指同一问题的不同路线，不代表谁取代了谁。标有“已核对”的对照过原始来源，其余未逐条核对。</p>
+<h2>读懂它需要的概念</h2><p class="tags"><a class="chip c" href="../c/mixture-of-experts.html">混合专家</a> <a class="chip c" href="../c/params-flops.html">参数量、计算量与显存</a> <a class="chip c" href="../c/distributed-training.html">分布式训练：数据并行与模型并行</a> <a class="chip c" href="../c/language-model.html">语言模型</a> <a class="chip c" href="../c/tokenization.html">分词与token</a></p>
+<h2>本篇术语</h2><ul><li><b>容量因子</b>　每个专家一次最多处理的词元数（相对平均值的倍数）；超出容量的词元被丢弃，不经过该专家。</li><li><b>词元丢弃</b>　因为专家已满，某个词元在这一层不被任何专家处理，只通过残差连接直接传到下一层。</li></ul>
+<h2>怎么学</h2><p>先读<a class="ln" href="../n/switch-transformer.html">稀疏MoE大模型</a>的路由与容量因子；读本文第4节路由分析的三个发现；动手：在开源OpenMoE检查点上统计同一词元在不同句子中被送往的专家，看是否几乎不变。</p>
+</div>
+<div class="rv r0"><b>待核对</b>　这篇讲解由AI模型撰写，尚未对照原始来源独立核对。写作时记录的出处：<a href="https://arxiv.org/abs/2402.01739" rel="noopener">https://arxiv.org/abs/2402.01739</a>（标题、7位作者、arXiv首次提交2024-01-29；摘要中完全开源可复现的解码器MoE、650M到34B、训练超过1T词元、MoE比稠密更有利的成本效果、三个发现（上下文无关的分工、早期路由学习、越靠后越丢弃）、路由主要基于词元ID、分配在预训练早期确定、多轮对话中靠后的词更易被丢、提出缓解策略。ST-MoE架构与top-2、UL2目标、代码比例、ICML 2024与机构为对正文的一般了解。）</div>
+<p class="report"><a class="btn sm" href="https://github.com/moyunxiang/ai_study/issues/new?title=%5B%E7%BA%A0%E9%94%99%5D%20OpenMoE%E4%B8%8E%E8%B7%AF%E7%94%B1%E5%88%86%E6%9E%90%EF%BC%88openmoe%EF%BC%89&amp;body=%E8%8A%82%E7%82%B9%EF%BC%9Aopenmoe%0A%E9%A1%B5%E9%9D%A2%EF%BC%9Ahttps%3A//moyunxiang.com/ai_study/n/openmoe.html%0A%0A%E5%93%AA%E4%B8%80%E5%8F%A5%E6%9C%89%E9%97%AE%E9%A2%98%EF%BC%9A%0A%0A%E5%BA%94%E8%AF%A5%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%88%E6%9C%80%E5%A5%BD%E9%99%84%E4%B8%8A%E5%87%BA%E5%A4%84%E9%93%BE%E6%8E%A5%EF%BC%89%EF%BC%9A%0A" rel="noopener">报告错误</a>　发现事实错误或说得过头的地方，请告诉我们（跳转到GitHub，会预填这个节点的信息）。</p>
+<div class="pn"><a href="warm.html"><small>本分支上一个 · 2024.01</small><b>WARM权重平均奖励模型</b></a><a class="r" href="wrap.html"><small>本分支下一个 · 2024.01</small><b>WRAP网页改写预训练</b></a></div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

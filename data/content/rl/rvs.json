@@ -1,0 +1,33 @@
+{
+  "id": "rvs",
+  "who": "Scott Emmons, Benjamin Eysenbach, Ilya Kostrikov, Sergey Levine · UC Berkeley, Carnegie Mellon University",
+  "venue": "ICLR 2022",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2112.10751"}
+  ],
+  "problem": "Decision Transformer等工作显示，不用时序差分、只做“以回报或目标为条件的监督学习”就能做离线RL。但这种做法什么时候有效、哪些组件是必需的（Transformer？长上下文？），并不清楚。",
+  "idea": "把“通过监督学习做RL”（作者称为RvS）简化到最基本的形式：一个两层MLP，输入当前状态和条件（目标状态或期望平均回报），用最大似然预测数据中的动作。系统地比较条件信息、模型容量、正则化等因素。",
+  "impact": "表明简单的条件行为克隆在多个离线基准上就能与TD学习或Transformer序列建模方法相当，澄清了序列建模式离线RL成功的关键因素，并指出它在随机/低质量数据上的弱点。",
+  "background": "[[decision-transformer]]和[[trajectory-transformer]]把离线RL写成序列建模问题，用Transformer在轨迹上训练，以“期望回报”为条件生成动作，效果可与[[cql]]、[[iql]]等TD方法相比。更早的“倒置RL”（Upside-Down RL）和目标条件的行为克隆也是类似思路。这引出疑问：是Transformer、长上下文起了作用，还是“以结果为条件的模仿”本身就够了？",
+  "method": "RvS把策略写成 `π(a | s, ω)`，ω是条件变量，有两种：\n\n- **RvS-G**：ω是目标状态，训练时从同一条轨迹中当前状态之后的某个状态采样（事后重标注，见[[her]]）；\n- **RvS-R**：ω是从当前步起的平均奖励（未来回报除以剩余步数），测试时手动设为一个较高的值。\n\n训练目标就是条件最大似然：`max_π E_{(s,a,ω)∼D}[ log π(a | s, ω) ]`。网络是只有两层隐藏层的前馈网络（宽度约1024），不看历史，只看当前状态。作者在D4RL的Gym运动、Franka Kitchen、AntMaze以及GCSL等任务上做了大量消融：网络容量、dropout等正则、条件选目标还是回报、是否需要历史上下文等。",
+  "results": "摘要称：在所考察的每个环境套件中，用两层前馈MLP做简单的最大似然，就能与基于TD学习或Transformer序列建模、复杂得多的方法的最佳结果相竞争；仔细选择模型容量（例如通过正则化或结构）以及选择以什么信息为条件（目标还是回报）对性能至关重要；现有RvS方法在随机数据上相对较弱，并留下若干开放问题。",
+  "legacy": "RvS与同期分析共同说明：Decision Transformer类方法的效果大多来自“以结果为条件的模仿”，而非Transformer本身；它们无法像TD方法那样把不同轨迹的片段“拼接”起来，在需要拼接的AntMaze等任务上明显落后。后续工作因此提出结合价值函数的条件模仿、或改进的拼接方法。",
+  "limits": [
+    {"text": "以回报为条件的模仿不能把多条次优轨迹的片段拼接成更好的轨迹，在需要拼接的任务上明显落后于TD方法。", "solved_by": []},
+    {"text": "在随机或低质量数据上表现较弱，测试时设定的条件回报也需要手动选择。", "solved_by": []}
+  ],
+  "relations": [
+    {"to": "decision-transformer", "type": "rivals", "note": "去掉Transformer和历史上下文，只用两层MLP做条件行为克隆，性能与之相当，说明关键在于条件模仿本身。"},
+    {"to": "iql", "type": "rivals", "note": "与IQL、CQL等TD方法比较：RvS更简单，但在需要拼接的任务上落后。"},
+    {"to": "her", "type": "uses", "note": "目标条件版本用事后重标注从同一轨迹采样目标。"},
+    {"to": "d4rl", "type": "uses", "note": "在D4RL等离线基准上进行系统消融。"}
+  ],
+  "prereq": ["offline-rl", "imitation-learning", "mle", "mlp", "regularization"],
+  "terms": [
+    {"t": "RvS（RL via Supervised Learning）", "d": "通过以目标或回报为条件的监督学习来解决RL问题，不使用时序差分或价值函数。"},
+    {"t": "轨迹拼接（stitching）", "d": "把数据中不同轨迹的好片段组合成一条更好的新轨迹；TD方法能做到，纯条件模仿通常做不到。"}
+  ],
+  "learn": "先读[[decision-transformer]]；读原文第4节关键设计选择与第5节结果；在hopper-medium-replay上训练RvS-R，改变测试时的目标回报，观察实际回报的变化。",
+  "check": {"source": "https://arxiv.org/abs/2112.10751", "confirmed": "标题、作者（Emmons, Eysenbach, Kostrikov, Levine）、arXiv v1于2021-12-20；摘要中不用TD学习的监督学习可有效做离线RL、把其归结到基本要素、两层前馈MLP的最大似然与TD或Transformer序列建模方法的最好结果相当、模型容量与条件信息选择至关重要、命名RvS learning、在随机数据上较弱。RvS-G/RvS-R的定义、网络宽度、任务套件、ICLR 2022与机构按原文正文和通行引用。"},
+  "aka": ["RvS", "RvS-R", "RvS-G", "RL via Supervised Learning", "条件行为克隆", "Outcome-Conditioned BC"]
+}

@@ -1,0 +1,35 @@
+{
+  "id": "zhang-nivre",
+  "who": "Yue Zhang（张岳）, Joakim Nivre · 剑桥大学、乌普萨拉大学",
+  "venue": "ACL 2011（短文）",
+  "links": [
+    {"label": "ACL Anthology", "url": "https://aclanthology.org/P11-2033/"}
+  ],
+  "aka": ["ZPar依存分析", "丰富非局部特征", "Rich Non-local Features", "Zhang & Nivre 2011", "束搜索转移式依存分析", "arc-eager beam search", "ZN特征模板"],
+  "problem": "转移式依存分析速度快（线性时间），但早期用贪心解码、特征只看栈顶和缓冲区附近的几个词，准确率比图依存分析低；它“能用任意非局部特征”的优势没有被充分利用。",
+  "idea": "在束搜索加全局训练的arc-eager转移式分析器上，加入一批以前没人用过的非局部特征：中心词与修饰词之间的距离、中心词已有的左右修饰词个数（配价）、已建子树中更远的节点（如中心词的中心词、第二个最左/最右修饰词）及其依存标签集合。",
+  "impact": "Penn Treebank上的依存准确率从91.4%提高到92.9%，成为当时转移式分析的最好结果并与最强的图依存分析器比肩，中文树库上也显著刷新纪录；这套特征模板（常称ZN特征）和开源的ZPar分析器成为此后转移式分析的标准基线，直到神经网络特征出现。",
+  "background": "[[nivre-parser]]式的转移式分析用移进—归约动作逐步建树，[[maltparser]]（2006）用分类器贪心地选动作，速度快但一步错就无法挽回。Zhang与Clark（2008）、Huang与Sagae（2010）引入束搜索和[[structured-perceptron]]式的全局训练，缓解了错误传播。图依存方面，[[mstparser]]和[[koo-collins]]的高阶模型通过动态规划实现精确搜索，但特征被限制在小部件内。转移式分析的一个公认优势是：搜索时整棵部分树已经确定，特征可以随意查看任何已建结构。",
+  "method": "基础系统：arc-eager转移系统（动作SHIFT、LEFT-ARC、RIGHT-ARC、REDUCE），束宽64的束搜索，用带提前更新（early update）的平均感知机做全局训练。在原有的基线特征（栈顶词S0、缓冲区前几个词N0、N1、N2的词与词性及其组合）之上加入：\n\n- **距离**：S0与N0之间的词数，与两者的词和词性组合；\n- **配价**：S0、N0已有的左修饰词数与右修饰词数；\n- **单向扩展**：S0的中心词、S0中心词的中心词、S0和N0的最左/最右修饰词及第二最左/最右修饰词；\n- **标签集合**：S0、N0已有修饰词的依存标签集合（例如“已经有了一个宾语dobj”）。\n\n这些特征能表达“动词已有一个宾语，不太会再接第二个”或“修饰词离中心词太远”这类图分析一阶、二阶部件难以表达的约束，而计算代价只是多查几个已有节点。",
+  "results": "在标准Penn Treebank设定下，新特征把依存准确率（attachment score）从91.4%提高到92.9%，是当时转移式分析的最好结果，与整体最好结果相当；在中文树库（CTB）上也显著提升了最好水平（原文摘要）。",
+  "legacy": "ZPar及其特征模板被广泛用作转移式依存分析和联合分词—词性—句法分析的基础。[[chen-manning-parser]]（2014）用前馈神经网络从稠密嵌入中自动学习特征组合，正是为了替代这类人工设计的稀疏特征；之后[[stack-lstm-parser]]、[[kiperwasser-goldberg]]用LSTM编码整个栈和句子，不再需要手工非局部特征。",
+  "limits": [
+    {"text": "特征全靠人工设计，组合多达数十个模板，稀疏且难以迁移到新语言。", "solved_by": ["chen-manning-parser"]},
+    {"text": "束搜索仍是近似搜索，束宽越大越慢，且只能产生投射树。", "solved_by": ["kiperwasser-goldberg"]}
+  ],
+  "relations": [
+    {"to": "nivre-parser", "type": "extends", "note": "使用Nivre提出的arc-eager转移系统，并以束搜索代替贪心解码。"},
+    {"to": "maltparser", "type": "solves", "note": "MaltParser贪心转移式分析准确率低于图分析；束搜索加丰富非局部特征使转移式分析追平最好的图分析器。"},
+    {"to": "structured-perceptron", "type": "uses", "note": "用带提前更新的平均感知机对整个转移序列做全局训练。"},
+    {"to": "koo-collins", "type": "rivals", "note": "图依存分析靠高阶部件和精确动态规划；本文用转移式分析加任意非局部特征达到相当的准确率。"},
+    {"to": "mstparser", "type": "rivals", "note": "延续MaltParser与MSTParser之争：转移式线性时间、特征自由，图式全局精确搜索。"}
+  ],
+  "prereq": ["feature-representation", "tree-search", "dynamic-programming", "sequence-labeling"],
+  "terms": [
+    {"t": "arc-eager", "d": "一种转移系统：右弧在修饰词一入栈时就立即建立，并用REDUCE动作把已完成的词弹出栈。"},
+    {"t": "束搜索", "d": "每一步只保留得分最高的k个部分分析，在贪心和穷举之间折中。"},
+    {"t": "提前更新", "d": "训练时一旦正确的部分分析掉出束外就立刻停止并更新权重，避免在已无望的搜索上浪费计算。"}
+  ],
+  "learn": "先读[[nivre-parser]]理解转移系统 → 读本文表1的特征模板 → 动手：实现一个带束搜索的arc-eager分析器，先只用基线特征，再加距离与配价特征，比较UAS。",
+  "check": {"source": "https://aclanthology.org/P11-2033/", "confirmed": "ACL Anthology与原文PDF：标题Transition-based Dependency Parsing with Rich Non-local Features、作者Zhang（剑桥）与Nivre（乌普萨拉）、ACL 2011短文（2011年6月）；摘要：转移式分析通常用启发式解码但可容纳任意丰富的特征，更丰富的特征集在标准Penn Treebank设定下把依存准确率从91.4%提高到92.9%，为转移式分析最好结果并可比整体最好，中文树库上显著提升最好水平，分析器开源。束宽64、具体特征类别与ZPar名称凭一般了解。"}
+}

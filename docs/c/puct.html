@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111213">
+<title>PUCT：带先验的树搜索选择规则（PUCT: Prior-Guided Tree Search Selection） · AI脉络</title>
+<meta name="description" content="AlphaGo系列在蒙特卡洛树搜索中选择分支的公式：在UCT的“平均价值+探索奖励”之上，用策略网络给出的先验概率加权探索项，让搜索优先尝试网络认为有希望的走法。">
+<link rel="canonical" href="https://moyunxiang.com/ai_study/c/puct.html">
+<meta property="og:site_name" content="AI脉络">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PUCT：带先验的树搜索选择规则（PUCT: Prior-Guided Tree Search Selection）">
+<meta property="og:description" content="AlphaGo系列在蒙特卡洛树搜索中选择分支的公式：在UCT的“平均价值+探索奖励”之上，用策略网络给出的先验概率加权探索项，让搜索优先尝试网络认为有希望的走法。">
+<meta property="og:url" content="https://moyunxiang.com/ai_study/c/puct.html">
+<meta property="og:image" content="https://moyunxiang.com/ai_study/assets/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111213'/%3E%3Cpath d='M12 40h12c12 0 12-20 26-20M24 40c12 0 14 8 26 8' fill='none' stroke='%23E8E8E8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='20' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='50' cy='48' r='4.5' fill='%23E8E8E8'/%3E%3Ccircle cx='12' cy='40' r='4.5' fill='%23ECEDEE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/style.css?v=28d085c6">
+<script>try{var t=JSON.parse(localStorage.getItem('aimap.theme')||'""');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body class="static">
+<header class="top">
+  <a class="brand" href="../index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 15h5c4.5 0 4.5-8 9.5-8H21M8 15c4.5 0 5 3.5 9.5 3.5H21"/><circle cx="21" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="18.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="3" cy="15" r="1.7" fill="currentColor" stroke="none"/></svg><span>AI脉络</span></a>
+  <nav class="nav" aria-label="主导航"><a href="../start.html">开始学习</a><a href="../timeline.html">时间线</a><a href="../fields.html">领域地图</a><a href="../glossary.html">知识索引</a></nav>
+  <a class="btn sm go" href="../index.html#/c/puct">交互版</a>
+  <button class="tbtn" type="button" aria-label="切换深色和浅色外观" title="切换深色 / 浅色" onclick="(function(){var r=document.documentElement,t=r.dataset.theme,l=t==='light'||(t==='auto'&&matchMedia('(prefers-color-scheme: light)').matches),n=l?'':'light';if(n)r.dataset.theme=n;else delete r.dataset.theme;try{localStorage.setItem('aimap.theme',JSON.stringify(n))}catch(e){}})()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+</header>
+<main class="page">
+<article><div class="narrow" style="margin:0 auto">
+<div class="article-head"><div class="eyebrow"><a href="../glossary.html">知识索引</a> · 强化学习 · 进阶</div>
+<h1>PUCT：带先验的树搜索选择规则</h1><div class="full">PUCT: Prior-Guided Tree Search Selection</div>
+<p class="muted" style="font-size:13px">也叫：PUCT　PUCB　Predictor + UCT　带先验的UCT　c_puct　MCTS选择规则　AlphaZero搜索　访问次数策略　visit count policy　Dirichlet噪声　根节点噪声</p>
+<div class="acts"><a class="btn sm" href="../index.html#/c/puct">在交互版中打开（看它长在树上的哪里）</a></div></div>
+<div class="prose">
+<p class="lede"><b>AlphaGo系列在蒙特卡洛树搜索中选择分支的公式：在UCT的“平均价值+探索奖励”之上，用策略网络给出的先验概率加权探索项，让搜索优先尝试网络认为有希望的走法。</b></p>
+<p class="tags">先要会：<a class="chip c" href="tree-search.html">博弈树搜索：minimax与MCTS</a> <a class="chip c" href="ucb-optimism.html">上置信界与乐观原则</a> <a class="chip c" href="policy-value.html">策略与价值函数</a></p>
+<p><a class="ln" href="../n/mcts.html">蒙特卡洛树搜索UCT</a>的经典选择规则UCT在每个节点上对子节点用<a class="lc" href="../c/ucb-optimism.html">上置信界与乐观原则</a>：<code>Q + c·√(ln N / n)</code>。它对所有未充分尝试的走法一视同仁。围棋每步有两百多种合法走法，平均地探索每一种代价太大，而<a class="ln" href="../n/alphago.html">AlphaGo</a>已经有了一个能预测高手落子的策略网络。<b>PUCT</b>（Predictor + UCT）把这个预测作为先验，引导探索。</p><p><b>公式</b>。在节点s处，选择</p><p class="formula"><code>a* = argmax_a [ Q(s, a) + c_puct · P(s, a) · √(Σ_b N(s, b)) / (1 + N(s, a)) ]</code></p><ul><li>Q(s, a)：已经模拟过的平均价值（利用）；</li><li>P(s, a)：策略网络给出的先验概率；</li><li>N(s, a)：这个分支被访问的次数；分子是父节点的总访问次数；</li><li>c_puct：平衡利用和探索的常数。</li></ul><p>先验高、访问少的走法探索项大；随着N(s, a)增长，探索项按<code>1/(1+N)</code>衰减，最终由实际的Q决定。与UCB1相比，探索项随父节点访问数按平方根增长（而不是对数），并直接由先验加权。这类带先验的规则最早来自老虎机文献中的PUCB，<a class="ln" href="../n/alphago.html">AlphaGo</a>用了它的一个变体，<a class="ln" href="../n/alphago-zero.html">AlphaGo Zero</a>和<a class="ln" href="../n/alphazero.html">AlphaZero</a>沿用并简化。</p><p><b>搜索结果怎样变成训练目标</b>。搜索结束后，根节点各走法的访问次数N形成一个比原始策略更强的分布：<code>π(a) ∝ N(s, a)^{1/τ}</code>，τ是温度。策略网络被训练去拟合这个分布，价值网络去拟合对局结果，这就是“搜索作为策略改进算子”，见<a class="lc" href="../c/policy-iteration-concept.html">策略评估、策略迭代与价值迭代</a>和<a class="ln" href="../n/expert-iteration.html">专家迭代ExIt</a>。</p><p><b>后续变化</b>。<a class="ln" href="../n/muzero.html">MuZero</a>在c_puct上加入随访问数缓慢增长的对数项，并在学到的模型里搜索；为了在很少模拟次数下也保证策略改进，后续工作用基于Gumbel采样的选择规则替代根节点的PUCT。为增加探索，自我对弈时还会在根节点的先验上混入Dirichlet噪声。</p>
+<div class="example"><h4>例子</h4><p>某节点父访问数ΣN=100，c_puct=1.5。走法A：Q=0.55，P=0.10，N=40；走法B：Q=0.40，P=0.50，N=5。A的得分<code>0.55 + 1.5×0.10×10/41 ≈ 0.55 + 0.037 = 0.587</code>；B的得分<code>0.40 + 1.5×0.50×10/6 = 0.40 + 1.25 = 1.65</code>。尽管B目前平均价值较低，先验高且访问少，下一次模拟会选B。</p></div>
+<h2>容易误解的地方</h2><ul><li>PUCT的探索严重依赖先验：网络给某个好走法的概率接近0时，搜索可能很久都不去试它，这是AlphaGo类程序出现“盲点”的原因之一。</li><li>不同论文的Q值初始化（未访问节点用0、父节点价值还是损失值）差别很大，对小模拟次数下的表现影响明显。</li></ul>
+
+</div>
+<div class="rv r0"><b>待核对</b>　词条由AI模型撰写，未对照来源独立核对。</div>
+</div></article>
+<footer class="foot"><span>© Yunxiang (Kevin) Mo · <a href="../about.html">关于内容与纠错</a></span><span>讲解由AI模型撰写，除标注“来源已核对”的以外未逐条核对，引用前请以原文为准。</span></footer>
+</main>
+</body>
+</html>

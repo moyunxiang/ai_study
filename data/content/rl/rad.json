@@ -1,0 +1,35 @@
+{
+  "id": "rad",
+  "who": "Michael Laskin, Kimin Lee, Adam Stooke, Lerrel Pinto, Pieter Abbeel, Aravind Srinivas · UC Berkeley, New York University",
+  "venue": "NeurIPS 2020",
+  "links": [
+    {"label": "arXiv", "url": "https://arxiv.org/abs/2004.14990"},
+    {"label": "GitHub", "url": "https://www.github.com/MishaLaskin/rad"}
+  ],
+  "problem": "从像素学控制的RL有两个短板：样本效率低，对新环境泛化差。当时提升样本效率的主流做法是加自监督辅助损失（重构、对比学习），设计复杂。",
+  "idea": "不加任何辅助损失，只在RL训练时对输入观测做数据增强。作者系统比较了随机裁剪、平移、颜色抖动、遮挡、随机卷积等增强，并新提出随机平移和随机幅度缩放（用于低维状态）。",
+  "impact": "与同期的DrQ一起证明“数据增强本身就是视觉RL最有效的改进之一”，随机裁剪/平移从此成为像素RL的默认配置。",
+  "background": "[[curl]]在[[sac]]上加对比学习辅助损失，首次让像素输入的DMC任务接近状态输入的样本效率；更早的方法则依赖像素重构或世界模型。这些方法都把“学表示”当作额外的任务。在计算机视觉里，数据增强是监督学习和对比学习成功的关键成分，但在RL中几乎没有被单独研究过：增强会不会破坏价值估计？哪些增强有用？[[coinrun]]的实验也显示，随机遮挡等增强对RL泛化有帮助。",
+  "method": "RAD是一个即插即用模块：从回放池或滚动数据取出一批观测后，对每个观测独立施加随机增强，再像平常一样计算RL损失。以SAC为例，评论家损失变为\n\n`L = ( Q(aug(o), a) − r − γ V̄(aug(o′)) )²`\n\n演员损失同样在增强后的观测上计算。对PPO这类在线策略算法，增强同样作用在采集到的观测上。\n\n作者比较的增强包括：随机裁剪（从100×100裁到84×84）、新提出的随机平移（把图像放进更大的画布中随机位置）、灰度、颜色抖动、遮挡块（cutout）、翻转、旋转、随机卷积；对低维状态，新提出随机幅度缩放，即把状态向量乘以一个随机系数。结论是：空间类增强（裁剪、平移）对DMC最有效，颜色和纹理类增强在Procgen这类泛化任务上更有帮助。",
+  "results": "摘要称：随机平移、裁剪、颜色抖动、遮挡、随机卷积和幅度缩放等增强能让简单的RL算法在常见基准上超过复杂的最先进方法。RAD在像素输入的DeepMind Control Suite上和状态输入的OpenAI Gym上，在数据效率和最终性能两方面都创下新纪录，并在几个OpenAI ProcGen基准上显著改善了测试时的泛化。",
+  "legacy": "RAD与[[drq]]几乎同时发布，DrQ还额外对价值目标做多次增强取平均；后续的[[drq-v2]]、SPR等方法都把随机平移作为默认组件。数据增强也被系统地用于提升RL的泛化，例如在Procgen上自动选择增强的方法。",
+  "limits": [
+    {"text": "哪种增强有效强依赖任务：对DMC有效的裁剪在别的环境可能有害，需要人为挑选。", "solved_by": []},
+    {"text": "增强只提供了对小扰动的不变性，对大的视觉干扰（换背景、换纹理）仍然很脆弱。", "solved_by": ["dbc"]}
+  ],
+  "relations": [
+    {"to": "curl", "type": "rivals", "note": "CURL靠对比学习辅助损失学表示；RAD去掉辅助损失，只保留数据增强，性能反而更好。"},
+    {"to": "sac", "type": "uses", "note": "在像素控制任务上以SAC为底层算法加入增强。"},
+    {"to": "ppo", "type": "uses", "note": "在ProcGen泛化实验中以PPO为底层算法加入增强。"},
+    {"to": "coinrun", "type": "extends", "note": "CoinRun发现遮挡等增强能改善RL泛化；RAD把多种增强做了系统比较。"},
+    {"to": "drq", "type": "rivals", "note": "同期独立提出用图像增强改进RL；DrQ还对价值目标做增强平均，两者结论一致。"}
+  ],
+  "prereq": ["data-augmentation", "actor-critic", "conv-layer", "generalization", "image-tensor"],
+  "terms": [
+    {"t": "随机裁剪", "d": "从稍大的图像中随机截取一块固定大小的区域作为输入，相当于让画面随机平移。"},
+    {"t": "随机幅度缩放", "d": "把低维状态向量整体乘以一个随机系数，是作者为非图像输入设计的增强。"}
+  ],
+  "learn": "先了解[[sac]]和视觉里的数据增强；读原文第4节各增强的比较表；在cheetah_run上分别用无增强、裁剪、颜色抖动训练SAC，比较50万步时的回报。",
+  "check": {"source": "https://arxiv.org/abs/2004.14990", "confirmed": "标题、作者（Laskin, Kimin Lee, Stooke, Pinto, Abbeel, Srinivas）、arXiv v1于2020-04-30；摘要中视觉RL的数据效率与泛化两个短板、RAD即插即用、首次对像素与状态输入做广泛的增强研究、新增随机平移与随机幅度缩放、列出的各增强、DMC像素与Gym状态上的新纪录、ProcGen上的泛化改进。裁剪尺寸、损失写法、增强效果因任务而异、NeurIPS 2020与机构按原文正文和通行引用。"},
+  "aka": ["RAD", "Reinforcement Learning with Augmented Data", "数据增强RL", "随机裁剪RL", "random crop RL"]
+}
