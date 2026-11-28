@@ -4,6 +4,26 @@
   "body": "[[c:policy-gradient-concept]]给出的是方向，不是步长。步子太小学得慢；步子太大，策略可能一下子变坏，而同策略算法的下一批数据又由这个坏策略产生，很难再爬回来。参数空间里的小步也不等于策略的小变化：网络某处参数稍动，某个状态下的动作概率可能从0.5跳到0.99。信赖域方法把“步长”直接定义在策略分布上。\n\n**代理目标**（surrogate objective）。用旧策略π_old采的数据，估计新策略π_θ的好坏：\n\n`L(θ) = E_{(s,a)~π_old}[ (π_θ(a|s) / π_old(a|s)) · A^{π_old}(s, a) ]`\n\n比率`ρ = π_θ/π_old`是[[c:importance-sampling]]权重，A是旧策略下的优势（见[[c:actor-critic]]）。在θ=θ_old处，L与真实目标的差`J(π_θ) − J(π_old)`一阶相同，但只有新策略访问的状态分布与旧策略接近时它才准，见[[c:performance-difference-lemma]]和[[c:state-visitation]]。\n\n**单调改进**。[[cpi]]和[[trpo]]的理论给出了一个下界：`J(π_new) ≥ J(π_old) + L(π_new) − C·max_s KL(π_old ‖ π_new)`。只要每步在这个下界上有提升，真实回报就单调不降。\n\n**TRPO**。实践中把惩罚换成约束：最大化L，同时要求平均KL散度不超过δ（例如0.01）。用[[natural-pg]]的思路做二阶近似，以共轭梯度求解方向，再做线搜索确保约束满足，见[[c:kl-divergence]]。\n\n**PPO**。[[ppo]]用一阶方法近似同样的效果：`L^CLIP = E[min(ρ·A, clip(ρ, 1−ε, 1+ε)·A)]`，ε常取0.2。概率比离开[1−ε, 1+ε]后继续推动不再有收益，于是可以对同一批数据安全地做多轮小批量更新。另一个变体用自适应系数的KL惩罚。[[implementation-matters]]发现PPO的稳定性有相当一部分来自代码层面的其他技巧，而不只是裁剪。[[mpo]]则用EM式的方式实现类似的KL约束。",
   "example": "某动作优势A=+2，旧概率0.4。PPO取ε=0.2：新概率升到0.48时ρ=1.2，目标为2.4；再升到0.6，ρ=1.5，裁剪后目标仍为2.4，梯度为0，不再往上推。若A=−2且新概率降到0.2（ρ=0.5），裁剪项为`0.8×(−2) = −1.6`，未裁剪项为`0.5×(−2) = −1`，取较小的−1.6，梯度同样为0，不再继续压低。",
   "pitfalls": "- PPO的裁剪并不能保证KL真的小：多轮更新后KL仍可能失控，很多实现额外监控KL并提前停止该轮更新。\n- 代理目标里的优势是旧策略的优势，新旧策略差得越远越不准，所以“多用几轮旧数据”和“稳定”是此消彼长的。",
-  "needs": ["policy-gradient-concept", "kl-divergence", "actor-critic"],
-  "aka": ["信赖域", "trust region", "信赖域策略优化", "代理目标", "surrogate objective", "替代目标", "clipped surrogate objective", "裁剪代理目标", "PPO-clip", "PPO-penalty", "KL约束", "KL constraint", "单调改进", "monotonic improvement", "概率比", "probability ratio", "重要性比裁剪"]
+  "needs": [
+    "policy-gradient-concept",
+    "kl-divergence",
+    "actor-critic"
+  ],
+  "aka": [
+    "信赖域",
+    "trust region",
+    "信赖域策略优化",
+    "代理目标",
+    "surrogate objective",
+    "替代目标",
+    "clipped surrogate objective",
+    "裁剪代理目标",
+    "KL约束",
+    "KL constraint",
+    "单调改进",
+    "monotonic improvement",
+    "概率比",
+    "probability ratio",
+    "重要性比裁剪"
+  ]
 }
